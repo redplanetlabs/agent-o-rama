@@ -13,7 +13,7 @@ public interface AgentsTopology {
     return (AgentsTopology) AORHelpers.CREATE_AGENTS_TOPOLOGY.invoke(name, setup, topologies);
   }
 
-  AgentBuilder newAgent(String name);
+  AgentGraph newAgent(String name);
 
   void declareKeyValueStore(String name, Class keyClass, Class valClass);
   void declareDocumentStore(String name, Class keyClass, Class... keyValClasses);
@@ -23,7 +23,7 @@ public interface AgentsTopology {
   PState.Declaration declarePState(String name,  PState.Schema schema);
 
   // TODO: document how to make LLMs
-  void declareObject(Object o);
+  void declareAgentObject(Object o);
 
   StreamTopology getStreamTopology();
 

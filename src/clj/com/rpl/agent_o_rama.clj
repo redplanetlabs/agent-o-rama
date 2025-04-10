@@ -12,8 +12,7 @@
       (newAgent [this name]
         ;; TODO: return AgentBuilder
         )
-      (getStreamTopology [this]
-        stream-topology)
+      (getStreamTopology [this] stream-topology)
 
       ;; TODO: need methods for getting mirror agents, and will also need methods for invoking mirror agents
 
@@ -31,7 +30,7 @@
         (declare-pstate* stream-topology (symbol name) schema))
       (declarePState [this name ^PState$Schema schema]
         (.pstate stream-topology name schema))
-      (declareObject [this name o]
+      (declareAgentObject [this name o]
         (declare-object* setup (symbol name) o))
       (define [this]
         (when @defined?-vol
@@ -39,8 +38,13 @@
         (vreset defined?-vol true)
         ))))
 
+(defn underlying-stream-topology [^AgentTopology at]
+  (.getStreamTopology at))
+
 (defn define-agents! [^AgentTopology at]
   (.define at))
+
+;; TODO: all the declare methods
 
 (defn- parse-map-options
   [[arg1 & rest-args :as args]]
