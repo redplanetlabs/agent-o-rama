@@ -12,3 +12,9 @@ pom.xml.asc
 .lein-failures
 .nrepl-port
 .cpcache/
+/.apt_generated_tests/
+/.apt_generated/
+.classpath
+.factorypath
+.settings/
+.project
