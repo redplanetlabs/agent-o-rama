@@ -47,6 +47,10 @@
             )))
     ))
 
+(defprotocol AgentGraphInternal
+  (internal-add-node! [this node])
+  (agent-graph-state [this]))
+
 (defn- mk-agent-graph [name]
   (let [nodes-vol (volatile! [])]
     (reify-AgentGraph
@@ -56,16 +60,24 @@
                 (->AggNode name
                            (normalize-output-nodes outputNodesSpec)
                            aggNode))
-        this
-        ))))
+        this )
+      AgentGraphInternal
+      (internal-add-node! [this node]
+        (vswap! nodes-vol conj node)
+        this)
+      (agent-graph-state [this]
+        {:nodes @nodes-vol})
+      )))
 
 (defn agents-topology [name setup topologies]
   (let [stream-topology (stream-topology topologies (str "__agents-topology-" name))
-        defined?-vol (volatile! false)]
+        defined?-vol (volatile! false)
+        agents-vol (volatile! [])]
     (reify AgentsTopology
       (newAgent [this name]
-        ;; TODO: return AgentGraph
-        )
+        (let [ret (mk-agent-graph name)]
+          (vswap! agents-vol conj ret)
+          ret ))
       (getStreamTopology [this] stream-topology)
 
       ;; TODO: need methods for getting mirror agents, and will also need methods for invoking mirror agents
@@ -92,6 +104,7 @@
         (when @defined?-vol
           (throw (ex-info "Agents topology already defined" {})))
         (vreset defined?-vol true)
+        ;; TODO: <<<>>>> implement defining
         ))))
 
 (defn underlying-stream-topology [^AgentTopology at]
@@ -101,6 +114,26 @@
   (.define at))
 
 ;; TODO: all the declare methods
+
+(defn node* [^AgentGraph agent-graph name output-nodes-spec node-fn]
+  (internal-add-node! agent-graph
+    (->Node name (normalize-output-nodes outputNodesSpec) node-fn)))
+
+(defmacro node [agent-graph name output-nodes-spec & fn-body]
+  `(node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))
+
+(defn agg-start-node* [^AgentGraph agent-graph name output-nodes-spec node-fn]
+  (internal-add-node! agent-graph
+    (->AggStartNode name (normalize-output-nodes outputNodesSpec) node-fn)))
+
+(defmacro agg-start-node [agent-graph name output-nodes-spec & fn-body]
+  `(agg-start-node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))
+
+(defn agg-node* [^AgentGraph agent-graph name output-nodes-spec agg-node-impl]
+  (internal-add-node! agent-graph
+    (->AggNode name (normalize-output-nodes outputNodesSpec) agg-node-impl)))
+
+;; TODO: define agg-node macro that allows for many "on" declarations, one "on-any", and one "on-complete"
 
 (defn- parse-map-options
   [[arg1 & rest-args :as args]]
