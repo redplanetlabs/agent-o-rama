@@ -49,7 +49,7 @@
             )))
     ))
 
-(defn- mk-agent-graph [name]
+(defn- mk-agent-graph []
   (let [nodes-vol (volatile! {})]
     (reify-AgentGraph
       (aggNode [this name outputNodesSpec aggNode]
@@ -72,11 +72,13 @@
 (defn agents-topology [name setup topologies]
   (let [stream-topology (stream-topology topologies (str "__agents-topology-" name))
         defined?-vol (volatile! false)
-        agents-vol (volatile! [])]
+        agents-vol (volatile! {})]
     (reify AgentsTopology
       (newAgent [this name]
-        (let [ret (mk-agent-graph name)]
-          (vswap! agents-vol conj ret)
+        (when (contains? @agents-vol name)
+          (throw (ex-info "Agent already exists" {:name name})))
+        (let [ret (mk-agent-graph)]
+          (vswap! agents-vol assoc name ret)
           ret ))
       (getStreamTopology [this] stream-topology)
 
