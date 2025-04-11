@@ -23,7 +23,7 @@ public interface AggNode {
   }
 
   interface Impl {<% (dofor [i (range 0 (- MAX-ARITY 2))] (str %>
-    <%= (mk-agg-node-on-type-decl i) %> AggNode.Impl on(String name, RamaFunction<%= (+ i 2) %> <%= (mk-agg-node-on-type-arg-decl i) %> impl);<% )) %>
+    <%= (mk-agg-node-on-type-decl i) %> AggNode.Impl on(String name, RamaFunction<%= (+ i 2) %><%= (mk-agg-node-on-type-arg-decl i) %> impl);<% )) %>
     <T> AggNode.Impl onAny(RamaFunction3<AgentNode, T, List, T> impl);
     <T> AggNode.Impl onComplete(RamaVoidFunction2<AgentNode, T> impl);
   }

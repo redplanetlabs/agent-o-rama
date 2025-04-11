@@ -47,6 +47,7 @@
                 (normalize-output-nodes outputNodesSpec#)
                 (j/convert-void-jfn jfn#)))
             )))
+    ~@body
     ))
 
 (defn- mk-agent-graph []

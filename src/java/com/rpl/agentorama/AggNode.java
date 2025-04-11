@@ -42,13 +42,13 @@ public interface AggNode {
   }
 
   interface Impl {
-    <S> AggNode.Impl on(String name, RamaFunction2 <AgentNode,S,S> impl);
-    <S,T0> AggNode.Impl on(String name, RamaFunction3 <AgentNode,S,T0,S> impl);
-    <S,T0,T1> AggNode.Impl on(String name, RamaFunction4 <AgentNode,S,T0,T1,S> impl);
-    <S,T0,T1,T2> AggNode.Impl on(String name, RamaFunction5 <AgentNode,S,T0,T1,T2,S> impl);
-    <S,T0,T1,T2,T3> AggNode.Impl on(String name, RamaFunction6 <AgentNode,S,T0,T1,T2,T3,S> impl);
-    <S,T0,T1,T2,T3,T4> AggNode.Impl on(String name, RamaFunction7 <AgentNode,S,T0,T1,T2,T3,T4,S> impl);
-    <S,T0,T1,T2,T3,T4,T5> AggNode.Impl on(String name, RamaFunction8 <AgentNode,S,T0,T1,T2,T3,T4,T5,S> impl);
+    <S> AggNode.Impl on(String name, RamaFunction2<AgentNode,S,S> impl);
+    <S,T0> AggNode.Impl on(String name, RamaFunction3<AgentNode,S,T0,S> impl);
+    <S,T0,T1> AggNode.Impl on(String name, RamaFunction4<AgentNode,S,T0,T1,S> impl);
+    <S,T0,T1,T2> AggNode.Impl on(String name, RamaFunction5<AgentNode,S,T0,T1,T2,S> impl);
+    <S,T0,T1,T2,T3> AggNode.Impl on(String name, RamaFunction6<AgentNode,S,T0,T1,T2,T3,S> impl);
+    <S,T0,T1,T2,T3,T4> AggNode.Impl on(String name, RamaFunction7<AgentNode,S,T0,T1,T2,T3,T4,S> impl);
+    <S,T0,T1,T2,T3,T4,T5> AggNode.Impl on(String name, RamaFunction8<AgentNode,S,T0,T1,T2,T3,T4,T5,S> impl);
     <T> AggNode.Impl onAny(RamaFunction3<AgentNode, T, List, T> impl);
     <T> AggNode.Impl onComplete(RamaVoidFunction2<AgentNode, T> impl);
   }
