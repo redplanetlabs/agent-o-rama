@@ -17,6 +17,10 @@
                               {:spec spec :class (class spec)}))
         ))
 
+(defprotocol AgentGraphInternal
+  (internal-add-node! [this name node])
+  (agent-graph-state [this]))
+
 (defmacro reify-AgentGraph [& body]
   `(reify AgentGraph
     ~@(for [i (range 1 8)]
@@ -24,46 +28,42 @@
               osym (type-hinted Object 'outputNodesSpec#)
               jfn-sym (type-hinted (h/rama-void-function-class (inc i)) 'jfn#)]
           `(~'node [this# ~name-sym ~osym ~jfn-sym]
-            (vswap! ~'nodes-vol
-              conj
+            (internal-add-node!
+              this#
+              ~name-sym
               (->Node
-                name#
                 (normalize-output-nodes outputNodesSpec#)
                 (h/convert-void-jfn jfn#)))
-            this#
             )))
     ~@(for [i (range 1 8)]
         (let [name-sym (type-hinted String 'name#)
               osym (type-hinted Object 'outputNodesSpec#)
               jfn-sym (type-hinted (h/rama-void-function-class (inc i)) 'jfn#)]
           `(~'node [this# ~name-sym ~osym ~jfn-sym]
-            (vswap! ~'nodes-vol
-              conj
+            (internal-add-node!
+              this#
+              ~name-sym
               (->AggStartNode
-                name#
                 (normalize-output-nodes outputNodesSpec#)
                 (j/convert-void-jfn jfn#)))
-            this#
             )))
     ))
 
-(defprotocol AgentGraphInternal
-  (internal-add-node! [this node])
-  (agent-graph-state [this]))
-
 (defn- mk-agent-graph [name]
-  (let [nodes-vol (volatile! [])]
+  (let [nodes-vol (volatile! {})]
     (reify-AgentGraph
       (aggNode [this name outputNodesSpec aggNode]
-        (vswap! nodes-vol
-                conj
-                (->AggNode name
-                           (normalize-output-nodes outputNodesSpec)
-                           aggNode))
-        this )
+        (internal-add-node!
+          this#
+          name
+          (->AggNode
+            (normalize-output-nodes outputNodesSpec)
+            addNode)))
       AgentGraphInternal
-      (internal-add-node! [this node]
-        (vswap! nodes-vol conj node)
+      (internal-add-node! [this name node]
+        (when (contains? @nodes-vol name)
+          (throw (ex-info "Node already exists" {:name name})))
+        (vswap! nodes-vol assoc name node)
         this)
       (agent-graph-state [this]
         {:nodes @nodes-vol})
@@ -104,7 +104,15 @@
         (when @defined?-vol
           (throw (ex-info "Agents topology already defined" {})))
         (vreset defined?-vol true)
-        ;; TODO: <<<>>>> implement defining
+        ;; TODO: <<<>>>> implement
+        ;;  - make loom graph for each agent
+        ;;  - verify valid agg subgraphs (no edges outside of graph in internal nodes)
+        ;;  - create depots / stream topology impls
+        ;;    - depot per agent
+        ;;    - task global for out-of-band events
+        ;;    - tick dpeot per agent
+        ;;      - check active nodes for retries
+        ;;    - source subscription
         ))))
 
 (defn underlying-stream-topology [^AgentTopology at]
@@ -147,9 +155,3 @@
          ~@body
          (define-agents! ~agent-topology-sym)
          ))))
-
-;; TODO:
-;;  - should define API in Java and implement in Clojure
-;;    - convert RamaFunction to clojure function
-;;      - currently an internal method...
-;;      - just pull it out and remove the INativeOperation handling
