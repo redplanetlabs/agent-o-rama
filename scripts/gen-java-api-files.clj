@@ -31,6 +31,18 @@
           (str/join "," (concat pre-type-strs (mk-type-strs i) post-type-strs))
           ">"))))
 
+(defn mk-agg-node-on-type-decl
+  [i]
+  (str "<"
+       (str/join "," (concat ["S"] (mk-type-strs i)))
+       ">"))
+
+(defn mk-agg-node-on-type-arg-decl
+  [i]
+  (str "<"
+       (str/join "," (concat ["AgentNode" "S"] (mk-type-strs i) ["S"]))
+       ">"))
+
 (defn mk-type-args-decl
   ([i] (mk-type-args-decl [] i))
   ([pre-args i]

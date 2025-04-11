@@ -22,8 +22,8 @@
   (agent-graph-state [this]))
 
 (defmacro reify-AgentGraph [& body]
-  `(reify AgentGraph
-    ~@(for [i (range 1 8)]
+  `(reify ~'AgentGraph
+    ~@(for [i (range 1 h/MAX-ARITY)]
         (let [name-sym (type-hinted String 'name#)
               osym (type-hinted Object 'outputNodesSpec#)
               jfn-sym (type-hinted (h/rama-void-function-class (inc i)) 'jfn#)]
@@ -35,7 +35,7 @@
                 (normalize-output-nodes outputNodesSpec#)
                 (h/convert-void-jfn jfn#)))
             )))
-    ~@(for [i (range 1 8)]
+    ~@(for [i (range 1 h/MAX-ARITY)]
         (let [name-sym (type-hinted String 'name#)
               osym (type-hinted Object 'outputNodesSpec#)
               jfn-sym (type-hinted (h/rama-void-function-class (inc i)) 'jfn#)]
@@ -50,7 +50,8 @@
     ))
 
 (defn- mk-agent-graph []
-  (let [nodes-vol (volatile! {})]
+  (let [nodes-vol (volatile! {})
+        start-node-vol (volatile! nil)]
     (reify-AgentGraph
       (aggNode [this name outputNodesSpec aggNode]
         (internal-add-node!
@@ -61,12 +62,17 @@
             addNode)))
       AgentGraphInternal
       (internal-add-node! [this name node]
+        (when (or (nil? name) (= "" name))
+          (throw (ex-info "Node name cannot be nil or empty string" {:name name})))
         (when (contains? @nodes-vol name)
           (throw (ex-info "Node already exists" {:name name})))
+        (when (nil? @start-node-vol)
+          (vreset! start-node-vol name))
         (vswap! nodes-vol assoc name node)
         this)
       (agent-graph-state [this]
-        {:nodes @nodes-vol})
+        {:nodes @nodes-vol
+         :start-node @start-node-vol})
       )))
 
 (defn agents-topology [name setup topologies]
