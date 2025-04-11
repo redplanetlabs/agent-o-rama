@@ -5,8 +5,6 @@ import com.rpl.rama.PState;
 import com.rpl.rama.RamaModule.*;
 import com.rpl.rama.module.*;
 
-import clojure.lang.IFn;
-
 public interface AgentsTopology {
 
   public static AgentsTopology create(String name, Setup setup, Topologies topologies) {
@@ -24,6 +22,8 @@ public interface AgentsTopology {
 
   // TODO: document how to make LLMs
   void declareAgentObject(Object o);
+
+  // TODO: need method for declaring mirror agents
 
   StreamTopology getStreamTopology();
 

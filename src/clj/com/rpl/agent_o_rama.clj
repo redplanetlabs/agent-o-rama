@@ -1,20 +1,76 @@
 (ns com.rpl.agent-o-rama
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
-  (:require [loom.graph :as graph])
-  (:import [com.rpl.agentorama AgentsTopology]
+  (:require [com.rpl.agent-o-rama.helpers :as h]
+            [loom.graph :as graph])
+  (:import [com.rpl.agentorama AgentsTopology AgentGraph]
            [com.rpl.rama PState$Schema]))
+
+(defrecord Node [name output-nodes node-fn])
+(defrecord AggStartNode [name output-nodes node-fn])
+(defrecord AggNode [name output-nodes agg-node])
+
+(defn- normalize-output-nodes [spec]
+  (cond (string? spec) [spec]
+        (collection? spec) (set spec)
+        :else (throw (ex-info "Invalid output nodes spec"
+                              {:spec spec :class (class spec)}))
+        ))
+
+(defmacro reify-AgentGraph [& body]
+  `(reify AgentGraph
+    ~@(for [i (range 1 8)]
+        (let [name-sym (type-hinted String 'name#)
+              osym (type-hinted Object 'outputNodesSpec#)
+              jfn-sym (type-hinted (h/rama-void-function-class (inc i)) 'jfn#)]
+          `(~'node [this# ~name-sym ~osym ~jfn-sym]
+            (vswap! ~'nodes-vol
+              conj
+              (->Node
+                name#
+                (normalize-output-nodes outputNodesSpec#)
+                (h/convert-void-jfn jfn#)))
+            this#
+            )))
+    ~@(for [i (range 1 8)]
+        (let [name-sym (type-hinted String 'name#)
+              osym (type-hinted Object 'outputNodesSpec#)
+              jfn-sym (type-hinted (h/rama-void-function-class (inc i)) 'jfn#)]
+          `(~'node [this# ~name-sym ~osym ~jfn-sym]
+            (vswap! ~'nodes-vol
+              conj
+              (->AggStartNode
+                name#
+                (normalize-output-nodes outputNodesSpec#)
+                (j/convert-void-jfn jfn#)))
+            this#
+            )))
+    ))
+
+(defn- mk-agent-graph [name]
+  (let [nodes-vol (volatile! [])]
+    (reify-AgentGraph
+      (aggNode [this name outputNodesSpec aggNode]
+        (vswap! nodes-vol
+                conj
+                (->AggNode name
+                           (normalize-output-nodes outputNodesSpec)
+                           aggNode))
+        this
+        ))))
 
 (defn agents-topology [name setup topologies]
   (let [stream-topology (stream-topology topologies (str "__agents-topology-" name))
         defined?-vol (volatile! false)]
     (reify AgentsTopology
       (newAgent [this name]
-        ;; TODO: return AgentBuilder
+        ;; TODO: return AgentGraph
         )
       (getStreamTopology [this] stream-topology)
 
       ;; TODO: need methods for getting mirror agents, and will also need methods for invoking mirror agents
+      ;;    - should invoking a mirror agent be a node, or should it just be an invoke?
+      ;;      - feels like an invoke
 
       (declareKeyValueStore [this name key-class val-class]
         (declare-pstate* stream-topology (symbol name) {key-class val-class}))
