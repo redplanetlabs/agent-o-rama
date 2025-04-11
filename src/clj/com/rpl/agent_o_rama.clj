@@ -143,7 +143,25 @@
   (internal-add-node! agent-graph
     (->AggNode name (normalize-output-nodes outputNodesSpec) agg-node-impl)))
 
+(defmacro agg-node-object [& body]
+  ;; TODO: <<<<>>>>
+  ;;  - sequence of forms beginning with "on', "on-any", or "on-complete"
+  ;;  - last one must be on-complete
+  ;;  - AggNode needs static versions of all its methods that then switch into Impl
+  ;;    - this code should invoke internal versions of those methods to build up the internal state
+  ;;    - should either be many on and one on-complete, or one on-any and one on-complete
+  )
+
+(defmacro agg-node [agent-graph name output-nodes-spec & body]
+  (agg-node* ~agent-graph ~name ~output-nodes-spec (agg-node-object ~@body)))
+
+
 ;; TODO: define agg-node macro that allows for many "on" declarations, one "on-any", and one "on-complete"
+; (agg-node "agg" "report"
+;   (on "result" [node agg-state llm-result]
+;     (conj agg-state llm-result))
+;   (on-complete [node agg-state]
+;     (agent-result! node "report" (invoke-model "*model" ["prompt" agg-state]))))
 
 (defn- parse-map-options
   [[arg1 & rest-args :as args]]
