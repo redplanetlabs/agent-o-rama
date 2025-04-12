@@ -4,12 +4,12 @@
             [loom.graph :as graph])
   (:import [com.rpl.agentorama AgentGraph AggNode AggNode$Impl]))
 
-(defrecord Node [name output-nodes node-fn])
-(defrecord NodeAggStart [name output-nodes node-fn])
-(defrecord NodeAgg [name output-nodes agg-node])
+(defrecord Node [output-nodes node-fn])
+(defrecord NodeAggStart [output-nodes node-fn])
+(defrecord NodeAgg [output-nodes agg-node])
 
 (defprotocol AgentGraphInternal
-  (internal-add-node! [this name node])
+  (internal-add-node! [this name output-nodes-spec node])
   (agent-graph-state [this]))
 
 (defprotocol AggNodeInternal
@@ -91,17 +91,12 @@
        ~ret-sym
        )))
 
-(defn normalize-output-nodes [spec]
-  (cond (string? spec) [spec]
-        (coll? spec) (set spec)
-        :else (throw (ex-info "Invalid output nodes spec"
-                              {:spec spec :class (class spec)}))))
-
 (defn agg-node* [^AgentGraph agent-graph name output-nodes-spec agg-node-impl]
   (internal-add-node!
     agent-graph
     name
-    (->NodeAgg name (normalize-output-nodes output-nodes-spec) agg-node-impl)))
+    output-nodes-spec
+    (->NodeAgg agg-node-impl)))
 
 (defmacro reify-AgentGraph [& body]
   `(reify ~'AgentGraph
@@ -114,9 +109,8 @@
             (internal-add-node!
               this#
               ~name-sym
-              (->Node
-                (normalize-output-nodes ~osym)
-                (h/convert-void-jfn ~jfn-sym)))
+              ~osym
+              (->Node (h/convert-void-jfn ~jfn-sym)))
             )))
     ~@(for [i (range 1 h/MAX-ARITY)]
         (let [name-sym (h/type-hinted String 'name#)
@@ -127,12 +121,17 @@
             (internal-add-node!
               this#
               ~name-sym
-              (->NodeAggStart
-                (normalize-output-nodes ~osym)
-                (h/convert-void-jfn ~jfn-sym)))
+              ~osym
+              (->NodeAggStart (h/convert-void-jfn ~jfn-sym)))
             )))
     ~@body
     ))
+
+(defn- normalize-output-nodes [spec]
+  (cond (string? spec) [spec]
+        (coll? spec) (set spec)
+        :else (throw (ex-info "Invalid output nodes spec"
+                              {:spec spec :class (class spec)}))))
 
 (defn mk-agent-graph []
   (let [nodes-vol (volatile! {})
@@ -142,25 +141,35 @@
         (internal-add-node!
           this
           name
-          (->NodeAgg
-            (normalize-output-nodes outputNodesSpec)
-            aggNode)))
+          outputNodesSpec
+          (->NodeAgg aggNode)))
       AgentGraphInternal
-      (internal-add-node! [this name node]
+      (internal-add-node! [this name output-nodes-spec node]
         (when (or (nil? name) (= "" name))
           (throw (ex-info "Node name cannot be nil or empty string" {:name name})))
         (when (contains? @nodes-vol name)
           (throw (ex-info "Node already exists" {:name name})))
         (when (nil? @start-node-vol)
           (vreset! start-node-vol name))
-        (vswap! nodes-vol assoc name node)
+        (vswap! nodes-vol
+                assoc
+                name
+                {:node node
+                 :output-nodes (normalize-output-nodes output-nodes-spec)})
         this)
       (agent-graph-state [this]
         {:nodes @nodes-vol
          :start-node @start-node-vol})
       )))
 
-(defn define-agents! [stream-topology agent-infos]
+(defn nodes->graph [nodes]
+
+  )
+
+(defn- define-agent! [stream-topology {:keys [nodes start-node]}]
+  (let [graph (nodes->graph nodes)]
+
+
   ;; TODO: <<<<>>>> implement
   ;;  - make loom graph for each agent
   ;;  - verify valid agg subgraphs (no edges outside of graph in internal nodes)
@@ -170,4 +179,8 @@
   ;;    - tick dpeot per agent
   ;;      - check active nodes for retries
   ;;    - source subscription
-  )
+    ))
+
+(defn define-agents! [stream-topology agent-infos]
+  (doseq [agent-info agent-infos]
+    (define-agent! stream-topology agent-info)))

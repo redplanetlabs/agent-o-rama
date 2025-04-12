@@ -60,7 +60,8 @@
   (i/internal-add-node!
     agent-graph
     name
-    (i/->Node (i/normalize-output-nodes output-nodes-spec) node-fn)))
+    output-nodes-spec
+    (i/->Node node-fn)))
 
 (defmacro node [agent-graph name output-nodes-spec & fn-body]
   `(node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))
@@ -69,7 +70,8 @@
   (i/internal-add-node!
     agent-graph
     name
-    (i/->NodeAggStart (i/normalize-output-nodes output-nodes-spec) node-fn)))
+    output-nodes-spec
+    (i/->NodeAggStart node-fn)))
 
 (defmacro agg-start-node [agent-graph name output-nodes-spec & fn-body]
   `(agg-start-node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))
