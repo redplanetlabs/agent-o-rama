@@ -1,7 +1,8 @@
 (ns com.rpl.agent-o-rama.impl
   (:require [clojure.set :as set]
-            [com.rpl.agent-o-rama.helpers :as h])
-  (:import [com.rpl.agentorama AggNode]))
+            [com.rpl.agent-o-rama.helpers :as h]
+            [loom.graph :as graph])
+  (:import [com.rpl.agentorama AgentGraph AggNode]))
 
 (defrecord Node [name output-nodes node-fn])
 (defrecord AggStartNode [name output-nodes node-fn])
@@ -20,8 +21,8 @@
 (defmacro reify-AggNode [& body]
   `(reify ~'AggNode
     ~@(for [i (range 0 (- h/MAX-ARITY 2))]
-        (let [name-sym (type-hinted String 'name#)
-              jfn-sym (type-hinted (h/rama-function-class (+ i 2)) 'jfn#)]
+        (let [name-sym (h/type-hinted String 'name#)
+              jfn-sym (h/type-hinted (h/rama-function-class (+ i 2)) 'jfn#)]
           `(~'on [this# ~name-sym ~jfn-sym]
             (internal-add-handler!
               this#
@@ -88,3 +89,81 @@
             ))
        ~ret-sym
        )))
+
+(defn normalize-output-nodes [spec]
+  (cond (string? spec) [spec]
+        (collection? spec) (set spec)
+        :else (throw (ex-info "Invalid output nodes spec"
+                              {:spec spec :class (class spec)}))))
+
+(defn agg-node* [^AgentGraph agent-graph name output-nodes-spec agg-node-impl]
+  (internal-add-node!
+    agent-graph
+    (->AggNode name (normalize-output-nodes outputNodesSpec) agg-node-impl)))
+
+(defmacro reify-AgentGraph [& body]
+  `(reify ~'AgentGraph
+    ~@(for [i (range 1 h/MAX-ARITY)]
+        (let [name-sym (h/type-hinted String 'name#)
+              osym (h/type-hinted Object 'outputNodesSpec#)
+              jfn-sym (h/type-hinted (h/rama-void-function-class (inc i)) 'jfn#)]
+          `(~'node [this# ~name-sym ~osym ~jfn-sym]
+            (internal-add-node!
+              this#
+              ~name-sym
+              (->Node
+                (normalize-output-nodes outputNodesSpec#)
+                (h/convert-void-jfn jfn#)))
+            )))
+    ~@(for [i (range 1 h/MAX-ARITY)]
+        (let [name-sym (h/type-hinted String 'name#)
+              osym (h/type-hinted Object 'outputNodesSpec#)
+              jfn-sym (h/type-hinted (h/rama-void-function-class (inc i)) 'jfn#)]
+          `(~'node [this# ~name-sym ~osym ~jfn-sym]
+            (internal-add-node!
+              this#
+              ~name-sym
+              (->AggStartNode
+                (normalize-output-nodes outputNodesSpec#)
+                (h/convert-void-jfn jfn#)))
+            )))
+    ~@body
+    ))
+
+(defn mk-agent-graph []
+  (let [nodes-vol (volatile! {})
+        start-node-vol (volatile! nil)]
+    (reify-AgentGraph
+      (aggNode [this name outputNodesSpec aggNode]
+        (internal-add-node!
+          this#
+          name
+          (->AggNode
+            (normalize-output-nodes outputNodesSpec)
+            addNode)))
+      AgentGraphInternal
+      (internal-add-node! [this name node]
+        (when (or (nil? name) (= "" name))
+          (throw (ex-info "Node name cannot be nil or empty string" {:name name})))
+        (when (contains? @nodes-vol name)
+          (throw (ex-info "Node already exists" {:name name})))
+        (when (nil? @start-node-vol)
+          (vreset! start-node-vol name))
+        (vswap! nodes-vol assoc name node)
+        this)
+      (agent-graph-state [this]
+        {:nodes @nodes-vol
+         :start-node @start-node-vol})
+      )))
+
+(defn define-agents! [stream-topology agent-infos]
+  ;; TODO: <<<<>>>> implement
+  ;;  - make loom graph for each agent
+  ;;  - verify valid agg subgraphs (no edges outside of graph in internal nodes)
+  ;;  - create depots / stream topology impls
+  ;;    - depot per agent
+  ;;    - task global for out-of-band events
+  ;;    - tick dpeot per agent
+  ;;      - check active nodes for retries
+  ;;    - source subscription
+  )
