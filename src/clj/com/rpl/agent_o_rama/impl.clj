@@ -3,6 +3,14 @@
             [com.rpl.agent-o-rama.helpers :as h])
   (:import [com.rpl.agentorama AggNode]))
 
+(defrecord Node [name output-nodes node-fn])
+(defrecord AggStartNode [name output-nodes node-fn])
+(defrecord AggNode [name output-nodes agg-node])
+
+(defprotocol AgentGraphInternal
+  (internal-add-node! [this name node])
+  (agent-graph-state [this]))
+
 (defprotocol AggNodeInternal
   (internal-add-handler! [this name afn])
   (internal-add-any-handler! [this afn])

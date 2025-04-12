@@ -2,24 +2,16 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require [com.rpl.agent-o-rama.helpers :as h]
+            [com.rpl.agent-o-rama.impl :as i]
             [loom.graph :as graph])
   (:import [com.rpl.agentorama AgentsTopology AgentGraph]
            [com.rpl.rama PState$Schema]))
-
-(defrecord Node [name output-nodes node-fn])
-(defrecord AggStartNode [name output-nodes node-fn])
-(defrecord AggNode [name output-nodes agg-node])
 
 (defn- normalize-output-nodes [spec]
   (cond (string? spec) [spec]
         (collection? spec) (set spec)
         :else (throw (ex-info "Invalid output nodes spec"
-                              {:spec spec :class (class spec)}))
-        ))
-
-(defprotocol AgentGraphInternal
-  (internal-add-node! [this name node])
-  (agent-graph-state [this]))
+                              {:spec spec :class (class spec)}))))
 
 (defmacro reify-AgentGraph [& body]
   `(reify ~'AgentGraph
@@ -28,10 +20,10 @@
               osym (type-hinted Object 'outputNodesSpec#)
               jfn-sym (type-hinted (h/rama-void-function-class (inc i)) 'jfn#)]
           `(~'node [this# ~name-sym ~osym ~jfn-sym]
-            (internal-add-node!
+            (i/internal-add-node!
               this#
               ~name-sym
-              (->Node
+              (i/->Node
                 (normalize-output-nodes outputNodesSpec#)
                 (h/convert-void-jfn jfn#)))
             )))
@@ -40,10 +32,10 @@
               osym (type-hinted Object 'outputNodesSpec#)
               jfn-sym (type-hinted (h/rama-void-function-class (inc i)) 'jfn#)]
           `(~'node [this# ~name-sym ~osym ~jfn-sym]
-            (internal-add-node!
+            (i/internal-add-node!
               this#
               ~name-sym
-              (->AggStartNode
+              (i/->AggStartNode
                 (normalize-output-nodes outputNodesSpec#)
                 (j/convert-void-jfn jfn#)))
             )))
@@ -55,14 +47,14 @@
         start-node-vol (volatile! nil)]
     (reify-AgentGraph
       (aggNode [this name outputNodesSpec aggNode]
-        (internal-add-node!
+        (i/internal-add-node!
           this#
           name
-          (->AggNode
+          (i/->AggNode
             (normalize-output-nodes outputNodesSpec)
             addNode)))
-      AgentGraphInternal
-      (internal-add-node! [this name node]
+      i/AgentGraphInternal
+      (i/internal-add-node! [this name node]
         (when (or (nil? name) (= "" name))
           (throw (ex-info "Node name cannot be nil or empty string" {:name name})))
         (when (contains? @nodes-vol name)
@@ -133,22 +125,22 @@
 ;; TODO: all the declare methods
 
 (defn node* [^AgentGraph agent-graph name output-nodes-spec node-fn]
-  (internal-add-node! agent-graph
-    (->Node name (normalize-output-nodes outputNodesSpec) node-fn)))
+  (i/internal-add-node! agent-graph
+    (i/->Node name (normalize-output-nodes outputNodesSpec) node-fn)))
 
 (defmacro node [agent-graph name output-nodes-spec & fn-body]
   `(node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))
 
 (defn agg-start-node* [^AgentGraph agent-graph name output-nodes-spec node-fn]
-  (internal-add-node! agent-graph
-    (->AggStartNode name (normalize-output-nodes outputNodesSpec) node-fn)))
+  (i/internal-add-node! agent-graph
+    (i/->AggStartNode name (normalize-output-nodes outputNodesSpec) node-fn)))
 
 (defmacro agg-start-node [agent-graph name output-nodes-spec & fn-body]
   `(agg-start-node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))
 
 (defn- agg-node* [^AgentGraph agent-graph name output-nodes-spec agg-node-impl]
-  (internal-add-node! agent-graph
-    (->AggNode name (normalize-output-nodes outputNodesSpec) agg-node-impl)))
+  (i/internal-add-node! agent-graph
+    (i/->AggNode name (normalize-output-nodes outputNodesSpec) agg-node-impl)))
 
 (defmacro agg-node [agent-graph name output-nodes-spec & body]
   `(agg-node* ~agent-graph ~name ~output-nodes-spec (i/agg-node-object ~@body)))
