@@ -22,6 +22,11 @@
   [i]
   (vec (for [j (range i)] (str "T" j))))
 
+(defn mk-void-function-types [i]
+  (if (= i 0)
+    ""
+    (str "<" (str/join "," (conj (mk-type-strs i))) ">")))
+
 (defn mk-full-type-decl
   ([i] (mk-full-type-decl [] i []))
   ([pre-type-strs i post-type-strs]
