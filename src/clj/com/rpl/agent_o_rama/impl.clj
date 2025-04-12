@@ -2,11 +2,11 @@
   (:require [clojure.set :as set]
             [com.rpl.agent-o-rama.helpers :as h]
             [loom.graph :as graph])
-  (:import [com.rpl.agentorama AgentGraph AggNode]))
+  (:import [com.rpl.agentorama AgentGraph AggNode AggNode$Impl]))
 
 (defrecord Node [name output-nodes node-fn])
-(defrecord AggStartNode [name output-nodes node-fn])
-(defrecord AggNode [name output-nodes agg-node])
+(defrecord NodeAggStart [name output-nodes node-fn])
+(defrecord NodeAgg [name output-nodes agg-node])
 
 (defprotocol AgentGraphInternal
   (internal-add-node! [this name node])
@@ -19,11 +19,12 @@
   (agg-node-state [this]))
 
 (defmacro reify-AggNode [& body]
-  `(reify ~'AggNode
+  `(reify ~'AggNode$Impl
     ~@(for [i (range 0 (- h/MAX-ARITY 2))]
         (let [name-sym (h/type-hinted String 'name#)
-              jfn-sym (h/type-hinted (h/rama-function-class (+ i 2)) 'jfn#)]
-          `(~'on [this# ~name-sym ~jfn-sym]
+              jfn-sym (h/type-hinted (h/rama-function-class (+ i 2)) 'jfn#)
+              on-sym (h/type-hinted AggNode$Impl 'on)]
+          `(~on-sym [this# ~name-sym ~jfn-sym]
             (internal-add-handler!
               this#
               ~name-sym
@@ -69,7 +70,7 @@
       ))
 
 (defmacro agg-node-object [& body]
-  (let [ret-sym (gen-sym "ret")]
+  (let [ret-sym (gensym "ret")]
     `(let [~ret-sym (mk-agg-node)]
       ~@(for [form body]
           (condp = (first form)
@@ -92,40 +93,43 @@
 
 (defn normalize-output-nodes [spec]
   (cond (string? spec) [spec]
-        (collection? spec) (set spec)
+        (coll? spec) (set spec)
         :else (throw (ex-info "Invalid output nodes spec"
                               {:spec spec :class (class spec)}))))
 
 (defn agg-node* [^AgentGraph agent-graph name output-nodes-spec agg-node-impl]
   (internal-add-node!
     agent-graph
-    (->AggNode name (normalize-output-nodes outputNodesSpec) agg-node-impl)))
+    name
+    (->NodeAgg name (normalize-output-nodes output-nodes-spec) agg-node-impl)))
 
 (defmacro reify-AgentGraph [& body]
   `(reify ~'AgentGraph
     ~@(for [i (range 1 h/MAX-ARITY)]
         (let [name-sym (h/type-hinted String 'name#)
               osym (h/type-hinted Object 'outputNodesSpec#)
-              jfn-sym (h/type-hinted (h/rama-void-function-class (inc i)) 'jfn#)]
-          `(~'node [this# ~name-sym ~osym ~jfn-sym]
+              jfn-sym (h/type-hinted (h/rama-void-function-class (inc i)) 'jfn#)
+              node-sym (h/type-hinted AgentGraph 'node)]
+          `(~node-sym [this# ~name-sym ~osym ~jfn-sym]
             (internal-add-node!
               this#
               ~name-sym
               (->Node
-                (normalize-output-nodes outputNodesSpec#)
-                (h/convert-void-jfn jfn#)))
+                (normalize-output-nodes ~osym)
+                (h/convert-void-jfn ~jfn-sym)))
             )))
     ~@(for [i (range 1 h/MAX-ARITY)]
         (let [name-sym (h/type-hinted String 'name#)
               osym (h/type-hinted Object 'outputNodesSpec#)
-              jfn-sym (h/type-hinted (h/rama-void-function-class (inc i)) 'jfn#)]
-          `(~'node [this# ~name-sym ~osym ~jfn-sym]
+              jfn-sym (h/type-hinted (h/rama-void-function-class (inc i)) 'jfn#)
+              agg-start-node-sym (h/type-hinted AgentGraph 'aggStartNode)]
+          `(~agg-start-node-sym [this# ~name-sym ~osym ~jfn-sym]
             (internal-add-node!
               this#
               ~name-sym
-              (->AggStartNode
-                (normalize-output-nodes outputNodesSpec#)
-                (h/convert-void-jfn jfn#)))
+              (->NodeAggStart
+                (normalize-output-nodes ~osym)
+                (h/convert-void-jfn ~jfn-sym)))
             )))
     ~@body
     ))
@@ -136,11 +140,11 @@
     (reify-AgentGraph
       (aggNode [this name outputNodesSpec aggNode]
         (internal-add-node!
-          this#
+          this
           name
-          (->AggNode
+          (->NodeAgg
             (normalize-output-nodes outputNodesSpec)
-            addNode)))
+            aggNode)))
       AgentGraphInternal
       (internal-add-node! [this name node]
         (when (or (nil? name) (= "" name))

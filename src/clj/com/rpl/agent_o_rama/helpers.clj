@@ -2,6 +2,11 @@
 
 (def MAX-ARITY 8)
 
+(defmacro dofor
+  "Shortcut for `doall` and `for`."
+  [& body]
+  `(doall (for ~@body)))
+
 (defn type-hinted
   [^Class class o]
   (with-meta o
@@ -42,7 +47,7 @@
 
 (defmacro mk-jfn-converter
   []
-  (let [arities (for [i (range jcommon/MAX-ARITY)]
+  (let [arities (for [i (range MAX-ARITY)]
                   (let [klass (rama-function-class i)
                         args  (dofor [j (range i)]
                                 (symbol (str "arg" j)))
@@ -52,3 +57,5 @@
     `(defn ~'convert-jfn
        [~'f]
        (fn ~@arities))))
+
+(mk-jfn-converter)

@@ -4,7 +4,7 @@
   (:require [com.rpl.agent-o-rama.helpers :as h]
             [com.rpl.agent-o-rama.impl :as i])
   (:import [com.rpl.agentorama AgentsTopology AgentGraph]
-           [com.rpl.rama PState$Schema]))
+           [com.rpl.rama PState$Declaration PState$Schema]))
 
 (defn agents-topology [name setup topologies]
   (let [stream-topology (stream-topology topologies (str "__agents-topology-" name))
@@ -14,7 +14,7 @@
       (newAgent [this name]
         (when (contains? @agents-vol name)
           (throw (ex-info "Agent already exists" {:name name})))
-        (let [ret (mk-agent-graph)]
+        (let [ret (i/mk-agent-graph)]
           (vswap! agents-vol assoc name ret)
           ret ))
       (getStreamTopology [this] stream-topology)
@@ -33,32 +33,34 @@
           stream-topology
           (symbol name)
           {key-class (fixed-keys-schema (into {} (partition 2 key-val-classes)))}))
-      (declarePState [this name ^Class schema]
+      (^PState$Declaration declarePState [this ^String name ^Class schema]
         (declare-pstate* stream-topology (symbol name) schema))
-      (declarePState [this name ^PState$Schema schema]
+      (^PState$Declaration declarePState [this ^String name ^PState$Schema schema]
         (.pstate stream-topology name schema))
       (declareAgentObject [this name o]
         (declare-object* setup (symbol name) o))
       (define [this]
         (when @defined?-vol
           (throw (ex-info "Agents topology already defined" {})))
-        (vreset defined?-vol true)
+        (vreset! defined?-vol true)
         (i/define-agents!
           stream-topology
           (mapv i/agent-graph-state @agents-vol))
         ))))
 
-(defn underlying-stream-topology [^AgentTopology at]
+(defn underlying-stream-topology [^AgentsTopology at]
   (.getStreamTopology at))
 
-(defn define-agents! [^AgentTopology at]
+(defn define-agents! [^AgentsTopology at]
   (.define at))
 
 ;; TODO: all the declare methods
 
 (defn node* [^AgentGraph agent-graph name output-nodes-spec node-fn]
-  (i/internal-add-node! agent-graph
-    (i/->Node name (i/normalize-output-nodes outputNodesSpec) node-fn)))
+  (i/internal-add-node!
+    agent-graph
+    name
+    (i/->Node (i/normalize-output-nodes output-nodes-spec) node-fn)))
 
 (defmacro node [agent-graph name output-nodes-spec & fn-body]
   `(node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))
@@ -66,7 +68,8 @@
 (defn agg-start-node* [^AgentGraph agent-graph name output-nodes-spec node-fn]
   (i/internal-add-node!
     agent-graph
-    (i/->AggStartNode name (i/normalize-output-nodes outputNodesSpec) node-fn)))
+    name
+    (i/->NodeAggStart (i/normalize-output-nodes output-nodes-spec) node-fn)))
 
 (defmacro agg-start-node [agent-graph name output-nodes-spec & fn-body]
   `(agg-start-node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))

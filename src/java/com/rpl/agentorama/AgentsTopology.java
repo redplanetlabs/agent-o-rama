@@ -21,7 +21,7 @@ public interface AgentsTopology {
   PState.Declaration declarePState(String name,  PState.Schema schema);
 
   // TODO: document how to make LLMs
-  void declareAgentObject(Object o);
+  void declareAgentObject(String name, Object o);
 
   // TODO: need method for declaring mirror agents
 
