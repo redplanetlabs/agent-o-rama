@@ -45,7 +45,7 @@
         (vreset! defined?-vol true)
         (i/define-agents!
           stream-topology
-          (mapv i/agent-graph-state @agents-vol))
+          @agents-vol)
         ))))
 
 (defn underlying-stream-topology [^AgentsTopology at]
@@ -55,6 +55,9 @@
   (.define at))
 
 ;; TODO: all the declare methods
+
+(defn new-agent [^AgentsTopology agents-topology name]
+  (.newAgent agents-topology name))
 
 (defn node* [^AgentGraph agent-graph name output-nodes-spec node-fn]
   (i/internal-add-node!
@@ -91,3 +94,8 @@
          ~@body
          (define-agents! ~agent-topology-sym)
          ))))
+
+;; TODO: <<<<>>>>
+;;  - need test namespace with ability to define and run agent graphs outside of modules
+;;    - make a "LocalAgentsTopology" with methods to run it
+;;    - getStreamTopology will throw exception

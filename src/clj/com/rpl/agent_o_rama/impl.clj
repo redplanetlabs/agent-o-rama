@@ -1,12 +1,13 @@
 (ns com.rpl.agent-o-rama.impl
   (:require [clojure.set :as set]
             [com.rpl.agent-o-rama.helpers :as h]
+            [loom.attr :as lattr]
             [loom.graph :as graph])
   (:import [com.rpl.agentorama AgentGraph AggNode AggNode$Impl]))
 
-(defrecord Node [output-nodes node-fn])
-(defrecord NodeAggStart [output-nodes node-fn])
-(defrecord NodeAgg [output-nodes agg-node])
+(defrecord Node [node-fn])
+(defrecord NodeAggStart [node-fn])
+(defrecord NodeAgg [agg-node])
 
 (defprotocol AgentGraphInternal
   (internal-add-node! [this name output-nodes-spec node])
@@ -144,7 +145,7 @@
           outputNodesSpec
           (->NodeAgg aggNode)))
       AgentGraphInternal
-      (internal-add-node! [this name output-nodes-spec node]
+      (internal-add-node! [this name output-nodes-spec node-obj]
         (when (or (nil? name) (= "" name))
           (throw (ex-info "Node name cannot be nil or empty string" {:name name})))
         (when (contains? @nodes-vol name)
@@ -154,7 +155,7 @@
         (vswap! nodes-vol
                 assoc
                 name
-                {:node node
+                {:node-obj node-obj
                  :output-nodes (normalize-output-nodes output-nodes-spec)})
         this)
       (agent-graph-state [this]
@@ -162,25 +163,97 @@
          :start-node @start-node-vol})
       )))
 
-(defn nodes->graph [nodes]
+(defn- nodes->graph [nodes]
+  (reduce-kv
+    (fn [graph name {:keys [node-obj output-nodes]}]
+      (reduce
+        (fn [graph output]
+          (graph/add-edges graph [name output]))
+        (-> graph
+            (graph/add-nodes name)
+            (lattr/add-attr name :node-obj node-obj))
+        output-nodes))
+    (graph/digraph)
+    nodes))
 
-  )
+(defn- annotate-aggs [graph node traversed agg-stack]
+  (let [curr-agg (peek agg-stack)
+        node-obj (lattr/attr graph node :node-obj)
+        next-traversed (conj traversed node)]
+    (cond
+      (contains? traversed node-obj)
+      ;; first case allows agg subgraph to loop back to start node of aggregation
+      (if (and (not= node curr-agg)
+               (not= (lattr/attr graph node :agg) curr-agg))
+        (throw (ex-info "Invalid loop to different agg context"
+                        {:agg1 curr-agg
+                         :agg2 (lattr/attr graph node :agg)}))
+        graph)
 
-(defn- define-agent! [stream-topology {:keys [nodes start-node]}]
-  (let [graph (nodes->graph nodes)]
+      (instance? Node node-obj)
+      (reduce
+        (fn [graph output-node]
+          (annotate-aggs
+            graph
+            output-node
+            next-traversed
+            agg-stack
+            ))
+        (lattr/add-attr graph node :agg curr-agg)
+        (graph/successors graph node))
 
+      (instance? NodeAggStart node-obj)
+      (let [new-agg-stack (conj agg-stack node)]
+        (reduce
+          (fn [graph output-node]
+            (annotate-aggs
+              graph
+              output-node
+              next-traversed
+              new-agg-stack
+              ))
+          (lattr/add-attr graph node :agg curr-agg)
+          (graph/successors graph node)))
 
-  ;; TODO: <<<<>>>> implement
-  ;;  - make loom graph for each agent
-  ;;  - verify valid agg subgraphs (no edges outside of graph in internal nodes)
-  ;;  - create depots / stream topology impls
-  ;;    - depot per agent
-  ;;    - task global for out-of-band events
-  ;;    - tick dpeot per agent
-  ;;      - check active nodes for retries
-  ;;    - source subscription
+      (instance? NodeAgg node-obj)
+      (do
+        (when (nil? curr-agg)
+          (throw (ex-info "Reached AggNode outside of agg context" {:name node})))
+        (let [new-agg-stack (pop agg-stack)]
+          (reduce
+            (fn [graph output-node]
+              (annotate-aggs
+                graph
+                output-node
+                next-traversed
+                new-agg-stack
+                ))
+            (lattr/add-attr graph node :agg curr-agg)
+            (graph/successors graph node))))
+
+      :else
+      (throw (ex-info "Unreachable" {})))
     ))
 
-(defn define-agents! [stream-topology agent-infos]
-  (doseq [agent-info agent-infos]
-    (define-agent! stream-topology agent-info)))
+(defn resolve-agent-graph [agent-graph]
+  (let [{:keys [nodes start-node]} (agent-graph-state agent-graph)
+        graph (nodes->graph nodes)
+        agg-graph (annotate-aggs graph start-node #{} [])]
+    (with-meta agg-graph {:start-node start-node})))
+
+(defn- define-agent! [stream-topology name agent-graph]
+  (let [graph (resolve-agent-graph agent-graph)]
+
+
+    ;; TODO: <<<<>>>> implement
+    ;;  - create depots / stream topology impls
+    ;;    - depot per agent
+    ;;    - task global for out-of-band events
+    ;;    - tick dpeot per agent
+    ;;      - check active nodes for retries
+    ;;    - source subscription
+    ))
+
+(defn define-agents! [stream-topology agent-graphs]
+  (doseq [[name agent-graph] agent-graphs]
+    (define-agent! stream-topology name agent-graph)))
