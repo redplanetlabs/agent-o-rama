@@ -7,7 +7,7 @@
            [com.rpl.rama PState$Declaration PState$Schema]))
 
 (defn agents-topology [name setup topologies]
-  (let [stream-topology (stream-topology topologies (str "__agents-topology-" name))
+  (let [stream-topology (stream-topology topologies (str "_agents-topology-" name))
         defined?-vol (volatile! false)
         agents-vol (volatile! {})]
     (reify AgentsTopology
@@ -44,6 +44,7 @@
           (throw (ex-info "Agents topology already defined" {})))
         (vreset! defined?-vol true)
         (i/define-agents!
+          setup
           stream-topology
           @agents-vol)
         ))))

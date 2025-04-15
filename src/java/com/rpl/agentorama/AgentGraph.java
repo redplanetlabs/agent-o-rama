@@ -4,6 +4,7 @@ package com.rpl.agentorama;
 import com.rpl.agentorama.ops.*;
 
 public interface AgentGraph {
+   AgentGraph node(String name, Object outputNodesSpec, RamaVoidFunction1<AgentNode> impl);
   <T0> AgentGraph node(String name, Object outputNodesSpec, RamaVoidFunction2<AgentNode,T0> impl);
   <T0,T1> AgentGraph node(String name, Object outputNodesSpec, RamaVoidFunction3<AgentNode,T0,T1> impl);
   <T0,T1,T2> AgentGraph node(String name, Object outputNodesSpec, RamaVoidFunction4<AgentNode,T0,T1,T2> impl);
