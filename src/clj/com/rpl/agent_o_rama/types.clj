@@ -19,6 +19,8 @@
    args :- [Object]
    ])
 
+;; TODO: <<<<>>>> define a type for the agent graph
+
 (drp/defrecord+ AgentGraphInfo
   [start-node :- String
    graph :- {String clojure.lang.Keyword} ; :node, :agg-node, :agg-start-node

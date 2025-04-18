@@ -265,19 +265,67 @@
 (defn random-long []
   (.nextLong ^java.util.Random (d/current-random-source)))
 
+(deframaop gen-id [$$id]
+  (local-select> STAY $$id :> *ret)
+  (local-transform> (term inc) $$id :> *ret)
+  (:> *ret))
+
+(defn- agent-graph-task-global-name [agent-name]
+  (str "*_agent-graph-" agent-name))
+
+(defn- graph-history-task-global-name [agent-name]
+  (str "$$_agent-graph-history-" agent-name))
+
+(defn- graph->graph-info [graph]
+  ;; TODO: <<<<>>>
+  ;;  - implement after defining graph type
+  ;;  - strip away functions
+  )
+
+(deframaop fetch-graph-version [*agent-name]
+  (<<with-substitutions
+    [*graph (declared-object-task-global (agent-graph-task-global-name *agent-name))
+     $$graph-history (this-module-pobject-task-global (graph-history-task-global-name *agent-name))]
+     ;; TODO: <<<<>>> type not defined yet
+    (get *graph :uuid :> *curr-uuid)
+    (local-select> LAST $$graph-history :> [*version {:keys [*uuid]}])
+    (<<if (= *uuid *curr-uuid)
+      (:> *version)
+     (else>)
+      (ops/current-task-id :> *task-id)
+      (|global)
+      (local-select> LAST $$graph-history :> [*version {:keys [*uuid]}])
+      (<<if (= *uuid *curr-uuid)
+        (identity *version :> *found-version)
+       (else>)
+        (inc (or> *version -1) :> *found-version)
+        (local-transform> [(keypath *found-version) (termval (graph->graph-info *graph))]
+          $$graph-history))
+      (|direct *task-id)
+      (local-transform> [(keypath *found-version) (termval (graph->graph-info *graph))]
+        $$graph-history)
+      (:> *found-version)
+      )))
+
 ;; TODO: <<<<<>>>> define records for invokes
 ;;    - input should be plain map so it can be used from REST API
 
 
 (defn- define-agent! [setup stream-topology name agent-graph]
   (let [graph (resolve-agent-graph agent-graph)
+        ;; TODO: <<<<>>>> graph needs to be a proper type (not loom)
+        ;;
         agent-depot-sym (symbol (str "*_agent-depot-" name))
+        agent-graph-sym (symbol (agent-graph-task-global-name name))
         agent-node-pstate-sym (symbol (str "$$_agent-node-" name))
         agent-pending-nodes-pstate-sym (symbol (str "$$_agent-pending-nodes-" name))
         agent-invoke-pstate-sym (symbol (str "$$_agent-invoke-" name))
-        agent-graph-history-pstate-sym (symbol (str "$$_agent-graph-history-" name))
+        agent-graph-history-pstate-sym (symbol (graph-history-task-global-name name))
+        agent-id-gen-pstate-sym (symbol (str "$$_agent-id-gen-" name))
         ]
     (declare-depot* setup agent-depot-sym agent-depot-partitioner)
+
+    (declare-object* setup agent-graph-sym ...graph)
 
     ;; TODO: <<<<>>>> should generalize this to also include the root invoke ID so can trace from there
     ;; - and ordered IDs is perfect for GC!
@@ -325,6 +373,11 @@
       stream-topology
       agent-graph-history-pstate-sym
       {Long AgentGraphInfo})
+    (declare-pstate*
+      stream-topology
+      agent-id-gen-pstate-sym
+      Long
+      {:initial-value 0})
 
     (<<sources stream-topology
       (source> agent-depot-sym :> *data)
@@ -332,10 +385,15 @@
         (case> (or> (aor-types/AgentInvoke? *data) (instance? Map *data)))
         (get-invoke-args *data :> *args)
         (ops/current-task-id :> *graph-task-id)
-        ;; TODO: use ID PState and longs (no rollover needed)
-        (...gen-id :> *id)
-
+        (gen-id agent-id-gen-pstate-sym :> *id)
         (random-long :> *invoke-id)
+        (fetch-graph-version :> *version)
+        (local-transform>
+          [(keypath *id)
+           (termval {:root-invoke-id *invoke-id
+                     :invoke-args *args
+                     :graph-version *version})]
+          agent-invoke-pstate-sym)
 
         ;; TODO:
         ;;  - initialize agent-invoke into agent-invoke-pstate-sym
