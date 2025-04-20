@@ -10,12 +10,8 @@
             ;; TODO: <<<<>>>> expose current-random-source in public API and use that
             [rpl.rama.distributed.core :as d])
   (:import [com.rpl.agentorama AgentGraph AggNode AggNode$Impl]
-           [com.rpl.agent_o_rama.types AgentResult]
-           [java.util Map]))
-
-(defrecord Node [node-fn])
-(defrecord NodeAggStart [node-fn])
-(defrecord NodeAgg [agg-node])
+           [com.rpl.agent_o_rama.types AgentNodeEmit AgentResult]
+           [java.util Map UUID]))
 
 (defprotocol AgentGraphInternal
   (internal-add-node! [this name output-nodes-spec node])
@@ -105,7 +101,7 @@
     agent-graph
     name
     output-nodes-spec
-    (->NodeAgg agg-node-impl)))
+    (aot-types/->NodeAgg agg-node-impl)))
 
 (defmacro reify-AgentGraph [& body]
   `(reify ~'AgentGraph
@@ -119,7 +115,7 @@
               this#
               ~name-sym
               ~osym
-              (->Node (h/convert-void-jfn ~jfn-sym)))
+              (aot-types/->Node (h/convert-void-jfn ~jfn-sym)))
             )))
     ~@(for [i (range 1 h/MAX-ARITY)]
         (let [name-sym (h/type-hinted String 'name#)
@@ -131,7 +127,7 @@
               this#
               ~name-sym
               ~osym
-              (->NodeAggStart (h/convert-void-jfn ~jfn-sym)))
+              (aot-types/->NodeAggStart (h/convert-void-jfn ~jfn-sym)))
             )))
     ~@body
     ))
@@ -152,7 +148,7 @@
           this
           name
           outputNodesSpec
-          (->NodeAgg aggNode)))
+          (aot-types/->NodeAgg aggNode)))
       AgentGraphInternal
       (internal-add-node! [this name output-nodes-spec node-obj]
         (when (or (nil? name) (= "" name))
@@ -248,7 +244,21 @@
   (let [{:keys [nodes start-node]} (agent-graph-state agent-graph)
         graph (nodes->graph nodes)
         agg-graph (annotate-aggs graph start-node #{} [])]
-    (with-meta agg-graph {:start-node start-node})))
+    (aor-types/->valid-AgentGraph
+      (reduce
+        (fn [m node]
+          (let [output-nodes (graph/successors agg-graph node)]
+            (assoc m
+                   node
+                   (aor-types/->valid-AgentNode
+                     (lattr/attr graph node :node-obj)
+                     (set output-nodes)
+                     (lattr/attr graph node :agg)))
+            ))
+        {}
+        (graph/nodes agg-graph))
+      start-node
+      (str (UUID/randomUUID)))))
 
 (defn get-invoke-args [data]
   ;; accepting Maps allows for REST API invokes, with limitation of allowed
@@ -262,6 +272,11 @@
   ;; TODO: <<<<>>>>
   )
 
+(defdepotpartitioner agent-streaming-depot-partitioner
+  [{:keys [agent-task-id]} num-partitions]
+  agent-task-id)
+
+
 (defn random-long []
   (.nextLong ^java.util.Random (d/current-random-source)))
 
@@ -273,20 +288,31 @@
 (defn- agent-graph-task-global-name [agent-name]
   (str "*_agent-graph-" agent-name))
 
+(defn- agent-node-task-global-name [agent-name]
+  (str "$$_agent-node-" agent-name))
+
 (defn- graph-history-task-global-name [agent-name]
   (str "$$_agent-graph-history-" agent-name))
 
-(defn- graph->graph-info [graph]
-  ;; TODO: <<<<>>>
-  ;;  - implement after defining graph type
-  ;;  - strip away functions
-  )
+(defn- graph->historical-graph-info [graph]
+  (aor-types/->valid-HistoricalAgentGraphInfo
+    (transform
+      [MAP-VALS
+       (view
+         (fn [{:keys [node output-nodes agg-context]}]
+           (aor-types/->valid-HistoricalAgentNodeInfo
+             (aor-types/node->type-kw node)
+             output-nodes
+             agg-context
+             )))]
+      (:node-map graph))
+    (:start-node graph)
+    (:uuid graph)))
 
 (deframaop fetch-graph-version [*agent-name]
   (<<with-substitutions
     [*graph (declared-object-task-global (agent-graph-task-global-name *agent-name))
      $$graph-history (this-module-pobject-task-global (graph-history-task-global-name *agent-name))]
-     ;; TODO: <<<<>>> type not defined yet
     (get *graph :uuid :> *curr-uuid)
     (local-select> LAST $$graph-history :> [*version {:keys [*uuid]}])
     (<<if (= *uuid *curr-uuid)
@@ -307,27 +333,41 @@
       (:> *found-version)
       )))
 
-;; TODO: <<<<<>>>> define records for invokes
-;;    - input should be plain map so it can be used from REST API
-
+(deframaop ack-invoke [*agent-name {:keys [*parent-task-id *parent-invoke-id *emit-index]}]
+  (<<with-substitutions
+    [$$node-invokes (this-module-pobject-task-global (agent-node-task-global-name *agent-name))]
+    (<<if *parent-task-id
+      (ops/current-task-id :> *start-task-id)
+      (|direct *parent-task-id)
+      (local-transform>
+        ;; in case it's been GC'd already, which is unlikely
+        [(must *parent-invoke-id)
+         :emits
+         (nthpath *emit-index)
+         :acked?
+         (termval true)]
+        $$node-invokes)
+      (|direct *start-task-id))
+    (:>)))
 
 (defn- define-agent! [setup stream-topology name agent-graph]
   (let [graph (resolve-agent-graph agent-graph)
-        ;; TODO: <<<<>>>> graph needs to be a proper type (not loom)
-        ;;
         agent-depot-sym (symbol (str "*_agent-depot-" name))
+        agent-streaming-depot-sym (symbol (str "*_agent-streaming-depot-" name))
         agent-graph-sym (symbol (agent-graph-task-global-name name))
-        agent-node-pstate-sym (symbol (str "$$_agent-node-" name))
+        agent-node-pstate-sym (symbol (agent-node-task-global-name name))
         agent-pending-nodes-pstate-sym (symbol (str "$$_agent-pending-nodes-" name))
         agent-invoke-pstate-sym (symbol (str "$$_agent-invoke-" name))
+        agent-streaming-results-pstate-sym (symbol (str "$$_agent-streaming-" name))
         agent-graph-history-pstate-sym (symbol (graph-history-task-global-name name))
         agent-id-gen-pstate-sym (symbol (str "$$_agent-id-gen-" name))
         ]
     (declare-depot* setup agent-depot-sym agent-depot-partitioner)
+    (declare-depot* setup agent-streaming-depot-sym agent-streaming-depot-partitioner)
 
-    (declare-object* setup agent-graph-sym ...graph)
+    (declare-object* setup agent-graph-sym graph)
 
-    ;; TODO: <<<<>>>> should generalize this to also include the root invoke ID so can trace from there
+    ;; TODO: <<<<>>>>
     ;; - and ordered IDs is perfect for GC!
     ;;    - especially since they're sequential, so know exactly how many are in there by looking at min and max
     ;;    - can materialize invoke args here, which is helpful for searching instead of having to query invokes PState repeatedly
@@ -338,19 +378,26 @@
         (fixed-keys-schema
           {:root-invoke-id Long
            :invoke-args [Object]
-           ;; TODO: <<<<<>>>> translate agent graph in task global into PState (without functions)
-           ;;   - capture args from the functions if not already in there
-           ;;   - this isn't central though...
-           ;;     - how to just see a listing of all of them?
-           ;;       - could be duplicated, and if not there go to task 0 to generate/fetch it, then bring it here and write it
-           ;;   - how to actually distinguish graph versions?
-           ;;     - put into the task global a random UUID?
            :graph-version Long
            :result AgentResult})})
     (declare-pstate*
       stream-topology
+      agent-streaming-results-pstate-sym
+      {Long ; agent ID
+        (map-schema
+          String ; node name
+          (map-schema
+            Long ; invoke-id
+            {Long ; emit index
+              {Long ; arg index
+                (list-schema Object {:subindex? true})
+                }}
+            {:subindex? true})
+          {:subindex? true})})
+    (declare-pstate*
+      stream-topology
       agent-node-pstate-sym
-      {Long
+      {Long ; invoke-id
         (fixed-keys-schema
           {:graph-id Long
            :graph-task-id Long
@@ -359,20 +406,20 @@
            :args [Object]
            :retry-count Long
            :emits [AgentNodeEmit]
-           :created-time-millis Long
-           :finished-time-millis Long
-           ;; TODO: <<<<>>>> also need stats for token count
-           ;;   - could be multiple LLM calls, so need token count per
+           :start-time-millis Long
+           :finish-time-millis Long
+           ;; TODO: <<<<>>>>
            ;;   - what other stats does langsmith track?
            })})
     (declare-pstate*
       stream-topology
       agent-pending-nodes-pstate-sym
       {Long Object})
+    ;; TODO: <<<<>>>> need custom key partitioner on this so can fetch from foreign client from task 0
     (declare-pstate*
       stream-topology
       agent-graph-history-pstate-sym
-      {Long AgentGraphInfo})
+      {Long HistoricalAgentGraphInfo})
     (declare-pstate*
       stream-topology
       agent-id-gen-pstate-sym
@@ -385,20 +432,19 @@
         (case> (or> (aor-types/AgentInvoke? *data) (instance? Map *data)))
         (get-invoke-args *data :> *args)
         (ops/current-task-id :> *graph-task-id)
-        (gen-id agent-id-gen-pstate-sym :> *id)
+        (gen-id agent-id-gen-pstate-sym :> *graph-id)
+        (ack-return> [*graph-task-id *graph-id])
         (random-long :> *invoke-id)
-        (fetch-graph-version :> *version)
+        (fetch-graph-version name :> *version)
         (local-transform>
-          [(keypath *id)
+          [(keypath *graph-id)
            (termval {:root-invoke-id *invoke-id
                      :invoke-args *args
                      :graph-version *version})]
           agent-invoke-pstate-sym)
-
-        ;; TODO:
-        ;;  - initialize agent-invoke into agent-invoke-pstate-sym
-        ;;  - initialize node invoke
-        ;;    - should be same code as that which handles emits
+        (get agent-graph-sym :start-node :> *next-node)
+        (identity nil :> *parent-info)
+        (anchor> <first-node-invoke>)
 
         (case> (aor-types/AsyncFutureResult? *data))
         ;; TODO: <<<<>>>
@@ -407,23 +453,65 @@
         ;;     - update node PState
         ;;     - if all AsyncFuture filled in, process it as an emit, unified with above code
         ;;    - and should be part of a loop
+        ;;    - this part unifies withh the invoke code above
         ;;  - if failure, bump retries and try it again
 
-        (case> (aor-types/ContinueExecution? *data))
+        (case> (aor-types/RetryExecution? *data))
         ;; TODO: <<<<>>>>
         ;;  - this is appended from tick depot
         ;;  - should verify it still needs execution
+        ;;  - what about things like PState writes, which could be on different tasks?
+        ;;    - hard to make those exactly-once, especially since writes are coming concurrently from multiple sources
+        ;;  - it doesn't necessarily have to retry the whole node:
+        ;;    - can check every emit and see if the asyncfuture's that are outstanding are still in the in-memory task global
+        ;;      - if so, just retry that one
+        ;;    - that map can be invoke-id -> info for each emit/arg
+        ;;    - if not, then clear emits and retry the whole node
+        ;;      - which unifies with cases abofe
         )
 
-        ;; TODO: <<<<<>>>>
-        ;; - what about module update mid agent execution?
-        ;;    - it could be changing graph structure, changing functions
-        ;;       - those executions should fail? or only fail if graph structure fundamentally changes?
-        ;;        - the latter is better
-        ;;    - this means nodes need to keep the UUID of execution
-        ;;      - but history might not be there anymore
-        ;;      - is it enough to store UUID + the node type?
+      ;; requires *invoke-id, *next-node, *graph-id, *graph-task-id, *args, and *parent-info to be in scope
+      (unify> <first-node-invoke> <next-node-invoke>)
+      (select> [:node-map (keypath *next-node) :node (view h/node->type-kw)]
+        agent-graph-sym :> *expected-node-type)
+      ;; stop execution if invoke has already been written to the PState since it's already handled or being handled
+      (local-select> [(keypath *invoke-id) nil?] agent-node-pstate-sym)
+      (local-transform>
+        [(keypath *invoke-id)
+         (termval {:graph-id *graph-id
+                   :graph-task-id *graph-task-id
+                   :expected-node-type *expected-node-type
+                   :node *next-node
+                   :args *args
+                   :retry-count 0
+                   :start-time-millis (h/current-time-millis)})]
+        agent-node-pstate-sym)
+      (ack-invoke name *parent-info)
+      (anchor> <invoke-initialized>)
 
+      ;; requires *invoke-id, *next-node, and *args to be in scope
+      (unify> <invoke-initialized> ...<retry-invoke>)
+      ;; TODO: <<<<>>>>
+      ;;  - fetch the node function
+      ;;  - invoke the node with the args
+
+
+      (source> agent-streaming-depot-sym
+        :> {:keys [*agent-id
+                   *node
+                   *invoke-id
+                   *emit-index
+                   *arg-index
+                   *streaming-index
+                   *value]})
+      (<<ramafn %correct-index? [*l]
+        (:> (= (count *l) *streaming-index)))
+      (local-transform>
+        [(keypath *agent-id *node *invoke-id *emit-index *arg-index)
+         (pred %correct-index?)
+         AFTER-ELEM
+         (termval *value)]
+        agent-streaming-results-pstate-sym)
       )
 
 

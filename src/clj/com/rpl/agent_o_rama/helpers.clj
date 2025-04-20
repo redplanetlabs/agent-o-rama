@@ -1,4 +1,5 @@
-(ns com.rpl.agent-o-rama.helpers)
+(ns com.rpl.agent-o-rama.helpers
+  (:import [com.rpl.rama.helpers TopologyUtils]))
 
 (def MAX-ARITY 8)
 
@@ -6,6 +7,9 @@
   "Shortcut for `doall` and `for`."
   [& body]
   `(doall (for ~@body)))
+
+(defn current-time-millis []
+  (TopologyUtils/currentTimeMillis))
 
 (defn type-hinted
   [^Class class o]
