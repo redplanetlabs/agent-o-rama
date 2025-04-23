@@ -1,6 +1,8 @@
 (ns com.rpl.agent-o-rama.types
   (:require [com.rpl.ramaspecter.defrecord-plus :as drp]
-            [rpl.schema.core :as s]))
+            [rpl.schema.core :as s])
+  (:import [com.rpl.agentorama AsyncResult]
+           [java.util.concurrent CompletableFuture]))
 
 (def NODE-KW :node)
 (def AGG-START-NODE-KW :agg-start-node)
@@ -21,7 +23,7 @@
    time-millis :- Long])
 
 (drp/defrecord+ AgentResult
-  [val :- Object])
+  [val :- (s/maybe Object)])
 
 (drp/defrecord+ InProgressArg
   [val :- Object])
@@ -42,15 +44,25 @@
    start-time-millis :- Long
    finish-time-millis :- Long])
 
-(s/defrecord+ AsyncArg
-  [uuid :- String])
+(drp/defrecord+ AsyncResultOutOfBand
+  [uuid :- String]
+  AsyncResult)
+
+(drp/defrecord+ AsyncResultPStateQuery
+  [module-name :- String
+   pstate-name :- String
+   path :- Object]
+  AsyncResult)
+
+(drp/defrecord+ AgentPStateTransform
+  [pstate-name :- String
+   path :- Object])
 
 (drp/defrecord+ AgentNodeEmit
   [invoke-id :- Long
    target-task-id :- Long
    node-name :- String
-   args :- [(s/cond-pre AgentNodeArg AsyncArg)]
-   acked? :- Boolean
+   args :- [(s/cond-pre AgentNodeArg AsyncResult CompletableFuture)]
    ])
 
 (drp/defrecord+ HistoricalAgentNodeInfo
@@ -64,9 +76,6 @@
    start-node :- String
    uuid :- String
    ])
-
-(sp/defrecord+ RetryExecution
-  [invoke-id :- Long])
 
 (drp/defrecord+ AsyncFutureResult
   [task-id :- Long
@@ -84,8 +93,3 @@
    arg-index :- Long
    streaming-index :- Long
    value :- Object])
-
-(drp/defrecord+ ParentInfo
-  [parent-task-id :- Long
-   parent-invoke-id :- Long
-   emit-index :- Long])

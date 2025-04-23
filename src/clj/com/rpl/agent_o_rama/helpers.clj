@@ -1,4 +1,5 @@
 (ns com.rpl.agent-o-rama.helpers
+  (:use [com.rpl.rama.path])
   (:import [com.rpl.rama.helpers TopologyUtils]))
 
 (def MAX-ARITY 8)
@@ -17,6 +18,9 @@
     {:tag (-> class
               .getTypeName
               symbol)}))
+
+(defn clj-transform [compiled-path obj]
+  (multi-transform ^:direct-nav compiled-path obj))
 
 (defn rama-void-function-class-symbol
   [i]

@@ -9,9 +9,15 @@
             [loom.graph :as graph]
             ;; TODO: <<<<>>>> expose current-random-source in public API and use that
             [rpl.rama.distributed.core :as d])
-  (:import [com.rpl.agentorama AgentGraph AggNode AggNode$Impl]
-           [com.rpl.agent_o_rama.types AgentNodeEmit AgentResult]
-           [java.util Map UUID]))
+  (:import [com.rpl.agentorama AgentGraph AgentNode AggNode AggNode$Impl AsyncResult]
+           [com.rpl.agent_o_rama.types
+             AgentNodeEmit
+             AgentResult
+             Node
+             NodeAgg
+             NodeAggStart]
+           [com.rpl.rama.helpers TopologyUtils]
+           [java.util Function Map UUID]))
 
 (defprotocol AgentGraphInternal
   (internal-add-node! [this name output-nodes-spec node])
@@ -181,6 +187,10 @@
     (graph/digraph)
     nodes))
 
+;; TODO: <<<<>>>>
+;;  - don't allow looping back to start agg node from within agg context (but OK from agg node)
+;;    - need test for looping back from agg node
+;;  - start agg node needs to know the agg node
 (defn- annotate-aggs [graph node traversed agg-stack]
   (let [curr-agg (peek agg-stack)
         node-obj (lattr/attr graph node :node-obj)
@@ -333,22 +343,68 @@
       (:> *found-version)
       )))
 
-(deframaop ack-invoke [*agent-name {:keys [*parent-task-id *parent-invoke-id *emit-index]}]
-  (<<with-substitutions
-    [$$node-invokes (this-module-pobject-task-global (agent-node-task-global-name *agent-name))]
-    (<<if *parent-task-id
-      (ops/current-task-id :> *start-task-id)
-      (|direct *parent-task-id)
-      (local-transform>
-        ;; in case it's been GC'd already, which is unlikely
-        [(must *parent-invoke-id)
-         :emits
-         (nthpath *emit-index)
-         :acked?
-         (termval true)]
-        $$node-invokes)
-      (|direct *start-task-id))
-    (:>)))
+(defprotocol AgentNodeInternal
+  (agent-node-state [this]))
+
+(defn mk-agent-node [task-id]
+  (let [result-vol (volatile! nil)
+        emits-vol (volatile! [])
+        pstate-transforms-vol (volatile! [])
+        start-time-millis (TopologyUtils/currentTimeMillis)]
+    (reify AgentNode
+      (emit [this node args]
+        (vswap! emits-vol conj
+          (aor-types/->valid-AgentNodeEmit
+            (random-long)
+            task-id
+            node
+            (mapv
+              (fn [arg]
+                (cond
+                  (instance? AsyncResult arg)
+                  arg
+
+                  (instance? CompletableFuture arg)
+                  (.thenApply
+                    ^CompletableFuture arg
+                    (reify Function
+                      (apply [_ v]
+                        [start-time-millis (h/current-time-millis) v]))
+
+                  :else
+                  (aor-types/->valid-AgentNodeArg
+                    arg
+                    0
+                    start-time-millis
+                    (TopologyUtils/currentTimeMillis)
+                    )))
+              args)
+            )))
+      (emitParallel [this node args]
+        ;; TODO: <<<<>>>>
+        ;;  - need the task global with shuffled task IDs
+        ;;  - ideally have the thread->tasks mapping
+        (assert false)
+        )
+      (result [this arg]
+        (when (some? @result-vol)
+          (throw (ex-info "Cannot have multiple results" {:current-result @result-vol})))
+        (vreset! result-vol (aor-types/->valid-AgentResult arg)))
+      (getObject [this name]
+        ;; TODO: <<<<>>>>
+        ;;  - how would this fetch mirrors?
+        ;;    - probably need a getPState/getStore API that takes in module name as input
+        ;;    - though "declareStore" API can put mapping into a task global...
+        )
+      AgentNodeInternal
+      (agent-node-state [this]
+        {:emits @emits-vol
+         :result @result-vol
+         :pstate-transforms @pstate-transforms-vol}))))
+
+(defn- immediate-async-resolve? [arg]
+  (or (instance? CompletableFuture arg)
+      (aor-types/AsyncResultPStateQuery? arg)))
 
 (defn- define-agent! [setup stream-topology name agent-graph]
   (let [graph (resolve-agent-graph agent-graph)
@@ -401,13 +457,22 @@
         (fixed-keys-schema
           {:graph-id Long
            :graph-task-id Long
-           :expected-node-type clojure.lang.Keyword ; :node, :agg-start-node, :agg-node
            :node String
-           :args [Object]
-           :retry-count Long
            :emits [AgentNodeEmit]
+           :result AgentResult
            :start-time-millis Long
            :finish-time-millis Long
+
+           ;; regular node state
+           :input [Object]
+           :agg-invoke-id Long
+
+           ;; agg state
+           :agg-inputs (map-schema Long [Object] {:subindex? true}) ; invoke ID -> args
+           :parent-agg-invoke-id Long
+           :agg-state Object
+           :agg-ack-val Long
+
            ;; TODO: <<<<>>>>
            ;;   - what other stats does langsmith track?
            })})
@@ -427,7 +492,7 @@
       {:initial-value 0})
 
     (<<sources stream-topology
-      (source> agent-depot-sym :> *data)
+      (source> agent-depot-sym {:retry-mode :none} :> *data)
       (<<cond
         (case> (or> (aor-types/AgentInvoke? *data) (instance? Map *data)))
         (get-invoke-args *data :> *args)
@@ -443,7 +508,8 @@
                      :graph-version *version})]
           agent-invoke-pstate-sym)
         (get agent-graph-sym :start-node :> *next-node)
-        (identity nil :> *parent-info)
+        (identity nil :> *node-invoke-source)
+        (identity [] :> *agg-context)
         (anchor> <first-node-invoke>)
 
         (case> (aor-types/AsyncFutureResult? *data))
@@ -453,47 +519,145 @@
         ;;     - update node PState
         ;;     - if all AsyncFuture filled in, process it as an emit, unified with above code
         ;;    - and should be part of a loop
-        ;;    - this part unifies withh the invoke code above
+        ;;    - this part unifies with the output portion of a node... which is inside the loop below
+        ;;      - maybe this can be factored into a helper function, and then this unifies with the loop?
         ;;  - if failure, bump retries and try it again
-
-        (case> (aor-types/RetryExecution? *data))
-        ;; TODO: <<<<>>>>
-        ;;  - this is appended from tick depot
-        ;;  - should verify it still needs execution
-        ;;  - what about things like PState writes, which could be on different tasks?
-        ;;    - hard to make those exactly-once, especially since writes are coming concurrently from multiple sources
-        ;;  - it doesn't necessarily have to retry the whole node:
-        ;;    - can check every emit and see if the asyncfuture's that are outstanding are still in the in-memory task global
-        ;;      - if so, just retry that one
-        ;;    - that map can be invoke-id -> info for each emit/arg
-        ;;    - if not, then clear emits and retry the whole node
-        ;;      - which unifies with cases abofe
+        <async-node-finished>
         )
 
-      ;; requires *invoke-id, *next-node, *graph-id, *graph-task-id, *args, and *parent-info to be in scope
-      (unify> <first-node-invoke> <next-node-invoke>)
-      (select> [:node-map (keypath *next-node) :node (view h/node->type-kw)]
-        agent-graph-sym :> *expected-node-type)
-      ;; stop execution if invoke has already been written to the PState since it's already handled or being handled
-      (local-select> [(keypath *invoke-id) nil?] agent-node-pstate-sym)
-      (local-transform>
-        [(keypath *invoke-id)
-         (termval {:graph-id *graph-id
-                   :graph-task-id *graph-task-id
-                   :expected-node-type *expected-node-type
-                   :node *next-node
-                   :args *args
-                   :retry-count 0
-                   :start-time-millis (h/current-time-millis)})]
-        agent-node-pstate-sym)
-      (ack-invoke name *parent-info)
-      (anchor> <invoke-initialized>)
+      ;; requires *invoke-id, *next-node, *args, *graph-id, *graph-task-id, *agg-invoke-id to be in scope
+      (unify> <first-node-invoke> <async-node-finished>)
+      (loop<- [*invoke-id *invoke-id
+               *next-node *next-node
+               *args *args
+               *agg-invoke-id *agg-invoke-id]
+        (select> [:node-map (keypath *next-node) :node (view h/node->type-kw)]
+          agent-graph-sym :> *expected-node-type)
+        (<<if (contains? #{aor-types/AGG-START-NODE-KW aor-types/AGG-NODE-KW} *expected-node-type)
+          (|direct *graph-task-id))
+        (select> [:node-map (keypath *next-node) :node]
+          agent-graph-sym :> *node-obj)
+        (ops/current-task-id :> *node-task-id)
+        (<<subsource *node-obj
+          (case> Node :> {:keys [*node-fn]})
+          (mk-agent-node *node-task-id :> *agent-node)
+          (apply *node-fn *agent-node *args)
+          (agent-node-state *agent-node :> {:keys [*emits *result *pstate-transforms]})
+          ;; TODO: <<<<>>>> need to remember indexes so that they can be updated
+          (select>
+            (subselect
+              INDEXED-VALS
+              (collect-one FIRST)
+              LAST
+              :args
+              INDEXED-VALS
+              (collect-one FIRST)
+              LAST
+              immediate-async-resolve?)
+            *emits :> *asyncs)
+          (loop<- [*emits *emits
+                   *asyncs (seq *asyncs) :> *emits]
+            (<<if (nil? *asyncs)
+              (:> *emits)
+             (else>)
+              (first *asyncs :> [*emit-index *arg-index *v])
+              (<<cond
+                (case> (instance? CompletableFuture *v))
+                (completable-future>> *v :> [*start-millis *finish-millis *res])
 
-      ;; requires *invoke-id, *next-node, and *args to be in scope
-      (unify> <invoke-initialized> ...<retry-invoke>)
-      ;; TODO: <<<<>>>>
-      ;;  - fetch the node function
-      ;;  - invoke the node with the args
+                (case> (aor-types/AsyncResultPStateQuery? *v))
+
+                (identity *v :> {:keys [*module-name *pstate-name *path]})
+                (h/current-time-millis :> *start-millis)
+                (pobject-task-global *module-name *pstate-name :> $$p)
+                (|path$$ $$p *path)
+                (pobject-task-global *module-name *pstate-name :> $$p)
+                (local-select> (subselect *path) $$p :> *res)
+                (h/current-time-millis :> *finish-millis)
+                (|direct *node-task-id)
+
+                (default> :unify false)
+                (throw! (ex-info "Unknown async type" {:class (class *v)})))
+              ;; TODO: <<<<>>> also emit start and finish time millis above
+              (h/clj-transform
+                (path>
+                  (nthpath *emit-index)
+                  :args
+                  (nthpath *arg-index)
+                  (termval
+                    (aor-types/->valid-AgentNodeArg
+                      *res
+                      0
+                      *start-millis
+                      *finish-millis)))
+                *emits
+                :> *new-emits)
+
+
+              (continue> *new-emits (next *asyncs))
+              ))
+          ;; TODO: <<<<>>>>
+          ;;  - handle PState AsyncResult or CompletableFuture *emits here, resolve them, and then do the write to the PState
+          ;;    - can it be done in parallel in <<atomic block, and the last one back initiates the emits?
+          ;;      - that doesn't work with looping...
+          ;;  - what about with concurrent checking of stalled agent invokes? how to know it's not stalled...
+          ;;  - what about transforms... those aren't passed along
+          ;;    - those should be initiated and then completed by the next node
+          ;;      - the stores returned will have private access to the volatile to accumulate transforms...
+          ;;        - so transforms are not asyncresult in the same way
+          ; (local-transform>
+          ;   [(keypath *invoke-id)
+          ;    (termval {:graph-id *graph-id
+          ;              :graph-task-id *graph-task-id
+          ;              :node *next-node
+          ;              :start-time-millis (h/current-time-millis)
+          ;              :input *args
+          ;             })]
+          ;     agent-node-pstate-sym))
+
+          (case> NodeAggStart :> {:keys [*node-fn]})
+          ;; TODO: <<<<<>>>> guaranteed to be new agg context
+          ;;  - needs to capture the current agg invoke-id into parent-agg-invoke-id
+
+          (case> NodeAgg :> {:keys [*agg-node]})
+          (assert! (some? *agg-invoke-id))
+
+          )
+
+
+
+        ;; TODO: <<<<>>>>
+        ;;  - normal node and start agg node check if it's initialized or not
+        ;;  - agg node checks if its invoke ID is in :agg-inputs an then skips the whole thing
+        ;;      - but what about its async emits?
+        ;;      - if task resets, need to retry ALL inputs
+        ;;  - either way, execute ack-invoke
+        ;;  - execution then differs per type:
+        ;;    - normal node and start agg node initialize similar but not the same
+        ;;      - start agg node initializes the agg fields
+        ;;    - normal node collects emits and writes them in
+        ;;    - start agg node returns the initial agg state and then writes it in (along with emits)
+        ;;    - agg node executes and writes new agg state plus the new emit plus its invoke ID + args
+
+
+
+
+
+
+        ;; TODO: <<<<>>>>
+        ;;  - verify the expected-node-type – need this in the closure, or just fetch it here?
+        ;;  - fetch the node function
+        ;;  - if agg start node, partition back to graph-task-id
+        ;;  - invoke the node with the args in a try/catch
+        ;;    - on failure, increment retry count, do |direct partition, and try again
+        ;;    - AgentNode reify captures all emits
+        ;;  - agg start node produces init for the agg state
+        ;;  - if any AsyncFuture results, then stop execution on this branch
+        ;;  - otherwise, if this has an agg context need to go to the agg task-id + invoke-id
+        ;;     - TODO: how to track that info
+        ;;     - TODO: what if nothing reaches the agg? how does it invoke it?
+        ;;        - what connects the agg start node to the agg node... they all just point to the agg start node
+
 
 
       (source> agent-streaming-depot-sym
