@@ -349,7 +349,6 @@
 (defn mk-agent-node [task-id]
   (let [result-vol (volatile! nil)
         emits-vol (volatile! [])
-        pstate-transforms-vol (volatile! [])
         start-time-millis (TopologyUtils/currentTimeMillis)]
     (reify AgentNode
       (emit [this node args]
@@ -399,8 +398,7 @@
       AgentNodeInternal
       (agent-node-state [this]
         {:emits @emits-vol
-         :result @result-vol
-         :pstate-transforms @pstate-transforms-vol}))))
+         :result @result-vol}))))
 
 (defn- immediate-async-resolve? [arg]
   (or (instance? CompletableFuture arg)
@@ -542,78 +540,96 @@
           (case> Node :> {:keys [*node-fn]})
           (mk-agent-node *node-task-id :> *agent-node)
           (apply *node-fn *agent-node *args)
-          (agent-node-state *agent-node :> {:keys [*emits *result *pstate-transforms]})
-          ;; TODO: <<<<>>>> need to remember indexes so that they can be updated
-          (select>
-            (subselect
-              INDEXED-VALS
-              (collect-one FIRST)
-              LAST
-              :args
-              INDEXED-VALS
-              (collect-one FIRST)
-              LAST
-              immediate-async-resolve?)
-            *emits :> *asyncs)
-          (loop<- [*emits *emits
-                   *asyncs (seq *asyncs) :> *emits]
-            (<<if (nil? *asyncs)
-              (:> *emits)
+          (agent-node-state *agent-node :> {:keys [*emits *result]})
+          (loop<- [*res []
+                   *emits (seq *emits)
+                   :> *emits]
+            (<<if (nil? *emits)
+              (:> *res)
              (else>)
-              (first *asyncs :> [*emit-index *arg-index *v])
-              (<<cond
-                (case> (instance? CompletableFuture *v))
-                (completable-future>> *v :> [*start-millis *finish-millis *res])
-
-                (case> (aor-types/AsyncResultPStateQuery? *v))
-
-                (identity *v :> {:keys [*module-name *pstate-name *path]})
-                (h/current-time-millis :> *start-millis)
+              (first *emits :> *emit)
+              (<<if (aor-types/AgentPStateTransform? *emit)
+                (identity *emit :> {:keys [*pstate-name *path]})
                 (pobject-task-global *module-name *pstate-name :> $$p)
                 (|path$$ $$p *path)
                 (pobject-task-global *module-name *pstate-name :> $$p)
-                (local-select> (subselect *path) $$p :> *res)
-                (h/current-time-millis :> *finish-millis)
+                (local-transform> *path $$p)
                 (|direct *node-task-id)
+                (continue> *res (next *emits))
+               (else>)
+                (select>
+                  (subselect
+                    :args
+                    INDEXED-VALS
+                    (collect-one FIRST)
+                    LAST
+                    immediate-async-resolve?)
+                  *emits :> *asyncs)
+                (loop<- [*emit *emit
+                         *asyncs (seq *asyncs)
+                         :> *emit]
+                  (<<if (nil? *asyncs)
+                    (:> *emit)
+                   (else>)
+                    (first *asyncs :> [*arg-index *v])
+                    (<<cond
+                      (case> (instance? CompletableFuture *v))
+                      (completable-future>> *v :> [*start-millis *finish-millis *res])
 
-                (default> :unify false)
-                (throw! (ex-info "Unknown async type" {:class (class *v)})))
-              ;; TODO: <<<<>>> also emit start and finish time millis above
-              (h/clj-transform
-                (path>
-                  (nthpath *emit-index)
-                  :args
-                  (nthpath *arg-index)
-                  (termval
-                    (aor-types/->valid-AgentNodeArg
-                      *res
-                      0
-                      *start-millis
-                      *finish-millis)))
-                *emits
-                :> *new-emits)
+                      (case> (aor-types/AsyncResultPStateQuery? *v))
+
+                      (identity *v :> {:keys [*module-name *pstate-name *path]})
+                      (h/current-time-millis :> *start-millis)
+                      (pobject-task-global *module-name *pstate-name :> $$p)
+                      (|path$$ $$p *path)
+                      (pobject-task-global *module-name *pstate-name :> $$p)
+                      (local-select> (subselect *path) $$p :> *res)
+                      (h/current-time-millis :> *finish-millis)
+                      (|direct *node-task-id)
+
+                      (default> :unify false)
+                      (throw! (ex-info "Unknown async type" {:class (class *v)})))
+                   (h/clj-transform
+                     (path>
+                       (nthpath *arg-index)
+                       (termval
+                         (aor-types/->valid-AgentNodeArg
+                           *res
+                           0
+                           *start-millis
+                           *finish-millis)))
+                     *emit
+                     :> *new-emit)
+                  (continue> *new-emit (next *asyncs))
+                  ))
+                (continue> (conj *res *emit) (next *emits))
+                )))
+          (local-transform>
+            [(keypath *invoke-id)
+             (termval {:graph-id *graph-id
+                       :graph-task-id *graph-task-id
+                       :node *next-node
+                       :start-time-millis ...*start-time-millis
+                       :finish-time-millis ...*start-time-millis
+                       :input *args
+                       :emits *emits
+                       :result ...*result TODO
+                       :agg-invoke-id ...TODO
+                      })]
+              agent-node-pstate-sym)
+          ;; TODO: <<<<>>>
+          ;;  - then check if all emits are fully resolved, if so propagate emits to their nodes
+          ;;    - and propagate ack to the aggregator ack-invoke-id
+          ;;    - need to unwrap args
 
 
-              (continue> *new-emits (next *asyncs))
-              ))
           ;; TODO: <<<<>>>>
-          ;;  - handle PState AsyncResult or CompletableFuture *emits here, resolve them, and then do the write to the PState
-          ;;    - can it be done in parallel in <<atomic block, and the last one back initiates the emits?
-          ;;      - that doesn't work with looping...
           ;;  - what about with concurrent checking of stalled agent invokes? how to know it's not stalled...
           ;;  - what about transforms... those aren't passed along
           ;;    - those should be initiated and then completed by the next node
           ;;      - the stores returned will have private access to the volatile to accumulate transforms...
           ;;        - so transforms are not asyncresult in the same way
-          ; (local-transform>
-          ;   [(keypath *invoke-id)
-          ;    (termval {:graph-id *graph-id
-          ;              :graph-task-id *graph-task-id
-          ;              :node *next-node
-          ;              :start-time-millis (h/current-time-millis)
-          ;              :input *args
-          ;             })]
-          ;     agent-node-pstate-sym))
+
 
           (case> NodeAggStart :> {:keys [*node-fn]})
           ;; TODO: <<<<<>>>> guaranteed to be new agg context
