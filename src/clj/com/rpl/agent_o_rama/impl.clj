@@ -353,6 +353,8 @@
         start-time-millis (TopologyUtils/currentTimeMillis)]
     (reify AgentNode
       (emit [this node args]
+        (when (some? @result-vol)
+          (throw (ex-info "Cannot emit with result already specified" {:current-result @result-vol})))
         (vswap! emits-vol conj
           (aor-types/->valid-AgentNodeEmit
             (random-long)
@@ -381,6 +383,8 @@
               args)
             )))
       (emitParallel [this node args]
+        (when (some? @result-vol)
+          (throw (ex-info "Cannot emit with result already specified" {:current-result @result-vol})))
         ;; TODO: <<<<>>>>
         ;;  - need the task global with shuffled task IDs
         ;;  - ideally have the thread->tasks mapping
@@ -389,6 +393,8 @@
       (result [this arg]
         (when (some? @result-vol)
           (throw (ex-info "Cannot have multiple results" {:current-result @result-vol})))
+        (when-not (empty? @emits-vol)
+          (throw (ex-info "Cannot both emit and result" {})))
         (vreset! result-vol (aor-types/->valid-AgentResult arg)))
       (getObject [this name]
         ;; TODO: <<<<>>>>
@@ -415,6 +421,8 @@
      (else>)
       (first *emits :> *emit)
       (<<if (aor-types/AgentPStateTransform? *emit)
+        ;; TODO: <<<<>>>> need to propagate failures back as the result
+        ;;  - need to expose try/catch somehow...
         (identity *emit :> {:keys [*pstate-name *path]})
         (this-module-pobject-task-global *pstate-name :> $$p)
         (|path$$ $$p *path)
@@ -440,9 +448,12 @@
             (first *asyncs :> [*arg-index *v])
             (<<cond
               (case> (instance? CompletableFuture *v))
+              ;; TODO: <<<<>>>> need to propagate failures back as the result (or to cause a retry)
               (completable-future> *v :> [*start-millis *finish-millis *res])
 
               (case> (aor-types/AsyncResultPStateQuery? *v))
+              ;; TODO: <<<<>>>> need to propagate failures back as the result
+              ;;  - need to expose try/catch somehow...
               (identity *v :> {:keys [*module-name *pstate-name *path]})
               (h/current-time-millis :> *start-millis)
               (pobject-task-global *module-name *pstate-name :> $$p)
@@ -590,7 +601,7 @@
         <async-node-finished>
         )
 
-      ;; requires *invoke-id, *next-node, *args, *graph-id, *graph-task-id, *agg-invoke-id to be in scope
+      ;; requires *graph-id, *graph-task-id, *invoke-id, *next-node, *args, *agg-invoke-id to be in scope
       (unify> <first-node-invoke> <async-node-finished>)
       (loop<- [*invoke-id *invoke-id
                *next-node *next-node
@@ -605,35 +616,47 @@
         (<<subsource *node-obj
           (case> Node :> {:keys [*node-fn]})
           (mk-agent-node :> *agent-node)
+          (h/current-time-millis :> *start-time-millis)
           (apply *node-fn *agent-node *args)
           (agent-node-state *agent-node :> {:keys [*emits *result]})
           (handle-async-emits *emits :> *emits)
+          ;; TODO: <<<<>>>>
+          (...emits-finished? *emits :> *emits-finished?)
+          (<<if *emits-finished?
+            (h/current-time-millis :> *finish-time-millis)
+           (else>)
+            (identity nil :> *finish-time-millis))
           (local-transform>
             [(keypath *invoke-id)
              (termval {:graph-id *graph-id
                        :graph-task-id *graph-task-id
                        :node *next-node
-                       :start-time-millis ...*start-time-millis
-                       :finish-time-millis ...*start-time-millis
+                       :start-time-millis *start-time-millis
+                       :finish-time-millis *finish-time-millis
                        :input *args
                        :emits *emits
                        :result *result
                        :agg-invoke-id *agg-invoke-id
                       })]
               agent-node-pstate-sym)
+          (<<if (some? *result)
+            (<<atomic
+              (|direct *graph-task-id)
+              (local-transform>
+                [(keypath *graph-id)
+                 :result
+                 (termval *result)
+                 ]
+                agent-invoke-pstate-sym)
+              ))
+          (<<if *emits-finished?
+            (ops/explode *emits :> {:keys [*invoke-id *target-task-id *node-name *args]})
+            (mapv :val *args :> *unwrapped-args)
+            (|direct *target-task-id)
+            (continue> *invoke-id *node-name *unwrapped-args *agg-invoke-id))
+          ;; TODO: <<<<>>>> emit code should be shared for all branches?
+          ;; TODO: <<<<>>>> need to propagate acking
 
-          ;; TODO: <<<<>>>
-          ;;  - then check if all emits are fully resolved, if so propagate emits to their nodes
-          ;;    - and propagate ack to the aggregator ack-invoke-id
-          ;;    - need to unwrap args
-
-
-          ;; TODO: <<<<>>>>
-          ;;  - what about with concurrent checking of stalled agent invokes? how to know it's not stalled...
-          ;;  - what about transforms... those aren't passed along
-          ;;    - those should be initiated and then completed by the next node
-          ;;      - the stores returned will have private access to the volatile to accumulate transforms...
-          ;;        - so transforms are not asyncresult in the same way
 
 
           (case> NodeAggStart :> {:keys [*node-fn]})
