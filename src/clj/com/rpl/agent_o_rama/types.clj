@@ -38,25 +38,35 @@
    start-node :- String
    uuid :- String])
 
-(s/defrecord+ AgentNodeArg
+(drp/defrecord+ AgentNodeArg
   [val :- (s/maybe Object)
-   tokens-used :- Long
-   start-time-millis :- Long
-   finish-time-millis :- Long])
+   async-op-index :- (s/maybe Long)])
+
+(drp/defrecord+ AsyncOpInfo
+  [start-time-millis :- (s/maybe Long)
+   finish-time-millis :- (s/maybe Long)
+   ;; info for models contains token stats, input prompt, output, etc.
+   info :- (s/maybe {String Object})])
 
 (drp/defrecord+ AsyncResultOutOfBand
-  [uuid :- String]
+  [id :- String]
   AsyncResult)
 
 (drp/defrecord+ AsyncResultPStateQuery
+  [async-op-index :- Long]
+  AsyncResult)
+
+(drp/defrecord+ AsyncPStateQuery
   [module-name :- String
    pstate-name :- String
-   path :- Object]
+   path :- Object
+   async-op-index :- Long]
   AsyncResult)
 
 (drp/defrecord+ AgentPStateTransform
   [pstate-name :- String
-   path :- Object])
+   path :- Object
+   async-op-index :- Long])
 
 (drp/defrecord+ AgentNodeEmit
   [invoke-id :- Long
@@ -80,16 +90,17 @@
 (drp/defrecord+ AsyncFutureResult
   [task-id :- Long
    invoke-id :- Long
-   emit-index :- Long
-   arg-index :- Long
-   result :- Object])
+   id :- String
+   result :- Object
+   start-time-millis :- Long
+   finish-time-millis :- Long
+   info :- {String Object}])
 
 (drp/defrecord+ AsyncFutureStreamingResult
   [agent-task-id :- Long
    agent-id :- Long
    node :- String
    invoke-id :- Long
-   emit-index :- Long
-   arg-index :- Long
+   id :- String
    streaming-index :- Long
    value :- Object])

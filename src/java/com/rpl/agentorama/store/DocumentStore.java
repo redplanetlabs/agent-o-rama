@@ -12,5 +12,4 @@ public interface DocumentStore<K> {
   void putDocumentFieldAsync(K key, Object docKey, Object value);
   void updateDocumentAsync(K key, RamaFunction1<Map, Map> updateFunction);
   <T, R> void updateDocumentFieldAsync(K key, Object docKey, RamaFunction1<T, R> updateFunction);
-
 }

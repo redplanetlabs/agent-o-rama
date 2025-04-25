@@ -13,6 +13,7 @@
            [com.rpl.agent_o_rama.types
              AgentNodeEmit
              AgentResult
+             AsyncOpInfo
              Node
              NodeAgg
              NodeAggStart]
@@ -350,38 +351,47 @@
   (let [task-id (ops/current-task-id)
         result-vol (volatile! nil)
         emits-vol (volatile! [])
+        async-ops-vol (volatile! [])
+        completable-futures (java.util.IdentityHashMap.)
         start-time-millis (TopologyUtils/currentTimeMillis)]
     (reify AgentNode
       (emit [this node args]
         (when (some? @result-vol)
           (throw (ex-info "Cannot emit with result already specified" {:current-result @result-vol})))
-        (vswap! emits-vol conj
-          (aor-types/->valid-AgentNodeEmit
-            (random-long)
-            task-id
-            node
-            (mapv
-              (fn [arg]
-                (cond
-                  (instance? AsyncResult arg)
-                  arg
+        (let [args (mapv
+                    (fn [arg]
+                      (cond
+                        (instance? AsyncResult arg)
+                        arg
 
-                  (instance? CompletableFuture arg)
-                  (.thenApply
-                    ^CompletableFuture arg
-                    (reify Function
-                      (apply [_ v]
-                        [start-time-millis (h/current-time-millis) v]))
+                        (instance? CompletableFuture arg)
+                        (do
+                          (when-not (.containsKey completable-futures arg)
+                            (let [i (count @async-ops-vol)]
+                              (.put completable-futures arg i)
+                              (vswap! async-ops-vol conj (aor-types/->static-map->valid-AsyncOpInfo {}))
+                              (vswap! emits-vol conj
+                                (.thenApply
+                                  ^CompletableFuture arg
+                                  (reify Function
+                                    (apply [_ v]
+                                      [i start-time-millis (h/current-time-millis) v]))))))
+                          (.thenApply
+                            ^CompletableFuture arg
+                            (reify Function
+                              (apply [_ v]
+                                [(.get completable-futures arg) v]))))
 
-                  :else
-                  (aor-types/->valid-AgentNodeArg
-                    arg
-                    0
-                    start-time-millis
-                    (TopologyUtils/currentTimeMillis)
-                    )))
-              args)
-            )))
+                        :else
+                        (aor-types/->valid-AgentNodeArg arg nil)))
+                    args))]
+          (vswap! emits-vol conj
+            (aor-types/->valid-AgentNodeEmit
+              (random-long)
+              task-id
+              node
+              args
+              )))
       (emitParallel [this node args]
         (when (some? @result-vol)
           (throw (ex-info "Cannot emit with result already specified" {:current-result @result-vol})))
@@ -405,32 +415,94 @@
       AgentNodeInternal
       (agent-node-state [this]
         {:emits @emits-vol
-         :result @result-vol}))))
+         :result @result-vol
+         :async-ops @async-ops-vol}))))
 
 (defn- immediate-async-resolve? [arg]
   (or (instance? CompletableFuture arg)
       (aor-types/AsyncResultPStateQuery? arg)))
 
-(deframaop handle-async-emits [*emits]
+(deframaop handle-async-emits [*async-ops *emits]
   (ops/current-task-id :> *node-task-id)
   (loop<- [*res []
+           *async-ops *async-ops
            *emits (seq *emits)
-           :> *emits]
+           :> *async-ops *emits]
     (<<if (nil? *emits)
-      (:> *res)
+      (:> *async-ops *res)
      (else>)
       (first *emits :> *emit)
-      (<<if (aor-types/AgentPStateTransform? *emit)
+      (<<cond
+        (case> (aor-types/AgentPStateTransform? *emit))
         ;; TODO: <<<<>>>> need to propagate failures back as the result
         ;;  - need to expose try/catch somehow...
-        (identity *emit :> {:keys [*pstate-name *path]})
+        (identity *emit :> {:keys [*pstate-name *path *async-op-index]})
         (this-module-pobject-task-global *pstate-name :> $$p)
+        (h/current-time-millis :> *start-time-millis)
         (|path$$ $$p *path)
         (this-module-pobject-task-global *pstate-name :> $$p)
         (local-transform> *path $$p)
+        (h/current-time-millis :> *finish-time-millis)
         (|direct *node-task-id)
-        (continue> *res (next *emits))
-       (else>)
+        (continue>
+          *res
+          (h/clj-transform
+            (path>
+             (nthpath *async-op-index)
+             (termval
+               (aor-types/->valid-AsyncOpInfo
+                 *start-time-millis
+                 *finish-time-millis
+                 {"type" "pstate-transform"
+                  "name" *pstate-name})))
+            *async-ops)
+          (next *emits))
+
+        (case> (aor-types/AgentPStateSelect? *emit))
+        ;; TODO: <<<<>>>> need to propagate failures back as the result
+        ;;  - need to expose try/catch somehow...
+        (identity *emit :> {:keys [*module-name *pstate-name *path *async-op-index]})
+        (pobject-task-global *module-name *pstate-name :> $$p)
+        (h/current-time-millis :> *start-time-millis)
+        (|path$$ $$p *path)
+        (pobject-task-global *module-name *pstate-name :> $$p)
+        (local-select> *path $$p :> *res)
+        (h/current-time-millis :> *finish-time-millis)
+        (|direct *node-task-id)
+        (continue>
+          *res
+          (h/clj-transform
+            (path>
+             (nthpath *async-op-index)
+             (termval
+               (aor-types/->valid-AsyncOpInfo
+                 *start-time-millis
+                 *finish-time-millis
+                 {"type" "pstate-select"
+                  "module-name" *module-name
+                  "name" *pstate-name
+                  "result" *res})))
+            *async-ops)
+          (next *emits))
+
+        (case> (instance> CompletableFuture *emit))
+        ;; TODO: <<<>>>> propagate failures
+        (completable-future> *emit :> [*async-op-index *start-millis *finish-millis *v])
+        (continue>
+          *res
+          (h/clj-transform
+            (path>
+             (nthpath *async-op-index)
+             (termval
+               (aor-types/->valid-AsyncOpInfo
+                 *start-millis
+                 *finish-millis
+                 {"type" "completable-future"
+                  "result" *v})))
+            *async-ops)
+          (next *emits))
+
+        (default>)
         (select>
           (subselect
             :args
@@ -448,39 +520,29 @@
             (first *asyncs :> [*arg-index *v])
             (<<cond
               (case> (instance? CompletableFuture *v))
-              ;; TODO: <<<<>>>> need to propagate failures back as the result (or to cause a retry)
-              (completable-future> *v :> [*start-millis *finish-millis *res])
+              ;; failure is already handled before
+              (completable-future> *v :> [*async-op-index *res])
 
               (case> (aor-types/AsyncResultPStateQuery? *v))
-              ;; TODO: <<<<>>>> need to propagate failures back as the result
-              ;;  - need to expose try/catch somehow...
-              (identity *v :> {:keys [*module-name *pstate-name *path]})
-              (h/current-time-millis :> *start-millis)
-              (pobject-task-global *module-name *pstate-name :> $$p)
-              (|path$$ $$p *path)
-              (pobject-task-global *module-name *pstate-name :> $$p)
-              (local-select> (subselect *path) $$p :> *res)
-              (h/current-time-millis :> *finish-millis)
-              (|direct *node-task-id)
+              (get *v :async-op-index :> *async-op-index)
+              (select> [(nthpath *async-op-index) :info (keypath "result")] *async-ops :> *res)
 
               (default> :unify false)
               (throw! (ex-info "Unknown async type" {:class (class *v)})))
-           (h/clj-transform
-             (path>
-               (nthpath *arg-index)
-               (termval
-                 (aor-types/->valid-AgentNodeArg
-                   *res
-                   0
-                   *start-millis
-                   *finish-millis)))
-             *emit
-             :> *new-emit)
-          (continue> *new-emit (next *asyncs))
-          ))
-        (continue> (conj *res *emit) (next *emits))
+            (h/clj-transform
+              (path>
+                (nthpath *arg-index)
+                (termval
+                  (aor-types/->valid-AgentNodeArg
+                    *res
+                    *async-op-index)))
+              *emit
+              :> *new-emit)
+           (continue> *new-emit (next *asyncs))
+           ))
+        (continue> (conj *res *emit) *async-ops (next *emits))
         )))
-  (:> *emits))
+  (:> *async-ops *emits))
 
 (defn- define-agent! [setup stream-topology name agent-graph]
   (let [graph (resolve-agent-graph agent-graph)
@@ -502,7 +564,6 @@
     ;; TODO: <<<<>>>>
     ;; - and ordered IDs is perfect for GC!
     ;;    - especially since they're sequential, so know exactly how many are in there by looking at min and max
-    ;;    - can materialize invoke args here, which is helpful for searching instead of having to query invokes PState repeatedly
     (declare-pstate*
       stream-topology
       agent-invoke-pstate-sym
@@ -511,6 +572,9 @@
           {:root-invoke-id Long
            :invoke-args [Object]
            :graph-version Long
+           ;; TODO: <<<<>>>> it should be able to be a redirect/retry
+           ;; - simpler would be if retry just continues it..., and then don't need redirect
+           ;; - maybe fork with same invoke ID has that behavior
            :result AgentResult})})
     (declare-pstate*
       stream-topology
@@ -518,13 +582,11 @@
       {Long ; agent ID
         (map-schema
           String ; node name
-          (map-schema
-            Long ; invoke-id
-            {Long ; emit index
-              {Long ; arg index
-                (list-schema Object {:subindex? true})
-                }}
-            {:subindex? true})
+          {String ; async invoke name
+            (map-schema
+              Long ; invoke-id
+              (list-schema Object {:subindex? true})
+              {:subindex? true})}
           {:subindex? true})})
     (declare-pstate*
       stream-topology
@@ -534,6 +596,7 @@
           {:graph-id Long
            :graph-task-id Long
            :node String
+           :async-ops [AsyncOpInfo]
            :emits [AgentNodeEmit]
            :result AgentResult
            :start-time-millis Long
@@ -589,6 +652,32 @@
         (anchor> <first-node-invoke>)
 
         (case> (aor-types/AsyncFutureResult? *data))
+        (identity *data :> {:keys [*invoke-id *id *result *start-time-millis *finish-time-millis *tokens-used]})
+        ;; TODO: <<<<>>>> want to keep track of LLM calls separately to emits
+        ;;  - so when looking at the node can see all the async stuff going on
+        ;;  - and would be nice for each emit arg to keep track of its "source"
+        ;;    - source would be like "chatGPT" "user-invoke-id"
+        ;;    - and for "user-invoke-id", it would show the input prompt, "chatGPT", tokens used, etc.
+        ;;    - so move token usage OUT of emits and into that part of structure
+        ;;    - and also start/finish?
+        (local-transform>
+          [(keypath *invoke-id)
+           :emits
+           ALL
+           :args
+           ALL
+           aor-types/AsyncResultOutOfBand?
+           (pred= *id)
+           (termval
+             ;; TODO: <<<<>>>> update args
+             (aor-types/->valid-AgentNodeArg
+               *result
+               *tokens-used
+               *start-time-millis
+               *finish-time-millis
+               ))]
+          agent-node-pstate-sym
+          )
         ;; TODO: <<<<>>>
         ;;   - look up the node invoke
         ;;   - if success:
@@ -618,8 +707,8 @@
           (mk-agent-node :> *agent-node)
           (h/current-time-millis :> *start-time-millis)
           (apply *node-fn *agent-node *args)
-          (agent-node-state *agent-node :> {:keys [*emits *result]})
-          (handle-async-emits *emits :> *emits)
+          (agent-node-state *agent-node :> {:keys [*async-ops *emits *result]})
+          (handle-async-emits *async-ops *emits :> *async-ops *emits)
           ;; TODO: <<<<>>>>
           (...emits-finished? *emits :> *emits-finished?)
           (<<if *emits-finished?
@@ -631,6 +720,7 @@
              (termval {:graph-id *graph-id
                        :graph-task-id *graph-task-id
                        :node *next-node
+                       :async-ops *async-ops
                        :start-time-millis *start-time-millis
                        :finish-time-millis *finish-time-millis
                        :input *args
