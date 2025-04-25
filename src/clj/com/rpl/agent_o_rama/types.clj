@@ -49,7 +49,7 @@
    info :- (s/maybe {String Object})])
 
 (drp/defrecord+ AsyncResultOutOfBand
-  [id :- String]
+  [async-op-index :- Long]
   AsyncResult)
 
 (drp/defrecord+ AsyncResultPStateQuery
@@ -90,7 +90,7 @@
 (drp/defrecord+ AsyncFutureResult
   [task-id :- Long
    invoke-id :- Long
-   id :- String
+   async-op-index :- Long
    result :- Object
    start-time-millis :- Long
    finish-time-millis :- Long

@@ -652,32 +652,29 @@
         (anchor> <first-node-invoke>)
 
         (case> (aor-types/AsyncFutureResult? *data))
-        (identity *data :> {:keys [*invoke-id *id *result *start-time-millis *finish-time-millis *tokens-used]})
-        ;; TODO: <<<<>>>> want to keep track of LLM calls separately to emits
-        ;;  - so when looking at the node can see all the async stuff going on
-        ;;  - and would be nice for each emit arg to keep track of its "source"
-        ;;    - source would be like "chatGPT" "user-invoke-id"
-        ;;    - and for "user-invoke-id", it would show the input prompt, "chatGPT", tokens used, etc.
-        ;;    - so move token usage OUT of emits and into that part of structure
-        ;;    - and also start/finish?
+        (identity *data :> {:keys [*invoke-id *async-op-index *result *start-time-millis *finish-time-millis *info]})
         (local-transform>
           [(keypath *invoke-id)
-           :emits
-           ALL
-           :args
-           ALL
-           aor-types/AsyncResultOutOfBand?
-           (pred= *id)
-           (termval
-             ;; TODO: <<<<>>>> update args
-             (aor-types/->valid-AgentNodeArg
-               *result
-               *tokens-used
-               *start-time-millis
-               *finish-time-millis
-               ))]
-          agent-node-pstate-sym
-          )
+           (multi-path
+             [:async-ops
+              (nthpath *async-op-index)
+              (termval
+                (aor-types/->valid-AsyncOpInfo
+                  *start-time-millis
+                  *finish-time-millis
+                  *info))]
+             [:emits
+               ALL
+               :args
+               ALL
+               aor-types/AsyncResultOutOfBand?
+               (selected? :async-op-index (pred= *async-op-index))
+               (termval
+                 (aor-types/->valid-AgentNodeArg
+                   *result
+                   *async-op-index
+                   ))])]
+          agent-node-pstate-sym)
         ;; TODO: <<<<>>>
         ;;   - look up the node invoke
         ;;   - if success:
