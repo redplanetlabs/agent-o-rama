@@ -544,6 +544,12 @@
         )))
   (:> *async-ops *emits))
 
+(defn- emits-finished? [emits]
+  (not
+    (selected-any?
+      [ALL :args ALL #(not (aor-types/AgentNodeArg? %))]
+      emits)))
+
 (defn- define-agent! [setup stream-topology name agent-graph]
   (let [graph (resolve-agent-graph agent-graph)
         agent-depot-sym (symbol (str "*_agent-depot-" name))
@@ -706,8 +712,7 @@
           (apply *node-fn *agent-node *args)
           (agent-node-state *agent-node :> {:keys [*async-ops *emits *result]})
           (handle-async-emits *async-ops *emits :> *async-ops *emits)
-          ;; TODO: <<<<>>>>
-          (...emits-finished? *emits :> *emits-finished?)
+          (emits-finished? *emits :> *emits-finished?)
           (<<if *emits-finished?
             (h/current-time-millis :> *finish-time-millis)
            (else>)
@@ -742,7 +747,7 @@
             (|direct *target-task-id)
             (continue> *invoke-id *node-name *unwrapped-args *agg-invoke-id))
           ;; TODO: <<<<>>>> emit code should be shared for all branches?
-          ;; TODO: <<<<>>>> need to propagate acking
+          ;; TODO: <<<<>>>> need to propagate agg acking
 
 
 
