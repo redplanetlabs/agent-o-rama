@@ -25,9 +25,6 @@
 (drp/defrecord+ AgentResult
   [val :- (s/maybe Object)])
 
-(drp/defrecord+ InProgressArg
-  [val :- Object])
-
 (drp/defrecord+ AgentNode
   [node :- (s/cond-pre Node NodeAggStart NodeAgg)
    output-nodes :- #{String}
@@ -60,8 +57,7 @@
   [module-name :- String
    pstate-name :- String
    path :- Object
-   async-op-index :- Long]
-  AsyncResult)
+   async-op-index :- Long])
 
 (drp/defrecord+ AgentPStateTransform
   [pstate-name :- String
@@ -104,3 +100,13 @@
    id :- String
    streaming-index :- Long
    value :- Object])
+
+(drp/defrecord+ NodeOp
+  [invoke-id :- Long
+   next-node :- String
+   args :- [Object]
+   agg-invoke-id :- Long])
+
+(drp/defrecord+ AggAckOp
+  [agg-invoke-id :- Long
+   ack-val :- Long])

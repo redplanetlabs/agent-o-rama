@@ -387,7 +387,10 @@
                     args))]
           (vswap! emits-vol conj
             (aor-types/->valid-AgentNodeEmit
+              ;; TODO: <<<<>>>> should set this to nil for now, and then set it later when conjing?
+              ;; TODO: <<<<<>>>> also keep track of count of number of "node" emits
               (random-long)
+              ;; TODO: <<<<>>>> if going to agg node or start agg node, make this the graph task ID
               task-id
               node
               args
@@ -398,6 +401,7 @@
         ;; TODO: <<<<>>>>
         ;;  - need the task global with shuffled task IDs
         ;;  - ideally have the thread->tasks mapping
+        ;;  - validate that this is not going to an agg node or agg start node
         (assert false)
         )
       (result [this arg]
@@ -550,6 +554,27 @@
       [ALL :args ALL #(not (aor-types/AgentNodeArg? %))]
       emits)))
 
+(defn- node-type [graph node]
+  (select-any [:node-map (keypath *next-node) :node (view h/node->type-kw)]
+    graph))
+
+(deframaop send-emits> [*agent-name *graph-task-id *invoke-id *agg-invoke-id *emits]
+  (anchor> <root>)
+  (ops/explode *emits :> {:keys [*invoke-id *target-task-id *node-name *args]})
+  (mapv :val *args :> *unwrapped-args)
+  (|direct *target-task-id)
+  (aor-types/->valid-NodeOp *invoke-id *node-name *unwrapped-args *agg-invoke-id :> *op)
+  (anchor> <regular-emit>)
+
+  (hook> <root>)
+  (filter> (and> (some? *agg-invoke-id) (empty? *emits)))
+  (|direct *graph-task-id)
+  (aor-types/->valid-AggAckOp *agg-invoke-id *invoke-id :> *op)
+  (anchor> <agg-ack-emit>)
+
+  (unify> <regular-emit> <agg-ack-emit>)
+  (:> *op))
+
 (defn- define-agent! [setup stream-topology name agent-graph]
   (let [graph (resolve-agent-graph agent-graph)
         agent-depot-sym (symbol (str "*_agent-depot-" name))
@@ -655,7 +680,6 @@
         (get agent-graph-sym :start-node :> *next-node)
         (identity nil :> *node-invoke-source)
         (identity [] :> *agg-context)
-        (anchor> <first-node-invoke>)
 
         (case> (aor-types/AsyncFutureResult? *data))
         (identity *data :> {:keys [*invoke-id *async-op-index *result *start-time-millis *finish-time-millis *info]})
@@ -681,32 +705,33 @@
                    *async-op-index
                    ))])]
           agent-node-pstate-sym)
-        ;; TODO: <<<<>>>
-        ;;   - look up the node invoke
-        ;;   - if success:
-        ;;     - update node PState
-        ;;     - if all AsyncFuture filled in, process it as an emit, unified with above code
-        ;;    - and should be part of a loop
-        ;;    - this part unifies with the output portion of a node... which is inside the loop below
-        ;;      - maybe this can be factored into a helper function, and then this unifies with the loop?
-        ;;  - if failure, bump retries and try it again
-        <async-node-finished>
-        )
+        (local-select>
+          [(keypath *invoke-id)
+           (subselect (multi-path :graph-id :graph-task-id :emits :node :agg-invoke-id :parent-agg-invoke-id))]
+          agent-node-pstate-sym :> [*graph-id *graph-task-id *emits *node *agg-invoke-id *parent-agg-invoke-id])
+        (filter> (emits-finished? *emits))
+        (node-type agent-graph-sym *node :> *node-type)
+        (ifexpr (= *node-type aor-types/AGG-NODE-KW)
+          *parent-agg-invoke-id
+          *agg-invoke-id
+          :> *agg-invoke-id)
+        (send-emits> name *graph-task-id *invoke-id *agg-invoke-id *emits :> *op)
+
+        (default> :unify false)
+        (throw! (ex-info "Unrecognized data type" {:class (class *data)})))
 
       ;; requires *graph-id, *graph-task-id, *invoke-id, *next-node, *args, *agg-invoke-id to be in scope
-      (unify> <first-node-invoke> <async-node-finished>)
-      (loop<- [*invoke-id *invoke-id
-               *next-node *next-node
-               *args *args
-               *agg-invoke-id *agg-invoke-id]
-        (select> [:node-map (keypath *next-node) :node (view h/node->type-kw)]
-          agent-graph-sym :> *expected-node-type)
-        (<<if (contains? #{aor-types/AGG-START-NODE-KW aor-types/AGG-NODE-KW} *expected-node-type)
-          (|direct *graph-task-id))
-        (select> [:node-map (keypath *next-node) :node]
-          agent-graph-sym :> *node-obj)
-        (<<subsource *node-obj
+      (loop<- [*op *op]
+        (<<if (aor-types/NodeOp? *op)
+          (get *op :next-node :> *next-node)
+          (select> [:node-map (keypath *next-node) :node]
+            agent-graph-sym :> *op-obj)
+         (else>)
+          (identity *op :> *op-obj))
+
+        (<<subsource *op-obj
           (case> Node :> {:keys [*node-fn]})
+          (identity *op :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
           (mk-agent-node :> *agent-node)
           (h/current-time-millis :> *start-time-millis)
           (apply *node-fn *agent-node *args)
@@ -742,22 +767,27 @@
                 agent-invoke-pstate-sym)
               ))
           (<<if *emits-finished?
-            (ops/explode *emits :> {:keys [*invoke-id *target-task-id *node-name *args]})
-            (mapv :val *args :> *unwrapped-args)
-            (|direct *target-task-id)
-            (continue> *invoke-id *node-name *unwrapped-args *agg-invoke-id))
-          ;; TODO: <<<<>>>> emit code should be shared for all branches?
-          ;; TODO: <<<<>>>> need to propagate agg acking
-
-
+            (send-emits> *graph-task-id *invoke-id *agg-invoke-id *emits :> *op)
+            (continue> *op))
 
           (case> NodeAggStart :> {:keys [*node-fn]})
           ;; TODO: <<<<<>>>> guaranteed to be new agg context
           ;;  - needs to capture the current agg invoke-id into parent-agg-invoke-id
+          ;;  - otherwise the code is the same as for Node...
+          ;;  - set up invoke ID for the aggregator as well and initialize its ack val
 
           (case> NodeAgg :> {:keys [*agg-node]})
           (assert! (some? *agg-invoke-id))
+          ;; TODO: <<<<>>>>
+          ;;  -
 
+          (case> AggAckOp :> {:keys [*agg-invoke-id *ack-val]})
+          ;: TODO: <<<<>>>>
+          ;;  - apply ack val
+          ;;  - if zero:
+          ;;     - run completion function
+          ;;     - handle-async-emits and/or completed emits
+          ;;     - seems like that should be in continuation
           )
 
 
