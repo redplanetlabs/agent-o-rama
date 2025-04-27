@@ -563,6 +563,33 @@
   (select-any [:node-map (keypath *next-node) :node (view h/node->type-kw)]
     graph))
 
+(deframafn handle-node-invoke [*name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *agg-invoke-id]
+  (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *agent-name))]
+    (mk-agent-node :> *agent-node)
+    (h/current-time-millis :> *start-time-millis)
+    ;; TODO: <<<<>>>> should be done in a try/catch with exceptions causing non-retryable failure
+    (apply *node-fn *agent-node *args :> *node-fn-res)
+    (agent-node-state *agent-node :> {:keys [*async-ops *emits *result]})
+    ;; TODO: <<<<>>>> error if not in agg context and #emits != 1
+    (handle-async-emits *async-ops *emits :> *async-ops *emits)
+    (local-transform>
+      [(keypath *invoke-id)
+       (termval {:graph-id *graph-id
+                 :graph-task-id *graph-task-id
+                 :node *next-node
+                 :async-ops *async-ops
+                 :start-time-millis *start-time-millis
+                 :input *args
+                 :emits *emits
+                 :result *result
+                 :agg-invoke-id *agg-invoke-id
+                })]
+        $$nodes)
+    (:> {:start-time-millis *start-time-millis
+         :node-fn-res *node-fn-res
+         :emits *emits
+         :result *result})))
+
 (deframaop send-emits> [*agent-name *graph-task-id *invoke-id *agg-invoke-id *emits]
   (anchor> <root>)
   (ops/explode *emits :> {:keys [*invoke-id *target-task-id *node-name *args]})
@@ -740,34 +767,16 @@
         (<<subsource *op-obj
           (case> Node :> {:keys [*node-fn]})
           (identity *op :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
-          (mk-agent-node :> *agent-node)
-          (h/current-time-millis :> *start-time-millis)
-          ;; TODO: <<<<>>>> should be done in a try/catch with exceptions causing non-retryable failure
-          (apply *node-fn *agent-node *args)
-          (agent-node-state *agent-node :> {:keys [*async-ops *emits *result]})
-          ;; TODO: <<<<>>>> error if not in agg context and #emits != 1
-          (handle-async-emits *async-ops *emits :> *async-ops *emits)
-          (local-transform>
-            [(keypath *invoke-id)
-             (termval {:graph-id *graph-id
-                       :graph-task-id *graph-task-id
-                       :node *next-node
-                       :async-ops *async-ops
-                       :start-time-millis *start-time-millis
-                       :input *args
-                       :emits *emits
-                       :result *result
-                       :agg-invoke-id *agg-invoke-id
-                      })]
-              agent-node-pstate-sym)
-
+          (handle-node-invoke
+            name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *new-agg-invoke-id
+            :> {:keys [*emits *result]})
 
           (case> NodeAggStart :> {:keys [*node-fn]})
           (identity *op :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
           (h/random-long :> *new-agg-invoke-id)
-          ;; TODO: <<<<>>>>
-          (...handle-node-invoke name *node-fn *invoke-id *next-node *args *new-agg-invoke-id
-            :> *start-time-millis *init-state *emits *result)
+          (handle-node-invoke
+            name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *new-agg-invoke-id
+            :> {:keys [*start-time-millis *node-fn-res *emits *result]})
           ;; TODO: <<<<>>>>
           (... :> *agg-node-name)
           (local-transform>
@@ -779,20 +788,10 @@
                        :agg-invoke-id *agg-invoke-id
                        ;; TODO: <<<<>>>> this needs to be a suindexed list
                        :agg-inputs ...
-                       :agg-state *init-state
+                       :agg-state *node-fn-res
                        :agg-ack-val *invoke-id
                       })]
               agent-node-pstate-sym)
-
-
-          ;; TODO: <<<<<>>>> guaranteed to be new agg context
-          ;;  - needs to capture the current agg invoke-id into parent-agg-invoke-id
-          ;;  - otherwise the code is the same as for Node except:
-          ;;    - also sets up the aggregation state
-          ;;    - captures result of invoke fn
-          ;;      - seems like can capture all that into a deframaop
-          ;;  - set up invoke ID for the aggregator as well and initialize its ack val
-          ;;    - agg-invoke-id will be for the aggnode
 
           (case> NodeAgg :> {:keys [*agg-node]})
           (assert! (some? *agg-invoke-id))
@@ -812,6 +811,7 @@
           (identity nil :> *emits)
           (identity nil :> *agg-invoke-id)
           )
+      ;; AgentNode implementation makes it impossible for there to be both emits and result
       (<<if (some? *result)
         (<<atomic
           (|direct *graph-task-id)
@@ -829,7 +829,6 @@
             agent-node-pstate-sym))
         (send-emits> *graph-task-id *invoke-id *agg-invoke-id *emits :> *op)
         (continue> *op)))
-
 
 
 
@@ -859,23 +858,13 @@
     ;;    - depot per agent for recieving inputs
     ;;      - client append is UUID + args
     ;;      - client should query for number of args
-    ;;    - depot for receiving continuations
-    ;;    - PState for storing inputs/outputs of nodes and agg info
-    ;;    - tick depot for checking active nodes and retrying/continuing if necessary
-    ;;    - task global for the actual graph structure so can look up node -> node-obj and agg label
     ;;    - task global for out-of-band events
-    ;;    - tick depot per agent
-    ;;      - check active nodes for retries
-    ;;    - source subscription
 
     ;; TODO: <<<<>>>
     ;;   - if node emits multiple times and is not in aggregation context, isn't that a problem?
     ;;      - same with not emitting at all
     ;;   - these should be runtime errors?
-    ;;      - easy to track if in agg context or not
-
-
-    ;;
+    ;;      - easy to track if in agg context or not    ;;
     ))
 
 (defn define-agents! [setup stream-topology agent-graphs]
