@@ -188,19 +188,13 @@
     (graph/digraph)
     nodes))
 
-;; TODO: <<<<>>>>
-;;  - don't allow looping back to start agg node from within agg context (but OK from agg node)
-;;    - need test for looping back from agg node
-;;  - start agg node needs to know the agg node
 (defn- annotate-aggs [graph node traversed agg-stack]
   (let [curr-agg (peek agg-stack)
         node-obj (lattr/attr graph node :node-obj)
         next-traversed (conj traversed node)]
     (cond
-      (contains? traversed node-obj)
-      ;; first case allows agg subgraph to loop back to start node of aggregation
-      (if (and (not= node curr-agg)
-               (not= (lattr/attr graph node :agg) curr-agg))
+      (contains? traversed node)
+      (if (not= (lattr/attr graph node :agg) curr-agg)
         (throw (ex-info "Invalid loop to different agg context"
                         {:agg1 curr-agg
                          :agg2 (lattr/attr graph node :agg)}))
@@ -235,7 +229,11 @@
       (do
         (when (nil? curr-agg)
           (throw (ex-info "Reached AggNode outside of agg context" {:name node})))
-        (let [new-agg-stack (pop agg-stack)]
+        (let [new-agg-stack (pop agg-stack)
+              curr-agg-end (lattr/attr graph curr-agg :agg-end)]
+          (if (some? curr-agg-end)
+            (throw (ex-info "Only one AggNode can be reached per aggregation context"
+                            {:curr-agg curr-agg :other-agg node})))
           (reduce
             (fn [graph output-node]
               (annotate-aggs
@@ -244,7 +242,9 @@
                 next-traversed
                 new-agg-stack
                 ))
-            (lattr/add-attr graph node :agg curr-agg)
+            (-> graph
+                (lattr/add-attr node :agg curr-agg)
+                (lattr/add-attr curr-agg :end-agg node))
             (graph/successors graph node))))
 
       :else
@@ -262,6 +262,9 @@
             (assoc m
                    node
                    (aor-types/->valid-AgentNode
+                     ;; TODO: <<<<>>>> need to capture the agg node name for the preagg node name
+                     ;; - make it part of this object?
+                     ;;   - can make it part of this object in annotate-aggs
                      (lattr/attr graph node :node-obj)
                      (set output-nodes)
                      (lattr/attr graph node :agg)))
@@ -427,6 +430,7 @@
       (aor-types/AsyncResultPStateQuery? arg)))
 
 (deframaop handle-async-emits [*async-ops *emits]
+  ;: TODO: <<<<>>>> need to know total number of node emits, and the compute the ack vals for them to use
   (ops/current-task-id :> *node-task-id)
   (loop<- [*res []
            *async-ops *async-ops
@@ -507,6 +511,7 @@
           (next *emits))
 
         (default>)
+        ;; TODO: <<<<>>> update the ack val here
         (select>
           (subselect
             :args
@@ -632,14 +637,14 @@
            :result AgentResult
            :start-time-millis Long
            :finish-time-millis Long
+           :agg-invoke-id Long
 
            ;; regular node state
            :input [Object]
-           :agg-invoke-id Long
 
            ;; agg state
+           ;; TODO: <<<<>>> change this to remember order
            :agg-inputs (map-schema Long [Object] {:subindex? true}) ; invoke ID -> args
-           :parent-agg-invoke-id Long
            :agg-state Object
            :agg-ack-val Long
 
@@ -677,9 +682,7 @@
                      :invoke-args *args
                      :graph-version *version})]
           agent-invoke-pstate-sym)
-        (get agent-graph-sym :start-node :> *next-node)
-        (identity nil :> *node-invoke-source)
-        (identity [] :> *agg-context)
+        (aor-types/->valid-NodeOp *invoke-id (get agent-graph-sym :start-node) *args nil :> *op)
 
         (case> (aor-types/AsyncFutureResult? *data))
         (identity *data :> {:keys [*invoke-id *async-op-index *result *start-time-millis *finish-time-millis *info]})
@@ -710,6 +713,11 @@
            (subselect (multi-path :graph-id :graph-task-id :emits :node :agg-invoke-id :parent-agg-invoke-id))]
           agent-node-pstate-sym :> [*graph-id *graph-task-id *emits *node *agg-invoke-id *parent-agg-invoke-id])
         (filter> (emits-finished? *emits))
+        (local-transform>
+          [(keypath *invoke-id)
+           :finish-time-millis
+           (termval *finish-time-millis)]
+          agent-node-pstate-sym)
         (node-type agent-graph-sym *node :> *node-type)
         (ifexpr (= *node-type aor-types/AGG-NODE-KW)
           *parent-agg-invoke-id
@@ -720,7 +728,7 @@
         (default> :unify false)
         (throw! (ex-info "Unrecognized data type" {:class (class *data)})))
 
-      ;; requires *graph-id, *graph-task-id, *invoke-id, *next-node, *args, *agg-invoke-id to be in scope
+      ;; requires *graph-id, *graph-task-id, *op to be in scope
       (loop<- [*op *op]
         (<<if (aor-types/NodeOp? *op)
           (get *op :next-node :> *next-node)
@@ -734,14 +742,11 @@
           (identity *op :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
           (mk-agent-node :> *agent-node)
           (h/current-time-millis :> *start-time-millis)
+          ;; TODO: <<<<>>>> should be done in a try/catch with exceptions causing non-retryable failure
           (apply *node-fn *agent-node *args)
           (agent-node-state *agent-node :> {:keys [*async-ops *emits *result]})
+          ;; TODO: <<<<>>>> error if not in agg context and #emits != 1
           (handle-async-emits *async-ops *emits :> *async-ops *emits)
-          (emits-finished? *emits :> *emits-finished?)
-          (<<if *emits-finished?
-            (h/current-time-millis :> *finish-time-millis)
-           (else>)
-            (identity nil :> *finish-time-millis))
           (local-transform>
             [(keypath *invoke-id)
              (termval {:graph-id *graph-id
@@ -749,37 +754,51 @@
                        :node *next-node
                        :async-ops *async-ops
                        :start-time-millis *start-time-millis
-                       :finish-time-millis *finish-time-millis
                        :input *args
                        :emits *emits
                        :result *result
                        :agg-invoke-id *agg-invoke-id
                       })]
               agent-node-pstate-sym)
-          (<<if (some? *result)
-            (<<atomic
-              (|direct *graph-task-id)
-              (local-transform>
-                [(keypath *graph-id)
-                 :result
-                 (termval *result)
-                 ]
-                agent-invoke-pstate-sym)
-              ))
-          (<<if *emits-finished?
-            (send-emits> *graph-task-id *invoke-id *agg-invoke-id *emits :> *op)
-            (continue> *op))
+
 
           (case> NodeAggStart :> {:keys [*node-fn]})
+          (identity *op :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
+          (h/random-long :> *new-agg-invoke-id)
+          ;; TODO: <<<<>>>>
+          (...handle-node-invoke name *node-fn *invoke-id *next-node *args *new-agg-invoke-id
+            :> *start-time-millis *init-state *emits *result)
+          ;; TODO: <<<<>>>>
+          (... :> *agg-node-name)
+          (local-transform>
+            [(keypath *new-agg-invoke-id)
+             (termval {:graph-id *graph-id
+                       :graph-task-id *graph-task-id
+                       :node *agg-node-name
+                       :start-time-millis *start-time-millis
+                       :agg-invoke-id *agg-invoke-id
+                       ;; TODO: <<<<>>>> this needs to be a suindexed list
+                       :agg-inputs ...
+                       :agg-state *init-state
+                       :agg-ack-val *invoke-id
+                      })]
+              agent-node-pstate-sym)
+
+
           ;; TODO: <<<<<>>>> guaranteed to be new agg context
           ;;  - needs to capture the current agg invoke-id into parent-agg-invoke-id
-          ;;  - otherwise the code is the same as for Node...
+          ;;  - otherwise the code is the same as for Node except:
+          ;;    - also sets up the aggregation state
+          ;;    - captures result of invoke fn
+          ;;      - seems like can capture all that into a deframaop
           ;;  - set up invoke ID for the aggregator as well and initialize its ack val
+          ;;    - agg-invoke-id will be for the aggnode
 
           (case> NodeAgg :> {:keys [*agg-node]})
           (assert! (some? *agg-invoke-id))
           ;; TODO: <<<<>>>>
-          ;;  -
+          ;;  - this processes emits incrementally as it goes
+          ;;  - what about 'finished' agg method for early finish
 
           (case> AggAckOp :> {:keys [*agg-invoke-id *ack-val]})
           ;: TODO: <<<<>>>>
@@ -788,41 +807,29 @@
           ;;     - run completion function
           ;;     - handle-async-emits and/or completed emits
           ;;     - seems like that should be in continuation
+          (identity nil :> *result)
+          (identity nil :> *invoke-id)
+          (identity nil :> *emits)
+          (identity nil :> *agg-invoke-id)
           )
+      (<<if (some? *result)
+        (<<atomic
+          (|direct *graph-task-id)
+          (local-transform>
+            [(keypath *graph-id)
+             :result
+             (termval *result)
+             ]
+            agent-invoke-pstate-sym)))
+      (<<if (emits-finished? *emits)
+        (local-transform>
+          [(keypath *new-agg-invoke-id)
+           :finish-time-millis
+           (termval (h/current-time-millis)]
+            agent-node-pstate-sym))
+        (send-emits> *graph-task-id *invoke-id *agg-invoke-id *emits :> *op)
+        (continue> *op)))
 
-
-
-        ;; TODO: <<<<>>>>
-        ;;  - normal node and start agg node check if it's initialized or not
-        ;;  - agg node checks if its invoke ID is in :agg-inputs an then skips the whole thing
-        ;;      - but what about its async emits?
-        ;;      - if task resets, need to retry ALL inputs
-        ;;  - either way, execute ack-invoke
-        ;;  - execution then differs per type:
-        ;;    - normal node and start agg node initialize similar but not the same
-        ;;      - start agg node initializes the agg fields
-        ;;    - normal node collects emits and writes them in
-        ;;    - start agg node returns the initial agg state and then writes it in (along with emits)
-        ;;    - agg node executes and writes new agg state plus the new emit plus its invoke ID + args
-
-
-
-
-
-
-        ;; TODO: <<<<>>>>
-        ;;  - verify the expected-node-type – need this in the closure, or just fetch it here?
-        ;;  - fetch the node function
-        ;;  - if agg start node, partition back to graph-task-id
-        ;;  - invoke the node with the args in a try/catch
-        ;;    - on failure, increment retry count, do |direct partition, and try again
-        ;;    - AgentNode reify captures all emits
-        ;;  - agg start node produces init for the agg state
-        ;;  - if any AsyncFuture results, then stop execution on this branch
-        ;;  - otherwise, if this has an agg context need to go to the agg task-id + invoke-id
-        ;;     - TODO: how to track that info
-        ;;     - TODO: what if nothing reaches the agg? how does it invoke it?
-        ;;        - what connects the agg start node to the agg node... they all just point to the agg start node
 
 
 
@@ -868,42 +875,6 @@
     ;;      - easy to track if in agg context or not
 
 
-    ;; TODO: <<<<>>>>
-    ;; FLOW:
-    ;;  - input depot receives args for invoke
-    ;;    - need to be able to partition by user ID so can colocate with user data?
-    ;;  - create state tracking this agent invoke
-    ;;    - assign an ID (task ID + UUID)
-    ;;    - need to know agg context and ID for it
-    ;;      - agg context is the AggStartNode name + the invoke ID + task ID where it was initiated
-    ;;  - create ID for the "emit" (which is the invoke in this case)
-    ;;  - write emit ID -> node name + args into state
-    ;;      - a state could be entered multiple times at same time, so need an identifier for the "active invoke"
-    ;;  - invoke node on that task
-    ;;    - on exception, update state with failure count
-    ;;    - on success, update state that the node is "done" and write targets nodes + invokes to them
-    ;;      - also need to write implicit output to agg node
-    ;;    - if any outputs are AsyncFuture:
-    ;;      - check type
-    ;;      - if PState query or write, then do it immediately
-    ;;          - error should be immediate failure of agent
-    ;;          - if "slow external", then update state with what it's waiting for in the in-memory task global along with its ID
-    ;;      - asyncfuture execution either deliver result, or it delivers failure
-    ;;        - failure here will be a depot append that increments failure count and tries again
-    ;;          - the failure append include the input to retry
-    ;;        - race condition with tick that checks if its empty or not...
-    ;;          - could fix this race by keeping in-mem info on whether it's active or not
-    ;;        - success updates state with value and that it's no longer pending
-    ;;          - when all of them are successful, can send to the next task
-    ;;          - sending to next task:
-    ;;            - update state on that task with the invokes
-    ;;            - sends message back to clear the state so it doesn't retry
-    ;;          - seems like input depot and continuation depot can just be the same...
-    ;;            - depot partitioniner for continuations can contain task ID
-    ;;    - TODO: what about aggs?
-    ;;      - if in agg context, need to send invoke IDs of emits to the origin
-    ;;        - and need confirmation it was sent and came back
-    ;;          - this needs to be paired with ack of its own invoke ID
     ;;
     ))
 
