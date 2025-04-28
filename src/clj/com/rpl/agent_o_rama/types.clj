@@ -9,7 +9,7 @@
 (def AGG-NODE-KW :agg-node)
 
 (defrecord Node [node-fn])
-(defrecord NodeAggStart [node-fn])
+(defrecord NodeAggStart [node-fn agg-node-name])
 (defrecord NodeAgg [agg-node])
 
 (defn node->type-kw [node]

@@ -134,7 +134,7 @@
               this#
               ~name-sym
               ~osym
-              (aot-types/->NodeAggStart (h/convert-void-jfn ~jfn-sym)))
+              (aot-types/->NodeAggStart (h/convert-void-jfn ~jfn-sym) nil))
             )))
     ~@body
     ))
@@ -230,8 +230,8 @@
         (when (nil? curr-agg)
           (throw (ex-info "Reached AggNode outside of agg context" {:name node})))
         (let [new-agg-stack (pop agg-stack)
-              curr-agg-end (lattr/attr graph curr-agg :agg-end)]
-          (if (some? curr-agg-end)
+              start-node-obj (lattr/attr graph curr-agg :node-obj)]
+          (if (some? (:agg-node-name start-node-obj))
             (throw (ex-info "Only one AggNode can be reached per aggregation context"
                             {:curr-agg curr-agg :other-agg node})))
           (reduce
@@ -244,7 +244,7 @@
                 ))
             (-> graph
                 (lattr/add-attr node :agg curr-agg)
-                (lattr/add-attr curr-agg :end-agg node))
+                (lattr/add-attr curr-agg :node-obj (assoc start-node-obj :agg-node-name node)))
             (graph/successors graph node))))
 
       :else
@@ -262,9 +262,6 @@
             (assoc m
                    node
                    (aor-types/->valid-AgentNode
-                     ;; TODO: <<<<>>>> need to capture the agg node name for the preagg node name
-                     ;; - make it part of this object?
-                     ;;   - can make it part of this object in annotate-aggs
                      (lattr/attr graph node :node-obj)
                      (set output-nodes)
                      (lattr/attr graph node :agg)))
@@ -771,14 +768,12 @@
             name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *new-agg-invoke-id
             :> {:keys [*emits *result]})
 
-          (case> NodeAggStart :> {:keys [*node-fn]})
+          (case> NodeAggStart :> {:keys [*node-fn *agg-node-name]})
           (identity *op :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
           (h/random-long :> *new-agg-invoke-id)
           (handle-node-invoke
             name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *new-agg-invoke-id
             :> {:keys [*start-time-millis *node-fn-res *emits *result]})
-          ;; TODO: <<<<>>>>
-          (... :> *agg-node-name)
           (local-transform>
             [(keypath *new-agg-invoke-id)
              (termval {:graph-id *graph-id

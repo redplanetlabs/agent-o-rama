@@ -75,7 +75,7 @@
     agent-graph
     name
     output-nodes-spec
-    (i/->NodeAggStart node-fn)))
+    (i/->NodeAggStart node-fn nil)))
 
 (defmacro agg-start-node [agent-graph name output-nodes-spec & fn-body]
   `(agg-start-node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))
