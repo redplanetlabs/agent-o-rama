@@ -6,13 +6,12 @@
             [com.rpl.agent-o-rama.types :as aor-types]
             [com.rpl.rama.ops :as ops]
             [loom.attr :as lattr]
-            [loom.graph :as graph]
-            ;; TODO: <<<<>>>> expose current-random-source in public API and use that
-            [rpl.rama.distributed.core :as d])
+            [loom.graph :as graph])
   (:import [com.rpl.agentorama AgentGraph AgentNode AggNode AggNode$Impl AsyncResult]
            [com.rpl.agent_o_rama.types
              AgentNodeEmit
              AgentResult
+             AggInput
              AsyncOpInfo
              Node
              NodeAgg
@@ -278,18 +277,9 @@
     (get data "args")
     (:args data)))
 
-(defdepotpartitioner agent-depot-partitioner
-  [data num-partitions]
-  ;; TODO: <<<<>>>>
-  )
-
 (defdepotpartitioner agent-streaming-depot-partitioner
   [{:keys [agent-task-id]} num-partitions]
   agent-task-id)
-
-
-(defn random-long []
-  (.nextLong ^java.util.Random (d/current-random-source)))
 
 (deframaop gen-id [$$id]
   (local-select> STAY $$id :> *ret)
@@ -347,7 +337,7 @@
 (defprotocol AgentNodeInternal
   (agent-node-state [this]))
 
-(defn mk-agent-node []
+(defn mk-agent-node [agent-graph graph-task-id]
   (let [task-id (ops/current-task-id)
         result-vol (volatile! nil)
         emits-vol (volatile! [])
@@ -387,11 +377,10 @@
                     args))]
           (vswap! emits-vol conj
             (aor-types/->valid-AgentNodeEmit
-              ;; TODO: <<<<>>>> should set this to nil for now, and then set it later when conjing?
-              ;; TODO: <<<<<>>>> also keep track of count of number of "node" emits
-              (random-long)
-              ;; TODO: <<<<>>>> if going to agg node or start agg node, make this the graph task ID
-              task-id
+              nil
+              (if (selected-any? [:node-map (keypath node) :node #(instance? Node %)] agent-graph)
+                task-id
+                graph-task-id)
               node
               args
               )))
@@ -402,6 +391,7 @@
         ;;  - need the task global with shuffled task IDs
         ;;  - ideally have the thread->tasks mapping
         ;;  - validate that this is not going to an agg node or agg start node
+        ;;  - error if using this to go to start agg or agg node
         (assert false)
         )
       (result [this arg]
@@ -426,8 +416,7 @@
   (or (instance? CompletableFuture arg)
       (aor-types/AsyncResultPStateQuery? arg)))
 
-(deframaop handle-async-emits [*async-ops *emits]
-  ;: TODO: <<<<>>>> need to know total number of node emits, and the compute the ack vals for them to use
+(deframaop handle-async-emits [*parent-invoke-id *async-ops *emits]
   (ops/current-task-id :> *node-task-id)
   (loop<- [*res []
            *async-ops *async-ops
@@ -508,7 +497,6 @@
           (next *emits))
 
         (default>)
-        ;; TODO: <<<<>>> update the ack val here
         (select>
           (subselect
             :args
@@ -548,6 +536,14 @@
            ))
         (continue> (conj *res *emit) *async-ops (next *emits))
         )))
+  (<<if (> (count *emits) 0)
+    (h/gen-subsequent-invoke-ids (count *emits) *parent-invoke-id :> *invoke-ids)
+    (<<semifn% %mapper
+      (:< *agent-node-emit *invoke-id)
+      (:> (assoc *agent-node-emit :invoke-id *invoke-id)))
+    (mapv %mapper *emits *invoke-ids :> *emits)
+   (else>)
+    (identity *emits :> *emits))
   (:> *async-ops *emits))
 
 (defn- emits-finished? [emits]
@@ -561,14 +557,15 @@
     graph))
 
 (deframafn handle-node-invoke [*name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *agg-invoke-id]
-  (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *agent-name))]
-    (mk-agent-node :> *agent-node)
+  (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *name))
+                        *agent-graph (declared-object-task-global (agent-graph-task-global-name *name))]
+    (mk-agent-node *agent-graph *graph-task-id :> *agent-node)
     (h/current-time-millis :> *start-time-millis)
     ;; TODO: <<<<>>>> should be done in a try/catch with exceptions causing non-retryable failure
     (apply *node-fn *agent-node *args :> *node-fn-res)
     (agent-node-state *agent-node :> {:keys [*async-ops *emits *result]})
     ;; TODO: <<<<>>>> error if not in agg context and #emits != 1
-    (handle-async-emits *async-ops *emits :> *async-ops *emits)
+    (handle-async-emits *invoke-id *async-ops *emits :> *async-ops *emits)
     (local-transform>
       [(keypath *invoke-id)
        (termval {:graph-id *graph-id
@@ -604,19 +601,22 @@
   (unify> <regular-emit> <agg-ack-emit>)
   (:> *op))
 
+(defn task-id-key-partitioner
+  [num-partitions task-id]
+  task-id)
+
 (defn- define-agent! [setup stream-topology name agent-graph]
   (let [graph (resolve-agent-graph agent-graph)
         agent-depot-sym (symbol (str "*_agent-depot-" name))
         agent-streaming-depot-sym (symbol (str "*_agent-streaming-depot-" name))
         agent-graph-sym (symbol (agent-graph-task-global-name name))
         agent-node-pstate-sym (symbol (agent-node-task-global-name name))
-        agent-pending-nodes-pstate-sym (symbol (str "$$_agent-pending-nodes-" name))
         agent-invoke-pstate-sym (symbol (str "$$_agent-invoke-" name))
         agent-streaming-results-pstate-sym (symbol (str "$$_agent-streaming-" name))
         agent-graph-history-pstate-sym (symbol (graph-history-task-global-name name))
         agent-id-gen-pstate-sym (symbol (str "$$_agent-id-gen-" name))
         ]
-    (declare-depot* setup agent-depot-sym agent-depot-partitioner)
+    (declare-depot* setup agent-depot-sym :random)
     (declare-depot* setup agent-streaming-depot-sym agent-streaming-depot-partitioner)
 
     (declare-object* setup agent-graph-sym graph)
@@ -632,9 +632,6 @@
           {:root-invoke-id Long
            :invoke-args [Object]
            :graph-version Long
-           ;; TODO: <<<<>>>> it should be able to be a redirect/retry
-           ;; - simpler would be if retry just continues it..., and then don't need redirect
-           ;; - maybe fork with same invoke ID has that behavior
            :result AgentResult})})
     (declare-pstate*
       stream-topology
@@ -667,8 +664,7 @@
            :input [Object]
 
            ;; agg state
-           ;; TODO: <<<<>>> change this to remember order
-           :agg-inputs (map-schema Long [Object] {:subindex? true}) ; invoke ID -> args
+           :agg-inputs (vector-schema AggInput {:subindex? true})
            :agg-state Object
            :agg-ack-val Long
 
@@ -677,13 +673,9 @@
            })})
     (declare-pstate*
       stream-topology
-      agent-pending-nodes-pstate-sym
-      {Long Object})
-    ;; TODO: <<<<>>>> need custom key partitioner on this so can fetch from foreign client from task 0
-    (declare-pstate*
-      stream-topology
       agent-graph-history-pstate-sym
-      {Long HistoricalAgentGraphInfo})
+      {Long HistoricalAgentGraphInfo}
+      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
       stream-topology
       agent-id-gen-pstate-sym
@@ -698,7 +690,7 @@
         (ops/current-task-id :> *graph-task-id)
         (gen-id agent-id-gen-pstate-sym :> *graph-id)
         (ack-return> [*graph-task-id *graph-id])
-        (random-long :> *invoke-id)
+        (h/random-long :> *invoke-id)
         (fetch-graph-version name :> *version)
         (local-transform>
           [(keypath *graph-id)
@@ -781,8 +773,7 @@
                        :node *agg-node-name
                        :start-time-millis *start-time-millis
                        :agg-invoke-id *agg-invoke-id
-                       ;; TODO: <<<<>>>> this needs to be a suindexed list
-                       :agg-inputs ...
+                       :agg-inputs []
                        :agg-state *node-fn-res
                        :agg-ack-val *invoke-id
                       })]
@@ -793,6 +784,7 @@
           ;; TODO: <<<<>>>>
           ;;  - this processes emits incrementally as it goes
           ;;  - what about 'finished' agg method for early finish
+          ;;  - seems like this should also implicitly have an AggAckOp for this invoke ID, as its terminal on this node
 
           (case> AggAckOp :> {:keys [*agg-invoke-id *ack-val]})
           ;: TODO: <<<<>>>>
@@ -813,8 +805,7 @@
           (local-transform>
             [(keypath *graph-id)
              :result
-             (termval *result)
-             ]
+             (termval *result)]
             agent-invoke-pstate-sym)))
       (<<if (emits-finished? *emits)
         (local-transform>
@@ -859,7 +850,7 @@
     ;;   - if node emits multiple times and is not in aggregation context, isn't that a problem?
     ;;      - same with not emitting at all
     ;;   - these should be runtime errors?
-    ;;      - easy to track if in agg context or not    ;;
+    ;;      - easy to track if in agg context or not
     ))
 
 (defn define-agents! [setup stream-topology agent-graphs]

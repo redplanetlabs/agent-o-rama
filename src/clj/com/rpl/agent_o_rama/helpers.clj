@@ -1,5 +1,7 @@
 (ns com.rpl.agent-o-rama.helpers
   (:use [com.rpl.rama.path])
+  (:require [;; TODO: <<<<>>>> expose current-random-source in public API and use that
+             [rpl.rama.distributed.core :as d]])
   (:import [com.rpl.rama.helpers TopologyUtils]))
 
 (def MAX-ARITY 8)
@@ -67,3 +69,12 @@
        (fn ~@arities))))
 
 (mk-jfn-converter)
+
+(defn random-long []
+  (.nextLong ^java.util.Random (d/current-random-source)))
+
+(defsemifn<- gen-subsequent-invoke-ids
+  (:< !send-amt !start-invoke-id)
+  (vec (repeatedly (dec !send-amt) random-long) :> *invoke-ids)
+  (reduce bit-xor !start-invoke-id *invoke-ids :> !last-invoke-id)
+  (:> (conj *invoke-ids !last-invoke-id)))

@@ -18,6 +18,8 @@
         (instance? NodeAgg node) AGG-NODE-KW
         :else (throw (ex-info "Unexpected node type" {:class (class node)}))))
 
+;; TODO: <<<<>>>> use flexible serialization for these to ease updating the library? or just some of them?
+
 (drp/defrecord+ AgentInvoke
   [args :- [Object]
    time-millis :- Long])
@@ -38,6 +40,10 @@
 (drp/defrecord+ AgentNodeArg
   [val :- (s/maybe Object)
    async-op-index :- (s/maybe Long)])
+
+(drp/defrecord+ AggInput
+  [invoke-id :- Long
+   args :- [Object]])
 
 (drp/defrecord+ AsyncOpInfo
   [start-time-millis :- (s/maybe Long)
