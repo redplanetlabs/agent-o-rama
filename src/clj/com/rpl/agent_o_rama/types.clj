@@ -10,7 +10,7 @@
 
 (defrecord Node [node-fn])
 (defrecord NodeAggStart [node-fn agg-node-name])
-(defrecord NodeAgg [agg-node])
+(defrecord NodeAgg [init-fn update-fn node-fn])
 
 (defn node->type-kw [node]
   (cond (instance? Node node) NODE-KW

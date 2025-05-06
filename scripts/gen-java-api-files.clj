@@ -45,7 +45,7 @@
 (defn mk-agg-node-on-type-arg-decl
   [i]
   (str "<"
-       (str/join "," (concat ["AgentNode" "S"] (mk-type-strs i) ["S"]))
+       (str/join "," (concat ["S"] (mk-type-strs i) ["Object"]))
        ">"))
 
 (defn mk-type-args-decl

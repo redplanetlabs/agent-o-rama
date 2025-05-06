@@ -3,8 +3,9 @@
         [com.rpl.rama.path])
   (:require [com.rpl.agent-o-rama.helpers :as h]
             [com.rpl.agent-o-rama.impl :as i])
-  (:import [com.rpl.agentorama AgentsTopology AgentGraph]
-           [com.rpl.rama PState$Declaration PState$Schema]))
+  (:import [com.rpl.agentorama AgentsTopology AgentGraph MultiAgg$Impl]
+           [com.rpl.rama PState$Declaration PState$Schema]
+           [com.rpl.rama.ops RamaAccumulatorAgg RamaCombinerAgg]))
 
 (defn agents-topology [name setup topologies]
   (let [stream-topology (stream-topology topologies (str "_agents-topology-" name))
@@ -60,7 +61,7 @@
 (defn new-agent [^AgentsTopology agents-topology name]
   (.newAgent agents-topology name))
 
-(defn node* [^AgentGraph agent-graph name output-nodes-spec node-fn]
+(defn node* [agent-graph name output-nodes-spec node-fn]
   (i/internal-add-node!
     agent-graph
     name
@@ -70,7 +71,7 @@
 (defmacro node [agent-graph name output-nodes-spec & fn-body]
   `(node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))
 
-(defn agg-start-node* [^AgentGraph agent-graph name output-nodes-spec node-fn]
+(defn agg-start-node* [agent-graph name output-nodes-spec node-fn]
   (i/internal-add-node!
     agent-graph
     name
@@ -80,8 +81,33 @@
 (defmacro agg-start-node [agent-graph name output-nodes-spec & fn-body]
   `(agg-start-node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))
 
-(defmacro agg-node [agent-graph name output-nodes-spec & body]
-  `(i/agg-node* ~agent-graph ~name ~output-nodes-spec (i/agg-node-object ~@body)))
+(defn agg-node* [agent-graph name output-nodes-spec agg node-fn]
+  (i/internal-add-agg-node!
+    agent-graph
+    name
+    output-nodes-spec
+    agg
+    node-fn))
+
+(defmacro agg-node [agent-graph name output-nodes-spec agg & fn-body]
+  `(agg-node* ~agent-graph ~name ~output-nodes-spec ~agg (fn ~@fn-body)))
+
+(defmacro multi-agg [& body]
+  (let [ret-sym (gensym "ret")]
+    `(let [~ret-sym (i/mk-multi-agg)]
+      ~@(for [form body]
+          (condp = (first form)
+            'init
+            (let [[_ & body] form]
+              `(i/internal-add-init! ~ret-sym (fn ~@body)))
+
+            'on
+            (let [[_ name & body] form]
+              `(i/internal-add-handler! ~ret-sym ~name (fn ~@body)))
+            (throw (ex-info "Invalid MultiAgg method" {:method (first form)}))
+            ))
+       ~ret-sym
+       )))
 
 (defn- parse-map-options
   [[arg1 & rest-args :as args]]

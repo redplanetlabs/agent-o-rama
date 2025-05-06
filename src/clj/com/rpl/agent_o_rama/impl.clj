@@ -7,7 +7,14 @@
             [com.rpl.rama.ops :as ops]
             [loom.attr :as lattr]
             [loom.graph :as graph])
-  (:import [com.rpl.agentorama AgentGraph AgentNode AggNode AggNode$Impl AsyncResult]
+  (:import [com.rpl.agentorama
+             AgentGraph
+             AgentNode
+             AsyncResult
+             MultiAgg
+             MultiAgg$Impl]
+           [com.rpl.agentorama.impl BuiltInAgg]
+           [com.rpl.agentorama.ops RamaVoidFunction3]
            [com.rpl.agent_o_rama.types
              AgentNodeEmit
              AgentResult
@@ -17,24 +24,24 @@
              NodeAgg
              NodeAggStart]
            [com.rpl.rama.helpers TopologyUtils]
+           [com.rpl.rama.ops RamaAccumulatorAgg RamaCombinerAgg]
            [java.util Function Map UUID]))
 
 (defprotocol AgentGraphInternal
+  (internal-add-init! [this afn])
   (internal-add-node! [this name output-nodes-spec node])
   (agent-graph-state [this]))
 
-(defprotocol AggNodeInternal
+(defprotocol MultiAggInternal
   (internal-add-handler! [this name afn])
-  (internal-add-any-handler! [this afn])
-  (internal-add-complete-handler! [this afn])
-  (agg-node-state [this]))
+  (multi-agg-state [this]))
 
-(defmacro reify-AggNode [& body]
-  `(reify ~'AggNode$Impl
-    ~@(for [i (range 0 (- h/MAX-ARITY 2))]
+(defmacro reify-MultiAgg [& body]
+  `(reify ~'MultiAgg$Impl
+    ~@(for [i (range 0 (- h/MAX-ARITY 1))]
         (let [name-sym (h/type-hinted String 'name#)
-              jfn-sym (h/type-hinted (h/rama-function-class (+ i 2)) 'jfn#)
-              on-sym (h/type-hinted AggNode$Impl 'on)]
+              jfn-sym (h/type-hinted (h/rama-function-class (+ i 1)) 'jfn#)
+              on-sym (h/type-hinted MultiAgg$Impl 'on)]
           `(~on-sym [this# ~name-sym ~jfn-sym]
             (internal-add-handler!
               this#
@@ -44,70 +51,26 @@
     ~@body
     ))
 
-(defn mk-agg-node []
+(defn mk-multi-agg []
   (let [on-vol (volatile! {})
-        on-any-vol (volatile! nil)
-        on-complete-vol (volatile! nil)]
-    (reify-AggNode
-      (onAny [this jfn]
-        (internal-add-any-handler! this (h/convert-jfn jfn)))
-      (onComplete [this jfn]
-        (internal-add-complete-handler! this (h/convert-void-jfn jfn)))
-      AggNodeInternal
+        init-vol (volatile! nil)]
+    (reify-MultiAgg
+      MultiAggInternal
+      (internal-add-init! [this afn]
+        (when (some? @init-vol)
+          (throw (ex-info "MultiAgg already has init function specified" {})))
+        (vreset! init-vol afn)
+        this)
       (internal-add-handler! [this name afn]
-        (when (some? @on-any-vol)
-          (throw (ex-info "Agg node may not have both 'on' and 'onAny' handlers" {})))
         (when (contains? @on-vol name)
-          (throw (ex-info "Agg node already has handler for given name" {:name name})))
+          (throw (ex-info "MultiAgg already has handler for given name" {:name name})))
         (vswap! on-vol assoc name afn)
         this)
-      (internal-add-any-handler! [this afn]
-        (when (some? @on-any-vol)
-          (throw (ex-info "Agg node can only have one onAny handler" {})))
-        (when-not (empty? @on-vol)
-          (throw (ex-info "Agg node may not have both 'on' and 'onAny' handlers" {})))
-        (vreset! on-any-vol afn)
-        this )
-      (internal-add-complete-handler! [this afn]
-        (when (some? @on-complete-vol)
-          (throw (ex-info "Agg node can only have one onComplete handler" {})))
-        (vreset! on-complete-vol afn)
-        this )
-      (agg-node-state [this]
-        {:on-handlers @on-vol
-         :on-any-handler @on-any-vol
-         :on-complete-handler @on-complete-vol
+      (multi-agg-state [this]
+        {:init-fn (or @init-vol (fn [] nil))
+         :on-handlers @on-vol
          }))
       ))
-
-(defmacro agg-node-object [& body]
-  (let [ret-sym (gensym "ret")]
-    `(let [~ret-sym (mk-agg-node)]
-      ~@(for [form body]
-          (condp = (first form)
-            'on
-            (let [[_ name & body] form]
-              `(internal-add-handler! ~ret-sym ~name (fn ~@body)))
-
-            'on-any
-            (let [[_ & body] form]
-              `(internal-add-any-handler! ~ret-sym (fn ~@body)))
-
-            'on-complete
-            (let [[_ & body] form]
-              `(internal-add-complete-handler! ~ret-sym (fn ~@body)))
-
-            (throw (ex-info "Invalid agg node method" {:method (first form)}))
-            ))
-       ~ret-sym
-       )))
-
-(defn agg-node* [^AgentGraph agent-graph name output-nodes-spec agg-node-impl]
-  (internal-add-node!
-    agent-graph
-    name
-    output-nodes-spec
-    (aot-types/->NodeAgg agg-node-impl)))
 
 (defmacro reify-AgentGraph [& body]
   `(reify ~'AgentGraph
@@ -145,16 +108,73 @@
         :else (throw (ex-info "Invalid output nodes spec"
                               {:spec spec :class (class spec)}))))
 
+(defn internal-add-agg-node!
+  [this name outputNodesSpec agg afn]
+  (if (instance? MultiAgg$Impl agg)
+    (let [{:keys [init-fn on-handlers]} (multi-agg-state agg)
+          update-fn (fn [state dispatch-name & args]
+                       (when-not (contains? on-handlers dispatch-name)
+                         (throw (ex-info "Invalid dispatch name for MultiAgg"
+                                         {:valid-names (keys on-handlers)
+                                          :name dispatch-name})))
+                       (apply (get on-handlers dispatch-name) args))]
+      (internal-add-node!
+        this
+        name
+        outputNodesSpec
+        (aot-types/->NodeAgg init-fn update-fn afn)))
+    (let [agg (if (instance? BuiltInAgg agg)
+                (.agg ^BuiltInAgg agg)
+                agg)
+          init-fn (ops/agg->init-fn agg)
+          update-fn (ops/agg->update-fn agg)]
+    (internal-add-node!
+      this
+      name
+      outputNodesSpec
+      (aot-types/->NodeAgg init-fn update-fn afn)))))
+
+(defn internal-add-agg-node-java!
+  [this name outputNodesSpec agg jfn]
+  (internal-add-agg-node!
+    this
+    name
+    outputNodesSpec
+    agg
+    (h/convert-void-jfn jfn)))
+
 (defn mk-agent-graph []
   (let [nodes-vol (volatile! {})
         start-node-vol (volatile! nil)]
     (reify-AgentGraph
-      (aggNode [this name outputNodesSpec aggNode]
-        (internal-add-node!
+      (aggNode ^AgentGraph [this ^String name ^Object outputNodesSpec ^RamaAccumulatorAgg agg ^RamaVoidFunction3 impl]
+        (internal-add-agg-node-java!
           this
           name
           outputNodesSpec
-          (aot-types/->NodeAgg aggNode)))
+          agg
+          impl))
+      (aggNode ^AgentGraph [this ^String name ^Object outputNodesSpec ^RamaCombinerAgg agg ^RamaVoidFunction3 impl]
+        (internal-add-agg-node-java!
+          this
+          name
+          outputNodesSpec
+          agg
+          impl))
+      (aggNode ^AgentGraph [this ^String name ^Object outputNodesSpec ^MultiAgg$Impl agg ^RamaVoidFunction3 impl]
+        (internal-add-agg-node-java!
+          this
+          name
+          outputNodesSpec
+          agg
+          impl))
+      (aggNode ^AgentGraph [this ^String name ^Object outputNodesSpec ^BuiltInAgg agg ^RamaVoidFunction3 impl]
+        (internal-add-agg-node-java!
+          this
+          name
+          outputNodesSpec
+          agg
+          impl))
       AgentGraphInternal
       (internal-add-node! [this name output-nodes-spec node-obj]
         (when (or (nil? name) (= "" name))
@@ -665,6 +685,7 @@
 
            ;; agg state
            :agg-inputs (vector-schema AggInput {:subindex? true})
+           :agg-start-res Object
            :agg-state Object
            :agg-ack-val Long
 
@@ -766,6 +787,11 @@
           (handle-node-invoke
             name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *new-agg-invoke-id
             :> {:keys [*start-time-millis *node-fn-res *emits *result]})
+          ;; TODO: <<<<>>>> run init fn of the agg
+          ;;    - should convert everything to internal accumulator
+          ;;    - what about converting things like Agg.sum()
+          ;;       - extract from AggImpl type
+          ;;    - would be nice to use to-streaming-accumulator internal function...
           (local-transform>
             [(keypath *new-agg-invoke-id)
              (termval {:graph-id *graph-id
@@ -774,7 +800,7 @@
                        :start-time-millis *start-time-millis
                        :agg-invoke-id *agg-invoke-id
                        :agg-inputs []
-                       :agg-state *node-fn-res
+                       :agg-start-res *node-fn-res
                        :agg-ack-val *invoke-id
                       })]
               agent-node-pstate-sym)
@@ -784,6 +810,7 @@
           ;; TODO: <<<<>>>>
           ;;  - this processes emits incrementally as it goes
           ;;  - what about 'finished' agg method for early finish
+          ;;    - need a sub-interface for this
           ;;  - seems like this should also implicitly have an AggAckOp for this invoke ID, as its terminal on this node
 
           (case> AggAckOp :> {:keys [*agg-invoke-id *ack-val]})
@@ -840,17 +867,8 @@
     ;; TODO: <<<<>>>> implement
     ;;  - need abstraction for human in the loop
     ;;    - need depot for this too
-    ;;  - create depots / stream topology impls
-    ;;    - depot per agent for recieving inputs
-    ;;      - client append is UUID + args
-    ;;      - client should query for number of args
-    ;;    - task global for out-of-band events
-
-    ;; TODO: <<<<>>>
-    ;;   - if node emits multiple times and is not in aggregation context, isn't that a problem?
-    ;;      - same with not emitting at all
-    ;;   - these should be runtime errors?
-    ;;      - easy to track if in agg context or not
+    ;;  - client should query for number of args
+    ;;  - task global for out-of-band events
     ))
 
 (defn define-agents! [setup stream-topology agent-graphs]
