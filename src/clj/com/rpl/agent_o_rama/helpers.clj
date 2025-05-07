@@ -73,12 +73,6 @@
 (defn random-long []
   (.nextLong ^java.util.Random (d/current-random-source)))
 
-(defsemifn<- gen-subsequent-invoke-ids
-  (:< !send-amt !start-invoke-id)
-  (vec (repeatedly (dec !send-amt) random-long) :> *invoke-ids)
-  (reduce bit-xor !start-invoke-id *invoke-ids :> !last-invoke-id)
-  (:> (conj *invoke-ids !last-invoke-id)))
-
 (defn invoke
   ([afn] (afn))
   ([afn a] (afn a))

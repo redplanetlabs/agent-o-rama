@@ -399,7 +399,7 @@
                     args))]
           (vswap! emits-vol conj
             (aor-types/->valid-AgentNodeEmit
-              nil
+              (h/random-long)
               (if (selected-any? [:node-map (keypath node) :node #(instance? Node %)] agent-graph)
                 task-id
                 graph-task-id)
@@ -558,14 +558,6 @@
            ))
         (continue> (conj *res *emit) *async-ops (next *emits))
         )))
-  (<<if (> (count *emits) 0)
-    (h/gen-subsequent-invoke-ids (count *emits) *parent-invoke-id :> *invoke-ids)
-    (<<semifn% %mapper
-      (:< *agent-node-emit *invoke-id)
-      (:> (assoc *agent-node-emit :invoke-id *invoke-id)))
-    (mapv %mapper *emits *invoke-ids :> *emits)
-   (else>)
-    (identity *emits :> *emits))
   (:> *async-ops *emits))
 
 (defn- emits-finished? [emits]
@@ -615,9 +607,11 @@
   (anchor> <regular-emit>)
 
   (hook> <root>)
-  (filter> (and> (some? *agg-invoke-id) (empty? *emits)))
+  (filter> (some? *agg-invoke-id))
+  (mapv :invoke-id *emits :> *next-invoke-ids)
+  (reduce bit-xor *emits *invoke-id :> *ack-val)
   (|direct *graph-task-id)
-  (aor-types/->valid-AggAckOp *agg-invoke-id *invoke-id :> *op)
+  (aor-types/->valid-AggAckOp *agg-invoke-id *ack-val :> *op)
   (anchor> <agg-ack-emit>)
 
   (unify> <regular-emit> <agg-ack-emit>)
@@ -655,6 +649,7 @@
     (get-node-obj *agent-graph *node :> {:keys [*node-fn]})
     ;; TODO: <<<<>>>> is relation between invoke-id and agg-invoke-id correct here?
     ;;    - was agg-invoke-id acked to the parent agg?
+    ;;    - it still needs to ack the startnode invoke ID to the parent as well as the invoke-id of the completion node-fn
     (handle-node-invoke *name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *agg-invoke-id
       :> {:keys [*emits *result]})
    (:> *emits *result)))
@@ -834,6 +829,7 @@
             name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *new-agg-invoke-id
             :> {:keys [*start-time-millis *node-fn-res *emits *result]})
           (get-node-obj agent-graph-sym *agg-node-name :> {:keys [*init-fn]})
+          ;; TODO: <<<<<>>>>> propagate errors
           (h/invoke *init-fn :> *init-agg-state)
           (local-transform>
             [(keypath *new-agg-invoke-id)
@@ -872,6 +868,7 @@
             (...complete-agg! name *agg-invoke-id :> *emits *result)
            (else>)
             (...ack-agg! name *agg-invoke-id *invoke-id :> *emits *result))
+          ;; TODO: <<<<>>>> should this be the startagg invoke ID to connect properly with previous agg?
           (identity *agg-invoke-id :> *invoke-id)
           (identity *parent-agg-invoke-id :> *agg-invoke-id)
 
@@ -881,13 +878,10 @@
           ;;  - otherwise, ack the invoke ID and if finished, run completion node...
 
           (case> AggAckOp :> {:keys [*agg-invoke-id *ack-val]})
-          (...ack-agg! name *agg-invoke-id *ack-val :> *invoke-id *emits *result *agg-invoke-id)
+          (ack-agg! name *agg-invoke-id *ack-val :> *emits *result)
           ;: TODO: <<<<>>>>
-          ;;  - apply ack val
-          ;;  - if zero:
-          ;;     - run completion function
-          ;;     - handle-async-emits and/or completed emits
-          ;;     - seems like that should be in continuation
+          ;;  - get the new-agg-invoke-id?
+          ;;  - what is invoke-id bound to? probably the invoke id of the agg? or of the startagg?
           )
       ;; AgentNode implementation makes it impossible for there to be both emits and result
       (<<if (some? *result)
