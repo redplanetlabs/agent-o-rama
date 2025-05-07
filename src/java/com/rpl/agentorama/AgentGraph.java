@@ -21,8 +21,8 @@ public interface AgentGraph {
   <T0,T1,T2,T3,T4> AgentGraph aggStartNode(String name, Object outputNodesSpec, RamaFunction6<AgentNode,T0,T1,T2,T3,T4,Object> impl);
   <T0,T1,T2,T3,T4,T5> AgentGraph aggStartNode(String name, Object outputNodesSpec, RamaFunction7<AgentNode,T0,T1,T2,T3,T4,T5,Object> impl);
   <T0,T1,T2,T3,T4,T5,T6> AgentGraph aggStartNode(String name, Object outputNodesSpec, RamaFunction8<AgentNode,T0,T1,T2,T3,T4,T5,T6,Object> impl);
-  <S> AgentGraph aggNode(String name, Object outputNodesSpec, RamaAccumulatorAgg agg, RamaVoidFunction3<AgentNode, S, Object> impl);
-  <S> AgentGraph aggNode(String name, Object outputNodesSpec, RamaCombinerAgg agg, RamaVoidFunction3<AgentNode, S, Object> impl);
-  <S> AgentGraph aggNode(String name, Object outputNodesSpec, MultiAgg.Impl agg, RamaVoidFunction3<AgentNode, S, Object> impl);
-  <S> AgentGraph aggNode(String name, Object outputNodesSpec, BuiltInAgg agg, RamaVoidFunction3<AgentNode, S, Object> impl);
+  <S, T> AgentGraph aggNode(String name, Object outputNodesSpec, RamaAccumulatorAgg agg, RamaVoidFunction3<AgentNode, S, T> impl);
+  <S, T> AgentGraph aggNode(String name, Object outputNodesSpec, RamaCombinerAgg agg, RamaVoidFunction3<AgentNode, S, T> impl);
+  <S, T> AgentGraph aggNode(String name, Object outputNodesSpec, MultiAgg.Impl agg, RamaVoidFunction3<AgentNode, S, T> impl);
+  <S, T> AgentGraph aggNode(String name, Object outputNodesSpec, BuiltInAgg agg, RamaVoidFunction3<AgentNode, S, T> impl);
 }

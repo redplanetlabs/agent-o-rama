@@ -11,6 +11,7 @@
              AgentGraph
              AgentNode
              AsyncResult
+             FinishedAgg
              MultiAgg
              MultiAgg$Impl]
            [com.rpl.agentorama.impl BuiltInAgg]
@@ -368,6 +369,7 @@
       (emit [this node args]
         (when (some? @result-vol)
           (throw (ex-info "Cannot emit with result already specified" {:current-result @result-vol})))
+        ;; TODO: <<<<>>>> error if node is not in output nodes of this node
         (let [args (mapv
                     (fn [arg]
                       (cond
@@ -625,6 +627,51 @@
   [num-partitions task-id]
   task-id)
 
+(defn get-node-obj [agent-graph node]
+  (select-any [:node-map (keypath *next-node) :node]
+    agent-graph))
+
+(defn extract-agg-result [res]
+  (cond (reduced? res)
+        {:new-agg-state @res
+         :finished? true}
+
+        (instance? FinishedAgg res)
+        {:new-agg-state (.value ^FinishedAgg res)
+         :finished? true}
+
+        :else
+        {:new-agg-state res
+         :finished? false}))
+
+(deframaop complete-agg! [*name *invoke-id]
+  (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *name))
+                         *agent-graph (declared-object-task-global (agent-graph-task-global-name *name))]
+    (local-select> (keypath *invoke-id) $$nodes
+      :> {*graph-task-id *graph-id *node *agg-ack-val *agg-state *agg-start-res *agg-invoke-id])
+    (local-transform>
+      [(keypath *invoke-id) :agg-finished? (termval true)]
+      $$nodes)
+    (get-node-obj *agent-graph *node :> {:keys [*node-fn]})
+    ;; TODO: <<<<>>>> is relation between invoke-id and agg-invoke-id correct here?
+    ;;    - was agg-invoke-id acked to the parent agg?
+    (handle-node-invoke *name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *agg-invoke-id
+      :> {:keys [*emits *result]})
+   (:> *emits *result)))
+
+(deframaop ack-agg [*name *nvoke-id *ack-val]
+  (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *name))
+                         *agent-graph (declared-object-task-global (agent-graph-task-global-name *name))]
+    (local-select> [(keypath *invoke-id) :agg-ack-val] $$nodes :> *agg-ack-val)
+    (bit-xor *ack-val *agg-ack-val :> *new-ack-val)
+    (local-transform>
+      [(keypath *invoke-id) :agg-ack-val (termval *new-ack-val)]
+      $$nodes)
+    (filter> (= 0 *new-ack-val))
+    (complete-agg! *name *invoke-id :> *emits *result)
+    (:> *emits *result)))
+
+
 (defn- define-agent! [setup stream-topology name agent-graph]
   (let [graph (resolve-agent-graph agent-graph)
         agent-depot-sym (symbol (str "*_agent-depot-" name))
@@ -688,6 +735,7 @@
            :agg-start-res Object
            :agg-state Object
            :agg-ack-val Long
+           :agg-finished? Boolean
 
            ;; TODO: <<<<>>>>
            ;;   - what other stats does langsmith track?
@@ -745,10 +793,9 @@
                    *async-op-index
                    ))])]
           agent-node-pstate-sym)
-        (local-select>
-          [(keypath *invoke-id)
-           (subselect (multi-path :graph-id :graph-task-id :emits :node :agg-invoke-id :parent-agg-invoke-id))]
-          agent-node-pstate-sym :> [*graph-id *graph-task-id *emits *node *agg-invoke-id *parent-agg-invoke-id])
+        (local-select> (keypath *invoke-id)
+          agent-node-pstate-sym
+          :> {:keys [*graph-id *graph-task-id *emits *node *agg-invoke-id *parent-agg-invoke-id]})
         (filter> (emits-finished? *emits))
         (local-transform>
           [(keypath *invoke-id)
@@ -769,8 +816,7 @@
       (loop<- [*op *op]
         (<<if (aor-types/NodeOp? *op)
           (get *op :next-node :> *next-node)
-          (select> [:node-map (keypath *next-node) :node]
-            agent-graph-sym :> *op-obj)
+          (get-node-obj agent-graph-sym *next-node :> *op-obj)
          (else>)
           (identity *op :> *op-obj))
 
@@ -787,11 +833,8 @@
           (handle-node-invoke
             name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *new-agg-invoke-id
             :> {:keys [*start-time-millis *node-fn-res *emits *result]})
-          ;; TODO: <<<<>>>> run init fn of the agg
-          ;;    - should convert everything to internal accumulator
-          ;;    - what about converting things like Agg.sum()
-          ;;       - extract from AggImpl type
-          ;;    - would be nice to use to-streaming-accumulator internal function...
+          (get-node-obj agent-graph-sym *agg-node-name :> {:keys [*init-fn]})
+          (h/invoke *init-fn :> *init-agg-state)
           (local-transform>
             [(keypath *new-agg-invoke-id)
              (termval {:graph-id *graph-id
@@ -800,30 +843,51 @@
                        :start-time-millis *start-time-millis
                        :agg-invoke-id *agg-invoke-id
                        :agg-inputs []
+                       :agg-state *init-agg-state
                        :agg-start-res *node-fn-res
                        :agg-ack-val *invoke-id
                       })]
               agent-node-pstate-sym)
 
-          (case> NodeAgg :> {:keys [*agg-node]})
+          (case> NodeAgg :> {:keys [*update-fn]})
+          (identity *op :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
           (assert! (some? *agg-invoke-id))
+          (local-select> (keypath *agg-invoke-id) agent-node-pstate-sym
+            :> {*agg-state :agg-state *parent-agg-invoke-id :agg-invoke-id})
+          ;; TODO: <<<<>>>> check if it's been early terminated, and filter out if that's the case
+          ;;  - just set agg-ack-val to 0?
+          ;;    - better if it's explicit
+
+          ;; TODO: <<<<>>>> catch exceptions and propagate failure
+          (apply *update-fn *agg-state *args :> *res)
+          (extract-agg-result *res :> {:keys [*new-agg-state *finished?]})
+
+          (local-transform>
+            [(keypath *agg-invoke-id)
+             (multi-path [:agg-state (termval *new-agg-state)]
+                         [:agg-inputs AFTER-ELEM (termval (aor-types/->valid-AggInput *invoke-id *args))])]
+            agent-node-pstate-sym)
+
+          (<<if *finished?
+            (...complete-agg! name *agg-invoke-id :> *emits *result)
+           (else>)
+            (...ack-agg! name *agg-invoke-id *invoke-id :> *emits *result))
+          (identity *agg-invoke-id :> *invoke-id)
+          (identity *parent-agg-invoke-id :> *agg-invoke-id)
+
+
           ;; TODO: <<<<>>>>
-          ;;  - this processes emits incrementally as it goes
-          ;;  - what about 'finished' agg method for early finish
-          ;;    - need a sub-interface for this
-          ;;  - seems like this should also implicitly have an AggAckOp for this invoke ID, as its terminal on this node
+          ;;  - if finished, run completion node and bind emits, result, etc.
+          ;;  - otherwise, ack the invoke ID and if finished, run completion node...
 
           (case> AggAckOp :> {:keys [*agg-invoke-id *ack-val]})
+          (...ack-agg! name *agg-invoke-id *ack-val :> *invoke-id *emits *result *agg-invoke-id)
           ;: TODO: <<<<>>>>
           ;;  - apply ack val
           ;;  - if zero:
           ;;     - run completion function
           ;;     - handle-async-emits and/or completed emits
           ;;     - seems like that should be in continuation
-          (identity nil :> *result)
-          (identity nil :> *invoke-id)
-          (identity nil :> *emits)
-          (identity nil :> *agg-invoke-id)
           )
       ;; AgentNode implementation makes it impossible for there to be both emits and result
       (<<if (some? *result)
@@ -836,6 +900,7 @@
             agent-invoke-pstate-sym)))
       (<<if (emits-finished? *emits)
         (local-transform>
+          ;; TODO: <<<<>>>> is this right?
           [(keypath *new-agg-invoke-id)
            :finish-time-millis
            (termval (h/current-time-millis)]
