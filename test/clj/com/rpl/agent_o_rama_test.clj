@@ -3,7 +3,6 @@
         [com.rpl.test-helpers])
   (:require [com.rpl.agent-o-rama :as aor]
             [com.rpl.agent-o-rama.impl :as i]
-            [com.rpl.test-helpers]
             [loom.attr :as lattr]
             [loom.graph :as graph]
           ))
