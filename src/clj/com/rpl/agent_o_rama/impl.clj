@@ -647,14 +647,11 @@
       [(keypath *invoke-id) :agg-finished? (termval true)]
       $$nodes)
     (get-node-obj *agent-graph *node :> {:keys [*node-fn]})
-    ;; TODO: <<<<>>>> is relation between invoke-id and agg-invoke-id correct here?
-    ;;    - was agg-invoke-id acked to the parent agg?
-    ;;    - it still needs to ack the startnode invoke ID to the parent as well as the invoke-id of the completion node-fn
     (handle-node-invoke *name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *agg-invoke-id
       :> {:keys [*emits *result]})
    (:> *emits *result)))
 
-(deframaop ack-agg [*name *nvoke-id *ack-val]
+(deframaop ack-agg [*name *invoke-id *ack-val]
   (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *name))
                          *agent-graph (declared-object-task-global (agent-graph-task-global-name *name))]
     (local-select> [(keypath *invoke-id) :agg-ack-val] $$nodes :> *agg-ack-val)
@@ -730,6 +727,7 @@
            :agg-start-res Object
            :agg-state Object
            :agg-ack-val Long
+           :agg-start-invoke-id Long
            :agg-finished? Boolean
 
            ;; TODO: <<<<>>>>
@@ -842,6 +840,7 @@
                        :agg-state *init-agg-state
                        :agg-start-res *node-fn-res
                        :agg-ack-val *invoke-id
+                       :agg-start-invoke-id *invoke-id
                       })]
               agent-node-pstate-sym)
 
@@ -849,11 +848,10 @@
           (identity *op :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
           (assert! (some? *agg-invoke-id))
           (local-select> (keypath *agg-invoke-id) agent-node-pstate-sym
-            :> {*agg-state :agg-state *parent-agg-invoke-id :agg-invoke-id})
-          ;; TODO: <<<<>>>> check if it's been early terminated, and filter out if that's the case
-          ;;  - just set agg-ack-val to 0?
-          ;;    - better if it's explicit
-
+            :> {*agg-state :agg-state
+                *parent-agg-invoke-id :agg-invoke-id
+                *agg-start-invoke-id :agg-start-invoke-id
+                })
           ;; TODO: <<<<>>>> catch exceptions and propagate failure
           (apply *update-fn *agg-state *args :> *res)
           (extract-agg-result *res :> {:keys [*new-agg-state *finished?]})
@@ -865,23 +863,18 @@
             agent-node-pstate-sym)
 
           (<<if *finished?
-            (...complete-agg! name *agg-invoke-id :> *emits *result)
+            (complete-agg! name *agg-invoke-id :> *emits *result)
            (else>)
-            (...ack-agg! name *agg-invoke-id *invoke-id :> *emits *result))
-          ;; TODO: <<<<>>>> should this be the startagg invoke ID to connect properly with previous agg?
-          (identity *agg-invoke-id :> *invoke-id)
+            (ack-agg! name *agg-invoke-id *invoke-id :> *emits *result))
+          (identity *agg-start-nvoke-id :> *invoke-id)
           (identity *parent-agg-invoke-id :> *agg-invoke-id)
 
 
-          ;; TODO: <<<<>>>>
-          ;;  - if finished, run completion node and bind emits, result, etc.
-          ;;  - otherwise, ack the invoke ID and if finished, run completion node...
-
           (case> AggAckOp :> {:keys [*agg-invoke-id *ack-val]})
           (ack-agg! name *agg-invoke-id *ack-val :> *emits *result)
-          ;: TODO: <<<<>>>>
-          ;;  - get the new-agg-invoke-id?
-          ;;  - what is invoke-id bound to? probably the invoke id of the agg? or of the startagg?
+          (local-select> (keypath *agg-invoke-id) agent-node-pstate-sym
+            :> {*agg-invoke-id :agg-invoke-id
+                *invoke-id :agg-start-invoke-id})
           )
       ;; AgentNode implementation makes it impossible for there to be both emits and result
       (<<if (some? *result)
@@ -894,14 +887,12 @@
             agent-invoke-pstate-sym)))
       (<<if (emits-finished? *emits)
         (local-transform>
-          ;; TODO: <<<<>>>> is this right?
-          [(keypath *new-agg-invoke-id)
+          [(keypath *invoke-id)
            :finish-time-millis
            (termval (h/current-time-millis)]
             agent-node-pstate-sym))
         (send-emits> *graph-task-id *invoke-id *agg-invoke-id *emits :> *op)
         (continue> *op)))
-
 
 
       (source> agent-streaming-depot-sym
