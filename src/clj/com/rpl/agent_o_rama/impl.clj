@@ -19,14 +19,18 @@
            [com.rpl.agent_o_rama.types
              AgentNodeEmit
              AgentResult
+             AggAckOp
              AggInput
              AsyncOpInfo
+             HistoricalAgentGraphInfo
              Node
              NodeAgg
              NodeAggStart]
            [com.rpl.rama.helpers TopologyUtils]
            [com.rpl.rama.ops RamaAccumulatorAgg RamaCombinerAgg]
-           [java.util Function Map UUID]))
+           [java.util Map UUID]
+           [java.util.concurrent CompletableFuture]
+           [java.util.function Function]))
 
 (defprotocol AgentGraphInternal
   (internal-add-init! [this afn])
@@ -34,6 +38,7 @@
   (agent-graph-state [this]))
 
 (defprotocol MultiAggInternal
+  (internal-add-init! [this afn])
   (internal-add-handler! [this name afn])
   (multi-agg-state [this]))
 
@@ -85,19 +90,19 @@
               this#
               ~name-sym
               ~osym
-              (aot-types/->Node (h/convert-void-jfn ~jfn-sym)))
+              (aor-types/->Node (h/convert-void-jfn ~jfn-sym)))
             )))
-    ~@(for [i (range 1 h/MAX-ARITY)]
+    ~@(for [i (range 2 (inc h/MAX-ARITY))]
         (let [name-sym (h/type-hinted String 'name#)
               osym (h/type-hinted Object 'outputNodesSpec#)
-              jfn-sym (h/type-hinted (h/rama-void-function-class i) 'jfn#)
+              jfn-sym (h/type-hinted (h/rama-function-class i) 'jfn#)
               agg-start-node-sym (h/type-hinted AgentGraph 'aggStartNode)]
           `(~agg-start-node-sym [this# ~name-sym ~osym ~jfn-sym]
             (internal-add-node!
               this#
               ~name-sym
               ~osym
-              (aot-types/->NodeAggStart (h/convert-void-jfn ~jfn-sym) nil))
+              (aor-types/->NodeAggStart (h/convert-void-jfn ~jfn-sym) nil))
             )))
     ~@body
     ))
@@ -123,7 +128,7 @@
         this
         name
         outputNodesSpec
-        (aot-types/->NodeAgg init-fn update-fn afn)))
+        (aor-types/->NodeAgg init-fn update-fn afn)))
     (let [agg (if (instance? BuiltInAgg agg)
                 (.agg ^BuiltInAgg agg)
                 agg)
@@ -133,7 +138,7 @@
       this
       name
       outputNodesSpec
-      (aot-types/->NodeAgg init-fn update-fn afn)))))
+      (aor-types/->NodeAgg init-fn update-fn afn)))))
 
 (defn internal-add-agg-node-java!
   [this name outputNodesSpec agg jfn]
@@ -148,28 +153,28 @@
   (let [nodes-vol (volatile! {})
         start-node-vol (volatile! nil)]
     (reify-AgentGraph
-      (aggNode ^AgentGraph [this ^String name ^Object outputNodesSpec ^RamaAccumulatorAgg agg ^RamaVoidFunction3 impl]
+      (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec ^RamaAccumulatorAgg agg ^RamaVoidFunction3 impl]
         (internal-add-agg-node-java!
           this
           name
           outputNodesSpec
           agg
           impl))
-      (aggNode ^AgentGraph [this ^String name ^Object outputNodesSpec ^RamaCombinerAgg agg ^RamaVoidFunction3 impl]
+      (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec ^RamaCombinerAgg agg ^RamaVoidFunction3 impl]
         (internal-add-agg-node-java!
           this
           name
           outputNodesSpec
           agg
           impl))
-      (aggNode ^AgentGraph [this ^String name ^Object outputNodesSpec ^MultiAgg$Impl agg ^RamaVoidFunction3 impl]
+      (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec ^MultiAgg$Impl agg ^RamaVoidFunction3 impl]
         (internal-add-agg-node-java!
           this
           name
           outputNodesSpec
           agg
           impl))
-      (aggNode ^AgentGraph [this ^String name ^Object outputNodesSpec ^BuiltInAgg agg ^RamaVoidFunction3 impl]
+      (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec ^BuiltInAgg agg ^RamaVoidFunction3 impl]
         (internal-add-agg-node-java!
           this
           name
@@ -319,14 +324,13 @@
 (defn- graph->historical-graph-info [graph]
   (aor-types/->valid-HistoricalAgentGraphInfo
     (transform
-      [MAP-VALS
-       (view
-         (fn [{:keys [node output-nodes agg-context]}]
-           (aor-types/->valid-HistoricalAgentNodeInfo
-             (aor-types/node->type-kw node)
-             output-nodes
-             agg-context
-             )))]
+      MAP-VALS
+      (fn [{:keys [node output-nodes agg-context]}]
+        (aor-types/->valid-HistoricalAgentNodeInfo
+          (aor-types/node->type-kw node)
+          output-nodes
+          agg-context
+          ))
       (:node-map graph))
     (:start-node graph)
     (:uuid graph)))
@@ -347,10 +351,10 @@
         (identity *version :> *found-version)
        (else>)
         (inc (or> *version -1) :> *found-version)
-        (local-transform> [(keypath *found-version) (termval (graph->graph-info *graph))]
+        (local-transform> [(keypath *found-version) (termval (graph->historical-graph-info *graph))]
           $$graph-history))
       (|direct *task-id)
-      (local-transform> [(keypath *found-version) (termval (graph->graph-info *graph))]
+      (local-transform> [(keypath *found-version) (termval (graph->historical-graph-info *graph))]
         $$graph-history)
       (:> *found-version)
       )))
@@ -381,7 +385,7 @@
                           (when-not (.containsKey completable-futures arg)
                             (let [i (count @async-ops-vol)]
                               (.put completable-futures arg i)
-                              (vswap! async-ops-vol conj (aor-types/->static-map->valid-AsyncOpInfo {}))
+                              (vswap! async-ops-vol conj (aor-types/->valid-AsyncOpInfo nil nil nil))
                               (vswap! emits-vol conj
                                 (.thenApply
                                   ^CompletableFuture arg
@@ -396,7 +400,7 @@
 
                         :else
                         (aor-types/->valid-AgentNodeArg arg nil)))
-                    args))]
+                    args)]
           (vswap! emits-vol conj
             (aor-types/->valid-AgentNodeEmit
               (h/random-long)
@@ -405,7 +409,7 @@
                 graph-task-id)
               node
               args
-              )))
+              ))))
       (emitParallel [this node args]
         (when (some? @result-vol)
           (throw (ex-info "Cannot emit with result already specified" {:current-result @result-vol})))
@@ -449,7 +453,7 @@
      (else>)
       (first *emits :> *emit)
       (<<cond
-        (case> (aor-types/AgentPStateTransform? *emit))
+        (case> (aor-types/AsyncPStateTransform? *emit))
         ;; TODO: <<<<>>>> need to propagate failures back as the result
         ;;  - need to expose try/catch somehow...
         (identity *emit :> {:keys [*pstate-name *path *async-op-index]})
@@ -474,7 +478,7 @@
             *async-ops)
           (next *emits))
 
-        (case> (aor-types/AgentPStateSelect? *emit))
+        (case> (aor-types/AsyncPStateQuery? *emit))
         ;; TODO: <<<<>>>> need to propagate failures back as the result
         ;;  - need to expose try/catch somehow...
         (identity *emit :> {:keys [*module-name *pstate-name *path *async-op-index]})
@@ -501,7 +505,7 @@
             *async-ops)
           (next *emits))
 
-        (case> (instance> CompletableFuture *emit))
+        (case> (instance? CompletableFuture *emit))
         ;; TODO: <<<>>>> propagate failures
         (completable-future> *emit :> [*async-op-index *start-millis *finish-millis *v])
         (continue>
@@ -567,7 +571,7 @@
       emits)))
 
 (defn- node-type [graph node]
-  (select-any [:node-map (keypath *next-node) :node (view h/node->type-kw)]
+  (select-any [:node-map (keypath node) :node (view aor-types/node->type-kw)]
     graph))
 
 (deframafn handle-node-invoke [*name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *agg-invoke-id]
@@ -622,7 +626,7 @@
   task-id)
 
 (defn get-node-obj [agent-graph node]
-  (select-any [:node-map (keypath *next-node) :node]
+  (select-any [:node-map (keypath node) :node]
     agent-graph))
 
 (defn extract-agg-result [res]
@@ -642,16 +646,17 @@
   (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *name))
                          *agent-graph (declared-object-task-global (agent-graph-task-global-name *name))]
     (local-select> (keypath *invoke-id) $$nodes
-      :> {*graph-task-id *graph-id *node *agg-ack-val *agg-state *agg-start-res *agg-invoke-id])
+      :> {:keys [*graph-task-id *graph-id *node *agg-ack-val *agg-state *agg-start-res *agg-invoke-id]})
     (local-transform>
       [(keypath *invoke-id) :agg-finished? (termval true)]
       $$nodes)
     (get-node-obj *agent-graph *node :> {:keys [*node-fn]})
-    (handle-node-invoke *name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *agg-invoke-id
+    (vector *agg-state *agg-start-res :> *args)
+    (handle-node-invoke *name *graph-task-id *graph-id *node-fn *invoke-id *node *args *agg-invoke-id
       :> {:keys [*emits *result]})
    (:> *emits *result)))
 
-(deframaop ack-agg [*name *invoke-id *ack-val]
+(deframaop ack-agg! [*name *invoke-id *ack-val]
   (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *name))
                          *agent-graph (declared-object-task-global (agent-graph-task-global-name *name))]
     (local-select> [(keypath *invoke-id) :agg-ack-val] $$nodes :> *agg-ack-val)
@@ -701,7 +706,7 @@
           {String ; async invoke name
             (map-schema
               Long ; invoke-id
-              (list-schema Object {:subindex? true})
+              (vector-schema Object {:subindex? true})
               {:subindex? true})}
           {:subindex? true})})
     (declare-pstate*
@@ -889,10 +894,10 @@
         (local-transform>
           [(keypath *invoke-id)
            :finish-time-millis
-           (termval (h/current-time-millis)]
+           (termval (h/current-time-millis))]
             agent-node-pstate-sym))
         (send-emits> *graph-task-id *invoke-id *agg-invoke-id *emits :> *op)
-        (continue> *op)))
+        (continue> *op))
 
 
       (source> agent-streaming-depot-sym

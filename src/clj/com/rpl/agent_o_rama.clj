@@ -2,7 +2,8 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require [com.rpl.agent-o-rama.helpers :as h]
-            [com.rpl.agent-o-rama.impl :as i])
+            [com.rpl.agent-o-rama.impl :as i]
+            [com.rpl.agent-o-rama.types :as aor-types])
   (:import [com.rpl.agentorama AgentsTopology AgentGraph MultiAgg$Impl]
            [com.rpl.rama PState$Declaration PState$Schema]
            [com.rpl.rama.ops RamaAccumulatorAgg RamaCombinerAgg]))
@@ -66,7 +67,7 @@
     agent-graph
     name
     output-nodes-spec
-    (i/->Node node-fn)))
+    (aor-types/->Node node-fn)))
 
 (defmacro node [agent-graph name output-nodes-spec & fn-body]
   `(node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))
@@ -76,7 +77,7 @@
     agent-graph
     name
     output-nodes-spec
-    (i/->NodeAggStart node-fn nil)))
+    (aor-types/->NodeAggStart node-fn nil)))
 
 (defmacro agg-start-node [agent-graph name output-nodes-spec & fn-body]
   `(agg-start-node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))

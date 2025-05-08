@@ -65,7 +65,7 @@
    path :- Object
    async-op-index :- Long])
 
-(drp/defrecord+ AgentPStateTransform
+(drp/defrecord+ AsyncPStateTransform
   [pstate-name :- String
    path :- Object
    async-op-index :- Long])
