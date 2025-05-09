@@ -1,11 +1,14 @@
 (ns repl
   (:require
    [com.rpl.agent-o-rama.ui.server :as srv]
+   [shadow.cljs.devtools.api :as shadow]
+
    [ring.adapter.jetty :as jetty]))
     
 (defonce jetty-ref (atom nil))
 
 (defn start []
+  (shadow/watch :frontend)
   (reset! jetty-ref
     (jetty/run-jetty #'srv/handler
       {:port 3000
