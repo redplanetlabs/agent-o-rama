@@ -272,7 +272,7 @@
             (graph/successors graph node))))
 
       :else
-      (throw (ex-info "Unreachable" {})))
+      (throw (ex-info "Undefined node" {:node node})))
     ))
 
 (defn resolve-agent-graph [agent-graph]
@@ -282,11 +282,14 @@
     (aor-types/->valid-AgentGraph
       (reduce
         (fn [m node]
-          (let [output-nodes (graph/successors agg-graph node)]
+          (let [output-nodes (graph/successors agg-graph node)
+                node-obj (lattr/attr agg-graph node :node-obj)]
+            (when (and (instance? NodeAggStart node-obj) (nil? (:agg-node-name node-obj)))
+              (throw (ex-info "No corresponding agg node" {:start-agg-node node})))
             (assoc m
                    node
                    (aor-types/->valid-AgentNode
-                     (lattr/attr agg-graph node :node-obj)
+                     node-obj
                      (set output-nodes)
                      (lattr/attr agg-graph node :agg)))
             ))

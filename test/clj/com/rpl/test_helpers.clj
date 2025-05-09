@@ -1,4 +1,5 @@
-(ns com.rpl.test-helpers)
+(ns com.rpl.test-helpers
+  (:use [clojure.test]))
 
 (defmacro letlocals
   [& body]
@@ -20,3 +21,12 @@
               tobind))]
     `(let ~binded
           ~last-expr)))
+
+(defmacro ex-info-thrown? [re data & body]
+  `(try
+    ~@body
+    (is false "Did not throw exception")
+    (catch clojure.lang.ExceptionInfo e#
+      (is (re-matches ~re (ex-message e#)))
+      (is (= ~data (ex-data e#)))
+      )))

@@ -218,14 +218,136 @@
     ))
 
 (deftest branching-graph-test
+  (letlocals
+    (bind ag
+      (-> (i/mk-agent-graph)
+          (aor/node "N1" ["A1" "B1"] [agent-node] )
+          (aor/node "A1" "A2" [agent-node] )
+          (aor/node "A2" ["A3" "A4"] [agent-node] )
+          (aor/node "A3" nil [agent-node] )
+          (aor/node "A4" nil [agent-node] )
 
-  )
+          (aor/node "B1" ["B2" "B3"] [agent-node] )
+          (aor/agg-start-node "B2" "B4" [agent-node] )
+          (aor/agg-node "B4" nil aggs/+sum [agent-node agg node-start-res] )
+          (aor/node "B3" nil [agent-node] )
+          ))
+    (bind graph (i/resolve-agent-graph ag))
+    (is (= "N1" (:start-node graph)))
+    (is (some? (:uuid graph)))
+    (is (some? (java.util.UUID/fromString (:uuid graph))))
+    (bind node-map (:node-map graph))
+    (is (= #{"N1" "A1" "A2" "A3" "A4" "B1" "B2" "B3" "B4"} (-> node-map keys set)))
+    (let [node (get node-map "N1")]
+      (is (= #{"A1" "B1"} (:output-nodes node)))
+      (is (nil? (:agg-context node))))
+    (let [node (get node-map "A1")]
+      (is (= #{"A2"} (:output-nodes node)))
+      (is (nil? (:agg-context node))))
+    (let [node (get node-map "A2")]
+      (is (= #{"A3" "A4"} (:output-nodes node)))
+      (is (nil? (:agg-context node))))
+    (let [node (get node-map "A3")]
+      (is (= #{} (:output-nodes node)))
+      (is (nil? (:agg-context node))))
+    (let [node (get node-map "A4")]
+      (is (= #{} (:output-nodes node)))
+      (is (nil? (:agg-context node))))
+    (let [node (get node-map "B1")]
+      (is (= #{"B2" "B3"} (:output-nodes node)))
+      (is (nil? (:agg-context node))))
+    (let [node (get node-map "B2")]
+      (is (= #{"B4"} (:output-nodes node)))
+      (is (nil? (:agg-context node)))
+      (is (= "B4" (-> node :node :agg-node-name))))
+    (let [node (get node-map "B4")]
+      (is (= #{} (:output-nodes node)))
+      (is (= "B2" (:agg-context node))))
+    (let [node (get node-map "B3")]
+      (is (= #{} (:output-nodes node)))
+      (is (nil? (:agg-context node))))
+    ))
 
+(deftest looping-graph-test
+  (letlocals
+    (bind ag
+      (-> (i/mk-agent-graph)
+          (aor/node "N1" ["A1" "B1"] [agent-node] )
+          (aor/node "A1" "A2" [agent-node] )
+          (aor/node "A2" "A3" [agent-node] )
+          (aor/node "A3" ["A1" "A2"] [agent-node] )
+
+          (aor/agg-start-node "B1" "B2" [agent-node] )
+          (aor/node "B2" "B3" [agent-node] )
+          (aor/node "B3" ["B2" "B4"] [agent-node] )
+          (aor/agg-node "B4" "B1" aggs/+sum [agent-node agg node-start-res] )
+          ))
+    (bind graph (i/resolve-agent-graph ag))
+    (is (= "N1" (:start-node graph)))
+    (is (some? (:uuid graph)))
+    (is (some? (java.util.UUID/fromString (:uuid graph))))
+    (bind node-map (:node-map graph))
+    (is (= #{"N1" "A1" "A2" "A3" "B1" "B2" "B3" "B4"} (-> node-map keys set)))
+    (let [node (get node-map "N1")]
+      (is (= #{"A1" "B1"} (:output-nodes node)))
+      (is (nil? (:agg-context node))))
+    (let [node (get node-map "A1")]
+      (is (= #{"A2"} (:output-nodes node)))
+      (is (nil? (:agg-context node))))
+    (let [node (get node-map "A2")]
+      (is (= #{"A3"} (:output-nodes node)))
+      (is (nil? (:agg-context node))))
+    (let [node (get node-map "A3")]
+      (is (= #{"A1" "A2"} (:output-nodes node)))
+      (is (nil? (:agg-context node))))
+    (let [node (get node-map "B1")]
+      (is (= #{"B2"} (:output-nodes node)))
+      (is (nil? (:agg-context node))))
+    (let [node (get node-map "B2")]
+      (is (= #{"B3"} (:output-nodes node)))
+      (is (= "B1" (:agg-context node))))
+    (let [node (get node-map "B3")]
+      (is (= #{"B2" "B4"} (:output-nodes node)))
+      (is (= "B1" (:agg-context node))))
+    (let [node (get node-map "B4")]
+      (is (= #{"B1"} (:output-nodes node)))
+      (is (= "B1" (:agg-context node))))
+  ))
+
+(deftest graph-error-cases
+  (ex-info-thrown? #"Undefined node" {:node "N2"}
+    (i/resolve-agent-graph
+      (-> (i/mk-agent-graph)
+          (aor/node "N1" "N2" [agent-node] )
+          )))
+  (ex-info-thrown? #"No corresponding agg node" {:start-agg-node "N1"}
+    (i/resolve-agent-graph
+      (-> (i/mk-agent-graph)
+          (aor/agg-start-node "N1" nil [agent-node] )
+          )))
+  (ex-info-thrown? #"Invalid loop to different agg context" {:agg1 "N1" :agg2 nil}
+    (i/resolve-agent-graph
+      (-> (i/mk-agent-graph)
+          (aor/agg-start-node "N1" "N2" [agent-node] )
+          (aor/node "N2" ["N1" "N3"] [agent-node] )
+          (aor/agg-node "N3" nil aggs/+sum [agent-node agg node-start-res] )
+          )))
+  (ex-info-thrown? #"Invalid loop to different agg context" {:agg1 "N1" :agg2 "A1"}
+    (i/resolve-agent-graph
+      (-> (i/mk-agent-graph)
+          (aor/agg-start-node "A1" "N1" [agent-node] )
+          (aor/agg-start-node "N1" "N2" [agent-node] )
+          (aor/node "N2" ["N1" "N3"] [agent-node] )
+          (aor/agg-node "N3" "A2" aggs/+sum [agent-node agg node-start-res] )
+          (aor/agg-node "A2" nil aggs/+sum [agent-node agg node-start-res] )
+          )))
+  (ex-info-thrown? #"Reached AggNode outside of agg context" {:name "N1"}
+    (i/resolve-agent-graph
+      (-> (i/mk-agent-graph)
+          (aor/agg-node "N1" nil aggs/+sum [agent-node agg node-start-res] )
+          )))
 ;; TODO: <<<<>>>
-;;  - test nested subgraphs
-;;  - test all error cases
-;;    - need to error if have startaggnode without a corresponding aggnode
-;;      - can error when converting the loom graph
-;;    - error if looping back to agg start node whether it's in another agg context or not
+;;    - error going directly to node within different agg context
 ;;    - error if going directly to aggnode or looping from aggnode to another node in same context...
 ;;    - specifically test aggnode looping on itself
+    )
