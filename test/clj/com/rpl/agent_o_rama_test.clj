@@ -6,7 +6,12 @@
             [com.rpl.rama.aggs :as aggs]
             [loom.attr :as lattr]
             [loom.graph :as graph])
-  (:import [com.rpl.agent_o_rama.types Node NodeAgg NodeAggStart]))
+  (:import [com.rpl.agentorama BuiltIn]
+           [com.rpl.agent_o_rama.types Node NodeAgg NodeAggStart]
+           [com.rpl.rama.ops
+             RamaAccumulatorAgg0
+             RamaAccumulatorAgg2
+             RamaCombinerAgg]))
 
 (defn node->agg [graph]
   (reduce
@@ -363,3 +368,59 @@
           (aor/agg-node "N2" "N2" aggs/+sum [agent-node agg node-start-res] )
           )))
     )
+
+(deftest agg-types-test
+  (letlocals
+    (bind get-agg-node
+      (fn [agg]
+        (-> (i/mk-agent-graph)
+            (aor/agg-start-node "N1" "N2" [agent-node] )
+            (aor/agg-node "N2" nil agg [agent-node] )
+            i/resolve-agent-graph
+            :node-map
+            (get "N2")
+            :node)
+      ))
+
+    (bind jaccum1
+      (reify RamaAccumulatorAgg2
+        (initVal [this] 10)
+        (accumulate [this val arg1 arg2]
+          (* arg2 (+ val arg1)))))
+
+    (bind jaccum2
+      (reify RamaAccumulatorAgg0
+        (initVal [this] 11)
+        (accumulate [this val]
+          (* val 2))))
+
+    (bind jcombiner
+      (reify RamaCombinerAgg
+        (zeroVal [this] 99)
+        (combine [this val1 val2]
+          (inc (* val1 val2)))))
+
+    (bind node (get-agg-node aggs/+sum))
+    (is (= 0 ((:init-fn node))))
+    (is (= 11 ((:update-fn node) 3 8)))
+
+    (bind node (get-agg-node aggs/+vec-agg))
+    (is (= [] ((:init-fn node))))
+    (is (= [1 2 5] ((:update-fn node) [1 2] 5)))
+
+    (bind node (get-agg-node BuiltIn/SUM_AGG))
+    (is (= 0 ((:init-fn node))))
+    (is (= 23 ((:update-fn node) 11 12)))
+
+    (bind node (get-agg-node jaccum1))
+    (is (= 10 ((:init-fn node))))
+    (is (= 35 ((:update-fn node) 3 4 5)))
+
+    (bind node (get-agg-node jaccum2))
+    (is (= 11 ((:init-fn node))))
+    (is (= 200 ((:update-fn node) 100)))
+
+    (bind node (get-agg-node jcombiner))
+    (is (= 99 ((:init-fn node))))
+    (is (= 13 ((:update-fn node) 3 4)))
+  ))
