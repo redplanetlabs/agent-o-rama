@@ -33,7 +33,6 @@
            [java.util.function Function]))
 
 (defprotocol AgentGraphInternal
-  (internal-add-init! [this afn])
   (internal-add-node! [this name output-nodes-spec node])
   (agent-graph-state [this]))
 
@@ -287,9 +286,9 @@
             (assoc m
                    node
                    (aor-types/->valid-AgentNode
-                     (lattr/attr graph node :node-obj)
+                     (lattr/attr agg-graph node :node-obj)
                      (set output-nodes)
-                     (lattr/attr graph node :agg)))
+                     (lattr/attr agg-graph node :agg)))
             ))
         {}
         (graph/nodes agg-graph))
