@@ -1,11 +1,4 @@
-;; shadow-cljs configuration
-{:source-paths
- ["src/cljs"
-  "test/cljs"]
-
- :dependencies
- []
-
+{:deps true
  :builds
  {:frontend
   {:target :browser
