@@ -356,8 +356,10 @@
 
           (aor/node "N2" "N3" [agent-node] )
           )))
-;; TODO: <<<<>>>
-;;    - error going directly to node within different agg context
-;;    - error if going directly to aggnode or looping from aggnode to another node in same context...
-;;      - specifically test aggnode looping on itself
+  (ex-info-thrown? #"Invalid loop to different agg context" {:agg1 nil :agg2 "N1" :node "N2" :path ["N1" "N2"]}
+    (i/resolve-agent-graph
+      (-> (i/mk-agent-graph)
+          (aor/agg-start-node "N1" "N2" [agent-node] )
+          (aor/agg-node "N2" "N2" aggs/+sum [agent-node agg node-start-res] )
+          )))
     )
