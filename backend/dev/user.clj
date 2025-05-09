@@ -25,4 +25,5 @@
   (refresh :after 'user/go))
 
 (comment
+  (stop)
   (reset))

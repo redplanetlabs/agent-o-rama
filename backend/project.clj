@@ -7,5 +7,5 @@
                  [com.stuartsierra/component "1.1.0"]
                  [http-kit "2.8.0"]
                  [org.clojure/tools.namespace "1.5.0"] ;; TODO move to dev alias?
-                 ]
+                 [metosin/reitit "0.8.0"]]
   :repl-options {:init-ns backend.core})

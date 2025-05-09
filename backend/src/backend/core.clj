@@ -1,6 +1,7 @@
 (ns backend.core
   (:require [com.stuartsierra.component :as component]
-            [org.httpkit.server :as httpkit]))
+            [org.httpkit.server :as httpkit]
+            [backend.router :as router]))
 
 
 (defrecord HttpKitWebServer [port handler]
@@ -19,14 +20,9 @@
         (assoc this :server-stopper nil))
       this)))
 
-(defrecord ReititHandler []
-  component/Lifecycle
-  (start [this] (fn [req] {:status 200 :body "hello world"}))
-  (stop [this]))
-
 (defn agentorama [config]
   (component/system-map
-   :handler (map->ReititHandler {}) 
+   :handler (router/map->ReititHandler {}) 
    :web-server (component/using
                 (map->HttpKitWebServer {:port (:port config)})
                 [:handler])))
