@@ -1,11 +1,12 @@
 ;; shadow-cljs configuration
 {:source-paths
- ["src/dev"
-  "src/main"
-  "src/test"]
+ ["src/cljs"
+  "test/cljs"]
 
  :dependencies
  []
 
  :builds
- {}}
+ {:frontend
+  {:target :browser
+   :modules {:main {:init-fn com.rpl.agent-o-rama/init}}}}}
