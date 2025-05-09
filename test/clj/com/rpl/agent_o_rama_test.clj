@@ -315,7 +315,7 @@
   ))
 
 (deftest graph-error-cases
-  (ex-info-thrown? #"Undefined node" {:node "N2"}
+  (ex-info-thrown? #"Undefined node" {:node "N2" :path ["N1"]}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
           (aor/node "N1" "N2" [agent-node] )
@@ -325,14 +325,14 @@
       (-> (i/mk-agent-graph)
           (aor/agg-start-node "N1" nil [agent-node] )
           )))
-  (ex-info-thrown? #"Invalid loop to different agg context" {:agg1 "N1" :agg2 nil}
+  (ex-info-thrown? #"Invalid loop to different agg context" {:agg1 "N1" :agg2 nil :node "N1" :path ["N1" "N2"]}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
           (aor/agg-start-node "N1" "N2" [agent-node] )
           (aor/node "N2" ["N1" "N3"] [agent-node] )
           (aor/agg-node "N3" nil aggs/+sum [agent-node agg node-start-res] )
           )))
-  (ex-info-thrown? #"Invalid loop to different agg context" {:agg1 "N1" :agg2 "A1"}
+  (ex-info-thrown? #"Invalid loop to different agg context" {:agg1 "N1" :agg2 "A1" :node "N1" :path ["A1" "N1" "N2"]}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
           (aor/agg-start-node "A1" "N1" [agent-node] )
@@ -341,12 +341,12 @@
           (aor/agg-node "N3" "A2" aggs/+sum [agent-node agg node-start-res] )
           (aor/agg-node "A2" nil aggs/+sum [agent-node agg node-start-res] )
           )))
-  (ex-info-thrown? #"Reached AggNode outside of agg context" {:name "N1"}
+  (ex-info-thrown? #"Reached AggNode outside of agg context" {:name "N1" :path []}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
           (aor/agg-node "N1" nil aggs/+sum [agent-node agg node-start-res] )
           )))
-  (ex-info-thrown? #"Rasdad" {:name "N1"}
+  (ex-info-thrown? #"Invalid loop to different agg context" {:agg1 nil :agg2 "C1" :node "N3" :path ["N1" "N2"]}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
           (aor/node "N1" ["C1" "N2"] [agent-node] )
