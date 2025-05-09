@@ -346,8 +346,18 @@
       (-> (i/mk-agent-graph)
           (aor/agg-node "N1" nil aggs/+sum [agent-node agg node-start-res] )
           )))
+  (ex-info-thrown? #"Rasdad" {:name "N1"}
+    (i/resolve-agent-graph
+      (-> (i/mk-agent-graph)
+          (aor/node "N1" ["C1" "N2"] [agent-node] )
+          (aor/agg-start-node "C1" "N3" [agent-node agg node-start-res] )
+          (aor/node "N3" "N4" [agent-node] )
+          (aor/agg-node "N4" nil aggs/+sum [agent-node agg node-start-res] )
+
+          (aor/node "N2" "N3" [agent-node] )
+          )))
 ;; TODO: <<<<>>>
 ;;    - error going directly to node within different agg context
 ;;    - error if going directly to aggnode or looping from aggnode to another node in same context...
-;;    - specifically test aggnode looping on itself
+;;      - specifically test aggnode looping on itself
     )

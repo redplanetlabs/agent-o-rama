@@ -212,73 +212,75 @@
     (graph/digraph)
     nodes))
 
-(defn- annotate-aggs [graph node traversed agg-stack]
-  (let [curr-agg (peek agg-stack)
-        node-obj (lattr/attr graph node :node-obj)
-        next-traversed (conj traversed node)]
-    (cond
-      (contains? traversed node)
-      (if (not= (lattr/attr graph node :agg) curr-agg)
-        (throw (ex-info "Invalid loop to different agg context"
-                        {:agg1 curr-agg
-                         :agg2 (lattr/attr graph node :agg)}))
-        graph)
+(defn- annotate-aggs-add-queue [queue nodes path curr-node agg-stack]
+  (let [new-path (conj path curr-node)]
+    (reduce
+      (fn [queue node]
+        (conj queue [node agg-stack new-path]))
+      queue
+      nodes)))
 
-      (instance? Node node-obj)
-      (reduce
-        (fn [graph output-node]
-          (annotate-aggs
-            graph
-            output-node
-            next-traversed
-            agg-stack
-            ))
-        (lattr/add-attr graph node :agg curr-agg)
-        (graph/successors graph node))
+(defn- annotate-aggs [graph start-node]
+  (loop [queue (conj clojure.lang.PersistentQueue/EMPTY [start-node [] []])
+         graph graph
+         traversed #{}]
+    (if (empty? queue)
+      graph
+      (let [[node agg-stack path] (peek queue)
+            next-queue (pop queue)
+            curr-agg (peek agg-stack)
+            node-obj (lattr/attr graph node :node-obj)
+            next-traversed (conj traversed node)]
+        (cond
+          (contains? traversed node)
+          (do
+            (when-not (= (lattr/attr graph node :agg) curr-agg)
+              (throw (ex-info "Invalid loop to different agg context"
+                              {:agg1 curr-agg
+                               :agg2 (lattr/attr graph node :agg)
+                               :node node
+                               :path path}))
+              graph)
+            (recur next-queue graph traversed))
 
-      (instance? NodeAggStart node-obj)
-      (let [new-agg-stack (conj agg-stack node)]
-        (reduce
-          (fn [graph output-node]
-            (annotate-aggs
-              graph
-              output-node
-              next-traversed
-              new-agg-stack
-              ))
-          (lattr/add-attr graph node :agg curr-agg)
-          (graph/successors graph node)))
+          (instance? Node node-obj)
+          (recur
+            (annotate-aggs-add-queue next-queue (graph/successors graph node) path node agg-stack)
+            (lattr/add-attr graph node :agg curr-agg)
+            next-traversed)
 
-      (instance? NodeAgg node-obj)
-      (do
-        (when (nil? curr-agg)
-          (throw (ex-info "Reached AggNode outside of agg context" {:name node})))
-        (let [new-agg-stack (pop agg-stack)
-              start-node-obj (lattr/attr graph curr-agg :node-obj)]
-          (if (some? (:agg-node-name start-node-obj))
-            (throw (ex-info "Only one AggNode can be reached per aggregation context"
-                            {:curr-agg curr-agg :other-agg node})))
-          (reduce
-            (fn [graph output-node]
-              (annotate-aggs
-                graph
-                output-node
-                next-traversed
-                new-agg-stack
-                ))
-            (-> graph
-                (lattr/add-attr node :agg curr-agg)
-                (lattr/add-attr curr-agg :node-obj (assoc start-node-obj :agg-node-name node)))
-            (graph/successors graph node))))
+          (instance? NodeAggStart node-obj)
+          (let [new-agg-stack (conj agg-stack node)]
+            (recur
+              (annotate-aggs-add-queue next-queue (graph/successors graph node) path node new-agg-stack)
+              (lattr/add-attr graph node :agg curr-agg)
+              next-traversed))
 
-      :else
-      (throw (ex-info "Undefined node" {:node node})))
-    ))
+          (instance? NodeAgg node-obj)
+          (do
+            (when (nil? curr-agg)
+              (throw (ex-info "Reached AggNode outside of agg context" {:name node :path path})))
+            (let [new-agg-stack (pop agg-stack)
+                  start-node-obj (lattr/attr graph curr-agg :node-obj)]
+              (if (some? (:agg-node-name start-node-obj))
+                (throw (ex-info "Only one AggNode can be reached per aggregation context"
+                                {:curr-agg curr-agg :other-agg node :path path})))
+
+              (recur
+                (annotate-aggs-add-queue next-queue (graph/successors graph node) path node new-agg-stack)
+                (-> graph
+                    (lattr/add-attr node :agg curr-agg)
+                    (lattr/add-attr curr-agg :node-obj (assoc start-node-obj :agg-node-name node)))
+                next-traversed)))
+
+          :else
+          (throw (ex-info "Undefined node" {:node node :path path})))
+        ))))
 
 (defn resolve-agent-graph [agent-graph]
   (let [{:keys [nodes start-node]} (agent-graph-state agent-graph)
         graph (nodes->graph nodes)
-        agg-graph (annotate-aggs graph start-node #{} [])]
+        agg-graph (annotate-aggs graph start-node)]
     (aor-types/->valid-AgentGraph
       (reduce
         (fn [m node]
