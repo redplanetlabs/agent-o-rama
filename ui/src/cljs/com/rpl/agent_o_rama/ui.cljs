@@ -7,10 +7,13 @@
    [reitit.coercion.spec :as rss]
    [reitit.frontend :as rf]
    [reitit.frontend.controllers :as rfc]
-   [reitit.frontend.easy :as rfe]))
+   [reitit.frontend.easy :as rfe]
+   
+   [day8.re-frame.http-fx]
+   
+   [com.rpl.agent-o-rama.ui.agents :as agents]))
 
 (def app-db  (reagent/atom {}))
-
 
 (re-frame/reg-fx :push-state
                  (fn [route]
@@ -53,7 +56,7 @@
 
 (defn sub-page1 []
   [:div
-   [:h1 "This is sub-page 1"]])
+   [:h1 "This is sub-page 100"]])
 
 (defn sub-page2 []
   [:div
@@ -94,7 +97,8 @@
      :link-text "Sub-page 2"
      :controllers
      [{:start (fn [& params] (js/console.log "Entering sub-page 2"))
-       :stop  (fn [& params] (js/console.log "Leaving sub-page 2"))}]}]])
+       :stop  (fn [& params] (js/console.log "Leaving sub-page 2"))}]}]
+   agents/routes])
 
 (defn on-navigate [new-match]
   (when new-match
