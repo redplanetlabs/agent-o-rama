@@ -4,10 +4,17 @@
    [ajax.core :as ajax]))
 
 (defn index []
-  (let [loading @(re-frame/subscribe [::loading])]
-    [:div (str "all agents " (pr-str loading))]))
+  (let [loading @(re-frame/subscribe [::loading])
+        agents @(re-frame/subscribe [::index])]
+    (println (pr-str agents))
+    [:div
+     [:div (str "all agents " (pr-str loading))]
+     [:ol
+      (for [agent agents]
+        [:li (pr-str agent)])]]))
 
 (re-frame/reg-sub ::loading (fn [db _] (::loading db)))
+(re-frame/reg-sub ::index (fn [db _] (::index db)))
 
 (re-frame/reg-event-fx
  ::load
@@ -17,12 +24,19 @@
     {:method :get
      :uri "/api/users/3"
      :response-format (ajax/json-response-format {:keywords? true})
-     :on-success [::loaded]}}))
+     :on-success [::loaded]
+     :on-failure [::failed]}}))
+
+(re-frame/reg-event-db
+ ::loaded
+ (fn [db [_ result]]
+   (println "here!!" result)
+   (assoc db ::index result)))
 
 (re-frame/reg-event-fx
- ::loaded
+ ::failed
  (fn [{:keys [db]} _]
-   {:db (assoc db ::loading false)}))
+   {:db (assoc db ::loading "ree")}))
 
 (def routes
   ["agents"

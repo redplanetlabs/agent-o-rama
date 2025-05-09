@@ -18,37 +18,36 @@
 
 (defn get-user-handler [request]
   (let [user-id (get-in request [:path-params :user-id])]
-    (resp/response {:user-id user-id :name "Alice" :email "alice@example.com"})))
+    (resp/response
+     [{:user-id user-id :name "Alice" :email "alice@example.com"}])))
 
 (defn create-item-handler [request]
   (let [item-data (:body-params request)]
-    (println "Creating item:" item-data)
     (:status 201 :body item-data)))
 
 (defn spa-index-handler [_request]
-  (-> (resp/resource-response "public/index.html")
+  (-> (resp/resource-response "index.html")
       (resp/content-type "text/html")))
 
+(def default-handler (ring/routes
+                      (ring/create-file-handler {:path ""
+                                                 :root "public"})
+                      (ring/ring-handler
+                       (ring/router
+                        [""
+                         ["/api/*" {:handler (fn [_req] (resp/not-found "arst"))}]
+                         ;; Return index.html for any non-API routes for History API routing
+                         ["/*" {:get {:handler spa-index-handler}}]]
+                        {:conflicts nil}))))
 (defn app-routes []
-  ;; TODO https://github.com/metosin/example-project/blob/92aaeef26483ba93cd6b5faa89eaeba3911d50fc/src/clj/backend/routes.clj#L99-L110
-  (ring/router
-   [["/api"
-     {:middleware []
-      :conflicting true}
+  (ring/ring-handler
+   (ring/router
+    ["/api"
      ["/users/:user-id" {:get #'get-user-handler}]
      ["/items" {:post #'create-item-handler}]]
-    ["/*" {:get {:handler spa-index-handler}
-           :conflicting true}]]
-   {:data {:muuntaja m/instance
-           :middleware [parameters/parameters-middleware 
-                        muuntaja/format-negotiate-middleware
-                        muuntaja/format-response-middleware
-                        muuntaja/format-request-middleware
-                        #(resource/wrap-resource % "public")
-                        content-type/wrap-content-type 
-                        not-modified/wrap-not-modified]}}))
+    
+    {:data {:muuntaja m/instance
+            :middleware [muuntaja/format-middleware]}})
+   default-handler))
 
-(def handler
-  (-> (app-routes)
-      (ring-file/wrap-file "public")
-      (ring-file-info/wrap-file-info)))
+(def handler (app-routes))
