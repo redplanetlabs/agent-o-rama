@@ -9,4 +9,4 @@
  :builds
  {:frontend
   {:target :browser
-   :modules {:main {:init-fn com.rpl.agent-o-rama/init}}}}}
+   :modules {:main {:init-fn com.rpl.agent-o-rama.ui/init}}}}}

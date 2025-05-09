@@ -1,4 +1,4 @@
-(ns com.rpl.agent-o-rama)
+(ns com.rpl.agent-o-rama.ui)
 
 (defn init []
   (println "app initted"))
