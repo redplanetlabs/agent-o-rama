@@ -497,3 +497,17 @@
             (:uuid graph)
             )))
     ))
+
+(deftest built-ins-test
+  (is (identical? aggs/+and (.agg BuiltIn/AND_AGG)))
+  (is (identical? aggs/+first (.agg BuiltIn/FIRST_AGG)))
+  (is (identical? aggs/+last (.agg BuiltIn/LAST_AGG)))
+  (is (identical? aggs/+vec-agg (.agg BuiltIn/LIST_AGG)))
+  (is (identical? aggs/+map-agg (.agg BuiltIn/MAP_AGG)))
+  (is (identical? aggs/+max (.agg BuiltIn/MAX_AGG)))
+  (is (identical? aggs/+merge (.agg BuiltIn/MERGE_MAP_AGG)))
+  (is (identical? aggs/+min (.agg BuiltIn/MIN_AGG)))
+  (is (identical? aggs/+multi-set-agg (.agg BuiltIn/MULTI_SET_AGG)))
+  (is (identical? aggs/+or (.agg BuiltIn/OR_AGG)))
+  (is (identical? aggs/+set-agg (.agg BuiltIn/SET_AGG)))
+  (is (identical? aggs/+sum (.agg BuiltIn/SUM_AGG))))
