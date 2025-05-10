@@ -3,6 +3,7 @@
         [com.rpl.test-helpers])
   (:require [com.rpl.agent-o-rama :as aor]
             [com.rpl.agent-o-rama.impl :as i]
+            [com.rpl.agent-o-rama.types :as aor-types]
             [com.rpl.rama.aggs :as aggs]
             [loom.attr :as lattr]
             [loom.graph :as graph])
@@ -475,3 +476,24 @@
         (is (= (ex-data e) {:bindings ['this] :required []}))
         )))
   )
+
+(deftest graph->historical-graph-info-test
+  (letlocals
+    (bind graph
+      (-> (i/mk-agent-graph)
+          (aor/agg-start-node "N1" "N2" [agent-node] )
+          (aor/node "N2" "N3" [agent-node a])
+          (aor/agg-node "N3" nil aggs/+sum [agent-node] )
+          i/resolve-agent-graph))
+    (bind historical
+      (#'i/graph->historical-graph-info graph))
+
+    (is (= historical
+          (aor-types/->HistoricalAgentGraphInfo
+            {"N1" (aor-types/->HistoricalAgentNodeInfo :agg-start-node #{"N2"} nil)
+             "N2" (aor-types/->HistoricalAgentNodeInfo :node #{"N3"} "N1")
+             "N3" (aor-types/->HistoricalAgentNodeInfo :agg-node #{} "N1")}
+            (:start-node graph)
+            (:uuid graph)
+            )))
+    ))

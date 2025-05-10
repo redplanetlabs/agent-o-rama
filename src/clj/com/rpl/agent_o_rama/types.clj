@@ -78,7 +78,7 @@
    ])
 
 (drp/defrecord+ HistoricalAgentNodeInfo
-  [node-type :- {String clojure.lang.Keyword} ; :node, :agg-node, :agg-start-node
+  [node-type :- clojure.lang.Keyword ; :node, :agg-node, :agg-start-node
    output-nodes :- #{String}
    agg-context :- (s/maybe String)
    ])
