@@ -109,7 +109,7 @@
             (let [[_ name & body] form]
               `(i/internal-add-handler! ~ret-sym ~name (fn ~@body)))
             (throw (ex-info "Invalid MultiAgg method" {:method (first form)}))
-            ))      
+            ))
        ~ret-sym
        )))
 
@@ -117,14 +117,20 @@
   [[arg1 & rest-args :as args]]
   (if (map? arg1) [arg1 rest-args] [{} args]))
 
-(defmacro defagentmodule [sym & args]
+(defmacro agentmodule [& args]
   (let [[options [[agent-topology-sym] & body]] (parse-map-options args)]
-    `(defmodule ~sym ~options
+    `(module ~options
        [setup# topologies#]
        (let [~agent-topology-sym (agents-topology "core" setup# topologies#)]
          ~@body
          (define-agents! ~agent-topology-sym)
          ))))
+
+(defmacro defagentmodule
+  [sym & args]
+  (let [[options args] (parse-map-options args)
+        name-default   (str sym)]
+    `(def ~sym (agentmodule ~(merge {:module-name name-default} options) ~@args))))
 
 ;; TODO: <<<<>>>>
 ;;  - need test namespace with ability to define and run agent graphs outside of modules

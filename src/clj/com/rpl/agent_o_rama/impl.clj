@@ -826,7 +826,7 @@
           (case> Node :> {:keys [*node-fn]})
           (identity *op :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
           (handle-node-invoke
-            name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *new-agg-invoke-id
+            name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *agg-invoke-id
             :> {:keys [*emits *result]})
 
           (case> NodeAggStart :> {:keys [*node-fn *agg-node-name]})
@@ -875,7 +875,7 @@
             (complete-agg! name *agg-invoke-id :> *emits *result)
            (else>)
             (ack-agg! name *agg-invoke-id *invoke-id :> *emits *result))
-          (identity *agg-start-nvoke-id :> *invoke-id)
+          (identity *agg-start-invoke-id :> *invoke-id)
           (identity *parent-agg-invoke-id :> *agg-invoke-id)
 
 

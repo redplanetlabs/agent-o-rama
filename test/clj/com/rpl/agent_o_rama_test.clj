@@ -5,6 +5,7 @@
             [com.rpl.agent-o-rama.impl :as i]
             [com.rpl.agent-o-rama.types :as aor-types]
             [com.rpl.rama.aggs :as aggs]
+            [com.rpl.rama.test :as rtest]
             [loom.attr :as lattr]
             [loom.graph :as graph])
   (:import [com.rpl.agentorama BuiltIn]
@@ -178,7 +179,6 @@
       ((-> node :node :node-fn) nil nil nil)
       (is (= ["N9"] @res))
       (vreset! res []))
-
 
     ;; starting with aggStartNode
     (bind ag
@@ -511,3 +511,18 @@
   (is (identical? aggs/+or (.agg BuiltIn/OR_AGG)))
   (is (identical? aggs/+set-agg (.agg BuiltIn/SET_AGG)))
   (is (identical? aggs/+sum (.agg BuiltIn/SUM_AGG))))
+
+(deftest graph-versioning-test
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+      (bind module
+        (aor/agentmodule [topology]
+          (-> topology
+              (aor/new-agent "foo")
+              (aor/node "start" nil [agent-node arg]
+                (println "foo")
+              ))
+
+          ))
+      (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+      )))
