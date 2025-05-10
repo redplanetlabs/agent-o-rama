@@ -423,4 +423,55 @@
     (bind node (get-agg-node jcombiner))
     (is (= 99 ((:init-fn node))))
     (is (= 13 ((:update-fn node) 3 4)))
+
+    (bind node
+      (get-agg-node
+        (aor/multi-agg
+          (init [] "10")
+          (on "abc" [curr a b]
+            (str curr "-" a "-" b))
+          (on "def" [curr a]
+            (str curr "!" a )))))
+    (is (= "10" ((:init-fn node))))
+    (is (= "111-1-2" ((:update-fn node) "111" "abc" 1 2)))
+    (is (= "111!3" ((:update-fn node) "111" "def" 3)))
+    (ex-info-thrown? #"Invalid dispatch name for MultiAgg" {:valid-names ["abc" "def"] :name "not-a-dispatch"}
+      ((:update-fn node) "111" "not-a-dispatch"))
+    (is (thrown? clojure.lang.ArityException
+          ((:update-fn node) "111" "abc" 1 2 3)))
+    (is (thrown? clojure.lang.ArityException
+          ((:update-fn node) "111" "abc" 1)))
+
+    (bind node
+      (get-agg-node
+        (aor/multi-agg
+          (on "a" [curr a b]
+            (str curr "-" a "-" b)))))
+    (is (nil? ((:init-fn node))))
+    (is (= "111-1-2" ((:update-fn node) "111" "a" 1 2)))
   ))
+
+(deftest multi-agg-errors-test
+  (ex-info-thrown? #"MultiAgg already has init function specified" {}
+    (aor/multi-agg
+      (init [] "10")
+      (init [] "1")
+      (on "abc" [curr a b]
+        (str curr "-" a "-" b))))
+  (ex-info-thrown? #"MultiAgg already has handler for given name" {:name "abc"}
+    (aor/multi-agg
+      (init [] "1")
+      (on "abc" [curr a b] curr)
+      (on "abc" [curr a b] curr)))
+  (try
+    (eval
+      `(aor/multi-agg
+        (~'init [~'this] "1")
+        (~'on "abc" [curr a b] curr)))
+    (is false)
+    (catch clojure.lang.Compiler$CompilerException e
+      (let [e (ex-cause e)]
+        (is (= (ex-message e) "Invalid binding vector for MultiAgg init"))
+        (is (= (ex-data e) {:bindings ['this] :required []}))
+        )))
+  )

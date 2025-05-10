@@ -99,14 +99,17 @@
       ~@(for [form body]
           (condp = (first form)
             'init
-            (let [[_ & body] form]
-              `(i/internal-add-init! ~ret-sym (fn ~@body)))
+            (let [[_ bindings & body] form]
+              (when-not (= [] bindings)
+                (throw (ex-info "Invalid binding vector for MultiAgg init"
+                                {:bindings bindings :required []})))
+              `(i/internal-add-init! ~ret-sym (fn [] ~@body)))
 
             'on
             (let [[_ name & body] form]
               `(i/internal-add-handler! ~ret-sym ~name (fn ~@body)))
             (throw (ex-info "Invalid MultiAgg method" {:method (first form)}))
-            ))
+            ))      
        ~ret-sym
        )))
 

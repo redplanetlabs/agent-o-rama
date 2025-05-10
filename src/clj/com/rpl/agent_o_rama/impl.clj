@@ -122,7 +122,7 @@
                          (throw (ex-info "Invalid dispatch name for MultiAgg"
                                          {:valid-names (keys on-handlers)
                                           :name dispatch-name})))
-                       (apply (get on-handlers dispatch-name) args))]
+                       (apply (get on-handlers dispatch-name) state args))]
       (internal-add-node!
         this
         name
