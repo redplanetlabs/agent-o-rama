@@ -532,7 +532,7 @@
       (bind invokes-pstate (foreign-pstate ipc module-name (i/agent-invoke-task-global-name "foo")))
       (bind graph-history-pstate (foreign-pstate ipc module-name (i/graph-history-task-global-name "foo")))
 
-      (foreign-append! depot (aor-types/->AgentInvoke [1] 0))
+      (println (foreign-append! depot (aor-types/->AgentInvoke [1] 0)))
 
       ;; TODO: <<<<<>>>>
 

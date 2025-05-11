@@ -27,6 +27,7 @@
              NodeAgg
              NodeAggStart]
            [com.rpl.rama.helpers TopologyUtils]
+           [com.rpl.rama.integration TaskGlobalObject]
            [com.rpl.rama.ops RamaAccumulatorAgg RamaCombinerAgg]
            [java.util Map UUID]
            [java.util.concurrent CompletableFuture]
@@ -313,7 +314,7 @@
 
 (deframaop gen-id [$$id]
   (local-select> STAY $$id :> *ret)
-  (local-transform> (term inc) $$id :> *ret)
+  (local-transform> (term inc) $$id)
   (:> *ret))
 
 (defn- agent-graph-task-global-name [agent-name]
@@ -348,9 +349,12 @@
     (:start-node graph)
     (:uuid graph)))
 
+(defn fetch-graph [agent-name]
+  (:val (declared-object-task-global (agent-graph-task-global-name agent-name))))
+
 (deframaop fetch-graph-version [*agent-name]
   (<<with-substitutions
-    [*graph (declared-object-task-global (agent-graph-task-global-name *agent-name))
+    [*graph (fetch-graph *agent-name)
      $$graph-history (this-module-pobject-task-global (graph-history-task-global-name *agent-name))]
     (get *graph :uuid :> *curr-uuid)
     (local-select> LAST $$graph-history :> [*version {:keys [*uuid]}])
@@ -589,7 +593,7 @@
 
 (deframafn handle-node-invoke [*name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *agg-invoke-id]
   (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *name))
-                        *agent-graph (declared-object-task-global (agent-graph-task-global-name *name))]
+                        *agent-graph (fetch-graph *name)]
     (mk-agent-node *agent-graph *graph-task-id :> *agent-node)
     (h/current-time-millis :> *start-time-millis)
     ;; TODO: <<<<>>>> should be done in a try/catch with exceptions causing non-retryable failure
@@ -657,7 +661,7 @@
 
 (deframaop complete-agg! [*name *invoke-id]
   (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *name))
-                         *agent-graph (declared-object-task-global (agent-graph-task-global-name *name))]
+                         *agent-graph (fetch-graph *name)]
     (local-select> (keypath *invoke-id) $$nodes
       :> {:keys [*graph-task-id *graph-id *node *agg-ack-val *agg-state *agg-start-res *agg-invoke-id]})
     (local-transform>
@@ -671,7 +675,7 @@
 
 (deframaop ack-agg! [*name *invoke-id *ack-val]
   (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *name))
-                         *agent-graph (declared-object-task-global (agent-graph-task-global-name *name))]
+                         *agent-graph (fetch-graph *name)]
     (local-select> [(keypath *invoke-id) :agg-ack-val] $$nodes :> *agg-ack-val)
     (bit-xor *ack-val *agg-ack-val :> *new-ack-val)
     (local-transform>
@@ -681,6 +685,9 @@
     (complete-agg! *name *invoke-id :> *emits *result)
     (:> *emits *result)))
 
+(defrecord ConstantTaskGlobal [val]
+  TaskGlobalObject
+  (prepareForTask [this task-id context] ))
 
 (defn- define-agent! [setup stream-topology name agent-graph]
   (let [graph (resolve-agent-graph agent-graph)
@@ -695,7 +702,7 @@
         ]
     (declare-depot* setup agent-depot-sym :random)
     (declare-depot* setup agent-streaming-depot-sym agent-streaming-depot-partitioner)
-    (declare-object* setup agent-graph-sym graph)
+    (declare-object* setup agent-graph-sym (->ConstantTaskGlobal graph))
 
     ;; TODO: <<<<>>>>
     ;; - and ordered IDs is perfect for GC!
