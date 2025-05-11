@@ -4,7 +4,12 @@
   (:require [com.rpl.agent-o-rama.helpers :as h]
             [com.rpl.agent-o-rama.impl :as i]
             [com.rpl.agent-o-rama.types :as aor-types])
-  (:import [com.rpl.agentorama AgentsTopology AgentGraph MultiAgg$Impl]
+  (:import [com.rpl.agentorama
+             AgentClient
+             AgentGraph
+             AgentManager
+             AgentsTopology
+             MultiAgg$Impl]
            [com.rpl.rama PState$Declaration PState$Schema]
            [com.rpl.rama.ops RamaAccumulatorAgg RamaCombinerAgg]))
 
@@ -131,6 +136,57 @@
   (let [[options args] (parse-map-options args)
         name-default   (str sym)]
     `(def ~sym (agentmodule ~(merge {:module-name name-default} options) ~@args))))
+
+(defn agent-manager [cluster]
+  ;; TODO: <<<<>>>>
+  )
+
+(defn agent-client [manager module-name agent-name]
+  (let []
+    ;; TODO: <<<<>>>>
+    (reify AgentClient
+      (invoke [this args]
+        ;; TODO: <<<<>>>>
+        )
+      (invokeAsync [this arg]
+        ;; TODO: <<<<>>>>
+        )
+      (initiate [this args]
+        ;; TODO: <<<<>>>>
+        )
+      (initiateAsync [this args]
+        ;; TODO: <<<<>>>>
+        )
+      (agentResult [this agent-invoke]
+        ;; TODO: <<<<>>>>
+        )
+      (agentResultAsync [this agent-invoke]
+        ;; TODO: <<<<>>>>
+        )
+      (stream [this agent-invoke node async-invoke-name]
+        ;; TODO: <<<<>>>>
+        )
+      (stream [this agent-invoke node async-invoke-name callback-void-jfn]
+        ;; TODO: <<<<>>>>
+        )
+      (streamInstance [this agent-invoke node async-invoke-name node-invoke-id]
+        ;; TODO: <<<<>>>>
+        )
+      (streamInstance [this agent-invoke node async-invoke-name node-invoke-id callback-void-jfn]
+        ;; TODO: <<<<>>>>
+        )
+      (close [this]
+        ;; TODO: <<<<>>>>
+        ))))
+
+(defn module-agents [cluster module-name]
+  ;; TODO: <<<<>>>> should use AgentManager for this so query topology client can be created already...
+  )
+;; TODO: <<<<>>>> need to define agent client
+;;    - gets depot/PStates/query topologies
+;;    - should wrap a Java client
+;;      - AgentManager.open(...) // same as clustermanager.open
+;;      - new AgentManager(ETLManagerBase)
 
 ;; TODO: <<<<>>>>
 ;;  - need test namespace with ability to define and run agent graphs outside of modules

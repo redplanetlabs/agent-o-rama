@@ -525,4 +525,9 @@
 
           ))
       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+      (bind module-name (get-module-name module))
+      (bind depot (foreign-depot ipc module-name (i/agent-depot-task-global-name "foo")))
+      ;; TODO: <<<<<>>>>
+      ;;  - get graph history PState      
+
       )))

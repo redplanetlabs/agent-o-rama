@@ -319,10 +319,19 @@
 (defn- agent-graph-task-global-name [agent-name]
   (str "*_agent-graph-" agent-name))
 
-(defn- agent-node-task-global-name [agent-name]
+(defn agent-depot-task-global-name [agent-name]
+  (str "*_agent-depot-" agent-name))
+
+(defn agent-invoke-task-global-name [agent-name]
+  (str "$$_agent-invoke-" agent-name))
+
+(defn agent-node-task-global-name [agent-name]
   (str "$$_agent-node-" agent-name))
 
-(defn- graph-history-task-global-name [agent-name]
+(defn agent-streaming-results-task-global-name [agent-name]
+  (str "$$_agent-streaming-" agent-name))
+
+(defn graph-history-task-global-name [agent-name]
   (str "$$_agent-graph-history-" agent-name))
 
 (defn- graph->historical-graph-info [graph]
@@ -675,12 +684,12 @@
 
 (defn- define-agent! [setup stream-topology name agent-graph]
   (let [graph (resolve-agent-graph agent-graph)
-        agent-depot-sym (symbol (str "*_agent-depot-" name))
+        agent-depot-sym (symbol (agent-depot-task-global-name name))
         agent-streaming-depot-sym (symbol (str "*_agent-streaming-depot-" name))
         agent-graph-sym (symbol (agent-graph-task-global-name name))
         agent-node-pstate-sym (symbol (agent-node-task-global-name name))
-        agent-invoke-pstate-sym (symbol (str "$$_agent-invoke-" name))
-        agent-streaming-results-pstate-sym (symbol (str "$$_agent-streaming-" name))
+        agent-invoke-pstate-sym (symbol (agent-invoke-task-global-name name))
+        agent-streaming-results-pstate-sym (symbol (agent-streaming-result-task-global-name name))
         agent-graph-history-pstate-sym (symbol (graph-history-task-global-name name))
         agent-id-gen-pstate-sym (symbol (str "$$_agent-id-gen-" name))
         ]
@@ -928,6 +937,7 @@
     ;;    - need depot for this too
     ;;  - client should query for number of args
     ;;  - task global for out-of-band events
+    ;;  - need ability to set breakpoints, which is implicit human in the loop?
     ))
 
 (defn define-agents! [setup stream-topology agent-graphs]
