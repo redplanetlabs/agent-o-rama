@@ -1,5 +1,6 @@
 (ns com.rpl.agent-o-rama.types
-  (:require [com.rpl.ramaspecter.defrecord-plus :as drp]
+  (:require [com.rpl.agent-o-rama.helpers :as h]
+            [com.rpl.ramaspecter.defrecord-plus :as drp]
             [rpl.schema.core :as s])
   (:import [com.rpl.agentorama AsyncResult]
            [com.rpl.rama.integration TaskGlobalObject]
@@ -17,7 +18,7 @@
   (cond (instance? Node node) NODE-KW
         (instance? NodeAggStart node) AGG-START-NODE-KW
         (instance? NodeAgg node) AGG-NODE-KW
-        :else (throw (ex-info "Unexpected node type" {:class (class node)}))))
+        :else (throw (h/ex-info "Unexpected node type" {:class (class node)}))))
 
 ;; TODO: <<<<>>>> use flexible serialization for these to ease updating the library? or just some of them?
 

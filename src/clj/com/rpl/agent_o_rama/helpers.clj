@@ -1,9 +1,17 @@
 (ns com.rpl.agent-o-rama.helpers
+  (:refer-clojure :exclude [ex-info])
   (:use [com.rpl.rama.path])
   (:require [com.rpl.rama.ops :as ops])
-  (:import [com.rpl.rama.helpers TopologyUtils]))
+  (:import [com.rpl.agentorama.impl AORExceptionInfo]
+           [com.rpl.rama.helpers TopologyUtils]))
 
 (def MAX-ARITY 8)
+
+(defn ex-info
+  ([message data]
+    (AORExceptionInfo. message data))
+  ([message data cause]
+    (AORExceptionInfo. message data cause)))
 
 (defmacro dofor
   "Shortcut for `doall` and `for`."

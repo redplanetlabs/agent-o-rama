@@ -63,12 +63,12 @@
       MultiAggInternal
       (internal-add-init! [this afn]
         (when (some? @init-vol)
-          (throw (ex-info "MultiAgg already has init function specified" {})))
+          (throw (h/ex-info "MultiAgg already has init function specified" {})))
         (vreset! init-vol afn)
         this)
       (internal-add-handler! [this name afn]
         (when (contains? @on-vol name)
-          (throw (ex-info "MultiAgg already has handler for given name" {:name name})))
+          (throw (h/ex-info "MultiAgg already has handler for given name" {:name name})))
         (vswap! on-vol assoc name afn)
         this)
       (multi-agg-state [this]
@@ -110,7 +110,7 @@
   (cond (string? spec) [spec]
         (coll? spec) (set spec)
         (nil? spec) #{}
-        :else (throw (ex-info "Invalid output nodes spec"
+        :else (throw (h/ex-info "Invalid output nodes spec"
                               {:spec spec :class (class spec)}))))
 
 (defn internal-add-agg-node!
@@ -119,7 +119,7 @@
     (let [{:keys [init-fn on-handlers]} (multi-agg-state agg)
           update-fn (fn [state dispatch-name & args]
                        (when-not (contains? on-handlers dispatch-name)
-                         (throw (ex-info "Invalid dispatch name for MultiAgg"
+                         (throw (h/ex-info "Invalid dispatch name for MultiAgg"
                                          {:valid-names (keys on-handlers)
                                           :name dispatch-name})))
                        (apply (get on-handlers dispatch-name) state args))]
@@ -183,9 +183,9 @@
       AgentGraphInternal
       (internal-add-node! [this name output-nodes-spec node-obj]
         (when (or (nil? name) (= "" name))
-          (throw (ex-info "Node name cannot be nil or empty string" {:name name})))
+          (throw (h/ex-info "Node name cannot be nil or empty string" {:name name})))
         (when (contains? @nodes-vol name)
-          (throw (ex-info "Node already exists" {:name name})))
+          (throw (h/ex-info "Node already exists" {:name name})))
         (when (nil? @start-node-vol)
           (vreset! start-node-vol name))
         (vswap! nodes-vol
@@ -235,7 +235,7 @@
           (contains? traversed node)
           (do
             (when-not (= (lattr/attr graph node :agg) curr-agg)
-              (throw (ex-info "Invalid loop to different agg context"
+              (throw (h/ex-info "Invalid loop to different agg context"
                               {:agg1 curr-agg
                                :agg2 (lattr/attr graph node :agg)
                                :node node
@@ -259,11 +259,11 @@
           (instance? NodeAgg node-obj)
           (do
             (when (nil? curr-agg)
-              (throw (ex-info "Reached AggNode outside of agg context" {:name node :path path})))
+              (throw (h/ex-info "Reached AggNode outside of agg context" {:name node :path path})))
             (let [new-agg-stack (pop agg-stack)
                   start-node-obj (lattr/attr graph curr-agg :node-obj)]
               (if (some? (:agg-node-name start-node-obj))
-                (throw (ex-info "Only one AggNode can be reached per aggregation context"
+                (throw (h/ex-info "Only one AggNode can be reached per aggregation context"
                                 {:curr-agg curr-agg :other-agg node :path path})))
 
               (recur
@@ -274,7 +274,7 @@
                 next-traversed)))
 
           :else
-          (throw (ex-info "Undefined node" {:node node :path path})))
+          (throw (h/ex-info "Undefined node" {:node node :path path})))
         ))))
 
 (defn resolve-agent-graph [agent-graph]
@@ -287,7 +287,7 @@
           (let [output-nodes (graph/successors agg-graph node)
                 node-obj (lattr/attr agg-graph node :node-obj)]
             (when (and (instance? NodeAggStart node-obj) (nil? (:agg-node-name node-obj)))
-              (throw (ex-info "No corresponding agg node" {:start-agg-node node})))
+              (throw (h/ex-info "No corresponding agg node" {:start-agg-node node})))
             (assoc m
                    node
                    (aor-types/->valid-AgentNode
@@ -398,9 +398,9 @@
     (reify AgentNode
       (emit [this node args]
         (when (some? @result-vol)
-          (throw (ex-info "Cannot emit with result already specified" {:current-result @result-vol})))
+          (throw (h/ex-info "Cannot emit with result already specified" {:current-result @result-vol})))
         (when-not (contains? valid-output-nodes node)
-          (throw (ex-info "Emitting to undeclared output node" {:node node :valid-output-nodes valid-output-nodes})))
+          (throw (h/ex-info "Emitting to undeclared output node" {:node node :valid-output-nodes valid-output-nodes})))
         (let [args (mapv
                     (fn [arg]
                       (cond
@@ -442,9 +442,9 @@
               ))))
       (result [this arg]
         (when (some? @result-vol)
-          (throw (ex-info "Cannot have multiple results" {:current-result @result-vol})))
+          (throw (h/ex-info "Cannot have multiple results" {:current-result @result-vol})))
         (when-not (empty? @emits-vol)
-          (throw (ex-info "Cannot both emit and result" {})))
+          (throw (h/ex-info "Cannot both emit and result" {})))
         (vreset! result-vol (aor-types/->valid-AgentResult arg)))
       (getObject [this name]
         ;; TODO: <<<<>>>>
@@ -568,7 +568,7 @@
               (select> [(nthpath *async-op-index) :info (keypath "result")] *async-ops :> *res)
 
               (default> :unify false)
-              (throw! (ex-info "Unknown async type" {:class (class *v)})))
+              (throw! (h/ex-info "Unknown async type" {:class (class *v)})))
             (h/clj-transform
               (path>
                 (nthpath *arg-index)
@@ -602,10 +602,6 @@
     ;; TODO: <<<<>>>> should be done in a try/catch with exceptions causing non-retryable failure
     (apply *node-fn *agent-node *args :> *node-fn-res)
     (agent-node-state *agent-node :> {:keys [*async-ops *emits *result]})
-    ;; TODO: <<<<>>>> error if not in agg context and #emits != 1
-    ;;    - or should it be allowed to have more than one emit?
-    ;;       - in this case it would be like having two paths racing to produce a result...
-    ;;       - or maybe one path is updating something else
     (handle-async-emits *invoke-id *async-ops *emits :> *async-ops *emits)
     (local-transform>
       [(keypath *invoke-id)
@@ -717,6 +713,7 @@
           {:root-invoke-id Long
            :invoke-args [Object]
            :graph-version Long
+           ;; TODO: <<<<<>>>>> if no result is ever specified, should error instead of hanging
            :result AgentResult})})
     (declare-pstate*
       stream-topology
@@ -829,7 +826,7 @@
         (send-emits> name *graph-task-id *invoke-id *agg-invoke-id *emits :> *op)
 
         (default> :unify false)
-        (throw! (ex-info "Unrecognized data type" {:class (class *data)})))
+        (throw! (h/ex-info "Unrecognized data type" {:class (class *data)})))
 
       ;; requires *graph-id, *graph-task-id, *op to be in scope
       (loop<- [*op *op]

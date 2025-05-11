@@ -21,7 +21,7 @@
     (reify AgentsTopology
       (newAgent [this name]
         (when (contains? @agents-vol name)
-          (throw (ex-info "Agent already exists" {:name name})))
+          (throw (h/ex-info "Agent already exists" {:name name})))
         (let [ret (i/mk-agent-graph)]
           (vswap! agents-vol assoc name ret)
           ret ))
@@ -35,7 +35,7 @@
         (declare-pstate* stream-topology (symbol name) {key-class val-class}))
       (declareDocumentStore [this name key-class key-val-classes]
         (when-not (-> key-val-classes count even?)
-          (throw (ex-info "Document store must be given even number of key/val classes"
+          (throw (h/ex-info "Document store must be given even number of key/val classes"
                           {:count (count key-val-classes)})))
         (declare-pstate*
           stream-topology
@@ -49,7 +49,7 @@
         (declare-object* setup (symbol name) o))
       (define [this]
         (when @defined?-vol
-          (throw (ex-info "Agents topology already defined" {})))
+          (throw (h/ex-info "Agents topology already defined" {})))
         (vreset! defined?-vol true)
         (i/define-agents!
           setup
@@ -107,14 +107,14 @@
             'init
             (let [[_ bindings & body] form]
               (when-not (= [] bindings)
-                (throw (ex-info "Invalid binding vector for MultiAgg init"
+                (throw (h/ex-info "Invalid binding vector for MultiAgg init"
                                 {:bindings bindings :required []})))
               `(i/internal-add-init! ~ret-sym (fn [] ~@body)))
 
             'on
             (let [[_ name & body] form]
               `(i/internal-add-handler! ~ret-sym ~name (fn ~@body)))
-            (throw (ex-info "Invalid MultiAgg method" {:method (first form)}))
+            (throw (h/ex-info "Invalid MultiAgg method" {:method (first form)}))
             ))
        ~ret-sym
        )))
