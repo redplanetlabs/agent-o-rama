@@ -1,7 +1,6 @@
 (ns com.rpl.agent-o-rama.helpers
   (:use [com.rpl.rama.path])
-  (:require ;; TODO: <<<<>>>> expose current-random-source in public API and use that
-            [rpl.rama.distributed.core :as d])
+  (:require [com.rpl.rama.ops :as ops])
   (:import [com.rpl.rama.helpers TopologyUtils]))
 
 (def MAX-ARITY 8)
@@ -71,7 +70,7 @@
 (mk-jfn-converter)
 
 (defn random-long []
-  (.nextLong ^java.util.Random (d/current-random-source)))
+  (.nextLong ^java.util.Random (ops/current-random-source)))
 
 (defn invoke
   ([afn] (afn))

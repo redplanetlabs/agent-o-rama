@@ -375,6 +375,13 @@
       (:> *found-version)
       )))
 
+(defn next-task-thread-id [task-thread-id-vol]
+  (when (empty? @task-thread-id-vol)
+    (let [^com.rpl.rama.ModuleInstanceInfo info (ops/module-instance-info)
+          shuffled (-> (.getTaskThreadIds info) shuffle seq)
+          ret (first shuffled)]
+      (vreset! task-thread-id-vol (next shuffled)))))
+
 (defprotocol AgentNodeInternal
   (agent-node-state [this]))
 
@@ -384,7 +391,9 @@
         emits-vol (volatile! [])
         async-ops-vol (volatile! [])
         completable-futures (java.util.IdentityHashMap.)
-        start-time-millis (TopologyUtils/currentTimeMillis)]
+        start-time-millis (TopologyUtils/currentTimeMillis)
+        task-thread-ids-vol (volatile! nil)
+        emit-count-vol (volatile! 0)]
     (reify AgentNode
       (emit [this node args]
         (when (some? @result-vol)
@@ -416,26 +425,19 @@
 
                         :else
                         (aor-types/->valid-AgentNodeArg arg nil)))
-                    args)]
+                    args)
+            emit-count (vswap! emit-count-vol inc)]
           (vswap! emits-vol conj
             (aor-types/->valid-AgentNodeEmit
               (h/random-long)
               (if (selected-any? [:node-map (keypath node) :node #(instance? Node %)] agent-graph)
-                task-id
+                (if (= emit-count 1)
+                  task-id
+                  (next-task-thread-id task-thread-ids-vol))
                 graph-task-id)
               node
               args
               ))))
-      (emitParallel [this node args]
-        (when (some? @result-vol)
-          (throw (ex-info "Cannot emit with result already specified" {:current-result @result-vol})))
-        ;; TODO: <<<<>>>>
-        ;;  - need the task global with shuffled task IDs
-        ;;  - ideally have the thread->tasks mapping
-        ;;  - validate that this is not going to an agg node or agg start node
-        ;;  - error if using this to go to start agg or agg node
-        (assert false)
-        )
       (result [this arg]
         (when (some? @result-vol)
           (throw (ex-info "Cannot have multiple results" {:current-result @result-vol})))

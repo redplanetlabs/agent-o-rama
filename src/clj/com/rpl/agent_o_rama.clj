@@ -122,9 +122,6 @@
 (defn emit! [^AgentNode agent-node node & args]
   (.emit agent-node node (into-array Object args)))
 
-(defn emit-parallel! [^AgentNode agent-node node & args]
-  (.emitParallel agent-node node (into-array Object args)))
-
 (defn result! [^AgentNode agent-node val]
   (.result agent-node val))
 
