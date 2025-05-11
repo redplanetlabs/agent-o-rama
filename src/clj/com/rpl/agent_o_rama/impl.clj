@@ -913,7 +913,7 @@
            :finish-time-millis
            (termval (h/current-time-millis))]
             agent-node-pstate-sym))
-        (send-emits> *graph-task-id *invoke-id *agg-invoke-id *emits :> *op)
+        (send-emits> name *graph-task-id *invoke-id *agg-invoke-id *emits :> *op)
         (continue> *op))
 
 
