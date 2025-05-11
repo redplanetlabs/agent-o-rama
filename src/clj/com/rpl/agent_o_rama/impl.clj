@@ -385,7 +385,7 @@
 (defprotocol AgentNodeInternal
   (agent-node-state [this]))
 
-(defn mk-agent-node [agent-graph graph-task-id]
+(defn mk-agent-node [agent-graph graph-task-id curr-node]
   (let [task-id (ops/current-task-id)
         result-vol (volatile! nil)
         emits-vol (volatile! [])
@@ -393,12 +393,14 @@
         completable-futures (java.util.IdentityHashMap.)
         start-time-millis (TopologyUtils/currentTimeMillis)
         task-thread-ids-vol (volatile! nil)
-        emit-count-vol (volatile! 0)]
+        emit-count-vol (volatile! 0)
+        valid-output-nodes (-> agent-graph :node-map (get curr-node) :output-nodes)]
     (reify AgentNode
       (emit [this node args]
         (when (some? @result-vol)
           (throw (ex-info "Cannot emit with result already specified" {:current-result @result-vol})))
-        ;; TODO: <<<<>>>> error if node is not in output nodes of this node
+        (when-not (contains? valid-output-nodes node)
+          (throw (ex-info "Emitting to undeclared output node" {:node node :valid-output-nodes valid-output-nodes})))
         (let [args (mapv
                     (fn [arg]
                       (cond
@@ -595,12 +597,15 @@
 (deframafn handle-node-invoke [*name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *agg-invoke-id]
   (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *name))
                         *agent-graph (fetch-graph *name)]
-    (mk-agent-node *agent-graph *graph-task-id :> *agent-node)
+    (mk-agent-node *agent-graph *graph-task-id *next-node :> *agent-node)
     (h/current-time-millis :> *start-time-millis)
     ;; TODO: <<<<>>>> should be done in a try/catch with exceptions causing non-retryable failure
     (apply *node-fn *agent-node *args :> *node-fn-res)
     (agent-node-state *agent-node :> {:keys [*async-ops *emits *result]})
     ;; TODO: <<<<>>>> error if not in agg context and #emits != 1
+    ;;    - or should it be allowed to have more than one emit?
+    ;;       - in this case it would be like having two paths racing to produce a result...
+    ;;       - or maybe one path is updating something else
     (handle-async-emits *invoke-id *async-ops *emits :> *async-ops *emits)
     (local-transform>
       [(keypath *invoke-id)
