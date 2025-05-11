@@ -779,8 +779,6 @@
                      :invoke-args *args
                      :graph-version *version})]
           agent-invoke-pstate-sym)
-
-        ;; TODO: <<<<>>> all the static references to agent-graph-sym are wrong now
         (aor-types/->valid-NodeOp *invoke-id (get agent-graph-sym :start-node) *args nil :> *op)
 
         (case> (aor-types/AsyncFutureResult? *data))
@@ -828,7 +826,6 @@
 
       ;; requires *graph-id, *graph-task-id, *op to be in scope
       (loop<- [*op *op]
-        (println "RUNNING OP" *op)
         (<<if (aor-types/NodeOp? *op)
           (get *op :next-node :> *next-node)
           (get-node-obj agent-graph-sym *next-node :> *op-obj)

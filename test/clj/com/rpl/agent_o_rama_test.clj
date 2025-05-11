@@ -521,9 +521,12 @@
         (aor/agentmodule [topology]
           (-> topology
               (aor/new-agent "foo")
-              (aor/node "start" nil [agent-node arg]
-                (println "foo" arg)
-              ))
+              (aor/node "start" "abc" [agent-node arg]
+                (println "start" arg)
+                (aor/emit! agent-node "abc" (str arg "!")))
+              (aor/node "abc" nil [agent-node arg]
+                (println "abc" arg))
+              )
 
           ))
       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
@@ -532,7 +535,7 @@
       (bind invokes-pstate (foreign-pstate ipc module-name (i/agent-invoke-task-global-name "foo")))
       (bind graph-history-pstate (foreign-pstate ipc module-name (i/graph-history-task-global-name "foo")))
 
-      (println (foreign-append! depot (aor-types/->AgentInvoke [1] 0)))
+      (println (foreign-append! depot (aor-types/->AgentInvoke ["hello"] 0)))
 
       ;; TODO: <<<<<>>>>
 
