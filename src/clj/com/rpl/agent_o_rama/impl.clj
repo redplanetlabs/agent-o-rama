@@ -27,7 +27,6 @@
              NodeAgg
              NodeAggStart]
            [com.rpl.rama.helpers TopologyUtils]
-           [com.rpl.rama.integration TaskGlobalObject]
            [com.rpl.rama.ops RamaAccumulatorAgg RamaCombinerAgg]
            [java.util Map UUID]
            [java.util.concurrent CompletableFuture]
@@ -350,20 +349,20 @@
     (:uuid graph)))
 
 (defn fetch-graph [agent-name]
-  (:val (declared-object-task-global (agent-graph-task-global-name agent-name))))
+  (declared-object-task-global (agent-graph-task-global-name agent-name)))
 
 (deframaop fetch-graph-version [*agent-name]
   (<<with-substitutions
     [*graph (fetch-graph *agent-name)
      $$graph-history (this-module-pobject-task-global (graph-history-task-global-name *agent-name))]
     (get *graph :uuid :> *curr-uuid)
-    (local-select> LAST $$graph-history :> [*version {:keys [*uuid]}])
+    (local-select> (view last) $$graph-history :> [*version {:keys [*uuid]}])
     (<<if (= *uuid *curr-uuid)
       (:> *version)
      (else>)
       (ops/current-task-id :> *task-id)
       (|global)
-      (local-select> LAST $$graph-history :> [*version {:keys [*uuid]}])
+      (local-select> (view last) $$graph-history :> [*version {:keys [*uuid]}])
       (<<if (= *uuid *curr-uuid)
         (identity *version :> *found-version)
        (else>)
@@ -685,10 +684,6 @@
     (complete-agg! *name *invoke-id :> *emits *result)
     (:> *emits *result)))
 
-(defrecord ConstantTaskGlobal [val]
-  TaskGlobalObject
-  (prepareForTask [this task-id context] ))
-
 (defn- define-agent! [setup stream-topology name agent-graph]
   (let [graph (resolve-agent-graph agent-graph)
         agent-depot-sym (symbol (agent-depot-task-global-name name))
@@ -702,7 +697,7 @@
         ]
     (declare-depot* setup agent-depot-sym :random)
     (declare-depot* setup agent-streaming-depot-sym agent-streaming-depot-partitioner)
-    (declare-object* setup agent-graph-sym (->ConstantTaskGlobal graph))
+    (declare-object* setup agent-graph-sym graph)
 
     ;; TODO: <<<<>>>>
     ;; - and ordered IDs is perfect for GC!
@@ -784,6 +779,8 @@
                      :invoke-args *args
                      :graph-version *version})]
           agent-invoke-pstate-sym)
+
+        ;; TODO: <<<<>>> all the static references to agent-graph-sym are wrong now
         (aor-types/->valid-NodeOp *invoke-id (get agent-graph-sym :start-node) *args nil :> *op)
 
         (case> (aor-types/AsyncFutureResult? *data))
@@ -831,6 +828,7 @@
 
       ;; requires *graph-id, *graph-task-id, *op to be in scope
       (loop<- [*op *op]
+        (println "RUNNING OP" *op)
         (<<if (aor-types/NodeOp? *op)
           (get *op :next-node :> *next-node)
           (get-node-obj agent-graph-sym *next-node :> *op-obj)

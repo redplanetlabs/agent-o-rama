@@ -2,6 +2,7 @@
   (:require [com.rpl.ramaspecter.defrecord-plus :as drp]
             [rpl.schema.core :as s])
   (:import [com.rpl.agentorama AsyncResult]
+           [com.rpl.rama.integration TaskGlobalObject]
            [java.util.concurrent CompletableFuture]))
 
 (def NODE-KW :node)
@@ -35,7 +36,9 @@
 (drp/defrecord+ AgentGraph
   [node-map :- {String AgentNode}
    start-node :- String
-   uuid :- String])
+   uuid :- String]
+  TaskGlobalObject
+  (prepareForTask [this task-id context] ))
 
 (drp/defrecord+ AgentNodeArg
   [val :- (s/maybe Object)
@@ -111,7 +114,7 @@
   [invoke-id :- Long
    next-node :- String
    args :- [Object]
-   agg-invoke-id :- Long])
+   agg-invoke-id :- (s/maybe Long)])
 
 (drp/defrecord+ AggAckOp
   [agg-invoke-id :- Long

@@ -522,7 +522,7 @@
           (-> topology
               (aor/new-agent "foo")
               (aor/node "start" nil [agent-node arg]
-                (println "foo")
+                (println "foo" arg)
               ))
 
           ))
