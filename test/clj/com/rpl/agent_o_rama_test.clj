@@ -1,6 +1,8 @@
 (ns com.rpl.agent-o-rama-test
   (:use [clojure.test]
-        [com.rpl.test-helpers])
+        [com.rpl.test-helpers]
+        [com.rpl.rama]
+        [com.rpl.rama.path])
   (:require [com.rpl.agent-o-rama :as aor]
             [com.rpl.agent-o-rama.impl :as i]
             [com.rpl.agent-o-rama.types :as aor-types]
@@ -527,7 +529,11 @@
       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
       (bind module-name (get-module-name module))
       (bind depot (foreign-depot ipc module-name (i/agent-depot-task-global-name "foo")))
+      (bind invokes-pstate (foreign-pstate ipc module-name (i/agent-invoke-task-global-name "foo")))
+      (bind graph-history-pstate (foreign-pstate ipc module-name (i/graph-history-task-global-name "foo")))
+
+      (foreign-append! depot (aor-types/->AgentInvoke [1] 0))
+
       ;; TODO: <<<<<>>>>
-      ;;  - get graph history PState      
 
       )))

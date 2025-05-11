@@ -301,11 +301,11 @@
       (str (UUID/randomUUID)))))
 
 (defn get-invoke-args [data]
-  ;; accepting Maps allows for REST API invokes, with limitation of allowed
-  ;; argument types being those representable by JSON
-  (if (instance? Map data)
-    (get data "args")
-    (:args data)))
+  (if (aor-types/AgentInvoke? data)
+    (:args data)
+    ;; accepting Maps allows for REST API invokes, with limitation of allowed
+    ;; argument types being those representable by JSON
+    (get data "args")))
 
 (defdepotpartitioner agent-streaming-depot-partitioner
   [{:keys [agent-task-id]} num-partitions]
@@ -689,13 +689,12 @@
         agent-graph-sym (symbol (agent-graph-task-global-name name))
         agent-node-pstate-sym (symbol (agent-node-task-global-name name))
         agent-invoke-pstate-sym (symbol (agent-invoke-task-global-name name))
-        agent-streaming-results-pstate-sym (symbol (agent-streaming-result-task-global-name name))
+        agent-streaming-results-pstate-sym (symbol (agent-streaming-results-task-global-name name))
         agent-graph-history-pstate-sym (symbol (graph-history-task-global-name name))
         agent-id-gen-pstate-sym (symbol (str "$$_agent-id-gen-" name))
         ]
     (declare-depot* setup agent-depot-sym :random)
     (declare-depot* setup agent-streaming-depot-sym agent-streaming-depot-partitioner)
-
     (declare-object* setup agent-graph-sym graph)
 
     ;; TODO: <<<<>>>>

@@ -1,10 +1,11 @@
 package com.rpl.agentorama;
 
+import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import com.rpl.agentorama.ops.*;
 
-public interface AgentClient {
+public interface AgentClient extends Closeable {
   <T> T invoke(Object... args);
   <T> CompletableFuture<T> invokeAsync(Object... args);
   AgentInvoke initiate(Object... args);
