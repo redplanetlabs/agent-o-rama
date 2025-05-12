@@ -9,15 +9,18 @@
    [ring.util.response :as resp]
    [ring.middleware.resource :as resource]
    [ring.middleware.content-type :as content-type]
-   [ring.middleware.not-modified :as not-modified]))
+   [ring.middleware.not-modified :as not-modified]
+   [reitit.coercion.malli :as rcm]
+   [reitit.ring.coercion :as rrc]
+   [malli.core :as mc]))
 
 (defn my-handler [req]
   {:status 200
    :headers {"content-type" "text/plain"}
    :body "Hello World!"})
 
-(defn get-user-handler [request]
-  (let [user-id (get-in request [:path-params :user-id])]
+(defn get-user-handler [{:keys [parameters]}]
+  (let [user-id (get-in parameters [:path :user-id])]
     (resp/response
      [{:user-id user-id :name "Alice" :email "alice@example.com"}
       {:user-id user-id :name "Alice" :email "alice@example.com"}])))
@@ -44,11 +47,17 @@
   (ring/ring-handler
    (ring/router
     ["/api"
-     ["/users/:user-id" {:get #'get-user-handler}]
+     ["/users/:user-id"
+      {:get {:parameters {:path [:map [:user-id :int]]}
+             :coercion rcm/coercion
+             :handler #'get-user-handler}}]
      ["/items" {:post #'create-item-handler}]]
-    
     {:data {:muuntaja m/instance
-            :middleware [muuntaja/format-middleware]}})
+            :middleware [muuntaja/format-middleware
+                         rrc/coerce-exceptions-middleware
+                         rrc/coerce-request-middleware
+                         rrc/coerce-response-middleware]
+            :coercion rcm/coercion}})
    default-handler))
 
 (def handler (app-routes))
