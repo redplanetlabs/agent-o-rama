@@ -351,6 +351,8 @@
 (defn fetch-graph [agent-name]
   (declared-object-task-global (agent-graph-task-global-name agent-name)))
 
+(defn hook:finding-graph-version [starting-task-id])
+
 (deframaop fetch-graph-version [*agent-name]
   (<<with-substitutions
     [*graph (fetch-graph *agent-name)
@@ -362,6 +364,7 @@
      (else>)
       (ops/current-task-id :> *task-id)
       (|global)
+      (hook:finding-graph-version *task-id)
       (local-select> (view last) $$graph-history :> [*version {:keys [*uuid]}])
       (<<if (= *uuid *curr-uuid)
         (identity *version :> *found-version)
@@ -714,7 +717,9 @@
            :invoke-args [Object]
            :graph-version Long
            ;; TODO: <<<<<>>>>> if no result is ever specified, should error instead of hanging
-           :result AgentResult})})
+           ;; - will need top-level acking that puts error here if it didn't complete
+           :result AgentResult})}
+      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
       stream-topology
       agent-streaming-results-pstate-sym
@@ -726,7 +731,8 @@
               Long ; invoke-id
               (vector-schema Object {:subindex? true})
               {:subindex? true})}
-          {:subindex? true})})
+          {:subindex? true})}
+      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
       stream-topology
       agent-node-pstate-sym
@@ -755,7 +761,8 @@
 
            ;; TODO: <<<<>>>>
            ;;   - what other stats does langsmith track?
-           })})
+           })}
+      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
       stream-topology
       agent-graph-history-pstate-sym
@@ -901,21 +908,20 @@
           )
       ;; AgentNode implementation makes it impossible for there to be both emits and result
       (<<if (some? *result)
-        (<<atomic
-          (|direct *graph-task-id)
-          (local-transform>
-            [(keypath *graph-id)
-             :result
-             (termval *result)]
-            agent-invoke-pstate-sym)))
+        (|direct *graph-task-id)
+        (local-transform>
+          [(keypath *graph-id)
+           :result
+           (termval *result)]
+          agent-invoke-pstate-sym))
       (<<if (emits-finished? *emits)
         (local-transform>
           [(keypath *invoke-id)
            :finish-time-millis
            (termval (h/current-time-millis))]
-            agent-node-pstate-sym))
+            agent-node-pstate-sym)
         (send-emits> name *graph-task-id *invoke-id *agg-invoke-id *emits :> *op)
-        (continue> *op))
+        (continue> *op)))
 
 
       (source> agent-streaming-depot-sym

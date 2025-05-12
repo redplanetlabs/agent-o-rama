@@ -4,6 +4,7 @@
         [com.rpl.rama]
         [com.rpl.rama.path])
   (:require [com.rpl.agent-o-rama :as aor]
+            [com.rpl.agent-o-rama.helpers :as h]
             [com.rpl.agent-o-rama.impl :as i]
             [com.rpl.agent-o-rama.types :as aor-types]
             [com.rpl.rama.aggs :as aggs]
@@ -515,28 +516,50 @@
   (is (identical? aggs/+sum (.agg BuiltIn/SUM_AGG))))
 
 (deftest graph-versioning-test
-  (with-open [ipc (rtest/create-ipc)]
-    (letlocals
-      (bind module
-        (aor/agentmodule [topology]
-          (-> topology
-              (aor/new-agent "foo")
-              (aor/node "start" "abc" [agent-node arg]
-                (println "start" arg)
-                (aor/emit! agent-node "abc" (str arg "!")))
-              (aor/node "abc" nil [agent-node arg]
-                (println "abc" arg))
-              )
+  (let [task-counts-vol (volatile! {})]
+    (with-redefs [i/hook:finding-graph-version
+                  (fn [task-id]
+                    (vswap! task-counts-vol
+                            #(transform [(keypath task-id) (nil->val 0)]
+                                       inc
+                                       %)))]
+      (with-open [ipc (rtest/create-ipc)]
+        (letlocals
+          (bind module
+            (aor/agentmodule [topology]
+              (-> topology
+                  (aor/new-agent "foo")
+                  (aor/node "start" "abc" [agent-node arg]
+                    (aor/emit! agent-node "abc" (str arg "!")))
+                  (aor/node "abc" nil [agent-node arg]
+                    (aor/result! agent-node (str arg "?")))
+                  )))
+          (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+          (bind module-name (get-module-name module))
+          (bind depot (foreign-depot ipc module-name (i/agent-depot-task-global-name "foo")))
+          (bind graph-history-pstate (foreign-pstate ipc module-name (i/graph-history-task-global-name "foo")))
 
-          ))
-      (rtest/launch-module! ipc module {:tasks 4 :threads 2})
-      (bind module-name (get-module-name module))
-      (bind depot (foreign-depot ipc module-name (i/agent-depot-task-global-name "foo")))
-      (bind invokes-pstate (foreign-pstate ipc module-name (i/agent-invoke-task-global-name "foo")))
-      (bind graph-history-pstate (foreign-pstate ipc module-name (i/graph-history-task-global-name "foo")))
+          (dotimes [_ 10]
+            (foreign-append! depot (aor-types/->AgentInvoke ["hello"] 0)))
+          (is (-> @task-counts-vol empty? not))
+          (doseq [[_ v] @task-counts-vol]
+            (is (= 1 v)))
 
-      (println (foreign-append! depot (aor-types/->AgentInvoke ["hello"] 0)))
+          (is (= [0] (foreign-select MAP-KEYS graph-history-pstate {:pkey 0})))
+          (bind hgraph (foreign-select-one (keypath 0) graph-history-pstate {:pkey 0}))
 
-      ;; TODO: <<<<<>>>>
+          (is (some? (:uuid hgraph)))
+          (is (= hgraph
+                (aor-types/->HistoricalAgentGraphInfo
+                  {"start" (aor-types/->HistoricalAgentNodeInfo :node #{"abc"} nil)
+                   "abc" (aor-types/->HistoricalAgentNodeInfo :node #{} nil)}
+                  "start"
+                  (:uuid hgraph)
+                  )))
 
-      )))
+
+          ;; TODO: <<<<<>>>>
+          ;;    - verify all node types
+
+
+          )))))
