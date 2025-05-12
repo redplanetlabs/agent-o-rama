@@ -37,7 +37,6 @@
  ::navigated
 
  (fn [db [_ new-match]]
-   (println "new match" new-match)
    (let [old-match   (:current-route db)
          controllers (rfc/apply-controllers (:controllers old-match) new-match)]
      (assoc db :current-route (assoc new-match :controllers controllers)))))

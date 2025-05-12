@@ -30,11 +30,24 @@
            (pr-str agent)]])]]]))
 
 ;; ========== agent ==========
-(defn agent-fsm [params]
-  (println "PARAMS" params))
+(defn agent-fsm [{{:keys [module-id agent-id]} :path}]
+  {:id          ::agent
+   :http-xhrio  {:uri             (str "/api/agents/" module-id "/" agent-id)
+                 :method          :get
+                 :response-format (ajax/transit-response-format)}
+   :max-retries 5
+   :path        [::agent module-id agent-id]})
+
+(re-frame/reg-sub
+ ::selected-agent
+ (fn [db _]
+   (let [{:keys [module-id agent-id]} (:path-params (:current-route db))]
+     (get-in db [::agent module-id agent-id]))))
 
 (defn agent []
-  [:div "agent"])
+  (let [agents @(re-frame/subscribe [::selected-agent])]
+    [common/http-loader-view ::agent
+     [:div "Ree" (pr-str agents)]]))
 
 (def routes
   ["agents"
@@ -43,12 +56,12 @@
      :view      index
      :link-text "agent index"
      :controllers
-     [{:start (fn [& params] (re-frame/dispatch [::http/start index-fsm]))}]}]
+     [{:start (fn [_] (re-frame/dispatch [::http/start index-fsm]))}]}]
    ["/:module-id/:agent-id"
     {:name      ::agent
      :view      agent
      :link-text "agent"
      :controllers
-     [{:start (fn [& params]
-                #_(re-frame/dispatch [::http/start fsm])
-                (agent-fsm params))}]}]])
+     [{:parameters {:path [:module-id :agent-id]}
+       :start (fn [params]
+                (re-frame/dispatch [::http/start (agent-fsm params)]))}]}]])

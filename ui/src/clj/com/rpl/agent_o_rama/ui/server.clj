@@ -34,7 +34,8 @@
   (ring/ring-handler
    (ring/router
     ["/api"
-     ["/agents" {:get {:handler #'agents/index}}]]
+     ["/agents" {:get {:handler #'agents/index}}]
+     ["/agents/:module-id/:agent-id" {:get {:handler #'agents/get}}]]
     {:data {:muuntaja m/instance
             :middleware [muuntaja/format-middleware
                          rrc/coerce-exceptions-middleware
