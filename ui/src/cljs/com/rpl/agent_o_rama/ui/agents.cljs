@@ -1,11 +1,12 @@
 (ns com.rpl.agent-o-rama.ui.agents
   (:require
-   [glimt.core :as http]
+   [com.rpl.agent-o-rama.ui.http :as http]
    [re-frame.core :as re-frame]
    [reagent.core :as reagent]
    [ajax.core :as ajax]
    [com.rpl.agent-o-rama.ui.common :as common]
    [reitit.frontend.easy :as rfe]))
+
 
 ;; ========== index ==========
 (def index-fsm {:id          ::index

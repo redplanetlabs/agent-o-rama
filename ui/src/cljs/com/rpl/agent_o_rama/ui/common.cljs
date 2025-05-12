@@ -1,6 +1,6 @@
 (ns com.rpl.agent-o-rama.ui.common
   (:require
-   [glimt.core :as http]
+   [com.rpl.agent-o-rama.ui.http :as http]
    [re-frame.core :as re-frame]
    [reagent.core :as reagent]))
 
