@@ -39,7 +39,8 @@
    start-node :- String
    uuid :- String]
   TaskGlobalObject
-  (prepareForTask [this task-id context] ))
+  (prepareForTask [this task-id context] )
+  (close [this] ))
 
 (drp/defrecord+ AgentNodeArg
   [val :- (s/maybe Object)

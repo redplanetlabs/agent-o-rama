@@ -526,7 +526,7 @@
       (with-open [ipc (rtest/create-ipc)]
         (letlocals
           (bind module
-            (aor/agentmodule [topology]
+            (aor/agentmodule {:module-name "foo-module"} [topology]
               (-> topology
                   (aor/new-agent "foo")
                   (aor/node "start" "abc" [agent-node arg]
@@ -541,11 +541,15 @@
           (rtest/launch-module! ipc module {:tasks 4 :threads 2})
           (bind module-name (get-module-name module))
           (bind depot (foreign-depot ipc module-name (i/agent-depot-task-global-name "foo")))
+          (bind invokes-pstate (foreign-pstate ipc module-name (i/agent-invoke-task-global-name "foo")))
           (bind graph-history-pstate (foreign-pstate ipc module-name (i/graph-history-task-global-name "foo")))
 
           (dotimes [_ 10]
-            (foreign-append! depot (aor-types/->AgentInvoke ["hello"] 0)))
-          (is (-> @task-counts-vol empty? not))
+            (let [{[graph-task-id graph-id] "_agents-topology-core"}
+                  (foreign-append! depot (aor-types/->AgentInvoke ["hello"] 0))]
+              (is (= 0 (foreign-select-one [(keypath graph-id) :graph-version]
+                                           invokes-pstate
+                                           {:pkey graph-task-id})))))          (is (-> @task-counts-vol empty? not))
           (doseq [[_ v] @task-counts-vol]
             (is (= 1 v)))
 
@@ -553,12 +557,47 @@
           (bind hgraph (foreign-select-one (keypath 0) graph-history-pstate {:pkey 0}))
 
           (is (some? (:uuid hgraph)))
-          (is (= hgraph
-                (aor-types/->HistoricalAgentGraphInfo
-                  {"start" (aor-types/->HistoricalAgentNodeInfo :node #{"abc"} nil)
-                   "abc" (aor-types/->HistoricalAgentNodeInfo :agg-start-node #{"agg"} nil)
-                   "agg" (aor-types/->HistoricalAgentNodeInfo :agg-node #{} "abc")}
-                  "start"
-                  (:uuid hgraph)
+          (bind graph-history1
+            (aor-types/->HistoricalAgentGraphInfo
+              {"start" (aor-types/->HistoricalAgentNodeInfo :node #{"abc"} nil)
+               "abc" (aor-types/->HistoricalAgentNodeInfo :agg-start-node #{"agg"} nil)
+               "agg" (aor-types/->HistoricalAgentNodeInfo :agg-node #{} "abc")}
+              "start"
+              (:uuid hgraph)))
+          (is (= hgraph graph-history1))
+
+          (bind module2
+            (aor/agentmodule {:module-name "foo-module"} [topology]
+              (-> topology
+                  (aor/new-agent "foo")
+                  (aor/node "start" nil [agent-node]
+                    (aor/result! agent-node "done"))
                   )))
+
+          (rtest/update-module! ipc module2)
+
+          (vreset! task-counts-vol {})
+          (dotimes [_ 10]
+            (let [{[graph-task-id graph-id] "_agents-topology-core"}
+                  (foreign-append! depot (aor-types/->AgentInvoke [] 0))]
+              (is (= 1 (foreign-select-one [(keypath graph-id) :graph-version]
+                                           invokes-pstate
+                                           {:pkey graph-task-id})))))
+          (is (-> @task-counts-vol empty? not))
+          (doseq [[_ v] @task-counts-vol]
+            (is (= 1 v)))
+
+          (is (= [0 1] (foreign-select MAP-KEYS graph-history-pstate {:pkey 0})))
+          (bind hgraph1 (foreign-select-one (keypath 0) graph-history-pstate {:pkey 0}))
+          (bind hgraph2 (foreign-select-one (keypath 1) graph-history-pstate {:pkey 0}))
+
+          (is (not= (:uuid hgraph1) (:uuid hgraph2)))
+
+          (bind graph-history2
+            (aor-types/->HistoricalAgentGraphInfo
+              {"start" (aor-types/->HistoricalAgentNodeInfo :node #{} nil)}
+              "start"
+              (:uuid hgraph2)))
+          (is (= hgraph1 graph-history1))
+          (is (= hgraph2 graph-history2))
           )))))
