@@ -6,9 +6,12 @@
 (defn index []
   (let [loading @(re-frame/subscribe [::loading])
         agents @(re-frame/subscribe [::index])]
-    (println (pr-str agents))
     [:div
-     [:div (str "all agents " (pr-str loading))]
+     [:div (case loading
+             :loading "🔄"
+             :done    "✅"
+             :failed  "❌"
+             nil "")]
      [:ol
       (for [agent agents]
         [:li (pr-str agent)])]]))
@@ -19,7 +22,7 @@
 (re-frame/reg-event-fx
  ::load
  (fn [{:keys [db]} _]
-   {:db (assoc db ::loading true)
+   {:db (assoc db ::loading :loading)
     :http-xhrio
     {:method :get
      :uri "/api/users/3"
@@ -30,13 +33,14 @@
 (re-frame/reg-event-db
  ::loaded
  (fn [db [_ result]]
-   (println "here!!" result)
-   (assoc db ::index result)))
+   (-> db
+       (assoc ::index result)
+       (assoc ::loading :done))))
 
 (re-frame/reg-event-fx
  ::failed
  (fn [{:keys [db]} _]
-   {:db (assoc db ::loading "ree")}))
+   {:db (assoc db ::loading :failed)}))
 
 (def routes
   ["agents"

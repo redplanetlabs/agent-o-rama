@@ -19,7 +19,8 @@
 (defn get-user-handler [request]
   (let [user-id (get-in request [:path-params :user-id])]
     (resp/response
-     [{:user-id user-id :name "Alice" :email "alice@example.com"}])))
+     [{:user-id user-id :name "Alice" :email "alice@example.com"}
+      {:user-id user-id :name "Alice" :email "alice@example.com"}])))
 
 (defn create-item-handler [request]
   (let [item-data (:body-params request)]
@@ -35,7 +36,7 @@
                       (ring/ring-handler
                        (ring/router
                         [""
-                         ["/api/*" {:handler (fn [_req] (resp/not-found "arst"))}]
+                         ["/api/*" {:handler (fn [_req] (resp/not-found ""))}]
                          ;; Return index.html for any non-API routes for History API routing
                          ["/*" {:get {:handler spa-index-handler}}]]
                         {:conflicts nil}))))
