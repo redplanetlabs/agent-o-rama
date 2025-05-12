@@ -635,7 +635,7 @@
   (hook> <root>)
   (filter> (some? *agg-invoke-id))
   (mapv :invoke-id *emits :> *next-invoke-ids)
-  (reduce bit-xor *emits *invoke-id :> *ack-val)
+  (reduce bit-xor *invoke-id *next-invoke-ids :> *ack-val)
   (|direct *graph-task-id)
   (aor-types/->valid-AggAckOp *agg-invoke-id *ack-val :> *op)
   (anchor> <agg-ack-emit>)
@@ -873,6 +873,7 @@
                        :agg-start-invoke-id *invoke-id
                       })]
               agent-node-pstate-sym)
+          (identity *new-agg-invoke-id :> *agg-invoke-id)
 
           (case> NodeAgg :> {:keys [*update-fn]})
           (identity *op :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})

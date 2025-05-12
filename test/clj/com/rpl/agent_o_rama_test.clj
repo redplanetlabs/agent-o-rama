@@ -531,8 +531,12 @@
                   (aor/new-agent "foo")
                   (aor/node "start" "abc" [agent-node arg]
                     (aor/emit! agent-node "abc" (str arg "!")))
-                  (aor/node "abc" nil [agent-node arg]
-                    (aor/result! agent-node (str arg "?")))
+                  (aor/agg-start-node "abc" "agg" [agent-node arg]
+                    (dotimes [_ 3]
+                      (aor/emit! agent-node "agg" 1))
+                    (str arg "?"))
+                  (aor/agg-node "agg" nil aggs/+sum [agent-node agg node-start-res]
+                    (aor/result! agent-node [agg node-start-res]))
                   )))
           (rtest/launch-module! ipc module {:tasks 4 :threads 2})
           (bind module-name (get-module-name module))
@@ -552,7 +556,8 @@
           (is (= hgraph
                 (aor-types/->HistoricalAgentGraphInfo
                   {"start" (aor-types/->HistoricalAgentNodeInfo :node #{"abc"} nil)
-                   "abc" (aor-types/->HistoricalAgentNodeInfo :node #{} nil)}
+                   "abc" (aor-types/->HistoricalAgentNodeInfo :agg-start-node #{"agg"} nil)
+                   "agg" (aor-types/->HistoricalAgentNodeInfo :agg-node #{} "abc")}
                   "start"
                   (:uuid hgraph)
                   )))
