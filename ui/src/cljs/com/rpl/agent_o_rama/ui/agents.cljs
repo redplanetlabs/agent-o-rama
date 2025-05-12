@@ -31,8 +31,11 @@
            (pr-str agent)]])]]]))
 
 ;; ========== agent ==========
+(defn agent-fsm-id [module-id agent-id]
+  (keyword (str "agent-" module-id "-" agent-id)))
+
 (defn agent-fsm [{{:keys [module-id agent-id]} :path}]
-  {:id          ::agent
+  {:id          (agent-fsm-id module-id agent-id)
    :http-xhrio  {:uri             (str "/api/agents/" module-id "/" agent-id)
                  :method          :get
                  :response-format (ajax/transit-response-format)}
@@ -45,10 +48,14 @@
    (let [{:keys [module-id agent-id]} (:path-params (:current-route db))]
      (get-in db [::agent module-id agent-id]))))
 
+(re-frame/reg-sub :route-params (fn [db _] (:path-params (:current-route db))))
+
 (defn agent []
-  (let [agents @(re-frame/subscribe [::selected-agent])]
-    [common/http-loader-view ::agent
-     [:div "Ree" (pr-str agents)]]))
+  (let [agent-data @(re-frame/subscribe [::selected-agent])
+        {:keys [module-id agent-id]} @(re-frame/subscribe [:route-params])]
+    [common/http-loader-view (agent-fsm-id module-id agent-id)
+     [:div "Agent Details: " (pr-str agent-data)]]))
+
 
 (def routes
   ["agents"
