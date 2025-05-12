@@ -50,11 +50,32 @@
 
 (re-frame/reg-sub :route-params (fn [db _] (:path-params (:current-route db))))
 
+(defn pp [x] (with-out-str (cljs.pprint/pprint x)))
+
 (defn agent []
   (let [agent-data @(re-frame/subscribe [::selected-agent])
         {:keys [module-id agent-id]} @(re-frame/subscribe [:route-params])]
     [common/http-loader-view (agent-fsm-id module-id agent-id)
-     [:div "Agent Details: " (pr-str agent-data)]]))
+     [:div
+      [:div
+       [:h1 "agent topology render"]
+       "todo"]
+      [:div
+       [:h1 "traces"]
+       [:ol
+        (for [data agent-data]
+          [:li [:pre (pp data)]])]]
+      [:div
+       [:h1 "stats"]
+       [:ul
+        [:li "run count 30"]
+        [:li "total tokens 3707"]
+        [:li "median tokens 621"]
+        [:li "error rate"]
+        [:li "latency"]
+        [:ul
+         [:li "p50 1.58s"]
+         [:li "p99 3.23s"]]]]]]))
 
 
 (def routes
