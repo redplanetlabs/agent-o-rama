@@ -25,8 +25,8 @@
    {:db (assoc db ::loading :loading)
     :http-xhrio
     {:method :get
-     :uri "/api/users/3"
-     :response-format (ajax/json-response-format {:keywords? true})
+     :uri "/api/agents"
+     :response-format (ajax/transit-response-format)
      :on-success [::loaded]
      :on-failure [::failed]}}))
 

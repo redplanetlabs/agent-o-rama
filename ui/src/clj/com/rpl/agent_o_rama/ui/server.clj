@@ -12,22 +12,9 @@
    [ring.middleware.not-modified :as not-modified]
    [reitit.coercion.malli :as rcm]
    [reitit.ring.coercion :as rrc]
-   [malli.core :as mc]))
+   [malli.core :as mc]
 
-(defn my-handler [req]
-  {:status 200
-   :headers {"content-type" "text/plain"}
-   :body "Hello World!"})
-
-(defn get-user-handler [{:keys [parameters]}]
-  (let [user-id (get-in parameters [:path :user-id])]
-    (resp/response
-     [{:user-id user-id :name "Alice" :email "alice@example.com"}
-      {:user-id user-id :name "Alice" :email "alice@example.com"}])))
-
-(defn create-item-handler [request]
-  (let [item-data (:body-params request)]
-    (:status 201 :body item-data)))
+   [com.rpl.agent-o-rama.ui.agents :as agents]))
 
 (defn spa-index-handler [_request]
   (-> (resp/resource-response "index.html")
@@ -47,11 +34,7 @@
   (ring/ring-handler
    (ring/router
     ["/api"
-     ["/users/:user-id"
-      {:get {:parameters {:path [:map [:user-id :int]]}
-             :coercion rcm/coercion
-             :handler #'get-user-handler}}]
-     ["/items" {:post #'create-item-handler}]]
+     ["/agents" {:get {:handler #'agents/index}}]]
     {:data {:muuntaja m/instance
             :middleware [muuntaja/format-middleware
                          rrc/coerce-exceptions-middleware
