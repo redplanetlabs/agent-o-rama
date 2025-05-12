@@ -1,46 +1,29 @@
 (ns com.rpl.agent-o-rama.ui.agents
   (:require
+   [glimt.core :as http]
    [re-frame.core :as re-frame]
-   [ajax.core :as ajax]))
+   [reagent.core :as reagent]
+   [ajax.core :as ajax]
+   [com.rpl.agent-o-rama.ui.common :as common]))
 
-(defn index []
-  (let [loading @(re-frame/subscribe [::loading])
-        agents @(re-frame/subscribe [::index])]
-    [:div
-     [:div (case loading
-             :loading "🔄"
-             :done    "✅"
-             :failed  "❌"
-             nil "")]
-     [:ol
-      (for [agent agents]
-        [:li (pr-str agent)])]]))
+(def fsm {:id          ::index
+          :http-xhrio  {:uri             "/api/agents"
+                        :method          :get
+                        :response-format (ajax/transit-response-format)}
+          :max-retries 5
+          :path        [::index]})
 
-(re-frame/reg-sub ::loading (fn [db _] (::loading db)))
 (re-frame/reg-sub ::index (fn [db _] (::index db)))
 
-(re-frame/reg-event-fx
- ::load
- (fn [{:keys [db]} _]
-   {:db (assoc db ::loading :loading)
-    :http-xhrio
-    {:method :get
-     :uri "/api/agents"
-     :response-format (ajax/transit-response-format)
-     :on-success [::loaded]
-     :on-failure [::failed]}}))
-
-(re-frame/reg-event-db
- ::loaded
- (fn [db [_ result]]
-   (-> db
-       (assoc ::index result)
-       (assoc ::loading :done))))
-
-(re-frame/reg-event-fx
- ::failed
- (fn [{:keys [db]} _]
-   {:db (assoc db ::loading :failed)}))
+(defn index []
+  (let [agents @(re-frame/subscribe [::index])]
+    [:div
+     [:h1 "agents"]
+     [common/http-loader-view ::index
+      [:ol
+       (for [agent agents]
+         [:li {:key (str (:module-id agent) (:agent-id agent))}
+          (pr-str agent)])]]]))
 
 (def routes
   ["agents"
@@ -49,4 +32,4 @@
      :view      index
      :link-text "agent index"
      :controllers
-     [{:start (fn [& params] (re-frame/dispatch [::load]))}]}]])
+     [{:start (fn [& params] (re-frame/dispatch [::http/start fsm]))}]}]])

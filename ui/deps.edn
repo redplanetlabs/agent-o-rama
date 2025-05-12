@@ -4,4 +4,5 @@
         metosin/reitit {:mvn/version "0.8.0"}
         re-frame/re-frame {:mvn/version "1.4.3"}
         day8.re-frame/http-fx {:mvn/version "0.2.4"}
-        metosin/malli {:mvn/version "0.18.0"}}}
+        metosin/malli {:mvn/version "0.18.0"}
+        glimt/glimt {:mvn/version "0.2.2"}}}
