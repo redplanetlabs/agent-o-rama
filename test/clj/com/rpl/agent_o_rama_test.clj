@@ -516,10 +516,10 @@
   (is (identical? aggs/+sum (.agg BuiltIn/SUM_AGG))))
 
 (deftest graph-versioning-test
-  (let [task-counts-vol (volatile! {})]
+  (let [task-counts-atom (atom {})]
     (with-redefs [i/hook:finding-graph-version
                   (fn [task-id]
-                    (vswap! task-counts-vol
+                    (swap! task-counts-atom
                             #(transform [(keypath task-id) (nil->val 0)]
                                        inc
                                        %)))]
@@ -549,8 +549,9 @@
                   (foreign-append! depot (aor-types/->AgentInvoke ["hello"] 0))]
               (is (= 0 (foreign-select-one [(keypath graph-id) :graph-version]
                                            invokes-pstate
-                                           {:pkey graph-task-id})))))          (is (-> @task-counts-vol empty? not))
-          (doseq [[_ v] @task-counts-vol]
+                                           {:pkey graph-task-id})))))
+          (is (-> @task-counts-atom empty? not))
+          (doseq [[_ v] @task-counts-atom]
             (is (= 1 v)))
 
           (is (= [0] (foreign-select MAP-KEYS graph-history-pstate {:pkey 0})))
@@ -576,15 +577,15 @@
 
           (rtest/update-module! ipc module2)
 
-          (vreset! task-counts-vol {})
+          (reset! task-counts-atom {})
           (dotimes [_ 10]
             (let [{[graph-task-id graph-id] "_agents-topology-core"}
                   (foreign-append! depot (aor-types/->AgentInvoke [] 0))]
               (is (= 1 (foreign-select-one [(keypath graph-id) :graph-version]
                                            invokes-pstate
                                            {:pkey graph-task-id})))))
-          (is (-> @task-counts-vol empty? not))
-          (doseq [[_ v] @task-counts-vol]
+          (is (-> @task-counts-atom empty? not))
+          (doseq [[_ v] @task-counts-atom]
             (is (= 1 v)))
 
           (is (= [0 1] (foreign-select MAP-KEYS graph-history-pstate {:pkey 0})))
