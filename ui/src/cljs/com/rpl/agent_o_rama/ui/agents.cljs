@@ -61,10 +61,16 @@
        [:h1 "agent topology render"]
        "todo"]
       [:div
-       [:h1 "traces"]
+       [:h1 "invokes"]
        [:ol
-        (for [data agent-data]
-          [:li [:pre (pp data)]])]]
+        (for [data (:invokes agent-data)]
+          [:li
+           [:div
+            [:a {:href (rfe/href ::invoke {:module-id module-id
+                                           :agent-id agent-id
+                                           :invoke-id (:root-invoke-id data)})}
+             "explore"]
+            [:pre (pp data)]]])]]
       [:div
        [:h1 "stats"]
        [:ul
@@ -77,6 +83,30 @@
          [:li "p50 1.58s"]
          [:li "p99 3.23s"]]]]]]))
 
+;; ============ invoke ==============
+
+
+(re-frame/reg-sub
+ ::selected-invoke
+ (fn [db _]
+   (let [{:keys [module-id agent-id invoke-id]} (:path-params (:current-route db))]
+     (get-in db [::invoke module-id agent-id invoke-id]))))
+
+(defn invoke-fsm-id [module-id agent-id invoke-id]
+  (keyword (str "invoke-" module-id "-" agent-id "-" invoke-id)))
+
+(defn invoke-fsm [{{:keys [module-id agent-id invoke-id]} :path}]
+  {:id          (invoke-fsm-id module-id agent-id invoke-id)
+   :http-xhrio  {:uri             (str "/api/agents/" module-id "/" agent-id "/" invoke-id)
+                 :method          :get
+                 :response-format (ajax/transit-response-format)}
+   :max-retries 5
+   :path        [::invoke module-id agent-id invoke-id]})
+
+(defn invoke []
+  (let [invoke-data @(re-frame/subscribe [::selected-invoke])]
+    [:div "invoke"
+     (pr-str invoke-data)]))
 
 (def routes
   ["agents"
@@ -93,4 +123,13 @@
      :controllers
      [{:parameters {:path [:module-id :agent-id]}
        :start (fn [params]
-                (re-frame/dispatch [::http/start (agent-fsm params)]))}]}]])
+                (re-frame/dispatch [::http/start (agent-fsm params)]))}]}]
+   
+   ["/:module-id/:agent-id/:invoke-id"
+    {:name      ::invoke
+     :view      invoke
+     :link-text "invoke"
+     :controllers
+     [{:parameters {:path [:module-id :agent-id :invoke-id]}
+       :start (fn [params]
+                (re-frame/dispatch [::http/start (invoke-fsm params)]))}]}]])
