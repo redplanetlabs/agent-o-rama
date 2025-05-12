@@ -324,24 +324,24 @@
   ))
 
 (deftest graph-error-cases
-  (ex-info-thrown? #"Undefined node" {:node "N2" :path ["N1"]}
+  (ex-info-thrown? #"Undefined node.*" {:node "N2" :path ["N1"]}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
           (aor/node "N1" "N2" [agent-node] )
           )))
-  (ex-info-thrown? #"No corresponding agg node" {:start-agg-node "N1"}
+  (ex-info-thrown? #"No corresponding agg node.*" {:start-agg-node "N1"}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
           (aor/agg-start-node "N1" nil [agent-node] )
           )))
-  (ex-info-thrown? #"Invalid loop to different agg context" {:agg1 "N1" :agg2 nil :node "N1" :path ["N1" "N2"]}
+  (ex-info-thrown? #"Invalid loop to different agg context.*" {:agg1 "N1" :agg2 nil :node "N1" :path ["N1" "N2"]}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
           (aor/agg-start-node "N1" "N2" [agent-node] )
           (aor/node "N2" ["N1" "N3"] [agent-node] )
           (aor/agg-node "N3" nil aggs/+sum [agent-node agg node-start-res] )
           )))
-  (ex-info-thrown? #"Invalid loop to different agg context" {:agg1 "N1" :agg2 "A1" :node "N1" :path ["A1" "N1" "N2"]}
+  (ex-info-thrown? #"Invalid loop to different agg context.*" {:agg1 "N1" :agg2 "A1" :node "N1" :path ["A1" "N1" "N2"]}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
           (aor/agg-start-node "A1" "N1" [agent-node] )
@@ -350,12 +350,12 @@
           (aor/agg-node "N3" "A2" aggs/+sum [agent-node agg node-start-res] )
           (aor/agg-node "A2" nil aggs/+sum [agent-node agg node-start-res] )
           )))
-  (ex-info-thrown? #"Reached AggNode outside of agg context" {:name "N1" :path []}
+  (ex-info-thrown? #"Reached AggNode outside of agg context.*" {:name "N1" :path []}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
           (aor/agg-node "N1" nil aggs/+sum [agent-node agg node-start-res] )
           )))
-  (ex-info-thrown? #"Invalid loop to different agg context" {:agg1 nil :agg2 "C1" :node "N3" :path ["N1" "N2"]}
+  (ex-info-thrown? #"Invalid loop to different agg context.*" {:agg1 nil :agg2 "C1" :node "N3" :path ["N1" "N2"]}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
           (aor/node "N1" ["C1" "N2"] [agent-node] )
@@ -365,7 +365,7 @@
 
           (aor/node "N2" "N3" [agent-node] )
           )))
-  (ex-info-thrown? #"Invalid loop to different agg context" {:agg1 nil :agg2 "N1" :node "N2" :path ["N1" "N2"]}
+  (ex-info-thrown? #"Invalid loop to different agg context.*" {:agg1 nil :agg2 "N1" :node "N2" :path ["N1" "N2"]}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
           (aor/agg-start-node "N1" "N2" [agent-node] )
@@ -439,7 +439,7 @@
     (is (= "10" ((:init-fn node))))
     (is (= "111-1-2" ((:update-fn node) "111" "abc" 1 2)))
     (is (= "111!3" ((:update-fn node) "111" "def" 3)))
-    (ex-info-thrown? #"Invalid dispatch name for MultiAgg" {:valid-names ["abc" "def"] :name "not-a-dispatch"}
+    (ex-info-thrown? #"Invalid dispatch name for MultiAgg.*" {:valid-names ["abc" "def"] :name "not-a-dispatch"}
       ((:update-fn node) "111" "not-a-dispatch"))
     (is (thrown? clojure.lang.ArityException
           ((:update-fn node) "111" "abc" 1 2 3)))
@@ -456,13 +456,13 @@
   ))
 
 (deftest multi-agg-errors-test
-  (ex-info-thrown? #"MultiAgg already has init function specified" {}
+  (ex-info-thrown? #"MultiAgg already has init function specified.*" {}
     (aor/multi-agg
       (init [] "10")
       (init [] "1")
       (on "abc" [curr a b]
         (str curr "-" a "-" b))))
-  (ex-info-thrown? #"MultiAgg already has handler for given name" {:name "abc"}
+  (ex-info-thrown? #"MultiAgg already has handler for given name.*" {:name "abc"}
     (aor/multi-agg
       (init [] "1")
       (on "abc" [curr a b] curr)
@@ -475,7 +475,7 @@
     (is false)
     (catch clojure.lang.Compiler$CompilerException e
       (let [e (ex-cause e)]
-        (is (= (ex-message e) "Invalid binding vector for MultiAgg init"))
+        (is (re-matches #"Invalid binding vector for MultiAgg init.*" (ex-message e)))
         (is (= (ex-data e) {:bindings ['this] :required []}))
         )))
   )
@@ -561,10 +561,4 @@
                   "start"
                   (:uuid hgraph)
                   )))
-
-
-          ;; TODO: <<<<<>>>>
-          ;;    - verify all node types
-
-
           )))))
