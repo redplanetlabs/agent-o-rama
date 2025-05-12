@@ -37,6 +37,7 @@
  ::navigated
 
  (fn [db [_ new-match]]
+   (println "new match" new-match)
    (let [old-match   (:current-route db)
          controllers (rfc/apply-controllers (:controllers old-match) new-match)]
      (assoc db :current-route (assoc new-match :controllers controllers)))))
@@ -48,20 +49,7 @@
 
 (defn home-page []
   [:div
-   [:h1 "This is home page"]
-   [:button
-    ;; Dispatch navigate event that triggers a (side)effect.
-    {:on-click #(re-frame/dispatch [::push-state ::sub-page2])}
-    "Go to sub-page 2"]])
-
-(defn sub-page1 []
-  [:div
-   [:h1 "This is sub-page 100"]])
-
-(defn sub-page2 []
-  [:div
-   [:h1 "This is sub-page 2"]])
-
+   [:h1 "This is home page"]])
 
 (defn href
   "Return relative url for given route. Url can be used in HTML links."
@@ -84,20 +72,6 @@
        :start (fn [& params](js/console.log "Entering home page"))
        ;; Teardown can be done here.
        :stop  (fn [& params] (js/console.log "Leaving home page"))}]}]
-   ["sub-page1"
-    {:name      ::sub-page1
-     :view      sub-page1
-     :link-text "Sub page 1"
-     :controllers
-     [{:start (fn [& params] (js/console.log "Entering sub-page 1"))
-       :stop  (fn [& params] (js/console.log "Leaving sub-page 1"))}]}]
-   ["sub-page2"
-    {:name      ::sub-page2
-     :view      sub-page2
-     :link-text "Sub-page 2"
-     :controllers
-     [{:start (fn [& params] (js/console.log "Entering sub-page 2"))
-       :stop  (fn [& params] (js/console.log "Leaving sub-page 2"))}]}]
    agents/routes])
 
 (defn on-navigate [new-match]
@@ -124,8 +98,17 @@
      [:li {:key route-name}
       (when (= route-name (-> current-route :data :name))
         "> ")
-      ;; Create a normal links that user can click
-      [:a {:href (href route-name)} text]])])
+
+      ;; only a couple routes are clickable directly from nav (no path parameters)
+      (cond
+        (= ::home route-name)
+        [:a {:href (href route-name)} text]
+        
+        (= ::agents/index route-name)
+        [:a {:href (href route-name)} text]
+        
+        :else
+        [:span text])])])
 
 (defn router-component [router]
   (let [current-route @(re-frame/subscribe [::current-route])]
