@@ -454,6 +454,14 @@
         ;;  - how would this fetch mirrors?
         ;;    - probably need a getPState/getStore API that takes in module name as input
         ;;    - though "declareStore" API can put mapping into a task global...
+        ;;      - mirrors would be outside of this though, it's nice if getDeclared can get any declared object based on name
+        ;;        - and this coudl simplify the task global fetching API...
+        ;;  - "getStore" would be easier to understand name
+        ;;  - maybe call this "getDeclared"
+        ;;  - woudl be better to just have getAgentObject and getStore APIs...
+        ;;    - and also getMirrorObject
+        ;;  - what about query topologies?
+        ;;    - getMirrorQueryTopology and getQueryTopology
         )
       AgentNodeInternal
       (agent-node-state [this]

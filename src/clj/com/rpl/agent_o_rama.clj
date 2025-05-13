@@ -68,36 +68,27 @@
 (defn new-agent [^AgentsTopology agents-topology name]
   (.newAgent agents-topology name))
 
-(defn node* [agent-graph name output-nodes-spec node-fn]
+(defn node [agent-graph name output-nodes-spec node-fn]
   (i/internal-add-node!
     agent-graph
     name
     output-nodes-spec
     (aor-types/->Node node-fn)))
 
-(defmacro node [agent-graph name output-nodes-spec & fn-body]
-  `(node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))
-
-(defn agg-start-node* [agent-graph name output-nodes-spec node-fn]
+(defn agg-start-node [agent-graph name output-nodes-spec node-fn]
   (i/internal-add-node!
     agent-graph
     name
     output-nodes-spec
     (aor-types/->NodeAggStart node-fn nil)))
 
-(defmacro agg-start-node [agent-graph name output-nodes-spec & fn-body]
-  `(agg-start-node* ~agent-graph ~name ~output-nodes-spec (fn ~@fn-body)))
-
-(defn agg-node* [agent-graph name output-nodes-spec agg node-fn]
+(defn agg-node [agent-graph name output-nodes-spec agg node-fn]
   (i/internal-add-agg-node!
     agent-graph
     name
     output-nodes-spec
     agg
     node-fn))
-
-(defmacro agg-node [agent-graph name output-nodes-spec agg & fn-body]
-  `(agg-node* ~agent-graph ~name ~output-nodes-spec ~agg (fn ~@fn-body)))
 
 (defmacro multi-agg [& body]
   (let [ret-sym (gensym "ret")]

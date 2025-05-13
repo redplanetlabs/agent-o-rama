@@ -30,15 +30,18 @@
     (bind res (volatile! []))
     (bind ag
       (-> (i/mk-agent-graph)
-          (aor/node "N1" "N2" [agent-node]
-            (vswap! res conj "N1"))
-          (aor/agg-start-node "N2" "N3" [agent-node]
-            (vswap! res conj "N2"))
-          (aor/node "N3" "N4" [agent-node arg1]
-            (vswap! res conj "N3"))
+          (aor/node "N1" "N2"
+            (fn [agent-node]
+              (vswap! res conj "N1")))
+          (aor/agg-start-node "N2" "N3"
+            (fn [agent-node]
+              (vswap! res conj "N2")))
+          (aor/node "N3" "N4"
+            (fn [agent-node arg1]
+              (vswap! res conj "N3")))
           (aor/agg-node "N4" nil aggs/+sum
-            [agent-node agg node-start-res]
-            (vswap! res conj "N4"))
+            (fn [agent-node agg node-start-res]
+              (vswap! res conj "N4")))
           ))
     (bind graph (i/resolve-agent-graph ag))
     (is (= "N1" (:start-node graph)))
@@ -82,27 +85,33 @@
     ;; test nested aggs
     (bind ag
       (-> (i/mk-agent-graph)
-          (aor/node "N1" "N2" [agent-node]
-            (vswap! res conj "N1"))
-          (aor/agg-start-node "N2" "N3" [agent-node]
-            (vswap! res conj "N2"))
-          (aor/node "N3" "N4" [agent-node arg1]
-            (vswap! res conj "N3"))
-          (aor/agg-start-node "N4" "N5" [agent-node]
-            (vswap! res conj "N4"))
+          (aor/node "N1" "N2"
+            (fn [agent-node]
+              (vswap! res conj "N1")))
+          (aor/agg-start-node "N2" "N3"
+            (fn [agent-node]
+              (vswap! res conj "N2")))
+          (aor/node "N3" "N4"
+            (fn [agent-node arg1]
+              (vswap! res conj "N3")))
+          (aor/agg-start-node "N4" "N5"
+            (fn [agent-node]
+              (vswap! res conj "N4")))
           (aor/agg-node "N5" "N6" aggs/+sum
-            [agent-node agg node-start-res]
-            (vswap! res conj "N5"))
-          (aor/agg-start-node "N6" "N7" [agent-node]
-            (vswap! res conj "N6"))
-          (aor/node "N7" "N8" [agent-node]
-            (vswap! res conj "N7"))
+            (fn [agent-node agg node-start-res]
+              (vswap! res conj "N5")))
+          (aor/agg-start-node "N6" "N7"
+            (fn [agent-node]
+              (vswap! res conj "N6")))
+          (aor/node "N7" "N8"
+            (fn [agent-node]
+              (vswap! res conj "N7")))
           (aor/agg-node "N8" "N9" aggs/+vec-agg
-            [agent-node agg node-start-res]
-            (vswap! res conj "N8"))
+            (fn [agent-node agg node-start-res]
+              (vswap! res conj "N8")))
           (aor/agg-node "N9" nil aggs/+sum
-            [agent-node agg node-start-res]
-            (vswap! res conj "N9"))
+            (fn [agent-node agg node-start-res]
+              (vswap! res conj "N9")))
           ))
     (bind graph (i/resolve-agent-graph ag))
     (is (= "N1" (:start-node graph)))
@@ -186,13 +195,15 @@
     ;; starting with aggStartNode
     (bind ag
       (-> (i/mk-agent-graph)
-          (aor/agg-start-node "N10" "N1" [agent-node arg1 arg2 arg3]
-            (vswap! res conj "N10"))
-          (aor/node "N1" "N2" [agent-node]
-            (vswap! res conj "N1"))
+          (aor/agg-start-node "N10" "N1"
+            (fn [agent-node arg1 arg2 arg3]
+              (vswap! res conj "N10")))
+          (aor/node "N1" "N2"
+            (fn [agent-node]
+              (vswap! res conj "N1")))
           (aor/agg-node "N2" nil aggs/+sum
-            [agent-node agg node-start-res]
-            (vswap! res conj "N2"))
+            (fn [agent-node agg node-start-res]
+              (vswap! res conj "N2")))
           ))
     (bind graph (i/resolve-agent-graph ag))
     (is (= "N10" (:start-node graph)))
@@ -230,16 +241,16 @@
   (letlocals
     (bind ag
       (-> (i/mk-agent-graph)
-          (aor/node "N1" ["A1" "B1"] [agent-node] )
-          (aor/node "A1" "A2" [agent-node] )
-          (aor/node "A2" ["A3" "A4"] [agent-node] )
-          (aor/node "A3" nil [agent-node] )
-          (aor/node "A4" nil [agent-node] )
+          (aor/node "N1" ["A1" "B1"] (fn [agent-node] ))
+          (aor/node "A1" "A2" (fn [agent-node] ))
+          (aor/node "A2" ["A3" "A4"] (fn [agent-node] ))
+          (aor/node "A3" nil (fn [agent-node] ))
+          (aor/node "A4" nil (fn [agent-node] ))
 
-          (aor/node "B1" ["B2" "B3"] [agent-node] )
-          (aor/agg-start-node "B2" "B4" [agent-node] )
-          (aor/agg-node "B4" nil aggs/+sum [agent-node agg node-start-res] )
-          (aor/node "B3" nil [agent-node] )
+          (aor/node "B1" ["B2" "B3"] (fn [agent-node] ))
+          (aor/agg-start-node "B2" "B4" (fn [agent-node] ))
+          (aor/agg-node "B4" nil aggs/+sum (fn [agent-node agg node-start-res] ))
+          (aor/node "B3" nil (fn [agent-node] ))
           ))
     (bind graph (i/resolve-agent-graph ag))
     (is (= "N1" (:start-node graph)))
@@ -281,15 +292,15 @@
   (letlocals
     (bind ag
       (-> (i/mk-agent-graph)
-          (aor/node "N1" ["A1" "B1"] [agent-node] )
-          (aor/node "A1" "A2" [agent-node] )
-          (aor/node "A2" "A3" [agent-node] )
-          (aor/node "A3" ["A1" "A2"] [agent-node] )
+          (aor/node "N1" ["A1" "B1"] (fn [agent-node] ))
+          (aor/node "A1" "A2" (fn [agent-node] ))
+          (aor/node "A2" "A3" (fn [agent-node] ))
+          (aor/node "A3" ["A1" "A2"] (fn [agent-node] ))
 
-          (aor/agg-start-node "B1" "B2" [agent-node] )
-          (aor/node "B2" "B3" [agent-node] )
-          (aor/node "B3" ["B2" "B4"] [agent-node] )
-          (aor/agg-node "B4" "B1" aggs/+sum [agent-node agg node-start-res] )
+          (aor/agg-start-node "B1" "B2" (fn [agent-node] ))
+          (aor/node "B2" "B3" (fn [agent-node] ))
+          (aor/node "B3" ["B2" "B4"] (fn [agent-node] ))
+          (aor/agg-node "B4" "B1" aggs/+sum (fn [agent-node agg node-start-res] ))
           ))
     (bind graph (i/resolve-agent-graph ag))
     (is (= "N1" (:start-node graph)))
@@ -327,49 +338,49 @@
   (ex-info-thrown? #"Undefined node.*" {:node "N2" :path ["N1"]}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
-          (aor/node "N1" "N2" [agent-node] )
+          (aor/node "N1" "N2" (fn [agent-node] ))
           )))
   (ex-info-thrown? #"No corresponding agg node.*" {:start-agg-node "N1"}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
-          (aor/agg-start-node "N1" nil [agent-node] )
+          (aor/agg-start-node "N1" nil (fn [agent-node] ))
           )))
   (ex-info-thrown? #"Invalid loop to different agg context.*" {:agg1 "N1" :agg2 nil :node "N1" :path ["N1" "N2"]}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
-          (aor/agg-start-node "N1" "N2" [agent-node] )
-          (aor/node "N2" ["N1" "N3"] [agent-node] )
-          (aor/agg-node "N3" nil aggs/+sum [agent-node agg node-start-res] )
+          (aor/agg-start-node "N1" "N2" (fn [agent-node] ))
+          (aor/node "N2" ["N1" "N3"] (fn [agent-node] ))
+          (aor/agg-node "N3" nil aggs/+sum (fn [agent-node agg node-start-res] ))
           )))
   (ex-info-thrown? #"Invalid loop to different agg context.*" {:agg1 "N1" :agg2 "A1" :node "N1" :path ["A1" "N1" "N2"]}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
-          (aor/agg-start-node "A1" "N1" [agent-node] )
-          (aor/agg-start-node "N1" "N2" [agent-node] )
-          (aor/node "N2" ["N1" "N3"] [agent-node] )
-          (aor/agg-node "N3" "A2" aggs/+sum [agent-node agg node-start-res] )
-          (aor/agg-node "A2" nil aggs/+sum [agent-node agg node-start-res] )
+          (aor/agg-start-node "A1" "N1" (fn [agent-node] ))
+          (aor/agg-start-node "N1" "N2" (fn [agent-node] ))
+          (aor/node "N2" ["N1" "N3"] (fn [agent-node] ))
+          (aor/agg-node "N3" "A2" aggs/+sum (fn [agent-node agg node-start-res] ))
+          (aor/agg-node "A2" nil aggs/+sum (fn [agent-node agg node-start-res] ))
           )))
   (ex-info-thrown? #"Reached AggNode outside of agg context.*" {:name "N1" :path []}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
-          (aor/agg-node "N1" nil aggs/+sum [agent-node agg node-start-res] )
+          (aor/agg-node "N1" nil aggs/+sum (fn [agent-node agg node-start-res] ))
           )))
   (ex-info-thrown? #"Invalid loop to different agg context.*" {:agg1 nil :agg2 "C1" :node "N3" :path ["N1" "N2"]}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
-          (aor/node "N1" ["C1" "N2"] [agent-node] )
-          (aor/agg-start-node "C1" "N3" [agent-node agg node-start-res] )
-          (aor/node "N3" "N4" [agent-node] )
-          (aor/agg-node "N4" nil aggs/+sum [agent-node agg node-start-res] )
+          (aor/node "N1" ["C1" "N2"] (fn [agent-node] ))
+          (aor/agg-start-node "C1" "N3" (fn [agent-node agg node-start-res] ))
+          (aor/node "N3" "N4" (fn [agent-node] ))
+          (aor/agg-node "N4" nil aggs/+sum (fn [agent-node agg node-start-res] ))
 
-          (aor/node "N2" "N3" [agent-node] )
+          (aor/node "N2" "N3" (fn [agent-node] ))
           )))
   (ex-info-thrown? #"Invalid loop to different agg context.*" {:agg1 nil :agg2 "N1" :node "N2" :path ["N1" "N2"]}
     (i/resolve-agent-graph
       (-> (i/mk-agent-graph)
-          (aor/agg-start-node "N1" "N2" [agent-node] )
-          (aor/agg-node "N2" "N2" aggs/+sum [agent-node agg node-start-res] )
+          (aor/agg-start-node "N1" "N2" (fn [agent-node] ))
+          (aor/agg-node "N2" "N2" aggs/+sum (fn [agent-node agg node-start-res] ))
           )))
     )
 
@@ -378,8 +389,8 @@
     (bind get-agg-node
       (fn [agg]
         (-> (i/mk-agent-graph)
-            (aor/agg-start-node "N1" "N2" [agent-node] )
-            (aor/agg-node "N2" nil agg [agent-node] )
+            (aor/agg-start-node "N1" "N2" (fn [agent-node] ))
+            (aor/agg-node "N2" nil agg (fn [agent-node] ))
             i/resolve-agent-graph
             :node-map
             (get "N2")
@@ -484,9 +495,9 @@
   (letlocals
     (bind graph
       (-> (i/mk-agent-graph)
-          (aor/agg-start-node "N1" "N2" [agent-node] )
-          (aor/node "N2" "N3" [agent-node a])
-          (aor/agg-node "N3" nil aggs/+sum [agent-node] )
+          (aor/agg-start-node "N1" "N2" (fn [agent-node] ))
+          (aor/node "N2" "N3" (fn [agent-node a]))
+          (aor/agg-node "N3" nil aggs/+sum (fn [agent-node] ))
           i/resolve-agent-graph))
     (bind historical
       (#'i/graph->historical-graph-info graph))
@@ -529,14 +540,17 @@
             (aor/agentmodule {:module-name "foo-module"} [topology]
               (-> topology
                   (aor/new-agent "foo")
-                  (aor/node "start" "abc" [agent-node arg]
-                    (aor/emit! agent-node "abc" (str arg "!")))
-                  (aor/agg-start-node "abc" "agg" [agent-node arg]
-                    (dotimes [_ 3]
-                      (aor/emit! agent-node "agg" 1))
-                    (str arg "?"))
-                  (aor/agg-node "agg" nil aggs/+sum [agent-node agg node-start-res]
-                    (aor/result! agent-node [agg node-start-res]))
+                  (aor/node "start" "abc"
+                    (fn [agent-node arg]
+                      (aor/emit! agent-node "abc" (str arg "!"))))
+                  (aor/agg-start-node "abc" "agg"
+                    (fn [agent-node arg]
+                      (dotimes [_ 3]
+                        (aor/emit! agent-node "agg" 1))
+                      (str arg "?")))
+                  (aor/agg-node "agg" nil aggs/+sum
+                    (fn [agent-node agg node-start-res]
+                      (aor/result! agent-node [agg node-start-res])))
                   )))
           (rtest/launch-module! ipc module {:tasks 4 :threads 2})
           (bind module-name (get-module-name module))
@@ -571,8 +585,9 @@
             (aor/agentmodule {:module-name "foo-module"} [topology]
               (-> topology
                   (aor/new-agent "foo")
-                  (aor/node "start" nil [agent-node]
-                    (aor/result! agent-node "done"))
+                  (aor/node "start" nil
+                    (fn [agent-node]
+                      (aor/result! agent-node "done")))
                   )))
 
           (rtest/update-module! ipc module2)
@@ -602,3 +617,22 @@
           (is (= hgraph1 graph-history1))
           (is (= hgraph2 graph-history2))
           )))))
+
+(deftest async-emits-test
+  ;; TODO: <<<<<>>>>>
+  ;;  - emit regular CF, PState queries, PState transforms, and out of band
+  ;;  - verify order of resolution (perhaps just through results of PState ops)
+  ;;  - check what gets passed to the next node (just accumulate into result)
+  )
+
+(deftest parallel-execution-test
+  ;; TODO: <<<<<>>>>>
+  )
+
+(deftest looped-test
+  ;; TODO: <<<<<>>>>
+  )
+
+(deftest aggs-test
+  ;; TODO: <<<<>>>>
+  )
