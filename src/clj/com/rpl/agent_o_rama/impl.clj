@@ -449,7 +449,7 @@
         (when-not (empty? @emits-vol)
           (throw (h/ex-info "Cannot both emit and result" {})))
         (vreset! result-vol (aor-types/->valid-AgentResult arg)))
-      (getObject [this name]
+      (getAgentObject [this name]
         ;; TODO: <<<<>>>>
         ;;  - how would this fetch mirrors?
         ;;    - probably need a getPState/getStore API that takes in module name as input
@@ -462,6 +462,11 @@
         ;;    - and also getMirrorObject
         ;;  - what about query topologies?
         ;;    - getMirrorQueryTopology and getQueryTopology
+        )
+      (getStore [this name]
+        ;; TODO: <<<<>>>>
+        ;;  - how to know what store type it is?
+        ;;    - would need a task global with the mapping
         )
       AgentNodeInternal
       (agent-node-state [this]

@@ -5,11 +5,10 @@ import java.util.Map;
 import com.rpl.agentorama.AsyncResult;
 import com.rpl.rama.ops.RamaFunction1;
 
-public interface DocumentStore<K> {
-  AsyncResult getDocumentAsync(K key);
+public interface DocumentStore<K> extends KeyValueStore<K, Map> {
   AsyncResult getDocumentFieldAsync(K key, Object docKey);
-  void putDocumentAsync(K key, Map document);
+  AsyncResult getDocumentFieldOrDefaultAsync(K key, Object docKey);
+  AsyncResult containsDocumentFieldAsync(K key, Object docKey);
   void putDocumentFieldAsync(K key, Object docKey, Object value);
-  void updateDocumentAsync(K key, RamaFunction1<Map, Map> updateFunction);
   <T, R> void updateDocumentFieldAsync(K key, Object docKey, RamaFunction1<T, R> updateFunction);
 }
