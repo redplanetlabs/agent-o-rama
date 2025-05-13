@@ -1,0 +1,7 @@
+graph ui libraries
+  selectednode callback to render panel
+  dagre auto layout
+
+version dropdown (default to latest version)
+agents-historical-info {version->graph}
+

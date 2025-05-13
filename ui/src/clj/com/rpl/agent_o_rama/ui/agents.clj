@@ -65,4 +65,28 @@
 
       ;; TODO: <<<<>>>>
       ;;   - what other stats does langsmith track?
+      }
+     {:graph-id 3 ;; ??
+      :graph-task-id 3 ;; ??
+      :node "start"
+      :async-ops []
+      :emits ["AgentNodeEmit"]
+      :result "AgentResult"
+      :start-time-millis  1747079542466
+      :finish-time-millis 1747079543000
+      :agg-invoke-id 3
+
+      ;; regular node state
+      :input ["CUSTOMER-356" "input 2"]
+
+      ;; agg state
+      :agg-inputs ["AGGINPUT1" "AGGINPUT2"]
+      :agg-start-res "?"
+      :agg-state "?"
+      :agg-ack-val "?"
+      :agg-start-invoke-id 3
+      :agg-finished? false
+
+      ;; TODO: <<<<>>>>
+      ;;   - what other stats does langsmith track?
       }]}})

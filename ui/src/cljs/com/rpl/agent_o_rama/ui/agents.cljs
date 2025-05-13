@@ -1,6 +1,8 @@
 (ns com.rpl.agent-o-rama.ui.agents
   (:require
    [com.rpl.agent-o-rama.ui.http :as http]
+   [com.rpl.agent-o-rama.ui.graph :as graph]
+   
    [re-frame.core :as re-frame]
    [reagent.core :as reagent]
    [ajax.core :as ajax]
@@ -58,8 +60,8 @@
     [common/http-loader-view (agent-fsm-id module-id agent-id)
      [:div
       [:div
-       [:h1 "agent topology render"]
-       "todo"]
+       [:h1 "agent graph render"]
+       [graph/graph]]
       [:div
        [:h1 "invokes"]
        [:ol
@@ -106,7 +108,7 @@
 (defn invoke []
   (let [invoke-data @(re-frame/subscribe [::selected-invoke])]
     [:div "invoke"
-     (pr-str invoke-data)]))
+     [:pre (pp invoke-data)]]))
 
 (def routes
   ["agents"
