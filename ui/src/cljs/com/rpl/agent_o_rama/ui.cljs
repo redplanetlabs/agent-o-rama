@@ -47,7 +47,7 @@
                     (:current-route db)))
 
 (defn home-page []
-  [:div
+  [:div.p-4.text-center
    [:h1 "This is home page"]])
 
 (defn href
@@ -90,13 +90,14 @@
     {:use-fragment true}))
 
 (defn nav [{:keys [router current-route]}]
-  [:ul
-   (for [route-name (r/route-names router)
-         :let       [route (r/match-by-name router route-name)
-                     text (-> route :data :link-text)]]
-     [:li {:key route-name}
-      (when (= route-name (-> current-route :data :name))
-        "> ")
+  [:div.p-4.bg-gray-100.shadow-md.mb-4
+   [:ul.flex.space-x-4
+    (for [route-name (r/route-names router)
+          :let       [route (r/match-by-name router route-name)
+                      text (-> route :data :link-text)]]
+      [:li {:key route-name}
+       (when (= route-name (-> current-route :data :name))
+         "> ")
 
       ;; only a couple routes are clickable directly from nav (no path parameters)
       (cond
@@ -107,14 +108,15 @@
         [:a {:href (href route-name)} text]
         
         :else
-        [:span text])])])
+        [:span text])])]])
 
 (defn router-component [router]
   (let [current-route @(re-frame/subscribe [::current-route])]
-    [:div
+    [:div.container.mx-auto.p-4
      [nav {:router router :current-route current-route}]
      (when current-route
-       [(-> current-route :data :view)])]))
+       [:div.mt-4.p-4.border.border-gray-300.rounded
+        [(-> current-route :data :view)]])]))
 
 
 (defn init []

@@ -22,14 +22,14 @@
 
 (defn index []
   (let [agents @(re-frame/subscribe [::index])]
-    [:div
-     [:h1 "agents"]
+    [:div.p-4
+     [:h1.text-2xl.font-bold.mb-4 "agents"]
      [common/http-loader-view ::index
-      [:ol
+      [:ol.list-decimal.list-inside
        (for [agent agents
              :let [url (rfe/href ::agent agent)]]
-         [:li {:key url}
-          [:a {:href url} 
+         [:li.mb-2 {:key url}
+          [:a.text-blue-600.hover:underline {:href url}
            (pr-str agent)]])]]]))
 
 ;; ========== agent ==========
@@ -56,30 +56,30 @@
   (let [agent-data @(re-frame/subscribe [::selected-agent])
         {:keys [module-id agent-id]} @(re-frame/subscribe [:route-params])]
     [common/http-loader-view (agent-fsm-id module-id agent-id)
-     [:div
-      [:div
-       [:h1 "agent graph render"]
+     [:div.p-4.grid.grid-cols-1.md:grid-cols-2.gap-4
+      [:div.border.border-gray-300.rounded.p-4
+       [:h1.text-xl.font-semibold.mb-2 "agent graph render"]
        [graph/graph]]
-      [:div
-       [:h1 "invokes"]
-       [:ol
+      [:div.border.border-gray-300.rounded.p-4
+       [:h1.text-xl.font-semibold.mb-2 "invokes"]
+       [:ol.list-decimal.list-inside
         (for [data (:invokes agent-data)]
-          [:li
-           [:div
-            [:a {:href (rfe/href ::invoke {:module-id module-id
-                                           :agent-id agent-id
-                                           :invoke-id (:root-invoke-id data)})}
+          [:li.mb-2
+           [:div.p-2.bg-gray-50.rounded
+            [:a.text-blue-600.hover:underline.mr-2 {:href (rfe/href ::invoke {:module-id module-id
+                                                                              :agent-id agent-id
+                                                                              :invoke-id (:root-invoke-id data)})}
              "explore"]
-            [:pre (common/pp data)]]])]]
-      [:div
-       [:h1 "stats"]
-       [:ul
+            [:pre.text-sm.overflow-x-auto (common/pp data)]]])]]
+      [:div.border.border-gray-300.rounded.p-4.md:col-span-2
+       [:h1.text-xl.font-semibold.mb-2 "stats"]
+       [:ul.list-disc.list-inside
         [:li "run count 30"]
         [:li "total tokens 3707"]
         [:li "median tokens 621"]
         [:li "error rate"]
         [:li "latency"]
-        [:ul
+        [:ul.list-circle.list-inside.ml-4
          [:li "p50 1.58s"]
          [:li "p99 3.23s"]]]]]]))
 
@@ -105,8 +105,9 @@
 
 (defn invoke []
   (let [invoke-data @(re-frame/subscribe [::selected-invoke])]
-    [:div "invoke"
-     [:pre (common/pp invoke-data)]]))
+    [:div.p-4
+     [:h2.text-xl.font-semibold.mb-2 "invoke details"]
+     [:pre.bg-gray-100.p-3.rounded.text-sm.overflow-x-auto (common/pp invoke-data)]]))
 
 (def routes
   ["agents"

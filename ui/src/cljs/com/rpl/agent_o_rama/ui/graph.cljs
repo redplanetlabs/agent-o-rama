@@ -18,10 +18,8 @@
                {:id "2" :position {:x 0 :y 100} :data {:label "second node"}}]
         edges [{:id "1->2" :source "1" :target "2"}]]
     [:div
-     [:pre (common/pp (:invokes data))]
-     [:div
-      [:div.bg-red-500
+     [:div 
+      [:div {:style {:width "400px" :height "400px"}}
        [:> ReactFlow {:nodes nodes :edges edges :proOptions {:hideAttribution true}}
         [:> Background]
-        [:> Controls]]]
-      [:p.text-red-500 "aroistenarsoietn aorsite naoirsetn arsetn"]]]))
+        [:> Controls]]]]]))
