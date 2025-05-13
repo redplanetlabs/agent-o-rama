@@ -1,6 +1,8 @@
 (ns com.rpl.agent-o-rama.ui.graph
   (:require
    [com.rpl.agent-o-rama.ui.http :as http]
+   [com.rpl.agent-o-rama.ui.common :as common]
+   
    [re-frame.core :as re-frame]
    [reagent.core :as reagent]
    [ajax.core :as ajax]
@@ -16,8 +18,10 @@
                {:id "2" :position {:x 0 :y 100} :data {:label "second node"}}]
         edges [{:id "1->2" :source "1" :target "2"}]]
     [:div
-     (pr-str (:invokes data))
-     [:div {:style {:height "300px" :width "300px"}}
-      [:> ReactFlow {:nodes nodes :edges edges :proOptions {:hideAttribution true}}
-       [:> Background]
-       [:> Controls]]]]))
+     [:pre (common/pp (:invokes data))]
+     [:div
+      [:div.bg-red-500
+       [:> ReactFlow {:nodes nodes :edges edges :proOptions {:hideAttribution true}}
+        [:> Background]
+        [:> Controls]]]
+      [:p.text-red-500 "aroistenarsoietn aorsite naoirsetn arsetn"]]]))

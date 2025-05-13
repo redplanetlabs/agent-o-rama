@@ -29,3 +29,5 @@
 
         ::http/loaded
         body))))
+
+(defn pp [x] (with-out-str (cljs.pprint/pprint x)))

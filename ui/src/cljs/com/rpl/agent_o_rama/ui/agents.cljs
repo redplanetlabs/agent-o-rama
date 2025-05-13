@@ -52,8 +52,6 @@
 
 (re-frame/reg-sub :route-params (fn [db _] (:path-params (:current-route db))))
 
-(defn pp [x] (with-out-str (cljs.pprint/pprint x)))
-
 (defn agent []
   (let [agent-data @(re-frame/subscribe [::selected-agent])
         {:keys [module-id agent-id]} @(re-frame/subscribe [:route-params])]
@@ -72,7 +70,7 @@
                                            :agent-id agent-id
                                            :invoke-id (:root-invoke-id data)})}
              "explore"]
-            [:pre (pp data)]]])]]
+            [:pre (common/pp data)]]])]]
       [:div
        [:h1 "stats"]
        [:ul
@@ -108,7 +106,7 @@
 (defn invoke []
   (let [invoke-data @(re-frame/subscribe [::selected-invoke])]
     [:div "invoke"
-     [:pre (pp invoke-data)]]))
+     [:pre (common/pp invoke-data)]]))
 
 (def routes
   ["agents"
