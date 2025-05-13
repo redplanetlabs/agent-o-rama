@@ -542,7 +542,8 @@
                   (aor/new-agent "foo")
                   (aor/node "start" "abc"
                     (fn [agent-node arg]
-                      (aor/emit! agent-node "abc" (str arg "!"))))
+                      (aor/emit! agent-node "abc" (str arg "!"))
+                      ))
                   (aor/agg-start-node "abc" "agg"
                     (fn [agent-node arg]
                       (dotimes [_ 3]

@@ -42,6 +42,12 @@
   (prepareForTask [this task-id context] )
   (close [this] ))
 
+(drp/defrecord+ StoreInfo
+  [store-info :- {String clojure.lang.Keyword}]
+  TaskGlobalObject
+  (prepareForTask [this task-id context] )
+  (close [this] ))
+
 (drp/defrecord+ AgentNodeArg
   [val :- (s/maybe Object)
    async-op-index :- (s/maybe Long)])

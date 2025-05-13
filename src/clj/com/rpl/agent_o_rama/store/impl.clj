@@ -1,5 +1,6 @@
 (ns com.rpl.agent-o-rama.store.impl
-  (:use [com.rpl.rama.path])
+  (:use [com.rpl.rama]
+        [com.rpl.rama.path])
   (:require [com.rpl.agent-o-rama.helpers :as h]
             [com.rpl.agent-o-rama.types :as aor-types]
             [com.rpl.ramaspecter.defrecord-plus :as drp]
@@ -7,6 +8,9 @@
   (:import [com.rpl.agentorama.store
              DocumentStore
              KeyValueStore]))
+
+(def KV :kv)
+(def DOC :doc)
 
 (defprotocol KeyValueStoreInternal
   (get-async* [this k default-value])
@@ -20,6 +24,12 @@
    pstate-name :- String
    emits-vol :- (s/pred volatile?)
    async-ops-vol :- (s/pred volatile?)])
+
+(defn declare-store* [stream-topology stores-vol name store-type schema]
+  (when (contains? @stores-vol name)
+    (throw (ex-info "Cannot declare same store twice" {:name name})))
+  (vswap! stores-vol assoc name store-type)
+  (declare-pstate* stream-topology (symbol name) schema))
 
 (defn- add-async-op! [emits-vol async-ops-vol emit]
   (vswap! emits-vol conj emit)
@@ -54,10 +64,11 @@
 
 (defn KeyValueImpl [store-params]
   `(KeyValueStore
-    (getAsync [this k]
-      (get-async* this k nil))
-    (getOrDefaultAsync [this k default-value]
-      (get-async* this k default-value))
+    (getAsync [this k#]
+      (get-async* this k# nil))
+    (getOrDefaultAsync [this k# default-value#]
+      (get-async* this k# default-value#))
+    ;: TODO: <<<<>>>> fix syms
     (putAsync [this k v]
       (put-async* this k v)))
     (updateAsync [this k jfn]
@@ -73,14 +84,17 @@
       (add-pstate-query! store-params (path (view #(contains? % k)))))
     (update-async* [this k afn]
       (add-pstate-transform! store-params (path (keypath k) (term afn))))
-    ))
+    )
 
-(defmacro reify-store [impls store-class store-params]
+(defmacro reify-store [impls store-params]
   (let [code (mapcat (fn [f] (f store-params))
                      impls)]
-    `(reify ~store-class ~@code)))
+    `(reify ~@code)))
 
 (defn mk-kv-store [store-params]
   (reify-store [KeyValueImpl] store-params))
+
+(defn mk-doc-store [store-params]
+  (reify-store [KeyValueImpl DocImpl] store-params))
 
 ;; TODO: <<<<>>>> define docuemntstore

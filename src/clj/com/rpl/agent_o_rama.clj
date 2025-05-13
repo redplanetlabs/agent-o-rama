@@ -3,6 +3,7 @@
         [com.rpl.rama.path])
   (:require [com.rpl.agent-o-rama.helpers :as h]
             [com.rpl.agent-o-rama.impl :as i]
+            [com.rpl.agent-o-rama.store.impl :as simpl]
             [com.rpl.agent-o-rama.types :as aor-types])
   (:import [com.rpl.agentorama
              AgentClient
@@ -17,7 +18,8 @@
 (defn agents-topology [name setup topologies]
   (let [stream-topology (stream-topology topologies (str "_agents-topology-" name))
         defined?-vol (volatile! false)
-        agents-vol (volatile! {})]
+        agents-vol (volatile! {})
+        store-info-vol (volatile! {})]
     (reify AgentsTopology
       (newAgent [this name]
         (when (contains? @agents-vol name)
@@ -32,14 +34,16 @@
       ;;      - feels like an invoke
 
       (declareKeyValueStore [this name key-class val-class]
-        (declare-pstate* stream-topology (symbol name) {key-class val-class}))
+        (simpl/declare-store* stream-topology store-info-vol name simpl/KV {key-class val-class}))
       (declareDocumentStore [this name key-class key-val-classes]
         (when-not (-> key-val-classes count even?)
           (throw (h/ex-info "Document store must be given even number of key/val classes"
                           {:count (count key-val-classes)})))
-        (declare-pstate*
+        (simpl/declare-store*
           stream-topology
-          (symbol name)
+          store-info-vol
+          name
+          simpl/DOC
           {key-class (fixed-keys-schema (into {} (partition 2 key-val-classes)))}))
       (^PState$Declaration declarePState [this ^String name ^Class schema]
         (declare-pstate* stream-topology (symbol name) schema))
@@ -53,8 +57,10 @@
         (vreset! defined?-vol true)
         (i/define-agents!
           setup
+          name
           stream-topology
-          @agents-vol)
+          @agents-vol
+          @store-info-vol)
         ))))
 
 (defn underlying-stream-topology [^AgentsTopology at]
