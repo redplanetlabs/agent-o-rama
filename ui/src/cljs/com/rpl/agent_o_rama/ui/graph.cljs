@@ -9,7 +9,7 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [reitit.frontend.easy :as rfe]
 
-   ["@xyflow/react" :refer [ReactFlow Background Controls]]
+   ["@xyflow/react" :refer [ReactFlow Background Controls useOnSelectionChange]]
    ["react" :refer [useState useCallback]]))
 
 (defn graph []
@@ -17,9 +17,9 @@
         nodes [{:id "1" :position {:x 0 :y 0} :data {:label "first node"}}
                {:id "2" :position {:x 0 :y 100} :data {:label "second node"}}]
         edges [{:id "1->2" :source "1" :target "2"}]]
-    [:div
-     [:div 
-      [:div {:style {:width "400px" :height "400px"}}
-       [:> ReactFlow {:nodes nodes :edges edges :proOptions {:hideAttribution true}}
-        [:> Background]
-        [:> Controls]]]]]))
+    [:div {:style {:width "400px" :height "400px"}}
+     [:> ReactFlow {:nodes nodes :edges edges
+                    :proOptions {:hideAttribution true}
+                    :onNodeClick (fn [_ node] (println (pr-str (js->clj node))))}
+      [:> Background]
+      [:> Controls]]]))

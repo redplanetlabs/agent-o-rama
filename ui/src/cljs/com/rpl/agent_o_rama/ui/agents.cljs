@@ -64,7 +64,7 @@
        [:h1.text-xl.font-semibold.mb-2 "invokes"]
        [:ol.list-decimal.list-inside
         (for [data (:invokes agent-data)]
-          [:li.mb-2
+          [:li.mb-2 {:key (:root-invoke-id data)}
            [:div.p-2.bg-gray-50.rounded
             [:a.text-blue-600.hover:underline.mr-2 {:href (rfe/href ::invoke {:module-id module-id
                                                                               :agent-id agent-id
