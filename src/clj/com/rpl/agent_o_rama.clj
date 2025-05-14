@@ -1,10 +1,10 @@
 (ns com.rpl.agent-o-rama
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
-  (:require [com.rpl.agent-o-rama.helpers :as h]
-            [com.rpl.agent-o-rama.impl :as i]
-            [com.rpl.agent-o-rama.store.impl :as simpl]
-            [com.rpl.agent-o-rama.types :as aor-types])
+  (:require [com.rpl.agent-o-rama.impl.core :as i]
+            [com.rpl.agent-o-rama.impl.helpers :as h]
+            [com.rpl.agent-o-rama.impl.store-impl :as simpl]
+            [com.rpl.agent-o-rama.impl.types :as aor-types])
   (:import [com.rpl.agentorama
              AgentClient
              AgentGraph

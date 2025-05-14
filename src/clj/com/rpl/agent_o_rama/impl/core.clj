@@ -1,10 +1,10 @@
-(ns com.rpl.agent-o-rama.impl
+(ns com.rpl.agent-o-rama.impl.core
   (:use [com.rpl.rama]
         [com.rpl.rama path])
   (:require [clojure.set :as set]
-            [com.rpl.agent-o-rama.helpers :as h]
-            [com.rpl.agent-o-rama.store.impl :as simpl]
-            [com.rpl.agent-o-rama.types :as aor-types]
+            [com.rpl.agent-o-rama.impl.helpers :as h]
+            [com.rpl.agent-o-rama.impl.store-impl :as simpl]
+            [com.rpl.agent-o-rama.impl.types :as aor-types]
             [com.rpl.rama.ops :as ops]
             [loom.attr :as lattr]
             [loom.graph :as graph])
@@ -17,7 +17,7 @@
              MultiAgg$Impl]
            [com.rpl.agentorama.impl BuiltInAgg]
            [com.rpl.agentorama.ops RamaVoidFunction3]
-           [com.rpl.agent_o_rama.types
+           [com.rpl.agent_o_rama.impl.types
              AgentNodeEmit
              AgentResult
              AggAckOp

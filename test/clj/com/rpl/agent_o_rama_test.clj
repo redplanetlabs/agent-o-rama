@@ -4,15 +4,15 @@
         [com.rpl.rama]
         [com.rpl.rama.path])
   (:require [com.rpl.agent-o-rama :as aor]
-            [com.rpl.agent-o-rama.helpers :as h]
-            [com.rpl.agent-o-rama.impl :as i]
-            [com.rpl.agent-o-rama.types :as aor-types]
+            [com.rpl.agent-o-rama.impl.core :as i]
+            [com.rpl.agent-o-rama.impl.helpers :as h]
+            [com.rpl.agent-o-rama.impl.types :as aor-types]
             [com.rpl.rama.aggs :as aggs]
             [com.rpl.rama.test :as rtest]
             [loom.attr :as lattr]
             [loom.graph :as graph])
   (:import [com.rpl.agentorama BuiltIn]
-           [com.rpl.agent_o_rama.types Node NodeAgg NodeAggStart]
+           [com.rpl.agent_o_rama.impl.types Node NodeAgg NodeAggStart]
            [com.rpl.rama.ops
              RamaAccumulatorAgg0
              RamaAccumulatorAgg2
@@ -619,11 +619,18 @@
           (is (= hgraph2 graph-history2))
           )))))
 
+(deftest node-traces-test
+  ;; TODO: <<<<>>>> verify everything in the nodes PState for each node, using sim time to control start/finish
+  ;;    - and parallelize the emits
+  ;;    - make helper function to get full trace starting from a root graph task ID + graph ID
+  )
+
 (deftest async-emits-test
   ;; TODO: <<<<<>>>>>
   ;;  - emit regular CF, PState queries, PState transforms, and out of band
   ;;  - verify order of resolution (perhaps just through results of PState ops)
   ;;  - check what gets passed to the next node (just accumulate into result)
+  ;;  - check node traces
   )
 
 (deftest parallel-execution-test

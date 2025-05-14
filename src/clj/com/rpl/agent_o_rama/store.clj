@@ -1,5 +1,5 @@
 (ns com.rpl.agent-o-rama.store
-  (:require [com.rpl.agent-o-rama.store.impl :as simpl])
+  (:require [com.rpl.agent-o-rama.impl.store-impl :as simpl])
   )
 
 (defn get-async

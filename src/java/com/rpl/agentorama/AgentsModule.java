@@ -7,7 +7,7 @@ public abstract class AgentsModule implements RamaModule {
 
   @Override
   public void define(Setup setup, Topologies topologies) {
-    AgentsTopology at = AgentsTopology.create("core", setup, topologies);
+    AgentsTopology at = AgentsTopology.create(setup, topologies);
     defineAgents(at);
     at.define();
   }

@@ -1,8 +1,8 @@
-(ns com.rpl.agent-o-rama.store.impl
+(ns com.rpl.agent-o-rama.impl.store-impl
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
-  (:require [com.rpl.agent-o-rama.helpers :as h]
-            [com.rpl.agent-o-rama.types :as aor-types]
+  (:require [com.rpl.agent-o-rama.impl.helpers :as h]
+            [com.rpl.agent-o-rama.impl.types :as aor-types]
             [com.rpl.ramaspecter.defrecord-plus :as drp]
             [rpl.schema.core :as s])
   (:import [com.rpl.agentorama.store

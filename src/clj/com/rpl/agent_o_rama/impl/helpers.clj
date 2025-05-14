@@ -1,4 +1,4 @@
-(ns com.rpl.agent-o-rama.helpers
+(ns com.rpl.agent-o-rama.impl.helpers
   (:refer-clojure :exclude [ex-info])
   (:use [com.rpl.rama.path])
   (:require [com.rpl.rama.ops :as ops])

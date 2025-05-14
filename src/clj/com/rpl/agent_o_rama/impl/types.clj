@@ -1,5 +1,5 @@
-(ns com.rpl.agent-o-rama.types
-  (:require [com.rpl.agent-o-rama.helpers :as h]
+(ns com.rpl.agent-o-rama.impl.types
+  (:require [com.rpl.agent-o-rama.impl.helpers :as h]
             [com.rpl.ramaspecter.defrecord-plus :as drp]
             [rpl.schema.core :as s])
   (:import [com.rpl.agentorama AsyncResult]
