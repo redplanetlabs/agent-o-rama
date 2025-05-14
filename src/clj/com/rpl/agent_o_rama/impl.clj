@@ -467,14 +467,14 @@
                                          emits-vol
                                          async-ops-vol)]
           (condp = (get store-info name)
-            simpl/KW
+            simpl/KV
             (simpl/mk-kv-store store-params)
 
             simpl/DOC
             (simpl/mk-doc-store store-params)
 
             nil
-            (simple/mk-pstate-store store-params)
+            (simpl/mk-pstate-store store-params)
 
             (throw (h/ex-info "Unknown store type"
                               {:name name
@@ -939,6 +939,11 @@
         (local-transform>
           [(keypath *graph-id)
            :result
+
+            ;; TODO: <<<<<>>>>> what about case of a retry?
+            ;;  - what about case where it errors on one branch but has a result in the other branch?
+            ;;  - seems like need "execution ID" so that it can only be overridden on a fresh retry
+           nil?
            (termval *result)]
           agent-invoke-pstate-sym))
       (<<if (emits-finished? *emits)

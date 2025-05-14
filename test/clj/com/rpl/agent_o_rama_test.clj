@@ -560,7 +560,7 @@
           (bind graph-history-pstate (foreign-pstate ipc module-name (i/graph-history-task-global-name "foo")))
 
           (dotimes [_ 10]
-            (let [{[graph-task-id graph-id] "_agents-topology-core"}
+            (let [{[graph-task-id graph-id] "_agents-topology"}
                   (foreign-append! depot (aor-types/->AgentInvoke ["hello"] 0))]
               (is (= 0 (foreign-select-one [(keypath graph-id) :graph-version]
                                            invokes-pstate
@@ -595,7 +595,7 @@
 
           (reset! task-counts-atom {})
           (dotimes [_ 10]
-            (let [{[graph-task-id graph-id] "_agents-topology-core"}
+            (let [{[graph-task-id graph-id] "_agents-topology"}
                   (foreign-append! depot (aor-types/->AgentInvoke [] 0))]
               (is (= 1 (foreign-select-one [(keypath graph-id) :graph-version]
                                            invokes-pstate

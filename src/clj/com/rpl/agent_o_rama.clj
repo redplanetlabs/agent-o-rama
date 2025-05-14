@@ -132,7 +132,7 @@
   (let [[options [[agent-topology-sym] & body]] (parse-map-options args)]
     `(module ~options
        [setup# topologies#]
-       (let [~agent-topology-sym (agents-topology "core" setup# topologies#)]
+       (let [~agent-topology-sym (agents-topology setup# topologies#)]
          ~@body
          (define-agents! ~agent-topology-sym)
          ))))

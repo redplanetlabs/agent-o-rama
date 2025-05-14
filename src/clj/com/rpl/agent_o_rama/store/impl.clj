@@ -31,7 +31,7 @@
   (vswap! async-ops-vol conj (aor-types/->valid-AsyncOpInfo nil nil nil)))
 
 (defn add-pstate-query! [store-params path]
-  (let [i (count @async-ops-vol)]
+  (let [i (count @(:async-ops-vol store-params))]
     (add-async-op! (:emits-vol store-params)
                    (:async-ops-vol store-params)
                    (aor-types/->valid-AsyncPStateQuery
@@ -47,7 +47,7 @@
                       {:this-module-name (:this-module-name store-params)
                        :pstate-module-name (:module-name store-params)
                        :pstate-name (:pstate-name store-params)})))
-  (let [i (count @async-ops-vol)]
+  (let [i (count @(:async-ops-vol store-params))]
     (add-async-op! (:emits-vol store-params)
                    (:async-ops-vol store-params)
                    (aor-types/->valid-AsyncPStateTransform
@@ -64,26 +64,26 @@
 
 (defn KeyValueImpl [store-params]
   `(KeyValueStore
-    (getAsync [this# k#]
+    (~'getAsync [this# k#]
       (get-async* this# k# nil))
-    (getOrDefaultAsync [this# k# default-value#]
+    (~'getOrDefaultAsync [this# k# default-value#]
       (get-async* this# k# default-value#))
-    (putAsync [this# k# v#]
-      (put-async* this# k# v#)))
-    (updateAsync [this# k# jfn#]
-      (update-async* this k# (h/convert-jfn jfn#)))
-    (containsAsync [this# k#]
+    (~'putAsync [this# k# v#]
+      (put-async* this# k# v#))
+    (~'updateAsync [this# k# jfn#]
+      (update-async* this# k# (h/convert-jfn jfn#)))
+    (~'containsAsync [this# k#]
       (contains?-async* this# k#))
     KeyValueStoreInternal
-    (get-async* [this# k# default-value#]
+    (~'get-async* [this# k# default-value#]
       (add-pstate-query! ~store-params (path (view #(get % k# default-value#)))))
-    (put-async* [this# k# v#]
+    (~'put-async* [this# k# v#]
       (add-pstate-transform! ~store-params (path (keypath k#) (termval v#))))
-    (contains?-async* [this# k#]
+    (~'contains?-async* [this# k#]
       (add-pstate-query! ~store-params (path (view #(contains? % k#)))))
-    (update-async* [this k# afn#]
+    (~'update-async* [this k# afn#]
       (add-pstate-transform! ~store-params (path (keypath k#) (term afn#))))
-    )
+    ))
 
 (defprotocol DocumentStoreInternal
   (get-document-field-async* [this k doc-key default-value])
@@ -93,24 +93,24 @@
 
 (defn DocImpl [store-params]
   `(DocumentStore
-     (getDocumentFieldAsync [this# k# doc-key#]
+     (~'getDocumentFieldAsync [this# k# doc-key#]
        (get-document-field-async* this# k# doc-key# nil))
-     (getDocumentFieldOrDefaultAsync [this# k# doc-key# default-value#]
+     (~'getDocumentFieldOrDefaultAsync [this# k# doc-key# default-value#]
        (get-document-field-async* this# k# doc-key# default-value#))
-     (containsDocumentFieldAsync [this# k# doc-key#]
+     (~'containsDocumentFieldAsync [this# k# doc-key#]
        (contains-document-field?-async* this# k# doc-key#))
-     (putDocumentFieldAsync [this# k# doc-key# v#]
+     (~'utDocumentFieldAsync [this# k# doc-key# v#]
        (put-document-field-async* this# k# doc-key# v#))
-     (updateDocumentFieldAsync [this# k# doc-key# jfn#]
+     (~'updateDocumentFieldAsync [this# k# doc-key# jfn#]
        (update-document-field-async* this k# doc-key# (h/convert-jfn jfn#)))
     DocumentStoreInternal
-    (get-document-field-async* [this# k# doc-key# default-value#]
+    (~'get-document-field-async* [this# k# doc-key# default-value#]
       (add-pstate-query! ~store-params (path (keypath k#) (view #(get % doc-key# default-value#)))))
-    (contains-document-field?-async* [this# k# doc-key#]
+    (~'contains-document-field?-async* [this# k# doc-key#]
       (add-pstate-query! ~store-params (path (keypath k#) (view #(contains? % doc-key#)))))
-    (put-document-field-async* [this# k# doc-key# v#]
+    (~'put-document-field-async* [this# k# doc-key# v#]
       (add-pstate-transform! ~store-params (path (keypath k# doc-key#) (termval v#))))
-    (update-document-field-async* [this# k# doc-key# afn#]
+    (~'update-document-field-async* [this# k# doc-key# afn#]
       (add-pstate-transform! ~store-params (path (keypath k# doc-key#) (term afn#))))
     ))
 
@@ -120,14 +120,14 @@
 
 (defn PStateStoreImpl [store-params]
   `(PStateStore
-    (select [this# jpath#]
+    (~'select [this# jpath#]
       (pstate-select* this# (java-path->clojure-path jpath#)))
-    (transform [this# jpath#]
+    (~'transform [this# jpath#]
       (pstate-transform* this# (java-path->clojure-path jpath#)))
     PStateStoreInternal
-    (pstate-select* [this# path#]
+    (~'pstate-select* [this# path#]
       (add-pstate-query! ~store-params path#))
-    (pstate-transform* [this# path#]
+    (~'pstate-transform* [this# path#]
       (add-pstate-transform! ~store-params path#))))
 
 (defmacro reify-store [impls store-params]
