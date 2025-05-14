@@ -15,8 +15,8 @@
            [com.rpl.rama PState$Declaration PState$Schema]
            [com.rpl.rama.ops RamaAccumulatorAgg RamaCombinerAgg]))
 
-(defn agents-topology [name setup topologies]
-  (let [stream-topology (stream-topology topologies (str "_agents-topology-" name))
+(defn agents-topology [setup topologies]
+  (let [stream-topology (stream-topology topologies "_agents-topology")
         defined?-vol (volatile! false)
         agents-vol (volatile! {})
         store-info-vol (volatile! {})]
@@ -57,7 +57,6 @@
         (vreset! defined?-vol true)
         (i/define-agents!
           setup
-          name
           stream-topology
           @agents-vol
           @store-info-vol)

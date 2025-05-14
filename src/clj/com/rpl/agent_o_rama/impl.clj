@@ -3,6 +3,7 @@
         [com.rpl.rama path])
   (:require [clojure.set :as set]
             [com.rpl.agent-o-rama.helpers :as h]
+            [com.rpl.agent-o-rama.store.impl :as simpl]
             [com.rpl.agent-o-rama.types :as aor-types]
             [com.rpl.rama.ops :as ops]
             [loom.attr :as lattr]
@@ -316,8 +317,8 @@
   (local-transform> (term inc) $$id)
   (:> *ret))
 
-(defn agents-store-info-name [topology-name]
-  (str "*_agents-store-info-" topology-name))
+(defn agents-store-info-name []
+  "*_agents-store-info")
 
 (defn- agent-graph-task-global-name [agent-name]
   (str "*_agent-graph-" agent-name))
@@ -401,7 +402,9 @@
         start-time-millis (TopologyUtils/currentTimeMillis)
         task-thread-ids-vol (volatile! nil)
         emit-count-vol (volatile! 0)
-        valid-output-nodes (-> agent-graph :node-map (get curr-node) :output-nodes)]
+        valid-output-nodes (-> agent-graph :node-map (get curr-node) :output-nodes)
+        ^com.rpl.rama.ModuleInstanceInfo info (ops/module-instance-info)
+        this-module-name (.getModuleName info)]
     (reify AgentNode
       (emit [this node args]
         (when (some? @result-vol)
@@ -455,22 +458,28 @@
         (vreset! result-vol (aor-types/->valid-AgentResult arg)))
       (getAgentObject [this name]
         ;; TODO: <<<<>>>>
-        ;;  - how would this fetch mirrors?
-        ;;    - probably need a getPState/getStore API that takes in module name as input
-        ;;    - though "declareStore" API can put mapping into a task global...
-        ;;      - mirrors would be outside of this though, it's nice if getDeclared can get any declared object based on name
-        ;;        - and this coudl simplify the task global fetching API...
-        ;;  - "getStore" would be easier to understand name
-        ;;  - maybe call this "getDeclared"
-        ;;  - woudl be better to just have getAgentObject and getStore APIs...
-        ;;    - and also getMirrorObject
-        ;;  - what about query topologies?
-        ;;    - getMirrorQueryTopology and getQueryTopology
         )
       (getStore [this name]
-        ;; TODO: <<<<>>>>
-        ;;  
-        )
+        (let [store-params
+              (simpl/->valid-StoreParams this-module-name
+                                         this-module-name
+                                         name
+                                         emits-vol
+                                         async-ops-vol)]
+          (condp = (get store-info name)
+            simpl/KW
+            (simpl/mk-kv-store store-params)
+
+            simpl/DOC
+            (simpl/mk-doc-store store-params)
+
+            nil
+            (simple/mk-pstate-store store-params)
+
+            (throw (h/ex-info "Unknown store type"
+                              {:name name
+                               :type (get store-info name)}))
+            )))
       AgentNodeInternal
       (agent-node-state [this]
         {:emits @emits-vol
@@ -613,10 +622,10 @@
   (select-any [:node-map (keypath node) :node (view aor-types/node->type-kw)]
     graph))
 
-(deframafn handle-node-invoke [*topology-name *name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *agg-invoke-id]
+(deframafn handle-node-invoke [*name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *agg-invoke-id]
   (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *name))
                         *agent-graph (fetch-graph *name)
-                        *store-info (declared-object-task-global (agents-store-info-nam topology-name))]
+                        *store-info (declared-object-task-global (agents-store-info-name))]
     (mk-agent-node *agent-graph *graph-task-id *next-node *store-info :> *agent-node)
     (h/current-time-millis :> *start-time-millis)
     ;; TODO: <<<<>>>> should be done in a try/catch with exceptions causing non-retryable failure
@@ -681,7 +690,7 @@
         {:new-agg-state res
          :finished? false}))
 
-(deframaop complete-agg! [*topology-name *name *invoke-id]
+(deframaop complete-agg! [*name *invoke-id]
   (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *name))
                          *agent-graph (fetch-graph *name)]
     (local-select> (keypath *invoke-id) $$nodes
@@ -691,11 +700,11 @@
       $$nodes)
     (get-node-obj *agent-graph *node :> {:keys [*node-fn]})
     (vector *agg-state *agg-start-res :> *args)
-    (handle-node-invoke *topology-name *name *graph-task-id *graph-id *node-fn *invoke-id *node *args *agg-invoke-id
+    (handle-node-invoke *name *graph-task-id *graph-id *node-fn *invoke-id *node *args *agg-invoke-id
       :> {:keys [*emits *result]})
    (:> *emits *result)))
 
-(deframaop ack-agg! [*topology-name *name *invoke-id *ack-val]
+(deframaop ack-agg! [*name *invoke-id *ack-val]
   (<<with-substitutions [$$nodes (this-module-pobject-task-global (agent-node-task-global-name *name))
                          *agent-graph (fetch-graph *name)]
     (local-select> [(keypath *invoke-id) :agg-ack-val] $$nodes :> *agg-ack-val)
@@ -704,10 +713,10 @@
       [(keypath *invoke-id) :agg-ack-val (termval *new-ack-val)]
       $$nodes)
     (filter> (= 0 *new-ack-val))
-    (complete-agg! *topology-name *name *invoke-id :> *emits *result)
+    (complete-agg! *name *invoke-id :> *emits *result)
     (:> *emits *result)))
 
-(defn- define-agent! [setup topology-name stream-topology name agent-graph]
+(defn- define-agent! [setup stream-topology name agent-graph]
   (let [graph (resolve-agent-graph agent-graph)
         agent-depot-sym (symbol (agent-depot-task-global-name name))
         agent-streaming-depot-sym (symbol (str "*_agent-streaming-depot-" name))
@@ -864,14 +873,14 @@
           (case> Node :> {:keys [*node-fn]})
           (identity *op :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
           (handle-node-invoke
-            topology-name name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *agg-invoke-id
+            name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *agg-invoke-id
             :> {:keys [*emits *result]})
 
           (case> NodeAggStart :> {:keys [*node-fn *agg-node-name]})
           (identity *op :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
           (h/random-long :> *new-agg-invoke-id)
           (handle-node-invoke
-            topology-name name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *new-agg-invoke-id
+            name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args *new-agg-invoke-id
             :> {:keys [*start-time-millis *node-fn-res *emits *result]})
           (get-node-obj agent-graph-sym *agg-node-name :> {:keys [*init-fn]})
           ;; TODO: <<<<<>>>>> propagate errors
@@ -911,15 +920,15 @@
             agent-node-pstate-sym)
 
           (<<if *finished?
-            (complete-agg! topology-name name *agg-invoke-id :> *emits *result)
+            (complete-agg! name *agg-invoke-id :> *emits *result)
            (else>)
-            (ack-agg! topology-name name *agg-invoke-id *invoke-id :> *emits *result))
+            (ack-agg! name *agg-invoke-id *invoke-id :> *emits *result))
           (identity *agg-start-invoke-id :> *invoke-id)
           (identity *parent-agg-invoke-id :> *agg-invoke-id)
 
 
           (case> AggAckOp :> {:keys [*agg-invoke-id *ack-val]})
-          (ack-agg! topology-name name *agg-invoke-id *ack-val :> *emits *result)
+          (ack-agg! name *agg-invoke-id *ack-val :> *emits *result)
           (local-select> (keypath *agg-invoke-id) agent-node-pstate-sym
             :> {*agg-invoke-id :agg-invoke-id
                 *invoke-id :agg-start-invoke-id})
@@ -969,7 +978,7 @@
     ;;  - need ability to set breakpoints, which is implicit human in the loop?
     ))
 
-(defn define-agents! [setup topology-name stream-topology agent-graphs store-info]
-  (declare-object* setup (-> topology-name agents-store-info-name symbol) (aor-types/->valid-StoreInfo store-info))
+(defn define-agents! [setup stream-topology agent-graphs store-info]
+  (declare-object* setup (symbol (agents-store-info-name)) (aor-types/->valid-StoreInfo store-info))
   (doseq [[name agent-graph] agent-graphs]
-    (define-agent! setup topology-name stream-topology name agent-graph)))
+    (define-agent! setup stream-topology name agent-graph)))

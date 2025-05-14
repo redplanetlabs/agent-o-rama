@@ -7,8 +7,8 @@ import com.rpl.rama.module.*;
 
 public interface AgentsTopology {
 
-  public static AgentsTopology create(String name, Setup setup, Topologies topologies) {
-    return (AgentsTopology) AORHelpers.CREATE_AGENTS_TOPOLOGY.invoke(name, setup, topologies);
+  public static AgentsTopology create(Setup setup, Topologies topologies) {
+    return (AgentsTopology) AORHelpers.CREATE_AGENTS_TOPOLOGY.invoke(setup, topologies);
   }
 
   AgentGraph newAgent(String name);
