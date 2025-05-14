@@ -57,20 +57,7 @@
         {:keys [module-id agent-id]} @(re-frame/subscribe [:route-params])]
     [common/http-loader-view (agent-fsm-id module-id agent-id)
      [:div.p-4.grid.grid-cols-1.md:grid-cols-2.gap-4
-      [:div.border.border-gray-300.rounded.p-4
-       [:h1.text-xl.font-semibold.mb-2 "agent graph render"]
-       [graph/graph]]
-      [:div.border.border-gray-300.rounded.p-4
-       [:h1.text-xl.font-semibold.mb-2 "invokes"]
-       [:ol.list-decimal.list-inside
-        (for [data (:invokes agent-data)]
-          [:li.mb-2 {:key (:root-invoke-id data)}
-           [:div.p-2.bg-gray-50.rounded
-            [:a.text-blue-600.hover:underline.mr-2 {:href (rfe/href ::invoke {:module-id module-id
-                                                                              :agent-id agent-id
-                                                                              :invoke-id (:root-invoke-id data)})}
-             "explore"]
-            [:pre.text-sm.overflow-x-auto (common/pp data)]]])]]
+      [graph/graph]
       [:div.border.border-gray-300.rounded.p-4.md:col-span-2
        [:h1.text-xl.font-semibold.mb-2 "stats"]
        [:ul.list-disc.list-inside
@@ -81,7 +68,18 @@
         [:li "latency"]
         [:ul.list-circle.list-inside.ml-4
          [:li "p50 1.58s"]
-         [:li "p99 3.23s"]]]]]]))
+         [:li "p99 3.23s"]]]]
+      [:div.border.border-gray-300.rounded.p-4.md:col-span-2
+       [:h1.text-xl.font-semibold.mb-2 "invokes"]
+       [:ol.list-decimal.list-inside
+        (for [data (:invokes agent-data)]
+          [:li.mb-2 {:key (:root-invoke-id data)}
+           [:div.p-2.bg-gray-50.rounded
+            [:a.text-blue-600.hover:underline.mr-2 {:href (rfe/href ::invoke {:module-id module-id
+                                                                              :agent-id agent-id
+                                                                              :invoke-id (:root-invoke-id data)})}
+             "explore"]
+            [:pre.text-sm.overflow-x-auto (common/pp data)]]])]]]]))
 
 ;; ============ invoke ==============
 

@@ -1,7 +1,10 @@
 graph ui libraries
-  selectednode callback to render panel
   dagre auto layout
+
+decide what to show next to graph
+  1. toplevel invokes
+   	 not filterable by clicking on node
+  2. list of node invokes (filterable by node)
 
 version dropdown (default to latest version)
 agents-historical-info {version->graph}
-
