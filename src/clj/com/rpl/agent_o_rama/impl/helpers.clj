@@ -1,24 +1,29 @@
 (ns com.rpl.agent-o-rama.impl.helpers
   (:refer-clojure :exclude [ex-info])
   (:use [com.rpl.rama.path])
-  (:require [com.rpl.rama.ops :as ops])
-  (:import [com.rpl.agentorama.impl AORExceptionInfo]
-           [com.rpl.rama.helpers TopologyUtils]))
+  (:require
+   [com.rpl.rama.ops :as ops])
+  (:import
+   [com.rpl.agentorama.impl
+    AORExceptionInfo]
+   [com.rpl.rama.helpers
+    TopologyUtils]))
 
 (def MAX-ARITY 8)
 
 (defn ex-info
   ([message data]
-    (AORExceptionInfo. message data))
+   (AORExceptionInfo. message data))
   ([message data cause]
-    (AORExceptionInfo. message data cause)))
+   (AORExceptionInfo. message data cause)))
 
 (defmacro dofor
   "Shortcut for `doall` and `for`."
   [& body]
   `(doall (for ~@body)))
 
-(defn current-time-millis []
+(defn current-time-millis
+  []
   (TopologyUtils/currentTimeMillis))
 
 (defn type-hinted
@@ -28,7 +33,8 @@
               .getTypeName
               symbol)}))
 
-(defn clj-transform [compiled-path obj]
+(defn clj-transform
+  [compiled-path obj]
   (multi-transform ^:direct-nav compiled-path obj))
 
 (defn rama-void-function-class-symbol
@@ -77,7 +83,8 @@
 
 (mk-jfn-converter)
 
-(defn random-long []
+(defn random-long
+  []
   (.nextLong ^java.util.Random (ops/current-random-source)))
 
 (defn invoke

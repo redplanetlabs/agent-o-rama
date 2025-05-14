@@ -1,10 +1,15 @@
 (ns com.rpl.agent-o-rama.impl.types
-  (:require [com.rpl.agent-o-rama.impl.helpers :as h]
-            [com.rpl.ramaspecter.defrecord-plus :as drp]
-            [rpl.schema.core :as s])
-  (:import [com.rpl.agentorama AsyncResult]
-           [com.rpl.rama.integration TaskGlobalObject]
-           [java.util.concurrent CompletableFuture]))
+  (:require
+   [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.ramaspecter.defrecord-plus :as drp]
+   [rpl.schema.core :as s])
+  (:import
+   [com.rpl.agentorama
+    AsyncResult]
+   [com.rpl.rama.integration
+    TaskGlobalObject]
+   [java.util.concurrent
+    CompletableFuture]))
 
 (def NODE-KW :node)
 (def AGG-START-NODE-KW :agg-start-node)
@@ -14,13 +19,15 @@
 (defrecord NodeAggStart [node-fn agg-node-name])
 (defrecord NodeAgg [init-fn update-fn node-fn])
 
-(defn node->type-kw [node]
+(defn node->type-kw
+  [node]
   (cond (instance? Node node) NODE-KW
         (instance? NodeAggStart node) AGG-START-NODE-KW
         (instance? NodeAgg node) AGG-NODE-KW
         :else (throw (h/ex-info "Unexpected node type" {:class (class node)}))))
 
-;; TODO: <<<<>>>> use flexible serialization for these to ease updating the library? or just some of them?
+;; TODO: <<<<>>>> use flexible serialization for these to ease updating the
+;; library? or just some of them?
 
 (drp/defrecord+ AgentInvoke
   [args :- [Object]
@@ -39,14 +46,14 @@
    start-node :- String
    uuid :- String]
   TaskGlobalObject
-  (prepareForTask [this task-id context] )
-  (close [this] ))
+  (prepareForTask [this task-id context])
+  (close [this]))
 
 (drp/defrecord+ StoreInfo
   [store-info :- {String clojure.lang.Keyword}]
   TaskGlobalObject
-  (prepareForTask [this task-id context] )
-  (close [this] ))
+  (prepareForTask [this task-id context])
+  (close [this]))
 
 (drp/defrecord+ AgentNodeArg
   [val :- (s/maybe Object)
@@ -86,19 +93,20 @@
    target-task-id :- Long
    node-name :- String
    args :- [(s/cond-pre AgentNodeArg AsyncResult CompletableFuture)]
-   ])
+  ])
 
 (drp/defrecord+ HistoricalAgentNodeInfo
   [node-type :- clojure.lang.Keyword ; :node, :agg-node, :agg-start-node
    output-nodes :- #{String}
    agg-context :- (s/maybe String)
-   ])
+  ])
 
 (drp/defrecord+ HistoricalAgentGraphInfo
-  [node-map :- {String HistoricalAgentNodeInfo} ; :node, :agg-node, :agg-start-node
+  [node-map :- {String HistoricalAgentNodeInfo} ; :node, :agg-node,
+                                                ; :agg-start-node
    start-node :- String
    uuid :- String
-   ])
+  ])
 
 (drp/defrecord+ AsyncFutureResult
   [task-id :- Long
