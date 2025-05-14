@@ -174,11 +174,11 @@
 
 (defn mk-kv-store
   [store-params]
-  (reify-store [KeyValueImpl] store-params))
+  (reify-store [KeyValueImpl PStateStoreImpl] store-params))
 
 (defn mk-doc-store
   [store-params]
-  (reify-store [KeyValueImpl DocImpl] store-params))
+  (reify-store [KeyValueImpl DocImpl PStateStoreImpl] store-params))
 
 (defn mk-pstate-store
   [store-params]
