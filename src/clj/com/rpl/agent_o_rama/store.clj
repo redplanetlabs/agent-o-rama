@@ -21,17 +21,19 @@
   ([store k doc-key]
     (get-document-field-async store k doc-key nil))
   ([store k doc-key default-value]
-    ;; TODO: <<<<>>>>
-    ))
+    (simpl/get-document-field-async* store k doc-key default-value)))
 
 (defn contains-document-field?-async [store k doc-key]
-  ;; TODO: <<<<>>>>
-  )
+  (simpl/contains-document-field?-async* store k doc-key))
 
 (defn put-document-field-async [store k doc-key value]
-  ;; TODO: <<<<>>>>
-  )
+  (simpl/put-document-field-async* store k doc-key value))
 
 (defn update-document-field-async [store k doc-key afn]
-  ;; TODO: <<<<>>>>
-  )
+  (simpl/update-document-field-async* store k doc-key afn))
+
+(defmacro pstate-select [store apath]
+  `(simpl/pstate-select* ~store (path ~apath)))
+
+(defmacro pstate-transform [store apath]
+  `(simpl/pstate-transform* ~store (path ~apath)))

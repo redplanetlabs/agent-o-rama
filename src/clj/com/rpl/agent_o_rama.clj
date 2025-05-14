@@ -121,6 +121,9 @@
 (defn result! [^AgentNode agent-node val]
   (.result agent-node val))
 
+(defn get-store [^AgentNode agent-node name]
+  (.getStore agent-node name))
+
 (defn- parse-map-options
   [[arg1 & rest-args :as args]]
   (if (map? arg1) [arg1 rest-args] [{} args]))

@@ -115,19 +115,19 @@
     ))
 
 (defprotocol PStateStoreInternal
-  (store-select* [this path])
-  (store-transform* [this path]))
+  (pstate-select* [this path])
+  (pstate-transform* [this path]))
 
 (defn PStateStoreImpl [store-params]
   `(PStateStore
     (select [this# jpath#]
-      (store-select* this# (java-path->clojure-path jpath#)))
+      (pstate-select* this# (java-path->clojure-path jpath#)))
     (transform [this# jpath#]
-      (store-transform* this# (java-path->clojure-path jpath#)))
+      (pstate-transform* this# (java-path->clojure-path jpath#)))
     PStateStoreInternal
-    (store-select* [this# path#]
+    (pstate-select* [this# path#]
       (add-pstate-query! ~store-params path#))
-    (store-transform* [this# path#]
+    (pstate-transform* [this# path#]
       (add-pstate-transform! ~store-params path#))))
 
 (defmacro reify-store [impls store-params]
