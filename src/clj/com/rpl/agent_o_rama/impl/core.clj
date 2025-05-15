@@ -377,19 +377,23 @@
    (apply *node-fn *agent-node *args :> *node-fn-res)
    (agent-node-state *agent-node :> {:keys [*async-ops *emits *result]})
    (handle-async-emits *invoke-id *async-ops *emits :> *async-ops *emits)
-   (local-transform>
-    [(keypath *invoke-id)
-     (termval {:graph-id          *graph-id
-               :graph-task-id     *graph-task-id
-               :node              *next-node
-               :async-ops         *async-ops
-               :start-time-millis *start-time-millis
-               :input             *args
-               :emits             *emits
-               :result            *result
-               :agg-invoke-id     *agg-invoke-id
-              })]
-    $$nodes)
+   ;; merge instead of overwrite since agg nodes run completion function on
+   ;; already existing node
+   (<<ramafn %merger
+     [*m]
+     (:> (reduce-kv assoc
+                    *m
+                    {:graph-id          *graph-id
+                     :graph-task-id     *graph-task-id
+                     :node              *next-node
+                     :async-ops         *async-ops
+                     :start-time-millis *start-time-millis
+                     :input             *args
+                     :emits             *emits
+                     :result            *result
+                     :agg-invoke-id     *agg-invoke-id
+                    })))
+   (local-transform> [(keypath *invoke-id) (term %merger)] $$nodes)
    (:> {:start-time-millis *start-time-millis
         :node-fn-res *node-fn-res
         :emits       *emits
