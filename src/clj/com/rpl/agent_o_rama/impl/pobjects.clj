@@ -79,6 +79,9 @@
      ;; start agg node
      :started-agg-invoke-id Long
 
+     ;; invoke of agg node (to make tracing easier)
+     :invoked-agg-invoke-id Long
+
      ;; agg state
      :agg-inputs         (vector-schema AggInput {:subindex? true})
      :agg-start-res      Object

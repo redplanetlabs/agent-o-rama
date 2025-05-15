@@ -697,6 +697,10 @@
                          (termval (aor-types/->valid-AggInput *invoke-id
                                                               *args))])]
            agent-node-pstate-sym)
+          (local-transform> [(keypath *invoke-id)
+                             :invoked-agg-invoke-id
+                             (termval *agg-invoke-id)]
+                            agent-node-pstate-sym)
 
           (<<if *finished?
             (complete-agg! name *agg-invoke-id :> *emits *result)
