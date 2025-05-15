@@ -8,6 +8,7 @@
    [ajax.core :as ajax]
    [com.rpl.agent-o-rama.ui.common :as common]
    [reitit.frontend.easy :as rfe]
+   [com.rpl.specter :as s]
 
    ["react" :refer [useState useCallback]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useOnSelectionChange]]
@@ -31,18 +32,32 @@
    (dissoc db ::selected-node)))
 
 (defn graph []
-  (let [data @(re-frame/subscribe [:com.rpl.agent-o-rama.ui.agents/selected-agent])
+  (let [data (:invokes-map @(re-frame/subscribe [:com.rpl.agent-o-rama.ui.agents/selected-invoke]))
         selected-node @(re-frame/subscribe [::selected-node])
         
         g (new (.. Dagre -graphlib -Graph))
         
-        nodes [{:id "1"
-                :data {:label "first node"}}
-               {:id "2"
-                :data {:label "second node" :arbitrary 3}}]
-        edges [{:id "1->2" :source "1" :target "2"}]]
+        nodes (into [] (map (fn [[id data]]
+                              {:id (str id) :data (assoc data :label (:node data))}) data))
+        implicit->real (into {}
+                             (s/select [s/ALL
+                                        (s/collect-one s/FIRST)
+                                        s/LAST
+                                        (s/must :invoked-agg-invoke-id)] data))
+        edges (for [[from to]
+                    (s/select [s/ALL
+                               (s/collect-one s/FIRST)
+                               s/LAST
+                               (s/must :emits)
+                               s/ALL
+                               :invoke-id] data)]
 
-    (js/console.log "rendering" g)
+                {:id (str from to)
+                 :source (str from)
+                 :target (str (get implicit->real to to))})
+        ]
+    
+    (tap>)
 
     (.setDefaultEdgeLabel g (fn [] #js {}))
     (.setGraph g #js {})

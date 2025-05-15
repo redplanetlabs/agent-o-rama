@@ -57,7 +57,6 @@
         {:keys [module-id agent-id]} @(re-frame/subscribe [:route-params])]
     [common/http-loader-view (agent-fsm-id module-id agent-id)
      [:div.p-4.grid.grid-cols-1.md:grid-cols-2.gap-4
-      [graph/graph]
       [:div.border.border-gray-300.rounded.p-4.md:col-span-2
        [:h1.text-xl.font-semibold.mb-2 "stats"]
        [:ul.list-disc.list-inside
@@ -104,6 +103,7 @@
 (defn invoke []
   (let [invoke-data @(re-frame/subscribe [::selected-invoke])]
     [:div.p-4
+     [graph/graph]
      [:h2.text-xl.font-semibold.mb-2 "invoke details"]
      [:pre.bg-gray-100.p-3.rounded.text-sm.overflow-x-auto (common/pp invoke-data)]]))
 
