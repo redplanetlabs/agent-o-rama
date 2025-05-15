@@ -1,3 +1,8 @@
+don't show node selector on agent page, show only graph and toplevelinvoke index.
+then on invoke page, show agent graph _and_ invoke graph (paginated)
+
+I have access to Historical* types
+
 graph ui libraries
   dagre auto layout
 
@@ -8,3 +13,4 @@ decide what to show next to graph
 
 version dropdown (default to latest version)
 agents-historical-info {version->graph}
+

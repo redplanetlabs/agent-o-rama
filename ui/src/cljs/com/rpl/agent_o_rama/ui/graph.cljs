@@ -39,7 +39,7 @@
     [:<>
      [:div.border.border-gray-300.rounded.p-4
       [:h1.text-xl.font-semibold.mb-2 "agent graph render"]
-      [:div {:style {:width "400px" :height "400px"}}
+      [:div {:style {:width "100%" :height "400px"}}
        [:> ReactFlow {:nodes nodes :edges edges
                       :proOptions {:hideAttribution true}
                       :onNodeClick (fn [_ node] (re-frame/dispatch [::set-selected-node (js->clj node :keywordize-keys true)]))
