@@ -13,8 +13,10 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.test :as rtest]
+   [com.rpl.ramaspecter :refer [walker]]
    [loom.attr :as lattr]
-   [loom.graph :as lgraph])
+   [loom.graph :as lgraph]
+   [meander.epsilon :as m])
   (:import
    [com.rpl.agentorama
     BuiltIn]
@@ -26,6 +28,117 @@
     RamaAccumulatorAgg0
     RamaAccumulatorAgg2
     RamaCombinerAgg]))
+
+(defmacro trace-matches?
+  [data & bindings]
+  (let [unique-syms (set (select [(walker symbol?)
+                                  #(= \!
+                                      (-> %
+                                          str
+                                          first))]
+                                 bindings))
+        unique-syms (setval [ALL NAME FIRST] \? unique-syms)
+        bindings    (setval [(walker symbol?)
+                             NAME
+                             FIRST
+                             #(= \! %)]
+                            \?
+                            bindings)]
+    `(m/find
+      ~data
+      (m/and
+       ~@bindings
+       (m/guard (= ~(count unique-syms)
+                   (count (set ~(vec unique-syms))))))
+      true)))
+
+(defn trace-time-deltas
+  [trace]
+  (transform [MAP-VALS
+              (multi-path
+               STAY
+               [(must :async-ops) ALL (view #(into {} %))])
+              (submap [:start-time-millis :finish-time-millis])
+              #(= 2 (count %))]
+             (fn [{:keys [start-time-millis finish-time-millis]}]
+               {:delta-millis (- finish-time-millis start-time-millis)})
+             trace))
+
+(deftest trace-matches-test
+  (is
+   (trace-matches?
+    {:a {:s 1 :f 2 :emit :b}
+     :b {:s 10 :f 11 :emit :c}
+     :c {:s 7 :f 8}}
+    {!k1 {:s ?s1 :f ?f1 :emit !k2}
+     !k2 {:s ?s2 :f ?f2 :emit !k3}
+     !k3 {:s ?s3 :f ?f3}}
+    (m/guard
+     (and (= 1 (- ?f1 ?s1))
+          (= 1 (- ?f2 ?s2))
+          (= 1 (- ?f3 ?s3)))
+    )))
+  (is
+   (not
+    (trace-matches?
+     {:a {:s 1 :f 2 :emit :c}
+      :b {:s 10 :f 11 :emit :c}
+      :c {:s 7 :f 8}}
+     {!k1 {:s ?s1 :f ?f1 :emit !k2}
+      !k2 {:s ?s2 :f ?f2 :emit !k3}
+      !k3 {:s ?s3 :f ?f3}}
+     (m/guard
+      (and (= 1 (- ?f1 ?s1))
+           (= 1 (- ?f2 ?s2))
+           (= 1 (- ?f3 ?s3)))
+     ))))
+  (is
+   (trace-matches?
+    {:a {:s 1 :f 2 :emit :b}
+     :b {:s 10 :f 12 :emit :c}
+     :c {:s 7 :f 10}}
+    {!k1 {:s ?s1 :f ?f1 :emit !k2}
+     !k2 {:s ?s2 :f ?f2 :emit !k3}
+     !k3 {:s ?s3 :f ?f3}}
+    (m/guard
+     (and (= 1 (- ?f1 ?s1))
+          (= 2 (- ?f2 ?s2))
+          (= 3 (- ?f3 ?s3)))
+    )))
+  (is
+   (not
+    (trace-matches?
+     {:a {:s 1 :f 2 :emit :b}
+      :b {:s 10 :f 12 :emit :c}
+      :c {:s 7 :f 10}}
+     {!k1 {:s ?s1 :f ?f1 :emit !k2}
+      !k2 {:s ?s2 :f ?f2 :emit !k3}
+      !k3 {:s ?s3 :f ?f3}}
+     (m/guard
+      (and (= 1 (- ?f1 ?s1))
+           (= 1 (- ?f2 ?s2))
+           (= 3 (- ?f3 ?s3)))
+     ))))
+)
+
+(deftest trace-time-deltas-test
+  (is
+   (=
+    (trace-time-deltas
+     {:a {:start-time-millis 3
+          :finish-time-millis 5
+          :q 1
+          :async-ops [{:a 2 :start-time-millis 10 :finish-time-millis 20}
+                      {:start-time-millis 11 :finish-time-millis 12}]}
+      :b {:start-time-millis 2 :finish-time-millis 6 :z 1 :x 9}
+      :c {:q 3}})
+    {:a {:delta-millis 2
+         :q         1
+         :async-ops [{:a 2 :delta-millis 10}
+                     {:delta-millis 1}]}
+     :b {:delta-millis 4 :z 1 :x 9}
+     :c {:q 3}}
+   )))
 
 (deftest graph-test
   (letlocals
@@ -842,8 +955,6 @@
                       "node1"
                       (fn [agent-node arg]
                         (aor/emit! agent-node "node1" (str arg "-0"))
-                        (aor/emit! agent-node "node1" (str arg "-1"))
-                        (aor/emit! agent-node "node1" (str arg "-2"))
                       ))
             (aor/node "node1"
                       "node2"
@@ -893,16 +1004,47 @@
        (foreign-select-one [(keypath graph-id) :root-invoke-id]
                            invokes-pstate
                            {:pkey graph-task-id}))
+     (bind res
+       (foreign-invoke-query traces-query
+                             graph-task-id
+                             [[graph-task-id root-invoke-id]]
+                             10000))
+     (def DATA (:invokes-map res))
+     (println "COUNT"
+              (-> res
+                  :invokes-map
+                  count))
      (clojure.pprint/pprint
-      (foreign-invoke-query traces-query
-                            graph-task-id
-                            [[graph-task-id root-invoke-id]]
-                            10000))
+      res
+     )
+
+     ; (m/find
+     ;   {:a {:s 1 :f 2 :emit :b}
+     ;    :b {:s 10 :f 12 :emit :c}
+     ;    :c {:s 7 :f 11}}
+     ;   (m/and
+     ;     {?k1 {:s ?s1 :f ?f1 :emit ?k2}
+     ;      ?k2 {:s ?s2 :f ?f2 :emit ?k3}
+     ;      ?k3 {:s ?s3 :f ?f3}}
+     ;     (m/guard
+     ;       (and (= 1 (- ?f1 ?s1))
+     ;            (= 2 (- ?f2 ?s2))
+     ;            (= 4 (- ?f3 ?s3)))
+     ;        ))
+     ;   :matched)
+
+     ; (trace-matches? (to-time-deltas data)
+     ;                 (m/and
+     ;                  ...
+     ;                 ))
+
+
 
      ;; TODO: <<<<>>>> verify everything in the nodes PState for each node,
      ;; using sim time to control start/finish
      ;;    - and parallelize the emits
     )))
+
 
 
 (deftest async-emits-test
