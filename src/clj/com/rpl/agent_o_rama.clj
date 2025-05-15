@@ -78,6 +78,7 @@
        (vreset! defined?-vol true)
        (i/define-agents!
         setup
+        topologies
         stream-topology
         @agents-vol
         @store-info-vol)

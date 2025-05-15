@@ -6,6 +6,7 @@
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.ops :as ops])
@@ -485,7 +486,7 @@
    (:> *emits *result)))
 
 (defn- define-agent!
-  [setup stream-topology name agent-graph]
+  [setup topologies stream-topology name agent-graph]
   (let [graph (graph/resolve-agent-graph agent-graph)
         agent-depot-sym (symbol (po/agent-depot-task-global-name name))
         agent-streaming-depot-sym (symbol (str "*_agent-streaming-depot-" name))
@@ -535,10 +536,7 @@
      Long
      {:initial-value 0})
 
-    ;; TODO: <<<<<>>>>> move PState/depot name functions to a common namespace
-    ;;    - and schemas?
-    ;;    - then define this query in a "queries" namespace
-    ;(...declare-tracing-query-topology name)
+    (queries/declare-tracing-query-topology topologies name)
 
     (<<sources stream-topology
      (source> agent-depot-sym {:retry-mode :none} :> *data)
@@ -766,9 +764,9 @@
   ))
 
 (defn define-agents!
-  [setup stream-topology agent-graphs store-info]
+  [setup topologies stream-topology agent-graphs store-info]
   (declare-object* setup
                    (symbol (po/agents-store-info-name))
                    (aor-types/->valid-StoreInfo store-info))
   (doseq [[name agent-graph] agent-graphs]
-    (define-agent! setup stream-topology name agent-graph)))
+    (define-agent! setup topologies stream-topology name agent-graph)))
