@@ -6,12 +6,13 @@
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.core :as i]
+   [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.test :as rtest]
    [loom.attr :as lattr]
-   [loom.graph :as graph])
+   [loom.graph :as lgraph])
   (:import
    [com.rpl.agentorama
     BuiltIn]
@@ -24,19 +25,11 @@
     RamaAccumulatorAgg2
     RamaCombinerAgg]))
 
-(defn node->agg
-  [graph]
-  (reduce
-   (fn [m n]
-     (assoc m n (lattr/attr graph n :agg)))
-   {}
-   (graph/nodes graph)))
-
 (deftest graph-test
   (letlocals
    (bind res (volatile! []))
    (bind ag
-     (-> (i/mk-agent-graph)
+     (-> (graph/mk-agent-graph)
          (aor/node "N1"
                    "N2"
                    (fn [agent-node]
@@ -55,7 +48,7 @@
                        (fn [agent-node agg node-start-res]
                          (vswap! res conj "N4")))
      ))
-   (bind graph (i/resolve-agent-graph ag))
+   (bind graph (graph/resolve-agent-graph ag))
    (is (= "N1" (:start-node graph)))
    (is (some? (:uuid graph)))
    (is (some? (java.util.UUID/fromString (:uuid graph))))
@@ -125,7 +118,7 @@
 
    ;; test nested aggs
    (bind ag
-     (-> (i/mk-agent-graph)
+     (-> (graph/mk-agent-graph)
          (aor/node "N1"
                    "N2"
                    (fn [agent-node]
@@ -166,7 +159,7 @@
                        (fn [agent-node agg node-start-res]
                          (vswap! res conj "N9")))
      ))
-   (bind graph (i/resolve-agent-graph ag))
+   (bind graph (graph/resolve-agent-graph ag))
    (is (= "N1" (:start-node graph)))
    (is (some? (:uuid graph)))
    (is (some? (java.util.UUID/fromString (:uuid graph))))
@@ -317,7 +310,7 @@
 
    ;; starting with aggStartNode
    (bind ag
-     (-> (i/mk-agent-graph)
+     (-> (graph/mk-agent-graph)
          (aor/agg-start-node "N10"
                              "N1"
                              (fn [agent-node arg1 arg2 arg3]
@@ -332,7 +325,7 @@
                        (fn [agent-node agg node-start-res]
                          (vswap! res conj "N2")))
      ))
-   (bind graph (i/resolve-agent-graph ag))
+   (bind graph (graph/resolve-agent-graph ag))
    (is (= "N10" (:start-node graph)))
    (is (some? (:uuid graph)))
    (is (some? (java.util.UUID/fromString (:uuid graph))))
@@ -395,7 +388,7 @@
 (deftest branching-graph-test
   (letlocals
    (bind ag
-     (-> (i/mk-agent-graph)
+     (-> (graph/mk-agent-graph)
          (aor/node "N1" ["A1" "B1"] (fn [agent-node]))
          (aor/node "A1" "A2" (fn [agent-node]))
          (aor/node "A2" ["A3" "A4"] (fn [agent-node]))
@@ -407,7 +400,7 @@
          (aor/agg-node "B4" nil aggs/+sum (fn [agent-node agg node-start-res]))
          (aor/node "B3" nil (fn [agent-node]))
      ))
-   (bind graph (i/resolve-agent-graph ag))
+   (bind graph (graph/resolve-agent-graph ag))
    (is (= "N1" (:start-node graph)))
    (is (some? (:uuid graph)))
    (is (some? (java.util.UUID/fromString (:uuid graph))))
@@ -452,7 +445,7 @@
 (deftest looping-graph-test
   (letlocals
    (bind ag
-     (-> (i/mk-agent-graph)
+     (-> (graph/mk-agent-graph)
          (aor/node "N1" ["A1" "B1"] (fn [agent-node]))
          (aor/node "A1" "A2" (fn [agent-node]))
          (aor/node "A2" "A3" (fn [agent-node]))
@@ -463,7 +456,7 @@
          (aor/node "B3" ["B2" "B4"] (fn [agent-node]))
          (aor/agg-node "B4" "B1" aggs/+sum (fn [agent-node agg node-start-res]))
      ))
-   (bind graph (i/resolve-agent-graph ag))
+   (bind graph (graph/resolve-agent-graph ag))
    (is (= "N1" (:start-node graph)))
    (is (some? (:uuid graph)))
    (is (some? (java.util.UUID/fromString (:uuid graph))))
@@ -501,21 +494,21 @@
 (deftest graph-error-cases
   (ex-info-thrown? #"Undefined node.*"
                    {:node "N2" :path ["N1"]}
-                   (i/resolve-agent-graph
-                    (-> (i/mk-agent-graph)
+                   (graph/resolve-agent-graph
+                    (-> (graph/mk-agent-graph)
                         (aor/node "N1" "N2" (fn [agent-node]))
                     )))
   (ex-info-thrown? #"No corresponding agg node.*"
                    {:start-agg-node "N1"}
-                   (i/resolve-agent-graph
-                    (-> (i/mk-agent-graph)
+                   (graph/resolve-agent-graph
+                    (-> (graph/mk-agent-graph)
                         (aor/agg-start-node "N1" nil (fn [agent-node]))
                     )))
   (ex-info-thrown?
    #"Invalid loop to different agg context.*"
    {:agg1 "N1" :agg2 nil :node "N1" :path ["N1" "N2"]}
-   (i/resolve-agent-graph
-    (-> (i/mk-agent-graph)
+   (graph/resolve-agent-graph
+    (-> (graph/mk-agent-graph)
         (aor/agg-start-node "N1" "N2" (fn [agent-node]))
         (aor/node "N2" ["N1" "N3"] (fn [agent-node]))
         (aor/agg-node "N3" nil aggs/+sum (fn [agent-node agg node-start-res]))
@@ -523,8 +516,8 @@
   (ex-info-thrown?
    #"Invalid loop to different agg context.*"
    {:agg1 "N1" :agg2 "A1" :node "N1" :path ["A1" "N1" "N2"]}
-   (i/resolve-agent-graph
-    (-> (i/mk-agent-graph)
+   (graph/resolve-agent-graph
+    (-> (graph/mk-agent-graph)
         (aor/agg-start-node "A1" "N1" (fn [agent-node]))
         (aor/agg-start-node "N1" "N2" (fn [agent-node]))
         (aor/node "N2" ["N1" "N3"] (fn [agent-node]))
@@ -534,15 +527,15 @@
   (ex-info-thrown?
    #"Reached AggNode outside of agg context.*"
    {:name "N1" :path []}
-   (i/resolve-agent-graph
-    (-> (i/mk-agent-graph)
+   (graph/resolve-agent-graph
+    (-> (graph/mk-agent-graph)
         (aor/agg-node "N1" nil aggs/+sum (fn [agent-node agg node-start-res]))
     )))
   (ex-info-thrown?
    #"Invalid loop to different agg context.*"
    {:agg1 nil :agg2 "C1" :node "N3" :path ["N1" "N2"]}
-   (i/resolve-agent-graph
-    (-> (i/mk-agent-graph)
+   (graph/resolve-agent-graph
+    (-> (graph/mk-agent-graph)
         (aor/node "N1" ["C1" "N2"] (fn [agent-node]))
         (aor/agg-start-node "C1" "N3" (fn [agent-node agg node-start-res]))
         (aor/node "N3" "N4" (fn [agent-node]))
@@ -553,8 +546,8 @@
   (ex-info-thrown?
    #"Invalid loop to different agg context.*"
    {:agg1 nil :agg2 "N1" :node "N2" :path ["N1" "N2"]}
-   (i/resolve-agent-graph
-    (-> (i/mk-agent-graph)
+   (graph/resolve-agent-graph
+    (-> (graph/mk-agent-graph)
         (aor/agg-start-node "N1" "N2" (fn [agent-node]))
         (aor/agg-node "N2" "N2" aggs/+sum (fn [agent-node agg node-start-res]))
     )))
@@ -564,10 +557,10 @@
   (letlocals
    (bind get-agg-node
      (fn [agg]
-       (-> (i/mk-agent-graph)
+       (-> (graph/mk-agent-graph)
            (aor/agg-start-node "N1" "N2" (fn [agent-node]))
            (aor/agg-node "N2" nil agg (fn [agent-node]))
-           i/resolve-agent-graph
+           graph/resolve-agent-graph
            :node-map
            (get "N2")
            :node)
@@ -681,13 +674,13 @@
 (deftest graph->historical-graph-info-test
   (letlocals
    (bind graph
-     (-> (i/mk-agent-graph)
+     (-> (graph/mk-agent-graph)
          (aor/agg-start-node "N1" "N2" (fn [agent-node]))
          (aor/node "N2" "N3" (fn [agent-node a]))
          (aor/agg-node "N3" nil aggs/+sum (fn [agent-node]))
-         i/resolve-agent-graph))
+         graph/resolve-agent-graph))
    (bind historical
-     (#'i/graph->historical-graph-info graph))
+     (graph/graph->historical-graph-info graph))
 
    (is
     (= historical
@@ -841,7 +834,16 @@
          ;;    - and parallelize the emits
          ;;    - make helper function to get full trace starting from a root
          ;;    graph task ID + graph ID
+         ;;       - or just make and use the query topology that will be needed
+         ;;       for the backend
+         ;;       - generate for each agent
+         ;;       - first gets root invoke ID
+         ;;       - (...get-trace-page [[task-id invoke-id] ...] limit) ->
+         ;;       {:nodes {<invoke-id> -> {info}} :next-query [...]}
+         ;;         - needs to get at most N agg inputs (probably 10)
+         ;;         - and can fetch more of them in explicit queries
 )
+
 
 (deftest async-emits-test
          ;; TODO: <<<<<>>>>>

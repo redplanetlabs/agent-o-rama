@@ -4,23 +4,15 @@
   (:require
    [clojure.set :as set]
    [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.rama.ops :as ops]
-   [loom.attr :as lattr]
-   [loom.graph :as graph])
+   [com.rpl.rama.ops :as ops])
   (:import
    [com.rpl.agentorama
-    AgentGraph
     AgentNode
     AsyncResult
-    FinishedAgg
-    MultiAgg
-    MultiAgg$Impl]
-   [com.rpl.agentorama.impl
-    BuiltInAgg]
-   [com.rpl.agentorama.ops
-    RamaVoidFunction3]
+    FinishedAgg]
    [com.rpl.agent_o_rama.impl.types
     AgentNodeEmit
     AgentResult
@@ -33,326 +25,12 @@
     NodeAggStart]
    [com.rpl.rama.helpers
     TopologyUtils]
-   [com.rpl.rama.ops
-    RamaAccumulatorAgg
-    RamaCombinerAgg]
    [java.util
-    Map
-    UUID]
+    Map]
    [java.util.concurrent
     CompletableFuture]
    [java.util.function
     Function]))
-
-(defprotocol AgentGraphInternal
-  (internal-add-node! [this name output-nodes-spec node])
-  (agent-graph-state [this]))
-
-(defprotocol MultiAggInternal
-  (internal-add-init! [this afn])
-  (internal-add-handler! [this name afn])
-  (multi-agg-state [this]))
-
-(defmacro reify-MultiAgg
-  [& body]
-  `(reify
-    ~'MultiAgg$Impl
-    ~@(for [i (range 0 (- h/MAX-ARITY 1))]
-        (let [name-sym (h/type-hinted String 'name#)
-              jfn-sym  (h/type-hinted (h/rama-function-class (+ i 1)) 'jfn#)
-              on-sym   (h/type-hinted MultiAgg$Impl 'on)]
-          `(~on-sym
-            [this# ~name-sym ~jfn-sym]
-            (internal-add-handler!
-             this#
-             ~name-sym
-             (h/convert-jfn ~jfn-sym))
-           )))
-    ~@body
-   ))
-
-(defn mk-multi-agg
-  []
-  (let [on-vol   (volatile! {})
-        init-vol (volatile! nil)]
-    (reify-MultiAgg
-     MultiAggInternal
-     (internal-add-init!
-      [this afn]
-      (when (some? @init-vol)
-        (throw (h/ex-info "MultiAgg already has init function specified" {})))
-      (vreset! init-vol afn)
-      this)
-     (internal-add-handler!
-      [this name afn]
-      (when (contains? @on-vol name)
-        (throw (h/ex-info "MultiAgg already has handler for given name"
-                          {:name name})))
-      (vswap! on-vol assoc name afn)
-      this)
-     (multi-agg-state [this]
-                      {:init-fn     (or @init-vol (fn [] nil))
-                       :on-handlers @on-vol
-                      }))
-  ))
-
-(defmacro reify-AgentGraph
-  [& body]
-  `(reify
-    ~'AgentGraph
-    ~@(for [i (range 1 h/MAX-ARITY)]
-        (let [name-sym (h/type-hinted String 'name#)
-              osym     (h/type-hinted Object 'outputNodesSpec#)
-              jfn-sym  (h/type-hinted (h/rama-void-function-class i) 'jfn#)
-              node-sym (h/type-hinted AgentGraph 'node)]
-          `(~node-sym
-            [this# ~name-sym ~osym ~jfn-sym]
-            (internal-add-node!
-             this#
-             ~name-sym
-             ~osym
-             (aor-types/->Node (h/convert-void-jfn ~jfn-sym)))
-           )))
-    ~@(for [i (range 2 (inc h/MAX-ARITY))]
-        (let [name-sym (h/type-hinted String 'name#)
-              osym     (h/type-hinted Object 'outputNodesSpec#)
-              jfn-sym  (h/type-hinted (h/rama-function-class i) 'jfn#)
-              agg-start-node-sym (h/type-hinted AgentGraph 'aggStartNode)]
-          `(~agg-start-node-sym
-            [this# ~name-sym ~osym ~jfn-sym]
-            (internal-add-node!
-             this#
-             ~name-sym
-             ~osym
-             (aor-types/->NodeAggStart (h/convert-void-jfn ~jfn-sym) nil))
-           )))
-    ~@body
-   ))
-
-(defn- normalize-output-nodes
-  [spec]
-  (cond (string? spec) [spec]
-        (coll? spec) (set spec)
-        (nil? spec) #{}
-        :else (throw (h/ex-info "Invalid output nodes spec"
-                                {:spec spec :class (class spec)}))))
-
-(defn internal-add-agg-node!
-  [this name outputNodesSpec agg afn]
-  (if (instance? MultiAgg$Impl agg)
-    (let [{:keys [init-fn on-handlers]} (multi-agg-state agg)
-          update-fn (fn [state dispatch-name & args]
-                      (when-not (contains? on-handlers dispatch-name)
-                        (throw (h/ex-info "Invalid dispatch name for MultiAgg"
-                                          {:valid-names (keys on-handlers)
-                                           :name        dispatch-name})))
-                      (apply (get on-handlers dispatch-name) state args))]
-      (internal-add-node!
-       this
-       name
-       outputNodesSpec
-       (aor-types/->NodeAgg init-fn update-fn afn)))
-    (let [agg       (if (instance? BuiltInAgg agg)
-                      (.agg ^BuiltInAgg agg)
-                      agg)
-          init-fn   (ops/agg->init-fn agg)
-          update-fn (ops/agg->update-fn agg)]
-      (internal-add-node!
-       this
-       name
-       outputNodesSpec
-       (aor-types/->NodeAgg init-fn update-fn afn)))))
-
-(defn internal-add-agg-node-java!
-  [this name outputNodesSpec agg jfn]
-  (internal-add-agg-node!
-   this
-   name
-   outputNodesSpec
-   agg
-   (h/convert-void-jfn jfn)))
-
-(defn mk-agent-graph
-  []
-  (let [nodes-vol      (volatile! {})
-        start-node-vol (volatile! nil)]
-    (reify-AgentGraph
-     (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec
-                           ^RamaAccumulatorAgg agg ^RamaVoidFunction3 impl]
-                          (internal-add-agg-node-java!
-                           this
-                           name
-                           outputNodesSpec
-                           agg
-                           impl))
-     (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec
-                           ^RamaCombinerAgg agg ^RamaVoidFunction3 impl]
-                          (internal-add-agg-node-java!
-                           this
-                           name
-                           outputNodesSpec
-                           agg
-                           impl))
-     (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec
-                           ^MultiAgg$Impl agg ^RamaVoidFunction3 impl]
-                          (internal-add-agg-node-java!
-                           this
-                           name
-                           outputNodesSpec
-                           agg
-                           impl))
-     (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec
-                           ^BuiltInAgg agg ^RamaVoidFunction3 impl]
-                          (internal-add-agg-node-java!
-                           this
-                           name
-                           outputNodesSpec
-                           agg
-                           impl))
-     AgentGraphInternal
-     (internal-add-node!
-      [this name output-nodes-spec node-obj]
-      (when (or (nil? name) (= "" name))
-        (throw (h/ex-info "Node name cannot be nil or empty string"
-                          {:name name})))
-      (when (contains? @nodes-vol name)
-        (throw (h/ex-info "Node already exists" {:name name})))
-      (when (nil? @start-node-vol)
-        (vreset! start-node-vol name))
-      (vswap! nodes-vol
-              assoc
-              name
-              {:node-obj     node-obj
-               :output-nodes (normalize-output-nodes output-nodes-spec)})
-      this)
-     (agent-graph-state [this]
-                        {:nodes      @nodes-vol
-                         :start-node @start-node-vol})
-    )))
-
-(defn- nodes->graph
-  [nodes]
-  (reduce-kv
-   (fn [graph name {:keys [node-obj output-nodes]}]
-     (reduce
-      (fn [graph output]
-        (graph/add-edges graph [name output]))
-      (-> graph
-          (graph/add-nodes name)
-          (lattr/add-attr name :node-obj node-obj))
-      output-nodes))
-   (graph/digraph)
-   nodes))
-
-(defn- annotate-aggs-add-queue
-  [queue nodes path curr-node agg-stack]
-  (let [new-path (conj path curr-node)]
-    (reduce
-     (fn [queue node]
-       (conj queue [node agg-stack new-path]))
-     queue
-     nodes)))
-
-(defn- annotate-aggs
-  [graph start-node]
-  (loop [queue     (conj clojure.lang.PersistentQueue/EMPTY [start-node [] []])
-         graph     graph
-         traversed #{}]
-    (if (empty? queue)
-      graph
-      (let [[node agg-stack path] (peek queue)
-            next-queue     (pop queue)
-            curr-agg       (peek agg-stack)
-            node-obj       (lattr/attr graph node :node-obj)
-            next-traversed (conj traversed node)]
-        (cond
-          (contains? traversed node)
-          (do
-            (when-not (= (lattr/attr graph node :agg) curr-agg)
-              (throw (h/ex-info "Invalid loop to different agg context"
-                                {:agg1 curr-agg
-                                 :agg2 (lattr/attr graph node :agg)
-                                 :node node
-                                 :path path}))
-              graph)
-            (recur next-queue graph traversed))
-
-          (instance? Node node-obj)
-          (recur
-           (annotate-aggs-add-queue next-queue
-                                    (graph/successors graph node)
-                                    path
-                                    node
-                                    agg-stack)
-           (lattr/add-attr graph node :agg curr-agg)
-           next-traversed)
-
-          (instance? NodeAggStart node-obj)
-          (let [new-agg-stack (conj agg-stack node)]
-            (recur
-             (annotate-aggs-add-queue next-queue
-                                      (graph/successors graph node)
-                                      path
-                                      node
-                                      new-agg-stack)
-             (lattr/add-attr graph node :agg curr-agg)
-             next-traversed))
-
-          (instance? NodeAgg node-obj)
-          (do
-            (when (nil? curr-agg)
-              (throw (h/ex-info "Reached AggNode outside of agg context"
-                                {:name node :path path})))
-            (let [new-agg-stack  (pop agg-stack)
-                  start-node-obj (lattr/attr graph curr-agg :node-obj)]
-              (if (some? (:agg-node-name start-node-obj))
-                (throw
-                 (h/ex-info
-                  "Only one AggNode can be reached per aggregation context"
-                  {:curr-agg curr-agg :other-agg node :path path})))
-
-              (recur
-               (annotate-aggs-add-queue next-queue
-                                        (graph/successors graph node)
-                                        path
-                                        node
-                                        new-agg-stack)
-               (-> graph
-                   (lattr/add-attr node :agg curr-agg)
-                   (lattr/add-attr curr-agg
-                                   :node-obj
-                                   (assoc start-node-obj :agg-node-name node)))
-               next-traversed)))
-
-          :else
-          (throw (h/ex-info "Undefined node" {:node node :path path})))
-      ))))
-
-(defn resolve-agent-graph
-  [agent-graph]
-  (let [{:keys [nodes start-node]} (agent-graph-state agent-graph)
-        graph     (nodes->graph nodes)
-        agg-graph (annotate-aggs graph start-node)]
-    (aor-types/->valid-AgentGraph
-     (reduce
-      (fn [m node]
-        (let [output-nodes (graph/successors agg-graph node)
-              node-obj     (lattr/attr agg-graph node :node-obj)]
-          (when (and (instance? NodeAggStart node-obj)
-                     (nil? (:agg-node-name node-obj)))
-            (throw (h/ex-info "No corresponding agg node"
-                              {:start-agg-node node})))
-          (assoc m
-           node
-           (aor-types/->valid-AgentNode
-            node-obj
-            (set output-nodes)
-            (lattr/attr agg-graph node :agg)))
-        ))
-      {}
-      (graph/nodes agg-graph))
-     start-node
-     (str (UUID/randomUUID)))))
 
 (defn get-invoke-args
   [data]
@@ -372,6 +50,7 @@
   (local-transform> (term inc) $$id)
   (:> *ret))
 
+;; TODO: <<<<<>>>> move these all to their own namespace pobjects.clj
 (defn agents-store-info-name
   []
   "*_agents-store-info")
@@ -400,21 +79,6 @@
   [agent-name]
   (str "$$_agent-graph-history-" agent-name))
 
-(defn- graph->historical-graph-info
-  [graph]
-  (aor-types/->valid-HistoricalAgentGraphInfo
-   (transform
-    MAP-VALS
-    (fn [{:keys [node output-nodes agg-context]}]
-      (aor-types/->valid-HistoricalAgentNodeInfo
-       (aor-types/node->type-kw node)
-       output-nodes
-       agg-context
-      ))
-    (:node-map graph))
-   (:start-node graph)
-   (:uuid graph)))
-
 (defn fetch-graph
   [agent-name]
   (declared-object-task-global (agent-graph-task-global-name agent-name)))
@@ -442,11 +106,11 @@
       (else>)
        (inc (or> *version -1) :> *found-version)
        (local-transform> [(keypath *found-version)
-                          (termval (graph->historical-graph-info *graph))]
+                          (termval (graph/graph->historical-graph-info *graph))]
                          $$graph-history))
      (|direct *task-id)
      (local-transform> [(keypath *found-version)
-                        (termval (graph->historical-graph-info *graph))]
+                        (termval (graph/graph->historical-graph-info *graph))]
                        $$graph-history)
      (:> *found-version)
    )))
@@ -854,7 +518,7 @@
 
 (defn- define-agent!
   [setup stream-topology name agent-graph]
-  (let [graph (resolve-agent-graph agent-graph)
+  (let [graph (graph/resolve-agent-graph agent-graph)
         agent-depot-sym (symbol (agent-depot-task-global-name name))
         agent-streaming-depot-sym (symbol (str "*_agent-streaming-depot-" name))
         agent-graph-sym (symbol (agent-graph-task-global-name name))
@@ -943,6 +607,11 @@
      agent-id-gen-pstate-sym
      Long
      {:initial-value 0})
+
+    ;; TODO: <<<<<>>>>> move PState/depot name functions to a common namespace
+    ;;    - and schemas?
+    ;;    - then define this query in a "queries" namespace
+    ;(...declare-tracing-query-topology name)
 
     (<<sources stream-topology
      (source> agent-depot-sym {:retry-mode :none} :> *data)

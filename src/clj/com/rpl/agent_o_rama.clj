@@ -4,6 +4,8 @@
   (:require
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.graph :as graph]
+   [com.rpl.agent-o-rama.impl.multi-agg :as ma]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.types :as aor-types])
   (:import
@@ -32,7 +34,7 @@
      (newAgent [this name]
        (when (contains? @agents-vol name)
          (throw (h/ex-info "Agent already exists" {:name name})))
-       (let [ret (i/mk-agent-graph)]
+       (let [ret (graph/mk-agent-graph)]
          (vswap! agents-vol assoc name ret)
          ret))
      (getStreamTopology [this] stream-topology)
@@ -97,7 +99,7 @@
 
 (defn node
   [agent-graph name output-nodes-spec node-fn]
-  (i/internal-add-node!
+  (graph/internal-add-node!
    agent-graph
    name
    output-nodes-spec
@@ -105,7 +107,7 @@
 
 (defn agg-start-node
   [agent-graph name output-nodes-spec node-fn]
-  (i/internal-add-node!
+  (graph/internal-add-node!
    agent-graph
    name
    output-nodes-spec
@@ -113,7 +115,7 @@
 
 (defn agg-node
   [agent-graph name output-nodes-spec agg node-fn]
-  (i/internal-add-agg-node!
+  (graph/internal-add-agg-node!
    agent-graph
    name
    output-nodes-spec
@@ -123,7 +125,7 @@
 (defmacro multi-agg
   [& body]
   (let [ret-sym (gensym "ret")]
-    `(let [~ret-sym (i/mk-multi-agg)]
+    `(let [~ret-sym (ma/mk-multi-agg)]
        ~@(for [form body]
            (condp = (first form)
              'init
@@ -131,11 +133,11 @@
                (when-not (= [] bindings)
                  (throw (h/ex-info "Invalid binding vector for MultiAgg init"
                                    {:bindings bindings :required []})))
-               `(i/internal-add-init! ~ret-sym (fn [] ~@body)))
+               `(ma/internal-add-init! ~ret-sym (fn [] ~@body)))
 
              'on
              (let [[_ name & body] form]
-               `(i/internal-add-handler! ~ret-sym ~name (fn ~@body)))
+               `(ma/internal-add-handler! ~ret-sym ~name (fn ~@body)))
              (throw (h/ex-info "Invalid MultiAgg method"
                                {:method (first form)}))
            ))
