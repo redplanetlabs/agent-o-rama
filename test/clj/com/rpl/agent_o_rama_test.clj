@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.test :as rtest]
@@ -830,20 +831,69 @@
         )))))
 
 (deftest node-traces-test
-         ;; TODO: <<<<>>>> verify everything in the nodes PState for each node,
-         ;; using sim time to control start/finish
-         ;;    - and parallelize the emits
-         ;;    - make helper function to get full trace starting from a root
-         ;;    graph task ID + graph ID
-         ;;       - or just make and use the query topology that will be needed
-         ;;       for the backend
-         ;;       - generate for each agent
-         ;;       - first gets root invoke ID
-         ;;       - (...get-trace-page [[task-id invoke-id] ...] limit) ->
-         ;;       {:nodes {<invoke-id> -> {info}} :next-query [...]}
-         ;;         - needs to get at most N agg inputs (probably 10)
-         ;;         - and can fetch more of them in explicit queries
-)
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (-> topology
+            (aor/new-agent "foo")
+            (aor/node "start"
+                      "node1"
+                      (fn [agent-node arg]
+                        (aor/emit! agent-node "node1" (str arg "-0"))
+                        (aor/emit! agent-node "node1" (str arg "-1"))
+                        (aor/emit! agent-node "node1" (str arg "-2"))
+                      ))
+            (aor/node "node1"
+                      "node2"
+                      (fn [agent-node arg]
+                        (aor/emit! agent-node "node2" (str arg "-00"))
+                        (aor/emit! agent-node "node2" (str arg "-01"))
+                      ))
+            (aor/node "node2"
+                      "node3"
+                      (fn [agent-node arg]
+                        (aor/emit! agent-node "node3" (str arg "-000"))
+                      ))
+            (aor/agg-start-node "node3"
+                                "node4"
+                                (fn [agent-node arg]
+                                  (dotimes [_ 3]
+                                    (aor/emit! agent-node "node4" 1))
+                                  (str arg "-0000")))
+            (aor/node "node4"
+                      "agg"
+                      (fn [agent-node arg]
+                        (aor/emit! agent-node "agg" (str arg "-a"))
+                      ))
+            (aor/agg-node "agg"
+                          nil
+                          aggs/+vec-agg
+                          (fn [agent-node agg node-start-res]
+                            (aor/result! agent-node [agg node-start-res])))
+        )))
+     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (bind module-name (get-module-name module))
+     (bind depot
+       (foreign-depot ipc
+                      module-name
+                      (po/agent-depot-task-global-name "foo")))
+     (bind traces-query
+       (foreign-query ipc
+                      module-name
+                      (queries/tracing-query-topology-name "foo")))
+     (bind {[graph-task-id graph-id] "_agents-topology"}
+       (foreign-append! depot (aor-types/->AgentInvoke ["xyz"] 0)))
+     (clojure.pprint/pprint (foreign-invoke-query traces-query
+                                                  graph-task-id
+                                                  [[graph-task-id graph-id]]
+                                                  10000))
+
+     ;; TODO: <<<<>>>> verify everything in the nodes PState for each node,
+     ;; using sim time to control start/finish
+     ;;    - and parallelize the emits
+    )))
 
 
 (deftest async-emits-test

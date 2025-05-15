@@ -92,7 +92,7 @@
                (-> (.getTaskThreadIds info)
                    shuffle
                    seq))))
-  (let [ret (first @task-thread-id-vol)]
+  (let [ret (long (first @task-thread-id-vol))]
     (vswap! task-thread-id-vol next)
     ret))
 
@@ -504,6 +504,7 @@
     (declare-depot* setup
                     agent-streaming-depot-sym
                     agent-streaming-depot-partitioner)
+
     (declare-object* setup agent-graph-sym graph)
 
     ;; TODO: <<<<>>>>

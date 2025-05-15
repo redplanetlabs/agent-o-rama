@@ -12,7 +12,8 @@
     AgentGraph
     MultiAgg$Impl]
    [com.rpl.agentorama.impl
-    BuiltInAgg]
+    BuiltInAgg
+    NippyMap]
    [com.rpl.agentorama.ops
     RamaVoidFunction3]
    [com.rpl.agent_o_rama.impl.types
@@ -133,23 +134,24 @@
         graph     (nodes->graph nodes)
         agg-graph (annotate-aggs graph start-node)]
     (aor-types/->valid-AgentGraph
-     (reduce
-      (fn [m node]
-        (let [output-nodes (lgraph/successors agg-graph node)
-              node-obj     (lattr/attr agg-graph node :node-obj)]
-          (when (and (instance? NodeAggStart node-obj)
-                     (nil? (:agg-node-name node-obj)))
-            (throw (h/ex-info "No corresponding agg node"
-                              {:start-agg-node node})))
-          (assoc m
-           node
-           (aor-types/->valid-AgentNode
-            node-obj
-            (set output-nodes)
-            (lattr/attr agg-graph node :agg)))
-        ))
-      {}
-      (lgraph/nodes agg-graph))
+     (NippyMap.
+      (reduce
+       (fn [m node]
+         (let [output-nodes (lgraph/successors agg-graph node)
+               node-obj     (lattr/attr agg-graph node :node-obj)]
+           (when (and (instance? NodeAggStart node-obj)
+                      (nil? (:agg-node-name node-obj)))
+             (throw (h/ex-info "No corresponding agg node"
+                               {:start-agg-node node})))
+           (assoc m
+            node
+            (aor-types/->valid-AgentNode
+             node-obj
+             (set output-nodes)
+             (lattr/attr agg-graph node :agg)))
+         ))
+       {}
+       (lgraph/nodes agg-graph)))
      start-node
      (str (UUID/randomUUID)))))
 

@@ -6,6 +6,8 @@
   (:import
    [com.rpl.agentorama
     AsyncResult]
+   [com.rpl.agentorama.impl
+    NippyMap]
    [com.rpl.rama.integration
     TaskGlobalObject]
    [java.util.concurrent
@@ -42,13 +44,13 @@
    agg-context :- (s/maybe String)])
 
 (drp/defrecord+ AgentGraph
-  [node-map :- {String AgentNode}
+  [node-map :- NippyMap ; {String AgentNode}
    start-node :- String
    uuid :- String]
   TaskGlobalObject
   (prepareForTask [this task-id context])
   (close [this]))
-
+  
 (drp/defrecord+ StoreInfo
   [store-info :- {String clojure.lang.Keyword}]
   TaskGlobalObject
