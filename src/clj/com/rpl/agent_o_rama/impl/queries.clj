@@ -28,6 +28,10 @@
     all-invoke-info
   ))
 
+(defn- emits->pairs
+  [emits]
+  (mapv (fn [emit] [(:target-task-id emit) (:invoke-id emit)]) emits))
+
 (defn declare-tracing-query-topology
   [topologies name]
   (let [topo-name    (tracing-query-topology-name name)
@@ -61,7 +65,9 @@
           (to-trace-invoke-info (into {} *all-invoke-info) :> *invoke-info)
           (|direct *graph-task-id)
           (local-select> STAY scratch-sym :> {*p :ti *m :m})
-          (continue> (assoc *m *invoke-id *invoke-info) *p)
+          (emits->pairs (get *invoke-info :emits) :> *new-pairs)
+          (continue> (assoc *m *invoke-id *invoke-info)
+                     (reduce conj *p *new-pairs))
         ))
       (|origin)
       (hash-map :invokes-map
