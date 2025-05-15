@@ -5,6 +5,7 @@
    [clojure.set :as set]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
+   [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.ops :as ops])
@@ -14,12 +15,7 @@
     AsyncResult
     FinishedAgg]
    [com.rpl.agent_o_rama.impl.types
-    AgentNodeEmit
-    AgentResult
     AggAckOp
-    AggInput
-    AsyncOpInfo
-    HistoricalAgentGraphInfo
     Node
     NodeAgg
     NodeAggStart]
@@ -50,38 +46,10 @@
   (local-transform> (term inc) $$id)
   (:> *ret))
 
-;; TODO: <<<<<>>>> move these all to their own namespace pobjects.clj
-(defn agents-store-info-name
-  []
-  "*_agents-store-info")
-
-(defn- agent-graph-task-global-name
-  [agent-name]
-  (str "*_agent-graph-" agent-name))
-
-(defn agent-depot-task-global-name
-  [agent-name]
-  (str "*_agent-depot-" agent-name))
-
-(defn agent-invoke-task-global-name
-  [agent-name]
-  (str "$$_agent-invoke-" agent-name))
-
-(defn agent-node-task-global-name
-  [agent-name]
-  (str "$$_agent-node-" agent-name))
-
-(defn agent-streaming-results-task-global-name
-  [agent-name]
-  (str "$$_agent-streaming-" agent-name))
-
-(defn graph-history-task-global-name
-  [agent-name]
-  (str "$$_agent-graph-history-" agent-name))
 
 (defn fetch-graph
   [agent-name]
-  (declared-object-task-global (agent-graph-task-global-name agent-name)))
+  (declared-object-task-global (po/agent-graph-task-global-name agent-name)))
 
 (defn hook:finding-graph-version [starting-task-id])
 
@@ -90,7 +58,7 @@
   (<<with-substitutions
    [*graph (fetch-graph *agent-name)
     $$graph-history
-    (this-module-pobject-task-global (graph-history-task-global-name
+    (this-module-pobject-task-global (po/graph-history-task-global-name
                                       *agent-name))]
    (get *graph :uuid :> *curr-uuid)
    (local-select> (view last) $$graph-history :> [*version {:keys [*uuid]}])
@@ -394,9 +362,9 @@
    *agg-invoke-id]
   (<<with-substitutions
    [$$nodes
-    (this-module-pobject-task-global (agent-node-task-global-name *name))
+    (this-module-pobject-task-global (po/agent-node-task-global-name *name))
     *agent-graph (fetch-graph *name)
-    *store-info (declared-object-task-global (agents-store-info-name))]
+    *store-info (declared-object-task-global (po/agents-store-info-name))]
    (mk-agent-node *agent-graph
                   *graph-task-id
                   *next-node
@@ -479,7 +447,7 @@
   [*name *invoke-id]
   (<<with-substitutions
    [$$nodes
-    (this-module-pobject-task-global (agent-node-task-global-name *name))
+    (this-module-pobject-task-global (po/agent-node-task-global-name *name))
     *agent-graph (fetch-graph *name)]
    (local-select> (keypath *invoke-id)
                   $$nodes
@@ -505,7 +473,7 @@
   [*name *invoke-id *ack-val]
   (<<with-substitutions
    [$$nodes
-    (this-module-pobject-task-global (agent-node-task-global-name *name))
+    (this-module-pobject-task-global (po/agent-node-task-global-name *name))
     *agent-graph (fetch-graph *name)]
    (local-select> [(keypath *invoke-id) :agg-ack-val] $$nodes :> *agg-ack-val)
    (bit-xor *ack-val *agg-ack-val :> *new-ack-val)
@@ -519,15 +487,16 @@
 (defn- define-agent!
   [setup stream-topology name agent-graph]
   (let [graph (graph/resolve-agent-graph agent-graph)
-        agent-depot-sym (symbol (agent-depot-task-global-name name))
+        agent-depot-sym (symbol (po/agent-depot-task-global-name name))
         agent-streaming-depot-sym (symbol (str "*_agent-streaming-depot-" name))
-        agent-graph-sym (symbol (agent-graph-task-global-name name))
-        agent-node-pstate-sym (symbol (agent-node-task-global-name name))
-        agent-invoke-pstate-sym (symbol (agent-invoke-task-global-name name))
+        agent-graph-sym (symbol (po/agent-graph-task-global-name name))
+        agent-node-pstate-sym (symbol (po/agent-node-task-global-name name))
+        agent-invoke-pstate-sym (symbol (po/agent-invoke-task-global-name name))
         agent-streaming-results-pstate-sym
-        (symbol (agent-streaming-results-task-global-name name))
-        agent-graph-history-pstate-sym (symbol (graph-history-task-global-name
-                                                name))
+        (symbol (po/agent-streaming-results-task-global-name name))
+        agent-graph-history-pstate-sym (symbol
+                                        (po/graph-history-task-global-name
+                                         name))
         agent-id-gen-pstate-sym (symbol (str "$$_agent-id-gen-" name))
        ]
     (declare-depot* setup agent-depot-sym :random)
@@ -543,64 +512,22 @@
     (declare-pstate*
      stream-topology
      agent-invoke-pstate-sym
-     {Long
-      (fixed-keys-schema
-       {:root-invoke-id Long
-        :invoke-args    [Object]
-        :graph-version  Long
-        ;; TODO: <<<<<>>>>> if no result is ever specified, should error instead
-        ;; of hanging
-        ;; - will need top-level acking that puts error here if it didn't
-        ;; complete
-        :result         AgentResult})}
+     po/AGENT-INVOKE-PSTATE-SCHEMA
      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
      stream-topology
      agent-streaming-results-pstate-sym
-     {Long ; agent ID
-      (map-schema
-       String ; node name
-       {String ; async invoke name
-        (map-schema
-         Long ; invoke-id
-         (vector-schema Object {:subindex? true})
-         {:subindex? true})}
-       {:subindex? true})}
+     po/AGENT-STREAMING-PSTATE-SCHEMA
      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
      stream-topology
      agent-node-pstate-sym
-     {Long ; invoke-id
-      (fixed-keys-schema
-       {:graph-id           Long
-        :graph-task-id      Long
-        :node               String
-        :async-ops          [AsyncOpInfo]
-        :emits              [AgentNodeEmit]
-        :result             AgentResult
-        :start-time-millis  Long
-        :finish-time-millis Long
-        :agg-invoke-id      Long
-
-        ;; regular node state
-        :input              [Object]
-
-        ;; agg state
-        :agg-inputs         (vector-schema AggInput {:subindex? true})
-        :agg-start-res      Object
-        :agg-state          Object
-        :agg-ack-val        Long
-        :agg-start-invoke-id Long
-        :agg-finished?      Boolean
-
-        ;; TODO: <<<<>>>>
-        ;;   - what other stats does langsmith track?
-       })}
+     po/AGENT-NODE-PSTATE-SCHEMA
      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
      stream-topology
      agent-graph-history-pstate-sym
-     {Long HistoricalAgentGraphInfo}
+     po/GRAPH-HISTORY-PSTATE-SCHEMA
      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
      stream-topology
@@ -841,7 +768,7 @@
 (defn define-agents!
   [setup stream-topology agent-graphs store-info]
   (declare-object* setup
-                   (symbol (agents-store-info-name))
+                   (symbol (po/agents-store-info-name))
                    (aor-types/->valid-StoreInfo store-info))
   (doseq [[name agent-graph] agent-graphs]
     (define-agent! setup stream-topology name agent-graph)))

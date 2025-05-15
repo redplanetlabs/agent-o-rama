@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.test :as rtest]
@@ -745,15 +746,15 @@
          (bind depot
            (foreign-depot ipc
                           module-name
-                          (i/agent-depot-task-global-name "foo")))
+                          (po/agent-depot-task-global-name "foo")))
          (bind invokes-pstate
            (foreign-pstate ipc
                            module-name
-                           (i/agent-invoke-task-global-name "foo")))
+                           (po/agent-invoke-task-global-name "foo")))
          (bind graph-history-pstate
            (foreign-pstate ipc
                            module-name
-                           (i/graph-history-task-global-name "foo")))
+                           (po/graph-history-task-global-name "foo")))
 
          (dotimes [_ 10]
            (let [{[graph-task-id graph-id] "_agents-topology"}
