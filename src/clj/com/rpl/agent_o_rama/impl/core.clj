@@ -653,6 +653,10 @@
           ;; TODO: <<<<<>>>>> propagate errors
           (h/invoke *init-fn :> *init-agg-state)
           (local-transform>
+           [(keypath *invoke-id) :started-agg-invoke-id
+            (termval *new-agg-invoke-id)]
+           agent-node-pstate-sym)
+          (local-transform>
            [(keypath *new-agg-invoke-id)
             (termval {:graph-id            *graph-id
                       :graph-task-id       *graph-task-id

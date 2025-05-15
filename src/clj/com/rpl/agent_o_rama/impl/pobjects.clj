@@ -76,6 +76,9 @@
      ;; regular node state
      :input              [Object]
 
+     ;; start agg node
+     :started-agg-invoke-id Long
+
      ;; agg state
      :agg-inputs         (vector-schema AggInput {:subindex? true})
      :agg-start-res      Object

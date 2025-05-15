@@ -879,16 +879,25 @@
        (foreign-depot ipc
                       module-name
                       (po/agent-depot-task-global-name "foo")))
+     (bind invokes-pstate
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-invoke-task-global-name "foo")))
      (bind traces-query
        (foreign-query ipc
                       module-name
                       (queries/tracing-query-topology-name "foo")))
      (bind {[graph-task-id graph-id] "_agents-topology"}
        (foreign-append! depot (aor-types/->AgentInvoke ["xyz"] 0)))
-     (clojure.pprint/pprint (foreign-invoke-query traces-query
-                                                  graph-task-id
-                                                  [[graph-task-id graph-id]]
-                                                  10000))
+     (bind root-invoke-id
+       (foreign-select-one [(keypath graph-id) :root-invoke-id]
+                           invokes-pstate
+                           {:pkey graph-task-id}))
+     (clojure.pprint/pprint
+      (foreign-invoke-query traces-query
+                            graph-task-id
+                            [[graph-task-id root-invoke-id]]
+                            10000))
 
      ;; TODO: <<<<>>>> verify everything in the nodes PState for each node,
      ;; using sim time to control start/finish

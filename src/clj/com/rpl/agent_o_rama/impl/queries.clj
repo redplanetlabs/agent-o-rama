@@ -65,9 +65,21 @@
           (to-trace-invoke-info (into {} *all-invoke-info) :> *invoke-info)
           (|direct *graph-task-id)
           (local-select> STAY scratch-sym :> {*p :ti *m :m})
-          (emits->pairs (get *invoke-info :emits) :> *new-pairs)
-          (continue> (assoc *m *invoke-id *invoke-info)
-                     (reduce conj *p *new-pairs))
+          (<<if (empty? *invoke-info)
+            (continue> *m *p)
+           (else>)
+            (emits->pairs (get *invoke-info :emits) :> *pairs)
+            (get *invoke-info
+                 :started-agg-invoke-id
+                 :> *started-agg-invoke-id)
+            (<<if (some? *started-agg-invoke-id)
+              (conj *pairs
+                    [*graph-task-id *started-agg-invoke-id]
+                    :> *new-pairs)
+             (else>)
+              (identity *pairs :> *new-pairs))
+            (continue> (assoc *m *invoke-id *invoke-info)
+                       (reduce conj *p *new-pairs)))
         ))
       (|origin)
       (hash-map :invokes-map
