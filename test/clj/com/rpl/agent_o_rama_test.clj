@@ -985,7 +985,6 @@
          (is (= hgraph2 graph-history2))
         )))))
 
-
 (deftest node-traces-test
   (with-open [ipc (rtest/create-ipc)]
     (letlocals
@@ -1364,6 +1363,13 @@
                              graph-task-id
                              [[graph-task-id root-invoke-id]]
                              3))
+
+     (bind res10
+       (foreign-invoke-query traces-query
+                             graph-task-id2
+                             [[graph-task-id2 root-invoke-id2]]
+                             3))
+
      (is
       (trace-matches?
        (-> res
@@ -1515,8 +1521,157 @@
              empty?))
 
 
-     ;; TODO: <<<<<>>>>
-     ;; - do multiple invokes and verify they can be read independently
+
+     ;; check other invoke trace
+     (is
+      (trace-matches?
+       (-> res10
+           :invokes-map
+           no-time-deltas)
+       {!id1 {:agg-invoke-id nil
+              :emits
+              [{:invoke-id      !id2
+                :target-task-id ?graph-task-id
+                :node-name      "node1"
+                :args           [{:val "ab-0"
+                                  :async-op-index nil}]}
+               {:invoke-id      !id3
+                :target-task-id !id1-t1
+                :node-name      "node2"
+                :args           [{:val "ba-1"
+                                  :async-op-index nil}]}]
+              :node          "start"
+              :async-ops     []
+              :result        nil
+              :graph-id      ?graph-id
+              :input         ["a" "b"]
+              :graph-task-id ?graph-task-id
+             }
+        !id2 {:agg-invoke-id nil
+              :emits
+              [{:invoke-id      !id4
+                :target-task-id ?graph-task-id
+                :node-name      "node3"
+                :args           [{:val "ab-0-a0"
+                                  :async-op-index nil}]}
+               {:invoke-id      !id5
+                :target-task-id !id2-t1
+                :node-name      "node4"
+                :args           [{:val "ab-0-a1"
+                                  :async-op-index nil}]}]
+              :node          "node1"
+              :async-ops     []
+              :result        nil
+              :graph-id      ?graph-id
+              :input         ["ab-0"]
+              :graph-task-id ?graph-task-id
+             }
+        !id3 {:agg-invoke-id nil
+              :emits
+              [{:invoke-id      !id6
+                :target-task-id !id1-t1
+                :node-name      "node5"
+                :args           [{:val "ba-1-b0"
+                                  :async-op-index nil}]}
+               {:invoke-id      !id7
+                :target-task-id !id3-t1
+                :node-name      "node6"
+                :args           [{:val "ba-1-b1"
+                                  :async-op-index nil}]}]
+              :node          "node2"
+              :async-ops     []
+              :result        nil
+              :graph-id      ?graph-id
+              :input         ["ba-1"]
+              :graph-task-id ?graph-task-id
+             }
+       }
+       (m/guard
+        (and (= ?graph-id graph-id2)
+             (= ?graph-task-id graph-task-id2)
+             (= !id1 root-invoke-id2)))))
+     (is (= 3
+            (-> res10
+                :invokes-map
+                count)))
+
+     (bind res11
+       (foreign-invoke-query traces-query
+                             graph-task-id
+                             (:next-task-invoke-pairs res10)
+                             3))
+     (is
+      (trace-matches?
+       (-> res11
+           :invokes-map
+           no-time-deltas)
+       {!id1 {:agg-invoke-id nil
+              :emits         []
+              :node          "node3"
+              :async-ops     []
+              :result        nil
+              :graph-id      ?graph-id
+              :input         ["ab-0-a0"]
+              :graph-task-id ?graph-task-id
+             }
+        !id2 {:agg-invoke-id nil
+              :emits         []
+              :node          "node4"
+              :async-ops     []
+              :result        nil
+              :graph-id      ?graph-id
+              :input         ["ab-0-a1"]
+              :graph-task-id ?graph-task-id
+             }
+        !id3 {:agg-invoke-id nil
+              :emits         []
+              :node          "node5"
+              :async-ops     []
+              :result        nil
+              :graph-id      ?graph-id
+              :input         ["ba-1-b0"]
+              :graph-task-id ?graph-task-id
+             }
+       }
+       (m/guard
+        (and (= ?graph-id graph-id2)
+             (= ?graph-task-id graph-task-id2)))))
+     (is (= 3
+            (-> res11
+                :invokes-map
+                count)))
+
+
+     (bind res12
+       (foreign-invoke-query traces-query
+                             graph-task-id
+                             (:next-task-invoke-pairs res11)
+                             3))
+     (is
+      (trace-matches?
+       (-> res12
+           :invokes-map
+           no-time-deltas)
+       {!id1 {:agg-invoke-id nil
+              :emits         []
+              :node          "node6"
+              :async-ops     []
+              :result        {:val ["done" "ba-1-b1"]}
+              :graph-id      ?graph-id
+              :input         ["ba-1-b1"]
+              :graph-task-id ?graph-task-id
+             }
+       }
+       (m/guard
+        (and (= ?graph-id graph-id2)
+             (= ?graph-task-id graph-task-id2)))))
+     (is (= 1
+            (-> res12
+                :invokes-map
+                count)))
+     (is (-> res12
+             :next-task-invoke-pairs
+             empty?))
     )))
 
 
