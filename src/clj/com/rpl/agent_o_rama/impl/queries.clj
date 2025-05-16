@@ -66,12 +66,9 @@
           (|direct *graph-task-id)
           (local-select> STAY scratch-sym :> {*p :ti *m :m})
           (emits->pairs (get *invoke-info :emits) :> *pairs)
-          (get *invoke-info
-               :started-agg-invoke-id
-               :> *started-agg-invoke-id)
-          (<<if (some? *started-agg-invoke-id)
+          (<<if (get *invoke-info :started-agg?)
             (conj *pairs
-                  [*graph-task-id *started-agg-invoke-id]
+                  [*graph-task-id (get *invoke-info :agg-invoke-id)]
                   :> *new-pairs)
            (else>)
             (identity *pairs :> *new-pairs))

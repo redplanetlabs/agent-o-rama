@@ -19,16 +19,19 @@
    [com.rpl.rama
     PState$Declaration
     PState$Schema]
+   [com.rpl.rama.module
+    StreamTopology]
    [com.rpl.rama.ops
     RamaAccumulatorAgg
     RamaCombinerAgg]))
 
 (defn agents-topology
   [setup topologies]
-  (let [stream-topology (stream-topology topologies "_agents-topology")
-        defined?-vol    (volatile! false)
-        agents-vol      (volatile! {})
-        store-info-vol  (volatile! {})]
+  (let [^StreamTopology stream-topology (stream-topology topologies
+                                                         "_agents-topology")
+        defined?-vol   (volatile! false)
+        agents-vol     (volatile! {})
+        store-info-vol (volatile! {})]
     (reify
      AgentsTopology
      (newAgent [this name]

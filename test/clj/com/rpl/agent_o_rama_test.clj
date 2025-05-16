@@ -1117,7 +1117,7 @@
                  :target-task-id !id5-t2
                  :node-name      "node4"
                  :args           [{:val 1 :async-op-index nil}]}]
-               :started-agg-invoke-id !agg0
+               :started-agg?  true
                :node          "node3"
                :async-ops     []
                :result        nil
@@ -1190,7 +1190,7 @@
                  :target-task-id !id12-t2
                  :node-name      "node4"
                  :args           [{:val 1 :async-op-index nil}]}]
-               :started-agg-invoke-id !agg1
+               :started-agg?  true
                :node          "node3"
                :async-ops     []
                :result        nil
@@ -1287,8 +1287,6 @@
         ))
       ))
 
-     ;; TODO: <<<<>>>> is agg-invoke-id and started-agg-invoke-id supposed to be
-     ;; the same on AggStartNode?
      ;; TODO: <<<<<>>>>> no finish time millis on the agg nodes
      ;
      ; (println "ROOT" root-invoke-id)

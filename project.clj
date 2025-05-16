@@ -4,6 +4,7 @@
   :test-paths ["test/clj"]
   :jvm-opts ["-Xss6m"]
   :dependencies [[com.rpl/rama-helpers "0.10.0"]]
+  :global-vars {*warn-on-reflection* true}
   :repositories
   [["releases"
     {:id  "maven-releases"

@@ -63,32 +63,32 @@
 (def AGENT-NODE-PSTATE-SCHEMA
   {Long ; invoke-id
    (fixed-keys-schema
-    {:graph-id           Long
-     :graph-task-id      Long
-     :node               String
-     :async-ops          [AsyncOpInfo]
-     :emits              [AgentNodeEmit]
-     :result             AgentResult
-     :start-time-millis  Long
-     :finish-time-millis Long
-     :agg-invoke-id      Long
+    {:graph-id            Long
+     :graph-task-id       Long
+     :node                String
+     :async-ops           [AsyncOpInfo]
+     :emits               [AgentNodeEmit]
+     :result              AgentResult
+     :start-time-millis   Long
+     :finish-time-millis  Long
+     :agg-invoke-id       Long
 
      ;; regular node state
-     :input              [Object]
+     :input               [Object]
 
      ;; start agg node
-     :started-agg-invoke-id Long
+     :started-agg?        Boolean
 
      ;; invoke of agg node (to make tracing easier)
      :invoked-agg-invoke-id Long
 
      ;; agg state
-     :agg-inputs         (vector-schema AggInput {:subindex? true})
-     :agg-start-res      Object
-     :agg-state          Object
-     :agg-ack-val        Long
+     :agg-inputs          (vector-schema AggInput {:subindex? true})
+     :agg-start-res       Object
+     :agg-state           Object
+     :agg-ack-val         Long
      :agg-start-invoke-id Long
-     :agg-finished?      Boolean
+     :agg-finished?       Boolean
 
      ;; TODO: <<<<>>>>
      ;;   - what other stats does langsmith track?
