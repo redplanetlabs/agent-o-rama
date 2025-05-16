@@ -1280,23 +1280,12 @@
        (m/guard
         (and (= ?graph-id graph-id)
              (= ?graph-task-id graph-task-id)
-             (= ?id1 root-invoke-id)))
+             (= !id1 root-invoke-id)))
        (m/guard
         (and (= #{!id9 !id10 !id11} #{!id9' !id10' !id11'})
              (= #{!id16 !id17 !id18} #{!id16' !id17' !id18'})
         ))
       ))
-
-     ;; TODO: <<<<<>>>>> no finish time millis on the agg nodes
-     ;
-     ; (println "ROOT" root-invoke-id)
-     ; (clojure.pprint/pprint
-     ;  (:invokes-map res)
-     ; )
-
-     ;; TODO: <<<<>>>> verify everything in the nodes PState for each node,
-     ;; using sim time to control start/finish
-     ;;    - and parallelize the emits
     )))
 
 
