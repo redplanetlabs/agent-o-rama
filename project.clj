@@ -2,6 +2,7 @@
   :source-paths ["src/clj"]
   :java-source-paths ["src/java"]
   :test-paths ["test/clj"]
+  :jvm-opts ["-Xss6m"]
   :dependencies [[com.rpl/rama-helpers "0.10.0"]]
   :repositories
   [["releases"

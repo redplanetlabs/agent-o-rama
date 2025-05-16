@@ -29,27 +29,37 @@
     RamaAccumulatorAgg2
     RamaCombinerAgg]))
 
+(defn parse-var-prefix
+  [sym]
+  (let [s (name sym)]
+    (if-let [[_ prefix] (re-matches #"^(.*?)[0-9]+$" s)]
+      prefix
+      s)))
+
 (defmacro trace-matches?
   [data & bindings]
-  (let [unique-syms (set (select [(walker symbol?)
-                                  #(= \!
-                                      (-> %
-                                          str
-                                          first))]
-                                 bindings))
-        unique-syms (setval [ALL NAME FIRST] \? unique-syms)
-        bindings    (setval [(walker symbol?)
-                             NAME
-                             FIRST
-                             #(= \! %)]
-                            \?
-                            bindings)]
+  (let [unique-syms   (set (select [(walker symbol?)
+                                    #(= \!
+                                        (-> %
+                                            str
+                                            first))]
+                                   bindings))
+        unique-syms   (setval [ALL NAME FIRST] \? unique-syms)
+        unique-groups (vals (group-by parse-var-prefix unique-syms))
+        unique-guards (for [group unique-groups]
+                        `(m/guard (= ~(count group)
+                                     (count (set ~(vec group))))))
+        bindings      (setval [(walker symbol?)
+                               NAME
+                               FIRST
+                               #(= \! %)]
+                              \?
+                              bindings)]
     `(m/find
       ~data
       (m/and
        ~@bindings
-       (m/guard (= ~(count unique-syms)
-                   (count (set ~(vec unique-syms))))))
+       ~@unique-guards)
       true)))
 
 (defn trace-time-deltas
@@ -63,6 +73,16 @@
              (fn [{:keys [start-time-millis finish-time-millis]}]
                {:delta-millis (- finish-time-millis start-time-millis)})
              trace))
+
+(defn no-time-deltas
+  [trace]
+  (setval [MAP-VALS
+           (multi-path
+            STAY
+            [(must :async-ops) ALL (view #(into {} %))])
+           (submap [:start-time-millis :finish-time-millis])]
+          {}
+          trace))
 
 (deftest trace-matches-test
   (is
@@ -119,6 +139,28 @@
            (= 1 (- ?f2 ?s2))
            (= 3 (- ?f3 ?s3)))
      ))))
+  (is
+   (trace-matches?
+    [1 2 3 1 2 3]
+    [!id1 !id2 !id3 !a1 !a2 !a3]))
+  (is
+   (trace-matches?
+    [1 2 3 4 5 6]
+    [!id1 !id2 !id3 !a1 !a2 !a3]))
+  (is
+   (not
+    (trace-matches?
+     [1 2 1 4 5 6]
+     [!id1 !id2 !id3 !a1 !a2 !a3])))
+  (is
+   (trace-matches?
+    [1 2 3 4 5 6]
+    [!id1-1 !id1-2 !id1-3 !id1 !id2 !id3]))
+  (is
+   (not
+    (trace-matches?
+     [1 2 1 4 5 6]
+     [!id1-1 !id1-2 !id1-3 !id1 !id2 !id3])))
 )
 
 (deftest trace-time-deltas-test
@@ -1009,36 +1051,250 @@
                              graph-task-id
                              [[graph-task-id root-invoke-id]]
                              10000))
-     (def DATA (:invokes-map res))
-     (println "COUNT"
-              (-> res
-                  :invokes-map
-                  count))
-     (clojure.pprint/pprint
-      res
-     )
 
-     ; (m/find
-     ;   {:a {:s 1 :f 2 :emit :b}
-     ;    :b {:s 10 :f 12 :emit :c}
-     ;    :c {:s 7 :f 11}}
-     ;   (m/and
-     ;     {?k1 {:s ?s1 :f ?f1 :emit ?k2}
-     ;      ?k2 {:s ?s2 :f ?f2 :emit ?k3}
-     ;      ?k3 {:s ?s3 :f ?f3}}
-     ;     (m/guard
-     ;       (and (= 1 (- ?f1 ?s1))
-     ;            (= 2 (- ?f2 ?s2))
-     ;            (= 4 (- ?f3 ?s3)))
-     ;        ))
-     ;   :matched)
+     (is (empty? (:next-task-invoke-pairs res)))
+     (is
+      (trace-matches?
+       (-> res
+           :invokes-map
+           no-time-deltas)
+       {!id1  {:agg-invoke-id nil
+               :emits
+               [{:invoke-id      !id2
+                 :target-task-id ?graph-task-id
+                 :node-name      "node1"
+                 :args           [{:val "xyz-0"
+                                   :async-op-index nil}]}]
+               :node          "start"
+               :async-ops     []
+               :result        nil
+               :graph-id      ?graph-id
+               :input         ["xyz"]
+               :graph-task-id ?graph-task-id
+              }
+        !id2  {:agg-invoke-id nil
+               :emits
+               [{:invoke-id      !id3
+                 :target-task-id ?graph-task-id
+                 :node-name      "node2"
+                 :args           [{:val "xyz-0-00"
+                                   :async-op-index nil}]}
+                {:invoke-id      !id4
+                 :target-task-id !id2-t1
+                 :node-name      "node2"
+                 :args           [{:val "xyz-0-01"
+                                   :async-op-index nil}]}]
+               :node          "node1"
+               :async-ops     []
+               :result        nil
+               :graph-id      ?graph-id
+               :input         ["xyz-0"]
+               :graph-task-id ?graph-task-id}
+        !id3  {:agg-invoke-id nil
+               :emits
+               [{:invoke-id      !id5
+                 :target-task-id ?graph-task-id
+                 :node-name      "node3"
+                 :args           [{:val "xyz-0-00-000"
+                                   :async-op-index nil}]}]
+               :node          "node2"
+               :async-ops     []
+               :result        nil
+               :graph-id      ?graph-id
+               :input         ["xyz-0-00"]
+               :graph-task-id ?graph-task-id}
+        !id5  {:agg-invoke-id !agg0
+               :emits
+               [{:invoke-id      !id6
+                 :target-task-id ?graph-task-id
+                 :node-name      "node4"
+                 :args           [{:val 1 :async-op-index nil}]}
+                {:invoke-id      !id7
+                 :target-task-id !id5-t1
+                 :node-name      "node4"
+                 :args           [{:val 1 :async-op-index nil}]}
+                {:invoke-id      !id8
+                 :target-task-id !id5-t2
+                 :node-name      "node4"
+                 :args           [{:val 1 :async-op-index nil}]}]
+               :started-agg-invoke-id !agg0
+               :node          "node3"
+               :async-ops     []
+               :result        nil
+               :graph-id      ?graph-id
+               :input         ["xyz-0-00-000"]
+               :graph-task-id ?graph-task-id}
+        !id6  {:agg-invoke-id !agg0
+               :emits
+               [{:invoke-id      !id9
+                 :target-task-id ?graph-task-id
+                 :node-name      "agg"
+                 :args           [{:val "1-a" :async-op-index nil}]}]
+               :node          "node4"
+               :async-ops     []
+               :result        nil
+               :graph-id      ?graph-id
+               :input         [1]
+               :graph-task-id ?graph-task-id}
+        !id9  {:invoked-agg-invoke-id !agg0}
+        !id7  {:agg-invoke-id !agg0
+               :emits
+               [{:invoke-id      !id10
+                 :target-task-id ?graph-task-id
+                 :node-name      "agg"
+                 :args           [{:val "1-a" :async-op-index nil}]}]
+               :node          "node4"
+               :async-ops     []
+               :result        nil
+               :graph-id      ?graph-id
+               :input         [1]
+               :graph-task-id ?graph-task-id}
+        !id10 {:invoked-agg-invoke-id !agg0}
+        !id8  {:agg-invoke-id !agg0
+               :emits
+               [{:invoke-id      !id11
+                 :target-task-id ?graph-task-id
+                 :node-name      "agg"
+                 :args           [{:val "1-a" :async-op-index nil}]}]
+               :node          "node4"
+               :async-ops     []
+               :result        nil
+               :graph-id      ?graph-id
+               :input         [1]
+               :graph-task-id ?graph-task-id}
+        !id11 {:invoked-agg-invoke-id !agg0}
+        !id4  {:agg-invoke-id nil
+               :emits
+               [{:invoke-id      !id12
+                 :target-task-id ?graph-task-id
+                 :node-name      "node3"
+                 :args           [{:val "xyz-0-01-000"
+                                   :async-op-index nil}]}]
+               :node          "node2"
+               :async-ops     []
+               :result        nil
+               :graph-id      ?graph-id
+               :input         ["xyz-0-01"]
+               :graph-task-id ?graph-task-id}
+        !id12 {:agg-invoke-id !agg1
+               :emits
+               [{:invoke-id      !id13
+                 :target-task-id ?graph-task-id
+                 :node-name      "node4"
+                 :args           [{:val 1 :async-op-index nil}]}
+                {:invoke-id      !id14
+                 :target-task-id !id12-t1
+                 :node-name      "node4"
+                 :args           [{:val 1 :async-op-index nil}]}
+                {:invoke-id      !id15
+                 :target-task-id !id12-t2
+                 :node-name      "node4"
+                 :args           [{:val 1 :async-op-index nil}]}]
+               :started-agg-invoke-id !agg1
+               :node          "node3"
+               :async-ops     []
+               :result        nil
+               :graph-id      ?graph-id
+               :input         ["xyz-0-01-000"]
+               :graph-task-id ?graph-task-id}
+        !id13 {:agg-invoke-id !agg1
+               :emits
+               [{:invoke-id      !id16
+                 :target-task-id ?graph-task-id
+                 :node-name      "agg"
+                 :args           [{:val "1-a" :async-op-index nil}]}]
+               :node          "node4"
+               :async-ops     []
+               :result        nil
+               :graph-id      ?graph-id
+               :input         [1]
+               :graph-task-id ?graph-task-id}
+        !id16 {:invoked-agg-invoke-id !agg1}
+        !id14 {:agg-invoke-id !agg1
+               :emits
+               [{:invoke-id      !id17
+                 :target-task-id ?graph-task-id
+                 :node-name      "agg"
+                 :args           [{:val "1-a" :async-op-index nil}]}]
+               :node          "node4"
+               :async-ops     []
+               :result        nil
+               :graph-id      ?graph-id
+               :input         [1]
+               :graph-task-id ?graph-task-id}
+        !id17 {:invoked-agg-invoke-id !agg1}
+        !id15 {:agg-invoke-id !agg1
+               :emits
+               [{:invoke-id      !id18
+                 :target-task-id ?graph-task-id
+                 :node-name      "agg"
+                 :args           [{:val "1-a" :async-op-index nil}]}]
+               :node          "node4"
+               :async-ops     []
+               :result        nil
+               :graph-id      ?graph-id
+               :input         [1]
+               :graph-task-id ?graph-task-id}
+        !id18 {:invoked-agg-invoke-id !agg1}
+        !agg0 {:agg-invoke-id   nil
+               :agg-input-count 3
+               :agg-start-res   "xyz-0-00-000-0000"
+               :emits           []
+               :node            "agg"
+               :agg-inputs-first-10
+               [{:invoke-id !id9' :args ["1-a"]}
+                {:invoke-id !id10' :args ["1-a"]}
+                {:invoke-id !id11' :args ["1-a"]}]
+               :async-ops       []
+               :agg-ack-val     0
+               :result          {:val [["1-a" "1-a" "1-a"]
+                                       "xyz-0-00-000-0000"]}
+               :agg-finished?   true
+               :graph-id        ?graph-id
+               :agg-state       ["1-a" "1-a" "1-a"]
+               :input           [["1-a" "1-a" "1-a"]
+                                 "xyz-0-00-000-0000"]
+               :agg-start-invoke-id !id5
+               :graph-task-id   ?graph-task-id}
+        !agg1 {:agg-invoke-id   nil
+               :agg-input-count 3
+               :agg-start-res   "xyz-0-01-000-0000"
+               :emits           []
+               :node            "agg"
+               :agg-inputs-first-10
+               [{:invoke-id !id16' :args ["1-a"]}
+                {:invoke-id !id17' :args ["1-a"]}
+                {:invoke-id !id18' :args ["1-a"]}]
+               :async-ops       []
+               :agg-ack-val     0
+               :result          {:val [["1-a" "1-a" "1-a"]
+                                       "xyz-0-01-000-0000"]}
+               :agg-finished?   true
+               :graph-id        ?graph-id
+               :agg-state       ["1-a" "1-a" "1-a"]
+               :input           [["1-a" "1-a" "1-a"]
+                                 "xyz-0-01-000-0000"]
+               :agg-start-invoke-id !id12
+               :graph-task-id   ?graph-task-id}
+       }
+       (m/guard
+        (and (= ?graph-id graph-id)
+             (= ?graph-task-id graph-task-id)
+             (= ?id1 root-invoke-id)))
+       (m/guard
+        (and (= #{!id9 !id10 !id11} #{!id9' !id10' !id11'})
+             (= #{!id16 !id17 !id18} #{!id16' !id17' !id18'})
+        ))
+      ))
 
-     ; (trace-matches? (to-time-deltas data)
-     ;                 (m/and
-     ;                  ...
-     ;                 ))
-
-
+     ;; TODO: <<<<>>>> is agg-invoke-id and started-agg-invoke-id supposed to be
+     ;; the same on AggStartNode?
+     ;; TODO: <<<<<>>>>> no finish time millis on the agg nodes
+     ;
+     ; (println "ROOT" root-invoke-id)
+     ; (clojure.pprint/pprint
+     ;  (:invokes-map res)
+     ; )
 
      ;; TODO: <<<<>>>> verify everything in the nodes PState for each node,
      ;; using sim time to control start/finish
