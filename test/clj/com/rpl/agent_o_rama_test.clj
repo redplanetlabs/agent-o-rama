@@ -985,6 +985,7 @@
          (is (= hgraph2 graph-history2))
         )))))
 
+
 (deftest node-traces-test
   (with-open [ipc (rtest/create-ipc)]
     (letlocals
@@ -1288,6 +1289,235 @@
       ))
     )))
 
+(deftest tracing-topology-pagination-test
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (-> topology
+            (aor/new-agent "foo")
+            (aor/node "start"
+                      ["node1" "node2"]
+                      (fn [agent-node arg1 arg2]
+                        (aor/emit! agent-node "node1" (str arg1 arg2 "-0"))
+                        (aor/emit! agent-node "node2" (str arg2 arg1 "-1"))
+                      ))
+            (aor/node "node1"
+                      ["node3" "node4"]
+                      (fn [agent-node arg]
+                        (aor/emit! agent-node "node3" (str arg "-a0"))
+                        (aor/emit! agent-node "node4" (str arg "-a1"))
+                      ))
+            (aor/node "node2"
+                      ["node5" "node6"]
+                      (fn [agent-node arg]
+                        (aor/emit! agent-node "node5" (str arg "-b0"))
+                        (aor/emit! agent-node "node6" (str arg "-b1"))
+                      ))
+            (aor/node "node3"
+                      nil
+                      (fn [agent-node arg]
+                      ))
+            (aor/node "node4"
+                      nil
+                      (fn [agent-node arg]
+                      ))
+            (aor/node "node5"
+                      nil
+                      (fn [agent-node arg]
+                      ))
+            (aor/node "node6"
+                      nil
+                      (fn [agent-node arg]
+                        (aor/result! agent-node ["done" arg])
+                      ))
+        )))
+     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (bind module-name (get-module-name module))
+     (bind depot
+       (foreign-depot ipc
+                      module-name
+                      (po/agent-depot-task-global-name "foo")))
+     (bind invokes-pstate
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-invoke-task-global-name "foo")))
+     (bind traces-query
+       (foreign-query ipc
+                      module-name
+                      (queries/tracing-query-topology-name "foo")))
+     (bind {[graph-task-id graph-id] "_agents-topology"}
+       (foreign-append! depot (aor-types/->AgentInvoke ["xy" "-z"] 0)))
+     (bind {[graph-task-id2 graph-id2] "_agents-topology"}
+       (foreign-append! depot (aor-types/->AgentInvoke ["a" "b"] 0)))
+     (bind root-invoke-id
+       (foreign-select-one [(keypath graph-id) :root-invoke-id]
+                           invokes-pstate
+                           {:pkey graph-task-id}))
+     (bind root-invoke-id2
+       (foreign-select-one [(keypath graph-id2) :root-invoke-id]
+                           invokes-pstate
+                           {:pkey graph-task-id2}))
+     (bind res
+       (foreign-invoke-query traces-query
+                             graph-task-id
+                             [[graph-task-id root-invoke-id]]
+                             3))
+     (is
+      (trace-matches?
+       (-> res
+           :invokes-map
+           no-time-deltas)
+       {!id1 {:agg-invoke-id nil
+              :emits
+              [{:invoke-id      !id2
+                :target-task-id ?graph-task-id
+                :node-name      "node1"
+                :args           [{:val "xy-z-0"
+                                  :async-op-index nil}]}
+               {:invoke-id      !id3
+                :target-task-id !id1-t1
+                :node-name      "node2"
+                :args           [{:val "-zxy-1"
+                                  :async-op-index nil}]}]
+              :node          "start"
+              :async-ops     []
+              :result        nil
+              :graph-id      ?graph-id
+              :input         ["xy" "-z"]
+              :graph-task-id ?graph-task-id
+             }
+        !id2 {:agg-invoke-id nil
+              :emits
+              [{:invoke-id      !id4
+                :target-task-id ?graph-task-id
+                :node-name      "node3"
+                :args           [{:val "xy-z-0-a0"
+                                  :async-op-index nil}]}
+               {:invoke-id      !id5
+                :target-task-id !id2-t1
+                :node-name      "node4"
+                :args           [{:val "xy-z-0-a1"
+                                  :async-op-index nil}]}]
+              :node          "node1"
+              :async-ops     []
+              :result        nil
+              :graph-id      ?graph-id
+              :input         ["xy-z-0"]
+              :graph-task-id ?graph-task-id
+             }
+        !id3 {:agg-invoke-id nil
+              :emits
+              [{:invoke-id      !id6
+                :target-task-id !id1-t1
+                :node-name      "node5"
+                :args           [{:val "-zxy-1-b0"
+                                  :async-op-index nil}]}
+               {:invoke-id      !id7
+                :target-task-id !id3-t1
+                :node-name      "node6"
+                :args           [{:val "-zxy-1-b1"
+                                  :async-op-index nil}]}]
+              :node          "node2"
+              :async-ops     []
+              :result        nil
+              :graph-id      ?graph-id
+              :input         ["-zxy-1"]
+              :graph-task-id ?graph-task-id
+             }
+       }
+       (m/guard
+        (and (= ?graph-id graph-id)
+             (= ?graph-task-id graph-task-id)
+             (= !id1 root-invoke-id)))))
+     (is (= 3
+            (-> res
+                :invokes-map
+                count)))
+
+     (bind res2
+       (foreign-invoke-query traces-query
+                             graph-task-id
+                             (:next-task-invoke-pairs res)
+                             3))
+     (is
+      (trace-matches?
+       (-> res2
+           :invokes-map
+           no-time-deltas)
+       {!id1 {:agg-invoke-id nil
+              :emits         []
+              :node          "node3"
+              :async-ops     []
+              :result        nil
+              :graph-id      ?graph-id
+              :input         ["xy-z-0-a0"]
+              :graph-task-id ?graph-task-id
+             }
+        !id2 {:agg-invoke-id nil
+              :emits         []
+              :node          "node4"
+              :async-ops     []
+              :result        nil
+              :graph-id      ?graph-id
+              :input         ["xy-z-0-a1"]
+              :graph-task-id ?graph-task-id
+             }
+        !id3 {:agg-invoke-id nil
+              :emits         []
+              :node          "node5"
+              :async-ops     []
+              :result        nil
+              :graph-id      ?graph-id
+              :input         ["-zxy-1-b0"]
+              :graph-task-id ?graph-task-id
+             }
+       }
+       (m/guard
+        (and (= ?graph-id graph-id)
+             (= ?graph-task-id graph-task-id)))))
+     (is (= 3
+            (-> res2
+                :invokes-map
+                count)))
+
+
+     (bind res3
+       (foreign-invoke-query traces-query
+                             graph-task-id
+                             (:next-task-invoke-pairs res2)
+                             3))
+     (is
+      (trace-matches?
+       (-> res3
+           :invokes-map
+           no-time-deltas)
+       {!id1 {:agg-invoke-id nil
+              :emits         []
+              :node          "node6"
+              :async-ops     []
+              :result        {:val ["done" "-zxy-1-b1"]}
+              :graph-id      ?graph-id
+              :input         ["-zxy-1-b1"]
+              :graph-task-id ?graph-task-id
+             }
+       }
+       (m/guard
+        (and (= ?graph-id graph-id)
+             (= ?graph-task-id graph-task-id)))))
+     (is (= 1
+            (-> res3
+                :invokes-map
+                count)))
+     (is (-> res3
+             :next-task-invoke-pairs
+             empty?))
+
+
+     ;; TODO: <<<<<>>>>
+     ;; - do multiple invokes and verify they can be read independently
+    )))
 
 
 (deftest async-emits-test
