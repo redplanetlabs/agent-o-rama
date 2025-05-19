@@ -14,17 +14,24 @@
 
 ;; ========== index ==========
 (defn index []
-  [query/query-view 
+  [query/query-view
    [:agent-index]
    (fn [agents]
-     [:div.container.mx-auto.p-6.max-w-3xl
-      [:h1.text-3xl.font-bold.mb-6.text-gray-800 "Agents"]
-      [:ol.space-y-3
+     [:div
+      [:div.flex.items-center.justify-between.mb-8
+       [:h1.text-3xl.font-bold.text-gray-800 "Agents"]
+       [:div.text-sm.text-gray-500 (str (count agents) " total")]]
+      [:div.divide-y.divide-gray-100
        (for [agent agents
              :let [url (rfe/href ::agent agent)]]
-         [:li.bg-white.p-4.rounded-lg.shadow.hover:shadow-md.transition-shadow.duration-200 {:key url}
-          [:a.text-indigo-600.hover:text-indigo-800.font-medium {:href url}
-           (pr-str agent)]])]])])
+         [:div.py-4.transition-colors.duration-150.hover:bg-gray-50 {:key url}
+          [:a.flex.items-center.group {:href url}
+           [:div.flex-1
+            [:div.text-lg.font-medium.text-indigo-600.group-hover:text-indigo-800
+             (let [{:keys [module-id agent-id]} agent]
+               [:div module-id "/" agent-id])]
+            [:div.mt-1.text-sm.text-gray-500.group-hover:text-gray-700
+             "View agent details"]]]])]])])
 
 ;; ========== agent ==========
 (defn agent []
