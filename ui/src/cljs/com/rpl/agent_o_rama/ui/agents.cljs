@@ -22,14 +22,14 @@
 
 (defn index []
   (let [agents @(re-frame/subscribe [::index])]
-    [:div.p-4
-     [:h1.text-2xl.font-bold.mb-4 "agents"]
+    [:div.container.mx-auto.p-6.max-w-3xl
+     [:h1.text-3xl.font-bold.mb-6.text-gray-800 "Agents"]
      [common/http-loader-view ::index
-      [:ol.list-decimal.list-inside
+      [:ol.space-y-3
        (for [agent agents
              :let [url (rfe/href ::agent agent)]]
-         [:li.mb-2 {:key url}
-          [:a.text-blue-600.hover:underline {:href url}
+         [:li.bg-white.p-4.rounded-lg.shadow.hover:shadow-md.transition-shadow.duration-200 {:key url}
+          [:a.text-indigo-600.hover:text-indigo-800.font-medium {:href url}
            (pr-str agent)]])]]]))
 
 ;; ========== agent ==========
@@ -56,29 +56,32 @@
   (let [agent-data @(re-frame/subscribe [::selected-agent])
         {:keys [module-id agent-id]} @(re-frame/subscribe [:route-params])]
     [common/http-loader-view (agent-fsm-id module-id agent-id)
-     [:div.p-4.grid.grid-cols-1.md:grid-cols-2.gap-4
-      [:div.border.border-gray-300.rounded.p-4.md:col-span-2
-       [:h1.text-xl.font-semibold.mb-2 "stats"]
-       [:ul.list-disc.list-inside
-        [:li "run count 30"]
-        [:li "total tokens 3707"]
-        [:li "median tokens 621"]
-        [:li "error rate"]
-        [:li "latency"]
-        [:ul.list-circle.list-inside.ml-4
-         [:li "p50 1.58s"]
-         [:li "p99 3.23s"]]]]
-      [:div.border.border-gray-300.rounded.p-4.md:col-span-2
-       [:h1.text-xl.font-semibold.mb-2 "invokes"]
-       [:ol.list-decimal.list-inside
-        (for [data (:invokes agent-data)]
-          [:li.mb-2 {:key (:root-invoke-id data)}
-           [:div.p-2.bg-gray-50.rounded
-            [:a.text-blue-600.hover:underline.mr-2 {:href (rfe/href ::invoke {:module-id module-id
-                                                                              :agent-id agent-id
-                                                                              :invoke-id (:root-invoke-id data)})}
-             "explore"]
-            [:pre.text-sm.overflow-x-auto (common/pp data)]]])]]]]))
+     [:div.container.mx-auto.p-6.max-w-4xl
+      [:div.grid.grid-cols-1.md:grid-cols-3.gap-6
+       [:div.md:col-span-1.bg-white.p-6.rounded-lg.shadow
+        [:h2.text-2xl.font-semibold.mb-4.text-gray-700 "Stats"]
+        [:ul.space-y-2.text-gray-600
+         [:li [:span.font-medium "Run Count:"] " 30"]
+         [:li [:span.font-medium "Total Tokens:"] " 3707"]
+         [:li [:span.font-medium "Median Tokens:"] " 621"]
+         [:li [:span.font-medium "Error Rate:"] " N/A"] ; Placeholder
+         [:li [:span.font-medium "Latency:"]
+          [:ul.list-disc.list-inside.ml-4.mt-1.space-y-1
+           [:li "p50: 1.58s"]
+           [:li "p99: 3.23s"]]]]]
+       [:div.md:col-span-2.bg-white.p-6.rounded-lg.shadow
+        [:h2.text-2xl.font-semibold.mb-4.text-gray-700 "Invokes"]
+        [:ol.space-y-3
+         (for [data (:invokes agent-data)]
+           [:li.p-3.bg-gray-50.rounded-md.border.border-gray-200 {:key (:root-invoke-id data)}
+            [:div.flex.justify-between.items-center.mb-2
+             [:a.text-indigo-600.hover:text-indigo-800.font-medium.text-sm
+              {:href (rfe/href ::invoke {:module-id module-id
+                                          :agent-id agent-id
+                                          :invoke-id (:root-invoke-id data)})} 
+              "Explore Invocation"]
+             ]
+            [:pre.text-xs.bg-gray-100.p-2.rounded.overflow-x-auto (common/pp data)]])]]]]]))
 
 ;; ============ invoke ==============
 
@@ -102,10 +105,13 @@
 
 (defn invoke []
   (let [invoke-data @(re-frame/subscribe [::selected-invoke])]
-    [:div.p-4
-     [graph/graph]
-     [:h2.text-xl.font-semibold.mb-2 "invoke details"]
-     [:pre.bg-gray-100.p-3.rounded.text-sm.overflow-x-auto (common/pp invoke-data)]]))
+    [:div.container.mx-auto.p-6.max-w-full
+     [:div.bg-white.p-6.rounded-lg.shadow.mb-6
+      [graph/graph]]
+     [:div.bg-white.p-6.rounded-lg.shadow
+      [:h2.text-2xl.font-semibold.mb-4.text-gray-700 "Invocation Details"]
+      [:pre.bg-gray-50.p-4.rounded-md.text-sm.overflow-x-auto.border.border-gray-200 
+       (common/pp invoke-data)]]]))
 
 (def routes
   ["agents"
