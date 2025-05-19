@@ -59,12 +59,14 @@
           :dispatch-later [{:ms delay-ms
                             :dispatch [:query/retry key]}]})
        ;; Max retries reached, record the error
-       {:db (assoc-in db [:queries key] 
-                      {:state :error
-                       :error error
-                       :uri (get-in db [:queries key :uri])
-                       :opts (get-in db [:queries key :opts])
-                       :fetched-at (js/Date.)})}))))
+       {:db (assoc-in
+             db
+             [:queries key] 
+             {:state :error
+              :error error
+              :uri (get-in db [:queries key :uri])
+              :opts (get-in db [:queries key :opts])
+              :fetched-at (js/Date.)})}))))
 
 (re-frame/reg-event-fx
  :query/retry
@@ -127,11 +129,9 @@
 ;; ----- View Helpers -----
 
 (defn query-view
-  "A pure view component for displaying query results. This doesn't trigger
-   any HTTP requests - those should be dispatched by controllers.
-   
-   key - vector that uniquely identifies the query
+  "key - vector that uniquely identifies the query
    content-fn - a function that receives data and returns hiccup
+  
    loading-view - (optional) hiccup for loading state
    error-view - (optional) function that receives error and refetch fn, returns hiccup"
   [key content-fn & {:keys [loading-view error-view]
