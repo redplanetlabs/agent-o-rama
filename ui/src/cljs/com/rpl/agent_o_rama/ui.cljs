@@ -93,22 +93,27 @@
   [:div.p-4.bg-gray-100.shadow-md.mb-4
    [:ul.flex.space-x-4
     (for [route-name (r/route-names router)
-          :let       [route (r/match-by-name router route-name)
-                      text (-> route :data :link-text)]]
+          :let [route (r/match-by-name router route-name)
+                text (-> route :data :link-text)
+                path-params (-> current-route :parameters :path)]]
       [:li {:key route-name}
        (when (= route-name (-> current-route :data :name))
          "> ")
 
-      ;; only a couple routes are clickable directly from nav (no path parameters)
-      (cond
-        (= ::home route-name)
-        [:a {:href (href route-name)} text]
-        
-        (= ::agents/index route-name)
-        [:a {:href (href route-name)} text]
-        
-        :else
-        [:span text])])]])
+       ;; only a couple routes are clickable directly from nav (no path parameters)
+       (cond
+         (= ::home route-name)
+         [:a {:href (href route-name)} text]
+         
+         (= ::agents/index route-name)
+         [:a {:href (href route-name)} text]
+
+         (and (= ::agents/agent route-name)
+              (not-empty (select-keys path-params [:module-id :agent-id])))
+         [:a {:href (href route-name path-params)} text]
+         
+         :else
+         [:span text])])]])
 
 (defn router-component [router]
   (let [current-route @(re-frame/subscribe [::current-route])]
