@@ -4,8 +4,8 @@
    [re-frame.core :as re-frame]
    [reagent.core :as reagent]))
 
-(defn http-loader-view [fsm-id body]
-  (reagent/with-let [state (re-frame/subscribe [::http/state fsm-id])]
+(defn http-loader-view [path body]
+  (reagent/with-let [state (re-frame/subscribe [::http/state path])]
     (let [[primary-state secondary-state] @state]
       (case primary-state
         nil
@@ -21,11 +21,7 @@
            [:div "Please wait, trying again"]
 
            ::http/halted
-           [:div
-            "Could not load data"
-            [:div
-             [:button {:on-click #(re-frame/dispatch [::http/restart fsm-id])}
-              "Click to try again"]]])]
+           [:div "Could not load data"])]
 
         ::http/loaded
         body))))

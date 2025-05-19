@@ -11,12 +11,12 @@
 
 
 ;; ========== index ==========
-(def index-fsm {:id          ::index
-                :http-xhrio  {:uri             "/api/agents"
+(def index-fsm {:http-xhrio  {:uri             "/api/agents"
                               :method          :get
                               :response-format (ajax/transit-response-format)}
                 :max-retries 5
                 :path        [::index]})
+
 
 (re-frame/reg-sub ::index (fn [db _] (::index db)))
 
@@ -24,7 +24,7 @@
   (let [agents @(re-frame/subscribe [::index])]
     [:div.container.mx-auto.p-6.max-w-3xl
      [:h1.text-3xl.font-bold.mb-6.text-gray-800 "Agents"]
-     [common/http-loader-view ::index
+     [common/http-loader-view [::index]
       [:ol.space-y-3
        (for [agent agents
              :let [url (rfe/href ::agent agent)]]
@@ -33,12 +33,8 @@
            (pr-str agent)]])]]]))
 
 ;; ========== agent ==========
-(defn agent-fsm-id [module-id agent-id]
-  (keyword (str "agent-" module-id "-" agent-id)))
-
 (defn agent-fsm [{{:keys [module-id agent-id]} :path}]
-  {:id          (agent-fsm-id module-id agent-id)
-   :http-xhrio  {:uri             (str "/api/agents/" module-id "/" agent-id)
+  {:http-xhrio  {:uri             (str "/api/agents/" module-id "/" agent-id)
                  :method          :get
                  :response-format (ajax/transit-response-format)}
    :max-retries 5
@@ -54,8 +50,9 @@
 
 (defn agent []
   (let [agent-data @(re-frame/subscribe [::selected-agent])
-        {:keys [module-id agent-id]} @(re-frame/subscribe [:route-params])]
-    [common/http-loader-view (agent-fsm-id module-id agent-id)
+        {:keys [module-id agent-id]} @(re-frame/subscribe [:route-params])
+        view-path [::agent module-id agent-id]]
+    [common/http-loader-view view-path
      [:div.container.mx-auto.p-6.max-w-4xl
       [:div.grid.grid-cols-1.md:grid-cols-3.gap-6
        [:div.md:col-span-1.bg-white.p-6.rounded-lg.shadow
@@ -84,24 +81,18 @@
             [:pre.text-xs.bg-gray-100.p-2.rounded.overflow-x-auto (common/pp data)]])]]]]]))
 
 ;; ============ invoke ==============
-
+(defn invoke-fsm [{{:keys [module-id agent-id invoke-id]} :path}]
+  {:http-xhrio  {:uri             (str "/api/agents/" module-id "/" agent-id "/" invoke-id)
+                 :method          :get
+                 :response-format (ajax/transit-response-format)}
+   :max-retries 5
+   :path        [::invoke module-id agent-id invoke-id]})
 
 (re-frame/reg-sub
  ::selected-invoke
  (fn [db _]
    (let [{:keys [module-id agent-id invoke-id]} (:path-params (:current-route db))]
      (get-in db [::invoke module-id agent-id invoke-id]))))
-
-(defn invoke-fsm-id [module-id agent-id invoke-id]
-  (keyword (str "invoke-" module-id "-" agent-id "-" invoke-id)))
-
-(defn invoke-fsm [{{:keys [module-id agent-id invoke-id]} :path}]
-  {:id          (invoke-fsm-id module-id agent-id invoke-id)
-   :http-xhrio  {:uri             (str "/api/agents/" module-id "/" agent-id "/" invoke-id)
-                 :method          :get
-                 :response-format (ajax/transit-response-format)}
-   :max-retries 5
-   :path        [::invoke module-id agent-id invoke-id]})
 
 (defn invoke []
   (let [invoke-data @(re-frame/subscribe [::selected-invoke])]

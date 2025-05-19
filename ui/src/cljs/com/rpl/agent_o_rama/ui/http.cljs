@@ -2,7 +2,15 @@
   (:require
    [re-frame.core :as f]
    [re-statecharts.core :as rs]
-   [statecharts.core :as sc]))
+   [statecharts.core :as sc]
+   [clojure.string :as str]))
+
+(defn path->keyword-id [path]
+  (->> path
+       (map #(if (keyword? %) (name %) (str %)))
+       (str/join "--")
+       (str "fsm-")
+       keyword))
 
 (defn update-retries [state & _]
   (update state :retries inc))
@@ -73,11 +81,14 @@
                          :on-success [::on-success config]})}))
 
 (f/reg-event-fx ::start
-                (fn [_ [_ config]]
-                  {::rs/start (fsm (merge {:state-path [:>]
-                                           :max-retries 0
-                                           :retry-delay 2000}
-                                          config))}))
+                (fn [_ [_ user-config]]
+                  (let [path (:path user-config)
+                        keyword-id (path->keyword-id path)
+                        fsm-config (assoc user-config :id keyword-id)]
+                    {::rs/start (fsm (merge {:state-path [:>]
+                                             :max-retries 0
+                                             :retry-delay 2000}
+                                            fsm-config))})))
 
 (defn ->seq [x]
   (if (coll? x)
@@ -85,6 +96,6 @@
     [x]))
 
 (f/reg-sub ::state
-  (fn [[_ id]]
-    (f/subscribe [::rs/state id]))
+  (fn [[_ path]]
+    (f/subscribe [::rs/state (path->keyword-id path)]))
   ->seq)
