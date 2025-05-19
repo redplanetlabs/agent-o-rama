@@ -56,12 +56,14 @@
           [:h2.text-2xl.font-semibold.mb-4.text-gray-700 "Invokes"]
           [:ol.space-y-3
            (for [data (:invokes agent-data)]
-             [:li.p-3.bg-gray-50.rounded-md.border.border-gray-200 {:key (:root-invoke-id data)}
+             [:a.p-3.bg-gray-50.rounded-md.border.border-gray-200.block.hover:bg-gray-100.transition-colors
+              {:key (:root-invoke-id data)
+               :href (rfe/href ::invoke {:module-id module-id
+                                        :agent-id agent-id
+                                        :invoke-id (:root-invoke-id data)})}
+              
               [:div.flex.justify-between.items-center.mb-2
-               [:a.text-indigo-600.hover:text-indigo-800.font-medium.text-sm
-                {:href (rfe/href ::invoke {:module-id module-id
-                                          :agent-id agent-id
-                                          :invoke-id (:root-invoke-id data)})} 
+               [:div.text-indigo-600.font-medium.text-sm
                 "Explore Invocation"]
                ]
               [:pre.text-xs.bg-gray-100.p-2.rounded.overflow-x-auto (common/pp data)]])]]]])]))
