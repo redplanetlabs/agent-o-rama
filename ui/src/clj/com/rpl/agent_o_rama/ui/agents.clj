@@ -40,7 +40,7 @@
    200
    
    :body
-   {:next-task-invoke-pairs [],
+   {:next-task-invoke-pairs [] ;; [task id, invoke id]
     :invokes-map
     {-8054378284095755674
      {:agg-invoke-id 630510010793576188,

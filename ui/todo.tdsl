@@ -1,16 +1,20 @@
-don't show node selector on agent page, show only graph and toplevelinvoke index.
-then on invoke page, show agent graph _and_ invoke graph (paginated)
+pagination
+waterfall view
+node details
 
-I have access to Historical* types
+directed edges
+display inputs in the node
+in node details, click on emits so navigate to that node
+more visible which node is selected
 
-graph ui libraries
-  dagre auto layout
+pagination (try example with 20k nodes)
+try minimap
 
-decide what to show next to graph
-  1. toplevel invokes
-   	 not filterable by clicking on node
-  2. list of node invokes (filterable by node)
+node details look nice (like langsmith)
+show agent graph and invocation side by side
+
+user/username/login flow
+keep going through langgaraph
+
 
 version dropdown (default to latest version)
-agents-historical-info {version->graph}
-
