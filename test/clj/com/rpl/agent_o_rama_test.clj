@@ -747,7 +747,7 @@
          (bind depot
            (foreign-depot ipc
                           module-name
-                          (po/agent-depot-task-global-name "foo")))
+                          (po/agent-depot-name "foo")))
          (bind invokes-pstate
            (foreign-pstate ipc
                            module-name

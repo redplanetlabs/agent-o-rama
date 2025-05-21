@@ -4,8 +4,6 @@
    [com.rpl.ramaspecter.defrecord-plus :as drp]
    [rpl.schema.core :as s])
   (:import
-   [com.rpl.agentorama
-    AsyncResult]
    [com.rpl.agentorama.impl
     NippyMap]
    [com.rpl.rama.integration

@@ -13,7 +13,6 @@
   (:import
    [com.rpl.agentorama
     AgentNode
-    AsyncResult
     FinishedAgg]
    [com.rpl.agentorama.impl
     RamaClientsTaskGlobal
@@ -102,7 +101,7 @@
   [task-thread-id-vol ^com.rpl.rama.ModuleInstanceInfo module-instance-info]
   (when (empty? @task-thread-id-vol)
     (vreset! task-thread-id-vol
-             (-> (.getTaskThreadIds info)
+             (-> (.getTaskThreadIds module-instance-info)
                  shuffle
                  seq)))
   (let [ret (long (first @task-thread-id-vol))]
@@ -203,8 +202,8 @@
   [agent-name task-id invoke-id node-fn agent-node args
    ^RamaClientsTaskGlobal rama-clients]
   ;; TODO: <<<<>>>> try/catch and handle errors
-  (let [res   (apply *node-fn *agent-node *args)
-        {:keys [*emits *result *nested-ops]} (agent-node-state *agent-node)
+  (let [res   (apply node-fn agent-node args)
+        {:keys [emits result nested-ops]} (agent-node-state agent-node)
         depot (.getAgentDepot rama-clients agent-name)]
     (foreign-append!
      depot
@@ -370,7 +369,7 @@
 (defn- define-agent!
   [setup topologies stream-topology name agent-graph]
   (let [graph (graph/resolve-agent-graph agent-graph)
-        agent-depot-sym (symbol (po/agent-depot-task-global-name name))
+        agent-depot-sym (symbol (po/agent-depot-name name))
         agent-streaming-depot-sym (symbol (str "*_agent-streaming-depot-" name))
         agent-graph-sym (symbol (po/agent-graph-task-global-name name))
         agent-node-pstate-sym (symbol (po/agent-node-task-global-name name))

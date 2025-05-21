@@ -135,10 +135,8 @@
    ))
 
 (defprotocol PStateStoreInternal
-  (pstate-select* [this path])
-  (pstate-select* [this pkey path])
-  (pstate-select-one* [this path])
-  (pstate-select-one* [this pkey path])
+  (pstate-select* [this path] [this pkey path])
+  (pstate-select-one* [this path] [this pkey path])
   (pstate-transform* [this pkey path]))
 
 (defn PStateStoreImpl

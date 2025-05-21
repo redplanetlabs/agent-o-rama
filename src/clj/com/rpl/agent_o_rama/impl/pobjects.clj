@@ -28,7 +28,7 @@
 
 (defn agent-depot-name
   [name]
-  (RamaClientsTaskGlobal/agentContinueDepotName name))
+  (RamaClientsTaskGlobal/agentDepotName name))
 
 (defn agents-clients-name
   []
