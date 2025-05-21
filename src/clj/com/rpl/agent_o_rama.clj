@@ -210,17 +210,16 @@
      (agentResultAsync [this agent-invoke]
                        ;; TODO: <<<<>>>>
      )
-     (stream [this agent-invoke node async-invoke-name]
+     (stream [this agent-invoke node]
              ;; TODO: <<<<>>>>
      )
-     (stream [this agent-invoke node async-invoke-name callback-void-jfn]
+     (stream [this agent-invoke node callback-void-jfn]
              ;; TODO: <<<<>>>>
      )
-     (streamInstance [this agent-invoke node async-invoke-name node-invoke-id]
+     (streamInstance [this agent-invoke node node-invoke-id]
                      ;; TODO: <<<<>>>>
      )
-     (streamInstance [this agent-invoke node async-invoke-name node-invoke-id
-                      callback-void-jfn]
+     (streamInstance [this agent-invoke node node-invoke-id callback-void-jfn]
                      ;; TODO: <<<<>>>>
      )
      (close [this]

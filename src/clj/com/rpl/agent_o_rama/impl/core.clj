@@ -15,6 +15,9 @@
     AgentNode
     AsyncResult
     FinishedAgg]
+   [com.rpl.agentorama.impl
+    RamaClientsTaskGlobal
+    VirtualThreadsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     AggAckOp
     Node
@@ -28,6 +31,11 @@
     CompletableFuture]
    [java.util.function
     Function]))
+
+;; TODO: <<<<>>>> impl is totally different now:
+;;  - depot append for each node execution
+;;  - depot append for PState writes
+;;  - foreign PState client used for queries directly
 
 (defn get-invoke-args
   [data]
@@ -47,6 +55,11 @@
   (local-transform> (term inc) $$id)
   (:> *ret))
 
+(defn submit-virtual-task!
+  [afn]
+  (let [^VirtualThreadsTaskGlobal virtual-exec
+        (declared-object-task-global (po/agents-virtual-threads-name))]
+    (.submitTask virtual-exec afn)))
 
 (defn fetch-graph
   [agent-name]
@@ -85,13 +98,12 @@
    )))
 
 (defn next-task-thread-id
-  [task-thread-id-vol]
+  [task-thread-id-vol ^com.rpl.rama.ModuleInstanceInfo module-instance-info]
   (when (empty? @task-thread-id-vol)
-    (let [^com.rpl.rama.ModuleInstanceInfo info (ops/module-instance-info)]
-      (vreset! task-thread-id-vol
-               (-> (.getTaskThreadIds info)
-                   shuffle
-                   seq))))
+    (vreset! task-thread-id-vol
+             (-> (.getTaskThreadIds info)
+                 shuffle
+                 seq)))
   (let [ret (long (first @task-thread-id-vol))]
     (vswap! task-thread-id-vol next)
     ret))
@@ -100,21 +112,24 @@
   (agent-node-state [this]))
 
 (defn mk-agent-node
-  [agent-graph graph-task-id curr-node store-info]
+  [agent-graph graph-task-id curr-node store-info
+   ^RamaClientsTaskGlobal rama-clients]
   (let [task-id             (ops/current-task-id)
         result-vol          (volatile! nil)
         emits-vol           (volatile! [])
-        async-ops-vol       (volatile! [])
-        completable-futures (java.util.IdentityHashMap.)
-        start-time-millis   (TopologyUtils/currentTimeMillis)
+        nested-ops-vol      (volatile! [])
         task-thread-ids-vol (volatile! nil)
         emit-count-vol      (volatile! 0)
         valid-output-nodes  (-> agent-graph
                                 :node-map
                                 (get curr-node)
                                 :output-nodes)
-        ^com.rpl.rama.ModuleInstanceInfo info (ops/module-instance-info)
-        this-module-name    (.getModuleName info)]
+
+        ^com.rpl.rama.ModuleInstanceInfo module-instance-info
+        (ops/module-instance-info)
+
+        this-module-name    (.getModuleName module-instance-info)
+        random-source       (ops/current-random-source)]
     (reify
      AgentNode
      (emit [this node args]
@@ -125,55 +140,22 @@
          (throw (h/ex-info "Emitting to undeclared output node"
                            {:node node
                             :valid-output-nodes valid-output-nodes})))
-       (let [args
-             (mapv
-              (fn [arg]
-                (cond
-                  (instance? AsyncResult arg)
-                  arg
-
-                  (instance? CompletableFuture arg)
-                  (do
-                    (when-not (.containsKey completable-futures arg)
-                      (let [i (count @async-ops-vol)]
-                        (.put completable-futures arg i)
-                        (vswap! async-ops-vol
-                                conj
-                                (aor-types/->valid-AsyncOpInfo nil nil nil))
-                        (vswap! emits-vol
-                                conj
-                                (.thenApply
-                                 ^CompletableFuture arg
-                                 (reify
-                                  Function
-                                  (apply [_ v]
-                                    [i start-time-millis (h/current-time-millis)
-                                     v]))))))
-                    (.thenApply
-                     ^CompletableFuture arg
-                     (reify
-                      Function
-                      (apply [_ v]
-                        [(.get completable-futures arg) v]))))
-
-                  :else
-                  (aor-types/->valid-AgentNodeArg arg nil)))
-              args)
-             emit-count (vswap! emit-count-vol inc)]
-         (vswap! emits-vol
-                 conj
-                 (aor-types/->valid-AgentNodeEmit
-                  (h/random-long)
-                  (if (selected-any? [:node-map (keypath node) :node
-                                      #(instance? Node %)]
-                                     agent-graph)
-                    (if (= emit-count 1)
-                      task-id
-                      (next-task-thread-id task-thread-ids-vol))
-                    graph-task-id)
-                  node
-                  args
-                 ))))
+       (let [emit-count (vswap! emit-count-vol inc)]
+         (vswap!
+          emits-vol
+          conj
+          (aor-types/->valid-AgentNodeEmit
+           (h/random-long random-source)
+           (if (selected-any? [:node-map (keypath node) :node
+                               #(instance? Node %)]
+                              agent-graph)
+             (if (= emit-count 1)
+               task-id
+               (next-task-thread-id task-thread-ids-vol module-instance-info))
+             graph-task-id)
+           node
+           args
+          ))))
      (result [this arg]
        (when (some? @result-vol)
          (throw (h/ex-info "Cannot have multiple results"
@@ -186,11 +168,11 @@
      )
      (getStore [this name]
        (let [store-params
-             (simpl/->valid-StoreParams this-module-name
-                                        this-module-name
-                                        name
-                                        emits-vol
-                                        async-ops-vol)]
+             (simpl/->valid-StoreParams
+              name
+              false
+              (.getLocalPState rama-clients name)
+              (.getPStateWriteDepot rama-clients))]
          (condp = (get store-info name)
            simpl/KV
            (simpl/mk-kv-store store-params)
@@ -207,157 +189,16 @@
          )))
      AgentNodeInternal
      (agent-node-state [this]
-       {:emits     @emits-vol
-        :result    @result-vol
-        :async-ops @async-ops-vol}))))
-
-(defn- immediate-async-resolve?
-  [arg]
-  (or (instance? CompletableFuture arg)
-      (aor-types/AsyncResultPStateQuery? arg)))
-
-(deframaop handle-async-emits
-  [*parent-invoke-id *async-ops *emits]
-  (ops/current-task-id :> *node-task-id)
-  (loop<- [*res []
-           *async-ops *async-ops
-           *emits (seq *emits)
-           :> *async-ops *emits]
-    (<<if (nil? *emits)
-      (:> *async-ops *res)
-     (else>)
-      (first *emits :> *emit)
-      (<<cond
-       (case> (aor-types/AsyncPStateTransform? *emit))
-        ;; TODO: <<<<>>>> need to propagate failures back as the result
-        ;;  - need to expose try/catch somehow...
-        (identity *emit :> {:keys [*pstate-name *path *async-op-index]})
-        (this-module-pobject-task-global *pstate-name :> $$p)
-        (h/current-time-millis :> *start-time-millis)
-        (|path$$ $$p *path)
-        (this-module-pobject-task-global *pstate-name :> $$p)
-        (local-transform> *path $$p)
-        (h/current-time-millis :> *finish-time-millis)
-        (|direct *node-task-id)
-        (continue>
-         *res
-         (h/clj-transform
-          (path>
-           (nthpath *async-op-index)
-           (termval
-            (aor-types/->valid-AsyncOpInfo
-             *start-time-millis
-             *finish-time-millis
-             {"type" "pstate-transform"
-              "name" *pstate-name})))
-          *async-ops)
-         (next *emits))
-
-       (case> (aor-types/AsyncPStateQuery? *emit))
-        ;; TODO: <<<<>>>> need to propagate failures back as the result
-        ;;  - need to expose try/catch somehow...
-        (identity *emit
-                  :> {:keys [*module-name *pstate-name *path
-                             *async-op-index]})
-        (pobject-task-global *module-name *pstate-name :> $$p)
-        (h/current-time-millis :> *start-time-millis)
-        (|path$$ $$p *path)
-        (pobject-task-global *module-name *pstate-name :> $$p)
-        (local-select> *path $$p :> *res)
-        (h/current-time-millis :> *finish-time-millis)
-        (|direct *node-task-id)
-        (continue>
-         *res
-         (h/clj-transform
-          (path>
-           (nthpath *async-op-index)
-           (termval
-            (aor-types/->valid-AsyncOpInfo
-             *start-time-millis
-             *finish-time-millis
-             {"type"        "pstate-select"
-              "module-name" *module-name
-              "name"        *pstate-name
-              "result"      *res})))
-          *async-ops)
-         (next *emits))
-
-       (case> (instance? CompletableFuture *emit))
-        ;; TODO: <<<>>>> propagate failures
-        (completable-future> *emit
-                             :> [*async-op-index *start-millis *finish-millis
-                                 *v])
-        (continue>
-         *res
-         (h/clj-transform
-          (path>
-           (nthpath *async-op-index)
-           (termval
-            (aor-types/->valid-AsyncOpInfo
-             *start-millis
-             *finish-millis
-             {"type"   "completable-future"
-              "result" *v})))
-          *async-ops)
-         (next *emits))
-
-       (default>)
-        (select>
-          (subselect
-           :args
-           INDEXED-VALS
-           (collect-one FIRST)
-           LAST
-           immediate-async-resolve?)
-          *emits
-          :> *asyncs)
-        (loop<- [*emit *emit
-                 *asyncs (seq *asyncs)
-                 :> *emit]
-          (<<if (nil? *asyncs)
-            (:> *emit)
-           (else>)
-            (first *asyncs :> [*arg-index *v])
-            (<<cond
-             (case> (instance? CompletableFuture *v))
-              ;; failure is already handled before
-              (completable-future> *v :> [*async-op-index *res])
-
-             (case> (aor-types/AsyncResultPStateQuery? *v))
-              (get *v :async-op-index :> *async-op-index)
-              (select> [(nthpath *async-op-index) :info (keypath "result")]
-                *async-ops
-                :> *res)
-
-             (default> :unify false)
-              (throw! (h/ex-info "Unknown async type" {:class (class *v)})))
-            (h/clj-transform
-             (path>
-              (nthpath *arg-index)
-              (termval
-               (aor-types/->valid-AgentNodeArg
-                *res
-                *async-op-index)))
-             *emit
-             :> *new-emit)
-            (continue> *new-emit (next *asyncs))
-          ))
-        (continue> (conj *res *emit) *async-ops (next *emits))
-      )))
-  (:> *async-ops *emits))
-
-(defn- emits-finished?
-  [emits]
-  (not
-   (selected-any?
-    [ALL :args ALL #(not (aor-types/AgentNodeArg? %))]
-    emits)))
+       {:emits  @emits-vol
+        :result @result-vol}))))
 
 (defn- node-type
   [graph node]
   (select-any [:node-map (keypath node) :node (view aor-types/node->type-kw)]
               graph))
 
+
+;; TODO: <<<<>>>>
 (deframafn handle-node-invoke
   [*name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args
    *agg-invoke-id]
@@ -365,15 +206,29 @@
    [$$nodes
     (this-module-pobject-task-global (po/agent-node-task-global-name *name))
     *agent-graph (fetch-graph *name)
-    *store-info (declared-object-task-global (po/agents-store-info-name))]
+    *store-info (declared-object-task-global (po/agents-store-info-name))
+    *rama-clients (declared-object-task-global (po/agents-clients-name))]
    (mk-agent-node *agent-graph
                   *graph-task-id
                   *next-node
                   *store-info
+                  *rama-clients
                   :> *agent-node)
    (h/current-time-millis :> *start-time-millis)
-   ;; TODO: <<<<>>>> should be done in a try/catch with exceptions causing
-   ;; non-retryable failure
+   ;; TODO: <<<<>>>>
+   ;;   - submit to virtual thread task global
+   ;;   - then write initiation to PState, then nothing
+   ;;   - needs foreign depot in closure of submitted function, and it needs
+   ;;   foreign client to every store
+   ;;     - what about getting access to local PStates through the task global?
+   ;;       - perhaps best for task global to create foreign clients AS
+   ;;       requested (with a lock)
+   ;;         - then don't need to declare dependencies, and don't need store
+   ;;         info
+   ;;       - no longer enforced dependencies though...
+   ;;       - in that case, can do on-demand for just local PStates for queries
+   ;;          - and task global can get foreign clients ahead of time
+   ;;          - get rid of store info PStates
    (apply *node-fn *agent-node *args :> *node-fn-res)
    (agent-node-state *agent-node :> {:keys [*async-ops *emits *result]})
    (handle-async-emits *invoke-id *async-ops *emits :> *async-ops *emits)
@@ -733,6 +588,10 @@
             (termval *result)]
            agent-invoke-pstate-sym))
         (<<if (emits-finished? *emits)
+          ;; TODO: <<<<<>>>> this writes to nodestartagg incorrectly when agg
+          ;; finishes
+          ;;   - need separate concept of "executed-invoke-id" and
+          ;;   "acking-invoke-id"
           (local-transform>
            [(keypath *invoke-id)
             :finish-time-millis
@@ -779,6 +638,16 @@
   [setup topologies stream-topology agent-graphs store-info]
   (declare-object* setup
                    (symbol (po/agents-store-info-name))
-                   (aor-types/->valid-StoreInfo store-info))
+                   (aor-types/->valid-StoreInfo store-info {}))
+  (declare-object* setup
+                   (symbol (po/agents-clients-name))
+                   (RamaClientsTaskGlobal.
+                    (-> agent-graphs
+                        keys
+                        vec)
+                    []))
+  (declare-object* setup
+                   (symbol (po/agents-virtual-threads-name))
+                   (VirtualThreadsTaskGlobal.))
   (doseq [[name agent-graph] agent-graphs]
     (define-agent! setup topologies stream-topology name agent-graph)))

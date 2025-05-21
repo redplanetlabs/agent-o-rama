@@ -50,51 +50,30 @@
   TaskGlobalObject
   (prepareForTask [this task-id context])
   (close [this]))
-  
+
 (drp/defrecord+ StoreInfo
-  [store-info :- {String clojure.lang.Keyword}]
+  [store-info :- {String clojure.lang.Keyword}
+   ;; module-name -> pstate-name -> store-type
+   mirror-store-info :- {String {String clojure.lang.Keyword}}]
   TaskGlobalObject
   (prepareForTask [this task-id context])
   (close [this]))
-
-(drp/defrecord+ AgentNodeArg
-  [val :- (s/maybe Object)
-   async-op-index :- (s/maybe Long)])
 
 (drp/defrecord+ AggInput
   [invoke-id :- Long
    args :- [Object]])
 
-(drp/defrecord+ AsyncOpInfo
-  [start-time-millis :- (s/maybe Long)
-   finish-time-millis :- (s/maybe Long)
+(drp/defrecord+ NestedOpInfo
+  [start-time-millis :- Long
+   finish-time-millis :- Long
    ;; info for models contains token stats, input prompt, output, etc.
    info :- (s/maybe {String Object})])
-
-(drp/defrecord+ AsyncResultOutOfBand
-  [async-op-index :- Long]
-  AsyncResult)
-
-(drp/defrecord+ AsyncResultPStateQuery
-  [async-op-index :- Long]
-  AsyncResult)
-
-(drp/defrecord+ AsyncPStateQuery
-  [module-name :- String
-   pstate-name :- String
-   path :- Object
-   async-op-index :- Long])
-
-(drp/defrecord+ AsyncPStateTransform
-  [pstate-name :- String
-   path :- Object
-   async-op-index :- Long])
 
 (drp/defrecord+ AgentNodeEmit
   [invoke-id :- Long
    target-task-id :- Long
    node-name :- String
-   args :- [(s/cond-pre AgentNodeArg AsyncResult CompletableFuture)]
+   args :- [Object]
   ])
 
 (drp/defrecord+ HistoricalAgentNodeInfo
@@ -110,22 +89,11 @@
    uuid :- String
   ])
 
-(drp/defrecord+ AsyncFutureResult
-  [task-id :- Long
-   invoke-id :- Long
-   async-op-index :- Long
-   result :- Object
-   start-time-millis :- Long
-   finish-time-millis :- Long
-   info :- {String Object}])
-
-(drp/defrecord+ AsyncFutureStreamingResult
+(drp/defrecord+ NodeStreamingResult
   [agent-task-id :- Long
    agent-id :- Long
    node :- String
    invoke-id :- Long
-   id :- String
-   streaming-index :- Long
    value :- Object])
 
 (drp/defrecord+ NodeOp
@@ -137,3 +105,8 @@
 (drp/defrecord+ AggAckOp
   [agg-invoke-id :- Long
    ack-val :- Long])
+
+(drp/defrecord+ PStateWrite
+  [pstate-name :- String
+   path :- s/Any
+   key :- s/Any])

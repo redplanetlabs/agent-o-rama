@@ -84,8 +84,9 @@
 (mk-jfn-converter)
 
 (defn random-long
-  []
-  (.nextLong ^java.util.Random (ops/current-random-source)))
+  ([] (random-long (ops/current-random-source)))
+  ([random-source]
+   (.nextLong ^java.util.Random random-source)))
 
 (defn invoke
   ([afn] (afn))

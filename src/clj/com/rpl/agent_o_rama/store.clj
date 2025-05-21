@@ -3,6 +3,8 @@
    [com.rpl.agent-o-rama.impl.store-impl :as simpl])
 )
 
+;: TODO: <<<<<>>>>> completely different API
+
 (defn get-async
   ([store k]
    (get-async store k nil))

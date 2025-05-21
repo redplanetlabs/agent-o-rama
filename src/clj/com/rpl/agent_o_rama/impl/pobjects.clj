@@ -1,11 +1,13 @@
 (ns com.rpl.agent-o-rama.impl.pobjects
   (:use [com.rpl.rama])
   (:import
+   [com.rpl.agentorama.impl
+    RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     AgentNodeEmit
     AgentResult
     AggInput
-    AsyncOpInfo
+    NestedOpInfo
     HistoricalAgentGraphInfo
     Node
     NodeAgg
@@ -16,13 +18,25 @@
   []
   "*_agents-store-info")
 
+(defn agents-virtual-threads-name
+  []
+  "*_agents-virtual-threads")
+
+(defn agent-pstate-write-depot-name
+  []
+  RamaClientsTaskGlobal/AGENT_PSTATE_WRITE_DEPOT)
+
+(defn agent-depot-name
+  [name]
+  (RamaClientsTaskGlobal/agentContinueDepotName name))
+
+(defn agents-clients-name
+  []
+  "*_agents-clients")
+
 (defn agent-graph-task-global-name
   [agent-name]
   (str "*_agent-graph-" agent-name))
-
-(defn agent-depot-task-global-name
-  [agent-name]
-  (str "*_agent-depot-" agent-name))
 
 (defn agent-invoke-task-global-name
   [agent-name]
@@ -48,11 +62,10 @@
   {Long ; agent ID
    (map-schema
     String ; node name
-    {String ; async invoke name
-     (map-schema
-      Long ; invoke-id
-      (vector-schema Object {:subindex? true})
-      {:subindex? true})}
+    (map-schema
+     Long  ; invoke-id
+     (vector-schema Object {:subindex? true})
+     {:subindex? true})
     {:subindex? true})})
 
 
@@ -66,7 +79,7 @@
     {:graph-id            Long
      :graph-task-id       Long
      :node                String
-     :async-ops           [AsyncOpInfo]
+     :nested-ops          [NestedOpInfo]
      :emits               [AgentNodeEmit]
      :result              AgentResult
      :start-time-millis   Long
