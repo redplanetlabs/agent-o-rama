@@ -38,10 +38,10 @@
         selected-node @(re-frame/subscribe [::selected-node])
         
         g (new (.. Dagre -graphlib -Graph))
-    
+        
         nodes (s/select [s/ALL
                          (s/selected? s/LAST (s/must :emits))
-                      
+                         
                          (s/view (fn [[id data]]
                                    {:id (str id)
                                     :data (assoc data :label (str (:node data)))}))]
@@ -58,7 +58,7 @@
                                (s/must :emits)
                                s/ALL
                                :invoke-id] data)]
-             
+                
                 {:id (str from to)
                  :source (str from)
                  :target (str (get implicit->real to to))})]
