@@ -32,11 +32,6 @@
    [java.util.function
     Function]))
 
-;; TODO: <<<<>>>> impl is totally different now:
-;;  - depot append for each node execution
-;;  - depot append for PState writes
-;;  - foreign PState client used for queries directly
-
 (defn get-invoke-args
   [data]
   (if (aor-types/AgentInvoke? data)
@@ -48,6 +43,12 @@
 (defdepotpartitioner agent-streaming-depot-partitioner
   [{:keys [agent-task-id]} num-partitions]
   agent-task-id)
+
+(defdepotpartitioner agent-depot-partitioner
+  [data num-partitions]
+  (if (aor-types/NodeComplete? data)
+    (:task-id data)
+    (rand-int num-partitions)))
 
 (deframaop gen-id
   [$$id]
@@ -189,16 +190,35 @@
          )))
      AgentNodeInternal
      (agent-node-state [this]
-       {:emits  @emits-vol
-        :result @result-vol}))))
+       {:emits      @emits-vol
+        :result     @result-vol
+        :nested-ops @nested-ops-vol}))))
 
 (defn- node-type
   [graph node]
   (select-any [:node-map (keypath node) :node (view aor-types/node->type-kw)]
               graph))
 
+(defn node-event
+  [agent-name task-id invoke-id node-fn agent-node args
+   ^RamaClientsTaskGlobal rama-clients]
+  ;; TODO: <<<<>>>> try/catch and handle errors
+  (let [res   (apply *node-fn *agent-node *args)
+        {:keys [*emits *result *nested-ops]} (agent-node-state *agent-node)
+        depot (.getAgentDepot rama-clients agent-name)]
+    (foreign-append!
+     depot
+     (aor-types/->valid-NodeComplete
+      task-id
+      invoke-id
+      res
+      emits
+      result
+      nested-ops
+      (h/current-time-millis))
+     :append-ack)
+  ))
 
-;; TODO: <<<<>>>>
 (deframafn handle-node-invoke
   [*name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args
    *agg-invoke-id]
@@ -214,70 +234,74 @@
                   *store-info
                   *rama-clients
                   :> *agent-node)
+
    (h/current-time-millis :> *start-time-millis)
-   ;; TODO: <<<<>>>>
-   ;;   - submit to virtual thread task global
-   ;;   - then write initiation to PState, then nothing
-   ;;   - needs foreign depot in closure of submitted function, and it needs
-   ;;   foreign client to every store
-   ;;     - what about getting access to local PStates through the task global?
-   ;;       - perhaps best for task global to create foreign clients AS
-   ;;       requested (with a lock)
-   ;;         - then don't need to declare dependencies, and don't need store
-   ;;         info
-   ;;       - no longer enforced dependencies though...
-   ;;       - in that case, can do on-demand for just local PStates for queries
-   ;;          - and task global can get foreign clients ahead of time
-   ;;          - get rid of store info PStates
-   (apply *node-fn *agent-node *args :> *node-fn-res)
-   (agent-node-state *agent-node :> {:keys [*async-ops *emits *result]})
-   (handle-async-emits *invoke-id *async-ops *emits :> *async-ops *emits)
+   (ops/current-task-id :> *task-id)
    ;; merge instead of overwrite since agg nodes run completion function on
    ;; already existing node
    (<<ramafn %merger
      [*m]
      (:> (reduce-kv assoc
                     *m
-                    {:graph-id          *graph-id
-                     :graph-task-id     *graph-task-id
-                     :node              *next-node
-                     :async-ops         *async-ops
+                    {:graph-id      *graph-id
+                     :graph-task-id *graph-task-id
+                     :node          *next-node
                      :start-time-millis *start-time-millis
-                     :input             *args
-                     :emits             *emits
-                     :result            *result
-                     :agg-invoke-id     *agg-invoke-id
+                     :input         *args
+                     :agg-invoke-id *agg-invoke-id
                     })))
    (local-transform> [(keypath *invoke-id) (term %merger)] $$nodes)
-   (:> {:start-time-millis *start-time-millis
-        :node-fn-res *node-fn-res
-        :emits       *emits
-        :result      *result})))
+   (|direct *task-id)
+   (submit-virtual-task!
+    (node-event *name
+                *task-id
+                *invoke-id
+                *node-fn
+                *agent-node
+                *args
+                *rama-clients))
+
+
+   (:> {:start-time-millis *start-time-millis})))
 
 (deframaop send-emits>
-  [*agent-name *graph-task-id *invoke-id *agg-invoke-id *emits]
-  (anchor> <root>)
-  (ops/explode *emits
-               :> {:keys [*invoke-id *target-task-id *node-name *args]})
-  (mapv :val *args :> *unwrapped-args)
-  (|direct *target-task-id)
-  (aor-types/->valid-NodeOp *invoke-id
-                            *node-name
-                            *unwrapped-args
-                            *agg-invoke-id
-                            :> *op)
-  (anchor> <regular-emit>)
+  [*agent-name *graph-task-id *graph-id *invoke-id *agg-invoke-id *emits]
+  (<<with-substitutions
+   [$$root
+    (this-module-pobject-task-global (po/agent-invoke-task-global-name
+                                      *agent-name))]
+   (anchor> <root>)
+   (ops/explode *emits
+                :> {:keys [*invoke-id *target-task-id *node-name *args]})
+   (mapv :val *args :> *unwrapped-args)
+   (|direct *target-task-id)
+   (aor-types/->valid-NodeOp *invoke-id
+                             *node-name
+                             *unwrapped-args
+                             *agg-invoke-id
+                             :> *op)
+   (anchor> <regular-emit>)
 
-  (hook> <root>)
-  (filter> (some? *agg-invoke-id))
-  (mapv :invoke-id *emits :> *next-invoke-ids)
-  (reduce bit-xor *invoke-id *next-invoke-ids :> *ack-val)
-  (|direct *graph-task-id)
-  (aor-types/->valid-AggAckOp *agg-invoke-id *ack-val :> *op)
-  (anchor> <agg-ack-emit>)
+   (hook> <root>)
+   (mapv :invoke-id *emits :> *next-invoke-ids)
+   (reduce bit-xor *invoke-id *next-invoke-ids :> *ack-val)
+   (|direct *graph-task-id)
 
-  (unify> <regular-emit> <agg-ack-emit>)
-  (:> *op))
+   (<<if (some? *agg-invoke-id)
+     (aor-types/->valid-AggAckOp *agg-invoke-id *ack-val :> *op)
+     (anchor> <agg-ack-emit>)
+    (else>)
+     (<<ramafn %update-ack-val
+       [*v]
+       (:> (bit-xor *v *ack-val)))
+     (local-transform>
+      [(keypath *graph-id)
+       :ack-val
+       (term %update-ack-val)]
+      $$root))
+
+   (unify> <regular-emit> <agg-ack-emit>)
+   (:> *op)))
 
 (defn task-id-key-partitioner
   [num-partitions task-id]
@@ -325,9 +349,8 @@
                        *invoke-id
                        *node
                        *args
-                       *agg-invoke-id
-                       :> {:keys [*emits *result]})
-   (:> *emits *result)))
+                       *agg-invoke-id)
+   (:>)))
 
 (deframaop ack-agg!
   [*name *invoke-id *ack-val]
@@ -341,8 +364,8 @@
     [(keypath *invoke-id) :agg-ack-val (termval *new-ack-val)]
     $$nodes)
    (filter> (= 0 *new-ack-val))
-   (complete-agg! *name *invoke-id :> *emits *result)
-   (:> *emits *result)))
+   (complete-agg! *name *invoke-id)
+   (:>)))
 
 (defn- define-agent!
   [setup topologies stream-topology name agent-graph]
@@ -359,7 +382,7 @@
                                          name))
         agent-id-gen-pstate-sym (symbol (str "$$_agent-id-gen-" name))
        ]
-    (declare-depot* setup agent-depot-sym :random)
+    (declare-depot* setup agent-depot-sym agent-depot-partitioner)
     (declare-depot* setup
                     agent-streaming-depot-sym
                     agent-streaming-depot-partitioner)
@@ -412,7 +435,8 @@
          [(keypath *graph-id)
           (termval {:root-invoke-id *invoke-id
                     :invoke-args    *args
-                    :graph-version  *version})]
+                    :graph-version  *version
+                    :ack-val        *invoke-id})]
          agent-invoke-pstate-sym)
         (aor-types/->valid-NodeOp *invoke-id
                                   (get agent-graph-sym :start-node)
@@ -420,49 +444,67 @@
                                   nil
                                   :> *op)
 
-       (case> (aor-types/AsyncFutureResult? *data))
+       (case> (aor-types/NodeComplete? *data))
         (identity *data
-                  :> {:keys [*invoke-id *async-op-index *result
-                             *start-time-millis *finish-time-millis *info]})
-        (local-transform>
-         [(keypath *invoke-id)
-          (multi-path
-           [:async-ops
-            (nthpath *async-op-index)
-            (termval
-             (aor-types/->valid-AsyncOpInfo
-              *start-time-millis
-              *finish-time-millis
-              *info))]
-           [:emits
-            ALL
-            :args
-            ALL
-            aor-types/AsyncResultOutOfBand?
-            (selected? :async-op-index (pred= *async-op-index))
-            (termval
-             (aor-types/->valid-AgentNodeArg
-              *result
-              *async-op-index
-             ))])]
-         agent-node-pstate-sym)
+                  :> {:keys [*invoke-id
+                             *node-fn-res
+                             *emits
+                             *result
+                             *nested-ops
+                             *finish-time-millis]})
+        (<<ramafn %merger
+          [*m]
+          (:> (merge *m
+                     {:emits      *emits
+                      :result     *result
+                      :nested-ops *nested-ops
+                      :finish-time-millis *finish-time-millis})))
+        (local-transform> [(keypath *invoke-id) (term *merger)]
+                          agent-node-pstate-sym)
         (local-select> (keypath *invoke-id)
                        agent-node-pstate-sym
-                       :> {:keys [*graph-id *graph-task-id *emits *node
-                                  *agg-invoke-id *parent-agg-invoke-id]})
-        (filter> (emits-finished? *emits))
-        (local-transform>
-         [(keypath *invoke-id)
-          :finish-time-millis
-          (termval *finish-time-millis)]
-         agent-node-pstate-sym)
-        (node-type agent-graph-sym *node :> *node-type)
-        (ifexpr (= *node-type aor-types/AGG-NODE-KW)
-          *parent-agg-invoke-id
-          *agg-invoke-id
-          :> *agg-invoke-id)
+                       :> {:keys [*graph-task-id *graph-id *node
+                                  *agg-invoke-id]})
+        (get-node-obj agent-graph-sym *node :> *node-obj)
+
+        (<<subsource *op-obj
+         (case> Node)
+          (identity *invoke-id :> *invoke-id)
+
+         (case> NodeAggStart)
+          ;; TODO: <<<<>>>> it's possible this initialization didn't happen
+          (local-transform> [(keypath *agg-invoke-id)
+                             :agg-start-res
+                             (termval *node-fn-res)]
+                            agent-node-pstate-sym)
+          (identity *invoke-id :> *invoke-id)
+
+
+         (case> NodeAgg)
+          (local-select> (keypath *invoke-id)
+                         agent-node-pstate-sym
+                         :> {*invoke-id :agg-start-invoke-id})
+
+        )
+
+        ;; AgentNode implementation makes it impossible for there to be both
+        ;; emits and result
+        (<<if (some? *result)
+          (|direct *graph-task-id)
+          (local-transform>
+           [(keypath *graph-id)
+            :result
+            ;; TODO: <<<<<>>>>> what about case of a retry?
+            ;;  - what about case where it errors on one branch but has a result
+            ;;  in the other branch?
+            ;;  - seems like need "execution ID" so that it can only be
+            ;;  overridden on a fresh retry
+            nil?
+            (termval *result)]
+           agent-invoke-pstate-sym))
         (send-emits> name
                      *graph-task-id
+                     *graph-id
                      *invoke-id
                      *agg-invoke-id
                      *emits
@@ -472,138 +514,96 @@
         (throw! (h/ex-info "Unrecognized data type" {:class (class *data)})))
 
       ;; requires *graph-id, *graph-task-id, *op to be in scope
-      (loop<- [*op *op]
-        (<<if (aor-types/NodeOp? *op)
-          (get *op :next-node :> *next-node)
-          (get-node-obj agent-graph-sym *next-node :> *op-obj)
+      (<<if (aor-types/NodeOp? *op)
+        (get *op :next-node :> *next-node)
+        (get-node-obj agent-graph-sym *next-node :> *op-obj)
+       (else>)
+        (identity *op :> *op-obj))
+
+      (<<subsource *op-obj
+       (case> Node :> {:keys [*node-fn]})
+        (identity *op
+                  :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
+        (handle-node-invoke
+         name
+         *graph-task-id
+         *graph-id
+         *node-fn
+         *invoke-id
+         *next-node
+         *args
+         *agg-invoke-id
+         :> {:keys [*emits *result]})
+
+       (case> NodeAggStart :> {:keys [*node-fn *agg-node-name]})
+        (identity *op
+                  :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
+        (h/random-long :> *new-agg-invoke-id)
+        (handle-node-invoke
+         name
+         *graph-task-id
+         *graph-id
+         *node-fn
+         *invoke-id
+         *next-node
+         *args
+         *new-agg-invoke-id
+         :> {:keys [*start-time-millis]})
+        (get-node-obj agent-graph-sym *agg-node-name :> {:keys [*init-fn]})
+        ;; TODO: <<<<<>>>>> propagate errors
+        (h/invoke *init-fn :> *init-agg-state)
+        (local-transform>
+         [(keypath *invoke-id) :started-agg? (termval true)]
+         agent-node-pstate-sym)
+        (local-transform>
+         [(keypath *new-agg-invoke-id)
+          (termval {:graph-id            *graph-id
+                    :graph-task-id       *graph-task-id
+                    :node                *agg-node-name
+                    :start-time-millis   *start-time-millis
+                    :agg-invoke-id       *agg-invoke-id
+                    :agg-inputs          []
+                    :agg-state           *init-agg-state
+                    :agg-ack-val         *invoke-id
+                    :agg-start-invoke-id *invoke-id
+                   })]
+         agent-node-pstate-sym)
+
+
+       (case> NodeAgg :> {:keys [*update-fn]})
+        (identity *op
+                  :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
+        (assert! (some? *agg-invoke-id))
+        (local-select> (keypath *agg-invoke-id)
+                       agent-node-pstate-sym
+                       :> {*agg-state :agg-state
+                           *parent-agg-invoke-id :agg-invoke-id
+                           *agg-start-invoke-id :agg-start-invoke-id
+                          })
+        ;; TODO: <<<<>>>> catch exceptions and propagate failure
+        (apply *update-fn *agg-state *args :> *res)
+        (extract-agg-result *res :> {:keys [*new-agg-state *finished?]})
+
+        (local-transform>
+         [(keypath *agg-invoke-id)
+          (multi-path [:agg-state (termval *new-agg-state)]
+                      [:agg-inputs AFTER-ELEM
+                       (termval (aor-types/->valid-AggInput *invoke-id
+                                                            *args))])]
+         agent-node-pstate-sym)
+        (local-transform> [(keypath *invoke-id)
+                           :invoked-agg-invoke-id
+                           (termval *agg-invoke-id)]
+                          agent-node-pstate-sym)
+
+        (<<if *finished?
+          (complete-agg! name *agg-invoke-id)
          (else>)
-          (identity *op :> *op-obj))
+          (ack-agg! name *agg-invoke-id *invoke-id))
 
-        (<<subsource *op-obj
-         (case> Node :> {:keys [*node-fn]})
-          (identity *op
-                    :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
-          (handle-node-invoke
-           name
-           *graph-task-id
-           *graph-id
-           *node-fn
-           *invoke-id
-           *next-node
-           *args
-           *agg-invoke-id
-           :> {:keys [*emits *result]})
-
-         (case> NodeAggStart :> {:keys [*node-fn *agg-node-name]})
-          (identity *op
-                    :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
-          (h/random-long :> *new-agg-invoke-id)
-          (handle-node-invoke
-           name
-           *graph-task-id
-           *graph-id
-           *node-fn
-           *invoke-id
-           *next-node
-           *args
-           *new-agg-invoke-id
-           :> {:keys [*start-time-millis *node-fn-res *emits *result]})
-          (get-node-obj agent-graph-sym *agg-node-name :> {:keys [*init-fn]})
-          ;; TODO: <<<<<>>>>> propagate errors
-          (h/invoke *init-fn :> *init-agg-state)
-          (local-transform>
-           [(keypath *invoke-id) :started-agg? (termval true)]
-           agent-node-pstate-sym)
-          (local-transform>
-           [(keypath *new-agg-invoke-id)
-            (termval {:graph-id            *graph-id
-                      :graph-task-id       *graph-task-id
-                      :node                *agg-node-name
-                      :start-time-millis   *start-time-millis
-                      :agg-invoke-id       *agg-invoke-id
-                      :agg-inputs          []
-                      :agg-state           *init-agg-state
-                      :agg-start-res       *node-fn-res
-                      :agg-ack-val         *invoke-id
-                      :agg-start-invoke-id *invoke-id
-                     })]
-           agent-node-pstate-sym)
-          (identity *new-agg-invoke-id :> *agg-invoke-id)
-
-         (case> NodeAgg :> {:keys [*update-fn]})
-          (identity *op
-                    :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
-          (assert! (some? *agg-invoke-id))
-          (local-select> (keypath *agg-invoke-id)
-                         agent-node-pstate-sym
-                         :> {*agg-state :agg-state
-                             *parent-agg-invoke-id :agg-invoke-id
-                             *agg-start-invoke-id :agg-start-invoke-id
-                            })
-          ;; TODO: <<<<>>>> catch exceptions and propagate failure
-          (apply *update-fn *agg-state *args :> *res)
-          (extract-agg-result *res :> {:keys [*new-agg-state *finished?]})
-
-          (local-transform>
-           [(keypath *agg-invoke-id)
-            (multi-path [:agg-state (termval *new-agg-state)]
-                        [:agg-inputs AFTER-ELEM
-                         (termval (aor-types/->valid-AggInput *invoke-id
-                                                              *args))])]
-           agent-node-pstate-sym)
-          (local-transform> [(keypath *invoke-id)
-                             :invoked-agg-invoke-id
-                             (termval *agg-invoke-id)]
-                            agent-node-pstate-sym)
-
-          (<<if *finished?
-            (complete-agg! name *agg-invoke-id :> *emits *result)
-           (else>)
-            (ack-agg! name *agg-invoke-id *invoke-id :> *emits *result))
-          (identity *agg-start-invoke-id :> *invoke-id)
-          (identity *parent-agg-invoke-id :> *agg-invoke-id)
-
-
-         (case> AggAckOp :> {:keys [*agg-invoke-id *ack-val]})
-          (ack-agg! name *agg-invoke-id *ack-val :> *emits *result)
-          (local-select> (keypath *agg-invoke-id)
-                         agent-node-pstate-sym
-                         :> {*agg-invoke-id :agg-invoke-id
-                             *invoke-id     :agg-start-invoke-id})
-        )
-        ;; AgentNode implementation makes it impossible for there to be both
-        ;; emits and result
-        (<<if (some? *result)
-          (|direct *graph-task-id)
-          (local-transform>
-           [(keypath *graph-id)
-            :result
-
-            ;; TODO: <<<<<>>>>> what about case of a retry?
-            ;;  - what about case where it errors on one branch but has a result
-            ;;  in the other branch?
-            ;;  - seems like need "execution ID" so that it can only be
-            ;;  overridden on a fresh retry
-            nil?
-            (termval *result)]
-           agent-invoke-pstate-sym))
-        (<<if (emits-finished? *emits)
-          ;; TODO: <<<<<>>>> this writes to nodestartagg incorrectly when agg
-          ;; finishes
-          ;;   - need separate concept of "executed-invoke-id" and
-          ;;   "acking-invoke-id"
-          (local-transform>
-           [(keypath *invoke-id)
-            :finish-time-millis
-            (termval (h/current-time-millis))]
-           agent-node-pstate-sym)
-          (send-emits> name
-                       *graph-task-id
-                       *invoke-id
-                       *agg-invoke-id
-                       *emits
-                       :> *op)
-          (continue> *op)))
+       (case> AggAckOp :> {:keys [*agg-invoke-id *ack-val]})
+        (ack-agg! name *agg-invoke-id *ack-val)
+      )
 
 
      (source> agent-streaming-depot-sym

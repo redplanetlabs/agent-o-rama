@@ -52,7 +52,8 @@
      ;; of hanging
      ;; - will need top-level acking that puts error here if it didn't
      ;; complete
-     :result         AgentResult})})
+     :result         AgentResult
+     :ack-val        Long})})
 
 (defn agent-streaming-results-task-global-name
   [agent-name]

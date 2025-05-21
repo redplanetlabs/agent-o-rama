@@ -38,6 +38,7 @@
 (drp/defrecord+ AgentResult
   [val :- (s/maybe Object)])
 
+
 (drp/defrecord+ AgentNode
   [node :- (s/cond-pre Node NodeAggStart NodeAgg)
    output-nodes :- #{String}
@@ -74,6 +75,16 @@
    target-task-id :- Long
    node-name :- String
    args :- [Object]
+  ])
+
+(drp/defrecord+ NodeComplete
+  [task-id :- Long
+   invoke-id :- Long
+   node-fn-res :- Object
+   emits :- [AgentNodeEmit]
+   result :- (s/maybe AgentResult)
+   nested-ops :- NestedOpInfo
+   finish-time-millis :- Long
   ])
 
 (drp/defrecord+ HistoricalAgentNodeInfo

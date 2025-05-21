@@ -70,7 +70,7 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
     return _mirrorClientInfo.getResource().pstateWritesDepot;
   }
 
-  public Depot getAgentContinueDepot(String agentName) {
+  public Depot getAgentDepot(String agentName) {
     return _mirrorClientInfo.getResource().agentDepots.get(agentName);
   }
 
