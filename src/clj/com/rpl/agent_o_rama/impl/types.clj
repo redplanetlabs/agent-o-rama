@@ -30,7 +30,7 @@
 ;; library? or just some of them?
 
 (drp/defrecord+ AgentInvoke
-  [args :- [Object]
+  [args :- [(s/maybe Object)]
    time-millis :- Long])
 
 (drp/defrecord+ AgentResult
@@ -60,7 +60,7 @@
 
 (drp/defrecord+ AggInput
   [invoke-id :- Long
-   args :- [Object]])
+   args :- [(s/maybe Object)]])
 
 (drp/defrecord+ NestedOpInfo
   [start-time-millis :- Long
@@ -72,16 +72,16 @@
   [invoke-id :- Long
    target-task-id :- Long
    node-name :- String
-   args :- [Object]
+   args :- [(s/maybe Object)]
   ])
 
 (drp/defrecord+ NodeComplete
   [task-id :- Long
    invoke-id :- Long
-   node-fn-res :- Object
+   node-fn-res :- (s/maybe Object)
    emits :- [AgentNodeEmit]
    result :- (s/maybe AgentResult)
-   nested-ops :- NestedOpInfo
+   nested-ops :- [NestedOpInfo]
    finish-time-millis :- Long
   ])
 
@@ -108,7 +108,7 @@
 (drp/defrecord+ NodeOp
   [invoke-id :- Long
    next-node :- String
-   args :- [Object]
+   args :- [(s/maybe Object)]
    agg-invoke-id :- (s/maybe Long)])
 
 (drp/defrecord+ AggAckOp

@@ -154,7 +154,7 @@
                (next-task-thread-id task-thread-ids-vol module-instance-info))
              graph-task-id)
            node
-           args
+           (vec args)
           ))))
      (result [this arg]
        (when (some? @result-vol)
@@ -201,24 +201,25 @@
 (defn node-event
   [agent-name task-id invoke-id node-fn agent-node args
    ^RamaClientsTaskGlobal rama-clients]
-  ;; TODO: <<<<>>>> try/catch and handle errors
-  (let [res   (apply node-fn agent-node args)
-        {:keys [emits result nested-ops]} (agent-node-state agent-node)
-        depot (.getAgentDepot rama-clients agent-name)]
-    (foreign-append!
-     depot
-     (aor-types/->valid-NodeComplete
-      task-id
-      invoke-id
-      res
-      emits
-      result
-      nested-ops
-      (h/current-time-millis))
-     :append-ack)
-  ))
+  (fn []
+    ;; TODO: <<<<>>>> try/catch and handle errors
+    (let [res   (apply node-fn agent-node args)
+          {:keys [emits result nested-ops]} (agent-node-state agent-node)
+          depot (.getAgentDepot rama-clients agent-name)]
+      (foreign-append!
+       depot
+       (aor-types/->valid-NodeComplete
+        task-id
+        invoke-id
+        res
+        emits
+        result
+        nested-ops
+        (h/current-time-millis))
+       :append-ack)
+    )))
 
-(deframafn handle-node-invoke
+(deframaop handle-node-invoke
   [*name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args
    *agg-invoke-id]
   (<<with-substitutions
@@ -272,11 +273,10 @@
    (anchor> <root>)
    (ops/explode *emits
                 :> {:keys [*invoke-id *target-task-id *node-name *args]})
-   (mapv :val *args :> *unwrapped-args)
    (|direct *target-task-id)
    (aor-types/->valid-NodeOp *invoke-id
                              *node-name
-                             *unwrapped-args
+                             *args
                              *agg-invoke-id
                              :> *op)
    (anchor> <regular-emit>)
@@ -423,7 +423,9 @@
     (<<sources stream-topology
      (source> agent-depot-sym {:retry-mode :none} :> *data)
       (<<cond
-       (case> (or> (aor-types/AgentInvoke? *data) (instance? Map *data)))
+       (case> (or> (aor-types/AgentInvoke? *data)
+                   (and> (instance? Map *data)
+                         (not (record? *data)))))
         (get-invoke-args *data :> *args)
         (ops/current-task-id :> *graph-task-id)
         (gen-id agent-id-gen-pstate-sym :> *graph-id)
@@ -453,12 +455,13 @@
                              *finish-time-millis]})
         (<<ramafn %merger
           [*m]
-          (:> (merge *m
-                     {:emits      *emits
-                      :result     *result
-                      :nested-ops *nested-ops
-                      :finish-time-millis *finish-time-millis})))
-        (local-transform> [(keypath *invoke-id) (term *merger)]
+          (:> (reduce-kv assoc
+                         *m
+                         {:emits      *emits
+                          :result     *result
+                          :nested-ops *nested-ops
+                          :finish-time-millis *finish-time-millis})))
+        (local-transform> [(keypath *invoke-id) (term %merger)]
                           agent-node-pstate-sym)
         (local-select> (keypath *invoke-id)
                        agent-node-pstate-sym
@@ -466,7 +469,7 @@
                                   *agg-invoke-id]})
         (get-node-obj agent-graph-sym *node :> *node-obj)
 
-        (<<subsource *op-obj
+        (<<subsource *node-obj
          (case> Node)
           (identity *invoke-id :> *invoke-id)
 
@@ -531,8 +534,7 @@
          *invoke-id
          *next-node
          *args
-         *agg-invoke-id
-         :> {:keys [*emits *result]})
+         *agg-invoke-id)
 
        (case> NodeAggStart :> {:keys [*node-fn *agg-node-name]})
         (identity *op
@@ -648,5 +650,15 @@
   (declare-object* setup
                    (symbol (po/agents-virtual-threads-name))
                    (VirtualThreadsTaskGlobal.))
+
+  (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))]
+    (declare-depot* setup pstate-write-depot-sym (hash-by :key))
+    (<<sources stream-topology
+     (source> pstate-write-depot-sym
+               {:retry-mode :none}
+              :> {:keys [*pstate-name *path]})
+      (this-module-pobject-task-global *pstate-name :> $$p)
+      (local-transform> *path $$p)
+    ))
   (doseq [[name agent-graph] agent-graphs]
     (define-agent! setup topologies stream-topology name agent-graph)))

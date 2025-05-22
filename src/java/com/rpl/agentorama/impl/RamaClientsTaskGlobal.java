@@ -5,6 +5,7 @@ import java.util.concurrent.*;
 import java.util.*;
 
 import com.rpl.rama.*;
+import com.rpl.rama.cluster.ClusterManagerBase;
 import com.rpl.rama.integration.*;
 
 public class RamaClientsTaskGlobal implements TaskGlobalObject {
@@ -20,9 +21,9 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
     public Map<String, Depot> agentDepots;
     public ConcurrentHashMap<String, PState> localPStates;
     public Depot pstateWritesDepot;
-    RamaClusterManager manager;
+    ClusterManagerBase manager;
 
-    public MirrorClientInfo(String moduleName, Map mirrorClients, Map agentDepots, Depot pstateWritesDepot, RamaClusterManager manager) {
+    public MirrorClientInfo(String moduleName, Map mirrorClients, Map agentDepots, Depot pstateWritesDepot, ClusterManagerBase manager) {
       this.moduleName = moduleName;
       this.mirrorClients = mirrorClients;
       this.agentDepots = agentDepots;
@@ -89,7 +90,7 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
     _mirrorClientInfo = new WorkerManagedResource("agentClients", context,
                           () -> {
                             String moduleName = context.getModuleInstanceInfo().getModuleName();
-                            RamaClusterManager manager = RamaClusterManager.openInternal();
+                            ClusterManagerBase manager = context.getClusterRetriever();
                             Map agentDepots = new HashMap();
                             for(String name: _agentNames) {
                               agentDepots.put(name, manager.clusterDepot(moduleName, agentDepotName(name)));
