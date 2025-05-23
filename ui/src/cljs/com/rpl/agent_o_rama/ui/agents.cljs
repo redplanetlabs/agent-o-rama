@@ -11,24 +11,6 @@
    
    [com.rpl.agent-o-rama.ui.common :as common]))
 
-;; ========== index ==========
-#_(defn index []
-  [:div
-   [:div.flex.items-center.justify-between.mb-8
-    [:h1.text-3xl.font-bold.text-gray-800 "Agents"]
-    [:div.text-sm.text-gray-500 (str (count agents) " total")]]
-   [:div.divide-y.divide-gray-100
-    (for [agent agents
-          :let [url (rfe/href ::agent agent)]]
-      [:div.py-4.transition-colors.duration-150.hover:bg-gray-50 {:key url}
-       [:a.flex.items-center.group {:href url}
-        [:div.flex-1
-         [:div.text-lg.font-medium.text-indigo-600.group-hover:text-indigo-800
-          (let [{:keys [module-id agent-id]} agent]
-            [:div module-id "/" agent-id])]
-         [:div.mt-1.text-sm.text-gray-500.group-hover:text-gray-700
-          "View agent details"]]]])]])
-
 (defui index []
   (let [{:keys [data isLoading]}
         (common/use-query {:query-key ["agents"]
@@ -47,6 +29,30 @@
                             ($ :div (:module-id agent) "/" (:agent-id agent)))
                           ($ :div.mt-1.text-sm.text-gray-500.group-hover:text-gray-700
                             "View agent details"))))))))))
+
+
+(defui agent []
+  (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
+        {:keys [data isLoading]}
+        (common/use-query {:query-key ["agent" module-id agent-id]
+                           :query-url (str "/api/agents/" module-id "/" agent-id)})]
+    
+    (cond
+      isLoading ($ :div "loading...")
+      (not data) ($ :div "no data")
+      :else ($ :div
+               ($ :div.grid.grid-cols-1.md:grid-cols-3.gap-6
+                  ($ :div.md:col-span-1.bg-white.p-6.rounded-lg.shadow
+                     ($ :h2.text-2xl.font-semibold.mb-4.text-gray-700 "Stats")
+                     ($ :ul.space-y-2.text-gray-600
+                        ($ :li ($ :span.font-medium "Run Count:") " 30")
+                        ($ :li ($ :span.font-medium "Total Tokens:") " 3707")
+                        ($ :li ($ :span.font-medium "Median Tokens:") " 621")
+                        ($ :li ($ :span.font-medium "Error Rate:") " N/A") ; Placeholder
+                        ($ :li ($ :span.font-medium "Latency:")
+                           ($ :ul.list-disc.list-inside.ml-4.mt-1.space-y-1
+                              ($ :li "p50: 1.58s")
+                              ($ :li "p99: 3.23s"))))))))))
 
 ;; ========== agent ==========
 #_(defn agent []

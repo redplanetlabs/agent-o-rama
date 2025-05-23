@@ -26,6 +26,7 @@
      ($ nav)
      ($ Router
         ($ Route {:path "/agents" :component agents/index})
+        ($ Route {:path "/agents/:module-id/:agent-id" :component agents/agent})
         ($ Route {:path "/" :component home}))))
 
 
