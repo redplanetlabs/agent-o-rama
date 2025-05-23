@@ -40,19 +40,17 @@
     (cond
       isLoading ($ :div "loading...")
       (not data) ($ :div "no data")
-      :else ($ :div
-               ($ :div.grid.grid-cols-1.md:grid-cols-3.gap-6
-                  ($ :div.md:col-span-1.bg-white.p-6.rounded-lg.shadow
-                     ($ :h2.text-2xl.font-semibold.mb-4.text-gray-700 "Stats")
-                     ($ :ul.space-y-2.text-gray-600
-                        ($ :li ($ :span.font-medium "Run Count:") " 30")
-                        ($ :li ($ :span.font-medium "Total Tokens:") " 3707")
-                        ($ :li ($ :span.font-medium "Median Tokens:") " 621")
-                        ($ :li ($ :span.font-medium "Error Rate:") " N/A") ; Placeholder
-                        ($ :li ($ :span.font-medium "Latency:")
-                           ($ :ul.list-disc.list-inside.ml-4.mt-1.space-y-1
-                              ($ :li "p50: 1.58s")
-                              ($ :li "p99: 3.23s"))))))))))
+      :else 
+      (let [invokes (:invokes data)]
+          ($ :div
+             (for [invoke invokes
+                     :let [url (str "/agents/" module-id "/" agent-id "/" (:root-invoke-id invoke))]]
+             ($ wouter/Link {:href url :key url}
+               ($ :div.bg-white.p-6.rounded-lg.shadow {:class "hover:bg-gray-100"}
+                  ($ :div.flex.justify-between.items-center.mb-2
+                     ($ :div.text-indigo-600.font-medium.text-sm
+                        "Explore Invocation"))
+                  ($ :pre.text-xs.bg-gray-100.p-2.rounded.overflow-x-auto (common/pp invoke))))))))))
 
 ;; ========== agent ==========
 #_(defn agent []
