@@ -1,17 +1,10 @@
 (ns com.rpl.agent-o-rama.ui
   (:require
-   [reagent.dom :as rd]
-   [reitit.core :as r]
-   [reitit.coercion.spec :as rss]
-   [reitit.frontend :as rf]
-   [reitit.frontend.controllers :as rfc]
-   [reitit.frontend.easy :as rfe]
-   
    [uix.core :as uix :refer [defui defhook $]]
    [uix.dom]
    
    [com.rpl.agent-o-rama.ui.agents :as agents]
-   ["wouter" :refer [Link Route Switch Router]]))
+   ["wouter" :refer [Link Route Switch Router useLocation]]))
 
 
 (defui button [{:keys [on-click children]}]
@@ -28,10 +21,14 @@
 (defui agents-viewer []
   ($ :div "agents"))
 
+(defui nav-row [{:keys [location href title]}]
+  ($ Link {:href href :class (if (= href location) "bg-purple-200 px-2" "px-2")} title))
+
 (defui nav []
-  ($ :div
-     ($ Link {:href "/counter" :class "bg-red-500"} "counter")
-     ($ Link {:href "/"} "home")))
+  (let [[location _] (useLocation)]
+    ($ :div.bg-purple-100.flex.p-2
+       ($ nav-row {:location location :href "/" :title "home"})
+       ($ nav-row {:location location :href "/counter" :title "counter"}))))
 
 (defui app []
   ($ :div
