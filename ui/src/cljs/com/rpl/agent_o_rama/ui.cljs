@@ -4,8 +4,10 @@
    [uix.dom]
    
    [com.rpl.agent-o-rama.ui.agents :as agents]
-   ["wouter" :refer [Link Route Switch Router useLocation]]))
+   ["wouter" :refer [Link Route Switch Router useLocation]]
+   ["@tanstack/react-query" :refer [QueryClient QueryClientProvider]]))
 
+(def query-client (QueryClient.))
 
 (defui home []
   ($ :div "home"))
@@ -29,6 +31,7 @@
 
 (defn init []
   (uix.dom/render-root
-   ($ app)
+   ($ QueryClientProvider {:client query-client}
+      ($ app))
    (uix.dom/create-root
     (.getElementById js/document "root"))))

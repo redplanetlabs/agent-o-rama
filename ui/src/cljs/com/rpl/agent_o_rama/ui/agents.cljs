@@ -4,6 +4,9 @@
    [com.rpl.agent-o-rama.ui.graph :as graph]
    
    [uix.core :as uix :refer [defui defhook $]]
+   ["axios" :as axios]
+
+
    
    [com.rpl.agent-o-rama.ui.common :as common]))
 
@@ -26,7 +29,10 @@
           "View agent details"]]]])]])
 
 (defui index []
-  ($ :div "agent index"))
+  (let [{:keys [data isLoading]}
+        (common/use-query {:query-key ["agents"]
+                           :query-fn (fn [] (axios/get "https://api.github.com/repos/tannerlinsley/react-query"))})]
+    ($ :div "agent index" (pr-str data))))
 
 ;; ========== agent ==========
 #_(defn agent []
