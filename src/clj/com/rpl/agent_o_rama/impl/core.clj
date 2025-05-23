@@ -162,7 +162,7 @@
                            {:current-result @result-vol})))
        (when-not (empty? @emits-vol)
          (throw (h/ex-info "Cannot both emit and result" {})))
-       (vreset! result-vol (aor-types/->valid-AgentResult arg)))
+       (vreset! result-vol (aor-types/->valid-AgentResult arg false)))
      (getAgentObject [this name]
                      ;; TODO: <<<<>>>>
      )
@@ -297,7 +297,17 @@
       [(keypath *graph-id)
        :ack-val
        (term %update-ack-val)]
-      $$root))
+      $$root)
+     (local-select> (keypath *graph-id)
+                    $$root
+                    :> {*root-ack-val :ack-val *result :result})
+     (<<if (and> (nil? *result) (= 0 *root-ack-val))
+       (local-transform>
+        [(keypath *graph-id) :result
+         (termval (aor-types/->AgentResult "Agent completed without result"
+                                           true))]
+        $$root))
+   )
 
    (unify> <regular-emit> <agg-ack-emit>)
    (:> *op)))
@@ -611,15 +621,14 @@
               :> {:keys [*agent-id
                           *node
                           *invoke-id
-                          *emit-index
-                          *arg-index
                           *streaming-index
                           *value]})
+      ;; this ensures idempotence
       (<<ramafn %correct-index?
         [*l]
         (:> (= (count *l) *streaming-index)))
       (local-transform>
-       [(keypath *agent-id *node *invoke-id *emit-index *arg-index)
+       [(keypath *agent-id *node *invoke-id)
         (pred %correct-index?)
         AFTER-ELEM
         (termval *value)]
@@ -631,7 +640,6 @@
     ;;  - need abstraction for human in the loop
     ;;    - need depot for this too
     ;;  - client should query for number of args
-    ;;  - task global for out-of-band events
     ;;  - need ability to set breakpoints, which is implicit human in the loop?
   ))
 

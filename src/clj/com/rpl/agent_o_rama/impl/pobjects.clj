@@ -50,8 +50,6 @@
      :graph-version  Long
      ;; TODO: <<<<<>>>>> if no result is ever specified, should error instead
      ;; of hanging
-     ;; - will need top-level acking that puts error here if it didn't
-     ;; complete
      :result         AgentResult
      :ack-val        Long})})
 

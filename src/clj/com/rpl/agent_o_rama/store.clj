@@ -1,8 +1,7 @@
 (ns com.rpl.agent-o-rama.store
   (:refer-clojure :exclude [get contains?])
   (:require
-   [com.rpl.agent-o-rama.impl.store-impl :as simpl])
-)
+   [com.rpl.agent-o-rama.impl.store-impl :as simpl]))
 
 (defn get
   ([store k]

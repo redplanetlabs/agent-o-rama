@@ -34,7 +34,8 @@
    time-millis :- Long])
 
 (drp/defrecord+ AgentResult
-  [val :- (s/maybe Object)])
+  [val :- (s/maybe Object)
+   failure? :- Boolean])
 
 
 (drp/defrecord+ AgentNode
@@ -103,6 +104,7 @@
    agent-id :- Long
    node :- String
    invoke-id :- Long
+   streaming-index :- Long
    value :- Object])
 
 (drp/defrecord+ NodeOp
