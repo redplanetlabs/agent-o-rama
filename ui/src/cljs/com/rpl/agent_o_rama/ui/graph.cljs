@@ -42,7 +42,7 @@
 
     (.setDefaultEdgeLabel g (fn [] #js {}))
     (.setGraph g #js {})
-    
+
     (doall (for [edge edges] (.setEdge g (:source edge) (:target edge))))
     (doall (for [node nodes]
              (.setNode g (:id node) (clj->js
