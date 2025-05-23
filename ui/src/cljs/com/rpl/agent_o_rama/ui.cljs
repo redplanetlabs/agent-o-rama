@@ -4,7 +4,7 @@
    [uix.dom]
    
    [com.rpl.agent-o-rama.ui.agents :as agents]
-   ["wouter" :refer [Link Route Switch Router useLocation]]
+   ["wouter" :refer [Link Route Switch Router useLocation useRoute]]
    ["@tanstack/react-query" :refer [QueryClient QueryClientProvider]]))
 
 (def query-client (QueryClient.))
@@ -13,13 +13,15 @@
   ($ :div "home"))
 
 (defui nav-row [{:keys [location href title]}]
-  ($ Link {:href href :class (if (= href location) "bg-purple-200 px-2" "px-2")} title))
+  (let [is-active (first (useRoute href))]
+    ($ Link {:href href :class (if is-active "bg-purple-200 px-2" "px-2")} title)))
 
 (defui nav []
   (let [[location _] (useLocation)]
     ($ :div.bg-purple-100.flex.p-2
        ($ nav-row {:location location :href "/" :title "home"})
-       ($ nav-row {:location location :href "/agents" :title "agents"}))))
+       ($ nav-row {:location location :href "/agents" :title "agents"})
+       ($ nav-row {:location location :href "/agents/:module-id/:agent-id" :title "agent"}))))
 
 (defui app []
   ($ :div
