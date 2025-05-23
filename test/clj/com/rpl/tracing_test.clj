@@ -51,7 +51,7 @@
   (transform [MAP-VALS
               (multi-path
                STAY
-               [(must :async-ops) ALL (view #(into {} %))])
+               [(must :nested-ops) ALL (view #(into {} %))])
               (submap [:start-time-millis :finish-time-millis])
               #(= 2 (count %))]
              (fn [{:keys [start-time-millis finish-time-millis]}]
@@ -63,7 +63,7 @@
   (setval [MAP-VALS
            (multi-path
             STAY
-            [(must :async-ops) ALL (view #(into {} %))])
+            [(must :nested-ops) ALL (view #(into {} %))])
            (submap [:start-time-millis :finish-time-millis])]
           {}
           trace))
@@ -154,14 +154,14 @@
      {:a {:start-time-millis 3
           :finish-time-millis 5
           :q 1
-          :async-ops [{:a 2 :start-time-millis 10 :finish-time-millis 20}
-                      {:start-time-millis 11 :finish-time-millis 12}]}
+          :nested-ops [{:a 2 :start-time-millis 10 :finish-time-millis 20}
+                       {:start-time-millis 11 :finish-time-millis 12}]}
       :b {:start-time-millis 2 :finish-time-millis 6 :z 1 :x 9}
       :c {:q 3}})
     {:a {:delta-millis 2
-         :q         1
-         :async-ops [{:a 2 :delta-millis 10}
-                     {:delta-millis 1}]}
+         :q 1
+         :nested-ops [{:a 2 :delta-millis 10}
+                      {:delta-millis 1}]}
      :b {:delta-millis 4 :z 1 :x 9}
      :c {:q 3}}
    )))
@@ -213,7 +213,7 @@
      (bind depot
        (foreign-depot ipc
                       module-name
-                      (po/agent-depot-task-global-name "foo")))
+                      (po/agent-depot-name "foo")))
      (bind invokes-pstate
        (foreign-pstate ipc
                        module-name
@@ -222,8 +222,8 @@
        (foreign-query ipc
                       module-name
                       (queries/tracing-query-topology-name "foo")))
-     (bind {[graph-task-id graph-id] "_agents-topology"}
-       (foreign-append! depot (aor-types/->AgentInvoke ["xyz"] 0)))
+     (bind [graph-task-id graph-id]
+       (invoke-agent-and-wait! depot invokes-pstate ["xyz"]))
      (bind root-invoke-id
        (foreign-select-one [(keypath graph-id) :root-invoke-id]
                            invokes-pstate
@@ -245,10 +245,9 @@
                [{:invoke-id      !id2
                  :target-task-id ?graph-task-id
                  :node-name      "node1"
-                 :args           [{:val "xyz-0"
-                                   :async-op-index nil}]}]
+                 :args           ["xyz-0"]}]
                :node          "start"
-               :async-ops     []
+               :nested-ops    []
                :result        nil
                :graph-id      ?graph-id
                :input         ["xyz"]
@@ -259,15 +258,13 @@
                [{:invoke-id      !id3
                  :target-task-id ?graph-task-id
                  :node-name      "node2"
-                 :args           [{:val "xyz-0-00"
-                                   :async-op-index nil}]}
+                 :args           ["xyz-0-00"]}
                 {:invoke-id      !id4
                  :target-task-id !id2-t1
                  :node-name      "node2"
-                 :args           [{:val "xyz-0-01"
-                                   :async-op-index nil}]}]
+                 :args           ["xyz-0-01"]}]
                :node          "node1"
-               :async-ops     []
+               :nested-ops    []
                :result        nil
                :graph-id      ?graph-id
                :input         ["xyz-0"]
@@ -277,10 +274,9 @@
                [{:invoke-id      !id5
                  :target-task-id ?graph-task-id
                  :node-name      "node3"
-                 :args           [{:val "xyz-0-00-000"
-                                   :async-op-index nil}]}]
+                 :args           ["xyz-0-00-000"]}]
                :node          "node2"
-               :async-ops     []
+               :nested-ops    []
                :result        nil
                :graph-id      ?graph-id
                :input         ["xyz-0-00"]
@@ -290,18 +286,18 @@
                [{:invoke-id      !id6
                  :target-task-id ?graph-task-id
                  :node-name      "node4"
-                 :args           [{:val 1 :async-op-index nil}]}
+                 :args           [1]}
                 {:invoke-id      !id7
                  :target-task-id !id5-t1
                  :node-name      "node4"
-                 :args           [{:val 1 :async-op-index nil}]}
+                 :args           [1]}
                 {:invoke-id      !id8
                  :target-task-id !id5-t2
                  :node-name      "node4"
-                 :args           [{:val 1 :async-op-index nil}]}]
+                 :args           [1]}]
                :started-agg?  true
                :node          "node3"
-               :async-ops     []
+               :nested-ops    []
                :result        nil
                :graph-id      ?graph-id
                :input         ["xyz-0-00-000"]
@@ -311,9 +307,9 @@
                [{:invoke-id      !id9
                  :target-task-id ?graph-task-id
                  :node-name      "agg"
-                 :args           [{:val "1-a" :async-op-index nil}]}]
+                 :args           ["1-a"]}]
                :node          "node4"
-               :async-ops     []
+               :nested-ops    []
                :result        nil
                :graph-id      ?graph-id
                :input         [1]
@@ -324,9 +320,9 @@
                [{:invoke-id      !id10
                  :target-task-id ?graph-task-id
                  :node-name      "agg"
-                 :args           [{:val "1-a" :async-op-index nil}]}]
+                 :args           ["1-a"]}]
                :node          "node4"
-               :async-ops     []
+               :nested-ops    []
                :result        nil
                :graph-id      ?graph-id
                :input         [1]
@@ -337,9 +333,9 @@
                [{:invoke-id      !id11
                  :target-task-id ?graph-task-id
                  :node-name      "agg"
-                 :args           [{:val "1-a" :async-op-index nil}]}]
+                 :args           ["1-a"]}]
                :node          "node4"
-               :async-ops     []
+               :nested-ops    []
                :result        nil
                :graph-id      ?graph-id
                :input         [1]
@@ -350,10 +346,9 @@
                [{:invoke-id      !id12
                  :target-task-id ?graph-task-id
                  :node-name      "node3"
-                 :args           [{:val "xyz-0-01-000"
-                                   :async-op-index nil}]}]
+                 :args           ["xyz-0-01-000"]}]
                :node          "node2"
-               :async-ops     []
+               :nested-ops    []
                :result        nil
                :graph-id      ?graph-id
                :input         ["xyz-0-01"]
@@ -363,18 +358,18 @@
                [{:invoke-id      !id13
                  :target-task-id ?graph-task-id
                  :node-name      "node4"
-                 :args           [{:val 1 :async-op-index nil}]}
+                 :args           [1]}
                 {:invoke-id      !id14
                  :target-task-id !id12-t1
                  :node-name      "node4"
-                 :args           [{:val 1 :async-op-index nil}]}
+                 :args           [1]}
                 {:invoke-id      !id15
                  :target-task-id !id12-t2
                  :node-name      "node4"
-                 :args           [{:val 1 :async-op-index nil}]}]
+                 :args           [1]}]
                :started-agg?  true
                :node          "node3"
-               :async-ops     []
+               :nested-ops    []
                :result        nil
                :graph-id      ?graph-id
                :input         ["xyz-0-01-000"]
@@ -384,9 +379,9 @@
                [{:invoke-id      !id16
                  :target-task-id ?graph-task-id
                  :node-name      "agg"
-                 :args           [{:val "1-a" :async-op-index nil}]}]
+                 :args           ["1-a"]}]
                :node          "node4"
-               :async-ops     []
+               :nested-ops    []
                :result        nil
                :graph-id      ?graph-id
                :input         [1]
@@ -397,9 +392,9 @@
                [{:invoke-id      !id17
                  :target-task-id ?graph-task-id
                  :node-name      "agg"
-                 :args           [{:val "1-a" :async-op-index nil}]}]
+                 :args           ["1-a"]}]
                :node          "node4"
-               :async-ops     []
+               :nested-ops    []
                :result        nil
                :graph-id      ?graph-id
                :input         [1]
@@ -410,9 +405,9 @@
                [{:invoke-id      !id18
                  :target-task-id ?graph-task-id
                  :node-name      "agg"
-                 :args           [{:val "1-a" :async-op-index nil}]}]
+                 :args           ["1-a"]}]
                :node          "node4"
-               :async-ops     []
+               :nested-ops    []
                :result        nil
                :graph-id      ?graph-id
                :input         [1]
@@ -427,7 +422,7 @@
                [{:invoke-id !id9' :args ["1-a"]}
                 {:invoke-id !id10' :args ["1-a"]}
                 {:invoke-id !id11' :args ["1-a"]}]
-               :async-ops       []
+               :nested-ops      []
                :agg-ack-val     0
                :result          {:val [["1-a" "1-a" "1-a"]
                                        "xyz-0-00-000-0000"]}
@@ -447,7 +442,7 @@
                [{:invoke-id !id16' :args ["1-a"]}
                 {:invoke-id !id17' :args ["1-a"]}
                 {:invoke-id !id18' :args ["1-a"]}]
-               :async-ops       []
+               :nested-ops      []
                :agg-ack-val     0
                :result          {:val [["1-a" "1-a" "1-a"]
                                        "xyz-0-01-000-0000"]}
@@ -519,7 +514,7 @@
      (bind depot
        (foreign-depot ipc
                       module-name
-                      (po/agent-depot-task-global-name "foo")))
+                      (po/agent-depot-name "foo")))
      (bind invokes-pstate
        (foreign-pstate ipc
                        module-name
@@ -528,10 +523,10 @@
        (foreign-query ipc
                       module-name
                       (queries/tracing-query-topology-name "foo")))
-     (bind {[graph-task-id graph-id] "_agents-topology"}
-       (foreign-append! depot (aor-types/->AgentInvoke ["xy" "-z"] 0)))
-     (bind {[graph-task-id2 graph-id2] "_agents-topology"}
-       (foreign-append! depot (aor-types/->AgentInvoke ["a" "b"] 0)))
+     (bind [graph-task-id graph-id]
+       (invoke-agent-and-wait! depot invokes-pstate ["xy" "-z"]))
+     (bind [graph-task-id2 graph-id2]
+       (invoke-agent-and-wait! depot invokes-pstate ["a" "b"]))
      (bind root-invoke-id
        (foreign-select-one [(keypath graph-id) :root-invoke-id]
                            invokes-pstate
@@ -562,15 +557,13 @@
               [{:invoke-id      !id2
                 :target-task-id ?graph-task-id
                 :node-name      "node1"
-                :args           [{:val "xy-z-0"
-                                  :async-op-index nil}]}
+                :args           ["xy-z-0"]}
                {:invoke-id      !id3
                 :target-task-id !id1-t1
                 :node-name      "node2"
-                :args           [{:val "-zxy-1"
-                                  :async-op-index nil}]}]
+                :args           ["-zxy-1"]}]
               :node          "start"
-              :async-ops     []
+              :nested-ops    []
               :result        nil
               :graph-id      ?graph-id
               :input         ["xy" "-z"]
@@ -581,15 +574,13 @@
               [{:invoke-id      !id4
                 :target-task-id ?graph-task-id
                 :node-name      "node3"
-                :args           [{:val "xy-z-0-a0"
-                                  :async-op-index nil}]}
+                :args           ["xy-z-0-a0"]}
                {:invoke-id      !id5
                 :target-task-id !id2-t1
                 :node-name      "node4"
-                :args           [{:val "xy-z-0-a1"
-                                  :async-op-index nil}]}]
+                :args           ["xy-z-0-a1"]}]
               :node          "node1"
-              :async-ops     []
+              :nested-ops    []
               :result        nil
               :graph-id      ?graph-id
               :input         ["xy-z-0"]
@@ -600,15 +591,13 @@
               [{:invoke-id      !id6
                 :target-task-id !id1-t1
                 :node-name      "node5"
-                :args           [{:val "-zxy-1-b0"
-                                  :async-op-index nil}]}
+                :args           ["-zxy-1-b0"]}
                {:invoke-id      !id7
                 :target-task-id !id3-t1
                 :node-name      "node6"
-                :args           [{:val "-zxy-1-b1"
-                                  :async-op-index nil}]}]
+                :args           ["-zxy-1-b1"]}]
               :node          "node2"
-              :async-ops     []
+              :nested-ops    []
               :result        nil
               :graph-id      ?graph-id
               :input         ["-zxy-1"]
@@ -637,7 +626,7 @@
        {!id1 {:agg-invoke-id nil
               :emits         []
               :node          "node3"
-              :async-ops     []
+              :nested-ops    []
               :result        nil
               :graph-id      ?graph-id
               :input         ["xy-z-0-a0"]
@@ -646,7 +635,7 @@
         !id2 {:agg-invoke-id nil
               :emits         []
               :node          "node4"
-              :async-ops     []
+              :nested-ops    []
               :result        nil
               :graph-id      ?graph-id
               :input         ["xy-z-0-a1"]
@@ -655,7 +644,7 @@
         !id3 {:agg-invoke-id nil
               :emits         []
               :node          "node5"
-              :async-ops     []
+              :nested-ops    []
               :result        nil
               :graph-id      ?graph-id
               :input         ["-zxy-1-b0"]
@@ -684,7 +673,7 @@
        {!id1 {:agg-invoke-id nil
               :emits         []
               :node          "node6"
-              :async-ops     []
+              :nested-ops    []
               :result        {:val ["done" "-zxy-1-b1"]}
               :graph-id      ?graph-id
               :input         ["-zxy-1-b1"]
@@ -715,15 +704,13 @@
               [{:invoke-id      !id2
                 :target-task-id ?graph-task-id
                 :node-name      "node1"
-                :args           [{:val "ab-0"
-                                  :async-op-index nil}]}
+                :args           ["ab-0"]}
                {:invoke-id      !id3
                 :target-task-id !id1-t1
                 :node-name      "node2"
-                :args           [{:val "ba-1"
-                                  :async-op-index nil}]}]
+                :args           ["ba-1"]}]
               :node          "start"
-              :async-ops     []
+              :nested-ops    []
               :result        nil
               :graph-id      ?graph-id
               :input         ["a" "b"]
@@ -734,15 +721,13 @@
               [{:invoke-id      !id4
                 :target-task-id ?graph-task-id
                 :node-name      "node3"
-                :args           [{:val "ab-0-a0"
-                                  :async-op-index nil}]}
+                :args           ["ab-0-a0"]}
                {:invoke-id      !id5
                 :target-task-id !id2-t1
                 :node-name      "node4"
-                :args           [{:val "ab-0-a1"
-                                  :async-op-index nil}]}]
+                :args           ["ab-0-a1"]}]
               :node          "node1"
-              :async-ops     []
+              :nested-ops    []
               :result        nil
               :graph-id      ?graph-id
               :input         ["ab-0"]
@@ -753,15 +738,13 @@
               [{:invoke-id      !id6
                 :target-task-id !id1-t1
                 :node-name      "node5"
-                :args           [{:val "ba-1-b0"
-                                  :async-op-index nil}]}
+                :args           ["ba-1-b0"]}
                {:invoke-id      !id7
                 :target-task-id !id3-t1
                 :node-name      "node6"
-                :args           [{:val "ba-1-b1"
-                                  :async-op-index nil}]}]
+                :args           ["ba-1-b1"]}]
               :node          "node2"
-              :async-ops     []
+              :nested-ops    []
               :result        nil
               :graph-id      ?graph-id
               :input         ["ba-1"]
@@ -790,7 +773,7 @@
        {!id1 {:agg-invoke-id nil
               :emits         []
               :node          "node3"
-              :async-ops     []
+              :nested-ops    []
               :result        nil
               :graph-id      ?graph-id
               :input         ["ab-0-a0"]
@@ -799,7 +782,7 @@
         !id2 {:agg-invoke-id nil
               :emits         []
               :node          "node4"
-              :async-ops     []
+              :nested-ops    []
               :result        nil
               :graph-id      ?graph-id
               :input         ["ab-0-a1"]
@@ -808,7 +791,7 @@
         !id3 {:agg-invoke-id nil
               :emits         []
               :node          "node5"
-              :async-ops     []
+              :nested-ops    []
               :result        nil
               :graph-id      ?graph-id
               :input         ["ba-1-b0"]
@@ -837,7 +820,7 @@
        {!id1 {:agg-invoke-id nil
               :emits         []
               :node          "node6"
-              :async-ops     []
+              :nested-ops    []
               :result        {:val ["done" "ba-1-b1"]}
               :graph-id      ?graph-id
               :input         ["ba-1-b1"]
