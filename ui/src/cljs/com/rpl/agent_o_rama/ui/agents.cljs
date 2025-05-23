@@ -87,6 +87,21 @@
                ]
               [:pre.text-xs.bg-gray-100.p-2.rounded.overflow-x-auto (common/pp data)]])]]]])]))
 
+(defui invoke []
+  (let [{:strs [module-id agent-id invoke-id]} (js->clj (wouter/useParams))
+        {:keys [data isLoading]}
+        (common/use-query {:query-key ["invoke" module-id agent-id invoke-id]
+                           :query-url (str "/api/agents/" module-id "/" agent-id "/" invoke-id)})]
+    (cond
+      isLoading ($ :div "loading...")
+      (not data) ($ :div "no data")
+      :else 
+      ($ :div
+         ($ :div.bg-white.p-6.rounded-lg.shadow
+            ($ :h2.text-2xl.font-semibold.mb-4.text-gray-700 "Invocation Details")
+            ($ :pre.bg-gray-50.p-4.rounded-md.text-sm.overflow-x-auto.border.border-gray-200 
+               (common/pp data)))))))
+
 ;; ============ invoke ==============
 #_(defn invoke []
   (let [{:keys [module-id agent-id invoke-id]} @(re-frame/subscribe [:route-params])]
