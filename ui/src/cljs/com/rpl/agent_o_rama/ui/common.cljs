@@ -9,10 +9,10 @@
 
   `query-key` query key array
   `query-fn` query function to fetch data"
-  [{:keys [query-key query-fn]}]
-  (let [result (rq/useQuery #js {:queryFn query-fn
+  [{:keys [query-key query-url]}]
+  (let [result (rq/useQuery #js {:queryFn (fn [] (axios/get query-url))
                                  :queryKey (into-array query-key)})]
-    {:data (js->clj result.data {:keywordize-keys true})
+    {:data (:data (js->clj result.data {:keywordize-keys true}))
      :error? result.isError
      :success? result.isSuccess
      :loading? result.isLoading}))

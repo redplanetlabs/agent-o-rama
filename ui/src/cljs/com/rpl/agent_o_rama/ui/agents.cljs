@@ -31,8 +31,20 @@
 (defui index []
   (let [{:keys [data isLoading]}
         (common/use-query {:query-key ["agents"]
-                           :query-fn (fn [] (axios/get "https://api.github.com/repos/tannerlinsley/react-query"))})]
-    ($ :div "agent index" (pr-str data))))
+                           :query-url "/api/agents"})]
+    (cond
+      isLoading ($ :div "loading...")
+      (not data) ($ :div "no data")
+      :else ($ :div
+              (for [agent data
+                    :let [url (str "/agents/" (:module-id agent) "/" (:agent-id agent))]]
+                ($ :div.py-4.transition-colors.duration-150.hover:bg-gray-50  {:key url}
+                  ($ :a.flex.items-center.group {:href url}
+                     ($ :div.flex-1
+                        ($ :div.text-lg.font-medium.text-indigo-600.group-hover:text-indigo-800
+                           ($ :div (:module-id agent) "/" (:agent-id agent)))
+                        ($ :div.mt-1.text-sm.text-gray-500.group-hover:text-gray-700
+                           "View agent details")))))))))
 
 ;; ========== agent ==========
 #_(defn agent []
