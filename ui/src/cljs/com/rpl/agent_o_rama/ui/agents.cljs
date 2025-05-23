@@ -65,4 +65,4 @@
          ($ :div.bg-white.p-6.rounded-lg.shadow
             ($ :h2.text-2xl.font-semibold.mb-4.text-gray-700 "Invocation Details")
             ($ :pre.bg-gray-50.p-4.rounded-md.text-sm.overflow-x-auto.border.border-gray-200 
-               ($ graph/graph {:data data})))))))
+               ($ graph/graph {:data (:invokes-map data)})))))))
