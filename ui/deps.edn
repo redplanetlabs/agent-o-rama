@@ -2,6 +2,6 @@
  :deps {thheller/shadow-cljs {:mvn/version "2.28.18"}
         ring/ring-jetty-adapter {:mvn/version "1.14.1"}
         metosin/reitit {:mvn/version "0.8.0"}
-        re-frame/re-frame {:mvn/version "1.4.3"}
-        day8.re-frame/http-fx {:mvn/version "0.2.4"}
-        com.rpl/specter {:mvn/version "1.1.4"}}}
+        com.rpl/specter {:mvn/version "1.1.4"}
+        com.pitch/uix.core {:mvn/version "1.4.3"}
+        com.pitch/uix.dom {:mvn/version "1.4.3"}}}
