@@ -3,38 +3,33 @@
    [com.rpl.agent-o-rama.ui.query :as query]
    [com.rpl.agent-o-rama.ui.graph :as graph]
    
-   [re-frame.core :as re-frame]
-   [reagent.core :as reagent]
-   [ajax.core :as ajax]
-   [com.rpl.agent-o-rama.ui.common :as common]
-   [reitit.frontend.easy :as rfe]))
-
-;; ========== route params utility ==========
-(re-frame/reg-sub :route-params (fn [db _] (:path-params (:current-route db))))
+   [uix.core :as uix :refer [defui defhook $]]
+   
+   [com.rpl.agent-o-rama.ui.common :as common]))
 
 ;; ========== index ==========
-(defn index []
-  [query/query-view
-   [:agent-index]
-   (fn [agents]
-     [:div
-      [:div.flex.items-center.justify-between.mb-8
-       [:h1.text-3xl.font-bold.text-gray-800 "Agents"]
-       [:div.text-sm.text-gray-500 (str (count agents) " total")]]
-      [:div.divide-y.divide-gray-100
-       (for [agent agents
-             :let [url (rfe/href ::agent agent)]]
-         [:div.py-4.transition-colors.duration-150.hover:bg-gray-50 {:key url}
-          [:a.flex.items-center.group {:href url}
-           [:div.flex-1
-            [:div.text-lg.font-medium.text-indigo-600.group-hover:text-indigo-800
-             (let [{:keys [module-id agent-id]} agent]
-               [:div module-id "/" agent-id])]
-            [:div.mt-1.text-sm.text-gray-500.group-hover:text-gray-700
-             "View agent details"]]]])]])])
+#_(defn index []
+  [:div
+   [:div.flex.items-center.justify-between.mb-8
+    [:h1.text-3xl.font-bold.text-gray-800 "Agents"]
+    [:div.text-sm.text-gray-500 (str (count agents) " total")]]
+   [:div.divide-y.divide-gray-100
+    (for [agent agents
+          :let [url (rfe/href ::agent agent)]]
+      [:div.py-4.transition-colors.duration-150.hover:bg-gray-50 {:key url}
+       [:a.flex.items-center.group {:href url}
+        [:div.flex-1
+         [:div.text-lg.font-medium.text-indigo-600.group-hover:text-indigo-800
+          (let [{:keys [module-id agent-id]} agent]
+            [:div module-id "/" agent-id])]
+         [:div.mt-1.text-sm.text-gray-500.group-hover:text-gray-700
+          "View agent details"]]]])]])
+
+(defui index []
+  ($ :div "agent index"))
 
 ;; ========== agent ==========
-(defn agent []
+#_(defn agent []
   (let [{:keys [module-id agent-id]} @(re-frame/subscribe [:route-params])]
     [query/query-view 
      [:agent module-id agent-id]
@@ -69,7 +64,7 @@
               [:pre.text-xs.bg-gray-100.p-2.rounded.overflow-x-auto (common/pp data)]])]]]])]))
 
 ;; ============ invoke ==============
-(defn invoke []
+#_(defn invoke []
   (let [{:keys [module-id agent-id invoke-id]} @(re-frame/subscribe [:route-params])]
     [query/query-view 
      [:invoke module-id agent-id invoke-id]
@@ -83,7 +78,7 @@
           (common/pp invoke-data)]]])]))
 
 
-(def routes
+#_(def routes
   ["agents"
    [""
     {:name ::index
