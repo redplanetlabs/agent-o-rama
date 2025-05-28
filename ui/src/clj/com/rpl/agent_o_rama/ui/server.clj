@@ -35,8 +35,9 @@
    (ring/router
     ["/api"
      ["/agents" {:get {:handler #'agents/index}}]
-     ["/agents/:module-id/:agent-id" {:get {:handler #'agents/get}}]
-     ["/agents/:module-id/:agent-id/:invoke-id" {:get {:handler #'agents/invoke}}]]
+     ["/agents/:module-id/:agent-id" {:get {:handler #'agents/get-invokes}}]
+     ["/agents/:module-id/:agent-id/:invoke-id" {:get {:handler #'agents/invoke}}]
+     ["/agents/:module-id/:agent-id/:invoke-id/paginated" {:get {:handler #'agents/invoke-paginated}}]]
     {:data {:muuntaja m/instance
             :middleware [muuntaja/format-middleware
                          rrc/coerce-exceptions-middleware

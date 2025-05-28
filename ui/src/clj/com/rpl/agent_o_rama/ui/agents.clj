@@ -9,7 +9,7 @@
     {:module-id "ModuleA" :agent-id "support"}
     {:module-id "ModuleB" :agent-id "research"}]})
 
-(defn get [{{:keys [module-id agent-id]} :path-params}]
+(defn get-invokes [{{:keys [module-id agent-id]} :path-params}]
   {:status
    200
    
@@ -766,3 +766,59 @@
    :body
    {:next-task-invoke-pairs [] ;; [task id, invoke id]
     :invokes-map all-data}})
+
+(defn get-paginated-graph
+  "Traverses the graph starting from a node and returns a subset of nodes
+   within the specified depth limit. Returns nodes and their immediate children,
+   marking which children have further descendants for pagination."
+  [invokes-map start-node-id max-depth]
+  (let [;; Helper to get children of a node
+        get-children (fn [node-id]
+                       (when-let [node (get invokes-map node-id)]
+                         (map :invoke-id (:emits node))))
+        
+        ;; BFS traversal with depth tracking
+        traverse (fn [start-id depth-limit]
+                   (loop [queue [[start-id 0]]
+                          visited #{}
+                          result {}]
+                     (if (empty? queue)
+                       result
+                       (let [[current-id depth] (first queue)
+                             remaining (rest queue)]
+                         (if (or (visited current-id) (>= depth depth-limit))
+                           (recur remaining visited result)
+                           (let [node (get invokes-map current-id)
+                                 children (get-children current-id)
+                                 ;; Check if children have their own children (for pagination indicators)
+                                 children-with-descendants 
+                                 (set (filter #(seq (get-children %)) children))
+                                 ;; Add children to queue only if we haven't reached depth limit
+                                 new-queue (if (< depth (dec depth-limit))
+                                             (concat remaining (map #(vector % (inc depth)) children))
+                                             remaining)]
+                             (recur new-queue
+                                    (conj visited current-id)
+                                    (assoc result current-id
+                                           (assoc node :has-paginated-children 
+                                                  children-with-descendants)))))))))
+        
+        ;; Find the start node ID
+        start-id (or start-node-id
+                     ;; Find node with :node "start"
+                     (first (keep (fn [[id node]]
+                                    (when (= (:node node) "start") id))
+                                  invokes-map)))]
+    
+    (traverse start-id max-depth)))
+
+(defn invoke-paginated 
+  [{{:keys [module-id agent-id invoke-id]} :path-params
+    {:keys [start-node-id depth] :or {depth "3"}} :query-params}]
+  (let [depth-int (Integer/parseInt depth)
+        start-id (when start-node-id (Long/parseLong start-node-id))
+        paginated-data (get-paginated-graph all-data start-id depth-int)]
+    {:status 200
+     :body {:invokes-map paginated-data
+            :pagination {:depth depth-int
+                         :start-node-id (or start-id "root")}}}))

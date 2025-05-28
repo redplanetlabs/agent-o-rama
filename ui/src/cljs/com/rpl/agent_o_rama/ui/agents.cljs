@@ -1,6 +1,5 @@
 (ns com.rpl.agent-o-rama.ui.agents
   (:require
-   [com.rpl.agent-o-rama.ui.query :as query]
    [com.rpl.agent-o-rama.ui.graph :as graph]
    
    [uix.core :as uix :refer [defui defhook $]]
@@ -53,16 +52,47 @@
                   ($ :pre.text-xs.bg-gray-100.p-2.rounded.overflow-x-auto (common/pp invoke))))))))))
 
 (defui invoke []
+  
   (let [{:strs [module-id agent-id invoke-id]} (js->clj (wouter/useParams))
+        [use-pagination? set-use-pagination] (uix/use-state true)
+        [pagination-state set-pagination-state] (uix/use-state {:depth 3 :start-node-id nil})
         {:keys [data isLoading]}
-        (common/use-query {:query-key ["invoke" module-id agent-id invoke-id]
-                           :query-url (str "/api/agents/" module-id "/" agent-id "/" invoke-id)})]
+        (common/use-query {:query-key (if use-pagination?
+                                        ["invoke-paginated" module-id agent-id invoke-id 
+                                         (:depth pagination-state) 
+                                         (:start-node-id pagination-state)]
+                                        ["invoke" module-id agent-id invoke-id])
+                           :query-url (if use-pagination?
+                                        (str "/api/agents/" module-id "/" agent-id "/" invoke-id "/paginated"
+                                             "?depth=" (:depth pagination-state)
+                                             (when (:start-node-id pagination-state)
+                                               (str "&start-node-id=" (:start-node-id pagination-state))))
+                                        (str "/api/agents/" module-id "/" agent-id "/" invoke-id))})
+        
+        handle-paginate-node (uix/use-callback
+                              (fn [node-id]
+                                (set-pagination-state {:depth 3 :start-node-id node-id}))
+                              [])]
     (cond
       isLoading ($ :div "loading...")
       (not data) ($ :div "no data")
       :else 
       ($ :div
          ($ :div.bg-white.p-6.rounded-lg.shadow
-            ($ :h2.text-2xl.font-semibold.mb-4.text-gray-700 "Invocation Details")
-            ($ :pre.bg-gray-50.p-4.rounded-md.text-sm.overflow-x-auto.border.border-gray-200 
-               ($ graph/graph {:data (:invokes-map data)})))))))
+            ($ :div.flex.justify-between.items-center.mb-4
+               ($ :h2.text-2xl.font-semibold.text-gray-700 "Invocation Details")
+               ($ :div.flex.items-center.gap-2
+                  ($ :label.text-sm.text-gray-600 "Pagination:")
+                  ($ :input.mr-2 {:type "checkbox"
+                                  :checked use-pagination?
+                                  :onChange #(set-use-pagination (not use-pagination?))})
+                  (when (and use-pagination? 
+                             (:start-node-id pagination-state) 
+                             (not= (:start-node-id pagination-state) "root"))
+                    ($ :button.ml-4.px-4.py-2.bg-gray-200.text-gray-700.rounded.hover:bg-gray-300
+                       {:onClick #(set-pagination-state {:depth 3 :start-node-id nil})}
+                       "← Back to root"))))
+            ($ graph/graph {:data (:invokes-map data)
+                            :on-paginate-node (when use-pagination? handle-paginate-node)}))))))
+
+

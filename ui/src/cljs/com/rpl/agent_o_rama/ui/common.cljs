@@ -9,10 +9,8 @@
 
 (defn fetch [url]
   (.then (js/fetch url #js {:headers #js {:Accept "application/transit+json"}})
-         (fn [response]
-           (.then (.text response)
-                  (fn [text]
-                    (t/read reader text))))))
+         (fn [response] (.then (.text response) (fn [text] (t/read reader text))))))
+
 (defn use-query
   "Wrap useQuery
 
