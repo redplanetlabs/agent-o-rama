@@ -89,7 +89,7 @@
         
         handle-paginate-node (uix/use-callback
                               (fn [node-id]
-                                (when-not (contains? @loading-nodes node-id)
+                                (when-not (contains? loading-nodes node-id)
                                   (set-loading-nodes #(conj % node-id))
                                   (-> (.get axios (str api-url 
                                                        "?depth=3&start-node-id=" node-id))
@@ -112,10 +112,10 @@
                                                  ;; Update nodes and edges
                                                  (set-nodes #(clj->js (concat (js->clj % :keywordize-keys true) new-nodes)))
                                                  (set-edges #(clj->js (concat (js->clj % :keywordize-keys true) new-edges)))
-                                                 (set-loading-nodes #(disj % node-id))))
-                                             (.catch (fn [error]
-                                                       (js/console.error "Failed to load paginated data:" error)
-                                                       (set-loading-nodes #(disj % node-id))))))))
+                                                 (set-loading-nodes #(disj % node-id)))))
+                                      (.catch (fn [error]
+                                                (js/console.error "Failed to load paginated data:" error)
+                                                (set-loading-nodes #(disj % node-id)))))))
                               [flow-nodes flow-edges api-url loading-nodes set-nodes set-edges])]
     
     ($ :<>
