@@ -7,26 +7,31 @@
    [com.rpl.specter :as s]
 
    ["react" :refer [useState useCallback useEffect]]
-   ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState]]
+   ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle]]
    ["@dagrejs/dagre" :as Dagre]
    ["axios" :as axios]))
 
-(defui custom-node [props]
-  (js/console.log "x" props)
-  (let [data (.-data props)
-        has-more? (.-has-more data)
-        node-id (.-node-id data)]
-    ($ :div {:className "relative"}
-       ($ :div {:className "bg-indigo-500 text-white p-3 rounded-md shadow-lg"}
-          {:style {:width "170px" :height "40px"}}
-          (.-label data))
-       (when has-more?
-         ($ :button {:className (str "absolute bottom-0 right-0 transform translate-x-1/2 translate-y-1/2 "
-                                     " text-white rounded-full w-6 h-6 text-xs font-bold shadow-md")
-                     :onClick (fn [e]
-                                (.stopPropagation e)
-                                #_(handle-paginate-node node-id))})))))
-
+(def custom-node
+  (uix.core/as-react
+   (fn [{:keys [data]}]
+     (let [data (js->clj data :keywordize-keys true)
+           has-more? (:has-more data)
+           node-id (:node-id data)]
+       (println "data" (keys data))
+       ($ :div {:className "relative"}
+          ($ :div {:className "bg-indigo-500 text-white p-3 rounded-md shadow-lg"
+                   :style {:width "170px" :height "40px"}}
+             (:label data))
+          ($ Handle {:type "target" :position "top"})
+          ($ Handle {:type "source" :position "bottom"})
+          (when has-more?
+            ($ :button {:className (str "absolute bottom-0 right-0 transform translate-x-1/2 translate-y-1/2 "
+                                        " text-white rounded-full w-6 h-6 text-xs font-bold shadow-md"
+                                        " cursor-pointer")
+                        :onClick (fn [e]
+                                   (js/console.log "clicked")
+                                   (.stopPropagation e)
+                                   #_(handle-paginate-node node-id))})))))))
 (def node-types (clj->js {"custom" custom-node}))
 
 (defn process-graph-data 
@@ -39,6 +44,7 @@
                          
                          (s/view (fn [[id data]]
                                    {:id (str id)
+                                    :type "custom"
                                     :data (assoc data 
                                                  :label (str (:node data))
                                                  :node-id id)}))]
@@ -84,6 +90,7 @@
                                         node-id (-> node :data :node-id)
                                         has-more? (has-paginated-children? node-id)]]
                               (assoc node 
+                                     :type "custom"
                                      :position position
                                      :data (assoc (:data node) :has-more has-more?)))]
       {:nodes nodes-with-layout
