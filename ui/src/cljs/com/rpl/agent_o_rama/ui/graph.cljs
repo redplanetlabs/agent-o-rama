@@ -11,6 +11,24 @@
    ["@dagrejs/dagre" :as Dagre]
    ["axios" :as axios]))
 
+(defui custom-node [props]
+  (js/console.log "x" props)
+  (let [data (.-data props)
+        has-more? (.-has-more data)
+        node-id (.-node-id data)]
+    ($ :div {:className "relative"}
+       ($ :div {:className "bg-indigo-500 text-white p-3 rounded-md shadow-lg"}
+          {:style {:width "170px" :height "40px"}}
+          (.-label data))
+       (when has-more?
+         ($ :button {:className (str "absolute bottom-0 right-0 transform translate-x-1/2 translate-y-1/2 "
+                                     " text-white rounded-full w-6 h-6 text-xs font-bold shadow-md")
+                     :onClick (fn [e]
+                                (.stopPropagation e)
+                                #_(handle-paginate-node node-id))})))))
+
+(def node-types (clj->js {"custom" custom-node}))
+
 (defn process-graph-data 
   "Process raw graph data into nodes and edges for React Flow"
   [data]
@@ -21,10 +39,9 @@
                          
                          (s/view (fn [[id data]]
                                    {:id (str id)
-                                    :type "custom"
                                     :data (assoc data 
-                                                :label (str (:node data))
-                                                :node-id id)}))]
+                                                 :label (str (:node data))
+                                                 :node-id id)}))]
                         data)
         implicit->real (into {}
                              (s/select [s/ALL
@@ -45,12 +62,12 @@
         
         ;; Check if a node's children are paginated (not all loaded)
         has-paginated-children? (fn [node-id]
-                                 (when-let [node-data (get data node-id)]
-                                   (let [emitted-ids (set (map :invoke-id (:emits node-data)))
-                                         paginated-children (:has-paginated-children node-data)]
-                                     (some #(and (contains? emitted-ids %)
-                                                (not (contains? data %)))
-                                           paginated-children))))]
+                                  (when-let [node-data (get data node-id)]
+                                    (let [emitted-ids (set (map :invoke-id (:emits node-data)))
+                                          paginated-children (:has-paginated-children node-data)]
+                                      (some #(and (contains? emitted-ids %)
+                                                  (not (contains? data %)))
+                                            paginated-children))))]
 
     (.setDefaultEdgeLabel g (fn [] #js {}))
     (.setGraph g #js {})
@@ -67,7 +84,6 @@
                                         node-id (-> node :data :node-id)
                                         has-more? (has-paginated-children? node-id)]]
                               (assoc node 
-                                     :type "custom"
                                      :position position
                                      :data (assoc (:data node) :has-more has-more?)))]
       {:nodes nodes-with-layout
@@ -124,27 +140,7 @@
                            :onNodesChange on-nodes-change
                            :onEdgesChange on-edges-change
                            :proOptions {:hideAttribution true}
-                           :nodeTypes {"custom" (fn [props]
-                                                 (let [data (.-data props)
-                                                       has-more? (.-has-more data)
-                                                       node-id (.-node-id data)
-                                                       is-loading? (contains? @loading-nodes node-id)]
-                                                   (js/console.log "DATA" props)
-                                                   ($ :div {:className "relative"}
-                                                      ($ :div {:className "bg-indigo-500 text-white p-3 rounded-md shadow-lg"}
-                                                         {:style {:width "170px" :height "40px"}}
-                                                         (.-label data))
-                                                      (when has-more?
-                                                        ($ :button {:className (str "absolute bottom-0 right-0 transform translate-x-1/2 translate-y-1/2 "
-                                                                                    (if is-loading?
-                                                                                      "bg-gray-400"
-                                                                                      "bg-blue-500 hover:bg-blue-600")
-                                                                                    " text-white rounded-full w-6 h-6 text-xs font-bold shadow-md")
-                                                                    :disabled is-loading?
-                                                                    :onClick (fn [e]
-                                                                               (.stopPropagation e)
-                                                                               (handle-paginate-node node-id))}
-                                                           (if is-loading? "..." "+"))))))}
+                           :nodeTypes node-types
                            :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
                            
                            :onNodeClick
