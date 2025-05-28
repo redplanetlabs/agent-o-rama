@@ -11,27 +11,7 @@
    ["@dagrejs/dagre" :as Dagre]
    ["axios" :as axios]))
 
-(def custom-node
-  (uix.core/as-react
-   (fn [{:keys [data]}]
-     (let [data (js->clj data :keywordize-keys true)
-           has-more? (:has-more data)
-           node-id (:node-id data)]
-       (println "data" (keys data))
-       ($ :div {:className "relative"}
-          ($ :div {:className "bg-indigo-500 text-white p-3 rounded-md shadow-lg"
-                   :style {:width "170px" :height "40px"}}
-             (:label data))
-          ($ Handle {:type "target" :position "top"})
-          ($ Handle {:type "source" :position "bottom"})
-          (when has-more?
-            ($ :button {:className (str "absolute bottom-0 right-0 transform translate-x-1/2 translate-y-1/2 "
-                                        " text-white rounded-full w-6 h-6 text-xs font-bold shadow-md"
-                                        " cursor-pointer")
-                        :onClick (fn [e]
-                                   (js/console.log "clicked")
-                                   (.stopPropagation e)
-                                   #_(handle-paginate-node node-id))})))))))
+(def custom-node)
 (def node-types (clj->js {"custom" custom-node}))
 
 (defn process-graph-data 
@@ -147,7 +127,27 @@
                            :onNodesChange on-nodes-change
                            :onEdgesChange on-edges-change
                            :proOptions {:hideAttribution true}
-                           :nodeTypes node-types
+                           :nodeTypes (clj->js {"custom"
+                                                (uix.core/as-react
+                                                 (fn [{:keys [data]}]
+                                                   (let [data (js->clj data :keywordize-keys true)
+                                                         has-more? (:has-more data)
+                                                         node-id (:node-id data)]
+                                                     (println "data" (keys data))
+                                                     ($ :div {:className "relative"}
+                                                        ($ :div {:className "bg-indigo-500 text-white p-3 rounded-md shadow-lg"
+                                                                 :style {:width "170px" :height "40px"}}
+                                                           (:label data))
+                                                        ($ Handle {:type "target" :position "top"})
+                                                        ($ Handle {:type "source" :position "bottom"})
+                                                        (when has-more?
+                                                          ($ :button {:className (str "absolute bottom-0 right-0 transform translate-x-1/2 translate-y-1/2 "
+                                                                                      " text-white rounded-full w-6 h-6 text-xs font-bold shadow-md"
+                                                                                      " cursor-pointer")
+                                                                      :onClick (fn [e]
+                                                                                 (js/console.log "clicked")
+                                                                                 (.stopPropagation e)
+                                                                                 (handle-paginate-node node-id))}))))))})
                            :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
                            
                            :onNodeClick
