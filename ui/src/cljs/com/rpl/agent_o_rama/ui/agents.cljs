@@ -69,7 +69,7 @@
             ($ :div.flex.justify-between.items-center.mb-4
                ($ :h2.text-2xl.font-semibold.text-gray-700 "Invocation Details")
                ($ :div.flex.items-center.gap-2
-                  ($ :label.text-sm.text-gray-600 "Pagination:")
+                  ($ :label.text-sm.text-gray-600 "Pagination")
                   ($ :input.mr-2 {:type "checkbox"
                                   :checked use-pagination?
                                   :onChange #(set-use-pagination (not use-pagination?))})))

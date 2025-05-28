@@ -21,6 +21,7 @@
                          
                          (s/view (fn [[id data]]
                                    {:id (str id)
+                                    :type "custom"
                                     :data (assoc data 
                                                 :label (str (:node data))
                                                 :node-id id)}))]
@@ -66,6 +67,7 @@
                                         node-id (-> node :data :node-id)
                                         has-more? (has-paginated-children? node-id)]]
                               (assoc node 
+                                     :type "custom"
                                      :position position
                                      :data (assoc (:data node) :has-more has-more?)))]
       {:nodes nodes-with-layout
@@ -111,7 +113,7 @@
                                              (.catch (fn [error]
                                                        (js/console.error "Failed to load paginated data:" error)
                                                        (set-loading-nodes #(disj % node-id))))))))
-                              [flow-nodes flow-edges api-url])]
+                              [flow-nodes flow-edges api-url loading-nodes set-nodes set-edges])]
     
     ($ :<>
        ($ :div {:className "rounded-lg overflow-hidden"}
@@ -122,7 +124,7 @@
                            :onNodesChange on-nodes-change
                            :onEdgesChange on-edges-change
                            :proOptions {:hideAttribution true}
-                           :nodeTypes {:custom (fn [props]
+                           :nodeTypes {"custom" (fn [props]
                                                  (let [data (.-data props)
                                                        has-more? (.-has-more data)
                                                        node-id (.-node-id data)

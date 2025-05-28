@@ -14,9 +14,9 @@
 
 (defui breadcrumb-item [{:keys [pattern href title get-title get-href is-last]}]
   (let [[location _] (useLocation)
-        [match params] (when pattern (useRoute pattern))
+        [match params] (useRoute pattern)
         ;; Also check if we're on a deeper route that starts with this pattern
-        [deeper-match deeper-params] (when pattern (useRoute (str pattern "/*")))
+        [deeper-match deeper-params] (useRoute (str pattern "/*"))
         params (when (or params deeper-params) (js->clj (or params deeper-params) {:keywordize-keys true}))
         should-show (cond
                       pattern (or match deeper-match)
