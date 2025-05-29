@@ -133,7 +133,6 @@
                                                    (let [data (js->clj data :keywordize-keys true)
                                                          has-more? (:has-more data)
                                                          node-id (:node-id data)]
-                                                     (println "data" (keys data))
                                                      ($ :div {:className "relative"}
                                                         ($ :div {:className "bg-indigo-500 text-white p-3 rounded-md shadow-lg"
                                                                  :style {:width "170px" :height "40px"}}

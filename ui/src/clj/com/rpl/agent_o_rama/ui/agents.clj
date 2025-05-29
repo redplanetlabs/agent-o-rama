@@ -816,13 +816,6 @@
   [{{:keys [module-id agent-id invoke-id]} :path-params
     {:strs [start-node-id depth] :or {depth "3"}} :query-params
     :as req}]
-  (def req req)
-  (:query-params req)
-  (def module-id module-id)
-  (def agent-id agent-id)
-  (def invoke-id invoke-id)
-  (def start-node-id start-node-id)
-  (def depth depth)
   (let [depth-int (Integer/parseInt depth)
         start-id (when start-node-id (Long/parseLong start-node-id))
         paginated-data (get-paginated-graph all-data start-id depth-int)]
