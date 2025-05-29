@@ -8,8 +8,7 @@
 
    ["react" :refer [useState useCallback useEffect]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle]]
-   ["@dagrejs/dagre" :as Dagre]
-   ["axios" :as axios]))
+   ["@dagrejs/dagre" :as Dagre]))
 
 (def custom-node)
 (def node-types (clj->js {"custom" custom-node}))
@@ -91,10 +90,10 @@
                               (fn [node-id]
                                 (when-not (contains? loading-nodes node-id)
                                   (set-loading-nodes #(conj % node-id))
-                                  (-> (.get axios (str api-url 
-                                                       "?depth=3&start-node-id=" node-id))
+                                  (-> (common/fetch (str api-url 
+                                                         "?depth=3&start-node-id=" node-id))
                                       (.then (fn [response]
-                                               (let [new-data (-> response .-data .-invokes-map js->clj)
+                                               (let [new-data (:invokes-map response)
                                                      {:keys [nodes edges]} (process-graph-data new-data)
                                                      
                                                      ;; Get current nodes/edges as CLJS data structures
