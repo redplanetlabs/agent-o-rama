@@ -34,12 +34,20 @@
   (ring/ring-handler
    (ring/router
     ["/api"
-     ["/agents" {:get {:handler #'agents/index}}]
-     ["/agents/:module-id/:agent-id" {:get {:handler #'agents/get-invokes}}]
-     ["/agents/:module-id/:agent-id/:invoke-id" {:get {:handler #'agents/invoke}}]
-     ["/agents/:module-id/:agent-id/:invoke-id/paginated" {:get {:handler #'agents/invoke-paginated}}]]
+     ["/agents"
+      {:get {:handler #'agents/index}}]
+     ["/agents/:module-id/:agent-id"
+      {:get {:handler #'agents/get-invokes}}]
+     ["/agents/:module-id/:agent-id/:invoke-id"
+      {:get {:handler #'agents/invoke}}]
+     ["/agents/:module-id/:agent-id/:invoke-id/paginated"
+      {:get {:parameters {:query [:map
+                                  [:depth int?]
+                                  [:start-node-id {:optional true} string?]]}
+             :handler #'agents/invoke-paginated}}]]
     {:data {:muuntaja m/instance
-            :middleware [muuntaja/format-middleware
+            :middleware [parameters/parameters-middleware
+                         muuntaja/format-middleware
                          rrc/coerce-exceptions-middleware
                          rrc/coerce-request-middleware
                          rrc/coerce-response-middleware]
