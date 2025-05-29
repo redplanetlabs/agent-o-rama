@@ -10,9 +10,6 @@
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle]]
    ["@dagrejs/dagre" :as Dagre]))
 
-(def custom-node)
-(def node-types (clj->js {"custom" custom-node}))
-
 (defn process-graph-data 
   "Process raw graph data into nodes and edges for React Flow"
   [data]
@@ -26,7 +23,8 @@
                                     :type "custom"
                                     :data (assoc data 
                                                  :label (str (:node data))
-                                                 :node-id id)}))]
+                                                 :node-id id
+                                                 :is-phantom false)}))]
                         data)
         implicit->real (into {}
                              (s/select [s/ALL
@@ -52,28 +50,44 @@
                                           paginated-children (:has-paginated-children node-data)]
                                       (some #(and (contains? emitted-ids %)
                                                   (not (contains? data %)))
-                                            paginated-children))))]
+                                            paginated-children))))
+        
+        ;; Create phantom nodes for pagination
+        phantom-nodes (for [node nodes
+                            :let [node-id (-> node :data :node-id)]
+                            :when (has-paginated-children? node-id)]
+                        {:id (str "phantom-" node-id)
+                         :type "phantom"
+                         :data {:label "Click to paginate"
+                                :parent-node-id node-id
+                                :is-phantom true}})
+        
+        ;; Create edges from parent nodes to their phantom children
+        phantom-edges (for [phantom phantom-nodes
+                            :let [parent-id (-> phantom :data :parent-node-id)]]
+                        {:id (str parent-id "->" (:id phantom))
+                         :source (str parent-id)
+                         :target (:id phantom)})
+        
+        all-nodes (concat nodes phantom-nodes)
+        all-edges (concat edges phantom-edges)]
 
     (.setDefaultEdgeLabel g (fn [] #js {}))
     (.setGraph g #js {})
 
-    (doall (for [edge edges] (.setEdge g (:source edge) (:target edge))))
-    (doall (for [node nodes]
+    (doall (for [edge all-edges] (.setEdge g (:source edge) (:target edge))))
+    (doall (for [node all-nodes]
              (.setNode g (:id node) (clj->js
                                      (merge node {:width 170 :height 40})))))
     
     (Dagre/layout g)
     
-    (let [nodes-with-layout (for [node nodes
-                                  :let [position (.node g (:id node))
-                                        node-id (-> node :data :node-id)
-                                        has-more? (has-paginated-children? node-id)]]
+    (let [nodes-with-layout (for [node all-nodes
+                                  :let [position (.node g (:id node))]]
                               (assoc node 
-                                     :type "custom"
-                                     :position position
-                                     :data (assoc (:data node) :has-more has-more?)))]
+                                     :position position))]
       {:nodes nodes-with-layout
-       :edges edges})))
+       :edges all-edges})))
 
 (defui graph [{:keys [initial-data api-url module-id agent-id invoke-id]}]
   (let [[selected-node set-selected-node] (uix/use-state nil)
@@ -126,23 +140,26 @@
                            :nodeTypes (clj->js {"custom"
                                                 (uix.core/as-react
                                                  (fn [{:keys [data]}]
-                                                   (let [data (js->clj data :keywordize-keys true)
-                                                         has-more? (:has-more data)
-                                                         node-id (:node-id data)]
+                                                   (let [data (js->clj data :keywordize-keys true)]
                                                      ($ :div {:className "relative"}
                                                         ($ :div {:className "bg-indigo-500 text-white p-3 rounded-md shadow-lg"
                                                                  :style {:width "170px" :height "40px"}}
                                                            (:label data))
                                                         ($ Handle {:type "target" :position "top"})
-                                                        ($ Handle {:type "source" :position "bottom"})
-                                                        (when has-more?
-                                                          ($ :button {:className (str "absolute bottom-0 right-0 transform translate-x-1/2 translate-y-1/2 "
-                                                                                      " text-white rounded-full w-6 h-6 text-xs font-bold shadow-md"
-                                                                                      " cursor-pointer")
-                                                                      :onClick (fn [e]
-                                                                                 (js/console.log "clicked")
-                                                                                 (.stopPropagation e)
-                                                                                 (handle-paginate-node node-id))}))))))})
+                                                        ($ Handle {:type "source" :position "bottom"})))))
+                                                "phantom"
+                                                (uix.core/as-react
+                                                 (fn [{:keys [data]}]
+                                                   (let [data (js->clj data :keywordize-keys true)
+                                                         parent-node-id (:parent-node-id data)]
+                                                     ($ :div {:className "relative cursor-pointer"
+                                                              :onClick (fn [e]
+                                                                         (.stopPropagation e)
+                                                                         (handle-paginate-node parent-node-id))}
+                                                        ($ :div {:className "bg-gray-100 text-gray-600 p-3 rounded-md shadow-lg border-2 border-dashed border-gray-400 hover:bg-gray-200 transition-colors"
+                                                                 :style {:width "170px" :height "40px"}}
+                                                           (:label data))
+                                                        ($ Handle {:type "target" :position "top"})))))})
                            :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
                            
                            :onNodeClick
