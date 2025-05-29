@@ -78,9 +78,10 @@
 (defui graph [{:keys [initial-data api-url module-id agent-id invoke-id]}]
   (let [[selected-node set-selected-node] (uix/use-state nil)
         [loading-nodes set-loading-nodes] (uix/use-state #{})
+        [graph-data set-graph-data] (uix/use-state initial-data)
         
-        ;; Process initial data
-        {:keys [nodes edges]} (process-graph-data initial-data)
+        ;; Process current graph data
+        {:keys [nodes edges]} (process-graph-data graph-data)
         
         ;; Use React Flow's state management hooks
         [flow-nodes set-nodes on-nodes-change] (useNodesState (clj->js nodes))
@@ -94,28 +95,24 @@
                                                          "?depth=3&start-node-id=" node-id))
                                       (.then (fn [response]
                                                (let [new-data (:invokes-map response)
-                                                     {:keys [nodes edges]} (process-graph-data new-data)
                                                      
-                                                     ;; Get current nodes/edges as CLJS data structures
-                                                     current-nodes (js->clj flow-nodes :keywordize-keys true)
-                                                     current-edges (js->clj flow-edges :keywordize-keys true)
+                                                     ;; Merge new data with existing graph data
+                                                     combined-data (merge graph-data new-data)
                                                      
-                                                     ;; Create sets of existing IDs
-                                                     existing-node-ids (set (map :id current-nodes))
-                                                     existing-edge-ids (set (map :id current-edges))
-                                                     
-                                                     ;; Filter out duplicates
-                                                     new-nodes (remove #(existing-node-ids (:id %)) nodes)
-                                                     new-edges (remove #(existing-edge-ids (:id %)) edges)]
+                                                     ;; Re-process the entire combined graph with dagre layout
+                                                     {:keys [nodes edges]} (process-graph-data combined-data)]
                                                  
-                                                 ;; Update nodes and edges
-                                                 (set-nodes #(clj->js (concat (js->clj % :keywordize-keys true) new-nodes)))
-                                                 (set-edges #(clj->js (concat (js->clj % :keywordize-keys true) new-edges)))
+                                                 ;; Update the graph data state
+                                                 (set-graph-data combined-data)
+                                                 
+                                                 ;; Replace all nodes and edges with the re-laid out versions
+                                                 (set-nodes (clj->js nodes))
+                                                 (set-edges (clj->js edges))
                                                  (set-loading-nodes #(disj % node-id)))))
                                       (.catch (fn [error]
                                                 (js/console.error "Failed to load paginated data:" error)
                                                 (set-loading-nodes #(disj % node-id)))))))
-                              [flow-nodes flow-edges api-url loading-nodes set-nodes set-edges])]
+                              [graph-data api-url loading-nodes set-nodes set-edges])]
     
     ($ :<>
        ($ :div {:className "rounded-lg overflow-hidden"}
