@@ -58,7 +58,7 @@
         {:keys [data isLoading]}
         (common/use-query {:query-key ["invoke-initial" module-id agent-id invoke-id use-pagination?]
                            :query-url (if use-pagination?
-                                       (str "/api/agents/" module-id "/" agent-id "/" invoke-id "/paginated?depth=3")
+                                       (str "/api/agents/" module-id "/" agent-id "/" invoke-id "/paginated?depth=1")
                                        (str "/api/agents/" module-id "/" agent-id "/" invoke-id))})]
     (cond
       isLoading ($ :div "loading...")

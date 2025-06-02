@@ -185,7 +185,7 @@
                                 (when-not (contains? loading-nodes node-id)
                                   (set-loading-nodes #(conj % node-id))
                                   (-> (common/fetch (str api-url 
-                                                         "?depth=3&start-node-id=" node-id))
+                                                         "?depth=1&start-node-id=" node-id))
                                       (.then (fn [response]
                                                (let [new-data (:invokes-map response)
                                                      
