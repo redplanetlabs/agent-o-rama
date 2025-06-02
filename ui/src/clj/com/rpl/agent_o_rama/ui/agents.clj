@@ -818,13 +818,17 @@
                            (recur remaining visited result)
                            (let [node (get clean-graph current-id)
                                  children (get-children current-id)
-                                 ;; Check if children have further descendants
-                                 children-with-descendants 
-                                 (set (filter #(seq (get-children %)) children))
+                                 
+                                 ;; Check if there are children that would be at the next depth level
+                                 ;; but aren't included due to depth limit
+                                 has-unloaded-children? (and (= depth depth-limit)
+                                                             (seq children))
                                  
                                  ;; Add pagination info
                                  node-with-pagination (assoc node :has-paginated-children 
-                                                             children-with-descendants)
+                                                             (if has-unloaded-children? 
+                                                               (set children)
+                                                               #{}))
                                  
                                  ;; Add children to queue only if within depth
                                  new-queue (if (< depth depth-limit)
