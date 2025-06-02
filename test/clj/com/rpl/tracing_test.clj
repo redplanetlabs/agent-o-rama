@@ -11,7 +11,10 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.test :as rtest]
    [com.rpl.ramaspecter :refer [walker]]
-   [meander.epsilon :as m]))
+   [meander.epsilon :as m])
+  (:import
+   [com.rpl.rama.helpers
+    TopologyUtils]))
 
 (defn parse-var-prefix
   [sym]
@@ -837,4 +840,73 @@
      (is (-> res12
              :next-task-invoke-pairs
              empty?))
+    )))
+
+(def +timing-sum
+  (accumulator
+   (fn [v]
+     (TopologyUtils/advanceSimTime v)
+     (term #(+ % v)))
+   :init-fn
+   (fn [] 0)
+  ))
+
+(deftest node-timings-test
+  (with-open [ipc (rtest/create-ipc)
+              _ (TopologyUtils/startSimTime)
+             ]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (-> topology
+            (aor/new-agent "foo")
+            (aor/node "start"
+                      "node1"
+                      (fn [agent-node]
+                        (TopologyUtils/advanceSimTime 5)
+                        (aor/emit! agent-node "node1")
+                      ))
+            (aor/agg-start-node "node1"
+                                "agg"
+                                (fn [agent-node]
+                                  (TopologyUtils/advanceSimTime 6)
+                                  (aor/emit! agent-node "agg" 1)
+                                  (aor/emit! agent-node "agg" 2)
+                                ))
+            (aor/agg-node "agg"
+                          nil
+                          +timing-sum
+                          (fn [agent-node agg node-start-res]
+                            (TopologyUtils/advanceSimTime 10)
+                            (aor/result! agent-node agg)))
+        )))
+     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (bind module-name (get-module-name module))
+     (bind depot
+       (foreign-depot ipc
+                      module-name
+                      (po/agent-depot-name "foo")))
+     (bind invokes-pstate
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-invoke-task-global-name "foo")))
+     (bind traces-query
+       (foreign-query ipc
+                      module-name
+                      (queries/tracing-query-topology-name "foo")))
+     (bind [graph-task-id graph-id]
+       (invoke-agent-and-wait! depot invokes-pstate []))
+     (bind root-invoke-id
+       (foreign-select-one [(keypath graph-id) :root-invoke-id]
+                           invokes-pstate
+                           {:pkey graph-task-id}))
+     (bind res
+       (foreign-invoke-query traces-query
+                             graph-task-id
+                             [[graph-task-id root-invoke-id]]
+                             100))
+
+     (clojure.pprint/pprint res)
+
     )))

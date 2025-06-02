@@ -3,6 +3,7 @@
         [com.rpl.rama path])
   (:require
    [clojure.set :as set]
+   [clojure.tools.logging :as cljlogging]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
@@ -202,8 +203,16 @@
   [agent-name task-id invoke-id node-fn agent-node args
    ^RamaClientsTaskGlobal rama-clients]
   (fn []
-    ;; TODO: <<<<>>>> try/catch and handle errors
-    (let [res   (apply node-fn agent-node args)
+    (let [res   (try
+                  (apply node-fn agent-node args)
+                  (catch Throwable t
+                    (cljlogging/error t
+                                      "Error during agent node execution"
+                                      {:node      agent-node
+                                       :invoke-id invoke-id})
+                    ;; TODO: <<<<>>>> handle errors properly
+                    (throw t)
+                  ))
           {:keys [emits result nested-ops]} (agent-node-state agent-node)
           depot (.getAgentDepot rama-clients agent-name)]
       (foreign-append!

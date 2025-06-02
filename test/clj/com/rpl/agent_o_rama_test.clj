@@ -830,7 +830,6 @@
          (is (= hgraph2 graph-history2))
         )))))
 
-
 (deftest async-emits-test
          ;; TODO: <<<<<>>>>>
          ;;  - emit regular CF, PState queries, PState transforms, and out of
