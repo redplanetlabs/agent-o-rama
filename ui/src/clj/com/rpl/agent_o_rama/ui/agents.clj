@@ -376,7 +376,6 @@
                      (first (keep (fn [[id node]]
                                     (when (= (:node node) "start") id))
                                   clean-graph)))]
-    (def start-id start-id)
     (traverse start-id max-depth)))
 
 ;; Synthetic graph generator for stress testing
@@ -386,8 +385,6 @@
     :as req}]
   (let [depth-int (Integer/parseInt depth)
         start-id (when start-node-id (Long/parseLong start-node-id))
-        _ (def start-id start-id)
-        _ (def depth-int depth-int)
         paginated-data (get-paginated-graph (if use-large? synthetic-20k-graph all-data) start-id depth-int)]
     {:status 200
      :body {:invokes-map paginated-data
