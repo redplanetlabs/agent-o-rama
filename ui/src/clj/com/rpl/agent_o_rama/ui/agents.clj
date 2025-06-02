@@ -1,4 +1,5 @@
-(ns com.rpl.agent-o-rama.ui.agents)
+(ns com.rpl.agent-o-rama.ui.agents
+  (:require [com.rpl.specter :as s]))
 
 (defn index [{:keys [parameters]}]
   {:status
@@ -759,32 +760,50 @@
     :agg-start-invoke-id -6698531969404300007,
     :graph-task-id 3}})
 
+(defn remove-implicit-nodes
+  "Preprocesses the invokes-map to remove implicit nodes and rewire edges to real nodes.
+   Returns a new map without implicit nodes where all references are updated."
+  [invokes-map]
+  (let [implicit->real
+        (into {}
+              (s/select [s/ALL
+                         (s/selected? s/LAST (s/must :invoked-agg-invoke-id))
+                         (s/view (fn [[id node]]
+                                   [id (:invoked-agg-invoke-id node)]))]
+                        invokes-map))]
+    (->> invokes-map
+         (s/setval [s/ALL 
+                    (s/selected? s/LAST (s/must :invoked-agg-invoke-id))]
+                   s/NONE)
+         (s/transform [s/ALL 
+                       s/LAST 
+                       (s/must :emits) 
+                       s/ALL 
+                       :invoke-id]
+                      #(get implicit->real % %)))))
+
 (defn invoke [{{:keys [module-id agent-id invoke-id]} :path-params}]
   {:status
    200
    
    :body
    {:next-task-invoke-pairs [] ;; [task id, invoke id]
-    :invokes-map all-data}})
+    :invokes-map (remove-implicit-nodes all-data)}})
 
 (defn get-paginated-graph
   "Traverses the graph starting from a node and returns a subset of nodes
    within the specified depth limit. Returns nodes and their immediate children,
    marking which children have further descendants for pagination."
   [invokes-map start-node-id max-depth]
-  (let [;; Create implicit->real mapping like the graph visualization does
-        implicit->real (into {}
-                             (keep (fn [[id node]]
-                                     (when (:invoked-agg-invoke-id node)
-                                       [id (:invoked-agg-invoke-id node)]))
-                                   invokes-map))
-        ;; Helper to get children of a node with implicit->real mapping
-        get-children (fn [node-id]
-                       (when-let [node (get invokes-map node-id)]
-                         ;; Apply implicit->real mapping to each child like the graph visualization
-                         (map #(get implicit->real % %) (map :invoke-id (:emits node)))))
+  (let [;; Preprocess to remove implicit nodes
+        clean-graph (remove-implicit-nodes invokes-map)
         
-        ;; BFS traversal with depth tracking
+        ;; Simple helper to get children - no mapping needed!
+        get-children (fn [node-id]
+                       (when-let [node (get clean-graph node-id)]
+                         (map :invoke-id (:emits node))))
+        
+        ;; Clean BFS traversal
         traverse (fn [start-id depth-limit]
                    (loop [queue [[start-id 0]]
                           visited #{}
@@ -793,29 +812,34 @@
                        result
                        (let [[current-id depth] (first queue)
                              remaining (rest queue)]
-                         (if (or (visited current-id) (>= depth depth-limit))
+                         (if (or (visited current-id) 
+                                 (> depth depth-limit)
+                                 (nil? (get clean-graph current-id)))
                            (recur remaining visited result)
-                           (let [node (get invokes-map current-id)
+                           (let [node (get clean-graph current-id)
                                  children (get-children current-id)
-                                 ;; Check if children have their own children (for pagination indicators)
+                                 ;; Check if children have further descendants
                                  children-with-descendants 
                                  (set (filter #(seq (get-children %)) children))
-                                 ;; Add children to queue only if we haven't reached depth limit
-                                 new-queue (if (< depth (dec depth-limit))
+                                 
+                                 ;; Add pagination info
+                                 node-with-pagination (assoc node :has-paginated-children 
+                                                             children-with-descendants)
+                                 
+                                 ;; Add children to queue only if within depth
+                                 new-queue (if (< depth depth-limit)
                                              (concat remaining (map #(vector % (inc depth)) children))
                                              remaining)]
                              (recur new-queue
                                     (conj visited current-id)
-                                    (assoc result current-id
-                                           (assoc node :has-paginated-children 
-                                                  children-with-descendants)))))))))
+                                    (assoc result current-id node-with-pagination))))))))
         
         ;; Find the start node ID
         start-id (or start-node-id
-                     ;; Find node with :node "start"
+                     ;; Find node with :node "start" in the clean graph
                      (first (keep (fn [[id node]]
                                     (when (= (:node node) "start") id))
-                                  invokes-map)))]
+                                  clean-graph)))]
     
     (traverse start-id max-depth)))
 

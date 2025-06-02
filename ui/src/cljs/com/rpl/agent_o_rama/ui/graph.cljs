@@ -109,11 +109,7 @@
                                                  :node-id id
                                                  :is-phantom false)}))]
                         data)
-        implicit->real (into {}
-                             (s/select [s/ALL
-                                        (s/collect-one s/FIRST)
-                                        s/LAST
-                                        (s/must :invoked-agg-invoke-id)] data))
+        
         edges (for [[from to]
                     (s/select [s/ALL
                                (s/collect-one s/FIRST)
@@ -124,7 +120,7 @@
                 
                 {:id (str from to)
                  :source (str from)
-                 :target (str (get implicit->real to to))})
+                 :target (str to)})
         
         ;; Check if a node's children are paginated (not all loaded)
         has-paginated-children? (fn [node-id]
