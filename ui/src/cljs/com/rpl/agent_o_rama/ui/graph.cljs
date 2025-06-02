@@ -46,13 +46,12 @@
                          (pr-str (js->clj input))
                          (str input)))))
                
-               ;; Result Section
-               ($ :div {:className "bg-blue-50 p-3 rounded-md"}
-                  ($ :div {:className "text-sm font-medium text-blue-700 mb-1"} "Result")
-                  ($ :div {:className "text-sm text-blue-600 font-mono break-words"}
-                     (if result
-                       (pr-str (js->clj result))
-                       "nil")))
+               ;; Result Section - only show if result is not nil
+               (when result
+                 ($ :div {:className "bg-blue-50 p-3 rounded-md"}
+                    ($ :div {:className "text-sm font-medium text-blue-700 mb-1"} "Result")
+                    ($ :div {:className "text-sm text-blue-600 font-mono break-words"}
+                       (pr-str (js->clj result)))))
                
                ;; Timing Section
                (when (and start-time finish-time)
@@ -225,6 +224,9 @@
                                                         ($ :div {:className "bg-indigo-500 text-white p-3 rounded-md shadow-lg"
                                                                  :style {:width "170px" :height "40px"}}
                                                            (:label data))
+                                                        ;; Result indicator circle
+                                                        (when (:result data)
+                                                          ($ :div {:className "absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"}))
                                                         ($ Handle {:type "target" :position "top"})
                                                         ($ Handle {:type "source" :position "bottom"})))))
                                                 "phantom"
