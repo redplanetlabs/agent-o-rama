@@ -1,3 +1,14 @@
+color code based on node/agg/start/etc (marker for result)
+emits panel with arguments/nodeids, that click for nav
+currently selected node coloring
+
+depth mapping by node count, not depth count (query topology does that automatically)
+
+mark node if it has result (AgentResult), don't render nil
+
+agg-invoke-id groups?
+
+
 fix spacing on paginate buttons
 fix agg node not showing up
 
