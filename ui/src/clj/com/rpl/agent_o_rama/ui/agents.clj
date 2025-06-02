@@ -772,10 +772,17 @@
    within the specified depth limit. Returns nodes and their immediate children,
    marking which children have further descendants for pagination."
   [invokes-map start-node-id max-depth]
-  (let [;; Helper to get children of a node
+  (let [;; Create implicit->real mapping like the graph visualization does
+        implicit->real (into {}
+                             (keep (fn [[id node]]
+                                     (when (:invoked-agg-invoke-id node)
+                                       [id (:invoked-agg-invoke-id node)]))
+                                   invokes-map))
+        ;; Helper to get children of a node with implicit->real mapping
         get-children (fn [node-id]
                        (when-let [node (get invokes-map node-id)]
-                         (map :invoke-id (:emits node))))
+                         ;; Apply implicit->real mapping to each child like the graph visualization
+                         (map #(get implicit->real % %) (map :invoke-id (:emits node)))))
         
         ;; BFS traversal with depth tracking
         traverse (fn [start-id depth-limit]
