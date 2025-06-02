@@ -219,24 +219,34 @@
                            :proOptions {:hideAttribution true}
                            :nodeTypes (clj->js {"custom"
                                                 (uix.core/as-react
-                                                 (fn [{:keys [data]}]
+                                                 (fn [{:keys [data selected]}]
                                                    (let [data (js->clj data :keywordize-keys true)
                                                          label (:label data)
                                                          ;; Determine node styling based on label
-                                                         node-style (cond
+                                                         base-style (cond
                                                                       (str/starts-with? label "node") 
-                                                                      {:className "bg-white text-gray-800 p-3 rounded-md shadow-lg border-2 border-gray-300"}
+                                                                      {:bg "bg-white" :text "text-gray-800" :border "border-2 border-gray-300"}
                                                                       
                                                                       (str/starts-with? label "start")
-                                                                      {:className "bg-green-500 text-white p-3 rounded-md shadow-lg"}
+                                                                      {:bg "bg-green-500" :text "text-white" :border "border-2 border-green-600"}
                                                                       
                                                                       (str/starts-with? label "agg")
-                                                                      {:className "bg-yellow-500 text-white p-3 rounded-md shadow-lg"}
+                                                                      {:bg "bg-yellow-500" :text "text-white" :border "border-2 border-yellow-600"}
                                                                       
                                                                       :else
-                                                                      {:className "bg-indigo-500 text-white p-3 rounded-md shadow-lg"})]
+                                                                      {:bg "bg-indigo-500" :text "text-white" :border "border-2 border-indigo-600"})
+                                                         ;; Add selection styling
+                                                         selection-classes (if selected
+                                                                             "ring-4 ring-blue-400 ring-opacity-75 shadow-2xl transform scale-105"
+                                                                             "shadow-lg")
+                                                         node-className (str (:bg base-style) " " 
+                                                                             (:text base-style) " " 
+                                                                             (:border base-style) " "
+                                                                             "p-3 rounded-md transition-all duration-200 " 
+                                                                             selection-classes)]
                                                      ($ :div {:className "relative"}
-                                                        ($ :div (merge node-style {:style {:width "170px" :height "40px"}})
+                                                        ($ :div {:className node-className
+                                                                 :style {:width "170px" :height "40px"}}
                                                            label)
                                                         ;; Result indicator circle
                                                         (when (:result data)
