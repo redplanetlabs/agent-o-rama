@@ -10,6 +10,10 @@
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle]]
    ["@dagrejs/dagre" :as Dagre]))
 
+(defui selected-node-comp [{:keys [selected-node]}]
+  ($ :div {:className "bg-red-500"} 
+     (common/pp selected-node )))
+
 (defn process-graph-data 
   "Process raw graph data into nodes and edges for React Flow"
   [data]
@@ -170,8 +174,5 @@
                 ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
                 ($ Controls {:className "fill-gray-500 stroke-gray-500"}))))
        (when selected-node
-         ($ :div {:className "mt-6 bg-white p-6 rounded-lg shadow"}
-            ($ :h3 {:className "text-xl font-semibold mb-3 text-gray-700"} "Selected Node Details")
-            ($ :pre {:className "bg-gray-50 p-4 rounded-md text-sm overflow-x-auto border border-gray-200"}
-               (common/pp selected-node)))))))
+         ($ selected-node-comp {:selected-node selected-node})))))
 
