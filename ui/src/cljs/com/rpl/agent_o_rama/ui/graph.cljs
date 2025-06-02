@@ -104,6 +104,7 @@
                          (s/view (fn [[id data]]
                                    {:id (str id)
                                     :type "custom"
+                                    :draggable false
                                     :data (assoc data 
                                                  :label (str (:node data))
                                                  :node-id id
