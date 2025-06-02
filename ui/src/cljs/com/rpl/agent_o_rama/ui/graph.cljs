@@ -10,7 +10,7 @@
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle]]
    ["@dagrejs/dagre" :as Dagre]))
 
-(defui selected-node-comp [{:keys [selected-node on-close]}]
+(defui selected-node-component [{:keys [selected-node on-close]}]
   (let [data (when selected-node 
                (js->clj (.-data selected-node) :keywordize-keys true))
         node-id (str (:node-id data))
@@ -25,16 +25,10 @@
         has-paginated (:has-paginated-children data)]
     
     (when selected-node
-      ($ :div {:className "fixed top-4 right-4 w-80 bg-white shadow-xl rounded-lg border border-gray-200 z-50 max-h-96 overflow-y-auto"}
-         ($ :div {:className "p-4"}
-            ;; Header
-            ($ :div {:className "flex justify-between items-center mb-4"}
-               ($ :h3 {:className "text-lg font-semibold text-gray-800"} "Node Details")
-               ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl"
-                           :onClick on-close} "×"))
-            
+      ($ :div {:className "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl"}
+         ($ :div {:className "p-6"}
             ;; Node Info Section
-            ($ :div {:className "space-y-3"}
+            ($ :div {:className "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"}
                ($ :div {:className "bg-indigo-50 p-3 rounded-md"}
                   ($ :div {:className "flex justify-between items-center"}
                      ($ :span {:className "text-sm font-medium text-indigo-700"} "Node")
@@ -47,7 +41,7 @@
                (when input
                  ($ :div {:className "bg-green-50 p-3 rounded-md"}
                     ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
-                    ($ :div {:className "text-sm text-green-600 font-mono"}
+                    ($ :div {:className "text-sm text-green-600 font-mono break-words"}
                        (if (array? input)
                          (pr-str (js->clj input))
                          (str input)))))
@@ -55,7 +49,7 @@
                ;; Result Section
                ($ :div {:className "bg-blue-50 p-3 rounded-md"}
                   ($ :div {:className "text-sm font-medium text-blue-700 mb-1"} "Result")
-                  ($ :div {:className "text-sm text-blue-600 font-mono"}
+                  ($ :div {:className "text-sm text-blue-600 font-mono break-words"}
                      (if result
                        (pr-str (js->clj result))
                        "nil")))
@@ -77,27 +71,27 @@
                           ($ :span {:className "text-xs text-yellow-600 font-mono"} 
                              (.toLocaleTimeString (js/Date. finish-time)))))))
                
-               ;; Emits Section
-               (when (and emits (> (.-length emits) 0))
-                 ($ :div {:className "bg-purple-50 p-3 rounded-md"}
-                    ($ :div {:className "text-sm font-medium text-purple-700 mb-2"} 
-                       (str "Emits (" (.-length emits) ")"))
-                    ($ :div {:className "space-y-2"}
-                       (for [emit (js->clj emits :keywordize-keys true)]
-                         ($ :div {:key (str (:invoke-id emit))
-                                  :className "bg-white p-2 rounded border border-purple-200"}
-                            ($ :div {:className "text-xs text-purple-600"}
-                               ($ :div (str "→ " (:node-name emit)))
-                               (when (:args emit)
-                                 ($ :div {:className "text-purple-500 mt-1"}
-                                    (pr-str (js->clj (:args emit)))))))))))
-               
                ;; Pagination Info
                (when (and has-paginated (> (.-length has-paginated) 0))
                  ($ :div {:className "bg-gray-50 p-3 rounded-md"}
                     ($ :div {:className "text-sm font-medium text-gray-700 mb-1"} "Pagination")
                     ($ :div {:className "text-xs text-gray-600"}
-                       (str (.-length has-paginated) " child(ren) not loaded"))))))))))
+                       (str (.-length has-paginated) " child(ren) not loaded")))))
+            
+            ;; Emits Section (full width)
+            (when (and emits (> (.-length emits) 0))
+              ($ :div {:className "mt-4 bg-purple-50 p-3 rounded-md"}
+                 ($ :div {:className "text-sm font-medium text-purple-700 mb-2"} 
+                    (str "Emits (" (.-length emits) ")"))
+                 ($ :div {:className "grid grid-cols-1 md:grid-cols-2 gap-2"}
+                    (for [emit (js->clj emits :keywordize-keys true)]
+                      ($ :div {:key (str (:invoke-id emit))
+                               :className "bg-white p-2 rounded border border-purple-200"}
+                         ($ :div {:className "text-xs text-purple-600"}
+                            ($ :div (str "→ " (:node-name emit)))
+                            (when (:args emit)
+                              ($ :div {:className "text-purple-500 mt-1 break-words"}
+                                 (pr-str (js->clj (:args emit))))))))))))))))
 
 (defn process-graph-data 
   "Process raw graph data into nodes and edges for React Flow"
@@ -259,6 +253,6 @@
                 ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
                 ($ Controls {:className "fill-gray-500 stroke-gray-500"}))))
        (when selected-node
-         ($ selected-node-comp {:selected-node selected-node
-                                :on-close #(set-selected-node nil)})))))
+         ($ selected-node-component {:selected-node selected-node
+                                     :on-close #(set-selected-node nil)})))))
 
