@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.graph
   (:require
    [com.rpl.agent-o-rama.ui.common :as common]
-   [clojure.string]
+   [clojure.string :as str]
    
    [uix.core :as uix :refer [defui defhook $]]
    
@@ -224,13 +224,13 @@
                                                          label (:label data)
                                                          ;; Determine node styling based on label
                                                          node-style (cond
-                                                                      (clojure.string/starts-with? label "node") 
+                                                                      (str/starts-with? label "node") 
                                                                       {:className "bg-white text-gray-800 p-3 rounded-md shadow-lg border-2 border-gray-300"}
                                                                       
-                                                                      (clojure.string/starts-with? label "start")
+                                                                      (str/starts-with? label "start")
                                                                       {:className "bg-green-500 text-white p-3 rounded-md shadow-lg"}
                                                                       
-                                                                      (clojure.string/starts-with? label "agg")
+                                                                      (str/starts-with? label "agg")
                                                                       {:className "bg-yellow-500 text-white p-3 rounded-md shadow-lg"}
                                                                       
                                                                       :else
