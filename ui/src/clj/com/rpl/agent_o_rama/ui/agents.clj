@@ -782,13 +782,13 @@
                        :invoke-id]
                       #(get implicit->real % %)))))
 
-(defn invoke [{{:keys [module-id agent-id invoke-id]} :path-params}]
-  {:status
-   200
-   
-   :body
-   {:next-task-invoke-pairs [] ;; [task id, invoke id]
-    :invokes-map (remove-implicit-nodes all-data)}})
+(def use-large? true)
+
+(defn invoke [{{:keys [module-id agent-id invoke-id]} :path-params
+              query-params                              :query-params}]
+  {:status 200
+   :body   {:next-task-invoke-pairs [] ;; [task id, invoke id]
+            :invokes-map (remove-implicit-nodes (if use-large? synthetic-20k-graph all-data))}})
 
 (defn get-paginated-graph
   "Traverses the graph starting from a node and returns a subset of nodes
@@ -853,8 +853,36 @@
     :as req}]
   (let [depth-int (Integer/parseInt depth)
         start-id (when start-node-id (Long/parseLong start-node-id))
-        paginated-data (get-paginated-graph all-data start-id depth-int)]
+        paginated-data (get-paginated-graph (if use-large? synthetic-20k-graph all-data) start-id depth-int)]
     {:status 200
      :body {:invokes-map paginated-data
             :pagination {:depth depth-int
                          :start-node-id (or start-id "root")}}}))
+
+;; Synthetic graph generator for stress testing
+(defn generate-synthetic-graph
+  "Generate a large synthetic invokes-map containing `n` nodes arranged as a binary tree.
+  Each node (except leaves) emits to its left and right children. The root node is
+  labelled `start` to integrate smoothly with existing front-end logic."
+  [n]
+  (into {}
+        (for [id (range 1 (inc n))]
+          (let [left  (* 2 id)
+                right (inc left)
+                emits (->> [[left 0] [right 1]]
+                            (filter (fn [[child _]] (<= child n)))
+                            (map (fn [[child task-id]]
+                                   {:invoke-id child
+                                    :target-task-id task-id
+                                    :node-name (str "node" child)
+                                    :args []})))]
+            [id {:node (if (= id 1) "start" (str "node" id))
+                 :emits emits
+                 :start-time-millis 0
+                 :finish-time-millis 1
+                 :input []
+                 :result nil
+                 :async-ops []}]))))
+
+;; Memoised default ~20k-node graph for convenience
+(def ^:private synthetic-20k-graph (generate-synthetic-graph 20000))
