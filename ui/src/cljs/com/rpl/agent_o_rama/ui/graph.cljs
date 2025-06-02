@@ -223,27 +223,24 @@
                                                    (let [data (js->clj data :keywordize-keys true)
                                                          label (:label data)
                                                          ;; Determine node styling based on label
-                                                         base-style (cond
-                                                                      (str/starts-with? label "node") 
-                                                                      {:bg "bg-white" :text "text-gray-800" :border "border-2 border-gray-300"}
-                                                                      
-                                                                      (str/starts-with? label "start")
-                                                                      {:bg "bg-green-500" :text "text-white" :border "border-2 border-green-600"}
-                                                                      
-                                                                      (str/starts-with? label "agg")
-                                                                      {:bg "bg-yellow-500" :text "text-white" :border "border-2 border-yellow-600"}
-                                                                      
-                                                                      :else
-                                                                      {:bg "bg-indigo-500" :text "text-white" :border "border-2 border-indigo-600"})
+                                                         base-classes (cond
+                                                                        (str/starts-with? label "node") 
+                                                                        ["bg-white" "text-gray-800" "border-2" "border-gray-300"]
+                                                                        
+                                                                        (str/starts-with? label "start")
+                                                                        ["bg-green-500" "text-white" "border-2" "border-green-600"]
+                                                                        
+                                                                        (str/starts-with? label "agg")
+                                                                        ["bg-yellow-500" "text-white" "border-2" "border-yellow-600"]
+                                                                        
+                                                                        :else
+                                                                        ["bg-indigo-500" "text-white" "border-2" "border-indigo-600"])
                                                          ;; Add selection styling
                                                          selection-classes (if selected
-                                                                             "ring-4 ring-blue-400 ring-opacity-75 shadow-2xl transform scale-105"
-                                                                             "shadow-lg")
-                                                         node-className (str (:bg base-style) " " 
-                                                                             (:text base-style) " " 
-                                                                             (:border base-style) " "
-                                                                             "p-3 rounded-md transition-all duration-200 " 
-                                                                             selection-classes)]
+                                                                             ["ring-4" "ring-blue-400" "ring-opacity-75" "shadow-2xl" "transform" "scale-105"]
+                                                                             ["shadow-lg"])
+                                                         common-classes ["p-3" "rounded-md" "transition-all" "duration-200"]
+                                                         node-className (str/join " " (concat base-classes selection-classes common-classes))]
                                                      ($ :div {:className "relative"}
                                                         ($ :div {:className node-className
                                                                  :style {:width "170px" :height "40px"}}
