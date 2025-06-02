@@ -228,6 +228,12 @@
        :append-ack)
     )))
 
+(defn- assoc-if-void
+  [m k v]
+  (if (contains? m k)
+    m
+    (assoc m k v)))
+
 (deframaop handle-node-invoke
   [*name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args
    *agg-invoke-id]
@@ -250,7 +256,7 @@
    ;; already existing node
    (<<ramafn %merger
      [*m]
-     (:> (reduce-kv assoc
+     (:> (reduce-kv assoc-if-void
                     *m
                     {:graph-id      *graph-id
                      :graph-task-id *graph-task-id

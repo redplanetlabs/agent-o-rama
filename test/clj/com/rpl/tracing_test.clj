@@ -237,6 +237,9 @@
                              [[graph-task-id root-invoke-id]]
                              10000))
 
+
+     (clojure.pprint/pprint res)
+
      (is (empty? (:next-task-invoke-pairs res)))
      (is
       (trace-matches?
@@ -907,6 +910,66 @@
                              [[graph-task-id root-invoke-id]]
                              100))
 
-     (clojure.pprint/pprint res)
-
+     (is
+      (trace-matches?
+       (:invokes-map res)
+       {!id1  {:agg-invoke-id     nil
+               :emits             [{:invoke-id      !id2
+                                    :target-task-id ?graph-task-id
+                                    :node-name      "node1"
+                                    :args           []}]
+               :node              "start"
+               :nested-ops        []
+               :result            nil
+               :graph-id          ?graph-id
+               :input             []
+               :graph-task-id     ?graph-task-id
+               :start-time-millis 0
+               :finish-time-millis 5
+              }
+        !id2  {:started-agg?      true
+               :agg-invoke-id     !id5
+               :emits             [{:invoke-id      !id3
+                                    :target-task-id ?graph-task-id
+                                    :node-name      "agg"
+                                    :args           [1]}
+                                   {:invoke-id      !id4
+                                    :target-task-id ?graph-task-id
+                                    :node-name      "agg"
+                                    :args           [2]}]
+               :node              "node1"
+               :nested-ops        []
+               :result            nil
+               :graph-id          ?graph-id
+               :input             []
+               :graph-task-id     ?graph-task-id
+               :start-time-millis 5
+               :finish-time-millis 11
+              }
+        !id3  {:invoked-agg-invoke-id !id5}
+        !id4  {:invoked-agg-invoke-id !id5}
+        !!id5 {:agg-invoke-id      nil
+               :emits              []
+               :agg-input-count    2
+               :agg-inputs-first-10
+               [{:invoke-id !id3 :args [1]}
+                {:invoke-id !id4 :args [2]}]
+               :agg-start-res      nil
+               :node               "agg"
+               :agg-ack-val        0
+               :nested-ops         []
+               :graph-id           ?graph-id
+               :input              [3 nil]
+               :graph-task-id      ?graph-task-id
+               :agg-state          3
+               :agg-start-invoke-id !id2
+               :agg-finished?      true
+               :start-time-millis  5
+               :finish-time-millis 24
+               :result             {:val 3 :failure? false}
+              }
+       }
+       (m/guard
+        (and (= ?graph-id graph-id)
+             (= ?graph-task-id graph-task-id)))))
     )))
