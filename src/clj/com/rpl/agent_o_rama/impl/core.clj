@@ -391,6 +391,30 @@
    (complete-agg! *name *invoke-id)
    (:>)))
 
+(defn hook:writing-result [graph-task-id graph-id result])
+
+(deframaop handle-result!
+  [*agent-name *graph-task-id *graph-id *result]
+  (<<with-substitutions
+   [$$root
+    (this-module-pobject-task-global (po/agent-invoke-task-global-name
+                                      *agent-name))]
+   (|direct *graph-task-id)
+   (hook:writing-result *graph-task-id *graph-id *result)
+   (local-transform>
+    [(keypath *graph-id)
+     :result
+     ;; TODO: <<<<<>>>>> what about case of a retry?
+     ;;  - what about case where it errors on one branch but has a result
+     ;;  in the other branch?
+     ;;  - seems like need "execution ID" so that it can only be
+     ;;  overridden on a fresh retry
+     ;;    - or just clear this on the retry
+     nil?
+     (termval *result)]
+    $$root)
+   (:>)))
+
 (defn- define-agent!
   [setup topologies stream-topology name agent-graph]
   (let [graph (graph/resolve-agent-graph agent-graph)
@@ -517,18 +541,7 @@
         ;; AgentNode implementation makes it impossible for there to be both
         ;; emits and result
         (<<if (some? *result)
-          (|direct *graph-task-id)
-          (local-transform>
-           [(keypath *graph-id)
-            :result
-            ;; TODO: <<<<<>>>>> what about case of a retry?
-            ;;  - what about case where it errors on one branch but has a result
-            ;;  in the other branch?
-            ;;  - seems like need "execution ID" so that it can only be
-            ;;  overridden on a fresh retry
-            nil?
-            (termval *result)]
-           agent-invoke-pstate-sym))
+          (handle-result! name *graph-task-id *graph-id *result))
         (send-emits> name
                      *graph-task-id
                      *graph-id

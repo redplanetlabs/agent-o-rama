@@ -55,3 +55,14 @@
     (close! proxy)
     [graph-task-id graph-id]
   ))
+
+(defn invoke-agent-and-return!
+  [depot invokes-pstate args]
+  (let [[graph-task-id graph-id] (invoke-agent-and-wait! depot
+                                                         invokes-pstate
+                                                         args)]
+    (foreign-select-one
+     [(keypath graph-id) :result]
+     invokes-pstate
+     {:pkey graph-task-id})
+  ))

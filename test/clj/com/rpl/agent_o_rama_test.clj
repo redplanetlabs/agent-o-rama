@@ -830,6 +830,85 @@
          (is (= hgraph2 graph-history2))
         )))))
 
+(deftest finish-test
+  (let [results-atom (atom [])]
+    (with-redefs [i/hook:writing-result
+                  (fn [graph-task-id graph-id result]
+                    (swap! results-atom conj result)
+                  )]
+      (with-open [ipc (rtest/create-ipc)]
+        (letlocals
+         (bind module
+           (aor/agentmodule
+            [topology]
+            (->
+              topology
+              (aor/new-agent "foo")
+              (aor/node "start"
+                        ["node1" "node2" "node3"]
+                        (fn [agent-node arg]
+                          (cond (= arg :regular)
+                                (aor/emit! agent-node "node1")
+
+                                (= arg :halt)
+                                (aor/emit! agent-node "node2")
+
+                                :else
+                                (aor/emit! agent-node "node3")
+                          )
+                        ))
+              (aor/node "node1"
+                        nil
+                        (fn [agent-node]
+                          (aor/result! agent-node "result1")
+                        ))
+              (aor/node "node2"
+                        nil
+                        (fn [agent-node]
+                        ))
+              (aor/node "node3"
+                        ["node2" "node4" "node5"]
+                        (fn [agent-node]
+                          ;; this makes the node4 and node5 emits happen on
+                          ;; different tasks
+                          (aor/emit! agent-node "node2")
+                          (aor/emit! agent-node "node4")
+                          (aor/emit! agent-node "node5")
+                        ))
+              (aor/node "node4"
+                        nil
+                        (fn [agent-node]
+                          (aor/result! agent-node "result2")
+                        ))
+              (aor/node "node5"
+                        nil
+                        (fn [agent-node]
+                          (aor/result! agent-node "result3")
+                        ))
+            )))
+         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (bind module-name (get-module-name module))
+         (bind depot
+           (foreign-depot ipc
+                          module-name
+                          (po/agent-depot-name "foo")))
+         (bind invokes-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-invoke-task-global-name "foo")))
+
+         (is (= (aor-types/->AgentResult "result1" false)
+                (invoke-agent-and-return! depot invokes-pstate [:regular])))
+         (is (= (aor-types/->AgentResult "Agent completed without result" true)
+                (invoke-agent-and-return! depot invokes-pstate [:halt])))
+
+         (reset! results-atom [])
+         (bind res (invoke-agent-and-return! depot invokes-pstate [:fork]))
+         (is (or (= (aor-types/->AgentResult "result2" false) res)
+                 (= (aor-types/->AgentResult "result3" false) res)))
+         (is (= (first @results-atom) res))
+        )))))
+
 (deftest async-emits-test
          ;; TODO: <<<<<>>>>>
          ;;  - emit regular CF, PState queries, PState transforms, and out of
@@ -839,10 +918,6 @@
          ;;  - check what gets passed to the next node (just accumulate into
          ;;  result)
          ;;  - check node traces
-)
-
-(deftest parallel-execution-test
-         ;; TODO: <<<<<>>>>>
 )
 
 (deftest looped-test
