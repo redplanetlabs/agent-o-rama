@@ -909,6 +909,91 @@
          (is (= (first @results-atom) res))
         )))))
 
+(deftest multiple-agents-test
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (->
+          topology
+          (aor/new-agent "foo")
+          (aor/node "start"
+                    "node1"
+                    (fn [agent-node arg]
+                      (aor/emit! agent-node "node1" (inc arg))
+                    ))
+          (aor/node "node1"
+                    nil
+                    (fn [agent-node arg]
+                      (aor/result! agent-node (* 2 arg))
+                    )))
+        (->
+          topology
+          (aor/new-agent "bar")
+          (aor/agg-start-node "start"
+                              "node1"
+                              (fn [agent-node arg]
+                                (aor/emit! agent-node "node1" arg)
+                                (aor/emit! agent-node "node1" (inc arg))
+                                (aor/emit! agent-node "node1" (* 2 arg))
+                              ))
+          (aor/agg-node "node1"
+                        nil
+                        aggs/+sum
+                        (fn [agent-node agg node-start-res]
+                          (aor/result! agent-node agg)))
+        )))
+     (rtest/launch-module! ipc module {:tasks 1 :threads 1})
+     (bind module-name (get-module-name module))
+     (bind depot-foo
+       (foreign-depot ipc
+                      module-name
+                      (po/agent-depot-name "foo")))
+     (bind invokes-pstate-foo
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-invoke-task-global-name "foo")))
+     (bind depot-bar
+       (foreign-depot ipc
+                      module-name
+                      (po/agent-depot-name "bar")))
+     (bind invokes-pstate-bar
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-invoke-task-global-name "bar")))
+
+     (bind [graph-task-id-foo1 graph-id-foo1]
+       (invoke-agent-and-wait! depot-foo invokes-pstate-foo [10]))
+     (bind [graph-task-id-foo2 graph-id-foo2]
+       (invoke-agent-and-wait! depot-foo invokes-pstate-foo [20]))
+     (bind [graph-task-id-bar1 graph-id-bar1]
+       (invoke-agent-and-wait! depot-bar invokes-pstate-bar [5]))
+     (bind [graph-task-id-bar2 graph-id-bar2]
+       (invoke-agent-and-wait! depot-bar invokes-pstate-bar [10]))
+
+     (is (= 22
+            (foreign-select-one
+             [(keypath graph-id-foo1) :result :val]
+             invokes-pstate-foo
+             {:pkey graph-task-id-foo1})))
+     (is (= 42
+            (foreign-select-one
+             [(keypath graph-id-foo2) :result :val]
+             invokes-pstate-foo
+             {:pkey graph-task-id-foo2})))
+     (is (= 21
+            (foreign-select-one
+             [(keypath graph-id-bar1) :result :val]
+             invokes-pstate-bar
+             {:pkey graph-task-id-bar1})))
+     (is (= 41
+            (foreign-select-one
+             [(keypath graph-id-bar2) :result :val]
+             invokes-pstate-bar
+             {:pkey graph-task-id-bar2})))
+    )))
+
 (deftest async-emits-test
          ;; TODO: <<<<<>>>>>
          ;;  - emit regular CF, PState queries, PState transforms, and out of
