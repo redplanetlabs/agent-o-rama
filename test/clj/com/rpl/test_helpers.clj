@@ -3,7 +3,8 @@
         [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
-   [com.rpl.agent-o-rama.impl.types :as aor-types]))
+   [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.ramaspecter :refer [walker]]))
 
 (defmacro letlocals
   [& body]
@@ -66,3 +67,58 @@
      invokes-pstate
      {:pkey graph-task-id})
   ))
+
+(defn- parse-var-prefix
+  [sym]
+  (let [s (name sym)]
+    (if-let [[_ prefix] (re-matches #"^(.*?)[0-9]+$" s)]
+      prefix
+      s)))
+
+(defmacro trace-matches?
+  [data & bindings]
+  (let [unique-syms   (set (select [(walker symbol?)
+                                    #(= \!
+                                        (-> %
+                                            str
+                                            first))]
+                                   bindings))
+        unique-syms   (setval [ALL NAME FIRST] \? unique-syms)
+        unique-groups (vals (group-by parse-var-prefix unique-syms))
+        unique-guards (for [group unique-groups]
+                        `(m/guard (= ~(count group)
+                                     (count (set ~(vec group))))))
+        bindings      (setval [(walker symbol?)
+                               NAME
+                               FIRST
+                               #(= \! %)]
+                              \?
+                              bindings)]
+    `(m/find
+      ~data
+      (m/and
+       ~@bindings
+       ~@unique-guards)
+      true)))
+
+(defn trace-time-deltas
+  [trace]
+  (transform [MAP-VALS
+              (multi-path
+               STAY
+               [(must :nested-ops) ALL (view #(into {} %))])
+              (submap [:start-time-millis :finish-time-millis])
+              #(= 2 (count %))]
+             (fn [{:keys [start-time-millis finish-time-millis]}]
+               {:delta-millis (- finish-time-millis start-time-millis)})
+             trace))
+
+(defn trace-no-times
+  [trace]
+  (setval [MAP-VALS
+           (multi-path
+            STAY
+            [(must :nested-ops) ALL (view #(into {} %))])
+           (submap [:start-time-millis :finish-time-millis])]
+          {}
+          trace))

@@ -10,66 +10,10 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.ramaspecter :refer [walker]]
    [meander.epsilon :as m])
   (:import
    [com.rpl.rama.helpers
     TopologyUtils]))
-
-(defn parse-var-prefix
-  [sym]
-  (let [s (name sym)]
-    (if-let [[_ prefix] (re-matches #"^(.*?)[0-9]+$" s)]
-      prefix
-      s)))
-
-(defmacro trace-matches?
-  [data & bindings]
-  (let [unique-syms   (set (select [(walker symbol?)
-                                    #(= \!
-                                        (-> %
-                                            str
-                                            first))]
-                                   bindings))
-        unique-syms   (setval [ALL NAME FIRST] \? unique-syms)
-        unique-groups (vals (group-by parse-var-prefix unique-syms))
-        unique-guards (for [group unique-groups]
-                        `(m/guard (= ~(count group)
-                                     (count (set ~(vec group))))))
-        bindings      (setval [(walker symbol?)
-                               NAME
-                               FIRST
-                               #(= \! %)]
-                              \?
-                              bindings)]
-    `(m/find
-      ~data
-      (m/and
-       ~@bindings
-       ~@unique-guards)
-      true)))
-
-(defn trace-time-deltas
-  [trace]
-  (transform [MAP-VALS
-              (multi-path
-               STAY
-               [(must :nested-ops) ALL (view #(into {} %))])
-              (submap [:start-time-millis :finish-time-millis])
-              #(= 2 (count %))]
-             (fn [{:keys [start-time-millis finish-time-millis]}]
-               {:delta-millis (- finish-time-millis start-time-millis)})
-             trace))
-
-(defn no-time-deltas
-  [trace]
-  (setval [MAP-VALS
-           (multi-path
-            STAY
-            [(must :nested-ops) ALL (view #(into {} %))])
-           (submap [:start-time-millis :finish-time-millis])]
-          {}
-          trace))
 
 (deftest trace-matches-test
   (is
@@ -237,15 +181,12 @@
                              [[graph-task-id root-invoke-id]]
                              10000))
 
-
-     (clojure.pprint/pprint res)
-
      (is (empty? (:next-task-invoke-pairs res)))
      (is
       (trace-matches?
        (-> res
            :invokes-map
-           no-time-deltas)
+           trace-no-times)
        {!id1  {:agg-invoke-id nil
                :emits
                [{:invoke-id      !id2
@@ -557,7 +498,7 @@
       (trace-matches?
        (-> res
            :invokes-map
-           no-time-deltas)
+           trace-no-times)
        {!id1 {:agg-invoke-id nil
               :emits
               [{:invoke-id      !id2
@@ -628,7 +569,7 @@
       (trace-matches?
        (-> res2
            :invokes-map
-           no-time-deltas)
+           trace-no-times)
        {!id1 {:agg-invoke-id nil
               :emits         []
               :node          "node3"
@@ -675,7 +616,7 @@
       (trace-matches?
        (-> res3
            :invokes-map
-           no-time-deltas)
+           trace-no-times)
        {!id1 {:agg-invoke-id nil
               :emits         []
               :node          "node6"
@@ -704,7 +645,7 @@
       (trace-matches?
        (-> res10
            :invokes-map
-           no-time-deltas)
+           trace-no-times)
        {!id1 {:agg-invoke-id nil
               :emits
               [{:invoke-id      !id2
@@ -775,7 +716,7 @@
       (trace-matches?
        (-> res11
            :invokes-map
-           no-time-deltas)
+           trace-no-times)
        {!id1 {:agg-invoke-id nil
               :emits         []
               :node          "node3"
@@ -822,7 +763,7 @@
       (trace-matches?
        (-> res12
            :invokes-map
-           no-time-deltas)
+           trace-no-times)
        {!id1 {:agg-invoke-id nil
               :emits         []
               :node          "node6"
