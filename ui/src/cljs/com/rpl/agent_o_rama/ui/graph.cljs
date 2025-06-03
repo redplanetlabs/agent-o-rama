@@ -11,7 +11,7 @@
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle]]
    ["@dagrejs/dagre" :as Dagre]))
 
-(defui selected-node-component [{:keys [selected-node on-close graph-data handle-paginate-node loading-nodes flow-nodes set-selected-node]}]
+(defui selected-node-component [{:keys [selected-node graph-data handle-paginate-node loading-nodes flow-nodes set-selected-node set-nodes]}]
   (let [data (when selected-node 
                (js->clj (.-data selected-node) :keywordize-keys true))
         node-id (str (:node-id data))
@@ -91,9 +91,11 @@
                                             (when-not is-loading
                                               (if is-loaded
                                                 ;; Find and select the loaded node
-                                                (when-let [target-node (->> (js->clj flow-nodes :keywordize-keys true)
-                                                                            (filter #(= (-> % :data :node-id) (:invoke-id emit)))
-                                                                            first)]
+                                                (let [nodes (js->clj flow-nodes :keywordize-keys true)
+                                                      target-node (->> nodes
+                                                                       (filter #(= (-> % :data :node-id) (:invoke-id emit)))
+                                                                       first)]
+                                                  
                                                   (set-selected-node (clj->js target-node)))
                                                 ;; Load the unloaded node
                                                 (when handle-paginate-node
@@ -215,7 +217,7 @@
                                                  ;; Update the graph data state
                                                  (set-graph-data combined-data)
                                                  
-                                                 ;; Replace all nodes and edges with the re-laid out versions
+                                                 ;; Replace all nodes and edges with the re-laid out versions, keepign the selection
                                                  (set-nodes (clj->js nodes))
                                                  (set-edges (clj->js edges))
                                                  (set-loading-nodes #(disj % node-id)))))
@@ -235,9 +237,10 @@
                            :proOptions {:hideAttribution true}
                            :nodeTypes (clj->js {"custom"
                                                 (uix.core/as-react
-                                                 (fn [{:keys [data selected]}]
+                                                 (fn [{:keys [data id]}]
                                                    (let [data (js->clj data :keywordize-keys true)
                                                          label (:label data)
+                                                         selected (= (when selected-node (.-id selected-node)) id)
                                                          base-classes (cond
                                                                         (str/starts-with? label "node") 
                                                                         ["bg-white" "text-gray-800" "border-2" "border-gray-300"]
@@ -282,16 +285,16 @@
                            :onNodeClick
                            (fn [_ node] (set-selected-node node))
                            
-                           :onPaneClick
+                           #_#_:onPaneClick
                            (fn [_] (set-selected-node nil))}
                 ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
                 ($ Controls {:className "fill-gray-500 stroke-gray-500"}))))
        (when selected-node
          ($ selected-node-component {:selected-node selected-node
-                                     :on-close #(set-selected-node nil)
                                      :graph-data graph-data
                                      :handle-paginate-node handle-paginate-node
                                      :loading-nodes loading-nodes
                                      :flow-nodes flow-nodes
+                                     :set-nodes set-nodes
                                      :set-selected-node set-selected-node})))))
 
