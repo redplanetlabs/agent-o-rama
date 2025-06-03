@@ -17,8 +17,8 @@ public interface AgentsTopology {
   void declareDocumentStore(String name, Class keyClass, Class... keyValClasses);
   // TODO: what other stores? column-oriented?
   //    - there should be a text search store
-  PState.Declaration declarePState(String name, Class schema);
-  PState.Declaration declarePState(String name,  PState.Schema schema);
+  PState.Declaration declarePStateStore(String name, Class schema);
+  PState.Declaration declarePStateStore(String name,  PState.Schema schema);
 
   // TODO: document how to make LLMs
   void declareAgentObject(String name, Object o);

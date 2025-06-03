@@ -68,10 +68,10 @@
         simpl/DOC
         {key-class (fixed-keys-schema (into {}
                                             (partition 2 key-val-classes)))}))
-     (^PState$Declaration declarePState [this ^String name ^Class schema]
+     (^PState$Declaration declarePStateStore [this ^String name ^Class schema]
        (declare-pstate* stream-topology (symbol name) schema))
-     (^PState$Declaration declarePState [this ^String name
-                                         ^PState$Schema schema]
+     (^PState$Declaration declarePStateStore [this ^String name
+                                              ^PState$Schema schema]
        (.pstate stream-topology name schema))
      (declareAgentObject [this name o]
        (declare-object* setup (symbol name) o))
@@ -94,6 +94,26 @@
 (defn define-agents!
   [^AgentsTopology at]
   (.define at))
+
+
+; (declareKeyValueStore [this name key-class val-class]
+; (declareDocumentStore [this name key-class key-val-classes]
+; (^PState$Declaration declarePStateStore [this ^String name ^Class schema]
+
+(defn declare-key-value-store
+  [^AgentsTopology agents-topology name key-class val-class]
+  (.declareKeyValueStore agents-topology name key-class val-class))
+
+(defn declare-document-store
+  [^AgentsTopology agents-topology name key-class & key-val-classes]
+  (.declareDocumentStore agents-topology
+                         name
+                         key-class
+                         (into-array Object key-val-classes)))
+
+(defn declare-pstate-store
+  [^AgentsTopology agents-topology name schema]
+  (declare-pstate* (.getStreamTopology agents-topology) (symbol name) schema))
 
 ;; TODO: all the declare methods
 

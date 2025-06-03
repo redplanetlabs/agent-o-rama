@@ -995,11 +995,40 @@
     )))
 
 (deftest stores-test
-         ;; TODO: <<<<<>>>>>
-         ;;  - do PState writes, reads
-         ;;   - verify can read own writes as well as previous writes
-         ;;  - check node traces for :nested-ops
-)
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (->
+          topology
+          (aor/new-agent "foo")
+          (aor/node "start"
+                    "node1"
+                    (fn [agent-node arg]
+
+                    )
+          ))
+       ))
+     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (bind module-name (get-module-name module))
+     (bind depot
+       (foreign-depot ipc
+                      module-name
+                      (po/agent-depot-name "foo")))
+     (bind invokes-pstate
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-invoke-task-global-name "foo")))
+
+     (bind [graph-task-id graph-id]
+       (invoke-agent-and-wait! depot invokes-pstate []))
+     ;; TODO: <<<<<>>>>>
+     ;;  - do PState writes, reads
+     ;;   - verify can read own writes as well as previous writes
+     ;;  - do foreign read of same PStates
+     ;;  - check node traces for :nested-ops
+    )))
 
 (deftest looped-test
          ;; TODO: <<<<<>>>>
