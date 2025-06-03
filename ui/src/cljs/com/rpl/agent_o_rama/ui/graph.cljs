@@ -11,6 +11,12 @@
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle]]
    ["@dagrejs/dagre" :as Dagre]))
 
+(defn starter-node? [node]
+  (not (nil? (:started-agg? node))))
+
+(defn agg-node? [node]
+  (not (nil? (:agg-state node))))
+
 (defui selected-node-component [{:keys [selected-node graph-data handle-paginate-node loading-nodes flow-nodes set-selected-node set-nodes]}]
   (let [data (when selected-node 
                (js->clj (.-data selected-node) :keywordize-keys true))
@@ -238,21 +244,23 @@
                            :nodeTypes (clj->js {"custom"
                                                 (uix.core/as-react
                                                  (fn [{:keys [data id]}]
+                                                   (println "data" data)
                                                    (let [data (js->clj data :keywordize-keys true)
                                                          label (:label data)
                                                          selected (= (when selected-node (.-id selected-node)) id)
                                                          base-classes (cond
-                                                                        (str/starts-with? label "node") 
-                                                                        ["bg-white" "text-gray-800" "border-2" "border-gray-300"]
+                                                                        ;; TODO special handling for root node once we wire up query topology
+                                                                        #_(str/starts-with? label "start")
+                                                                        #_["bg-green-500" "text-white" "border-2" "border-green-600"]
                                                                         
-                                                                        (str/starts-with? label "start")
-                                                                        ["bg-green-500" "text-white" "border-2" "border-green-600"]
-                                                                        
-                                                                        (str/starts-with? label "agg")
+                                                                        (agg-node? data)
                                                                         ["bg-yellow-500" "text-white" "border-2" "border-yellow-600"]
-                                                                        
+
+                                                                        (starter-node? data)
+                                                                        ["bg-green-500" "text-white" "border-2" "border-green-600"]
+
                                                                         :else
-                                                                        ["bg-indigo-500" "text-white" "border-2" "border-indigo-600"])
+                                                                        ["bg-white" "text-gray-800" "border-2" "border-gray-300"])
                                                          selection-classes (if selected
                                                                              ["ring-4" "ring-blue-400" "ring-opacity-75" "shadow-2xl" "transform" "scale-105"]
                                                                              ["shadow-lg"])
