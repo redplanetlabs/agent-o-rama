@@ -994,15 +994,11 @@
              {:pkey graph-task-id-bar2})))
     )))
 
-(deftest async-emits-test
+(deftest stores-test
          ;; TODO: <<<<<>>>>>
-         ;;  - emit regular CF, PState queries, PState transforms, and out of
-         ;;  band
-         ;;  - verify order of resolution (perhaps just through results of
-         ;;  PState ops)
-         ;;  - check what gets passed to the next node (just accumulate into
-         ;;  result)
-         ;;  - check node traces
+         ;;  - do PState writes, reads
+         ;;   - verify can read own writes as well as previous writes
+         ;;  - check node traces for :nested-ops
 )
 
 (deftest looped-test

@@ -173,7 +173,8 @@
               name
               false
               (.getLocalPState rama-clients name)
-              (.getPStateWriteDepot rama-clients))]
+              (.getPStateWriteDepot rama-clients)
+              nested-ops-vol)]
          (condp = (get store-info name)
            simpl/KV
            (simpl/mk-kv-store store-params)

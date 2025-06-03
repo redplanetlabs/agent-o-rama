@@ -23,6 +23,7 @@
    mirror? :- Boolean
    pstate-client :- PState
    write-depot :- Depot
+   nested-ops-vol :- (s/pred volatile?)
   ])
 
 (defn declare-store*
@@ -39,18 +40,76 @@
   (contains?* [this k])
   (update* [this k afn]))
 
-(defn- pstate-write!
-  [store-params path k]
+(defn- pstate-write!*
+  [store-params path k op params]
   (when (:mirror? store-params)
     (throw (ex-info "Can only write to colocated PStates"
                     {:pstate-name (:pstate-name store-params)})))
-  (foreign-append!
-   (:write-depot store-params)
-   (aor-types/->PStateWrite
-    (:pstate-name store-params)
-    path
-    k
-   )))
+  (let [start-time  (h/current-time-millis)
+        _
+        (foreign-append!
+         (:write-depot store-params)
+         (aor-types/->PStateWrite
+          (:pstate-name store-params)
+          path
+          k))
+        finish-time (h/current-time-millis)]
+    (vswap! (:nested-ops-vol store-params)
+            (aor-types/->NestedOpInfo
+             start-time
+             finish-time
+             {"type"   "store-write"
+              "op"     op
+              "params" params}
+            ))))
+
+(defmacro pstate-write!
+  [store-params path k op & params]
+  `(pstate-write!* ~store-params ~path ~k ~op ~(vec params)))
+
+(defn recorded-pstate-query!*
+  [query-fn apath store-params options op params]
+  (let [start-time  (h/current-time-millis)
+        res         (query-fn
+                     apath
+                     (:pstate-client store-params)
+                     options)
+        finish-time (h/current-time-millis)
+       ]
+    (vswap!
+     (:nested-ops-vol store-params)
+     conj
+     (aor-types/->valid-NestedOpInfo
+      start-time
+      finish-time
+      {"type"   "store-query"
+       "op"     op
+       "params" params
+       "result" res}
+     ))
+    res))
+
+(defmacro recorded-pstate-select-one!
+  [apath store-params options op & params]
+  `(recorded-pstate-query!*
+    compiled-foreign-select-one
+    (path ~apath)
+    ~store-params
+    ~options
+    ~op
+    ~(vec params)
+   ))
+
+(defmacro recorded-pstate-select!
+  [apath store-params options op & params]
+  `(recorded-pstate-query!*
+    compiled-foreign-select
+    (path ~apath)
+    ~store-params
+    ~options
+    ~op
+    ~(vec params)
+   ))
 
 (defn KeyValueImpl
   [store-params]
@@ -73,20 +132,34 @@
     KeyValueStoreInternal
     (~'get*
      [this# k# default-value#]
-     (foreign-select-one (view #(get ~'% k# default-value#))
-                         (:pstate-client ~store-params)
-                         {:pkey k#}))
+     (recorded-pstate-select-one!
+      (view #(get ~'% k# default-value#))
+      ~store-params
+      {:pkey k#}
+      "get"
+      k#))
     (~'put*
      [this# k# v#]
-     (pstate-write! ~store-params (path (keypath k#) (termval v#)) k#))
+     (pstate-write! ~store-params
+                    (path (keypath k#) (termval v#))
+                    k#
+                    "put"
+                    k#
+                    v#))
     (~'contains?*
      [this# k#]
-     (foreign-select-one #(view contains? ~'% k#)
-                         (:pstate-client ~store-params)
-                         {:pkey k#}))
+     (recorded-pstate-select-one! #(view contains? ~'% k#)
+                                  ~store-params
+                                  {:pkey k#}
+                                  "contains?"
+                                  k#))
     (~'update*
      [this k# afn#]
-     (pstate-write! ~store-params (path (keypath k#) (term afn#)) k#))
+     (pstate-write! ~store-params
+                    (path (keypath k#) (term afn#))
+                    k#
+                    "update"
+                    k#))
    ))
 
 
@@ -117,21 +190,40 @@
     DocumentStoreInternal
     (~'get-document-field*
      [this# k# doc-key# default-value#]
-     (foreign-select-one [(keypath k#)
-                          (view #(get ~'% doc-key# default-value#))]
-                         (:pstate-client ~store-params)
-                         {:pkey k#}))
+     (recorded-pstate-select-one! [(keypath k#)
+                                   (view #(get ~'% doc-key# default-value#))]
+                                  ~store-params
+                                  {:pkey k#}
+                                  "get-document-field"
+                                  k#
+                                  doc-key#
+                                  {:default default-value#}
+     ))
     (~'contains-document-field?*
      [this# k# doc-key#]
-     (foreign-select-one [(keypath k#) #(view contains? ~'% doc-key#)]
-                         (:pstate-client ~store-params)
-                         {:pkey k#}))
+     (recorded-pstate-select-one! [(keypath k#) #(view contains? ~'% doc-key#)]
+                                  ~store-params
+                                  {:pkey k#}
+                                  "contains-document-field?"
+                                  k#
+                                  doc-key#))
     (~'put-document-field*
      [this# k# doc-key# v#]
-     (pstate-write! ~store-params (path (keypath k# doc-key#) (termval v#)) k#))
+     (pstate-write! ~store-params
+                    (path (keypath k# doc-key#) (termval v#))
+                    k#
+                    "put-document-field"
+                    k#
+                    doc-key#
+                    v#))
     (~'update-document-field*
      [this# k# doc-key# afn#]
-     (pstate-write! ~store-params (path (keypath k# doc-key#) (term afn#)) k#))
+     (pstate-write! ~store-params
+                    (path (keypath k# doc-key#) (term afn#))
+                    k#
+                    "update-document-field"
+                    k#
+                    doc-key#))
    ))
 
 (defprotocol PStateStoreInternal
@@ -160,19 +252,35 @@
     PStateStoreInternal
     (~'pstate-select*
      [this# path#]
-     (foreign-select path# (:pstate-client ~store-params)))
+     (recorded-pstate-select!
+      path#
+      ~store-params
+      {}
+      "pstate-select"))
     (~'pstate-select*
      [this# pkey# path#]
-     (foreign-select path# (:pstate-client ~store-params) {:pkey pkey#}))
+     (recorded-pstate-select!
+      path#
+      ~store-params
+      {:pkey pkey#}
+      "pstate-select"
+      {:pkey pkey#}))
     (~'pstate-select-one*
      [this# path#]
-     (foreign-select-one path# (:pstate-client ~store-params)))
+     (recorded-pstate-select-one! path#
+                                  ~store-params
+                                  {}
+                                  "pstate-select-one"))
     (~'pstate-select-one*
      [this# pkey# path#]
-     (foreign-select-one path# (:pstate-client ~store-params) {:pkey pkey#}))
+     (recorded-pstate-select-one! path#
+                                  ~store-params
+                                  {:pkey pkey#}
+                                  "pstate-select-one"
+                                  {:pkey pkey#}))
     (~'pstate-transform*
      [this# pkey# path#]
-     (pstate-write! ~store-params path# pkey#)
+     (pstate-write! ~store-params path# pkey# "pstate-transform" pkey#)
     )))
 
 (defmacro reify-store
