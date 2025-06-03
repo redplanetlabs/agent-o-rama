@@ -11,7 +11,7 @@
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle]]
    ["@dagrejs/dagre" :as Dagre]))
 
-(defui selected-node-component [{:keys [selected-node on-close]}]
+(defui selected-node-component [{:keys [selected-node on-close graph-data handle-paginate-node loading-nodes]}]
   (let [data (when selected-node 
                (js->clj (.-data selected-node) :keywordize-keys true))
         node-id (str (:node-id data))
@@ -69,29 +69,39 @@
                        ($ :div {:className "flex justify-between"}
                           ($ :span {:className "text-xs text-yellow-600"} "Finished")
                           ($ :span {:className "text-xs text-yellow-600 font-mono"} 
-                             (.toLocaleTimeString (js/Date. finish-time)))))))
-               
-               ;; Pagination Info
-               (when (and has-paginated (> (.-length has-paginated) 0))
-                 ($ :div {:className "bg-gray-50 p-3 rounded-md"}
-                    ($ :div {:className "text-sm font-medium text-gray-700 mb-1"} "Pagination")
-                    ($ :div {:className "text-xs text-gray-600"}
-                       (str (.-length has-paginated) " child(ren) not loaded")))))
+                             (.toLocaleTimeString (js/Date. finish-time))))))))
             
             ;; Emits Section (full width)
-            (when (and emits (> (.-length emits) 0))
+            (when (and emits (> (count emits) 0))
               ($ :div {:className "mt-4 bg-purple-50 p-3 rounded-md"}
                  ($ :div {:className "text-sm font-medium text-purple-700 mb-2"} 
-                    (str "Emits (" (.-length emits) ")"))
+                    (str "Emits (" (count emits) ")"))
                  ($ :div {:className "grid grid-cols-1 md:grid-cols-2 gap-2"}
                     (for [emit (js->clj emits :keywordize-keys true)]
-                      ($ :div {:key (str (:invoke-id emit))
-                               :className "bg-white p-2 rounded border border-purple-200"}
-                         ($ :div {:className "text-xs text-purple-600"}
-                            ($ :div (str "→ " (:node-name emit)))
-                            (when (:args emit)
-                              ($ :div {:className "text-purple-500 mt-1 break-words"}
-                                 (pr-str (js->clj (:args emit))))))))))))))))
+                      (let [emit-id (str (:invoke-id emit))
+                            is-loaded (contains? graph-data (:invoke-id emit))
+                            is-loading (contains? loading-nodes emit-id)]
+                        ($ :div {:key emit-id
+                                 :className "bg-white p-2 rounded border border-purple-200"}
+                           ($ :div {:className "flex justify-between items-start"}
+                              ($ :div {:className "text-xs text-purple-600 flex-1"}
+                                 ($ :div (str "→ " (:node-name emit)))
+                                 (when (:args emit)
+                                   ($ :div {:className "text-purple-500 mt-1 break-words"}
+                                      (pr-str (js->clj (:args emit)))))
+                                 ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
+                                    (str "ID: " emit-id)))
+                              (when (not is-loaded)
+                                ($ :button {:className (str "ml-2 px-2 py-1 text-xs rounded "
+                                                           (if is-loading
+                                                             "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                                             "bg-purple-600 text-white hover:bg-purple-700"))
+                                           :disabled is-loading
+                                           :onClick (fn [e]
+                                                      (.stopPropagation e)
+                                                      (when handle-paginate-node
+                                                        (handle-paginate-node emit-id)))}
+                                   (if is-loading "Loading..." "Load")))))))))))))))
 
 (defn process-graph-data 
   "Process raw graph data into nodes and edges for React Flow"
@@ -222,7 +232,6 @@
                                                  (fn [{:keys [data selected]}]
                                                    (let [data (js->clj data :keywordize-keys true)
                                                          label (:label data)
-                                                         ;; Determine node styling based on label
                                                          base-classes (cond
                                                                         (str/starts-with? label "node") 
                                                                         ["bg-white" "text-gray-800" "border-2" "border-gray-300"]
@@ -235,7 +244,6 @@
                                                                         
                                                                         :else
                                                                         ["bg-indigo-500" "text-white" "border-2" "border-indigo-600"])
-                                                         ;; Add selection styling
                                                          selection-classes (if selected
                                                                              ["ring-4" "ring-blue-400" "ring-opacity-75" "shadow-2xl" "transform" "scale-105"]
                                                                              ["shadow-lg"])
@@ -245,11 +253,11 @@
                                                         ($ :div {:className node-className
                                                                  :style {:width "170px" :height "40px"}}
                                                            label)
-                                                        ;; Result indicator circle
                                                         (when (:result data)
                                                           ($ :div {:className "absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"}))
                                                         ($ Handle {:type "target" :position "top"})
                                                         ($ Handle {:type "source" :position "bottom"})))))
+                                                
                                                 "phantom"
                                                 (uix.core/as-react
                                                  (fn [{:keys [data]}]
@@ -274,5 +282,8 @@
                 ($ Controls {:className "fill-gray-500 stroke-gray-500"}))))
        (when selected-node
          ($ selected-node-component {:selected-node selected-node
-                                     :on-close #(set-selected-node nil)})))))
+                                     :on-close #(set-selected-node nil)
+                                     :graph-data graph-data
+                                     :handle-paginate-node handle-paginate-node
+                                     :loading-nodes loading-nodes})))))
 
