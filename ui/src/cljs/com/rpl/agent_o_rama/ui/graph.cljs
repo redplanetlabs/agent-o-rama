@@ -11,7 +11,7 @@
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle]]
    ["@dagrejs/dagre" :as Dagre]))
 
-(defui selected-node-component [{:keys [selected-node on-close graph-data handle-paginate-node loading-nodes]}]
+(defui selected-node-component [{:keys [selected-node on-close graph-data handle-paginate-node loading-nodes flow-nodes set-selected-node]}]
   (let [data (when selected-node 
                (js->clj (.-data selected-node) :keywordize-keys true))
         node-id (str (:node-id data))
@@ -80,28 +80,34 @@
                     (for [emit (js->clj emits :keywordize-keys true)]
                       (let [emit-id (str (:invoke-id emit))
                             is-loaded (contains? graph-data (:invoke-id emit))
-                            is-loading (contains? loading-nodes emit-id)]
+                            is-loading (contains? loading-nodes emit-id)
+                            border-class (if is-loaded "border-purple-200" "border-dashed border-purple-300")
+                            cursor-class (if is-loading "cursor-wait" "cursor-pointer")
+                            bg-class (if is-loaded "bg-gray-50" "bg-white hover:bg-purple-50")]
                         ($ :div {:key emit-id
-                                 :className "bg-white p-2 rounded border border-purple-200"}
-                           ($ :div {:className "flex justify-between items-start"}
-                              ($ :div {:className "text-xs text-purple-600 flex-1"}
-                                 ($ :div (str "→ " (:node-name emit)))
-                                 (when (:args emit)
-                                   ($ :div {:className "text-purple-500 mt-1 break-words"}
-                                      (pr-str (js->clj (:args emit)))))
-                                 ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
-                                    (str "ID: " emit-id)))
-                              (when (not is-loaded)
-                                ($ :button {:className (str "ml-2 px-2 py-1 text-xs rounded "
-                                                           (if is-loading
-                                                             "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                                             "bg-purple-600 text-white hover:bg-purple-700"))
-                                           :disabled is-loading
-                                           :onClick (fn [e]
-                                                      (.stopPropagation e)
-                                                      (when handle-paginate-node
-                                                        (handle-paginate-node emit-id)))}
-                                   (if is-loading "Loading..." "Load")))))))))))))))
+                                 :className (str bg-class " p-2 rounded border " border-class " " cursor-class " transition-colors")
+                                 :onClick (fn [e]
+                                            (.stopPropagation e)
+                                            (when-not is-loading
+                                              (if is-loaded
+                                                ;; Find and select the loaded node
+                                                (when-let [target-node (->> (js->clj flow-nodes :keywordize-keys true)
+                                                                            (filter #(= (-> % :data :node-id) (:invoke-id emit)))
+                                                                            first)]
+                                                  (set-selected-node (clj->js target-node)))
+                                                ;; Load the unloaded node
+                                                (when handle-paginate-node
+                                                  (handle-paginate-node emit-id)))))}
+                           ($ :div {:className "text-xs text-purple-600"}
+                              ($ :div (str "→ " (:node-name emit)))
+                              (when (:args emit)
+                                ($ :div {:className "text-purple-500 mt-1 break-words"}
+                                   (pr-str (js->clj (:args emit)))))
+                              ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
+                                 (str "ID: " emit-id))
+                              (when is-loading
+                                ($ :div {:className "text-purple-400 mt-1 text-xs italic"}
+                                   "Loading..."))))))))))))))
 
 (defn process-graph-data 
   "Process raw graph data into nodes and edges for React Flow"
@@ -285,5 +291,7 @@
                                      :on-close #(set-selected-node nil)
                                      :graph-data graph-data
                                      :handle-paginate-node handle-paginate-node
-                                     :loading-nodes loading-nodes})))))
+                                     :loading-nodes loading-nodes
+                                     :flow-nodes flow-nodes
+                                     :set-selected-node set-selected-node})))))
 
