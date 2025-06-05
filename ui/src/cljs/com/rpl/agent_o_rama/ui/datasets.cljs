@@ -143,15 +143,7 @@
         
         {:keys [data isLoading]}
         (common/use-query {:query-keys ["dataset" dataset-id]
-                          :query-url (str "/api/datasets/" dataset-id)})
-        
-        {:keys [data entriesData isLoading entriesLoading]}
-        (common/use-query {:query-keys ["dataset-entries" dataset-id]
-                          :query-url (str "/api/datasets/" dataset-id "/entries")})
-        
-        {:keys [data evaluationsData]}
-        (common/use-query {:query-keys ["evaluations" dataset-id]
-                          :query-url (str "/api/evaluations?dataset-id=" dataset-id)})]
+                          :query-url (str "/api/datasets/" dataset-id)})]
     
     (if isLoading
       ($ :div.p-6 "Loading dataset...")
@@ -185,44 +177,50 @@
          
          ;; Tab content
          (case activeTab
-           "entries" ($ dataset-entries {:dataset-id dataset-id :entries-data entriesData})
-           "evaluations" ($ dataset-evaluations {:dataset-id dataset-id :evaluations evaluationsData})
+           "entries" ($ dataset-entries {:dataset-id dataset-id})
+           "evaluations" ($ dataset-evaluations {:dataset-id dataset-id})
            nil)))))
 
 ;; Dataset entries component
-(defui dataset-entries [{:keys [dataset-id entries-data]}]
-  (let [[showAddForm setShowAddForm] (uix/use-state false)]
-    ($ :div
-       ($ :div.flex.justify-between.items-center.mb-4
-          ($ :h3.text-lg.font-semibold "Dataset Entries")
-          ($ :button.bg-green-500.text-white.px-4.py-2.rounded.hover:bg-green-600
-             {:onClick #(setShowAddForm true)}
-             "Add Entry"))
+(defui dataset-entries [{:keys [dataset-id]}]
+  (let [[showAddForm setShowAddForm] (uix/use-state false)
+        
+        {:keys [data isLoading mutate]}
+        (common/use-query {:query-keys ["dataset-entries" dataset-id]
+                          :query-url (str "/api/datasets/" dataset-id "/entries")})]
+           ($ :div
+          ($ :div.flex.justify-between.items-center.mb-4
+             ($ :h3.text-lg.font-semibold "Dataset Entries")
+             ($ :button.bg-green-500.text-white.px-4.py-2.rounded.hover:bg-green-600
+                {:onClick #(setShowAddForm true)}
+                "Add Entry"))
+          
+          (if isLoading
+            ($ :div.text-center "Loading entries...")
+            (if (and data (:entries data))
+              ($ :div.space-y-4
+                 (for [entry (:entries data)]
+                   ($ :div.border.rounded.p-4
+                      {:key (:id entry)}
+                      ($ :div.mb-2
+                         ($ :h4.font-medium "Input:")
+                         ($ :pre.bg-gray-100.p-2.rounded.text-sm.overflow-x-auto
+                            (common/pp (:input entry))))
+                      ($ :div.mb-2
+                         ($ :h4.font-medium "Expected Output:")
+                         ($ :div.text-sm.text-gray-700 (:expected-output entry)))
+                      (when (:metadata entry)
+                        ($ :div
+                           ($ :h4.font-medium "Metadata:")
+                           ($ :pre.bg-gray-50.p-2.rounded.text-xs
+                              (common/pp (:metadata entry))))))))
+              ($ :div.text-center.text-gray-500 "No entries yet")))
        
-       (if (:entries entries-data)
-         ($ :div.space-y-4
-            (for [entry (:entries entries-data)]
-              ($ :div.border.rounded.p-4
-                 {:key (:id entry)}
-                 ($ :div.mb-2
-                    ($ :h4.font-medium "Input:")
-                    ($ :pre.bg-gray-100.p-2.rounded.text-sm.overflow-x-auto
-                       (common/pp (:input entry))))
-                 ($ :div.mb-2
-                    ($ :h4.font-medium "Expected Output:")
-                    ($ :div.text-sm.text-gray-700 (:expected-output entry)))
-                 (when (:metadata entry)
-                   ($ :div
-                      ($ :h4.font-medium "Metadata:")
-                      ($ :pre.bg-gray-50.p-2.rounded.text-xs
-                         (common/pp (:metadata entry))))))))
-         ($ :div.text-center.text-gray-500 "No entries yet"))
-       
-       (when showAddForm
-         ($ add-entry-modal
-            {:dataset-id dataset-id
-             :on-close #(setShowAddForm false)
-             :on-success #(setShowAddForm false)})))))
+                (when showAddForm
+           ($ add-entry-modal
+              {:dataset-id dataset-id
+               :on-close #(setShowAddForm false)
+               :on-success #(do (mutate) (setShowAddForm false))})))))
 
 ;; Add entry modal
 (defui add-entry-modal [{:keys [dataset-id on-close on-success]}]
@@ -275,18 +273,24 @@
                    "Add Entry")))))))
 
 ;; Dataset evaluations component
-(defui dataset-evaluations [{:keys [dataset-id evaluations]}]
-  (let [[showRunForm setShowRunForm] (uix/use-state false)]
-    ($ :div
-       ($ :div.flex.justify-between.items-center.mb-4
-          ($ :h3.text-lg.font-semibold "Evaluations")
-          ($ :button.bg-purple-500.text-white.px-4.py-2.rounded.hover:bg-purple-600
-             {:onClick #(setShowRunForm true)}
-             "Run Evaluation"))
-       
-       (if (seq evaluations)
-         ($ :div.space-y-4
-            (for [evaluation evaluations]
+(defui dataset-evaluations [{:keys [dataset-id]}]
+  (let [[showRunForm setShowRunForm] (uix/use-state false)
+        
+        {:keys [data isLoading mutate]}
+        (common/use-query {:query-keys ["evaluations" dataset-id]
+                          :query-url (str "/api/evaluations?dataset-id=" dataset-id)})]
+           ($ :div
+          ($ :div.flex.justify-between.items-center.mb-4
+             ($ :h3.text-lg.font-semibold "Evaluations")
+             ($ :button.bg-purple-500.text-white.px-4.py-2.rounded.hover:bg-purple-600
+                {:onClick #(setShowRunForm true)}
+                "Run Evaluation"))
+          
+          (if isLoading
+            ($ :div.text-center "Loading evaluations...")
+            (if (seq data)
+              ($ :div.space-y-4
+                 (for [evaluation data]
               ($ :div.border.rounded.p-4
                  {:key (:id evaluation)}
                  ($ :div.flex.justify-between.items-start.mb-2
@@ -321,16 +325,16 @@
                            ($ :div.font-medium (str "$" (:total-cost-usd results)))))))
                  
                  ($ :div.text-xs.text-gray-500.mt-2
-                    (str "Started: " (format-date (:started-at evaluation)))
-                    (when (:completed-at evaluation)
-                      (str " • Duration: " (format-duration (:started-at evaluation) (:completed-at evaluation))))))))
-         ($ :div.text-center.text-gray-500 "No evaluations yet"))
-       
-       (when showRunForm
-         ($ run-evaluation-modal
-            {:dataset-id dataset-id
-             :on-close #(setShowRunForm false)
-             :on-success #(setShowRunForm false)})))))
+                                          (str "Started: " (format-date (:started-at evaluation)))
+                      (when (:completed-at evaluation)
+                        (str " • Duration: " (format-duration (:started-at evaluation) (:completed-at evaluation))))))))
+              ($ :div.text-center.text-gray-500 "No evaluations yet")))
+          
+          (when showRunForm
+            ($ run-evaluation-modal
+               {:dataset-id dataset-id
+                :on-close #(setShowRunForm false)
+                :on-success #(do (mutate) (setShowRunForm false))})))))
 
 ;; Run evaluation modal
 (defui run-evaluation-modal [{:keys [dataset-id on-close on-success]}]
