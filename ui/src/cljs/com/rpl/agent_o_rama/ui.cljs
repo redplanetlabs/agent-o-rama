@@ -15,10 +15,8 @@
 (defui sidebar-nav []
   (let [[location _] (useLocation)]
     ($ :div.w-64.h-screen.flex.flex-col.bg-gray-100
-       ;; Navigation links
        ($ :nav.flex-1.p-4
           ($ :div.space-y-2
-             ;; Home/Overview
              ($ Link
                 {:href "/"
                  :className (str "flex items-center px-3 py-2 transition-colors "
@@ -26,8 +24,6 @@
                                    "bg-gray-300"
                                    "hover:bg-gray-200"))}
                 "Overview")
-             
-             ;; Agents section
              ($ Link
                 {:href "/agents"
                  :className (str "flex items-center px-3 py-2 transition-colors "
@@ -36,8 +32,6 @@
                                    "bg-gray-300"
                                    "hover:bg-gray-200"))}
                 "Agents")
-             
-             ;; Datasets section  
              ($ Link
                 {:href "/datasets"
                  :className (str "flex items-center px-3 py-2 transition-colors "
@@ -45,12 +39,7 @@
                                          (.startsWith location "/datasets/"))
                                    "bg-gray-300"
                                    "hover:bg-gray-200"))}
-                "Datasets")))
-       
-       ;; Footer
-       ($ :div.p-4.border-t.border-gray-700.text-gray-400.text-sm
-          ($ :div "v1.0.0-beta")
-          ($ :div "Built with Rama")))))
+                "Datasets"))))))
 
 ;; Breadcrumb for sub-navigation within sections
 (defui breadcrumb []

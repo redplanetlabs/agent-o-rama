@@ -61,12 +61,12 @@
     ($ :div.p-4
        ($ :div.text-xl.font-semibold.mb-4 "Agent Details")
        ($ :div.p-4.flex.gap-1
-          (for [tab-label ["invocations" "datasets" "evaluations"]]
+          (for [tab-label ["invocations"]]
             ($ wouter/Link
                {:href (str "/agents/" module-id "/" agent-id "/" tab-label)
                 :key tab-label
                 :style {:flex-grow "1"}}
-               ($ :div.bg-purple-100.flex-1.p-4.hover:bg-purple-200.cursor-pointer
+               ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
                   tab-label)))))))
 
 (defui invoke []
