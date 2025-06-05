@@ -175,7 +175,8 @@
               (.getLocalPState rama-clients name)
               (.getPStateWriteDepot rama-clients)
               nested-ops-vol)]
-         (condp = (get store-info name)
+         ;; TODO: <<<<>>>> not sure this is the right approach for mirrors
+         (condp = (get (:store-info store-info) name)
            simpl/KV
            (simpl/mk-kv-store store-params)
 

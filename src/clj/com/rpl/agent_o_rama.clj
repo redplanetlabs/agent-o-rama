@@ -66,8 +66,9 @@
         store-info-vol
         name
         simpl/DOC
-        {key-class (fixed-keys-schema (into {}
-                                            (partition 2 key-val-classes)))}))
+        {key-class (fixed-keys-schema
+                    (into {}
+                          (mapv vec (partition 2 key-val-classes))))}))
      (^PState$Declaration declarePStateStore [this ^String name ^Class schema]
        (declare-pstate* stream-topology (symbol name) schema))
      (^PState$Declaration declarePStateStore [this ^String name

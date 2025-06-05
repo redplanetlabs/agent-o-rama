@@ -1,5 +1,5 @@
 (ns com.rpl.agent-o-rama.store
-  (:refer-clojure :exclude [get contains?])
+  (:refer-clojure :exclude [get contains? update])
   (:require
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]))
 

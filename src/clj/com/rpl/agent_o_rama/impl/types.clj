@@ -67,7 +67,7 @@
   [start-time-millis :- Long
    finish-time-millis :- Long
    ;; info for models contains token stats, input prompt, output, etc.
-   info :- (s/maybe {String Object})])
+   info :- (s/maybe {String (s/maybe Object)})])
 
 (drp/defrecord+ AgentNodeEmit
   [invoke-id :- Long

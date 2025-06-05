@@ -14,7 +14,7 @@ public interface AgentsTopology {
   AgentGraph newAgent(String name);
 
   void declareKeyValueStore(String name, Class keyClass, Class valClass);
-  void declareDocumentStore(String name, Class keyClass, Class... keyValClasses);
+  void declareDocumentStore(String name, Class keyClass, Object... keyAndValClasses);
   // TODO: what other stores? column-oriented?
   //    - there should be a text search store
   PState.Declaration declarePStateStore(String name, Class schema);

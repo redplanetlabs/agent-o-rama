@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.store :as store]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
@@ -1000,15 +1001,49 @@
      (bind module
        (aor/agentmodule
         [topology]
+        (aor/declare-key-value-store
+         topology
+         "$$kv"
+         clojure.lang.Keyword
+         Object)
+        (aor/declare-document-store
+         topology
+         "$$doc"
+         String
+         :a Long
+         :b String
+         :c java.util.List)
+        (aor/declare-pstate-store
+         topology
+         "$$p"
+         {Long (map-schema Long Long {:subindex? true})})
         (->
           topology
           (aor/new-agent "foo")
           (aor/node "start"
                     "node1"
                     (fn [agent-node arg]
-
-                    )
-          ))
+                      (let [kv (aor/get-store agent-node "$$kv")
+                            b  (store/get kv :b [])
+                            c  (store/get kv :c)]
+                        (store/put kv :a arg)
+                        (store/put kv :b (conj b arg))
+                        (store/update kv :d #(+ (or % 0) arg))
+                        (aor/emit! agent-node
+                                   "node1"
+                                   arg
+                                   {:kv
+                                    {:a (store/get kv :a)
+                                     :b (store/get kv :b)
+                                     :c (store/get kv :c)
+                                     :d (store/get kv :d)}})
+                      )))
+          (aor/node "node1"
+                    nil
+                    (fn [agent-node arg res]
+                      (aor/result! agent-node res)
+                    ))
+        )
        ))
      (rtest/launch-module! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
@@ -1021,8 +1056,10 @@
                        module-name
                        (po/agent-invoke-task-global-name "foo")))
 
-     (bind [graph-task-id graph-id]
-       (invoke-agent-and-wait! depot invokes-pstate []))
+     (println "RES"
+              (invoke-agent-and-return! depot invokes-pstate [3]))
+     (println "RES 2"
+              (invoke-agent-and-return! depot invokes-pstate [1]))
      ;; TODO: <<<<<>>>>>
      ;;  - do PState writes, reads
      ;;   - verify can read own writes as well as previous writes

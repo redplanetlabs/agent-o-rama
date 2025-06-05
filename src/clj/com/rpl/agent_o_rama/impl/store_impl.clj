@@ -55,6 +55,7 @@
           k))
         finish-time (h/current-time-millis)]
     (vswap! (:nested-ops-vol store-params)
+            conj
             (aor-types/->NestedOpInfo
              start-time
              finish-time
@@ -133,7 +134,7 @@
     (~'get*
      [this# k# default-value#]
      (recorded-pstate-select-one!
-      (view #(get ~'% k# default-value#))
+      (view (fn [v#] (get v# k# default-value#)))
       ~store-params
       {:pkey k#}
       "get"
@@ -148,13 +149,13 @@
                     v#))
     (~'contains?*
      [this# k#]
-     (recorded-pstate-select-one! #(view contains? ~'% k#)
+     (recorded-pstate-select-one! (fn [v#] (view contains? v# k#))
                                   ~store-params
                                   {:pkey k#}
                                   "contains?"
                                   k#))
     (~'update*
-     [this k# afn#]
+     [this# k# afn#]
      (pstate-write! ~store-params
                     (path (keypath k#) (term afn#))
                     k#
@@ -186,12 +187,13 @@
      (put-document-field* this# k# doc-key# v#))
     (~'updateDocumentField
      [this# k# doc-key# jfn#]
-     (update-document-field* this k# doc-key# (h/convert-jfn jfn#)))
+     (update-document-field* this# k# doc-key# (h/convert-jfn jfn#)))
     DocumentStoreInternal
     (~'get-document-field*
      [this# k# doc-key# default-value#]
      (recorded-pstate-select-one! [(keypath k#)
-                                   (view #(get ~'% doc-key# default-value#))]
+                                   (view (fn [v#]
+                                           (get v# doc-key# default-value#)))]
                                   ~store-params
                                   {:pkey k#}
                                   "get-document-field"
@@ -201,7 +203,8 @@
      ))
     (~'contains-document-field?*
      [this# k# doc-key#]
-     (recorded-pstate-select-one! [(keypath k#) #(view contains? ~'% doc-key#)]
+     (recorded-pstate-select-one! [(keypath k#)
+                                   (fn [v#] (view contains? v# doc-key#))]
                                   ~store-params
                                   {:pkey k#}
                                   "contains-document-field?"
@@ -285,7 +288,7 @@
 
 (defmacro reify-store
   [impls store-params]
-  (let [code (mapcat (fn [f] (f store-params))
+  (let [code (mapcat (fn [f] ((resolve f) store-params))
               impls)]
     `(reify ~@code)))
 
