@@ -14,58 +14,38 @@
 ;; Sidebar navigation component
 (defui sidebar-nav []
   (let [[location _] (useLocation)]
-    ($ :div.w-64.bg-gray-900.text-white.h-screen.flex.flex-col
-       ;; Header
-       ($ :div.p-4.border-b.border-gray-700
-          ($ :h1.text-xl.font-bold "Agent-o-rama")
-          ($ :p.text-gray-400.text-sm "AI Agent Platform"))
-       
+    ($ :div.w-64.h-screen.flex.flex-col.bg-gray-100
        ;; Navigation links
        ($ :nav.flex-1.p-4
           ($ :div.space-y-2
              ;; Home/Overview
              ($ Link
                 {:href "/"
-                 :className (str "flex items-center px-3 py-2 rounded-lg transition-colors "
-                               (if (= location "/")
-                                 "bg-blue-600 text-white"
-                                 "text-gray-300 hover:bg-gray-800 hover:text-white"))}
-                ($ :span.mr-3 "🏠")
+                 :className (str "flex items-center px-3 py-2 transition-colors "
+                                 (if (= location "/")
+                                   "bg-gray-300"
+                                   "hover:bg-gray-200"))}
                 "Overview")
              
              ;; Agents section
              ($ Link
                 {:href "/agents"
-                 :className (str "flex items-center px-3 py-2 rounded-lg transition-colors "
-                               (if (or (= location "/agents") 
-                                      (.startsWith location "/agents/"))
-                                 "bg-blue-600 text-white"
-                                 "text-gray-300 hover:bg-gray-800 hover:text-white"))}
-                ($ :span.mr-3 "🤖")
+                 :className (str "flex items-center px-3 py-2 transition-colors "
+                                 (if (or (= location "/agents") 
+                                         (.startsWith location "/agents/"))
+                                   "bg-gray-300"
+                                   "hover:bg-gray-200"))}
                 "Agents")
              
              ;; Datasets section  
              ($ Link
                 {:href "/datasets"
-                 :className (str "flex items-center px-3 py-2 rounded-lg transition-colors "
-                               (if (or (= location "/datasets")
-                                      (.startsWith location "/datasets/"))
-                                 "bg-blue-600 text-white"
-                                 "text-gray-300 hover:bg-gray-800 hover:text-white"))}
-                ($ :span.mr-3 "📊")
-                "Datasets")
-             
-             ;; Future: Evaluations
-             ($ :div.flex.items-center.px-3.py-2.text-gray-500.cursor-not-allowed
-                ($ :span.mr-3 "📈")
-                "Evaluations"
-                ($ :span.ml-auto.text-xs.bg-gray-700.px-2.py-1.rounded "Soon"))
-             
-             ;; Future: Settings
-             ($ :div.flex.items-center.px-3.py-2.text-gray-500.cursor-not-allowed
-                ($ :span.mr-3 "⚙️")
-                "Settings"
-                ($ :span.ml-auto.text-xs.bg-gray-700.px-2.py-1.rounded "Soon"))))
+                 :className (str "flex items-center px-3 py-2 transition-colors "
+                                 (if (or (= location "/datasets")
+                                         (.startsWith location "/datasets/"))
+                                   "bg-gray-300"
+                                   "hover:bg-gray-200"))}
+                "Datasets")))
        
        ;; Footer
        ($ :div.p-4.border-t.border-gray-700.text-gray-400.text-sm
@@ -74,38 +54,11 @@
 
 ;; Breadcrumb for sub-navigation within sections
 (defui breadcrumb []
-  (let [[location _] (useLocation)
-        [agent-match agent-params] (useRoute "/agents/:module-id/:agent-id/*")
-        [dataset-match dataset-params] (useRoute "/datasets/:dataset-id")
-        agent-params (when agent-params (js->clj agent-params {:keywordize-keys true}))
-        dataset-params (when dataset-params (js->clj dataset-params {:keywordize-keys true}))]
+  (let [[location _] (useLocation)]
     
     ($ :div.bg-gray-100.px-4.py-2.border-b.text-sm.text-gray-600
-       (cond
-         ;; Agent sub-navigation
-         agent-match
-         ($ :div.flex.items-center.space-x-2
-            ($ Link {:href "/agents" :className "hover:text-blue-600"} "Agents")
-            ($ :span "›")
-            ($ Link {:href (str "/agents/" (:module-id agent-params) "/" (:agent-id agent-params))
-                    :className "hover:text-blue-600"}
-               (str (:module-id agent-params) "/" (:agent-id agent-params)))
-            (when (.includes location "/invocations")
-              ($ :span
-                 ($ :span "›")
-                 ($ :span.ml-2 "Invocations"))))
-         
-         ;; Dataset sub-navigation  
-         dataset-match
-         ($ :div.flex.items-center.space-x-2
-            ($ Link {:href "/datasets" :className "hover:text-blue-600"} "Datasets")
-            ($ :span "›")
-            ($ :span (:dataset-id dataset-params)))
-         
-         ;; Default breadcrumb
-         :else
-         ($ :div.flex.items-center.space-x-2
-            ($ :span "Welcome to Agent-o-rama"))))))
+       ;; TODO make clickable/dynamic
+       ($ :div location))))
 
 ;; Main content area wrapper
 (defui main-content []
