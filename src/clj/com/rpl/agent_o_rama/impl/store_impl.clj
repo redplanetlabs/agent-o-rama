@@ -46,7 +46,7 @@
     (throw (ex-info "Can only write to colocated PStates"
                     {:pstate-name (:pstate-name store-params)})))
   (let [start-time  (h/current-time-millis)
-        _
+        {ret aor-types/AGENTS-TOPOLOGY-NAME}
         (foreign-append!
          (:write-depot store-params)
          (aor-types/->PStateWrite
@@ -54,6 +54,8 @@
           path
           k))
         finish-time (h/current-time-millis)]
+    (if (= (:type ret) :failure)
+      (throw (:exception ret)))
     (vswap! (:nested-ops-vol store-params)
             conj
             (aor-types/->NestedOpInfo

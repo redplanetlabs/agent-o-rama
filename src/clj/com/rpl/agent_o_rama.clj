@@ -27,8 +27,9 @@
 
 (defn agents-topology
   [setup topologies]
-  (let [^StreamTopology stream-topology (stream-topology topologies
-                                                         "_agents-topology")
+  (let [^StreamTopology stream-topology (stream-topology
+                                         topologies
+                                         aor-types/AGENTS-TOPOLOGY-NAME)
         defined?-vol   (volatile! false)
         agents-vol     (volatile! {})
         store-info-vol (volatile! {})]

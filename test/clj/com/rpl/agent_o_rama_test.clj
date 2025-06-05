@@ -1073,21 +1073,27 @@
                 arg
                 (assoc
                  res
-                 :doc {:s    (store/get doc :s)
-                       :t    (store/get doc :t)
-                       :y    (store/contains? doc :s)
-                       :z    (store/contains? doc :abcde)
-                       :ma   (store/get-document-field doc :m :a)
-                       :mb   (store/get-document-field doc :m :b)
-                       :mc   (store/get-document-field doc :m :c)
-                       :ma?  (store/contains-document-field? doc :m :a)
-                       :mc?  (store/contains-document-field? doc :m :c)
-                       :psa  (store/pstate-select-one [:s :a] doc)
-                       :psb  (store/pstate-select [:s :b ALL] doc)
-                       :pzz  [(store/pstate-select :zz doc :e)
-                              (store/pstate-select :zz doc)]
-                       :pzz2 [(store/pstate-select-one :zz doc :e)
-                              (store/pstate-select-one :zz doc)]
+                 :doc {:s     (store/get doc :s)
+                       :t     (store/get doc :t)
+                       :y     (store/contains? doc :s)
+                       :z     (store/contains? doc :abcde)
+                       :ma    (store/get-document-field doc :m :a)
+                       :mb    (store/get-document-field doc :m :b)
+                       :mc    (store/get-document-field doc :m :c)
+                       :ma?   (store/contains-document-field? doc :m :a)
+                       :mc?   (store/contains-document-field? doc :m :c)
+                       :psa   (store/pstate-select-one [:s :a] doc)
+                       :psb   (store/pstate-select [:s :b ALL] doc)
+                       :pzz   [(store/pstate-select :zz doc :e)
+                               (store/pstate-select :zz doc)]
+                       :pzz2  [(store/pstate-select-one :zz doc :e)
+                               (store/pstate-select-one :zz doc)]
+                       :error (try
+                                (store/put-document-field! doc :qq :c 1)
+                                nil
+                                (catch Exception e
+                                  (ex-message e)
+                                ))
                       }))
              )))
           (aor/node
@@ -1160,22 +1166,23 @@
                       :h [3 nil]
                       :i true
                       :j false}
-             :doc    {:s    {:a 6
-                             :b [10 3]}
-                      :t    nil
-                      :y    true
-                      :z    false
-                      :ma   204
-                      :mb   [3]
-                      :mc   nil
-                      :ma?  true
-                      :mc?  false
-                      :psa  6
-                      :psb  [10 3]
-                      :pzz  [[{:a 3 :b [4]}]
-                             [nil]]
-                      :pzz2 [{:a 3 :b [4]}
-                             nil]
+             :doc    {:s     {:a 6
+                              :b [10 3]}
+                      :t     nil
+                      :y     true
+                      :z     false
+                      :ma    204
+                      :mb    [3]
+                      :mc    nil
+                      :ma?   true
+                      :mc?   false
+                      :psa   6
+                      :psb   [10 3]
+                      :pzz   [[{:a 3 :b [4]}]
+                              [nil]]
+                      :pzz2  [{:a 3 :b [4]}
+                              nil]
+                      :error "Invalid key"
                      }
              :pstate {:ks   [0 1]
                       :kv   [53 3]
@@ -1193,22 +1200,23 @@
                       :h [1 nil]
                       :i true
                       :j false}
-             :doc    {:s    {:a 14
-                             :b [10 3 1]}
-                      :t    nil
-                      :y    true
-                      :z    false
-                      :ma   412
-                      :mb   [3 1]
-                      :mc   nil
-                      :ma?  true
-                      :mc?  false
-                      :psa  14
-                      :psb  [10 3 1]
-                      :pzz  [[{:a 1 :b [2]}]
-                             [nil]]
-                      :pzz2 [{:a 1 :b [2]}
-                             nil]
+             :doc    {:s     {:a 14
+                              :b [10 3 1]}
+                      :t     nil
+                      :y     true
+                      :z     false
+                      :ma    412
+                      :mb    [3 1]
+                      :mc    nil
+                      :ma?   true
+                      :mc?   false
+                      :psa   14
+                      :psb   [10 3 1]
+                      :pzz   [[{:a 1 :b [2]}]
+                              [nil]]
+                      :pzz2  [{:a 1 :b [2]}
+                              nil]
+                      :error "Invalid key"
                      }
              :pstate {:ks   [0 1 2]
                       :kv   [54 3 1]

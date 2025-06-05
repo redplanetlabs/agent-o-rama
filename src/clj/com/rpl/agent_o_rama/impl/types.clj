@@ -11,6 +11,8 @@
    [java.util.concurrent
     CompletableFuture]))
 
+(def AGENTS-TOPOLOGY-NAME "_agents-topology")
+
 (def NODE-KW :node)
 (def AGG-START-NODE-KW :agg-start-node)
 (def AGG-NODE-KW :agg-node)

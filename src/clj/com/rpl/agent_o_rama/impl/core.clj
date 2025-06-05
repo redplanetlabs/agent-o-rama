@@ -673,6 +673,20 @@
     ;;  - need ability to set breakpoints, which is implicit human in the loop?
   ))
 
+(deframafn do-transform!*
+  [*path $$p]
+  (local-transform> *path $$p)
+  (:> {:type :success}))
+
+(defn do-transform!
+  [path pstate]
+  (try
+    (do-transform!* path pstate)
+    (catch Exception e
+      {:type      :failure
+       :exception e}
+    )))
+
 (defn define-agents!
   [setup topologies stream-topology agent-graphs store-info]
   (declare-object* setup
@@ -696,7 +710,8 @@
                {:retry-mode :none}
               :> {:keys [*pstate-name *path]})
       (this-module-pobject-task-global *pstate-name :> $$p)
-      (local-transform> *path $$p)
+      (do-transform! *path $$p :> *ret)
+      (ack-return> *ret)
     ))
   (doseq [[name agent-graph] agent-graphs]
     (define-agent! setup topologies stream-topology name agent-graph)))
