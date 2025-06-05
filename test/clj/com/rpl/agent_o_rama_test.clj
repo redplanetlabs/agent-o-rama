@@ -1026,9 +1026,9 @@
                       (let [kv (aor/get-store agent-node "$$kv")
                             b  (store/get kv :b [])
                             c  (store/get kv :c)]
-                        (store/put kv :a arg)
-                        (store/put kv :b (conj b arg))
-                        (store/update kv :d #(+ (or % 0) arg))
+                        (store/put! kv :a arg)
+                        (store/put! kv :b (conj b arg))
+                        (store/update! kv :d #(+ (or % 0) arg))
                         (aor/emit! agent-node
                                    "node1"
                                    arg
@@ -1065,6 +1065,10 @@
      ;;   - verify can read own writes as well as previous writes
      ;;  - do foreign read of same PStates
      ;;  - check node traces for :nested-ops
+     ;;  - verify all operations on each store type:
+     ;;     - PState ops on all
+     ;;     - KV on doc and KV
+     ;;     - doc just on doc
     )))
 
 (deftest looped-test

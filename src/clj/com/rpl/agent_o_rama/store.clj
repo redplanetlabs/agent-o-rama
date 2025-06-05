@@ -1,5 +1,5 @@
 (ns com.rpl.agent-o-rama.store
-  (:refer-clojure :exclude [get contains? update])
+  (:refer-clojure :exclude [get contains?])
   (:require
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]))
 
@@ -13,11 +13,11 @@
   [store k]
   (simpl/contains?* store k))
 
-(defn put
+(defn put!
   [store k v]
   (simpl/put* store k v))
 
-(defn update
+(defn update!
   [store k afn]
   (simpl/update* store k afn))
 
@@ -31,7 +31,7 @@
   [store k doc-key]
   (simpl/contains-document-field?* store k doc-key))
 
-(defn put-document-field
+(defn put-document-field!
   [store k doc-key value]
   (simpl/put-document-field* store k doc-key value))
 
@@ -51,6 +51,6 @@
   ([store partitioning-key apath]
    `(simpl/pstate-select-one* ~store ~partitioning-key (path ~apath))))
 
-(defmacro pstate-transform
+(defmacro pstate-transform!
   [store partitioning-key apath]
   `(simpl/pstate-transform* ~store ~partitioning-key (path ~apath)))
