@@ -149,7 +149,7 @@
                     v#))
     (~'contains?*
      [this# k#]
-     (recorded-pstate-select-one! (fn [v#] (view contains? v# k#))
+     (recorded-pstate-select-one! (view contains? k#)
                                   ~store-params
                                   {:pkey k#}
                                   "contains?"
@@ -204,7 +204,7 @@
     (~'contains-document-field?*
      [this# k# doc-key#]
      (recorded-pstate-select-one! [(keypath k#)
-                                   (fn [v#] (view contains? v# doc-key#))]
+                                   (view contains? doc-key#)]
                                   ~store-params
                                   {:pkey k#}
                                   "contains-document-field?"

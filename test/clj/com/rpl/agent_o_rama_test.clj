@@ -1045,19 +1045,28 @@
                                 (store/pstate-select :zz kv)]
                             :h [(store/pstate-select-one :zz kv :e)
                                 (store/pstate-select-one :zz kv)]
-
+                            :i (store/contains? kv :a)
+                            :j (store/contains? kv :abcde)
                            }})
              )))
           (aor/node "doc"
                     "end"
                     (fn [agent-node arg res]
-                      (aor/emit!
-                       agent-node
-                       "end"
-                       (assoc
-                        res
-                        :doc {}))
-                    ))
+                      (let [doc (aor/get-store agent-node "$$doc")]
+                        ; (defn get-document-field
+                        ;   ([store k doc-key]
+                        ;   ([store k doc-key default-value]
+                        ; (defn contains-document-field?
+                        ; (defn put-document-field!
+                        ; (defn update-document-field
+
+                        (aor/emit!
+                         agent-node
+                         "end"
+                         (assoc
+                          res
+                          :doc {}))
+                      )))
           (aor/node "end"
                     nil
                     (fn [agent-node res]
@@ -1083,7 +1092,9 @@
                    :e [3]
                    :f 3
                    :g [[3] [nil]]
-                   :h [3 nil]}
+                   :h [3 nil]
+                   :i true
+                   :j false}
              :doc {}}
             (:val (invoke-agent-and-return! depot invokes-pstate [3]))))
      (is (= {:kv  {:a 1
@@ -1093,7 +1104,9 @@
                    :e [3 1]
                    :f 1
                    :g [[1] [nil]]
-                   :h [1 nil]}
+                   :h [1 nil]
+                   :i true
+                   :j false}
              :doc {}}
             (:val (invoke-agent-and-return! depot invokes-pstate [1]))))
      ;; TODO: <<<<<>>>>>
