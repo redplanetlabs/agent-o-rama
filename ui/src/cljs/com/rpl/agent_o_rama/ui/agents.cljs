@@ -34,7 +34,7 @@
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
         {:keys [data isLoading]}
         (common/use-query {:query-key ["agent" module-id agent-id]
-                           :query-url (str "/api/agents/" module-id "/" agent-id)})]
+                           :query-url (str "/api/agents/" module-id "/" agent-id "/invocations")})]
     (cond
       isLoading ($ :div "loading...")
       (not data) ($ :div "no data")
@@ -49,10 +49,16 @@
               ($ :pre.text-xs.bg-gray-100.p-2.rounded.overflow-x-auto (common/pp invoke))))))))
 
 (defui datasets []
-  (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))]
+  (let [{:strs [module-id agent-id]}
+        (js->clj (wouter/useParams))
+
+        {:keys [data isLoading]}
+        (common/use-query {:query-keys ["dataset" module-id agent-id]
+                           :query-url (str "/api/agents/" module-id "/" agent-id "/dataset")} )]
     ($ :div
        ($ :h2.text-xl.font-semibold.mb-4 "Datasets")
-       ($ :div.text-gray-500 "Datasets functionality coming soon..."))))
+       ($ :div.text-gray-500 "Datasets functionality coming soon...")
+       (common/pre data))))
 
 (defui evaluations []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))]
@@ -82,8 +88,8 @@
         {:keys [data isLoading]}
         (common/use-query {:query-key ["invoke-initial" module-id agent-id invoke-id use-pagination?]
                            :query-url (if use-pagination?
-                                       (str "/api/agents/" module-id "/" agent-id "/" invoke-id "/paginated?depth=1")
-                                       (str "/api/agents/" module-id "/" agent-id "/" invoke-id))})]
+                                        (str "/api/agents/" module-id "/" agent-id "/invocations/" invoke-id "/paginated?depth=1")
+                                        (str "/api/agents/" module-id "/" agent-id "/invocations/" invoke-id))})]
     (cond
       isLoading ($ :div "loading...")
       (not data) ($ :div "no data")
@@ -98,10 +104,10 @@
                                   :checked use-pagination?
                                   :onChange #(set-use-pagination (not use-pagination?))})))
             ($ graph/graph {:initial-data (:invokes-map data)
-                           :api-url (when use-pagination? 
-                                     (str "/api/agents/" module-id "/" agent-id "/" invoke-id "/paginated"))
-                           :module-id module-id
-                           :agent-id agent-id
-                           :invoke-id invoke-id}))))))
+                            :api-url (when use-pagination? 
+                                       (str "/api/agents/" module-id "/" agent-id "/invocations/" invoke-id "/paginated"))
+                            :module-id module-id
+                            :agent-id agent-id
+                            :invoke-id invoke-id}))))))
 
 

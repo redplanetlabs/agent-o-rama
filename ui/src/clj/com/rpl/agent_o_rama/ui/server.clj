@@ -36,11 +36,11 @@
     ["/api"
      ["/agents"
       {:get {:handler #'agents/index}}]
-     ["/agents/:module-id/:agent-id"
+     ["/agents/:module-id/:agent-id/invocations"
       {:get {:handler #'agents/get-invokes}}]
-     ["/agents/:module-id/:agent-id/:invoke-id"
+     ["/agents/:module-id/:agent-id/invocations/:invoke-id"
       {:get {:handler #'agents/invoke}}]
-     ["/agents/:module-id/:agent-id/:invoke-id/paginated"
+     ["/agents/:module-id/:agent-id/invocations/:invoke-id/paginated"
       {:get {:parameters {:query [:map
                                   [:depth int?]
                                   [:start-node-id {:optional true} string?]]}
