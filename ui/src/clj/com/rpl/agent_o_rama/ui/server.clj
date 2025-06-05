@@ -48,7 +48,33 @@
              :handler #'agents/invoke-paginated}}]
      
      ["/agents/:module-id/:agent-id/datasets"
-      {:get {:handler #'datasets/index}}]]
+      {:get {:handler #'datasets/index}}]
+     ["/agents/:module-id/:agent-id/evaluate"
+      {:post {:handler #'datasets/start-evaluation}}]
+
+     ;; Dataset management routes
+     ["/datasets"
+      {:get {:handler #'datasets/list-datasets}
+       :post {:handler #'datasets/create-dataset}}]
+     ["/datasets/:id"
+      {:get {:handler #'datasets/get-dataset}
+       :put {:handler #'datasets/update-dataset}
+       :delete {:handler #'datasets/delete-dataset}}]
+     ["/datasets/:id/entries"
+      {:get {:parameters {:query [:map
+                                  [:limit {:optional true} int?]
+                                  [:offset {:optional true} int?]]}
+             :handler #'datasets/get-dataset-entries}
+       :post {:handler #'datasets/add-dataset-entry}}]
+
+     ;; Evaluation routes  
+     ["/evaluations"
+      {:get {:parameters {:query [:map
+                                  [:dataset-id {:optional true} string?]]}
+             :handler #'datasets/list-evaluations}
+       :post {:handler #'datasets/start-evaluation}}]
+     ["/evaluations/:id"
+      {:get {:handler #'datasets/get-evaluation}}]]
     {:data {:muuntaja m/instance
             :middleware [parameters/parameters-middleware
                          muuntaja/format-middleware
