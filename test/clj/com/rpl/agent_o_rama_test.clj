@@ -1020,27 +1020,47 @@
         (->
           topology
           (aor/new-agent "foo")
-          (aor/node "start"
-                    "node1"
-                    (fn [agent-node arg]
-                      (let [kv (aor/get-store agent-node "$$kv")
-                            b  (store/get kv :b [])
-                            c  (store/get kv :c)]
-                        (store/put! kv :a arg)
-                        (store/put! kv :b (conj b arg))
-                        (store/update! kv :d #(+ (or % 0) arg))
-                        (aor/emit! agent-node
-                                   "node1"
-                                   arg
-                                   {:kv
-                                    {:a (store/get kv :a)
-                                     :b (store/get kv :b)
-                                     :c (store/get kv :c)
-                                     :d (store/get kv :d)}})
-                      )))
-          (aor/node "node1"
-                    nil
+          (aor/node
+           "kv"
+           "doc"
+           (fn [agent-node arg]
+             (let [kv (aor/get-store agent-node "$$kv")
+                   b  (store/get kv :b [])
+                   c  (store/get kv :c)]
+               (store/put! kv :a arg)
+               (store/put! kv :b (conj b arg))
+               (store/update! kv :d #(+ (or % 0) arg))
+               (store/pstate-transform! [:zz (termval arg)] kv :e)
+               (aor/emit! agent-node
+                          "doc"
+                          arg
+                          {:kv
+                           {:a (store/get kv :a)
+                            :b (store/get kv :b)
+                            :c (store/get kv :c)
+                            :d (store/get kv :d)
+                            :e (store/pstate-select [:b ALL] kv)
+                            :f (store/pstate-select-one :a kv)
+                            :g [(store/pstate-select :zz kv :e)
+                                (store/pstate-select :zz kv)]
+                            :h [(store/pstate-select-one :zz kv :e)
+                                (store/pstate-select-one :zz kv)]
+
+                           }})
+             )))
+          (aor/node "doc"
+                    "end"
                     (fn [agent-node arg res]
+                      (aor/emit!
+                       agent-node
+                       "end"
+                       (assoc
+                        res
+                        :doc {}))
+                    ))
+          (aor/node "end"
+                    nil
+                    (fn [agent-node res]
                       (aor/result! agent-node res)
                     ))
         )
@@ -1056,10 +1076,26 @@
                        module-name
                        (po/agent-invoke-task-global-name "foo")))
 
-     (println "RES"
-              (invoke-agent-and-return! depot invokes-pstate [3]))
-     (println "RES 2"
-              (invoke-agent-and-return! depot invokes-pstate [1]))
+     (is (= {:kv  {:a 3
+                   :b [3]
+                   :c nil
+                   :d 3
+                   :e [3]
+                   :f 3
+                   :g [[3] [nil]]
+                   :h [3 nil]}
+             :doc {}}
+            (:val (invoke-agent-and-return! depot invokes-pstate [3]))))
+     (is (= {:kv  {:a 1
+                   :b [3 1]
+                   :c nil
+                   :d 4
+                   :e [3 1]
+                   :f 1
+                   :g [[1] [nil]]
+                   :h [1 nil]}
+             :doc {}}
+            (:val (invoke-agent-and-return! depot invokes-pstate [1]))))
      ;; TODO: <<<<<>>>>>
      ;;  - do PState writes, reads
      ;;   - verify can read own writes as well as previous writes

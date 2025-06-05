@@ -1,4 +1,5 @@
 (ns com.rpl.agent-o-rama.store
+  (:use [com.rpl.rama path])
   (:refer-clojure :exclude [get contains?])
   (:require
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]))
@@ -40,17 +41,17 @@
   (simpl/update-document-field* store k doc-key afn))
 
 (defmacro pstate-select
-  ([store apath]
+  ([apath store]
    `(simpl/pstate-select* ~store (path ~apath)))
-  ([store partitioning-key apath]
+  ([apath store partitioning-key]
    `(simpl/pstate-select* ~store ~partitioning-key (path ~apath))))
 
 (defmacro pstate-select-one
-  ([store apath]
+  ([apath store]
    `(simpl/pstate-select-one* ~store (path ~apath)))
-  ([store partitioning-key apath]
+  ([apath store partitioning-key]
    `(simpl/pstate-select-one* ~store ~partitioning-key (path ~apath))))
 
 (defmacro pstate-transform!
-  [store partitioning-key apath]
+  [apath store partitioning-key]
   `(simpl/pstate-transform* ~store ~partitioning-key (path ~apath)))
