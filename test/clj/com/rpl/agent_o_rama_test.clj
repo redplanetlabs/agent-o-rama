@@ -1100,6 +1100,14 @@
        (foreign-pstate ipc
                        module-name
                        (po/agent-invoke-task-global-name "foo")))
+     (bind kv
+       (foreign-pstate ipc
+                       module-name
+                       "$$kv"))
+     (bind doc
+       (foreign-pstate ipc
+                       module-name
+                       "$$doc"))
 
      (is (= {:kv  {:a 3
                    :b [3]
@@ -1143,6 +1151,12 @@
                    :ma? true
                    :mc? false}}
             (:val (invoke-agent-and-return! depot invokes-pstate [1]))))
+
+
+     (is (= 1 (foreign-select-one :a kv)))
+     (is (= [3 1] (foreign-select-one :b kv)))
+     (is (= [10 3 1] (foreign-select-one [:s :b] doc)))
+
      ;; TODO: <<<<<>>>>>
      ;;  - do PState writes, reads
      ;;   - verify can read own writes as well as previous writes
