@@ -1,3 +1,7 @@
+get rid of intermediate agent info screen
+react-query/mutationify the mutations for agent creation
+use a library for form state (the one recommended by uix readme)
+"add current trace to dataset" button 
 depth mapping by node count, not depth count (query topology does that automatically)
 
 agg-invoke-id groups?
