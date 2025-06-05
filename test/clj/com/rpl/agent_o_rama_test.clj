@@ -1015,7 +1015,7 @@
         (aor/declare-pstate-store
          topology
          "$$p"
-         {Long (map-schema Long Long {:subindex? true})})
+         {clojure.lang.Keyword (map-schema Long Long {:subindex? true})})
         (->
           topology
           (aor/new-agent "foo")
@@ -1049,7 +1049,7 @@
              )))
           (aor/node
            "doc"
-           "end"
+           "pstate"
            (fn [agent-node arg res]
              (let [doc (aor/get-store agent-node "$$doc")
                    s   (store/get doc :s {:a 2 :b [10]})
@@ -1069,7 +1069,8 @@
                                         :e)
                (aor/emit!
                 agent-node
-                "end"
+                "pstate"
+                arg
                 (assoc
                  res
                  :doc {:s    (store/get doc :s)
@@ -1088,6 +1089,36 @@
                        :pzz2 [(store/pstate-select-one :zz doc :e)
                               (store/pstate-select-one :zz doc)]
                       }))
+             )))
+          (aor/node
+           "pstate"
+           "end"
+           (fn [agent-node arg res]
+             (let [p (aor/get-store agent-node "$$p")
+                   _ (store/pstate-transform! [:a (keypath 0) (nil->val 50)
+                                               (term #(+ % arg))]
+                                              p
+                                              :a)
+                   i (store/pstate-select-one [:a LAST FIRST] p)]
+               (store/pstate-transform! [:a (keypath (inc i)) (termval arg)]
+                                        p
+                                        :a)
+               (store/pstate-transform! [:zz 0 (termval arg)]
+                                        p
+                                        :e)
+               (aor/emit!
+                agent-node
+                "end"
+                (assoc
+                 res
+                 :pstate {:ks   (store/pstate-select [:a MAP-KEYS] p)
+                          :kv   (store/pstate-select [:a MAP-VALS] p)
+                          :k0   (store/pstate-select-one [:a 0] p)
+                          :zz0  [(store/pstate-select [:zz 0] p :e)
+                                 (store/pstate-select [:zz 0] p)]
+                          :zz02 [(store/pstate-select-one [:zz 0] p :e)
+                                 (store/pstate-select-one [:zz 0] p)]
+                         }))
              )))
           (aor/node "end"
                     nil
@@ -1114,80 +1145,88 @@
        (foreign-pstate ipc
                        module-name
                        "$$doc"))
+     (bind p
+       (foreign-pstate ipc
+                       module-name
+                       "$$p"))
 
-     (is (= {:kv  {:a 3
-                   :b [3]
-                   :c nil
-                   :d 3
-                   :e [3]
-                   :f 3
-                   :g [[3] [nil]]
-                   :h [3 nil]
-                   :i true
-                   :j false}
-             :doc {:s    {:a 6
-                          :b [10 3]}
-                   :t    nil
-                   :y    true
-                   :z    false
-                   :ma   204
-                   :mb   [3]
-                   :mc   nil
-                   :ma?  true
-                   :mc?  false
-                   :psa  6
-                   :psb  [10 3]
-                   :pzz  [[{:a 3 :b [4]}]
-                          [nil]]
-                   :pzz2 [{:a 3 :b [4]}
-                          nil]
-                  }}
+     (is (= {:kv     {:a 3
+                      :b [3]
+                      :c nil
+                      :d 3
+                      :e [3]
+                      :f 3
+                      :g [[3] [nil]]
+                      :h [3 nil]
+                      :i true
+                      :j false}
+             :doc    {:s    {:a 6
+                             :b [10 3]}
+                      :t    nil
+                      :y    true
+                      :z    false
+                      :ma   204
+                      :mb   [3]
+                      :mc   nil
+                      :ma?  true
+                      :mc?  false
+                      :psa  6
+                      :psb  [10 3]
+                      :pzz  [[{:a 3 :b [4]}]
+                             [nil]]
+                      :pzz2 [{:a 3 :b [4]}
+                             nil]
+                     }
+             :pstate {:ks   [0 1]
+                      :kv   [53 3]
+                      :k0   53
+                      :zz0  [[3] [nil]]
+                      :zz02 [3 nil]}}
             (:val (invoke-agent-and-return! depot invokes-pstate [3]))))
-     (is (= {:kv  {:a 1
-                   :b [3 1]
-                   :c nil
-                   :d 4
-                   :e [3 1]
-                   :f 1
-                   :g [[1] [nil]]
-                   :h [1 nil]
-                   :i true
-                   :j false}
-             :doc {:s    {:a 14
-                          :b [10 3 1]}
-                   :t    nil
-                   :y    true
-                   :z    false
-                   :ma   412
-                   :mb   [3 1]
-                   :mc   nil
-                   :ma?  true
-                   :mc?  false
-                   :psa  14
-                   :psb  [10 3 1]
-                   :pzz  [[{:a 1 :b [2]}]
-                          [nil]]
-                   :pzz2 [{:a 1 :b [2]}
-                          nil]
-                  }}
+     (is (= {:kv     {:a 1
+                      :b [3 1]
+                      :c nil
+                      :d 4
+                      :e [3 1]
+                      :f 1
+                      :g [[1] [nil]]
+                      :h [1 nil]
+                      :i true
+                      :j false}
+             :doc    {:s    {:a 14
+                             :b [10 3 1]}
+                      :t    nil
+                      :y    true
+                      :z    false
+                      :ma   412
+                      :mb   [3 1]
+                      :mc   nil
+                      :ma?  true
+                      :mc?  false
+                      :psa  14
+                      :psb  [10 3 1]
+                      :pzz  [[{:a 1 :b [2]}]
+                             [nil]]
+                      :pzz2 [{:a 1 :b [2]}
+                             nil]
+                     }
+             :pstate {:ks   [0 1 2]
+                      :kv   [54 3 1]
+                      :k0   54
+                      :zz0  [[1] [nil]]
+                      :zz02 [1 nil]}}
             (:val (invoke-agent-and-return! depot invokes-pstate [1]))))
 
 
      (is (= 1 (foreign-select-one :a kv)))
      (is (= [3 1] (foreign-select-one :b kv)))
      (is (= [10 3 1] (foreign-select-one [:s :b] doc)))
+     (is (= 54 (foreign-select-one [:a 0] p)))
+     (is (= 1 (foreign-select-one [:zz 0] p {:pkey :e})))
 
      ;; TODO: <<<<<>>>>>
-     ;;  - do PState writes, reads
-     ;;   - verify can read own writes as well as previous writes
-     ;;  - do foreign read of same PStates
+     ;;  - check error when writing to a non-existent field in doc store
      ;;  - check node traces for :nested-ops
-     ;;  - verify all operations on each store type:
-     ;;     - PState ops on all
-     ;;     - KV on doc and KV
-     ;;     - doc just on doc
-     ;;; - check error when writing to a non-existent field in doc store
-     ;;  - verify reading from non-existent field in doc store is OK
     )))
 
 (deftest looped-test
