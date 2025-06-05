@@ -402,7 +402,6 @@
                                   clean-graph)))]
     (traverse start-id max-depth)))
 
-;; Synthetic graph generator for stress testing
 (defn invoke-paginated 
   [{{:keys [module-id agent-id invoke-id]} :path-params
     {:strs [start-node-id depth] :or {depth "3"}} :query-params

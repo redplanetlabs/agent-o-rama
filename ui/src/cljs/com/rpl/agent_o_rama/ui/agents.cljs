@@ -30,26 +30,37 @@
                             "View agent details"))))))))))
 
 
-(defui agent []
+(defui invocations []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
         {:keys [data isLoading]}
         (common/use-query {:query-key ["agent" module-id agent-id]
                            :query-url (str "/api/agents/" module-id "/" agent-id)})]
-    
     (cond
       isLoading ($ :div "loading...")
       (not data) ($ :div "no data")
       :else 
-      (let [invokes (:invokes data)]
-          ($ :div
-             (for [invoke invokes
-                     :let [url (str "/agents/" module-id "/" agent-id "/" (:root-invoke-id invoke))]]
-             ($ wouter/Link {:href url :key url}
-               ($ :div.bg-white.p-6.rounded-lg.shadow {:class "hover:bg-gray-100"}
-                  ($ :div.flex.justify-between.items-center.mb-2
-                     ($ :div.text-indigo-600.font-medium.text-sm
-                        "Explore Invocation"))
-                  ($ :pre.text-xs.bg-gray-100.p-2.rounded.overflow-x-auto (common/pp invoke))))))))))
+      (for [invoke (:invokes data)
+            :let [url (str "/agents/" module-id "/" agent-id "/" (:root-invoke-id invoke))]]
+        ($ wouter/Link {:href url :key url}
+           ($ :div.bg-white.p-6 {:class "hover:bg-gray-100"}
+              ($ :div.flex.justify-between.items-center.mb-2
+                 ($ :div.text-indigo-600.font-medium.text-sm
+                    "Explore Invocation"))
+              ($ :pre.text-xs.bg-gray-100.p-2.rounded.overflow-x-auto (common/pp invoke))))))))
+
+(defui agent []
+  (let [[tab set-tab] (uix/use-state "invocations")]
+    ($ :div
+       ($ :div.p-4.flex.gap-1
+          (for [tab-label ["invocations" "datasets" "evaluations"]]
+            ($ :div.bg-purple-100.flex-1.p-4.hover:bg-purple-200.cursor-pointer
+               {:onClick #(set-tab tab-label)
+                :style {:text-decoration (if (= tab tab-label) "underline" "")}}
+               tab-label)))
+       ($ :div.p-4
+          (cond
+            (= tab "invocations") ($ invocations)
+            :else ($ :div "no tab selected"))))))
 
 (defui invoke []
   (let [{:strs [module-id agent-id invoke-id]} (js->clj (wouter/useParams))
