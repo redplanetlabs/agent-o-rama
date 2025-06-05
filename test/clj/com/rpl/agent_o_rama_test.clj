@@ -1047,42 +1047,48 @@
                             :j (store/contains? kv :abcde)
                            }})
              )))
-          (aor/node "doc"
-                    "end"
-                    (fn [agent-node arg res]
-                      (let [doc (aor/get-store agent-node "$$doc")
-                            s   (store/get doc :s {:a 2 :b [10]})
-                            ma  (store/get-document-field doc :m :a 100)
-                            mb  (store/get-document-field doc :m :b [])]
-                        (store/put! doc
-                                    :s
-                                    (-> s
-                                        (update :a inc)
-                                        (update :b #(conj % arg))))
-                        (store/update! doc :s #(update % :a (fn [v] (* 2 v))))
-                        (store/put-document-field! doc :m :a (+ ma 2))
-                        (store/update-document-field! doc :m :a #(* 2 %))
-                        (store/put-document-field! doc :m :b (conj mb arg))
-                        ; pstate-select (2 variants)
-                        ; pstate-select-one
-                        ; pstate-transform!
-
-                        (aor/emit!
-                         agent-node
-                         "end"
-                         (assoc
-                          res
-                          :doc {:s   (store/get doc :s)
-                                :t   (store/get doc :t)
-                                :y   (store/contains? doc :s)
-                                :z   (store/contains? doc :abcde)
-                                :ma  (store/get-document-field doc :m :a)
-                                :mb  (store/get-document-field doc :m :b)
-                                :mc  (store/get-document-field doc :m :c)
-                                :ma? (store/contains-document-field? doc :m :a)
-                                :mc? (store/contains-document-field? doc :m :c)
-                               }))
-                      )))
+          (aor/node
+           "doc"
+           "end"
+           (fn [agent-node arg res]
+             (let [doc (aor/get-store agent-node "$$doc")
+                   s   (store/get doc :s {:a 2 :b [10]})
+                   ma  (store/get-document-field doc :m :a 100)
+                   mb  (store/get-document-field doc :m :b [])]
+               (store/put! doc
+                           :s
+                           (-> s
+                               (update :a inc)
+                               (update :b #(conj % arg))))
+               (store/update! doc :s #(update % :a (fn [v] (* 2 v))))
+               (store/put-document-field! doc :m :a (+ ma 2))
+               (store/update-document-field! doc :m :a #(* 2 %))
+               (store/put-document-field! doc :m :b (conj mb arg))
+               (store/pstate-transform! [:zz (termval {:a arg :b [(inc arg)]})]
+                                        doc
+                                        :e)
+               (aor/emit!
+                agent-node
+                "end"
+                (assoc
+                 res
+                 :doc {:s    (store/get doc :s)
+                       :t    (store/get doc :t)
+                       :y    (store/contains? doc :s)
+                       :z    (store/contains? doc :abcde)
+                       :ma   (store/get-document-field doc :m :a)
+                       :mb   (store/get-document-field doc :m :b)
+                       :mc   (store/get-document-field doc :m :c)
+                       :ma?  (store/contains-document-field? doc :m :a)
+                       :mc?  (store/contains-document-field? doc :m :c)
+                       :psa  (store/pstate-select-one [:s :a] doc)
+                       :psb  (store/pstate-select [:s :b ALL] doc)
+                       :pzz  [(store/pstate-select :zz doc :e)
+                              (store/pstate-select :zz doc)]
+                       :pzz2 [(store/pstate-select-one :zz doc :e)
+                              (store/pstate-select-one :zz doc)]
+                      }))
+             )))
           (aor/node "end"
                     nil
                     (fn [agent-node res]
@@ -1119,16 +1125,23 @@
                    :h [3 nil]
                    :i true
                    :j false}
-             :doc {:s   {:a 6
-                         :b [10 3]}
-                   :t   nil
-                   :y   true
-                   :z   false
-                   :ma  204
-                   :mb  [3]
-                   :mc  nil
-                   :ma? true
-                   :mc? false}}
+             :doc {:s    {:a 6
+                          :b [10 3]}
+                   :t    nil
+                   :y    true
+                   :z    false
+                   :ma   204
+                   :mb   [3]
+                   :mc   nil
+                   :ma?  true
+                   :mc?  false
+                   :psa  6
+                   :psb  [10 3]
+                   :pzz  [[{:a 3 :b [4]}]
+                          [nil]]
+                   :pzz2 [{:a 3 :b [4]}
+                          nil]
+                  }}
             (:val (invoke-agent-and-return! depot invokes-pstate [3]))))
      (is (= {:kv  {:a 1
                    :b [3 1]
@@ -1140,16 +1153,23 @@
                    :h [1 nil]
                    :i true
                    :j false}
-             :doc {:s   {:a 14
-                         :b [10 3 1]}
-                   :t   nil
-                   :y   true
-                   :z   false
-                   :ma  412
-                   :mb  [3 1]
-                   :mc  nil
-                   :ma? true
-                   :mc? false}}
+             :doc {:s    {:a 14
+                          :b [10 3 1]}
+                   :t    nil
+                   :y    true
+                   :z    false
+                   :ma   412
+                   :mb   [3 1]
+                   :mc   nil
+                   :ma?  true
+                   :mc?  false
+                   :psa  14
+                   :psb  [10 3 1]
+                   :pzz  [[{:a 1 :b [2]}]
+                          [nil]]
+                   :pzz2 [{:a 1 :b [2]}
+                          nil]
+                  }}
             (:val (invoke-agent-and-return! depot invokes-pstate [1]))))
 
 
