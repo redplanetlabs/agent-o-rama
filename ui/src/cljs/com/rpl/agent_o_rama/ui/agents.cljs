@@ -4,7 +4,7 @@
    
    [uix.core :as uix :refer [defui defhook $]]
    ["axios" :as axios]
-   ["wouter" :as wouter]
+   ["wouter" :as wouter :refer [useLocation]]
 
 
    
@@ -40,7 +40,7 @@
       (not data) ($ :div "no data")
       :else 
       (for [invoke (:invokes data)
-            :let [url (str "/agents/" module-id "/" agent-id "/" (:root-invoke-id invoke))]]
+            :let [url (str "/agents/" module-id "/" agent-id "/invocations/" (:root-invoke-id invoke))]]
         ($ wouter/Link {:href url :key url}
            ($ :div.bg-white.p-6 {:class "hover:bg-gray-100"}
               ($ :div.flex.justify-between.items-center.mb-2
@@ -48,19 +48,29 @@
                     "Explore Invocation"))
               ($ :pre.text-xs.bg-gray-100.p-2.rounded.overflow-x-auto (common/pp invoke))))))))
 
-(defui agent []
-  (let [[tab set-tab] (uix/use-state "invocations")]
+(defui datasets []
+  (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))]
     ($ :div
+       ($ :h2.text-xl.font-semibold.mb-4 "Datasets")
+       ($ :div.text-gray-500 "Datasets functionality coming soon..."))))
+
+(defui evaluations []
+  (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))]
+    ($ :div
+       ($ :h2.text-xl.font-semibold.mb-4 "Evaluations")
+       ($ :div.text-gray-500 "Evaluations functionality coming soon..."))))
+
+(defui agent []
+  (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
+        [location navigate] (useLocation)]
+    
+    ($ :div.p-4
+       ($ :div.text-xl.font-semibold.mb-4 "Agent Details")
        ($ :div.p-4.flex.gap-1
           (for [tab-label ["invocations" "datasets" "evaluations"]]
-            ($ :div.bg-purple-100.flex-1.p-4.hover:bg-purple-200.cursor-pointer
-               {:onClick #(set-tab tab-label)
-                :style {:text-decoration (if (= tab tab-label) "underline" "")}}
-               tab-label)))
-       ($ :div.p-4
-          (cond
-            (= tab "invocations") ($ invocations)
-            :else ($ :div "no tab selected"))))))
+            ($ wouter/Link {:href (str "/agents/" module-id "/" agent-id "/" tab-label) :key tab-label}
+               ($ :div.bg-purple-100.flex-1.p-4.hover:bg-purple-200.cursor-pointer
+                  tab-label)))))))
 
 (defui invoke []
   (let [{:strs [module-id agent-id invoke-id]} (js->clj (wouter/useParams))

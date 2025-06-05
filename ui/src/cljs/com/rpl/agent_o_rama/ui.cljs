@@ -52,8 +52,21 @@
                         :get-href (fn [params] (str "/agents/" (:module-id params) "/" (:agent-id params)))
                         :get-title (fn [params] (str (:module-id params) "/" (:agent-id params)))})
      
+     ;; Tab breadcrumbs
+     ($ breadcrumb-item {:pattern "/agents/:module-id/:agent-id/invocations"
+                        :get-href (fn [params] (str "/agents/" (:module-id params) "/" (:agent-id params) "/invocations"))
+                        :get-title (fn [params] "invocations")})
+     
+     ($ breadcrumb-item {:pattern "/agents/:module-id/:agent-id/datasets"
+                        :get-href (fn [params] (str "/agents/" (:module-id params) "/" (:agent-id params) "/datasets"))
+                        :get-title (fn [params] "datasets")})
+     
+     ($ breadcrumb-item {:pattern "/agents/:module-id/:agent-id/evaluations"
+                        :get-href (fn [params] (str "/agents/" (:module-id params) "/" (:agent-id params) "/evaluations"))
+                        :get-title (fn [params] "evaluations")})
+     
      ;; Invoke breadcrumb  
-     ($ breadcrumb-item {:pattern "/agents/:module-id/:agent-id/:invoke-id"
+     ($ breadcrumb-item {:pattern "/agents/:module-id/:agent-id/invocations/:invoke-id"
                         :get-href (fn [params] (str "/agents/" (:module-id params) "/" (:agent-id params) "/" (:invoke-id params)))
                         :get-title (fn [params] (str (:invoke-id params)))
                         :is-last true})))
@@ -62,8 +75,11 @@
   ($ :div
      ($ nav)
      ($ Router
+        ($ Route {:path "/agents/:module-id/:agent-id/invocations" :component agents/invocations})
+        ($ Route {:path "/agents/:module-id/:agent-id/invocations/:invoke-id" :component agents/invoke})
+        ($ Route {:path "/agents/:module-id/:agent-id/datasets" :component agents/datasets})
+        ($ Route {:path "/agents/:module-id/:agent-id/evaluations" :component agents/evaluations})
         ($ Route {:path "/agents/:module-id/:agent-id" :component agents/agent})
-        ($ Route {:path "/agents/:module-id/:agent-id/:invoke-id" :component agents/invoke})
         ($ Route {:path "/" :component agents/index}))))
 
 
