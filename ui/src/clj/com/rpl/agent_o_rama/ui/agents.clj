@@ -314,6 +314,30 @@
 
 (def use-large? false)
 
+(defn generate-synthetic-graph
+  "Generate a large synthetic invokes-map containing `n` nodes arranged as a binary tree.
+  Each node (except leaves) emits to its left and right children. The root node is
+  labelled `start` to integrate smoothly with existing front-end logic."
+  [n]
+  (into {}
+        (for [id (range 1 (inc n))]
+          (let [left  (* 2 id)
+                right (inc left)
+                emits (->> [[left 0] [right 1]]
+                           (filter (fn [[child _]] (<= child n)))
+                           (map (fn [[child task-id]]
+                                  {:invoke-id child
+                                   :target-task-id task-id
+                                   :node-name (str "node" child)
+                                   :args []})))]
+            [id {:node (if (= id 1) "start" (str "node" id))
+                 :emits emits
+                 :start-time-millis 0
+                 :finish-time-millis 1
+                 :input []
+                 :result nil
+                 :async-ops []}]))))
+
 (def ^:private synthetic-20k-graph (generate-synthetic-graph 20000))
 
 (defn invoke [{{:keys [module-id agent-id invoke-id]} :path-params
@@ -391,26 +415,4 @@
             :pagination {:depth depth-int
                          :start-node-id (or start-id "root")}}}))
 
-(defn generate-synthetic-graph
-  "Generate a large synthetic invokes-map containing `n` nodes arranged as a binary tree.
-  Each node (except leaves) emits to its left and right children. The root node is
-  labelled `start` to integrate smoothly with existing front-end logic."
-  [n]
-  (into {}
-        (for [id (range 1 (inc n))]
-          (let [left  (* 2 id)
-                right (inc left)
-                emits (->> [[left 0] [right 1]]
-                            (filter (fn [[child _]] (<= child n)))
-                            (map (fn [[child task-id]]
-                                   {:invoke-id child
-                                    :target-task-id task-id
-                                    :node-name (str "node" child)
-                                    :args []})))]
-            [id {:node (if (= id 1) "start" (str "node" id))
-                 :emits emits
-                 :start-time-millis 0
-                 :finish-time-millis 1
-                 :input []
-                 :result nil
-                 :async-ops []}]))))
+

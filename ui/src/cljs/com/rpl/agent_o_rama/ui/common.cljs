@@ -6,7 +6,6 @@
 (def reader (t/reader :json))
 
 (defn pp [x] (with-out-str (cljs.pprint/pprint x)))
-
 (defn fetch [url]
   (.then (js/fetch url #js {:headers #js {:Accept "application/transit+json"}})
          (fn [response] (.then (.text response) (fn [text] (t/read reader text))))))
