@@ -86,6 +86,7 @@
 
 (defn get-dataset [{:keys [path-params]}]
   (let [dataset-id (:id path-params)]
+    (def dataset-id dataset-id)
     (if-let [dataset (get @datasets-db dataset-id)]
       {:status 200 :body dataset}
       {:status 404 :body {:error "Dataset not found"}})))

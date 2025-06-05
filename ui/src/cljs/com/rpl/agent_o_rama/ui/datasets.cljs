@@ -48,7 +48,7 @@
         [showCreateForm setShowCreateForm] (uix/use-state false)
         
         {:keys [data isLoading mutate]}
-        (common/use-query {:query-keys ["datasets"]
+        (common/use-query {:query-key ["datasets"]
                           :query-url "/api/datasets"})
         
         delete-dataset
@@ -142,9 +142,10 @@
   (let [[activeTab setActiveTab] (uix/use-state "entries")
         
         {:keys [data isLoading]}
-        (common/use-query {:query-keys ["dataset" dataset-id]
-                          :query-url (str "/api/datasets/" dataset-id)})]
+        (common/use-query {:query-key ["dataset" dataset-id]
+                           :query-url (str "/api/datasets/" dataset-id)})]
     
+    (println "ERM" data)
     (if isLoading
       ($ :div.p-6 "Loading dataset...")
       ($ :div.p-6
@@ -186,155 +187,89 @@
   (let [[showAddForm setShowAddForm] (uix/use-state false)
         
         {:keys [data isLoading mutate]}
-        (common/use-query {:query-keys ["dataset-entries" dataset-id]
-                          :query-url (str "/api/datasets/" dataset-id "/entries")})]
-           ($ :div
-          ($ :div.flex.justify-between.items-center.mb-4
-             ($ :h3.text-lg.font-semibold "Dataset Entries")
-             ($ :button.bg-green-500.text-white.px-4.py-2.rounded.hover:bg-green-600
-                {:onClick #(setShowAddForm true)}
-                "Add Entry"))
-          
-          (if isLoading
-            ($ :div.text-center "Loading entries...")
-            (if (and data (:entries data))
-              ($ :div.space-y-4
-                 (for [entry (:entries data)]
-                   ($ :div.border.rounded.p-4
-                      {:key (:id entry)}
-                      ($ :div.mb-2
-                         ($ :h4.font-medium "Input:")
-                         ($ :pre.bg-gray-100.p-2.rounded.text-sm.overflow-x-auto
-                            (common/pp (:input entry))))
-                      ($ :div.mb-2
-                         ($ :h4.font-medium "Expected Output:")
-                         ($ :div.text-sm.text-gray-700 (:expected-output entry)))
-                      (when (:metadata entry)
-                        ($ :div
-                           ($ :h4.font-medium "Metadata:")
-                           ($ :pre.bg-gray-50.p-2.rounded.text-xs
-                              (common/pp (:metadata entry))))))))
-              ($ :div.text-center.text-gray-500 "No entries yet")))
-       
-                (when showAddForm
-           ($ add-entry-modal
-              {:dataset-id dataset-id
-               :on-close #(setShowAddForm false)
-               :on-success #(do (mutate) (setShowAddForm false))})))))
+        (common/use-query {:query-key ["dataset-entries" dataset-id]
+                           :query-url (str "/api/datasets/" dataset-id "/entries")})]
+    ($ :div
+       (if isLoading
+         ($ :div.text-center "Loading entries...")
+         (if (and data (:entries data))
+           ($ :div.space-y-4
+              (for [entry (:entries data)]
+                ($ :div.border.rounded.p-4
+                   {:key (:id entry)}
+                   ($ :div.mb-2
+                      ($ :h4.font-medium "Input:")
+                      ($ :pre.bg-gray-100.p-2.rounded.text-sm.overflow-x-auto
+                         (common/pp (:input entry))))
+                   ($ :div.mb-2
+                      ($ :h4.font-medium "Expected Output:")
+                      ($ :div.text-sm.text-gray-700 (:expected-output entry))))))
+           ($ :div.text-center.text-gray-500 "No entries yet"))))))
 
 ;; Add entry modal
-(defui add-entry-modal [{:keys [dataset-id on-close on-success]}]
-  (let [[formData setFormData] (uix/use-state {:input ""
-                                               :expected-output ""
-                                               :metadata ""})
-        
-        handle-submit
-        (fn [e]
-          (.preventDefault e)
-          (let [payload {:input (js/JSON.parse (:input formData))
-                         :expected-output (:expected-output formData)
-                         :metadata (when (seq (:metadata formData))
-                                     (js/JSON.parse (:metadata formData)))}]
-            (-> (axios/post (str "/api/datasets/" dataset-id "/entries") payload)
-                (.then on-success)
-                (.catch #(js/console.error "Failed to add entry:" %)))))]
-    
-    ($ :div {:className "fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-             :onClick on-close}
-       ($ :div {:className "bg-white p-6 rounded-lg w-2/3 max-w-4xl max-h-5/6 overflow-y-auto"
-                :onClick #(.stopPropagation %)}
-          ($ :h2.text-xl.font-bold.mb-4 "Add Dataset Entry")
-          ($ :form {:onSubmit handle-submit}
-             ($ :div.mb-4
-                ($ :label.block.text-sm.font-medium.mb-1 "Input (JSON)")
-                ($ :textarea.w-full.border.rounded.px-3.py-2.h-32.font-mono.text-sm
-                   {:value (:input formData)
-                    :onChange #(setFormData assoc :input (.. % -target -value))
-                    :placeholder "{\"query\": \"Your input here\", \"context\": {}}"
-                    :required true}))
-             ($ :div.mb-4
-                ($ :label.block.text-sm.font-medium.mb-1 "Expected Output")
-                ($ :textarea.w-full.border.rounded.px-3.py-2.h-32
-                   {:value (:expected-output formData)
-                    :onChange #(setFormData assoc :expected-output (.. % -target -value))
-                    :required true}))
-             ($ :div.mb-6
-                ($ :label.block.text-sm.font-medium.mb-1 "Metadata (JSON, optional)")
-                ($ :textarea.w-full.border.rounded.px-3.py-2.h-20.font-mono.text-sm
-                   {:value (:metadata formData)
-                    :onChange #(setFormData assoc :metadata (.. % -target -value))
-                    :placeholder "{\"difficulty\": \"easy\", \"category\": \"support\"}"}))
-             ($ :div.flex.gap-2.justify-end
-                ($ :button.px-4.py-2.border.rounded.hover:bg-gray-50
-                   {:type "button" :onClick on-close}
-                   "Cancel")
-                ($ :button.px-4.py-2.bg-green-500.text-white.rounded.hover:bg-green-600
-                   {:type "submit"}
-                   "Add Entry")))))))
-
 ;; Dataset evaluations component
 (defui dataset-evaluations [{:keys [dataset-id]}]
   (let [[showRunForm setShowRunForm] (uix/use-state false)
         
         {:keys [data isLoading mutate]}
-        (common/use-query {:query-keys ["evaluations" dataset-id]
-                          :query-url (str "/api/evaluations?dataset-id=" dataset-id)})]
-           ($ :div
-          ($ :div.flex.justify-between.items-center.mb-4
-             ($ :h3.text-lg.font-semibold "Evaluations")
-             ($ :button.bg-purple-500.text-white.px-4.py-2.rounded.hover:bg-purple-600
-                {:onClick #(setShowRunForm true)}
-                "Run Evaluation"))
-          
-          (if isLoading
-            ($ :div.text-center "Loading evaluations...")
-            (if (seq data)
-              ($ :div.space-y-4
-                 (for [evaluation data]
-              ($ :div.border.rounded.p-4
-                 {:key (:id evaluation)}
-                 ($ :div.flex.justify-between.items-start.mb-2
-                    ($ :div
-                       ($ :h4.font-medium (str "Evaluation " (:id evaluation)))
-                       ($ :p.text-sm.text-gray-600 
-                          (str "Agent: " (get-in evaluation [:agent-config :module-id]) 
-                               "/" (get-in evaluation [:agent-config :agent-id]))))
-                    ($ :span.px-2.py-1.rounded.text-sm
-                       {:className (case (:status evaluation)
-                                    "completed" "bg-green-100 text-green-800"
-                                    "running" "bg-yellow-100 text-yellow-800"
-                                    "failed" "bg-red-100 text-red-800"
-                                    "bg-gray-100 text-gray-800")}
-                       (:status evaluation)))
-                 
-                 (when (:results evaluation)
-                   (let [results (:results evaluation)]
-                     ($ :div.grid.grid-cols-2.md:grid-cols-4.gap-4.text-sm
-                        ($ :div
-                           ($ :div.text-gray-500 "Success Rate")
-                           ($ :div.font-medium 
-                              (str (Math/round (* 100 (/ (:successful results) (:total-entries results)))) "%")))
-                        ($ :div
-                           ($ :div.text-gray-500 "Avg Latency")
-                           ($ :div.font-medium (str (:avg-latency-ms results) "ms")))
-                        ($ :div
-                           ($ :div.text-gray-500 "Avg Tokens")
-                           ($ :div.font-medium (:avg-tokens results)))
-                        ($ :div
-                           ($ :div.text-gray-500 "Total Cost")
-                           ($ :div.font-medium (str "$" (:total-cost-usd results)))))))
-                 
-                 ($ :div.text-xs.text-gray-500.mt-2
-                                          (str "Started: " (format-date (:started-at evaluation)))
+        (common/use-query {:query-key ["evaluations" dataset-id]
+                           :query-url (str "/api/evaluations?dataset-id=" dataset-id)})]
+    ($ :div
+       ($ :div.flex.justify-between.items-center.mb-4
+          ($ :h3.text-lg.font-semibold "Evaluations")
+          ($ :button.bg-purple-500.text-white.px-4.py-2.rounded.hover:bg-purple-600
+             {:onClick #(setShowRunForm true)}
+             "Run Evaluation"))
+       
+       (if isLoading
+         ($ :div.text-center "Loading evaluations...")
+         (if (seq data)
+           ($ :div.space-y-4
+              (for [evaluation data]
+                ($ :div.border.rounded.p-4
+                   {:key (:id evaluation)}
+                   ($ :div.flex.justify-between.items-start.mb-2
+                      ($ :div
+                         ($ :h4.font-medium (str "Evaluation " (:id evaluation)))
+                         ($ :p.text-sm.text-gray-600 
+                            (str "Agent: " (get-in evaluation [:agent-config :module-id]) 
+                                 "/" (get-in evaluation [:agent-config :agent-id]))))
+                      ($ :span.px-2.py-1.rounded.text-sm
+                         {:className (case (:status evaluation)
+                                       "completed" "bg-green-100 text-green-800"
+                                       "running" "bg-yellow-100 text-yellow-800"
+                                       "failed" "bg-red-100 text-red-800"
+                                       "bg-gray-100 text-gray-800")}
+                         (:status evaluation)))
+                   
+                   (when (:results evaluation)
+                     (let [results (:results evaluation)]
+                       ($ :div.grid.grid-cols-2.md:grid-cols-4.gap-4.text-sm
+                          ($ :div
+                             ($ :div.text-gray-500 "Success Rate")
+                             ($ :div.font-medium 
+                                (str (Math/round (* 100 (/ (:successful results) (:total-entries results)))) "%")))
+                          ($ :div
+                             ($ :div.text-gray-500 "Avg Latency")
+                             ($ :div.font-medium (str (:avg-latency-ms results) "ms")))
+                          ($ :div
+                             ($ :div.text-gray-500 "Avg Tokens")
+                             ($ :div.font-medium (:avg-tokens results)))
+                          ($ :div
+                             ($ :div.text-gray-500 "Total Cost")
+                             ($ :div.font-medium (str "$" (:total-cost-usd results)))))))
+                   
+                   ($ :div.text-xs.text-gray-500.mt-2
+                      (str "Started: " (format-date (:started-at evaluation)))
                       (when (:completed-at evaluation)
                         (str " • Duration: " (format-duration (:started-at evaluation) (:completed-at evaluation))))))))
-              ($ :div.text-center.text-gray-500 "No evaluations yet")))
-          
-          (when showRunForm
-            ($ run-evaluation-modal
-               {:dataset-id dataset-id
-                :on-close #(setShowRunForm false)
-                :on-success #(do (mutate) (setShowRunForm false))})))))
+           ($ :div.text-center.text-gray-500 "No evaluations yet")))
+       
+       (when showRunForm
+         ($ run-evaluation-modal
+            {:dataset-id dataset-id
+             :on-close #(setShowRunForm false)
+             :on-success #(do (mutate) (setShowRunForm false))})))))
 
 ;; Run evaluation modal
 (defui run-evaluation-modal [{:keys [dataset-id on-close on-success]}]
