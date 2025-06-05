@@ -1009,10 +1009,9 @@
         (aor/declare-document-store
          topology
          "$$doc"
-         String
+         clojure.lang.Keyword
          :a Long
-         :b String
-         :c java.util.List)
+         :b java.util.List)
         (aor/declare-pstate-store
          topology
          "$$p"
@@ -1025,8 +1024,7 @@
            "doc"
            (fn [agent-node arg]
              (let [kv (aor/get-store agent-node "$$kv")
-                   b  (store/get kv :b [])
-                   c  (store/get kv :c)]
+                   b  (store/get kv :b [])]
                (store/put! kv :a arg)
                (store/put! kv :b (conj b arg))
                (store/update! kv :d #(+ (or % 0) arg))
@@ -1052,20 +1050,38 @@
           (aor/node "doc"
                     "end"
                     (fn [agent-node arg res]
-                      (let [doc (aor/get-store agent-node "$$doc")]
-                        ; (defn get-document-field
-                        ;   ([store k doc-key]
-                        ;   ([store k doc-key default-value]
-                        ; (defn contains-document-field?
-                        ; (defn put-document-field!
-                        ; (defn update-document-field
+                      (let [doc (aor/get-store agent-node "$$doc")
+                            s   (store/get doc :s {:a 2 :b [10]})
+                            ma  (store/get-document-field doc :m :a 100)
+                            mb  (store/get-document-field doc :m :b [])]
+                        (store/put! doc
+                                    :s
+                                    (-> s
+                                        (update :a inc)
+                                        (update :b #(conj % arg))))
+                        (store/update! doc :s #(update % :a (fn [v] (* 2 v))))
+                        (store/put-document-field! doc :m :a (+ ma 2))
+                        (store/update-document-field! doc :m :a #(* 2 %))
+                        (store/put-document-field! doc :m :b (conj mb arg))
+                        ; pstate-select (2 variants)
+                        ; pstate-select-one
+                        ; pstate-transform!
 
                         (aor/emit!
                          agent-node
                          "end"
                          (assoc
                           res
-                          :doc {}))
+                          :doc {:s   (store/get doc :s)
+                                :t   (store/get doc :t)
+                                :y   (store/contains? doc :s)
+                                :z   (store/contains? doc :abcde)
+                                :ma  (store/get-document-field doc :m :a)
+                                :mb  (store/get-document-field doc :m :b)
+                                :mc  (store/get-document-field doc :m :c)
+                                :ma? (store/contains-document-field? doc :m :a)
+                                :mc? (store/contains-document-field? doc :m :c)
+                               }))
                       )))
           (aor/node "end"
                     nil
@@ -1095,7 +1111,16 @@
                    :h [3 nil]
                    :i true
                    :j false}
-             :doc {}}
+             :doc {:s   {:a 6
+                         :b [10 3]}
+                   :t   nil
+                   :y   true
+                   :z   false
+                   :ma  204
+                   :mb  [3]
+                   :mc  nil
+                   :ma? true
+                   :mc? false}}
             (:val (invoke-agent-and-return! depot invokes-pstate [3]))))
      (is (= {:kv  {:a 1
                    :b [3 1]
@@ -1107,7 +1132,16 @@
                    :h [1 nil]
                    :i true
                    :j false}
-             :doc {}}
+             :doc {:s   {:a 14
+                         :b [10 3 1]}
+                   :t   nil
+                   :y   true
+                   :z   false
+                   :ma  412
+                   :mb  [3 1]
+                   :mc  nil
+                   :ma? true
+                   :mc? false}}
             (:val (invoke-agent-and-return! depot invokes-pstate [1]))))
      ;; TODO: <<<<<>>>>>
      ;;  - do PState writes, reads
@@ -1118,6 +1152,8 @@
      ;;     - PState ops on all
      ;;     - KV on doc and KV
      ;;     - doc just on doc
+     ;;; - check error when writing to a non-existent field in doc store
+     ;;  - verify reading from non-existent field in doc store is OK
     )))
 
 (deftest looped-test

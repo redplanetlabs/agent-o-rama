@@ -36,7 +36,7 @@
   [store k doc-key value]
   (simpl/put-document-field* store k doc-key value))
 
-(defn update-document-field
+(defn update-document-field!
   [store k doc-key afn]
   (simpl/update-document-field* store k doc-key afn))
 
