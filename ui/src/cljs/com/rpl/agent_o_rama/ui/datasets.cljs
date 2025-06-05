@@ -100,8 +100,7 @@
                 (.then on-success)
                 (.catch #(js/console.error "Failed to create dataset:" %)))))]
     
-    ($ :div.fixed.inset-0.bg-black.bg-opacity-50.flex.items-center.justify-center.z-50
-       {:onClick on-close}
+    ($ :div {:className "fixed inset-0 bg-black/50 flex items-center justify-center z-50" :onClick on-close}
        ($ :div.bg-white.p-6.rounded-lg.w-96.max-w-full
           {:onClick #(.stopPropagation %)}
           ($ :h2.text-xl.font-bold.mb-4 "Create New Dataset")
@@ -235,17 +234,17 @@
         (fn [e]
           (.preventDefault e)
           (let [payload {:input (js/JSON.parse (:input formData))
-                        :expected-output (:expected-output formData)
-                        :metadata (when (seq (:metadata formData))
-                                   (js/JSON.parse (:metadata formData)))}]
+                         :expected-output (:expected-output formData)
+                         :metadata (when (seq (:metadata formData))
+                                     (js/JSON.parse (:metadata formData)))}]
             (-> (axios/post (str "/api/datasets/" dataset-id "/entries") payload)
                 (.then on-success)
                 (.catch #(js/console.error "Failed to add entry:" %)))))]
     
-    ($ :div.fixed.inset-0.bg-black.bg-opacity-50.flex.items-center.justify-center.z-50
-       {:onClick on-close}
-       ($ :div {:className "bg-white p-6 rounded-lg w-2/3 max-w-4xl max-h-5/6 overflow-y-auto"}
-          {:onClick #(.stopPropagation %)}
+    ($ :div {:className "fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+             :onClick on-close}
+       ($ :div {:className "bg-white p-6 rounded-lg w-2/3 max-w-4xl max-h-5/6 overflow-y-auto"
+                :onClick #(.stopPropagation %)}
           ($ :h2.text-xl.font-bold.mb-4 "Add Dataset Entry")
           ($ :form {:onSubmit handle-submit}
              ($ :div.mb-4
