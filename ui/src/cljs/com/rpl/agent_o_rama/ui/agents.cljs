@@ -48,18 +48,6 @@
                     "Explore Invocation"))
               ($ :pre.text-xs.bg-gray-100.p-2.rounded.overflow-x-auto (common/pp invoke))))))))
 
-(defui datasets []
-  (let [{:strs [module-id agent-id]}
-        (js->clj (wouter/useParams))
-
-        {:keys [data isLoading]}
-        (common/use-query {:query-keys ["dataset" module-id agent-id]
-                           :query-url (str "/api/agents/" module-id "/" agent-id "/dataset")} )]
-    ($ :div
-       ($ :h2.text-xl.font-semibold.mb-4 "Datasets")
-       ($ :div.text-gray-500 "Datasets functionality coming soon...")
-       (common/pre data))))
-
 (defui evaluations []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))]
     ($ :div

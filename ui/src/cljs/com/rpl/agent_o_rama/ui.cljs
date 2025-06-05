@@ -5,7 +5,9 @@
    
    [com.rpl.agent-o-rama.ui.agents :as agents]
    ["wouter" :refer [Link Route Switch Router useLocation useRoute]]
-   ["@tanstack/react-query" :refer [QueryClient QueryClientProvider]]))
+   ["@tanstack/react-query" :refer [QueryClient QueryClientProvider]]
+   
+   [com.rpl.agent-o-rama.ui.datasets :as datasets]))
 
 (def query-client (QueryClient.))
 
@@ -77,7 +79,7 @@
      ($ Router
         ($ Route {:path "/agents/:module-id/:agent-id/invocations" :component agents/invocations})
         ($ Route {:path "/agents/:module-id/:agent-id/invocations/:invoke-id" :component agents/invoke})
-        ($ Route {:path "/agents/:module-id/:agent-id/datasets" :component agents/datasets})
+        ($ Route {:path "/agents/:module-id/:agent-id/datasets" :component datasets/datasets})
         ($ Route {:path "/agents/:module-id/:agent-id/evaluations" :component agents/evaluations})
         ($ Route {:path "/agents/:module-id/:agent-id" :component agents/agent})
         ($ Route {:path "/" :component agents/index}))))

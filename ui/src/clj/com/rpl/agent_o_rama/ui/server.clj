@@ -14,7 +14,8 @@
    [reitit.ring.coercion :as rrc]
    [malli.core :as mc]
 
-   [com.rpl.agent-o-rama.ui.agents :as agents]))
+   [com.rpl.agent-o-rama.ui.agents :as agents]
+   [com.rpl.agent-o-rama.ui.datasets :as datasets]))
 
 (defn spa-index-handler [_request]
   (-> (resp/resource-response "index.html")
@@ -44,7 +45,10 @@
       {:get {:parameters {:query [:map
                                   [:depth int?]
                                   [:start-node-id {:optional true} string?]]}
-             :handler #'agents/invoke-paginated}}]]
+             :handler #'agents/invoke-paginated}}]
+     
+     ["/agents/:module-id/:agent-id/datasets"
+      {:get {:handler #'datasets/index}}]]
     {:data {:muuntaja m/instance
             :middleware [parameters/parameters-middleware
                          muuntaja/format-middleware
