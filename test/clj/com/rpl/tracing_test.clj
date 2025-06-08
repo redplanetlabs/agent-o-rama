@@ -797,8 +797,7 @@
 
 (deftest node-timings-test
   (with-open [ipc (rtest/create-ipc)
-              _ (TopologyUtils/startSimTime)
-             ]
+              _ (TopologyUtils/startSimTime)]
     (letlocals
      (bind module
        (aor/agentmodule

@@ -40,12 +40,15 @@
   (contains?* [this k])
   (update* [this k afn]))
 
+(defn hook:initiating-pstate-write [])
+
 (defn- pstate-write!*
   [store-params path k op params]
   (when (:mirror? store-params)
     (throw (ex-info "Can only write to colocated PStates"
                     {:pstate-name (:pstate-name store-params)})))
   (let [start-time  (h/current-time-millis)
+        _ (hook:initiating-pstate-write)
         {ret aor-types/AGENTS-TOPOLOGY-NAME}
         (foreign-append!
          (:write-depot store-params)
@@ -70,9 +73,12 @@
   [store-params path k op & params]
   `(pstate-write!* ~store-params ~path ~k ~op ~(vec params)))
 
+(defn hook:initiating-pstate-query [])
+
 (defn recorded-pstate-query!*
   [query-fn apath store-params options op params]
   (let [start-time  (h/current-time-millis)
+        _ (hook:initiating-pstate-query)
         res         (query-fn
                      apath
                      (:pstate-client store-params)

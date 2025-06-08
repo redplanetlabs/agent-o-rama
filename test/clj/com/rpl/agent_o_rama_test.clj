@@ -11,11 +11,13 @@
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.store :as store]
    [com.rpl.agent-o-rama.impl.queries :as queries]
+   [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.test :as rtest]
    [loom.attr :as lattr]
-   [loom.graph :as lgraph])
+   [loom.graph :as lgraph]
+   [meander.epsilon :as m])
   (:import
    [com.rpl.agentorama
     BuiltIn]
@@ -23,6 +25,8 @@
     Node
     NodeAgg
     NodeAggStart]
+   [com.rpl.rama.helpers
+    TopologyUtils]
    [com.rpl.rama.ops
     RamaAccumulatorAgg0
     RamaAccumulatorAgg2
@@ -1224,18 +1228,267 @@
                       :zz0  [[1] [nil]]
                       :zz02 [1 nil]}}
             (:val (invoke-agent-and-return! depot invokes-pstate [1]))))
-
-
      (is (= 1 (foreign-select-one :a kv)))
      (is (= [3 1] (foreign-select-one :b kv)))
      (is (= [10 3 1] (foreign-select-one [:s :b] doc)))
      (is (= 54 (foreign-select-one [:a 0] p)))
      (is (= 1 (foreign-select-one [:zz 0] p {:pkey :e})))
-
-     ;; TODO: <<<<<>>>>>
-     ;;  - check error when writing to a non-existent field in doc store
-     ;;  - check node traces for :nested-ops
     )))
+
+(deftest store-traces-test
+  (let [advance-vol (volatile! 1)
+        advance-fn  (fn [& args]
+                      (TopologyUtils/advanceSimTime @advance-vol)
+                      (vswap! advance-vol inc))]
+    (with-redefs [simpl/hook:initiating-pstate-write advance-fn
+                  simpl/hook:initiating-pstate-query advance-fn]
+      (with-open [ipc (rtest/create-ipc)
+                  _ (TopologyUtils/startSimTime)]
+        (letlocals
+         (bind module
+           (aor/agentmodule
+            [topology]
+            (aor/declare-key-value-store
+             topology
+             "$$kv"
+             clojure.lang.Keyword
+             Object)
+            (aor/declare-document-store
+             topology
+             "$$doc"
+             clojure.lang.Keyword
+             :a Object
+             :b Object)
+            (aor/declare-pstate-store
+             topology
+             "$$p"
+             {clojure.lang.Keyword Object})
+            (->
+              topology
+              (aor/new-agent "foo")
+              (aor/node
+               "kv"
+               "doc"
+               (fn [agent-node]
+                 (let [kv (aor/get-store agent-node "$$kv")
+                       b  (store/get kv :b [])
+                       c  (store/get kv :b)
+                       d  (store/contains? kv :a)]
+                   (store/put! kv :a 1)
+                   (store/update! kv :d str)
+                   (aor/emit! agent-node "doc")
+                 )))
+              (aor/node
+               "doc"
+               "pstate"
+               (fn [agent-node]
+                 (let [doc (aor/get-store agent-node "$$doc")
+                       ma  (store/get-document-field doc :m :a)
+                       mb  (store/get-document-field doc :m :b [])
+                       ma? (store/contains-document-field? doc :m :a)]
+                   (store/put-document-field! doc :m :a 1)
+                   (store/update-document-field! doc :m :a str)
+                   (aor/emit! agent-node "pstate")
+                 )))
+              (aor/node
+               "pstate"
+               "end"
+               (fn [agent-node]
+                 (let [p (aor/get-store agent-node "$$p")
+                       _ (store/pstate-transform! [:a (termval 1)] p :a)
+                       _ (store/pstate-transform! [:b (termval 2)] p :a)
+                       i (store/pstate-select-one :a p)
+                       j (store/pstate-select :a p)
+                       k (store/pstate-select-one :b p :a)
+                       j (store/pstate-select :b p :a)]
+                   (aor/emit! agent-node "end")
+                 )))
+              (aor/node "end"
+                        nil
+                        (fn [agent-node]
+                          (aor/result! agent-node "done")))
+            )
+           ))
+         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (bind module-name (get-module-name module))
+         (bind depot
+           (foreign-depot ipc
+                          module-name
+                          (po/agent-depot-name "foo")))
+         (bind invokes-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-invoke-task-global-name "foo")))
+         (bind traces-query
+           (foreign-query ipc
+                          module-name
+                          (queries/tracing-query-topology-name "foo")))
+         (bind [graph-task-id graph-id]
+           (invoke-agent-and-wait! depot invokes-pstate []))
+         (bind root-invoke-id
+           (foreign-select-one [(keypath graph-id) :root-invoke-id]
+                               invokes-pstate
+                               {:pkey graph-task-id}))
+         (bind res
+           (foreign-invoke-query traces-query
+                                 graph-task-id
+                                 [[graph-task-id root-invoke-id]]
+                                 10000))
+         (is
+          (trace-matches?
+           (:invokes-map res)
+           {!id1
+            {:agg-invoke-id     nil
+             :emits             [{:invoke-id      !id2
+                                  :target-task-id ?graph-task-id
+                                  :node-name      "doc"
+                                  :args           []}]
+             :node              "kv"
+             :nested-ops
+             [{:start-time-millis 0
+               :finish-time-millis 1
+               :info
+               {"type" "store-query" "op" "get" "params" [:b] "result" []}}
+              {:start-time-millis 1
+               :finish-time-millis 3
+               :info
+               {"type" "store-query" "op" "get" "params" [:b] "result" nil}}
+              {:start-time-millis 3
+               :finish-time-millis 6
+               :info
+               {"type"   "store-query"
+                "op"     "contains?"
+                "params" [:a]
+                "result" false}}
+              {:start-time-millis 6
+               :finish-time-millis 10
+               :info {"type" "store-write" "op" "put" "params" [:a 1]}}
+              {:start-time-millis 10
+               :finish-time-millis 15
+               :info {"type" "store-write" "op" "update" "params" [:d]}}]
+             :result            nil
+             :graph-id          ?graph-id
+             :input             []
+             :graph-task-id     ?graph-task-id
+             :start-time-millis 0
+             :finish-time-millis 15
+            }
+            !id2
+            {:agg-invoke-id     nil
+             :emits             [{:invoke-id      !id3
+                                  :target-task-id ?graph-task-id
+                                  :node-name      "pstate"
+                                  :args           []}]
+             :node              "doc"
+             :nested-ops
+             [{:start-time-millis 15
+               :finish-time-millis 21
+               :info
+               {"type"   "store-query"
+                "op"     "get-document-field"
+                "params" [:m :a {:default nil}]
+                "result" nil}}
+              {:start-time-millis 21
+               :finish-time-millis 28
+               :info
+               {"type"   "store-query"
+                "op"     "get-document-field"
+                "params" [:m :b {:default []}]
+                "result" []}}
+              {:start-time-millis 28
+               :finish-time-millis 36
+               :info
+               {"type"   "store-query"
+                "op"     "contains-document-field?"
+                "params" [:m :a]
+                "result" false}}
+              {:start-time-millis 36
+               :finish-time-millis 45
+               :info
+               {"type"   "store-write"
+                "op"     "put-document-field"
+                "params" [:m :a 1]}}
+              {:start-time-millis 45
+               :finish-time-millis 55
+               :info
+               {"type"   "store-write"
+                "op"     "update-document-field"
+                "params" [:m :a]}}]
+             :result            nil
+             :graph-id          ?graph-id
+             :input             []
+             :graph-task-id     ?graph-task-id
+             :start-time-millis 15
+             :finish-time-millis 55
+            }
+            !id3
+            {:agg-invoke-id     nil
+             :emits             [{:invoke-id      !id4
+                                  :target-task-id ?graph-task-id
+                                  :node-name      "end"
+                                  :args           []}]
+             :node              "pstate"
+             :nested-ops
+             [{:start-time-millis 55
+               :finish-time-millis 66
+               :info
+               {"type" "store-write" "op" "pstate-transform" "params" [:a]}}
+              {:start-time-millis 66
+               :finish-time-millis 78
+               :info
+               {"type" "store-write" "op" "pstate-transform" "params" [:a]}}
+              {:start-time-millis 78
+               :finish-time-millis 91
+               :info
+               {"type"   "store-query"
+                "op"     "pstate-select-one"
+                "params" []
+                "result" 1}}
+              {:start-time-millis 91
+               :finish-time-millis 105
+               :info
+               {"type"   "store-query"
+                "op"     "pstate-select"
+                "params" []
+                "result" [1]}}
+              {:start-time-millis 105
+               :finish-time-millis 120
+               :info
+               {"type"   "store-query"
+                "op"     "pstate-select-one"
+                "params" [{:pkey :a}]
+                "result" 2}}
+              {:start-time-millis 120
+               :finish-time-millis 136
+               :info
+               {"type"   "store-query"
+                "op"     "pstate-select"
+                "params" [{:pkey :a}]
+                "result" [2]}}]
+             :result            nil
+             :graph-id          ?graph-id
+             :input             []
+             :graph-task-id     ?graph-task-id
+             :start-time-millis 55
+             :finish-time-millis 136
+            }
+            !id4
+            {:agg-invoke-id     nil
+             :emits             []
+             :node              "end"
+             :nested-ops        []
+             :result            {:val "done" :failure? false}
+             :graph-id          ?graph-id
+             :input             []
+             :graph-task-id     ?graph-task-id
+             :start-time-millis 136
+             :finish-time-millis 136
+            }
+           }
+           (m/guard
+            (and (= ?graph-id graph-id)
+                 (= ?graph-task-id graph-task-id)))))
+        )))))
 
 (deftest looped-test
          ;; TODO: <<<<<>>>>
