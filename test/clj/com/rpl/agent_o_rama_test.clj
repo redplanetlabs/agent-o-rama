@@ -1491,9 +1491,116 @@
         )))))
 
 (deftest looped-test
-         ;; TODO: <<<<<>>>>
-)
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (->
+          topology
+          (aor/new-agent "foo")
+          (aor/node
+           "start"
+           ["node1" "AS1"]
+           (fn [agent-node arg res]
+             (if (= arg 2)
+               (aor/emit! agent-node "AS1" (inc arg) (conj res "start"))
+               (aor/emit! agent-node "node1" (inc arg) (conj res "start")))))
+          (aor/node
+           "node1"
+           "start"
+           (fn [agent-node arg res]
+             (aor/emit! agent-node "start" arg (conj res "node1"))))
+          (aor/agg-start-node
+           "AS1"
+           "AS1-n1"
+           (fn [agent-node arg res]
+             (aor/emit! agent-node "AS1-n1" 0)
+             {:arg arg :res res}))
+          (aor/node
+           "AS1-n1"
+           ["AS1-n2" "AS2"]
+           (fn [agent-node n]
+             (when (< n 2)
+               (aor/emit! agent-node "AS1-n2" (inc n)))
+             (aor/emit! agent-node "AS2" 0)
+           ))
+          (aor/node
+           "AS1-n2"
+           "AS1-n3"
+           (fn [agent-node n]
+             (aor/emit! agent-node "AS1-n3" n)))
+          (aor/node
+           "AS1-n3"
+           "AS1-n1"
+           (fn [agent-node n]
+             (aor/emit! agent-node "AS1-n1" n)))
+          (aor/agg-start-node
+           "AS2"
+           "AS2-n1"
+           (fn [agent-node n]
+             (aor/emit! agent-node "AS2-n1" n)
+             {}))
+          (aor/node
+           "AS2-n1"
+           ["AS2-n2" "AS2-agg"]
+           (fn [agent-node n]
+             (aor/emit! agent-node "AS2-agg" 1)
+             (when (< n 2)
+               (aor/emit! agent-node "AS2-n2" (inc n)))
+           ))
+          (aor/node
+           "AS2-n2"
+           "AS2-n1"
+           (fn [agent-node n]
+             (aor/emit! agent-node "AS2-n1" n)
+           ))
+          (aor/agg-node
+           "AS2-agg"
+           ["AS1-agg" "AS2"]
+           aggs/+sum
+           (fn [agent-node agg node-start-res]
+             ;; will loop once
+             (when (= agg 3)
+               (aor/emit! agent-node "AS2" 1))
+             (aor/emit! agent-node "AS1-agg" agg)
+           ))
+          (aor/agg-node
+           "AS1-agg"
+           nil
+           aggs/+sum
+           (fn [agent-node agg {:keys [arg res]}]
+             (aor/result! agent-node (conj res agg))
+           ))
+        )))
+     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (bind module-name (get-module-name module))
+     (bind depot
+       (foreign-depot ipc
+                      module-name
+                      (po/agent-depot-name "foo")))
+     (bind invokes-pstate
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-invoke-task-global-name "foo")))
+
+     ;; TODO: <<<<>>>> what should result be?
+     (is (= ["start" "node1" "start" "node1" "start"]
+            (:val (invoke-agent-and-return! depot invokes-pstate [0 []]))))
+     ;; TODO: <<<<<>>>>
+     ;;  - complicated graph with looping and nested aggs
+    )))
 
 (deftest aggs-test
          ;; TODO: <<<<>>>>
+         ;; - test with early return with custom agg
+         ;;   - ignores subsequent aggs, runs agg function early and only once
+         ;;   - early return that is part of a subagg
+         ;; - test with accums and combiners
+)
+
+
+(deftest traced-out-of-band-test
+         ;; TODO: <<<<<>>>> do custom CF thing with custom tracing
+         ;;  - need to make API for this
 )

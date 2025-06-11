@@ -34,7 +34,7 @@ public class NippyMap implements Map, RamaSerializable {
     private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
       int size = in.readInt();
       byte[] ser = new byte[size];
-      in.read(ser);
+      in.readFully(ser);
       this.delegate = (Map) thaw(ser);
     }
 
