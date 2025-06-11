@@ -1584,11 +1584,8 @@
                        module-name
                        (po/agent-invoke-task-global-name "foo")))
 
-     ;; TODO: <<<<>>>> what should result be?
-     (is (= ["start" "node1" "start" "node1" "start"]
+     (is (= ["start" "node1" "start" "node1" "start" 15]
             (:val (invoke-agent-and-return! depot invokes-pstate [0 []]))))
-     ;; TODO: <<<<<>>>>
-     ;;  - complicated graph with looping and nested aggs
     )))
 
 (deftest aggs-test

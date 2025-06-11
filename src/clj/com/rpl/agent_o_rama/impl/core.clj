@@ -202,7 +202,7 @@
               graph))
 
 (defn node-event
-  [agent-name task-id invoke-id node-fn agent-node args
+  [agent-name task-id invoke-id node-name node-fn agent-node args
    ^RamaClientsTaskGlobal rama-clients]
   (fn []
     (let [res   (try
@@ -210,7 +210,7 @@
                   (catch Throwable t
                     (cljlogging/error t
                                       "Error during agent node execution"
-                                      {:node      agent-node
+                                      {:node      node-name
                                        :invoke-id invoke-id})
                     ;; TODO: <<<<>>>> handle errors properly
                     (throw t)
@@ -273,6 +273,7 @@
     (node-event *name
                 *task-id
                 *invoke-id
+                *next-node
                 *node-fn
                 *agent-node
                 *args
