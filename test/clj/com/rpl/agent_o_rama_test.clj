@@ -25,6 +25,9 @@
     Node
     NodeAgg
     NodeAggStart]
+   [com.rpl.aortest
+    EarlySumAccum
+    EarlySumCombiner]
    [com.rpl.rama.helpers
     TopologyUtils]
    [com.rpl.rama.ops
@@ -1588,14 +1591,215 @@
             (:val (invoke-agent-and-return! depot invokes-pstate [0 []]))))
     )))
 
-(deftest aggs-test
-         ;; TODO: <<<<>>>>
-         ;; - test with early return with custom agg
-         ;;   - ignores subsequent aggs, runs agg function early and only once
-         ;;   - early return that is part of a subagg
-         ;; - test with accums and combiners
-)
 
+(def +early-sum-accum
+  (accumulator
+   (fn [v]
+     (term (fn [curr]
+             (let [ret (+ curr v)]
+               (if (> ret 10)
+                 (reduced ret)
+                 ret
+               ))
+           )))
+   :init-fn
+   (constantly 0)))
+
+(def +early-sum-combiner
+  (combiner
+   (fn [v1 v2]
+     (let [ret (+ v1 v2)]
+       (if (> ret 5)
+         (reduced ret)
+         ret
+       )))
+   :init-fn
+   (constantly 0)))
+
+(deftest early-aggs-test
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (let [g
+              (->
+                topology
+                (aor/new-agent "foo")
+                (aor/agg-start-node
+                 "start"
+                 ["ca" "cc" "ja" "jc" "ma"]
+                 (fn [agent-node]
+                   (aor/emit! agent-node "ca")
+                   (aor/emit! agent-node "cc")
+                   (aor/emit! agent-node "ja")
+                   (aor/emit! agent-node "jc")
+                   (aor/emit! agent-node "ma")
+                 ))
+                (aor/agg-start-node
+                 "ma"
+                 "ma-agg"
+                 (fn [agent-node]
+                   (dotimes [i 5]
+                     (aor/emit! agent-node "ma-agg" "a" i)
+                     (aor/emit! agent-node "ma-agg" "b" i)
+                     (aor/emit! agent-node "ma-agg" "c" i))
+                 ))
+                (aor/agg-node
+                 "ma-agg"
+                 "agg"
+                 (aor/multi-agg
+                  (init [] 0)
+                  (on "a"
+                      [curr v]
+                      (let [ret (+ curr v)]
+                        (if (> ret 20)
+                          (reduced ret)
+                          ret)))
+                  (on "b"
+                      [curr v]
+                      (let [ret (+ curr (* 2 v))]
+                        (if (> ret 20)
+                          (reduced ret)
+                          ret)))
+                  (on "c"
+                      [curr v]
+                      (let [ret (+ curr (* 3 v))]
+                        (if (> ret 20)
+                          (reduced ret)
+                          ret))))
+                 (fn [agent-node agg node-start-res]
+                   (aor/emit! agent-node "agg" ["ma" agg])))
+              )]
+          (doseq [[label the-agg] [["ca" +early-sum-accum]
+                                   ["cc" +early-sum-combiner]
+                                   ["ja" (EarlySumAccum.)]
+                                   ["jc" (EarlySumCombiner.)]]]
+            (let [agg-label (str label "-agg")]
+              (-> g
+                  (aor/agg-start-node label
+                                      agg-label
+                                      (fn [agent-node]
+                                        (dotimes [i 7]
+                                          (aor/emit! agent-node agg-label i))
+                                      ))
+                  (aor/agg-node agg-label
+                                "agg"
+                                the-agg
+                                (fn [agent-node agg node-start-res]
+                                  (aor/emit! agent-node "agg" [label agg])
+                                )))
+            ))
+          (aor/agg-node
+           g
+           "agg"
+           nil
+           aggs/+set-agg
+           (fn [agent-node agg node-start-res]
+             (aor/result! agent-node agg)))
+        )))
+     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (bind module-name (get-module-name module))
+     (bind depot
+       (foreign-depot ipc
+                      module-name
+                      (po/agent-depot-name "foo")))
+     (bind invokes-pstate
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-invoke-task-global-name "foo")))
+
+     (bind ret
+       (invoke-agent-and-return! depot invokes-pstate []))
+
+
+     (is (=
+          #{["ca" 15]
+            ["cc" 6]
+            ["ja" 15]
+            ["jc" 6]
+            ["ma" 21]
+           }
+          (:val ret)))
+    )))
+
+(deftest multi-agg-test
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (->
+          topology
+          (aor/new-agent "foo")
+          (aor/agg-start-node
+           "start"
+           ["a" "b" "c"]
+           (fn [agent-node]
+             (aor/emit! agent-node "a" 1)
+             (aor/emit! agent-node "b" 2)
+             (aor/emit! agent-node "c" 3)
+             (aor/emit! agent-node "a" 4)
+             (aor/emit! agent-node "a" 5)
+             (aor/emit! agent-node "c" 6)
+             (aor/emit! agent-node "a" 7)
+             (aor/emit! agent-node "b" 8)
+           ))
+          (aor/node
+           "a"
+           "agg"
+           (fn [agent-node v]
+             (aor/emit! agent-node "agg" "a" v)))
+          (aor/node
+           "b"
+           "agg"
+           (fn [agent-node v]
+             (aor/emit! agent-node "agg" "b" v)))
+          (aor/node
+           "c"
+           "agg"
+           (fn [agent-node v]
+             (aor/emit! agent-node "agg" "c" v)))
+          (aor/agg-node
+           "agg"
+           nil
+           (aor/multi-agg
+            (init [] [[] [] []])
+            (on "a"
+                [[a b c] v]
+                [(conj a v) b c])
+            (on "b"
+                [[a b c] v]
+                [a (conj b v) c])
+            (on "c"
+                [[a b c] v]
+                [a b (conj c v)]))
+           (fn [agent-node agg node-start-res]
+             (aor/result! agent-node agg)))
+        )))
+     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (bind module-name (get-module-name module))
+     (bind depot
+       (foreign-depot ipc
+                      module-name
+                      (po/agent-depot-name "foo")))
+     (bind invokes-pstate
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-invoke-task-global-name "foo")))
+
+     (bind ret
+       (:val (invoke-agent-and-return! depot invokes-pstate [])))
+
+     (is (= 3 (count ret)))
+     (bind [a b c] ret)
+     (is (= #{1 4 5 7} (set a)))
+     (is (= 4 (count a)))
+     (is (= #{2 8} (set b)))
+     (is (= 2 (count b)))
+     (is (= #{3 6} (set c)))
+     (is (= 2 (count c)))
+    )))
 
 (deftest traced-out-of-band-test
          ;; TODO: <<<<<>>>> do custom CF thing with custom tracing

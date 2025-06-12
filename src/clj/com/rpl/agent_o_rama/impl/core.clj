@@ -618,10 +618,12 @@
         (assert! (some? *agg-invoke-id))
         (local-select> (keypath *agg-invoke-id)
                        agent-node-pstate-sym
-                       :> {*agg-state :agg-state
+                       :> {*agg-state           :agg-state
                            *parent-agg-invoke-id :agg-invoke-id
                            *agg-start-invoke-id :agg-start-invoke-id
+                           *agg-finished?       :agg-finished?
                           })
+        (filter> (not *agg-finished?))
         ;; TODO: <<<<>>>> catch exceptions and propagate failure
         (apply *update-fn *agg-state *args :> *res)
         (extract-agg-result *res :> {:keys [*new-agg-state *finished?]})
