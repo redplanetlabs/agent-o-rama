@@ -7,7 +7,9 @@
    [com.rpl.agentorama.impl
     AORExceptionInfo]
    [com.rpl.rama.helpers
-    TopologyUtils]))
+    TopologyUtils]
+   [java.util.function
+    Function]))
 
 (def MAX-ARITY 8)
 
@@ -106,3 +108,12 @@
   ([afn a b c d e f g h i j k l m n] (afn a b c d e f g h i j k l m n))
   ([afn a b c d e f g h i j k l m n o] (afn a b c d e f g h i j k l m n o))
   ([afn a b c d e f g h i j k l m n o p] (afn a b c d e f g h i j k l m n o p)))
+
+
+(defmacro cf-function
+  [& body]
+  `(let [afn# (fn & body)]
+     (reify
+      Function
+      (apply [_ arg]
+        (afn# arg)))))

@@ -29,8 +29,6 @@
     RamaCombinerAgg]
    [java.util.concurrent
     CompletableFuture]
-   [java.util.function
-    Function]
    [rpl.rama.generated
     TopologyDoesNotExistException]))
 
@@ -271,29 +269,49 @@
              (foreign-append-async!
               agent-depot
               (vec args))
-             (reify
-              Function
-              (apply [_
-                      {[graph-task-id graph-id]
-                       aor-types/AGENTS-TOPOLOGY-NAME}]
-                (AgentInvoke. graph-task-id graph-id)
-              ))))
+             (h/cf-function [{[graph-task-id graph-id]
+                              aor-types/AGENTS-TOPOLOGY-NAME}]
+               (AgentInvoke. graph-task-id graph-id)
+             )))
           (agentResult [this agent-invoke]
-                       ;; TODO: <<<<>>>>
-          )
+            (.get (.agentResultAsync this agent-invoke)))
           (agentResultAsync [this agent-invoke]
-                            ;; TODO: <<<<>>>>
-
-                            ; (foreign-proxy-async
-                            ;  [(keypath graph-id) :result]
-                            ;  invokes-pstate
-                            ;  {:pkey        graph-task-id
-                            ;   :callback-fn (fn [new-val _ _]
-                            ;                  (when (some? new-val)
-                            ;
-                            ;                  ))
-                            ;  })
-          )
+            (let [graph-task-id (.getTaskId agent-invoke)
+                  graph-id      (.getAgentInvokeId agent-invoke)
+                  ret           (CompletableFuture.)
+                  proxy-atom    (atom nil)]
+              (.thenApply
+               (foreign-proxy-async
+                [(keypath graph-id) :result]
+                invokes-pstate
+                {:pkey        graph-task-id
+                 :callback-fn (fn [new-val _ _]
+                                (when (some? new-val)
+                                  (if (:failure? new-val)
+                                    (.completeExceptionallly
+                                     ret
+                                     (ex-info (:val new-val) {}))
+                                    (.complete ret (:val new-val)))
+                                  (locking proxy-atom
+                                    (if (nil? @proxy-atom)
+                                      (reset! proxy-atom ::close)
+                                      (do
+                                        (close! @proxy-atom)
+                                        (reset! proxy-atom ::done)
+                                      )))
+                                ))
+                })
+               (h/cf-function [proxy-state]
+                 (locking proxy-atom
+                   (if (= ::close @proxy-atom)
+                     (do
+                       (close! proxy-state)
+                       (reset! proxy-atom ::done))
+                     (reset! proxy-atom proxy-state))
+                 ))
+              )
+              ret
+            ))
           (stream [this agent-invoke node]
                   ;; TODO: <<<<>>>>
           )
