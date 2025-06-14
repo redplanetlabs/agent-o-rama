@@ -14,6 +14,7 @@
    [com.rpl.agentorama
     AgentClient
     AgentGraph
+    AgentInvoke
     AgentManager
     AgentNode
     AgentsTopology
@@ -26,6 +27,10 @@
    [com.rpl.rama.ops
     RamaAccumulatorAgg
     RamaCombinerAgg]
+   [java.util.concurrent
+    CompletableFuture]
+   [java.util.function
+    Function]
    [rpl.rama.generated
     TopologyDoesNotExistException]))
 
@@ -254,22 +259,40 @@
          (reify
           AgentClient
           (invoke [this args]
-                  ;; TODO: <<<<>>>>
-          )
+            (.get (.invokeAsync this args)))
           (invokeAsync [this arg]
                        ;; TODO: <<<<>>>>
+                       ;;   initiateAsync -> agentResultAsync
           )
           (initiate [this args]
-                    ;; TODO: <<<<>>>>
-          )
+            (.get (.initiateAsync this args)))
           (initiateAsync [this args]
-                         ;; TODO: <<<<>>>>
-          )
+            (.thenApply
+             (foreign-append-async!
+              agent-depot
+              (vec args))
+             (reify
+              Function
+              (apply [_
+                      {[graph-task-id graph-id]
+                       aor-types/AGENTS-TOPOLOGY-NAME}]
+                (AgentInvoke. graph-task-id graph-id)
+              ))))
           (agentResult [this agent-invoke]
                        ;; TODO: <<<<>>>>
           )
           (agentResultAsync [this agent-invoke]
                             ;; TODO: <<<<>>>>
+
+                            ; (foreign-proxy-async
+                            ;  [(keypath graph-id) :result]
+                            ;  invokes-pstate
+                            ;  {:pkey        graph-task-id
+                            ;   :callback-fn (fn [new-val _ _]
+                            ;                  (when (some? new-val)
+                            ;
+                            ;                  ))
+                            ;  })
           )
           (stream [this agent-invoke node]
                   ;; TODO: <<<<>>>>
