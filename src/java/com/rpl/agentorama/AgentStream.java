@@ -4,5 +4,5 @@ import java.io.Closeable;
 import java.util.List;
 
 public interface AgentStream extends Closeable {
-  <T> List<T> get();
+  <T> List<StreamingChunk<T>> get();
 }

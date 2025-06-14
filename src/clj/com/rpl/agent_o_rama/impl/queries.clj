@@ -9,7 +9,11 @@
 
 (defn tracing-query-topology-name
   [name]
-  (str "get-trace-page-" name))
+  (str "_agents-get-trace-page-" name))
+
+(defn agent-get-names-query-name
+  []
+  "_agents-get-names")
 
 (defn- to-pqueue
   [coll]
@@ -82,3 +86,5 @@
                 *next-task-invoke-pairs
                 :> *res)
     )))
+
+;; TODO: <<<<>>>> implement getNames query topology

@@ -6,6 +6,8 @@
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.multi-agg :as ma]
+   [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.types :as aor-types])
   (:import
@@ -23,7 +25,9 @@
     StreamTopology]
    [com.rpl.rama.ops
     RamaAccumulatorAgg
-    RamaCombinerAgg]))
+    RamaCombinerAgg]
+   [rpl.rama.generated
+    TopologyDoesNotExistException]))
 
 (defn agents-topology
   [setup topologies]
@@ -204,52 +208,94 @@
        (agentmodule ~(merge {:module-name name-default} options) ~@args))))
 
 (defn agent-manager
-  [cluster]
-  ;; TODO: <<<<>>>>
-)
-
-(defn agent-client
-  [manager module-name agent-name]
-  (let []
-    ;; TODO: <<<<>>>>
+  [cluster module-name]
+  (let [agent-names-query
+        (try
+          (foreign-query cluster
+                         module-name
+                         (queries/agent-get-names-query-name))
+          (catch TopologyDoesNotExistException e
+            (throw (ex-info e
+                            "Module does not host agents"
+                            {:module-name module-name}))
+          ))]
     (reify
-     AgentClient
-     (invoke [this args]
-             ;; TODO: <<<<>>>>
-     )
-     (invokeAsync [this arg]
+     AgentManager
+     (getAgentClient [this agentName]
+       (let [agents-set           (foreign-invoke-query agent-names-query)
+             _ (when-not (contains? agents-set agentName)
+                 (throw (ex-info "Agent does not exist"
+                                 {:available  agents-set
+                                  :agent-name agentName})))
+             agent-depot          (foreign-depot cluster
+                                                 module-name
+                                                 (po/agent-depot-name
+                                                  agentName))
+             invokes-pstate       (foreign-pstate
+                                   cluster
+                                   module-name
+                                   (po/agent-invoke-task-global-name agentName))
+             streaming-pstate     (foreign-pstate
+                                   cluster
+                                   module-name
+                                   (po/agent-streaming-results-task-global-name
+                                    agentName))
+             graph-history-pstate (foreign-pstate
+                                   cluster
+                                   module-name
+                                   (po/graph-history-task-global-name
+                                    agentName))
+             tracing-query        (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/tracing-query-topology-name
+                                    agentName))]
+
+         (reify
+          AgentClient
+          (invoke [this args]
                   ;; TODO: <<<<>>>>
-     )
-     (initiate [this args]
-               ;; TODO: <<<<>>>>
-     )
-     (initiateAsync [this args]
-                    ;; TODO: <<<<>>>>
-     )
-     (agentResult [this agent-invoke]
-                  ;; TODO: <<<<>>>>
-     )
-     (agentResultAsync [this agent-invoke]
+          )
+          (invokeAsync [this arg]
                        ;; TODO: <<<<>>>>
-     )
-     (stream [this agent-invoke node]
-             ;; TODO: <<<<>>>>
-     )
-     (stream [this agent-invoke node callback-void-jfn]
-             ;; TODO: <<<<>>>>
-     )
-     (streamInstance [this agent-invoke node node-invoke-id]
-                     ;; TODO: <<<<>>>>
-     )
-     (streamInstance [this agent-invoke node node-invoke-id callback-void-jfn]
-                     ;; TODO: <<<<>>>>
-     )
-     (close [this]
-            ;; TODO: <<<<>>>>
+          )
+          (initiate [this args]
+                    ;; TODO: <<<<>>>>
+          )
+          (initiateAsync [this args]
+                         ;; TODO: <<<<>>>>
+          )
+          (agentResult [this agent-invoke]
+                       ;; TODO: <<<<>>>>
+          )
+          (agentResultAsync [this agent-invoke]
+                            ;; TODO: <<<<>>>>
+          )
+          (stream [this agent-invoke node]
+                  ;; TODO: <<<<>>>>
+          )
+          (stream [this agent-invoke node callback-void-jfn]
+                  ;; TODO: <<<<>>>>
+                  ;;  - need a proxy on invoke ids, and need a proxy per invoke?
+                  ;;   - or could materialize into TWO spots in the PState...
+                  ;;     - and can be idempotent the same way, with the index...
+                  ;;
+          )
+          ;; TODO: <<<<>>> methods for getting graph history
+          ;;    - just max version and method to get historicalgraphinfo at a
+          ;;    particular version
+          ;;    - need historicalgraphinfo to be a java type
+         )))
+     (getAgentNames [this]
+       (foreign-invoke-query agent-names-query)
      ))))
 
+(defn agent-client
+  [^AgentManager agent-manager agent-name]
+  (.getAgentClient agent-manager agent-name))
+
 (defn module-agents
-  [cluster module-name]
+  [agent-manager]
   ;; TODO: <<<<>>>> should use AgentManager for this so query topology client
   ;; can be created already...
 )

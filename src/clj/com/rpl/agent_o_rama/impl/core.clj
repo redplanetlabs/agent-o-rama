@@ -658,13 +658,23 @@
                           *value]})
       ;; this ensures idempotence
       (<<ramafn %correct-index?
-        [*l]
-        (:> (= (count *l) *streaming-index)))
+        [*v]
+        (:> (= (inc *v) *streaming-index)))
+      (aor-types/mk-StreamingChunk
+       *invoke-id
+       *streaming-index
+       *value
+       :> *chunk)
       (local-transform>
-       [(keypath *agent-id *node *invoke-id)
-        (pred %correct-index?)
-        AFTER-ELEM
-        (termval *value)]
+       [(keypath *agent-id *node)
+        (selected?
+         :invokes
+         (keypath *invoke-id)
+         (nil->val -1)
+         (pred %correct-index?))
+        (multi-path
+         [:all AFTER-ELEM (termval *chunk)]
+         [:invokes (keypath *invoke-id) (termval *streaming-index)])]
        agent-streaming-results-pstate-sym)
     )
 

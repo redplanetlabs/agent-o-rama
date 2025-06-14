@@ -8,25 +8,14 @@ import java.io.*;
 import java.util.*;
 
 public class NippyMap implements Map, RamaSerializable {
-    public static IFn FREEZE = Util.getIFn("taoensso.nippy", "freeze");
-    public static IFn THAW = Util.getIFn("taoensso.nippy", "thaw");
-
     private Map delegate;
-
-    private static byte[] freeze(Object v) {
-      return (byte[]) FREEZE.invoke(v);
-    }
-
-    private static Object thaw(byte[] ser) {
-      return THAW.invoke(ser);
-    }
 
     public NippyMap(Map val) {
       delegate = val;
     }
 
     private void writeObject(ObjectOutputStream out) throws IOException {
-      byte[] ser = freeze(delegate);
+      byte[] ser = AORHelpers.freeze(delegate);
       out.writeInt(ser.length);
       out.write(ser);
     }
@@ -35,7 +24,7 @@ public class NippyMap implements Map, RamaSerializable {
       int size = in.readInt();
       byte[] ser = new byte[size];
       in.readFully(ser);
-      this.delegate = (Map) thaw(ser);
+      this.delegate = (Map) AORHelpers.thaw(ser);
     }
 
     @Override

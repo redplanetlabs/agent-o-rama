@@ -6,10 +6,10 @@ import com.rpl.agentorama.impl.AORHelpers;
 import com.rpl.rama.cluster.ClusterManagerBase;
 
 public interface AgentManager {
-  public static AgentManager create(ClusterManagerBase cluster) {
-    return (AgentManager) AORHelpers.CREATE_AGENT_MANAGER.invoke(cluster);
+  public static AgentManager create(ClusterManagerBase cluster, String moduleName) {
+    return (AgentManager) AORHelpers.CREATE_AGENT_MANAGER.invoke(cluster, moduleName);
   }
 
-  AgentClient getAgentClient(String moduleName, String agentName);
-  Set<String> moduleAgents(String moduleName);
+  AgentClient getAgentClient(String agentName);
+  Set<String> getAgentNames();
 }

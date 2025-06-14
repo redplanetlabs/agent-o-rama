@@ -4,6 +4,8 @@
    [com.rpl.ramaspecter.defrecord-plus :as drp]
    [rpl.schema.core :as s])
   (:import
+   [com.rpl.agentorama
+    StreamingChunk]
    [com.rpl.agentorama.impl
     NippyMap]
    [com.rpl.rama.integration
@@ -123,3 +125,7 @@
   [pstate-name :- String
    path :- s/Any
    key :- s/Any])
+
+(defn mk-StreamingChunk
+  [invoke-id index chunk]
+  (StreamingChunk. invoke-id index chunk))

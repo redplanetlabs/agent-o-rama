@@ -1,6 +1,8 @@
 (ns com.rpl.agent-o-rama.impl.pobjects
   (:use [com.rpl.rama])
   (:import
+   [com.rpl.agentorama
+    StreamingChunk]
    [com.rpl.agentorama.impl
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
@@ -60,11 +62,12 @@
 (def AGENT-STREAMING-PSTATE-SCHEMA
   {Long ; agent ID
    (map-schema
-    String ; node name
-    (map-schema
-     Long  ; invoke-id
-     (vector-schema Object {:subindex? true})
-     {:subindex? true})
+    String          ; node name
+    {:all     (vector-schema StreamingChunk {:subindex? true})
+     :invokes (map-schema
+               Long ; invoke-id
+               Long ; index
+               {:subindex? true})}
     {:subindex? true})})
 
 
