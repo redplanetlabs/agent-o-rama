@@ -677,13 +677,6 @@
          [:invokes (keypath *invoke-id) (termval *streaming-index)])]
        agent-streaming-results-pstate-sym)
     )
-
-
-    ;; TODO: <<<<>>>> implement
-    ;;  - need abstraction for human in the loop
-    ;;    - need depot for this too
-    ;;  - client should query for number of args
-    ;;  - need ability to set breakpoints, which is implicit human in the loop?
   ))
 
 (deframafn do-transform!*

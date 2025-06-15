@@ -129,3 +129,6 @@
 (defn mk-StreamingChunk
   [invoke-id index chunk]
   (StreamingChunk. invoke-id index chunk))
+
+(defprotocol AgentClientInternal
+  (stream-internal [this agent-invoke node callback-fn]))

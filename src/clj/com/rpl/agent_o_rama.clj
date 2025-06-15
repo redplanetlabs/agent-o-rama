@@ -2,6 +2,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
@@ -18,6 +19,7 @@
     AgentManager
     AgentNode
     AgentsTopology
+    AgentStream
     MultiAgg$Impl]
    [com.rpl.rama
     PState$Declaration
@@ -259,9 +261,10 @@
           (invoke [this args]
             (.get (.invokeAsync this args)))
           (invokeAsync [this arg]
-                       ;; TODO: <<<<>>>>
-                       ;;   initiateAsync -> agentResultAsync
-          )
+            (.thenCompose
+             (.initiateAsync this arg)
+             (h/cf-function [agent-invoke]
+               (.agentResultAsync this agent-invoke))))
           (initiate [this args]
             (.get (.initiateAsync this args)))
           (initiateAsync [this args]
@@ -313,41 +316,83 @@
               ret
             ))
           (stream [this agent-invoke node]
-                  ;; TODO: <<<<>>>>
-          )
+            (.stream this agent-invoke node callback-void-jfn))
           (stream [this agent-invoke node callback-void-jfn]
-                  ;; TODO: <<<<>>>>
-                  ;;  - need a proxy on invoke ids, and need a proxy per invoke?
-                  ;;   - or could materialize into TWO spots in the PState...
-                  ;;     - and can be idempotent the same way, with the index...
-                  ;;
-          )
+            (aor-types/stream-internal this
+                                       agent-invoke
+                                       node
+                                       (when callback-void-jfn
+                                         (h/convert-void-jfn
+                                          callback-void-jfn))))
           ;; TODO: <<<<>>> methods for getting graph history
           ;;    - just max version and method to get historicalgraphinfo at a
           ;;    particular version
           ;;    - need historicalgraphinfo to be a java type
          )))
      (getAgentNames [this]
-       (foreign-invoke-query agent-names-query)
-     ))))
+       (foreign-invoke-query agent-names-query))
+     aor-types/AgentClientInternal
+     (stream-internal [this agent-invoke node callback-fn]
+       (let [results-vol []
+             pcallback-fn (fn [new-chunks diff old-chunks]
+                            (let [new-chunks (or new-chunks [])
+                                  old-chunks (or old-chunks [])]
+                              (vreset! results-vol new-chunks)
+                              (when callback-fn
+                                (callback-fn
+                                 new-chunks
+                                 (iclient/new-items new-chunks old-chunks)))))
+             ps (foreign-proxy
+                 [(keypath graph-id node :all)
+                  (srange-dynamic h/start-index
+                                  h/srange-dynamic-end-index)]
+                 streaming-pstate
+                 {:pkey        graph-task-id
+                  :callback-fn pcallback-fn})]
+         (reify
+          AgentStream
+          (get [this] @results-vol)
+          (close [this] (close! ps)))
+       ))
+    )))
 
 (defn agent-client
-  [^AgentManager agent-manager agent-name]
+  ^AgentClient [^AgentManager agent-manager agent-name]
   (.getAgentClient agent-manager agent-name))
 
-(defn module-agents
+(defn agent-names
   [agent-manager]
-  ;; TODO: <<<<>>>> should use AgentManager for this so query topology client
-  ;; can be created already...
-)
-;; TODO: <<<<>>>> need to define agent client
-;;    - gets depot/PStates/query topologies
-;;    - should wrap a Java client
-;;      - AgentManager.open(...) // same as clustermanager.open
-;;      - new AgentManager(ETLManagerBase)
+  (.getAgentNames agent-manager))
 
-;; TODO: <<<<>>>>
-;;  - need test namespace with ability to define and run agent graphs outside of
-;;  modules
-;;    - make a "LocalAgentsTopology" with methods to run it
-;;    - getStreamTopology will throw exception
+(defn agent-invoke
+  [^AgentClient agent-client & args]
+  (.invoke agent-client (into-array Object args)))
+
+(defn agent-invoke-async
+  [^AgentClient agent-client & args]
+  (.invokeAsync agent-client (into-array Object args)))
+
+(defn agent-initiate
+  ^AgentInvoke [^AgentClient agent-client & args]
+  (.initiate agent-client (into-array Object args)))
+
+(defn agent-initiate-async
+  ^AgentInvoke [^AgentClient agent-client & args]
+  (.initiateAsync agent-client (into-array Object args)))
+
+(defn agent-result
+  [^AgentClient agent-client agent-invoke]
+  (.agentResult agent-client agent-invoke))
+
+(defn agent-result-async
+  [^AgentClient agent-client agent-invoke]
+  (.agentResultAsync agent-client agent-invoke))
+
+(defn agent-stream
+  (^AgentStream [^AgentClient agent-client agent-invoke node]
+   (.stream agent-client agent-invoke node))
+  (^AgentStream [^AgentClient agent-client agent-invoke node callback-fn]
+   (aor-types/stream-internal agent-client agent-invoke node callback-fn)))
+
+
+;; TODO: <<<<>>>> need to define Clojure API for any other methods

@@ -117,3 +117,8 @@
       Function
       (apply [_ arg]
         (afn# arg)))))
+
+(defn start-index [s] 0)
+(defn srange-dynamic-end-index
+  [s start-index]
+  (count s))
