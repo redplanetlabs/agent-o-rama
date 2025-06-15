@@ -1801,6 +1801,43 @@
      (is (= 2 (count c)))
     )))
 
+(deftest basic-agent-client-test
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (->
+          topology
+          (aor/new-agent "foo")
+          (aor/node "start"
+                    nil
+                    (fn [agent-node]
+                      (aor/result! 1))))
+        (->
+          topology
+          (aor/new-agent "bar")
+          (aor/node "start"
+                    nil
+                    (fn [agent-node]
+                      (aor/result! 2))))
+       ))
+     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (bind module-name (get-module-name module))
+     (bind agent-manager (aor/agent-manager ipc module-name))
+     (is (= #{"foo" "bar"} (aor/agent-names agent-manager)))
+
+     (bind foo (aor/agent-client agent-manager "foo"))
+     (bind bar (aor/agent-client agent-manager "bar"))
+
+     (is (thrown? clojure.lang.ExceptionInfo
+                  (aor/agent-client agent-manager "car")))
+     ;; TODO: <<<<>>>>
+     ;;   - verify all the basic methods
+     ;;   - initiate / initiateAsync / invoke / invokeAsync / agentResult /
+     ;;   agentResultAsync
+    )))
+
 (deftest traced-out-of-band-test
          ;; TODO: <<<<<>>>> do custom CF thing with custom tracing
          ;;  - need to make API for this

@@ -87,4 +87,10 @@
                 :> *res)
     )))
 
-;; TODO: <<<<>>>> implement getNames query topology
+(defn declare-agent-get-names-query-topology
+  [topologies agent-names]
+  (<<query-topology topologies
+    (agent-get-names-query-name)
+    [:> *res]
+    (|origin)
+    (identity agent-names :> *res)))

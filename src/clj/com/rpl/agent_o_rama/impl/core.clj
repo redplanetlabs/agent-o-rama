@@ -719,5 +719,9 @@
       (do-transform! *path $$p :> *ret)
       (ack-return> *ret)
     ))
+  (queries/declare-agent-get-names-query-topology topologies
+                                                  (-> agent-graphs
+                                                      keys
+                                                      set))
   (doseq [[name agent-graph] agent-graphs]
     (define-agent! setup topologies stream-topology name agent-graph)))
