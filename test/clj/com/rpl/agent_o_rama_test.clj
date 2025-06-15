@@ -1813,14 +1813,14 @@
           (aor/node "start"
                     nil
                     (fn [agent-node]
-                      (aor/result! 1))))
+                      (aor/result! agent-node "abcd"))))
         (->
           topology
           (aor/new-agent "bar")
           (aor/node "start"
                     nil
-                    (fn [agent-node]
-                      (aor/result! 2))))
+                    (fn [agent-node v1 v2]
+                      (aor/result! agent-node (+ v1 v2)))))
        ))
      (rtest/launch-module! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
@@ -1832,8 +1832,15 @@
 
      (is (thrown? clojure.lang.ExceptionInfo
                   (aor/agent-client agent-manager "car")))
+
+     (is (= "abcd" (aor/agent-invoke foo)))
+     (is (= 11 (aor/agent-invoke bar 3 8)))
+
      ;; TODO: <<<<>>>>
      ;;   - verify all the basic methods
+     ;;   - verify proxies closing
+     ;;     - redef close! and count, and capture what's being closed
+     ;;     - need hook to capture underlying proxy
      ;;   - initiate / initiateAsync / invoke / invokeAsync / agentResult /
      ;;   agentResultAsync
     )))

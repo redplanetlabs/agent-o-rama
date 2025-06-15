@@ -262,9 +262,9 @@
           AgentClient
           (invoke [this args]
             (.get (.invokeAsync this args)))
-          (invokeAsync [this arg]
+          (invokeAsync [this args]
             (.thenCompose
-             (.initiateAsync this arg)
+             (.initiateAsync this args)
              (h/cf-function [agent-invoke]
                (.agentResultAsync this agent-invoke))))
           (initiate [this args]
@@ -273,7 +273,9 @@
             (.thenApply
              (foreign-append-async!
               agent-depot
-              (vec args))
+              (aor-types/->AgentInvoke
+               (vec args)
+               (h/current-time-millis)))
              (h/cf-function [{[graph-task-id graph-id]
                               aor-types/AGENTS-TOPOLOGY-NAME}]
                (AgentInvoke. graph-task-id graph-id)
