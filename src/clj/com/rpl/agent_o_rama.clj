@@ -226,6 +226,8 @@
           ))]
     (reify
      AgentManager
+     (getAgentNames [this]
+       (foreign-invoke-query agent-names-query))
      (getAgentClient [this agentName]
        (let [agents-set           (foreign-invoke-query agent-names-query)
              _ (when-not (contains? agents-set agentName)
@@ -279,8 +281,8 @@
           (agentResult [this agent-invoke]
             (.get (.agentResultAsync this agent-invoke)))
           (agentResultAsync [this agent-invoke]
-            (let [graph-task-id (.getTaskId agent-invoke)
-                  graph-id      (.getAgentInvokeId agent-invoke)
+            (let [graph-task-id (.getTaskId ^AgentInvoke agent-invoke)
+                  graph-id      (.getAgentInvokeId ^AgentInvoke agent-invoke)
                   ret           (CompletableFuture.)
                   proxy-atom    (atom nil)]
               (.thenApply
@@ -291,7 +293,7 @@
                  :callback-fn (fn [new-val _ _]
                                 (when (some? new-val)
                                   (if (:failure? new-val)
-                                    (.completeExceptionallly
+                                    (.completeExceptionally
                                      ret
                                      (ex-info (:val new-val) {}))
                                     (.complete ret (:val new-val)))
@@ -316,7 +318,7 @@
               ret
             ))
           (stream [this agent-invoke node]
-            (.stream this agent-invoke node callback-void-jfn))
+            (.stream this agent-invoke node))
           (stream [this agent-invoke node callback-void-jfn]
             (aor-types/stream-internal this
                                        agent-invoke
@@ -324,44 +326,44 @@
                                        (when callback-void-jfn
                                          (h/convert-void-jfn
                                           callback-void-jfn))))
+          aor-types/AgentClientInternal
+          (stream-internal [this agent-invoke node callback-fn]
+            (let [graph-task-id (.getTaskId ^AgentInvoke agent-invoke)
+                  graph-id      (.getAgentInvokeId ^AgentInvoke agent-invoke)
+                  results-vol   []
+                  pcallback-fn  (fn [new-chunks diff old-chunks]
+                                  (let [new-chunks (or new-chunks [])
+                                        old-chunks (or old-chunks [])]
+                                    (vreset! results-vol new-chunks)
+                                    (when callback-fn
+                                      (callback-fn
+                                       new-chunks
+                                       (iclient/new-items new-chunks
+                                                          old-chunks)))))
+                  ps            (foreign-proxy
+                                 [(keypath graph-id node :all)
+                                  (srange-dynamic h/start-index
+                                                  h/srange-dynamic-end-index)]
+                                 streaming-pstate
+                                 {:pkey        graph-task-id
+                                  :callback-fn pcallback-fn})]
+              (reify
+               AgentStream
+               (get [this] @results-vol)
+               (close [this] (close! ps)))
+            ))
           ;; TODO: <<<<>>> methods for getting graph history
           ;;    - just max version and method to get historicalgraphinfo at a
           ;;    particular version
           ;;    - need historicalgraphinfo to be a java type
-         )))
-     (getAgentNames [this]
-       (foreign-invoke-query agent-names-query))
-     aor-types/AgentClientInternal
-     (stream-internal [this agent-invoke node callback-fn]
-       (let [results-vol []
-             pcallback-fn (fn [new-chunks diff old-chunks]
-                            (let [new-chunks (or new-chunks [])
-                                  old-chunks (or old-chunks [])]
-                              (vreset! results-vol new-chunks)
-                              (when callback-fn
-                                (callback-fn
-                                 new-chunks
-                                 (iclient/new-items new-chunks old-chunks)))))
-             ps (foreign-proxy
-                 [(keypath graph-id node :all)
-                  (srange-dynamic h/start-index
-                                  h/srange-dynamic-end-index)]
-                 streaming-pstate
-                 {:pkey        graph-task-id
-                  :callback-fn pcallback-fn})]
-         (reify
-          AgentStream
-          (get [this] @results-vol)
-          (close [this] (close! ps)))
-       ))
-    )))
+         ))))))
 
 (defn agent-client
   ^AgentClient [^AgentManager agent-manager agent-name]
   (.getAgentClient agent-manager agent-name))
 
 (defn agent-names
-  [agent-manager]
+  [^AgentManager agent-manager]
   (.getAgentNames agent-manager))
 
 (defn agent-invoke

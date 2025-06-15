@@ -112,11 +112,11 @@
 
 (defmacro cf-function
   [& body]
-  `(let [afn# (fn & body)]
+  `(let [afn# (fn ~@body)]
      (reify
       Function
-      (apply [_ arg]
-        (afn# arg)))))
+      (apply [_ arg#]
+        (afn# arg#)))))
 
 (defn start-index [s] 0)
 (defn srange-dynamic-end-index

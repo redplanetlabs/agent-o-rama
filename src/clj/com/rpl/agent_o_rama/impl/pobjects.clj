@@ -62,12 +62,13 @@
 (def AGENT-STREAMING-PSTATE-SCHEMA
   {Long ; agent ID
    (map-schema
-    String          ; node name
-    {:all     (vector-schema StreamingChunk {:subindex? true})
-     :invokes (map-schema
-               Long ; invoke-id
-               Long ; index
-               {:subindex? true})}
+    String           ; node name
+    (fixed-keys-schema
+     {:all     (vector-schema StreamingChunk {:subindex? true})
+      :invokes (map-schema
+                Long ; invoke-id
+                Long ; index
+                {:subindex? true})})
     {:subindex? true})})
 
 
