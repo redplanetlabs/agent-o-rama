@@ -2,6 +2,8 @@
   (:require
    [com.rpl.agent-o-rama.ui.common :as common]
    [clojure.string :as str]
+   [goog.i18n.DateTimeFormat :as dtf]
+   [goog.date.UtcDateTime    :as utc-dt]
    
    [uix.core :as uix :refer [defui defhook $]]
    
@@ -10,6 +12,21 @@
    ["react" :refer [useState useCallback useEffect]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle]]
    ["@dagrejs/dagre" :as Dagre]))
+
+(defn format-ms [ms]
+  (let [date (js/Date. ms)
+        formatter (js/Intl.DateTimeFormat.
+                   "en-US"
+                   #js {:year          "numeric"
+                        :month         "long"
+                        :day           "numeric"
+                        :hour          "2-digit"
+                        :minute        "2-digit"
+                        :second        "2-digit"
+                        :hour12 false})
+        base (.format formatter date)
+        millis (.padStart (str (.getMilliseconds date)) 3 "0")]
+    (str base "." millis)))
 
 (defn starter-node? [node]
   (not (nil? (:started-agg? node))))
@@ -111,7 +128,10 @@
                                      ($ :div {:className "text-xs text-sky-600 mt-1 font-mono break-words"}
                                         (str "result: " (pr-str (js->clj op-result))))))
                                 (when duration
-                                  ($ :div {:className "text-xs text-sky-500 font-mono"}
+                                  ($ :div {:className "text-xs text-sky-500 font-mono"
+                                           :title (str (format-ms start-time)
+                                                       " to "
+                                                       (format-ms finish-time))}
                                      (str duration "ms")))))))))))
             
             ;; Emits Section (full width)
