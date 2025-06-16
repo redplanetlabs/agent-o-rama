@@ -1,3 +1,17 @@
+agent page (boxes with expand links)
+
+link to run page (not interactive), agent graph (pretty small, zoom) , stats summary, recent invokes (all invockes button), alerts box
+
+fork ui {
+  fork button next to graph, ui in fork mode. (editable node inputs)
+  dirty node indicator (downstream in trace are grayed out)
+  execute forked button on the bottom
+  
+  normal nodes cannot fork a node as well as one of its ancestors
+}
+
+tracing currently in flight (polling, indicator, pagination complicates this)
+
 get rid of intermediate agent info screen
 react-query/mutationify the mutations for agent creation
 use a library for form state (the one recommended by uix readme)

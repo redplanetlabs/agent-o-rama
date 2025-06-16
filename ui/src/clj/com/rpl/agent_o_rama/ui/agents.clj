@@ -340,11 +340,168 @@
 
 (def ^:private synthetic-20k-graph (generate-synthetic-graph 20000))
 
+(def nested-op-trace
+  (remove-implicit-nodes
+   {549670855068890709
+    {:agg-invoke-id nil,
+     :emits
+     [{:invoke-id 2970571310786788940,
+       :target-task-id 2,
+       :node-name "doc",
+       :args []}],
+     :finish-time-millis 15,
+     :node "kv",
+     :result nil,
+     :nested-ops
+     [{:start-time-millis 0,
+       :finish-time-millis 1,
+       :info
+       {"type" "store-query", "op" "get", "params" [:b], "result" []}}
+      {:start-time-millis 1,
+       :finish-time-millis 3,
+       :info
+       {"type" "store-query", "op" "get", "params" [:b], "result" nil}}
+      {:start-time-millis 3,
+       :finish-time-millis 6,
+       :info
+       {"type" "store-query",
+        "op" "contains?",
+        "params" [:a],
+        "result" false}}
+      {:start-time-millis 6,
+       :finish-time-millis 10,
+       :info {"type" "store-write", "op" "put", "params" [:a 1]}}
+      {:start-time-millis 10,
+       :finish-time-millis 15,
+       :info {"type" "store-write", "op" "update", "params" [:d]}}],
+     :graph-id 0,
+     :start-time-millis 0,
+     :input [],
+     :graph-task-id 2},
+    2970571310786788940
+    {:agg-invoke-id nil,
+     :emits
+     [{:invoke-id -4117109912539327325,
+       :target-task-id 2,
+       :node-name "pstate",
+       :args []}],
+     :finish-time-millis 55,
+     :node "doc",
+     :result nil,
+     :nested-ops
+     [{:start-time-millis 15,
+       :finish-time-millis 21,
+       :info
+       {"type" "store-query",
+        "op" "get-document-field",
+        "params" [:m :a {:default nil}],
+        "result" nil}}
+      {:start-time-millis 21,
+       :finish-time-millis 28,
+       :info
+       {"type" "store-query",
+        "op" "get-document-field",
+        "params" [:m :b {:default []}],
+        "result" []}}
+      {:start-time-millis 28,
+       :finish-time-millis 36,
+       :info
+       {"type" "store-query",
+        "op" "contains-document-field?",
+        "params" [:m :a],
+        "result" false}}
+      {:start-time-millis 36,
+       :finish-time-millis 45,
+       :info
+       {"type" "store-write",
+        "op" "put-document-field",
+        "params" [:m :a 1]}}
+      {:start-time-millis 45,
+       :finish-time-millis 55,
+       :info
+       {"type" "store-write",
+        "op" "update-document-field",
+        "params" [:m :a]}}],
+     :graph-id 0,
+     :start-time-millis 15,
+     :input [],
+     :graph-task-id 2},
+    -4117109912539327325
+    {:agg-invoke-id nil,
+     :emits
+     [{:invoke-id 524362729813538124,
+       :target-task-id 2,
+       :node-name "end",
+       :args []}],
+     :finish-time-millis 136,
+     :node "pstate",
+     :result nil,
+     :nested-ops
+     [{:start-time-millis 55,
+       :finish-time-millis 66,
+       :info
+       {"type" "store-write", "op" "pstate-transform", "params" [:a]}}
+      {:start-time-millis 66,
+       :finish-time-millis 78,
+       :info
+       {"type" "store-write", "op" "pstate-transform", "params" [:a]}}
+      {:start-time-millis 78,
+       :finish-time-millis 91,
+       :info
+       {"type" "store-query",
+        "op" "pstate-select-one",
+        "params" [],
+        "result" 1}}
+      {:start-time-millis 91,
+       :finish-time-millis 105,
+       :info
+       {"type" "store-query",
+        "op" "pstate-select",
+        "params" [],
+        "result" [1]}}
+      {:start-time-millis 105,
+       :finish-time-millis 120,
+       :info
+       {"type" "store-query",
+        "op" "pstate-select-one",
+        "params" [{:pkey :a}],
+        "result" 2}}
+      {:start-time-millis 120,
+       :finish-time-millis 136,
+       :info
+       {"type" "store-query",
+        "op" "pstate-select",
+        "params" [{:pkey :a}],
+        "result" [2]}}],
+     :graph-id 0,
+     :start-time-millis 55,
+     :input [],
+     :graph-task-id 2},
+    524362729813538124
+    {:agg-invoke-id nil,
+     :emits [],
+     :finish-time-millis 136,
+     :node "end",
+     :result {:val "done", :failure? false},
+     :nested-ops [],
+     :graph-id 0,
+     :start-time-millis 136,
+     :input [],
+     :graph-task-id 2}}))
+
+(defn select-data [module-id agent-id]
+  (case [module-id agent-id]
+    ["ModuleB" "research"] synthetic-20k-graph
+    ["ModuleA" "research"] all-data
+    ["ModuleA" "support"] nested-op-trace))
+
 (defn invoke [{{:keys [module-id agent-id invoke-id]} :path-params
               query-params                            :query-params}]
+  (def module-id module-id)
+  (def agent-id agent-id)
   {:status 200
    :body   {:next-task-invoke-pairs [] ;; [task id, invoke id]
-            :invokes-map (remove-implicit-nodes (if use-large? synthetic-20k-graph all-data))}})
+            :invokes-map (remove-implicit-nodes (select-data module-id agent-id))}})
 
 (defn get-paginated-graph
   "Traverses the graph starting from a node and returns a subset of nodes
@@ -406,9 +563,14 @@
   [{{:keys [module-id agent-id invoke-id]} :path-params
     {:strs [start-node-id depth] :or {depth "3"}} :query-params
     :as req}]
+  (def module-id module-id)
+  (def agent-id agent-id)
   (let [depth-int (Integer/parseInt depth)
         start-id (when start-node-id (Long/parseLong start-node-id))
-        paginated-data (get-paginated-graph (if use-large? synthetic-20k-graph all-data) start-id depth-int)]
+        paginated-data (get-paginated-graph
+                        (select-data module-id agent-id)
+                        start-id
+                        depth-int)]
     {:status 200
      :body {:invokes-map paginated-data
             :pagination {:depth depth-int
