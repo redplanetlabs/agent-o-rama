@@ -77,6 +77,15 @@
                           ($ :span {:className "text-xs text-yellow-600 font-mono"} 
                              (.toLocaleTimeString (js/Date. finish-time))))))))
             
+            (when (not (empty? (:nested-ops data)))
+              ($ :div {:className "bg-red-50 p-3 rounded-md mt-4"}
+                 ($ :div {:className "text-sm font-medium text-red-700 mb-2"} "Operations")
+                 ($ :div {:className "space-y-1"}
+                    (for [op (:nested-ops data)]
+                      ($ :div {:className "flex justify-between"}
+                         (TODO)
+                         )))))
+            
             ;; Emits Section (full width)
             (when (and emits (> (count emits) 0))
               ($ :div {:className "mt-4 bg-purple-50 p-3 rounded-md"}
