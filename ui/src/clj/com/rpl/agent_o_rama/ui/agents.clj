@@ -497,8 +497,6 @@
 
 (defn invoke [{{:keys [module-id agent-id invoke-id]} :path-params
               query-params                            :query-params}]
-  (def module-id module-id)
-  (def agent-id agent-id)
   {:status 200
    :body   {:next-task-invoke-pairs [] ;; [task id, invoke id]
             :invokes-map (remove-implicit-nodes (select-data module-id agent-id))}})
@@ -563,8 +561,6 @@
   [{{:keys [module-id agent-id invoke-id]} :path-params
     {:strs [start-node-id depth] :or {depth "3"}} :query-params
     :as req}]
-  (def module-id module-id)
-  (def agent-id agent-id)
   (let [depth-int (Integer/parseInt depth)
         start-id (when start-node-id (Long/parseLong start-node-id))
         paginated-data (get-paginated-graph
