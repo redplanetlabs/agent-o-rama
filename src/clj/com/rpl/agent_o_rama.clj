@@ -376,7 +376,7 @@
   (.invoke agent-client (into-array Object args)))
 
 (defn agent-invoke-async
-  [^AgentClient agent-client & args]
+  ^CompletableFuture [^AgentClient agent-client & args]
   (.invokeAsync agent-client (into-array Object args)))
 
 (defn agent-initiate
@@ -384,7 +384,7 @@
   (.initiate agent-client (into-array Object args)))
 
 (defn agent-initiate-async
-  ^AgentInvoke [^AgentClient agent-client & args]
+  ^CompletableFuture [^AgentClient agent-client & args]
   (.initiateAsync agent-client (into-array Object args)))
 
 (defn agent-result
@@ -392,7 +392,7 @@
   (.agentResult agent-client agent-invoke))
 
 (defn agent-result-async
-  [^AgentClient agent-client agent-invoke]
+  ^CompletableFuture [^AgentClient agent-client agent-invoke]
   (.agentResultAsync agent-client agent-invoke))
 
 (defn agent-stream

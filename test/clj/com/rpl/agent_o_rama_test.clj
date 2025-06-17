@@ -33,7 +33,9 @@
    [com.rpl.rama.ops
     RamaAccumulatorAgg0
     RamaAccumulatorAgg2
-    RamaCombinerAgg]))
+    RamaCombinerAgg]
+   [java.util.concurrent
+    CompletableFuture]))
 
 (deftest graph-test
   (letlocals
@@ -1869,13 +1871,20 @@
          (is (= 22 (aor/agent-result bar inv)))
          (is (opens-matches-closes? @opens-atom @closes-atom))
 
-         ;; TODO: <<<<>>>>
-         ;;   - verify all the basic methods
-         ;;   - initiate / initiateAsync / invoke / invokeAsync / agentResult /
-         ;;   agentResultAsync
-         ;;   - call agent-result after it's already finished
 
-         (is (= (count @opens-atom) 4))
+         (bind cf (aor/agent-invoke-async foo))
+         (is (instance? CompletableFuture cf))
+         (is (= "abcd" (.get cf)))
+
+         (bind cf (aor/agent-initiate-async bar 2 12))
+         (is (instance? CompletableFuture cf))
+         (bind inv (.get cf))
+
+         (bind cf (aor/agent-result-async bar inv))
+         (is (instance? CompletableFuture cf))
+         (is (= 14 (.get cf)))
+
+         (is (= (count @opens-atom) 6))
          (is (opens-matches-closes? @opens-atom @closes-atom))
         )))))
 
