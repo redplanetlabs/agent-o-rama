@@ -309,6 +309,7 @@
                                 ))
                 })
                (h/cf-function [proxy-state]
+                 (i/hook:agent-result-proxy proxy-state)
                  (locking proxy-atom
                    (if (= ::close @proxy-atom)
                      (do
@@ -352,7 +353,9 @@
               (reify
                AgentStream
                (get [this] @results-vol)
-               (close [this] (close! ps)))
+               (close [this] (close! ps))
+               clojure.lang.IDeref
+               (deref [this] (.get this)))
             ))
           ;; TODO: <<<<>>> methods for getting graph history
           ;;    - just max version and method to get historicalgraphinfo at a

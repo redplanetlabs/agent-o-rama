@@ -1801,49 +1801,83 @@
      (is (= 2 (count c)))
     )))
 
+(defn opens-matches-closes?
+  [opens closes]
+  (let [opens      (mapv System/identityHashCode opens)
+        closes     (mapv System/identityHashCode closes)
+        opens-map  (transform MAP-VALS count (group-by identity opens))
+        closes-map (transform MAP-VALS count (group-by identity closes))]
+    (and
+     ;; sanity check
+     (every? #(= % 1) (vals opens-map))
+     (= opens-map closes-map))
+  ))
+
 (deftest basic-agent-client-test
-  (with-open [ipc (rtest/create-ipc)]
-    (letlocals
-     (bind module
-       (aor/agentmodule
-        [topology]
-        (->
-          topology
-          (aor/new-agent "foo")
-          (aor/node "start"
-                    nil
-                    (fn [agent-node]
-                      (aor/result! agent-node "abcd"))))
-        (->
-          topology
-          (aor/new-agent "bar")
-          (aor/node "start"
-                    nil
-                    (fn [agent-node v1 v2]
-                      (aor/result! agent-node (+ v1 v2)))))
-       ))
-     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
-     (bind module-name (get-module-name module))
-     (bind agent-manager (aor/agent-manager ipc module-name))
-     (is (= #{"foo" "bar"} (aor/agent-names agent-manager)))
+  (let [opens-atom  (atom [])
+        closes-atom (atom [])
+        results-vol (atom 0)
+        orig-close! close!]
+    (with-redefs [i/hook:agent-result-proxy
+                  (fn [proxy]
+                    (swap! opens-atom conj proxy))
+                  close! (fn [item]
+                           (swap! closes-atom conj item)
+                           (orig-close! item))
+                  i/hook:writing-result (fn [& args] (swap! results-vol inc))]
+      (with-open [ipc (rtest/create-ipc)]
+        (letlocals
+         (bind module
+           (aor/agentmodule
+            [topology]
+            (->
+              topology
+              (aor/new-agent "foo")
+              (aor/node "start"
+                        nil
+                        (fn [agent-node]
+                          (aor/result! agent-node "abcd"))))
+            (->
+              topology
+              (aor/new-agent "bar")
+              (aor/node "start"
+                        nil
+                        (fn [agent-node v1 v2]
+                          (aor/result! agent-node (+ v1 v2)))))
+           ))
+         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (bind module-name (get-module-name module))
 
-     (bind foo (aor/agent-client agent-manager "foo"))
-     (bind bar (aor/agent-client agent-manager "bar"))
+         (bind agent-manager (aor/agent-manager ipc module-name))
+         (is (= #{"foo" "bar"} (aor/agent-names agent-manager)))
 
-     (is (thrown? clojure.lang.ExceptionInfo
-                  (aor/agent-client agent-manager "car")))
+         (bind foo (aor/agent-client agent-manager "foo"))
+         (bind bar (aor/agent-client agent-manager "bar"))
 
-     (is (= "abcd" (aor/agent-invoke foo)))
-     (is (= 11 (aor/agent-invoke bar 3 8)))
+         (is (thrown? clojure.lang.ExceptionInfo
+                      (aor/agent-client agent-manager "car")))
 
-     ;; TODO: <<<<>>>>
-     ;;   - verify all the basic methods
-     ;;   - verify proxies closing
-     ;;     - redef close! and count, and capture what's being closed
-     ;;     - need hook to capture underlying proxy
-     ;;   - initiate / initiateAsync / invoke / invokeAsync / agentResult /
-     ;;   agentResultAsync
-    )))
+         (is (= "abcd" (aor/agent-invoke foo)))
+         (is (= 11 (aor/agent-invoke bar 3 8)))
+
+         (reset! results-vol 0)
+         ;; verify agent-result can be called after agent has already finished
+         (bind inv (aor/agent-initiate bar 10 12))
+         (is (condition-attained? (= 1 @results-vol)))
+         (is (= 22 (aor/agent-result bar inv)))
+         (is (opens-matches-closes? @opens-atom @closes-atom))
+         (is (= 22 (aor/agent-result bar inv)))
+         (is (opens-matches-closes? @opens-atom @closes-atom))
+
+         ;; TODO: <<<<>>>>
+         ;;   - verify all the basic methods
+         ;;   - initiate / initiateAsync / invoke / invokeAsync / agentResult /
+         ;;   agentResultAsync
+         ;;   - call agent-result after it's already finished
+
+         (is (= (count @opens-atom) 4))
+         (is (opens-matches-closes? @opens-atom @closes-atom))
+        )))))
 
 (deftest traced-out-of-band-test
          ;; TODO: <<<<<>>>> do custom CF thing with custom tracing

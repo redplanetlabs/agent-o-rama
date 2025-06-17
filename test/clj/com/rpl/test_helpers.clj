@@ -122,3 +122,38 @@
            (submap [:start-time-millis :finish-time-millis])]
           {}
           trace))
+
+(defn condition-attained?*
+  ([f] (condition-attained?* f {}))
+  ([f
+    {:keys [max-wait max-delay initial-delay backoff-factor retry-on-exception
+            context]
+     :or   {max-wait           10000
+            max-delay          100
+            initial-delay      10
+            backoff-factor     2
+            retry-on-exception false
+           }}]
+   (let [start-time-millis (System/currentTimeMillis)]
+     (loop [delay    (long initial-delay)
+            wait     0
+            attempts 1]
+       (let [[res e] (if retry-on-exception
+                       (try
+                         [(f) nil]
+                         (catch Exception e
+                           [false e]))
+                       [(f) nil])]
+         (if (or e (not val))
+           (if (< (- (System/currentTimeMillis) start-time-millis) max-wait)
+             (do
+               (Thread/sleep delay)
+               (recur (long (min (* delay backoff-factor) max-delay))
+                      (long (+ wait delay))
+                      (inc attempts)))
+             false)
+           true))))))
+
+(defmacro condition-attained?
+  [& body]
+  `(condition-attained?* (fn [] ~@body)))

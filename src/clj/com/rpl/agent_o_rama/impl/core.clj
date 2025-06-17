@@ -32,6 +32,9 @@
    [java.util.function
     Function]))
 
+;; for agent-o-rama namespace
+(defn hook:agent-result-proxy [proxy])
+
 (defn get-invoke-args
   [data]
   (if (aor-types/AgentInvoke? data)
