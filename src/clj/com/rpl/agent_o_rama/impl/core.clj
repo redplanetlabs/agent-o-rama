@@ -116,43 +116,49 @@
 (defprotocol AgentNodeInternal
   (agent-node-state [this]))
 
+(defprotocol StreamingRecorderInternal
+  (waitFinish [this]))
+
+(defn- verify-successful-cf!
+  [^CompletableFuture cf]
+  (.get cf)
+  (when (.isCompletedExceptionally cf)
+    (throw (ex-info "Streaming append failed" {} (.get cf)))))
+
 (defn mk-streaming-recorder
   [graph-task-id graph-id node invoke-id retry-num streaming-depot]
-  ;; TODO: <<<<>>>>> depot should ack/retry indefinitely, or permanently fail
-  ;; streaming?
-  ;;    - seems like failed streaming should fail the agent run and cause a
-  ;;    retry of the agent invoke
-  ;;      - failure of any depot append should do this?
-  ;;    - suppose have pending CFs at end of node, and they they never finish
-  ;;    (e.g. disk is out of space)
-  ;;      - retrying agent is unsafe at that point
-  ;;        - unless include another "retry-num" that causes them to filter
-  ;;        themselves out
-  ;;          - and then don't need any coordination here
-  (let [index-vol (volatile! 0)]
+  (let [index-vol (volatile! 0)
+        outstanding-queue-vol (volatile! clojure.lang.PersistentQueue/EMPTY)]
     (reify
      StreamingRecorder
      (record [this chunk]
-       ;; TODO: <<<>>>> can indexes go out of order if do multiple calls in
-       ;; parallel?
-       ;;   - especially if fail and retry...s
-       ;;   - need to full ack here since node can't move on until all streaming
-       ;;   is done
-       ;;   - seems inefficient to lock here, as won't get any depot
-       ;;   batching...
-       ;;     - hard to make ETL side smarter...
-       ;;       - if goes out of order, can grab from a buffer in PState and
-       ;;       move it to correct the order
-       ;;     - could retry if the index hasn't changed
-       (aor-types/->valid-NodeStreamingResult
-        graph-task-id
-        graph-id
-        node
-        invoke-id
-        retry-num
-        ...streaming-index
-        chunk)
-     )
+       ;; crucial to lock so that appends on this depot happen in order of
+       ;; indexes
+       (locking index-vol
+         (let [streaming-index @index-vol
+               _ (vswap! index-vol inc)
+               cf (foreign-append-async!
+                   streaming-depot
+                   (aor-types/->valid-NodeStreamingResult
+                    graph-task-id
+                    graph-id
+                    node
+                    invoke-id
+                    retry-num
+                    streaming-index
+                    chunk))]
+           (vswap! outstanding-queue-vol conj cf)
+           (when (> (count @outstanding-queue-vol) 1000)
+             (dotimes [_ 100]
+               (let [cf (peek @outstanding-queue-vol)]
+                 (vswap! outstanding-queue-vol pop)
+                 (verify-successful-cf! cf)
+               )))
+         )))
+     StreamingRecorderInternal
+     (waitFinish [this]
+       (doseq [cf @outstanding-queue-vol]
+         (verify-successful-cf! cf)))
     )))
 
 (defn mk-agent-node
@@ -245,9 +251,7 @@
                               :type (get store-info name)}))
          )))
      (getStreamingRecorder [this]
-                           ;; TODO: <<<<>>>>> should be shared object
-                           ;; gets streaming depot for this agent
-     )
+       streaming-recorder)
      AgentNodeInternal
      (agent-node-state [this]
        {:emits      @emits-vol
@@ -260,11 +264,15 @@
               graph))
 
 (defn node-event
-  [agent-name task-id invoke-id retry-num node-name node-fn agent-node args
+  [agent-name task-id invoke-id retry-num node-name node-fn
+   ^AgentNode agent-node args
    ^RamaClientsTaskGlobal rama-clients]
   (fn []
     (let [res   (try
                   (apply node-fn agent-node args)
+                  (-> agent-node
+                      .getStreamingRecorder
+                      waitFinish)
                   (catch Throwable t
                     (cljlogging/error t
                                       "Error during agent node execution"
@@ -760,13 +768,6 @@
                           *value]})
       (local-select> [(keypath *agent-id) :retry-num (pred= *retry-num)]
                      agent-invoke-pstate-sym)
-      ;; TODO: <<<<>>>> if there's a retry mid-stream, how to handle?
-      ;;  - client would need to receive an error to the stream...
-      ;;    - the retry is going to clear the node outright...
-      ;;      - how to communicate that explicitly to the client?
-      ;;        - maybe streaming can START with special object saying the retry
-      ;;        number and reason for starting that way...
-
       ;; this ensures idempotence
       (<<ramafn %correct-index?
         [*v]
