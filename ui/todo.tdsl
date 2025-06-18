@@ -10,6 +10,9 @@ fork ui {
   normal nodes cannot fork a node as well as one of its ancestors
 }
 
+retries with the llm api provider (retry-after header) integrated with node retries
+  include retry stats in the stats
+
 tracing currently in flight (polling, indicator, pagination complicates this)
 
 get rid of intermediate agent info screen

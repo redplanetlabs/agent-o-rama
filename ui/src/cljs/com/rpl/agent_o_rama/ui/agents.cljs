@@ -61,13 +61,36 @@
     ($ :div.p-4
        ($ :div.text-xl.font-semibold.mb-4 "Agent Details")
        ($ :div.p-4.flex.gap-1
-          (for [tab-label ["invocations"]]
-            ($ wouter/Link
-               {:href (str "/agents/" module-id "/" agent-id "/" tab-label)
-                :key tab-label
-                :style {:flex-grow "1"}}
-               ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
-                  tab-label)))))))
+          ($ wouter/Link
+             {:href (str "/agents/" module-id "/" agent-id "/run")
+              :key tab-label
+              :style {:flex-grow "1"}}
+             ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
+                "manually run agent")))
+       
+       ($ :div.p-4.flex.gap-1
+          ($ wouter/Link
+             {:href (str "/agents/" module-id "/" agent-id "/invocations")
+              :key tab-label
+              :style {:flex-grow "1"}}
+             ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
+                "invocations")))
+       
+       ($ :div.p-4.flex.gap-1
+          ($ wouter/Link
+             {:href (str "/agents/" module-id "/" agent-id "/stats")
+              :key tab-label
+              :style {:flex-grow "1"}}
+             ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
+                "stats summary")))
+       
+       ($ :div.p-4.flex.gap-1
+          ($ wouter/Link
+             {:href (str "/agents/" module-id "/" agent-id "/alerts")
+              :key tab-label
+              :style {:flex-grow "1"}}
+             ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
+                "alerts"))))))
 
 (defui invoke []
   (let [{:strs [module-id agent-id invoke-id]} (js->clj (wouter/useParams))
