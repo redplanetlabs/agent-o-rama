@@ -1888,6 +1888,25 @@
          (is (opens-matches-closes? @opens-atom @closes-atom))
         )))))
 
+(deftest node-streaming-test
+         ;; TODO: <<<<>>>> have multiple nodes streaming across multiple
+         ;; invokes, check ordering within invoke after separating
+         ;;  - need a custom object that will do the streaming...
+         ;;     - just need access to the foreign depot
+         ;;  - what is API to get access to streaming?
+         ;;     - feels like need a way when invoking the object to have a
+         ;;     "StreamingCallback"
+         ;;       that takes a chunk of data as an object...
+         ;;     - and you get it from the node, which keeps track of the invoke
+         ;;     ID and streaming index
+         ;;       - needs to be thread-safe
+         ;;       - node.getObject will auto-wrap it for the upcoming invokes
+         ;;       - only accessible in task globals?
+         ;;         - could just have node.getStreamingCallback... need better
+         ;;         name
+         ;;             - getStreamingRecorder
+)
+
 (deftest traced-out-of-band-test
          ;; TODO: <<<<<>>>> do custom CF thing with custom tracing
          ;;  - need to make API for this

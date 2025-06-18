@@ -32,6 +32,10 @@
   [name]
   (RamaClientsTaskGlobal/agentDepotName name))
 
+(defn agent-streaming-depot-name
+  [name]
+  (RamaClientsTaskGlobal/agentStreamingDepotName name))
+
 (defn agents-clients-name
   []
   "*_agents-clients")
@@ -53,7 +57,16 @@
      ;; TODO: <<<<<>>>>> if no result is ever specified, should error instead
      ;; of hanging
      :result         AgentResult
-     :ack-val        Long})})
+     :ack-val        Long
+     :retry-num      Long})})
+
+(defn agent-valid-invokes-task-global-name
+  [agent-name]
+  (str "$$agent-valid-invokes-" agent-name))
+
+(def AGENT-VALID-INVOKES-PSTATE-SCHEMA
+  ;; root-invoke-id -> valid retry-num
+  {Long Long})
 
 (defn agent-streaming-results-task-global-name
   [agent-name]

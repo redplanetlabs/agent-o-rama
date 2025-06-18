@@ -12,8 +12,10 @@ public interface AgentClient {
   <T> T agentResult(AgentInvoke invoke);
   <T> CompletableFuture<T> agentResultAsync(AgentInvoke invoke);
   AgentStream stream(AgentInvoke invoke, String node);
-  // callback takes in [all items, new items]
-  <T> AgentStream stream(AgentInvoke invoke, String node, RamaVoidFunction2<List<StreamingChunk<T>>, List<StreamingChunk<T>>> callback);
+  // callback takes in [all items, new items, reset?]
+  <T> AgentStream stream(AgentInvoke invoke,
+                         String node,
+                         RamaVoidFunction3<List<StreamingChunk<T>>, List<StreamingChunk<T>, Boolean>> callback);
   // TODO: methods to get trace info
   //  - needs to be paginated
   //  - should be exact same as query topology

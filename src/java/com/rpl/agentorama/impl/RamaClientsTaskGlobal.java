@@ -13,20 +13,26 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
     return "*_agent-depot-" + agentName;
   }
 
+  public static String agentStreamingDepotName(String agentName) {
+    return "*_agent-streaming-depot-" + agentName;
+  }
+
   public static String AGENT_PSTATE_WRITE_DEPOT = "*_agent-pstate-write";
 
-  private static class MirrorClientInfo implements Closeable {
+  private static class ClientInfo implements Closeable {
     private String moduleName;
     public Map<List, PState> mirrorClients;
     public Map<String, Depot> agentDepots;
+    public Map<String, Depot> streamingDepots;
     public ConcurrentHashMap<String, PState> localPStates;
     public Depot pstateWritesDepot;
     ClusterManagerBase manager;
 
-    public MirrorClientInfo(String moduleName, Map mirrorClients, Map agentDepots, Depot pstateWritesDepot, ClusterManagerBase manager) {
+    public ClientInfo(String moduleName, Map mirrorClients, Map agentDepots, Map streamingDepots, Depot pstateWritesDepot, ClusterManagerBase manager) {
       this.moduleName = moduleName;
       this.mirrorClients = mirrorClients;
       this.agentDepots = agentDepots;
+      this.streamingDepots = streamingDepots;
       this.pstateWritesDepot = pstateWritesDepot;
       this.localPStates = new ConcurrentHashMap();
       this.manager = manager;
@@ -52,7 +58,7 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
     }
   }
 
-  WorkerManagedResource<MirrorClientInfo> _mirrorClientInfo;
+  WorkerManagedResource<ClientInfo> _clientInfo;
 
   final Collection<String> _agentNames;
   final List<List> _mirrorTuples;
@@ -62,21 +68,25 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
     List tuple = new ArrayList();
     tuple.add(moduleName);
     tuple.add(pstateName);
-    PState ret = _mirrorClientInfo.getResource().mirrorClients.get(tuple);
+    PState ret = _clientInfo.getResource().mirrorClients.get(tuple);
     if(ret==null) throw new RuntimeException("Mirror PState is not a dependency:" + moduleName + "/" + pstateName);
     return ret;
   }
 
   public Depot getPStateWriteDepot() {
-    return _mirrorClientInfo.getResource().pstateWritesDepot;
+    return _clientInfo.getResource().pstateWritesDepot;
   }
 
   public Depot getAgentDepot(String agentName) {
-    return _mirrorClientInfo.getResource().agentDepots.get(agentName);
+    return _clientInfo.getResource().agentDepots.get(agentName);
+  }
+
+  public Depot getAgentStreamingDepot(String agentName) {
+    return _clientInfo.getResource().streamingDepots.get(agentName);
   }
 
   public PState getLocalPState(String pstateName) {
-    return _mirrorClientInfo.getResource().getLocalPState(pstateName);
+    return _clientInfo.getResource().getLocalPState(pstateName);
   }
 
   // TODO: maybe this should contain store info as well?
@@ -87,31 +97,36 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
 
   @Override
   public void prepareForTask(int taskId, TaskGlobalContext context) {
-    _mirrorClientInfo = new WorkerManagedResource("agentClients", context,
-                          () -> {
-                            String moduleName = context.getModuleInstanceInfo().getModuleName();
-                            ClusterManagerBase manager = context.getClusterRetriever();
-                            Map agentDepots = new HashMap();
-                            for(String name: _agentNames) {
-                              agentDepots.put(name, manager.clusterDepot(moduleName, agentDepotName(name)));
-                            }
-                            Map clients = new HashMap();
-                            for(List<String> tuple: _mirrorTuples) {
-                              String mm = tuple.get(0);
-                              String pstateName = tuple.get(1);
-                              clients.put(tuple, manager.clusterPState(mm, pstateName));
-                            }
-                            return new MirrorClientInfo(
-                                     moduleName,
-                                     clients,
-                                     agentDepots,
-                                     manager.clusterDepot(moduleName, AGENT_PSTATE_WRITE_DEPOT),
-                                     manager);
-                          });
+    _clientInfo = new WorkerManagedResource("agentClients", context,
+                    () -> {
+                      String moduleName = context.getModuleInstanceInfo().getModuleName();
+                      ClusterManagerBase manager = context.getClusterRetriever();
+                      Map agentDepots = new HashMap();
+                      for(String name: _agentNames) {
+                        agentDepots.put(name, manager.clusterDepot(moduleName, agentDepotName(name)));
+                      }
+                      Map streamingDepots = new HashMap();
+                      for(String name: _agentNames) {
+                        streamingDepots.put(name, manager.clusterDepot(moduleName, agentStreamingDepotName(name)));
+                      }
+                      Map clients = new HashMap();
+                      for(List<String> tuple: _mirrorTuples) {
+                        String mm = tuple.get(0);
+                        String pstateName = tuple.get(1);
+                        clients.put(tuple, manager.clusterPState(mm, pstateName));
+                      }
+                      return new ClientInfo(
+                               moduleName,
+                               clients,
+                               agentDepots,
+                               streamingDepots,
+                               manager.clusterDepot(moduleName, AGENT_PSTATE_WRITE_DEPOT),
+                               manager);
+                    });
   }
 
   @Override
   public void close() throws IOException {
-    _mirrorClientInfo.close();
+    _clientInfo.close();
   }
 }

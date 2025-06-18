@@ -83,6 +83,7 @@
 (drp/defrecord+ NodeComplete
   [task-id :- Long
    invoke-id :- Long
+   retry-num :- Long
    node-fn-res :- (s/maybe Object)
    emits :- [AgentNodeEmit]
    result :- (s/maybe AgentResult)
@@ -108,6 +109,7 @@
    agent-id :- Long
    node :- String
    invoke-id :- Long
+   retry-num :- Long
    streaming-index :- Long
    value :- Object])
 

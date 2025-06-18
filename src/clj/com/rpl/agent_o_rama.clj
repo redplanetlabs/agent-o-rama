@@ -24,6 +24,10 @@
    [com.rpl.rama
     PState$Declaration
     PState$Schema]
+   [com.rpl.rama.diffs
+    Diff
+    Diff$Processor
+    SequenceInsertDiff$Processor]
    [com.rpl.rama.module
     StreamTopology]
    [com.rpl.rama.ops
@@ -334,25 +338,45 @@
             (let [graph-task-id (.getTaskId ^AgentInvoke agent-invoke)
                   graph-id      (.getAgentInvokeId ^AgentInvoke agent-invoke)
                   results-vol   []
-                  pcallback-fn  (fn [new-chunks diff old-chunks]
-                                  (let [new-chunks (or new-chunks [])
-                                        old-chunks (or old-chunks [])]
-                                    (vreset! results-vol new-chunks)
-                                    (when callback-fn
-                                      (callback-fn
-                                       new-chunks
-                                       (iclient/new-items new-chunks
-                                                          old-chunks)))))
-                  ps            (foreign-proxy
-                                 [(keypath graph-id node :all)
-                                  (srange-dynamic h/start-index
-                                                  h/srange-dynamic-end-index)]
-                                 streaming-pstate
-                                 {:pkey        graph-task-id
-                                  :callback-fn pcallback-fn})]
+                  resets-vol    (volatile! 0)
+                  pcallback-fn
+                  (fn [new-chunks ^Diff diff old-chunks]
+                    (let [new-chunks (or new-chunks [])
+                          old-chunks (or old-chunks [])
+                          reset?-vol (volatile! false)]
+                      (.process diff
+                                (reify
+                                 Diff$Processor
+                                 (unhandled [this] (vreset! reset?-vol true))
+
+                                 SequenceInsertDiff$Processor
+                                 (processSequenceInsertDiff [this diff])
+                                ))
+                      (when @reset?-vol
+                        (vswap! resets-vol inc))
+                      (vreset! results-vol new-chunks)
+                      (when callback-fn
+                        (if @reset?-vol
+                          (callback-fn
+                           new-chunks
+                           new-chunks
+                           true)
+                          (callback-fn
+                           new-chunks
+                           (iclient/new-items new-chunks
+                                              old-chunks)
+                           false)))))
+                  (foreign-proxy
+                   [(keypath graph-id node :all)
+                    (srange-dynamic h/start-index
+                                    h/srange-dynamic-end-index)]
+                   streaming-pstate
+                   {:pkey        graph-task-id
+                    :callback-fn pcallback-fn})]
               (reify
                AgentStream
                (get [this] @results-vol)
+               (numResets [this] @resets-vol)
                (close [this] (close! ps))
                clojure.lang.IDeref
                (deref [this] (.get this)))
@@ -401,5 +425,8 @@
   (^AgentStream [^AgentClient agent-client agent-invoke node callback-fn]
    (aor-types/stream-internal agent-client agent-invoke node callback-fn)))
 
+(defn agent-stream-num-resets
+  [^AgentStream stream]
+  (.numResets stream))
 
 ;; TODO: <<<<>>>> need to define Clojure API for any other methods

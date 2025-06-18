@@ -14,7 +14,8 @@
   (:import
    [com.rpl.agentorama
     AgentNode
-    FinishedAgg]
+    FinishedAgg
+    StreamingRecorder]
    [com.rpl.agentorama.impl
     RamaClientsTaskGlobal
     VirtualThreadsTaskGlobal]
@@ -115,9 +116,48 @@
 (defprotocol AgentNodeInternal
   (agent-node-state [this]))
 
+(defn mk-streaming-recorder
+  [graph-task-id graph-id node invoke-id retry-num streaming-depot]
+  ;; TODO: <<<<>>>>> depot should ack/retry indefinitely, or permanently fail
+  ;; streaming?
+  ;;    - seems like failed streaming should fail the agent run and cause a
+  ;;    retry of the agent invoke
+  ;;      - failure of any depot append should do this?
+  ;;    - suppose have pending CFs at end of node, and they they never finish
+  ;;    (e.g. disk is out of space)
+  ;;      - retrying agent is unsafe at that point
+  ;;        - unless include another "retry-num" that causes them to filter
+  ;;        themselves out
+  ;;          - and then don't need any coordination here
+  (let [index-vol (volatile! 0)]
+    (reify
+     StreamingRecorder
+     (record [this chunk]
+       ;; TODO: <<<>>>> can indexes go out of order if do multiple calls in
+       ;; parallel?
+       ;;   - especially if fail and retry...s
+       ;;   - need to full ack here since node can't move on until all streaming
+       ;;   is done
+       ;;   - seems inefficient to lock here, as won't get any depot
+       ;;   batching...
+       ;;     - hard to make ETL side smarter...
+       ;;       - if goes out of order, can grab from a buffer in PState and
+       ;;       move it to correct the order
+       ;;     - could retry if the index hasn't changed
+       (aor-types/->valid-NodeStreamingResult
+        graph-task-id
+        graph-id
+        node
+        invoke-id
+        retry-num
+        ...streaming-index
+        chunk)
+     )
+    )))
+
 (defn mk-agent-node
-  [agent-graph graph-task-id curr-node store-info
-   ^RamaClientsTaskGlobal rama-clients]
+  [agent-name agent-graph graph-task-id graph-id curr-node invoke-id retry-num
+   store-info ^RamaClientsTaskGlobal rama-clients]
   (let [task-id             (ops/current-task-id)
         result-vol          (volatile! nil)
         emits-vol           (volatile! [])
@@ -133,7 +173,15 @@
         (ops/module-instance-info)
 
         this-module-name    (.getModuleName module-instance-info)
-        random-source       (ops/current-random-source)]
+        random-source       (ops/current-random-source)
+        streaming-depot     (.getAgentStreamingDepot rama-clients agent-name)
+        streaming-recorder  (mk-streaming-recorder graph-task-id
+                                                   graph-id
+                                                   curr-node
+                                                   invoke-id
+                                                   retry-num
+                                                   streaming-depot)
+       ]
     (reify
      AgentNode
      (emit [this node args]
@@ -193,6 +241,10 @@
                              {:name name
                               :type (get store-info name)}))
          )))
+     (getStreamingRecorder [this]
+                           ;; TODO: <<<<>>>>> should be shared object
+                           ;; gets streaming depot for this agent
+     )
      AgentNodeInternal
      (agent-node-state [this]
        {:emits      @emits-vol
@@ -205,7 +257,7 @@
               graph))
 
 (defn node-event
-  [agent-name task-id invoke-id node-name node-fn agent-node args
+  [agent-name task-id invoke-id retry-num node-name node-fn agent-node args
    ^RamaClientsTaskGlobal rama-clients]
   (fn []
     (let [res   (try
@@ -225,6 +277,7 @@
        (aor-types/->valid-NodeComplete
         task-id
         invoke-id
+        retry-num
         res
         emits
         result
@@ -240,17 +293,21 @@
     (assoc m k v)))
 
 (deframaop handle-node-invoke
-  [*name *graph-task-id *graph-id *node-fn *invoke-id *next-node *args
-   *agg-invoke-id]
+  [*name *graph-task-id *graph-id *node-fn *invoke-id *retry-num *next-node
+   *args *agg-invoke-id]
   (<<with-substitutions
    [$$nodes
     (this-module-pobject-task-global (po/agent-node-task-global-name *name))
     *agent-graph (fetch-graph *name)
     *store-info (declared-object-task-global (po/agents-store-info-name))
     *rama-clients (declared-object-task-global (po/agents-clients-name))]
-   (mk-agent-node *agent-graph
+   (mk-agent-node *name
+                  *agent-graph
                   *graph-task-id
+                  *graph-id
                   *next-node
+                  *invoke-id
+                  *retry-num
                   *store-info
                   *rama-clients
                   :> *agent-node)
@@ -276,13 +333,12 @@
     (node-event *name
                 *task-id
                 *invoke-id
+                *retry-num
                 *next-node
                 *node-fn
                 *agent-node
                 *args
                 *rama-clients))
-
-
    (:> {:start-time-millis *start-time-millis})))
 
 (deframaop send-emits>
@@ -324,7 +380,8 @@
                     :> {*root-ack-val :ack-val *result :result})
      (<<if (and> (nil? *result) (= 0 *root-ack-val))
        (local-transform>
-        [(keypath *graph-id) :result
+        [(keypath *graph-id)
+         :result
          (termval (aor-types/->AgentResult "Agent completed without result"
                                            true))]
         $$root))
@@ -358,7 +415,7 @@
      :finished?     false}))
 
 (deframaop complete-agg!
-  [*name *invoke-id]
+  [*name *invoke-id *retry-num]
   (<<with-substitutions
    [$$nodes
     (this-module-pobject-task-global (po/agent-node-task-global-name *name))
@@ -377,13 +434,14 @@
                        *graph-id
                        *node-fn
                        *invoke-id
+                       *retry-num
                        *node
                        *args
                        *agg-invoke-id)
    (:>)))
 
 (deframaop ack-agg!
-  [*name *invoke-id *ack-val]
+  [*name *invoke-id *retry-num *ack-val]
   (<<with-substitutions
    [$$nodes
     (this-module-pobject-task-global (po/agent-node-task-global-name *name))
@@ -394,7 +452,7 @@
     [(keypath *invoke-id) :agg-ack-val (termval *new-ack-val)]
     $$nodes)
    (filter> (= 0 *new-ack-val))
-   (complete-agg! *name *invoke-id)
+   (complete-agg! *name *invoke-id *retry-num)
    (:>)))
 
 (defn hook:writing-result [graph-task-id graph-id result])
@@ -421,14 +479,30 @@
     $$root)
    (:>)))
 
+(deframaop filter-valid-retry-num>
+  [*agent-name *graph-id *retry-num]
+  (<<with-substitutions
+   [$$valid
+    (this-module-pobject-task-global (po/agent-valid-invokes-task-global-name
+                                      *agent-name))]
+   (local-select> (keypath *graph-id)
+                  agent-valid-invokes-pstate-sym
+                  :> *valid-retry-num)
+   (filter> (or> (nil? *valid-retry-num) (= *valid-retry-num *retry-num)))
+   (:>)))
+
 (defn- define-agent!
   [setup topologies stream-topology name agent-graph]
   (let [graph (graph/resolve-agent-graph agent-graph)
         agent-depot-sym (symbol (po/agent-depot-name name))
-        agent-streaming-depot-sym (symbol (str "*_agent-streaming-depot-" name))
+        agent-streaming-depot-sym (symbol (po/agent-streaming-depot-name name))
         agent-graph-sym (symbol (po/agent-graph-task-global-name name))
         agent-node-pstate-sym (symbol (po/agent-node-task-global-name name))
         agent-invoke-pstate-sym (symbol (po/agent-invoke-task-global-name name))
+
+        agent-valid-invokes-pstate-sym
+        (symbol (po/agent-valid-invokes-task-global-name name))
+
         agent-streaming-results-pstate-sym
         (symbol (po/agent-streaming-results-task-global-name name))
         agent-graph-history-pstate-sym (symbol
@@ -451,6 +525,14 @@
      stream-topology
      agent-invoke-pstate-sym
      po/AGENT-INVOKE-PSTATE-SCHEMA
+     {:key-partitioner task-id-key-partitioner})
+    ;; TODO: <<<<>>>>> as this is broadcast, how does this get cleaned up?
+    ;;  - if retry num is greater than 0 when GC, need to also broadcast
+    ;;  the delete
+    (declare-pstate*
+     stream-topology
+     agent-valid-invokes-pstate-sym
+     po/AGENT-VALID-INVOKES-PSTATE-SCHEMA
      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
      stream-topology
@@ -487,12 +569,14 @@
         (ack-return> [*graph-task-id *graph-id])
         (h/random-long :> *invoke-id)
         (fetch-graph-version name :> *version)
+        (identity 0 :> *retry-num)
         (local-transform>
          [(keypath *graph-id)
           (termval {:root-invoke-id *invoke-id
                     :invoke-args    *args
                     :graph-version  *version
-                    :ack-val        *invoke-id})]
+                    :ack-val        *invoke-id
+                    :retry-num      *retry-num})]
          agent-invoke-pstate-sym)
         (aor-types/->valid-NodeOp *invoke-id
                                   (get agent-graph-sym :start-node)
@@ -503,11 +587,19 @@
        (case> (aor-types/NodeComplete? *data))
         (identity *data
                   :> {:keys [*invoke-id
+                             *retry-num
                              *node-fn-res
                              *emits
                              *result
                              *nested-ops
                              *finish-time-millis]})
+
+        (local-select> [(keypath *invoke-id) :graph-id]
+                       agent-node-pstate-sym
+                       :> *graph-id)
+        (filter> (some? *graph-id))
+        (filter-valid-retry-num> name *graph-id *retry-num)
+
         (<<ramafn %merger
           [*m]
           (:> (reduce-kv assoc
@@ -560,11 +652,14 @@
         (throw! (h/ex-info "Unrecognized data type" {:class (class *data)})))
 
       ;; requires *graph-id, *graph-task-id, *op to be in scope
+      (filter-valid-retry-num> name *graph-id *retry-num)
       (<<if (aor-types/NodeOp? *op)
         (get *op :next-node :> *next-node)
         (get-node-obj agent-graph-sym *next-node :> *op-obj)
        (else>)
         (identity *op :> *op-obj))
+      ;; TODO: <<<<>>>> if this is a retry, need to clear streaming results if
+      ;; the node didn't finish
 
       (<<subsource *op-obj
        (case> Node :> {:keys [*node-fn]})
@@ -576,6 +671,7 @@
          *graph-id
          *node-fn
          *invoke-id
+         *retry-num
          *next-node
          *args
          *agg-invoke-id)
@@ -590,6 +686,7 @@
          *graph-id
          *node-fn
          *invoke-id
+         *retry-num
          *next-node
          *args
          *new-agg-invoke-id
@@ -613,7 +710,6 @@
                     :agg-start-invoke-id *invoke-id
                    })]
          agent-node-pstate-sym)
-
 
        (case> NodeAgg :> {:keys [*update-fn]})
         (identity *op
@@ -644,21 +740,30 @@
                           agent-node-pstate-sym)
 
         (<<if *finished?
-          (complete-agg! name *agg-invoke-id)
+          (complete-agg! name *agg-invoke-id *retry-num)
          (else>)
-          (ack-agg! name *agg-invoke-id *invoke-id))
+          (ack-agg! name *agg-invoke-id *retry-num *invoke-id))
 
        (case> AggAckOp :> {:keys [*agg-invoke-id *ack-val]})
-        (ack-agg! name *agg-invoke-id *ack-val)
+        (ack-agg! name *agg-invoke-id *retry-num *ack-val)
       )
-
 
      (source> agent-streaming-depot-sym
               :> {:keys [*agent-id
                           *node
                           *invoke-id
+                          *retry-num
                           *streaming-index
                           *value]})
+      (local-select> [(keypath *agent-id) :retry-num (pred= *retry-num)]
+                     agent-invoke-pstate-sym)
+      ;; TODO: <<<<>>>> if there's a retry mid-stream, how to handle?
+      ;;  - client would need to receive an error to the stream...
+      ;;    - the retry is going to clear the node outright...
+      ;;      - how to communicate that explicitly to the client?
+      ;;        - maybe streaming can START with special object saying the retry
+      ;;        number and reason for starting that way...
+
       ;; this ensures idempotence
       (<<ramafn %correct-index?
         [*v]
