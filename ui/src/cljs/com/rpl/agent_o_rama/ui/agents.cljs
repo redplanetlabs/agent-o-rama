@@ -48,6 +48,36 @@
                     "Explore Invocation"))
               ($ :pre.text-xs.bg-gray-100.p-2.rounded.overflow-x-auto (common/pp invoke))))))))
 
+(defui mini-invocations []
+  (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
+        {:keys [data isLoading]}
+        (common/use-query {:query-key ["agent" module-id agent-id]
+                           :query-url (str "/api/agents/" module-id "/" agent-id "/invocations")})
+
+        [location navigate] (useLocation)]
+    {:root-invoke-id 121,
+     :invoke-args ["CUSTOMER-123"],
+     :graph-version 0, 
+     :result {:success true}}
+    (cond
+      isLoading ($ :div "loading...")
+      (not data) ($ :div "no data")
+      :else
+      ($ :table
+         ($ :thead ($ :tr ($ :th "invoke id") ($ :th "args") ($ :th "version") ($ :th "result")))
+         ($ :tbody
+            (for [invoke (:invokes data)
+                  :let [url (str "/agents/" module-id "/" agent-id "/invocations/" (:root-invoke-id invoke))]]
+              ($ :tr.bg-gray-200.hover:bg-gray-300.cursor-pointer
+                 {:key url :onClick (fn [e]
+                                      (println e)
+                                      (. e stopPropagation)
+                                      (navigate url))}
+                 ($ :td (:root-invoke-id invoke))
+                 ($ :td (common/pp (:invoke-args invoke)))
+                 ($ :td (:graph-version invoke))
+                 ($ :td (common/pp (:result invoke))))))))))
+
 (defui evaluations []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))]
     ($ :div
@@ -69,12 +99,13 @@
                 "manually run agent")))
        
        ($ :div.p-4.flex.gap-1
-          ($ wouter/Link
-             {:href (str "/agents/" module-id "/" agent-id "/invocations")
-              :key tab-label
-              :style {:flex-grow "1"}}
+          ($ :div
+             {:key tab-label
+              :style {:flex-grow "1"}
+              :onClick (fn [_] (navigate (str "/agents/" module-id "/" agent-id "/invocations")))}
              ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
-                "invocations")))
+                "invocations"
+                ($ mini-invocations))))
        
        ($ :div.p-4.flex.gap-1
           ($ wouter/Link
