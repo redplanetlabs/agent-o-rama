@@ -20,6 +20,9 @@
 
 (drp/defrecord+ StoreParams
   [pstate-name :- String
+   agent-name :- String
+   graph-id :- Long
+   retry-num :- Long
    mirror? :- Boolean
    pstate-client :- PState
    write-depot :- Depot
@@ -53,6 +56,9 @@
         (foreign-append!
          (:write-depot store-params)
          (aor-types/->PStateWrite
+          (:agent-name store-params)
+          (:graph-id store-params)
+          (:retry-num store-params)
           (:pstate-name store-params)
           path
           k))

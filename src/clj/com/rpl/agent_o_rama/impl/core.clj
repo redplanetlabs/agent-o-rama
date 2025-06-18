@@ -222,6 +222,9 @@
        (let [store-params
              (simpl/->valid-StoreParams
               name
+              agent-name
+              graph-id
+              retry-num
               false
               (.getLocalPState rama-clients name)
               (.getPStateWriteDepot rama-clients)
@@ -822,7 +825,9 @@
     (<<sources stream-topology
      (source> pstate-write-depot-sym
                {:retry-mode :none}
-              :> {:keys [*pstate-name *path]})
+              :> {:keys [*pstate-name *path *agent-name *graph-id
+                          *retry-num]})
+      (filter-valid-retry-num> *agent-name *graph-id *retry-num)
       (this-module-pobject-task-global *pstate-name :> $$p)
       (do-transform! *path $$p :> *ret)
       (ack-return> *ret)

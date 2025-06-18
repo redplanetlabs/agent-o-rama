@@ -124,7 +124,10 @@
    ack-val :- Long])
 
 (drp/defrecord+ PStateWrite
-  [pstate-name :- String
+  [agent-name :- String
+   graph-id :- Long
+   retry-num :- Long
+   pstate-name :- String
    path :- s/Any
    key :- s/Any])
 
