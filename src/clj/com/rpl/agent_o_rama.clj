@@ -366,6 +366,8 @@
                            (iclient/new-items new-chunks
                                               old-chunks)
                            false)))))
+
+                  ps
                   (foreign-proxy
                    [(keypath graph-id node :all)
                     (srange-dynamic h/start-index

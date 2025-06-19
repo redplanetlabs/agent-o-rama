@@ -269,10 +269,10 @@
    ^RamaClientsTaskGlobal rama-clients]
   (fn []
     (let [res   (try
-                  (apply node-fn agent-node args)
-                  (-> agent-node
-                      .getStreamingRecorder
-                      waitFinish)
+                  (h/returning (apply node-fn agent-node args)
+                    (-> agent-node
+                        .getStreamingRecorder
+                        waitFinish))
                   (catch Throwable t
                     (cljlogging/error t
                                       "Error during agent node execution"
@@ -497,7 +497,7 @@
     (this-module-pobject-task-global (po/agent-valid-invokes-task-global-name
                                       *agent-name))]
    (local-select> (keypath *graph-id)
-                  agent-valid-invokes-pstate-sym
+                  $$valid
                   :> *valid-retry-num)
    (filter> (or> (nil? *valid-retry-num) (= *valid-retry-num *retry-num)))
    (:>)))

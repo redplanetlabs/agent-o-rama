@@ -122,3 +122,9 @@
 (defn srange-dynamic-end-index
   [s start-index]
   (count s))
+
+(defmacro returning
+  [expr & body]
+  `(let [rv# ~expr]
+     ~@body
+     rv#))
