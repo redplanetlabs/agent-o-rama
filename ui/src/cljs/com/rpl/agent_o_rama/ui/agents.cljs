@@ -17,10 +17,10 @@
     (cond
       isLoading ($ :div "loading...")
       (not data) ($ :div "no data")
-      :else ($ :div
+      :else ($ :div.p-4
               (for [agent data
                     :let [url (str "/agents/" (:module-id agent) "/" (:agent-id agent))]]
-                ($ :div.py-4.transition-colors.duration-150.hover:bg-gray-50  {:key url}
+                ($ :div.p-4.transition-colors.duration-150.hover:bg-gray-200.bg-gray-100.m-4  {:key url}
                   ($ wouter/Link {:href url}
                      ($ :div.flex.items-center.group 
                       ($ :div.flex-1
@@ -125,8 +125,8 @@
 
 (defui invoke []
   (let [{:strs [module-id agent-id invoke-id]} (js->clj (wouter/useParams))
-        [use-pagination? set-use-pagination] (uix/use-state false)
-        [fork? set-fork]                     (uix/use-state true)
+        [use-pagination? set-use-pagination] (uix/use-state true)
+        [fork? set-fork]                     (uix/use-state false)
         ;; Only fetch initial data - no need to refetch on pagination state changes
         {:keys [data isLoading]}
         (common/use-query {:query-key ["invoke-initial" module-id agent-id invoke-id use-pagination?]
