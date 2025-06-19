@@ -338,33 +338,48 @@
                                        (when callback-void-jfn
                                          (h/convert-void-jfn
                                           callback-void-jfn))))
+          ;; TODO: <<<<>>> methods for getting graph history
+          ;;    - just max version and method to get historicalgraphinfo at a
+          ;;    particular version
+          ;;    - need historicalgraphinfo to be a java type
+
           aor-types/AgentClientInternal
+          ;; TODO: <<<<<>>>> factor out impl into iclient
           (stream-internal [this agent-invoke node callback-fn]
             (let [graph-task-id (.getTaskId ^AgentInvoke agent-invoke)
                   graph-id      (.getAgentInvokeId ^AgentInvoke agent-invoke)
-                  results-vol   []
+                  results-vol   (volatile! [])
                   resets-vol    (volatile! 0)
                   ps-vol        (volatile! nil)
                   pcallback-fn
-                  (fn [new-chunks ^Diff diff old-chunks]
+                  (fn [new-chunks ^Diff diff _]
                     (when-not (instance? DestroyedDiff diff)
-                      (let [new-chunks (or new-chunks [])
-                            old-chunks (or old-chunks [])
-                            reset?-vol (volatile! false)
-                            finished?  (iclient/finished-stream? new-chunks)
-                            new-chunks (if finished?
-                                         (pop new-chunks)
-                                         new-chunks)]
-                        (.process
-                         diff
-                         (reify
-                          Diff$Processor
-                          (unhandled [this] (vreset! reset?-vol true))
+                      (let [new-chunks   (or new-chunks [])
+                            old-chunks   @results-vol
+                            unknown?-vol (volatile! false)
+                            finished?    (iclient/finished-stream? new-chunks)
+                            new-chunks   (if finished?
+                                           (pop new-chunks)
+                                           new-chunks)
+                            _ (.process
+                               diff
+                               (reify
+                                Diff$Processor
+                                (unhandled [this]
+                                  (vreset! unknown?-vol true))
 
-                          SequenceInsertDiff$Processor
-                          (processSequenceInsertDiff [this diff])
-                         ))
-                        (when @reset?-vol
+                                SequenceInsertDiff$Processor
+                                (processSequenceInsertDiff [this diff])
+                               ))
+
+                            reset?
+                            (or (< (count new-chunks)
+                                   (count old-chunks))
+                                (not= old-chunks
+                                      (subvec new-chunks
+                                              0
+                                              (count old-chunks))))]
+                        (when reset?
                           (vswap! resets-vol inc))
                         (when finished?
                           (locking ps-vol
@@ -375,7 +390,7 @@
                             )))
                         (vreset! results-vol new-chunks)
                         (when callback-fn
-                          (if @reset?-vol
+                          (if reset?
                             (callback-fn
                              new-chunks
                              new-chunks
@@ -412,10 +427,6 @@
                clojure.lang.IDeref
                (deref [this] (.get this)))
             ))
-          ;; TODO: <<<<>>> methods for getting graph history
-          ;;    - just max version and method to get historicalgraphinfo at a
-          ;;    particular version
-          ;;    - need historicalgraphinfo to be a java type
          ))))))
 
 (defn agent-client

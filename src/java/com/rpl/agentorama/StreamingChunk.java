@@ -3,6 +3,7 @@ package com.rpl.agentorama;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.Objects;
 
 import com.rpl.agentorama.impl.AORHelpers;
 import com.rpl.rama.RamaSerializable;
@@ -28,6 +29,21 @@ public class StreamingChunk<T> implements RamaSerializable {
 
   public T getChunk() {
     return _chunk;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    StreamingChunk<?> that = (StreamingChunk<?>) o;
+    return _invokeId == that._invokeId &&
+           _index == that._index &&
+           Objects.equals(_chunk, that._chunk);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_invokeId, _index, _chunk);
   }
 
   private void writeObject(ObjectOutputStream out) throws IOException {
