@@ -80,7 +80,7 @@
         breadcrumb-items (when (seq segments)
                            (build-breadcrumbs segments))]
     
-    ($ :div.bg-gray-100.px-4.py-2.border-b.text-sm.text-gray-600
+    ($ :div.bg-gray-100.px-4.py-2.text-sm.text-gray-600
        ($ :div.flex.items-center.space-x-2
           ;; Home link (always present)
           ($ Link {:href "/" :className "text-blue-600 hover:text-blue-800"} "Home")
