@@ -7,5 +7,5 @@ public interface AgentNode {
   void result(Object arg);
   <T> T getAgentObject(String name);
   <T extends Store> T getStore(String name);
-  StreamingRecorder getStreamingRecorder();
+  void streamChunk(Object chunk);
 }

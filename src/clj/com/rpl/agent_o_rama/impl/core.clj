@@ -114,7 +114,8 @@
     ret))
 
 (defprotocol AgentNodeInternal
-  (agent-node-state [this]))
+  (agent-node-state [this])
+  (get-streaming-recorder [this]))
 
 (defprotocol StreamingRecorderInternal
   (waitFinish [this]))
@@ -131,7 +132,7 @@
         outstanding-queue-vol (volatile! clojure.lang.PersistentQueue/EMPTY)]
     (reify
      StreamingRecorder
-     (record [this chunk]
+     (streamChunk [this chunk]
        ;; crucial to lock so that appends on this depot happen in order of
        ;; indexes
        (locking index-vol
@@ -250,9 +251,10 @@
                              {:name name
                               :type (get store-info name)}))
          )))
-     (getStreamingRecorder [this]
-       streaming-recorder)
+     (streamChunk [this chunk]
+       (.record streaming-recorder))
      AgentNodeInternal
+     (get-streaming-recorder [this] streaming-recorder)
      (agent-node-state [this]
        {:emits      @emits-vol
         :result     @result-vol
@@ -271,7 +273,7 @@
     (let [res   (try
                   (h/returning (apply node-fn agent-node args)
                     (-> agent-node
-                        .getStreamingRecorder
+                        get-streaming-recorder
                         waitFinish))
                   (catch Throwable t
                     (cljlogging/error t

@@ -195,6 +195,10 @@
   [^AgentNode agent-node name]
   (.getStore agent-node name))
 
+(defn streaming-chunk!
+  [^AgentNode agent-node chunk]
+  (.streamChunk agent-node chunk))
+
 (defn- parse-map-options
   [[arg1 & rest-args :as args]]
   (if (map? arg1) [arg1 rest-args] [{} args]))
