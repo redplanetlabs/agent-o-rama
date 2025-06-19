@@ -125,7 +125,8 @@
 
 (defui invoke []
   (let [{:strs [module-id agent-id invoke-id]} (js->clj (wouter/useParams))
-        [use-pagination? set-use-pagination] (uix/use-state true)
+        [use-pagination? set-use-pagination] (uix/use-state false)
+        [fork? set-fork]                     (uix/use-state true)
         ;; Only fetch initial data - no need to refetch on pagination state changes
         {:keys [data isLoading]}
         (common/use-query {:query-key ["invoke-initial" module-id agent-id invoke-id use-pagination?]
@@ -144,7 +145,8 @@
                   ($ :label.text-sm.text-gray-600 "Pagination")
                   ($ :input.mr-2 {:type "checkbox"
                                   :checked use-pagination?
-                                  :onChange #(set-use-pagination (not use-pagination?))})))
+                                  :onChange #(set-use-pagination (not use-pagination?))})
+                  ($ :div.bg-gray-50.p-1.border-blue-100.border.rounded.cursor-pointer "Fork")))
             ($ graph/graph {:initial-data (:invokes-map data)
                             :api-url (when use-pagination? 
                                        (str "/api/agents/" module-id "/" agent-id "/invocations/" invoke-id "/paginated"))
