@@ -8,6 +8,8 @@
     AORExceptionInfo]
    [com.rpl.rama.helpers
     TopologyUtils]
+   [java.util.concurrent
+    Semaphore]
    [java.util.function
     Function]))
 
@@ -128,3 +130,28 @@
   `(let [rv# ~expr]
      ~@body
      rv#))
+
+(defn mk-semaphore
+  (^Semaphore [permits] (mk-semaphore permits false))
+  (^Semaphore [permits fair?] (Semaphore. permits fair?)))
+
+(defn acquire-semaphore
+  ([^Semaphore s] (.acquire s))
+  ([^Semaphore s amt] (.acquire s amt))
+  ([^Semaphore s amt timeout-millis]
+   (or (.tryAcquire s
+                    amt
+                    timeout-millis
+                    java.util.concurrent.TimeUnit/MILLISECONDS)
+       (throw (ex-info "Semaphore timed out"
+                       {:amt amt :timeout-millis timeout-millis})))))
+
+(defn release-semaphore
+  ([^Semaphore s] (.release s))
+  ([^Semaphore s amt] (.release s amt)))
+
+(defn lastv
+  [v]
+  (let [c (count v)]
+    (if (not= c 0)
+      (nth v (dec c)))))

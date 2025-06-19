@@ -4,6 +4,7 @@
   (:require
    [clojure.set :as set]
    [clojure.tools.logging :as cljlogging]
+   [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
@@ -15,6 +16,7 @@
    [com.rpl.agentorama
     AgentNode
     FinishedAgg
+    StreamingChunk
     StreamingRecorder]
    [com.rpl.agentorama.impl
     RamaClientsTaskGlobal
@@ -354,12 +356,23 @@
                 *rama-clients))
    (:> {:start-time-millis *start-time-millis})))
 
+(defn finished-streaming-chunk
+  []
+  (StreamingChunk.
+   -1
+   -1
+   iclient/FINISHED))
+
 (deframaop send-emits>
   [*agent-name *graph-task-id *graph-id *invoke-id *agg-invoke-id *emits]
   (<<with-substitutions
    [$$root
-    (this-module-pobject-task-global (po/agent-invoke-task-global-name
-                                      *agent-name))]
+    (this-module-pobject-task-global
+     (po/agent-invoke-task-global-name *agent-name))
+
+    $$streaming
+    (this-module-pobject-task-global
+     (po/agent-streaming-results-task-global-name *agent-name))]
    (anchor> <root>)
    (ops/explode *emits
                 :> {:keys [*invoke-id *target-task-id *node-name *args]})
@@ -398,6 +411,14 @@
          (termval (aor-types/->AgentResult "Agent completed without result"
                                            true))]
         $$root))
+     (finished-streaming-chunk :> *finished-streaming-chunk)
+     (local-transform>
+      [(keypath *graph-id)
+       MAP-VALS
+       :all
+       AFTER-ELEM
+       (termval *finished-streaming-chunk)]
+      $$streaming)
    )
 
    (unify> <regular-emit> <agg-ack-emit>)

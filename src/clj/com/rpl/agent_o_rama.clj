@@ -25,6 +25,7 @@
     PState$Declaration
     PState$Schema]
    [com.rpl.rama.diffs
+    DestroyedDiff
     Diff
     Diff$Processor
     SequenceInsertDiff$Processor]
@@ -195,7 +196,7 @@
   [^AgentNode agent-node name]
   (.getStore agent-node name))
 
-(defn streaming-chunk!
+(defn stream-chunk!
   [^AgentNode agent-node chunk]
   (.streamChunk agent-node chunk))
 
@@ -343,33 +344,49 @@
                   graph-id      (.getAgentInvokeId ^AgentInvoke agent-invoke)
                   results-vol   []
                   resets-vol    (volatile! 0)
+                  ps-vol        (volatile! nil)
                   pcallback-fn
                   (fn [new-chunks ^Diff diff old-chunks]
-                    (let [new-chunks (or new-chunks [])
-                          old-chunks (or old-chunks [])
-                          reset?-vol (volatile! false)]
-                      (.process diff
-                                (reify
-                                 Diff$Processor
-                                 (unhandled [this] (vreset! reset?-vol true))
+                    (when-not (instance? DestroyedDiff diff)
+                      (let [new-chunks (or new-chunks [])
+                            old-chunks (or old-chunks [])
+                            reset?-vol (volatile! false)
+                            finished?  (iclient/finished-stream? new-chunks)
+                            new-chunks (if finished?
+                                         (pop new-chunks)
+                                         new-chunks)]
+                        (.process
+                         diff
+                         (reify
+                          Diff$Processor
+                          (unhandled [this] (vreset! reset?-vol true))
 
-                                 SequenceInsertDiff$Processor
-                                 (processSequenceInsertDiff [this diff])
-                                ))
-                      (when @reset?-vol
-                        (vswap! resets-vol inc))
-                      (vreset! results-vol new-chunks)
-                      (when callback-fn
-                        (if @reset?-vol
-                          (callback-fn
-                           new-chunks
-                           new-chunks
-                           true)
-                          (callback-fn
-                           new-chunks
-                           (iclient/new-items new-chunks
-                                              old-chunks)
-                           false)))))
+                          SequenceInsertDiff$Processor
+                          (processSequenceInsertDiff [this diff])
+                         ))
+                        (when @reset?-vol
+                          (vswap! resets-vol inc))
+                        (when finished?
+                          (locking ps-vol
+                            (if-let [ps @ps-vol]
+                              (when-not (= ps ::finished)
+                                (close! ps))
+                              (vreset! ps-vol ::finished)
+                            )))
+                        (vreset! results-vol new-chunks)
+                        (when callback-fn
+                          (if @reset?-vol
+                            (callback-fn
+                             new-chunks
+                             new-chunks
+                             true
+                             finished?)
+                            (callback-fn
+                             new-chunks
+                             (iclient/new-items new-chunks
+                                                old-chunks)
+                             false
+                             finished?))))))
 
                   ps
                   (foreign-proxy
@@ -379,11 +396,19 @@
                    streaming-pstate
                    {:pkey        graph-task-id
                     :callback-fn pcallback-fn})]
+              (locking ps-vol
+                (if (= ::finished @ps-vol)
+                  (close! ps)
+                  (vreset! ps-vol ps)))
               (reify
                AgentStream
                (get [this] @results-vol)
                (numResets [this] @resets-vol)
-               (close [this] (close! ps))
+               (close [this]
+                 (locking ps-vol
+                   (when-not (= ::finished @ps-vol)
+                     (vreset! ps-vol ::finished)
+                     (close! ps))))
                clojure.lang.IDeref
                (deref [this] (.get this)))
             ))
