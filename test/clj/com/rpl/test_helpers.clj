@@ -144,7 +144,7 @@
                          (catch Exception e
                            [false e]))
                        [(f) nil])]
-         (if (or e (not val))
+         (if (or e (not res))
            (if (< (- (System/currentTimeMillis) start-time-millis) max-wait)
              (do
                (Thread/sleep delay)

@@ -46,6 +46,15 @@ public class StreamingChunk<T> implements RamaSerializable {
     return Objects.hash(_invokeId, _index, _chunk);
   }
 
+  @Override
+  public String toString() {
+    return "StreamingChunk{" +
+           "invokeId=" + _invokeId +
+           ", index=" + _index +
+           ", chunk=" + _chunk +
+           '}';
+  }
+
   private void writeObject(ObjectOutputStream out) throws IOException {
     out.writeLong(_invokeId);
     out.writeInt(_index);

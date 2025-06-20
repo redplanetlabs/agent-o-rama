@@ -128,7 +128,12 @@
   (when (.isCompletedExceptionally cf)
     (throw (ex-info "Streaming append failed" {} (.get cf)))))
 
+;; these are for redef in tests
+(defn identity-streaming-index [v] v)
+(defn identity-retry-num [v] v)
+
 (defn mk-streaming-recorder
+  ^StreamingRecorder
   [graph-task-id graph-id node invoke-id retry-num streaming-depot]
   (let [index-vol (volatile! 0)
         outstanding-queue-vol (volatile! clojure.lang.PersistentQueue/EMPTY)]
@@ -147,8 +152,8 @@
                     graph-id
                     node
                     invoke-id
-                    retry-num
-                    streaming-index
+                    (identity-retry-num retry-num)
+                    (identity-streaming-index streaming-index)
                     chunk))]
            (vswap! outstanding-queue-vol conj cf)
            (when (> (count @outstanding-queue-vol) 1000)
@@ -254,7 +259,7 @@
                               :type (get store-info name)}))
          )))
      (streamChunk [this chunk]
-       (.record streaming-recorder))
+       (.streamChunk streaming-recorder chunk))
      AgentNodeInternal
      (get-streaming-recorder [this] streaming-recorder)
      (agent-node-state [this]
@@ -525,6 +530,11 @@
    (filter> (or> (nil? *valid-retry-num) (= *valid-retry-num *retry-num)))
    (:>)))
 
+(defn hook:processing-streaming [node streaming-index value])
+(defn hook:processing-streaming*
+  [node streaming-index value]
+  (hook:processing-streaming node streaming-index value))
+
 (defn- define-agent!
   [setup topologies stream-topology name agent-graph]
   (let [graph (graph/resolve-agent-graph agent-graph)
@@ -789,6 +799,7 @@
                           *retry-num
                           *streaming-index
                           *value]})
+      (hook:processing-streaming* *node *streaming-index *value)
       (local-select> [(keypath *agent-id) :retry-num (pred= *retry-num)]
                      agent-invoke-pstate-sym)
       ;; this ensures idempotence

@@ -20,7 +20,8 @@
    [meander.epsilon :as m])
   (:import
    [com.rpl.agentorama
-    BuiltIn]
+    BuiltIn
+    StreamingChunk]
    [com.rpl.agent_o_rama.impl.types
     Node
     NodeAgg
@@ -1888,7 +1889,194 @@
          (is (opens-matches-closes? @opens-atom @closes-atom))
         )))))
 
+(defn matching-ascending-seq?
+  [items final-seq]
+  (and (apply < (mapv count items))
+       (= final-seq (last items))
+       (every?
+        (fn [s]
+          (= s (subvec final-seq 0 (count s))))
+        items)))
+
+(def SEM)
+
 (deftest node-streaming-test
+  (let [processed-atom (atom [])
+        streaming-index-mod-atom (atom 0)
+        override-retry-num-atom (atom nil)]
+    (with-redefs [SEM (h/mk-semaphore 0)
+                  i/hook:processing-streaming
+                  (fn [_ streaming-index value]
+                    (swap! processed-atom conj [streaming-index value])
+                  )
+
+                  i/identity-streaming-index
+                  (fn [v]
+                    (- v @streaming-index-mod-atom))
+
+                  i/identity-retry-num
+                  (fn [v]
+                    (if @override-retry-num-atom
+                      @override-retry-num-atom
+                      v))
+                 ]
+      (with-open [ipc (rtest/create-ipc)]
+        (letlocals
+         (bind module
+           (module
+             [setup topologies]
+             (declare-depot setup *reset-depot :random)
+             (let [topology (aor/agents-topology setup topologies)
+                   s        (aor/underlying-stream-topology topology)]
+               (->
+                 topology
+                 (aor/new-agent "foo")
+                 (aor/node
+                  "start"
+                  nil
+                  (fn [agent-node]
+                    (aor/stream-chunk! agent-node "a")
+                    (aor/stream-chunk! agent-node "b")
+                    (aor/stream-chunk! agent-node "c")
+                    (h/acquire-semaphore SEM 1)
+
+                    (aor/stream-chunk! agent-node "d")
+                    (aor/stream-chunk! agent-node "e")
+                    (h/acquire-semaphore SEM 1)
+
+                    (aor/stream-chunk! agent-node "f")
+                    (aor/stream-chunk! agent-node "g")
+                    (h/acquire-semaphore SEM 1)
+
+                    (aor/stream-chunk! agent-node "h")
+                    (h/acquire-semaphore SEM 1)
+
+                    (aor/stream-chunk! agent-node "i")
+                    (aor/stream-chunk! agent-node "j")
+                    (h/acquire-semaphore SEM 1)
+
+                    (aor/result! agent-node "abcd")
+                  )))
+               (aor/define-agents! topology)
+               (<<sources s
+                (source> *reset-depot
+                         :> [*agent-name *graph-task-id *graph-id])
+                 (|direct *graph-task-id)
+                 (this-module-pobject-task-global
+                  (po/agent-invoke-task-global-name *agent-name)
+                  :> $$root)
+                 (this-module-pobject-task-global
+                  (po/agent-streaming-results-task-global-name *agent-name)
+                  :> $$streaming)
+                 (local-transform>
+                  [(keypath *graph-id) :retry-num (term inc)]
+                  $$root)
+                 (local-transform>
+                  [(keypath *graph-id)
+                   MAP-VALS
+                   (multi-path [:all NONE>]
+                               [:invokes NONE>])]
+                  $$streaming)
+               )
+             )))
+         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (bind module-name (get-module-name module))
+
+         (bind reset-depot (foreign-depot ipc module-name "*reset-depot"))
+         (bind agent-manager (aor/agent-manager ipc module-name))
+         (bind foo (aor/agent-client agent-manager "foo"))
+
+         (bind inv (aor/agent-initiate foo))
+         (bind all-chunks-atom (atom []))
+         (bind chunks-atom (atom []))
+         (bind meta-atom (atom []))
+         (bind clear!
+           (fn []
+             (reset! all-chunks-atom [])
+             (reset! chunks-atom [])
+             (reset! meta-atom [])))
+
+         (aor/agent-stream
+          foo
+          inv
+          "start"
+          (fn [all-chunks new-chunks reset? complete?]
+            (swap! all-chunks-atom conj
+              (mapv (fn [^StreamingChunk sc]
+                      [(.getIndex sc) (.getChunk sc)])
+                    all-chunks))
+            (swap! meta-atom conj [reset? complete?])
+            (doseq [^StreamingChunk sc new-chunks]
+              (swap! chunks-atom conj
+                [(.getInvokeId sc)
+                 (.getIndex sc)
+                 (.getChunk sc)]))
+          ))
+
+         (is (condition-attained? (= 3 (count @chunks-atom))))
+         (is (matching-ascending-seq? @all-chunks-atom
+                                      [[0 "a"] [1 "b"] [2 "c"]]))
+         (bind inv-id (select-any [FIRST FIRST] @chunks-atom))
+         (is (apply = inv-id (select [ALL FIRST] @chunks-atom)))
+         (is (= [[0 "a"] [1 "b"] [2 "c"]]
+                (setval [ALL FIRST] NONE @chunks-atom)))
+         (doseq [m @meta-atom]
+           (= [false false] m))
+
+         (clear!)
+         (h/release-semaphore SEM 1)
+         (is (condition-attained? (= 2 (count @chunks-atom))))
+         (is (matching-ascending-seq? @all-chunks-atom
+                                      [[0 "a"] [1 "b"] [2 "c"] [3 "d"]
+                                       [4 "e"]]))
+         (is (apply = inv-id (select [ALL FIRST] @chunks-atom)))
+         (is (= [[3 "d"] [4 "e"]] (setval [ALL FIRST] NONE @chunks-atom)))
+         (doseq [m @meta-atom]
+           (= [false false] m))
+
+
+         (reset! processed-atom [])
+         (clear!)
+         (foreign-append! reset-depot
+                          ["foo" (.getTaskId inv) (.getAgentInvokeId inv)])
+         (h/release-semaphore SEM 1)
+         (is (condition-attained? (= [[5 "f"] [6 "g"]] @processed-atom)))
+         (is (condition-attained? (= 1 (count @meta-atom))))
+         (is (= [] @chunks-atom))
+         (is (= [[]] @all-chunks-atom))
+         (is (= [[true false]] @meta-atom))
+
+         ;; verify these don't get through because streaming-index is wrong
+         (clear!)
+         (reset! streaming-index-mod-atom 6)
+         (reset! override-retry-num-atom 1)
+         (reset! processed-atom [])
+         (h/release-semaphore SEM 1)
+         (is (condition-attained? (= [[1 "h"]] @processed-atom)))
+         (is (= [] @meta-atom))
+         (is (= [] @chunks-atom))
+         (is (= [] @all-chunks-atom))
+
+         (clear!)
+         (reset! streaming-index-mod-atom 8)
+         (h/release-semaphore SEM 1)
+         (is (condition-attained? (= 2 (count @chunks-atom))))
+         (is (matching-ascending-seq? @all-chunks-atom
+                                      [[0 "i"] [1 "j"]]))
+         (is (apply = inv-id (select [ALL FIRST] @chunks-atom)))
+         (is (= [[0 "i"] [1 "j"]] (setval [ALL FIRST] NONE @chunks-atom)))
+         (doseq [m @meta-atom]
+           (= [false false] m))
+
+
+         (clear!)
+         (h/release-semaphore SEM 1)
+         (is (= "abcd" (aor/agent-result foo inv)))
+         (is (condition-attained? (= 1 (count @meta-atom))))
+         (is (= [[false true]] @meta-atom))
+         (is (= [[[0 "i"] [1 "j"]]] @all-chunks-atom))
+         (is (= [] @chunks-atom))
+
          ;; TODO: <<<<>>>> have multiple nodes streaming across multiple
          ;; invokes, check ordering within invoke after separating
          ;;  - need a custom object that will do the streaming...
@@ -1905,7 +2093,20 @@
          ;;         - could just have node.getStreamingCallback... need better
          ;;         name
          ;;             - getStreamingRecorder
-)
+         ;; - failures and retry count inc + clear to verify retry? set properly
+         ;; in the
+         ;; callback
+
+         ;; TODO: <<<<<>>>> have a second agent that doesn't mess with retry
+         ;; counts and just streams normally
+
+         ;;  TODO: <<<<>>>> test stream after the node is complete
+
+         ;; TODO: <<<<<>>>>>> test multiple nodes streaming at same time for
+         ;; multiple agents and multiple agent executions
+
+         ;; TODO: <<<<<>>>> test proxy gets closed properly
+        )))))
 
 (deftest traced-out-of-band-test
          ;; TODO: <<<<<>>>> do custom CF thing with custom tracing
