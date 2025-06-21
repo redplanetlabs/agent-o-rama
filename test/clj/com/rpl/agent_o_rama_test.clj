@@ -2089,222 +2089,223 @@
         )))))
 
 (deftest many-nodes-streaming-test
-  (with-redefs [SEM (h/mk-semaphore 0)]
-    (with-open [ipc (rtest/create-ipc)]
-      (letlocals
-       (bind module
-         (aor/agentmodule
-          [topology]
-          (->
-            topology
-            (aor/new-agent "foo")
-            (aor/node
-             "start"
-             ["node1" "node2" "node3"]
-             (fn [agent-node]
-               (aor/emit! agent-node "node3")
-               (aor/emit! agent-node "node1")
-               (aor/emit! agent-node "node1")
-               (aor/emit! agent-node "node2")
-               (aor/emit! agent-node "node2")
-             ))
-            (aor/node
-             "node1"
-             nil
-             (fn [agent-node]
-               (dotimes [i 50]
-                 (when (= 0 (mod i 10))
-                   (Thread/sleep ^Long (rand-int 10)))
-                 (aor/stream-chunk! agent-node i))))
-            (aor/node
-             "node2"
-             nil
-             (fn [agent-node]
-               (dotimes [i 50]
-                 (when (= 0 (mod i 10))
-                   (Thread/sleep ^Long (rand-int 10)))
-                 (aor/stream-chunk! agent-node (+ 200 i)))))
-            (aor/node
-             "node3"
-             nil
-             (fn [agent-node]
-               (aor/result! agent-node "aaa")))
-          )
-          (->
-            topology
-            (aor/new-agent "bar")
-            (aor/node
-             "start"
-             ["node1" "node2" "node3"]
-             (fn [agent-node]
-               (aor/emit! agent-node "node1")
-               (aor/emit! agent-node "node1")
-               (aor/emit! agent-node "node2")
-               (aor/emit! agent-node "node2")
-               (aor/emit! agent-node "node3")
-             ))
-            (aor/node
-             "node1"
-             nil
-             (fn [agent-node]
-               (dotimes [i 50]
-                 (when (= 0 (mod i 10))
-                   (Thread/sleep ^Long (rand-int 10)))
-                 (aor/stream-chunk! agent-node (+ 1000 i)))))
-            (aor/node
-             "node2"
-             nil
-             (fn [agent-node]
-               (dotimes [i 50]
-                 (when (= 0 (mod i 10))
-                   (Thread/sleep ^Long (rand-int 10)))
-                 (aor/stream-chunk! agent-node (+ 1200 i)))))
-            (aor/node
-             "node3"
-             nil
-             (fn [agent-node]
-               (aor/result! agent-node "bbb")))
-          )
-         ))
-       (rtest/launch-module! ipc module {:tasks 8 :threads 8})
-       (bind module-name (get-module-name module))
+  (let [orig-close! close!
+        closes-atom (atom 0)]
+    (with-redefs [SEM    (h/mk-semaphore 0)
+                  close! (fn [item]
+                           (swap! closes-atom inc)
+                           (orig-close! item))]
+      (with-open [ipc (rtest/create-ipc)]
+        (letlocals
+         (bind module
+           (aor/agentmodule
+            [topology]
+            (->
+              topology
+              (aor/new-agent "foo")
+              (aor/node
+               "start"
+               ["node1" "node2" "node3"]
+               (fn [agent-node]
+                 (aor/emit! agent-node "node3")
+                 (aor/emit! agent-node "node1")
+                 (aor/emit! agent-node "node1")
+                 (aor/emit! agent-node "node2")
+                 (aor/emit! agent-node "node2")
+               ))
+              (aor/node
+               "node1"
+               nil
+               (fn [agent-node]
+                 (dotimes [i 50]
+                   (when (= 0 (mod i 10))
+                     (Thread/sleep ^Long (rand-int 10)))
+                   (aor/stream-chunk! agent-node i))))
+              (aor/node
+               "node2"
+               nil
+               (fn [agent-node]
+                 (dotimes [i 50]
+                   (when (= 0 (mod i 10))
+                     (Thread/sleep ^Long (rand-int 10)))
+                   (aor/stream-chunk! agent-node (+ 200 i)))))
+              (aor/node
+               "node3"
+               nil
+               (fn [agent-node]
+                 (aor/result! agent-node "aaa")))
+            )
+            (->
+              topology
+              (aor/new-agent "bar")
+              (aor/node
+               "start"
+               ["node1" "node2" "node3"]
+               (fn [agent-node]
+                 (aor/emit! agent-node "node1")
+                 (aor/emit! agent-node "node1")
+                 (aor/emit! agent-node "node2")
+                 (aor/emit! agent-node "node2")
+                 (aor/emit! agent-node "node3")
+               ))
+              (aor/node
+               "node1"
+               nil
+               (fn [agent-node]
+                 (dotimes [i 50]
+                   (when (= 0 (mod i 10))
+                     (Thread/sleep ^Long (rand-int 10)))
+                   (aor/stream-chunk! agent-node (+ 1000 i)))))
+              (aor/node
+               "node2"
+               nil
+               (fn [agent-node]
+                 (dotimes [i 50]
+                   (when (= 0 (mod i 10))
+                     (Thread/sleep ^Long (rand-int 10)))
+                   (aor/stream-chunk! agent-node (+ 1200 i)))))
+              (aor/node
+               "node3"
+               nil
+               (fn [agent-node]
+                 (aor/result! agent-node "bbb")))
+            )
+           ))
+         (rtest/launch-module! ipc module {:tasks 8 :threads 8})
+         (bind module-name (get-module-name module))
 
-       (bind agent-manager (aor/agent-manager ipc module-name))
-       (bind foo (aor/agent-client agent-manager "foo"))
-       (bind bar (aor/agent-client agent-manager "bar"))
-
-
-       (bind m
-         {"foo" {0 (aor/agent-initiate foo)
-                 1 (aor/agent-initiate foo)}
-          "bar" {0 (aor/agent-initiate bar)
-                 1 (aor/agent-initiate bar)}})
-
-       (bind m2
-         (transform
-          [ALL (collect-one FIRST) LAST MAP-VALS]
-          (fn [agent-name inv]
-            (reduce
-             (fn [m n]
-               (let [a (atom [])]
-                 (aor/agent-stream
-                  (if (= "foo" agent-name) foo bar)
-                  inv
-                  n
-                  (fn [all-chunks new-chunks reset? complete?]
-                    (swap! a conj
-                      [(mapv (fn [^StreamingChunk sc]
-                               [(.getInvokeId sc) (.getIndex sc)
-                                (.getChunk sc)])
-                             all-chunks)
-                       (mapv (fn [^StreamingChunk sc]
-                               [(.getInvokeId sc) (.getIndex sc)
-                                (.getChunk sc)])
-                             new-chunks)
-                       reset?
-                       complete?])))
-                 (assoc m n a)))
-             {}
-             ["node1" "node2"]))
-          m))
-
-       (bind res-map
-         (transform [ALL (collect-one FIRST) LAST MAP-VALS]
-                    (fn [agent-name inv]
-                      (aor/agent-result
-                       (if (= "foo" agent-name) foo bar)
-                       inv
-                      ))
-                    m))
-
-       (is (= {"foo" {0 "aaa"
-                      1 "aaa"}
-               "bar" {0 "bbb"
-                      1 "bbb"}}
-              res-map))
-
-       (is (condition-attained?
-            (= 8
-               (count (select [MAP-VALS
-                               MAP-VALS
-                               MAP-VALS
-                               (view deref)
-                               LAST
-                               (nthpath 3)
-                               (pred= true)]
-                              m2)))))
+         (bind agent-manager (aor/agent-manager ipc module-name))
+         (bind foo (aor/agent-client agent-manager "foo"))
+         (bind bar (aor/agent-client agent-manager "bar"))
 
 
-       (bind m2 (transform [MAP-VALS MAP-VALS MAP-VALS] deref m2))
+         (bind m
+           {"foo" {0 (aor/agent-initiate foo)
+                   1 (aor/agent-initiate foo)}
+            "bar" {0 (aor/agent-initiate bar)
+                   1 (aor/agent-initiate bar)}})
 
-       (bind expected-map
-         {"foo" {"node1" (mapv (fn [i] [i i]) (range 50))
-                 "node2" (mapv (fn [i] [i (+ 200 i)]) (range 50))}
-          "bar" {"node1" (mapv (fn [i] [i (+ 1000 i)]) (range 50))
-                 "node2" (mapv (fn [i] [i (+ 1200 i)]) (range 50))}})
+         (bind m2
+           (transform
+            [ALL (collect-one FIRST) LAST MAP-VALS]
+            (fn [agent-name inv]
+              (reduce
+               (fn [m n]
+                 (let [a (atom [])]
+                   (aor/agent-stream
+                    (if (= "foo" agent-name) foo bar)
+                    inv
+                    n
+                    (fn [all-chunks new-chunks reset? complete?]
+                      (swap! a conj
+                        [(mapv (fn [^StreamingChunk sc]
+                                 [(.getInvokeId sc) (.getIndex sc)
+                                  (.getChunk sc)])
+                               all-chunks)
+                         (mapv (fn [^StreamingChunk sc]
+                                 [(.getInvokeId sc) (.getIndex sc)
+                                  (.getChunk sc)])
+                               new-chunks)
+                         reset?
+                         complete?])))
+                   (assoc m n a)))
+               {}
+               ["node1" "node2"]))
+            m))
 
-       (bind separate-by-invoke-id*
-         (fn [chunks]
-           (let [grouped (group-by first chunks)]
-             (setval [MAP-VALS ALL FIRST] NONE grouped))))
+         (bind res-map
+           (transform [ALL (collect-one FIRST) LAST MAP-VALS]
+                      (fn [agent-name inv]
+                        (aor/agent-result
+                         (if (= "foo" agent-name) foo bar)
+                         inv
+                        ))
+                      m))
 
-       (bind separate-by-invoke-id
-         (fn [chunks]
-           (let [g (mapv separate-by-invoke-id* chunks)]
-             (reduce
-              (fn [res maps]
-                (reduce-kv
-                 (fn [res k elems]
-                   (setval [(keypath k) NIL->VECTOR AFTER-ELEM] elems res))
-                 res
-                 maps))
-              {}
-              g
-             ))))
+         (is (= {"foo" {0 "aaa"
+                        1 "aaa"}
+                 "bar" {0 "bbb"
+                        1 "bbb"}}
+                res-map))
 
-       (doseq [[agent-name inv-map] m2]
-         (doseq [[_ node-map] inv-map]
-           (doseq [[node res] node-map]
-             (letlocals
-              (bind expected
-                (-> expected-map
-                    (get agent-name)
-                    (get node)))
-              (bind metas
-                (mapv #(select-any (srange 2 4) %) res))
-              (is (= [false true] (last metas)))
-              (is (every? #(= % [false false]) (butlast metas)))
-              (bind all-chunks (separate-by-invoke-id (mapv first res)))
-              (bind chunks (separate-by-invoke-id (mapv second res)))
-
-              (doseq [[_ inv-all-chunks] all-chunks]
-                ;; <= because last one could just be the completion one
-                (is (matching-ascending-seq? inv-all-chunks expected <=)))
-
-              (doseq [[_ inv-chunks] chunks]
-                (is (= expected (apply concat inv-chunks))))
-             ))))
-
-
-
-
-       ;; TODO: <<<<<>>>> test proxy gets closed properly
-       ;;   - would be nice if on final failure, it fails all streams that
-       ;;   haven't finished yet
-       ;;     - another special last StreamingChunk that indicates failure so
-       ;;     it closes
-       ;;       - no callback in this case, just close the proxy
-
-       ;;  TODO: <<<<>>>> test stream after the node is complete
-       ;;   - should close proxy immediately after getting one callback
+         (is (condition-attained?
+              (= 8
+                 (count (select [MAP-VALS
+                                 MAP-VALS
+                                 MAP-VALS
+                                 (view deref)
+                                 LAST
+                                 (nthpath 3)
+                                 (pred= true)]
+                                m2)))))
 
 
-       ;; TODO: <<<<<>>>> test manual proxy close
-       ;;   - use semaphore, close manually, verify no more callbacks go through
-       ;;     - how to ensure? isn't the close async? or does it synchronously
-       ;;     guarantee that?
+         (bind m2 (transform [MAP-VALS MAP-VALS MAP-VALS] deref m2))
 
-      ))))
+         (bind expected-map
+           {"foo" {"node1" (mapv (fn [i] [i i]) (range 50))
+                   "node2" (mapv (fn [i] [i (+ 200 i)]) (range 50))}
+            "bar" {"node1" (mapv (fn [i] [i (+ 1000 i)]) (range 50))
+                   "node2" (mapv (fn [i] [i (+ 1200 i)]) (range 50))}})
+
+         (bind separate-by-invoke-id*
+           (fn [chunks]
+             (let [grouped (group-by first chunks)]
+               (setval [MAP-VALS ALL FIRST] NONE grouped))))
+
+         (bind separate-by-invoke-id
+           (fn [chunks]
+             (let [g (mapv separate-by-invoke-id* chunks)]
+               (reduce
+                (fn [res maps]
+                  (reduce-kv
+                   (fn [res k elems]
+                     (setval [(keypath k) NIL->VECTOR AFTER-ELEM] elems res))
+                   res
+                   maps))
+                {}
+                g
+               ))))
+
+         (doseq [[agent-name inv-map] m2]
+           (doseq [[_ node-map] inv-map]
+             (doseq [[node res] node-map]
+               (letlocals
+                (bind expected
+                  (-> expected-map
+                      (get agent-name)
+                      (get node)))
+                (bind metas
+                  (mapv #(select-any (srange 2 4) %) res))
+                (is (= [false true] (last metas)))
+                (is (every? #(= % [false false]) (butlast metas)))
+                (bind all-chunks (separate-by-invoke-id (mapv first res)))
+                (bind chunks (separate-by-invoke-id (mapv second res)))
+
+                (doseq [[_ inv-all-chunks] all-chunks]
+                  ;; <= because last one could just be the completion one
+                  (is (matching-ascending-seq? inv-all-chunks expected <=)))
+
+                (doseq [[_ inv-chunks] chunks]
+                  (is (= expected (apply concat inv-chunks))))
+               ))))
+
+
+         ;; 4 for results, 8 for streams
+         (is (= 12 @closes-atom))
+
+
+         ;;  TODO: <<<<>>>> test stream after the node is complete
+         ;;   - should close proxy immediately after getting one callback
+
+
+         ;; TODO: <<<<<>>>> test manual proxy close
+         ;;   - use semaphore, close manually, verify no more callbacks go
+         ;;   through
+         ;;     - how to ensure? isn't the close async? or does it synchronously
+         ;;     guarantee that?
+
+        )))))
 
 (deftest traced-out-of-band-test
          ;; TODO: <<<<<>>>> do custom CF thing with custom tracing
