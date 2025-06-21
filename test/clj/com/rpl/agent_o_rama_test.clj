@@ -1901,6 +1901,18 @@
 
 (def SEM)
 
+(defn- sc->data
+  [chunks]
+  (mapv (fn [^StreamingChunk sc]
+          [(.getIndex sc) (.getChunk sc)])
+        chunks))
+
+(defn- sc->full-data
+  [chunks]
+  (mapv (fn [^StreamingChunk sc]
+          [(.getInvokeId sc) (.getIndex sc) (.getChunk sc)])
+        chunks))
+
 (deftest node-streaming-fault-tolerance-test
   (let [processed-atom (atom [])
         streaming-index-mod-atom (atom 0)
@@ -1996,12 +2008,6 @@
              (reset! all-chunks-atom [])
              (reset! chunks-atom [])
              (reset! meta-atom [])))
-
-         (bind sc->data
-           (fn [chunks]
-             (mapv (fn [^StreamingChunk sc]
-                     [(.getIndex sc) (.getChunk sc)])
-                   chunks)))
 
          (bind as
            (aor/agent-stream
@@ -2295,8 +2301,33 @@
          (is (= 12 @closes-atom))
 
 
-         ;;  TODO: <<<<>>>> test stream after the node is complete
-         ;;   - should close proxy immediately after getting one callback
+         (bind as
+           (aor/agent-stream foo (select-any (keypath "foo" 0) m) "node1"))
+         (is (= 13 @closes-atom))
+
+         (bind foo-node1-expected
+           (select-any (keypath "foo" "node1") expected-map))
+
+         (doseq [[_ [elems]] (separate-by-invoke-id [(sc->full-data @as)])]
+           (is (= foo-node1-expected elems)))
+
+         (bind res-atom (atom []))
+         (bind as
+           (aor/agent-stream foo
+                             (select-any (keypath "foo" 0) m)
+                             "node1"
+                             (fn [all-chunks new-chunks reset? complete?]
+                               (swap! res-atom conj
+                                 [all-chunks new-chunks reset? complete?])
+                             )))
+         (is (= 14 @closes-atom))
+         (is (= 1 (count @res-atom)))
+         (bind res (first @res-atom))
+         (doseq [data [@as (first res) (second res)]]
+           (doseq [[_ [elems]] (separate-by-invoke-id [(sc->full-data data)])]
+             (is (= foo-node1-expected elems))))
+         (is (= false (nth res 2)))
+         (is (= true (nth res 3)))
 
 
          ;; TODO: <<<<<>>>> test manual proxy close

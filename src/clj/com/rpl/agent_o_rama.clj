@@ -330,7 +330,7 @@
               ret
             ))
           (stream [this agent-invoke node]
-            (.stream this agent-invoke node))
+            (.stream this agent-invoke node nil))
           (stream [this agent-invoke node callback-void-jfn]
             (aor-types/stream-internal this
                                        agent-invoke
