@@ -38,14 +38,6 @@
 ;; for agent-o-rama namespace
 (defn hook:agent-result-proxy [proxy])
 
-(defn get-invoke-args
-  [data]
-  (if (aor-types/AgentInvoke? data)
-    (:args data)
-    ;; accepting Maps allows for REST API invokes, with limitation of allowed
-    ;; argument types being those representable by JSON
-    (get data "args")))
-
 (defdepotpartitioner agent-streaming-depot-partitioner
   [{:keys [agent-task-id]} num-partitions]
   agent-task-id)
@@ -605,10 +597,8 @@
     (<<sources stream-topology
      (source> agent-depot-sym {:retry-mode :none} :> *data)
       (<<cond
-       (case> (or> (aor-types/AgentInvoke? *data)
-                   (and> (instance? Map *data)
-                         (not (record? *data)))))
-        (get-invoke-args *data :> *args)
+       (case> (aor-types/AgentInvoke? *data))
+        (get *data :args :> *args)
         (ops/current-task-id :> *graph-task-id)
         (gen-id agent-id-gen-pstate-sym :> *graph-id)
         (ack-return> [*graph-task-id *graph-id])
