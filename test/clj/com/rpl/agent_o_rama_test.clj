@@ -1997,22 +1997,26 @@
              (reset! chunks-atom [])
              (reset! meta-atom [])))
 
-         (aor/agent-stream
-          foo
-          inv
-          "start"
-          (fn [all-chunks new-chunks reset? complete?]
-            (swap! all-chunks-atom conj
-              (mapv (fn [^StreamingChunk sc]
-                      [(.getIndex sc) (.getChunk sc)])
-                    all-chunks))
-            (swap! meta-atom conj [reset? complete?])
-            (doseq [^StreamingChunk sc new-chunks]
-              (swap! chunks-atom conj
-                [(.getInvokeId sc)
-                 (.getIndex sc)
-                 (.getChunk sc)]))
-          ))
+         (bind sc->data
+           (fn [chunks]
+             (mapv (fn [^StreamingChunk sc]
+                     [(.getIndex sc) (.getChunk sc)])
+                   chunks)))
+
+         (bind as
+           (aor/agent-stream
+            foo
+            inv
+            "start"
+            (fn [all-chunks new-chunks reset? complete?]
+              (swap! all-chunks-atom conj (sc->data all-chunks))
+              (swap! meta-atom conj [reset? complete?])
+              (doseq [^StreamingChunk sc new-chunks]
+                (swap! chunks-atom conj
+                  [(.getInvokeId sc)
+                   (.getIndex sc)
+                   (.getChunk sc)]))
+            )))
 
          (is (condition-attained? (= 3 (count @chunks-atom))))
          (is (matching-ascending-seq? @all-chunks-atom
@@ -2023,6 +2027,7 @@
                 (setval [ALL FIRST] NONE @chunks-atom)))
          (doseq [m @meta-atom]
            (= [false false] m))
+         (is (= [[0 "a"] [1 "b"] [2 "c"]] (sc->data @as)))
 
          (clear!)
          (h/release-semaphore SEM 1)
@@ -2034,6 +2039,7 @@
          (is (= [[3 "d"] [4 "e"]] (setval [ALL FIRST] NONE @chunks-atom)))
          (doseq [m @meta-atom]
            (= [false false] m))
+         (is (= [[0 "a"] [1 "b"] [2 "c"] [3 "d"] [4 "e"]] (sc->data @as)))
 
 
          (reset! processed-atom [])
@@ -2045,6 +2051,7 @@
          (is (condition-attained? (= 1 (count @meta-atom))))
          (is (= [] @chunks-atom))
          (is (= [[]] @all-chunks-atom))
+         (is (= [] @as))
          (is (= [[true false]] @meta-atom))
 
          ;; verify these don't get through because streaming-index is wrong
@@ -2057,6 +2064,7 @@
          (is (= [] @meta-atom))
          (is (= [] @chunks-atom))
          (is (= [] @all-chunks-atom))
+         (is (= [] @as))
 
          (clear!)
          (reset! streaming-index-mod-atom 8)
@@ -2068,6 +2076,7 @@
          (is (= [[0 "i"] [1 "j"]] (setval [ALL FIRST] NONE @chunks-atom)))
          (doseq [m @meta-atom]
            (= [false false] m))
+         (is (= [[0 "i"] [1 "j"]] (sc->data @as)))
 
          (clear!)
          (h/release-semaphore SEM 1)
@@ -2076,6 +2085,7 @@
          (is (= [[false true]] @meta-atom))
          (is (= [[[0 "i"] [1 "j"]]] @all-chunks-atom))
          (is (= [] @chunks-atom))
+         (is (= [[0 "i"] [1 "j"]] (sc->data @as)))
         )))))
 
 (deftest many-nodes-streaming-test
@@ -2278,14 +2288,15 @@
 
 
 
-       ;;  TODO: <<<<>>>> test stream after the node is complete
-
        ;; TODO: <<<<<>>>> test proxy gets closed properly
        ;;   - would be nice if on final failure, it fails all streams that
        ;;   haven't finished yet
        ;;     - another special last StreamingChunk that indicates failure so
        ;;     it closes
        ;;       - no callback in this case, just close the proxy
+
+       ;;  TODO: <<<<>>>> test stream after the node is complete
+       ;;   - should close proxy immediately after getting one callback
 
 
        ;; TODO: <<<<<>>>> test manual proxy close
