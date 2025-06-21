@@ -1900,7 +1900,7 @@
 
 (def SEM)
 
-(deftest node-streaming-test
+(deftest node-streaming-fault-tolerance-test
   (let [processed-atom (atom [])
         streaming-index-mod-atom (atom 0)
         override-retry-num-atom (atom nil)]
@@ -2068,7 +2068,6 @@
          (doseq [m @meta-atom]
            (= [false false] m))
 
-
          (clear!)
          (h/release-semaphore SEM 1)
          (is (= "abcd" (aor/agent-result foo inv)))
@@ -2076,37 +2075,178 @@
          (is (= [[false true]] @meta-atom))
          (is (= [[[0 "i"] [1 "j"]]] @all-chunks-atom))
          (is (= [] @chunks-atom))
-
-         ;; TODO: <<<<>>>> have multiple nodes streaming across multiple
-         ;; invokes, check ordering within invoke after separating
-         ;;  - need a custom object that will do the streaming...
-         ;;     - just need access to the foreign depot
-         ;;  - what is API to get access to streaming?
-         ;;     - feels like need a way when invoking the object to have a
-         ;;     "StreamingCallback"
-         ;;       that takes a chunk of data as an object...
-         ;;     - and you get it from the node, which keeps track of the invoke
-         ;;     ID and streaming index
-         ;;       - needs to be thread-safe
-         ;;       - node.getObject will auto-wrap it for the upcoming invokes
-         ;;       - only accessible in task globals?
-         ;;         - could just have node.getStreamingCallback... need better
-         ;;         name
-         ;;             - getStreamingRecorder
-         ;; - failures and retry count inc + clear to verify retry? set properly
-         ;; in the
-         ;; callback
-
-         ;; TODO: <<<<<>>>> have a second agent that doesn't mess with retry
-         ;; counts and just streams normally
-
-         ;;  TODO: <<<<>>>> test stream after the node is complete
-
-         ;; TODO: <<<<<>>>>>> test multiple nodes streaming at same time for
-         ;; multiple agents and multiple agent executions
-
-         ;; TODO: <<<<<>>>> test proxy gets closed properly
         )))))
+
+(deftest many-nodes-streaming-test
+  (with-redefs [SEM (h/mk-semaphore 0)]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (->
+            topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             ["node1" "node2" "node3"]
+             (fn [agent-node]
+               (aor/emit! agent-node "node3")
+               (aor/emit! agent-node "node1")
+               (aor/emit! agent-node "node1")
+               (aor/emit! agent-node "node2")
+               (aor/emit! agent-node "node2")
+             ))
+            (aor/node
+             "node1"
+             nil
+             (fn [agent-node]
+               (dotimes [i 50]
+                 (when (= 0 (mod i 10))
+                   (Thread/sleep 2))
+                 (aor/stream-chunk! agent-node i))))
+            (aor/node
+             "node2"
+             nil
+             (fn [agent-node]
+               (dotimes [i 50]
+                 (when (= 0 (mod i 10))
+                   (Thread/sleep 2))
+                 (aor/stream-chunk! agent-node (+ 200 i)))))
+            (aor/node
+             "node3"
+             nil
+             (fn [agent-node]
+               (aor/result! agent-node "aaa")))
+          )
+          (->
+            topology
+            (aor/new-agent "bar")
+            (aor/node
+             "start"
+             ["node1" "node2" "node3"]
+             (fn [agent-node]
+               (aor/emit! agent-node "node1")
+               (aor/emit! agent-node "node1")
+               (aor/emit! agent-node "node2")
+               (aor/emit! agent-node "node2")
+               (aor/emit! agent-node "node3")
+             ))
+            (aor/node
+             "node1"
+             nil
+             (fn [agent-node]
+               (dotimes [i 50]
+                 (when (= 0 (mod i 10))
+                   (Thread/sleep 2))
+                 (aor/stream-chunk! agent-node (+ 1000 i)))))
+            (aor/node
+             "node2"
+             nil
+             (fn [agent-node]
+               (dotimes [i 50]
+                 (when (= 0 (mod i 10))
+                   (Thread/sleep 2))
+                 (aor/stream-chunk! agent-node (+ 1200 i)))))
+            (aor/node
+             "node3"
+             nil
+             (fn [agent-node]
+               (aor/result! agent-node "bbb")))
+          )
+         ))
+       (rtest/launch-module! ipc module {:tasks 4 :threads 4})
+       (bind module-name (get-module-name module))
+
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind foo (aor/agent-client agent-manager "foo"))
+       (bind bar (aor/agent-client agent-manager "bar"))
+
+
+       (bind m
+         {"foo" {0 (aor/agent-initiate foo)
+                 1 (aor/agent-initiate foo)}
+          "bar" {0 (aor/agent-initiate bar)
+                 1 (aor/agent-initiate bar)}})
+
+       (bind m2
+         (transform
+          [ALL (collect-one FIRST) LAST MAP-VALS]
+          (fn [agent-name inv]
+            (reduce
+             (fn [m n]
+               (let [a (atom [])]
+                 (aor/agent-stream
+                  (if (= "foo" agent-name) foo bar)
+                  inv
+                  n
+                  (fn [all-chunks new-chunks reset? complete?]
+                    (swap! a conj
+                      [(mapv (fn [^StreamingChunk sc]
+                               [(.getInvokeId sc) (.getIndex sc)
+                                (.getChunk sc)])
+                             all-chunks)
+                       (mapv (fn [^StreamingChunk sc]
+                               [(.getInvokeId sc) (.getIndex sc)
+                                (.getChunk sc)])
+                             new-chunks)
+                       reset?
+                       complete?])))
+                 (assoc m n a)))
+             {}
+             ["node1" "node2"]))
+          m))
+
+       (bind res-map
+         (transform [ALL (collect-one FIRST) LAST MAP-VALS]
+                    (fn [agent-name inv]
+                      (aor/agent-result
+                       (if (= "foo" agent-name) foo bar)
+                       inv
+                      ))
+                    m))
+
+       (is (= {"foo" {0 "aaa"
+                      1 "aaa"}
+               "bar" {0 "bbb"
+                      1 "bbb"}}
+              res-map))
+
+       (is (condition-attained?
+            (= 8
+               (count (select [MAP-VALS MAP-VALS MAP-VALS (view deref) LAST
+                               (nthpath 3) (pred= true)]
+                              m2)))))
+
+
+       (bind m2 (transform [MAP-VALS MAP-VALS MAP-VALS] deref m2))
+
+       (clojure.pprint/pprint m2)
+
+
+
+       ;; TODO: <<<<<>>>>
+       ;;  - get stream for each node for each invoke (8 total so 8 vols)
+       ;;  - verify order of chunks for separate invokes
+       ;;  - verify final completion and no resets
+
+
+       ;;  TODO: <<<<>>>> test stream after the node is complete
+
+       ;; TODO: <<<<<>>>> test proxy gets closed properly
+       ;;   - would be nice if on final failure, it fails all streams that
+       ;;   haven't finished yet
+       ;;     - another special last StreamingChunk that indicates failure so
+       ;;     it closes
+       ;;       - no callback in this case, just close the proxy
+
+
+       ;; TODO: <<<<<>>>> test manual proxy close
+       ;;   - use semaphore, close manually, verify no more callbacks go through
+       ;;     - how to ensure? isn't the close async? or does it synchronously
+       ;;     guarantee that?
+
+      ))))
 
 (deftest traced-out-of-band-test
          ;; TODO: <<<<<>>>> do custom CF thing with custom tracing

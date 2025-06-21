@@ -409,21 +409,22 @@
      (local-select> (keypath *graph-id)
                     $$root
                     :> {*root-ack-val :ack-val *result :result})
-     (<<if (and> (nil? *result) (= 0 *root-ack-val))
+     (<<if (= 0 *root-ack-val)
+       (<<if (nil? *result)
+         (local-transform>
+          [(keypath *graph-id)
+           :result
+           (termval (aor-types/->AgentResult "Agent completed without result"
+                                             true))]
+          $$root))
+       (finished-streaming-chunk :> *finished-streaming-chunk)
        (local-transform>
         [(keypath *graph-id)
-         :result
-         (termval (aor-types/->AgentResult "Agent completed without result"
-                                           true))]
-        $$root))
-     (finished-streaming-chunk :> *finished-streaming-chunk)
-     (local-transform>
-      [(keypath *graph-id)
-       MAP-VALS
-       :all
-       AFTER-ELEM
-       (termval *finished-streaming-chunk)]
-      $$streaming)
+         MAP-VALS
+         :all
+         AFTER-ELEM
+         (termval *finished-streaming-chunk)]
+        $$streaming))
    )
 
    (unify> <regular-emit> <agg-ack-emit>)
