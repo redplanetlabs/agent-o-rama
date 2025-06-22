@@ -37,10 +37,6 @@
               .getTypeName
               symbol)}))
 
-(defn clj-transform
-  [compiled-path obj]
-  (multi-transform ^:direct-nav compiled-path obj))
-
 (defn rama-void-function-class-symbol
   [i]
   (symbol (str "com.rpl.agentorama.ops.RamaVoidFunction" i)))

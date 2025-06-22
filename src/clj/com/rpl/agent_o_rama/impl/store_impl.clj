@@ -32,7 +32,7 @@
 (defn declare-store*
   [stream-topology stores-vol name store-type schema]
   (when (contains? @stores-vol name)
-    (throw (ex-info "Cannot declare same store twice" {:name name})))
+    (throw (h/ex-info "Cannot declare same store twice" {:name name})))
   (vswap! stores-vol assoc name store-type)
   (declare-pstate* stream-topology (symbol name) schema))
 
@@ -48,8 +48,8 @@
 (defn- pstate-write!*
   [store-params path k op params]
   (when (:mirror? store-params)
-    (throw (ex-info "Can only write to colocated PStates"
-                    {:pstate-name (:pstate-name store-params)})))
+    (throw (h/ex-info "Can only write to colocated PStates"
+                      {:pstate-name (:pstate-name store-params)})))
   (let [start-time  (h/current-time-millis)
         _ (hook:initiating-pstate-write)
         {ret aor-types/AGENTS-TOPOLOGY-NAME}

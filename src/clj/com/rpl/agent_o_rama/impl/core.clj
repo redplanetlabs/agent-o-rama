@@ -118,7 +118,7 @@
   [^CompletableFuture cf]
   (.get cf)
   (when (.isCompletedExceptionally cf)
-    (throw (ex-info "Streaming append failed" {} (.get cf)))))
+    (throw (h/ex-info "Streaming append failed" {} (.get cf)))))
 
 ;; these are for redef in tests
 (defn identity-streaming-index [v] v)

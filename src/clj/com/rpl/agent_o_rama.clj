@@ -224,9 +224,9 @@
                          module-name
                          (queries/agent-get-names-query-name))
           (catch TopologyDoesNotExistException e
-            (throw (ex-info e
-                            "Module does not host agents"
-                            {:module-name module-name}))
+            (throw (h/ex-info e
+                              "Module does not host agents"
+                              {:module-name module-name}))
           ))]
     (reify
      AgentManager
@@ -235,9 +235,9 @@
      (getAgentClient [this agentName]
        (let [agents-set           (foreign-invoke-query agent-names-query)
              _ (when-not (contains? agents-set agentName)
-                 (throw (ex-info "Agent does not exist"
-                                 {:available  agents-set
-                                  :agent-name agentName})))
+                 (throw (h/ex-info "Agent does not exist"
+                                   {:available  agents-set
+                                    :agent-name agentName})))
              agent-depot          (foreign-depot cluster
                                                  module-name
                                                  (po/agent-depot-name
@@ -301,7 +301,7 @@
                                   (if (:failure? new-val)
                                     (.completeExceptionally
                                      ret
-                                     (ex-info (:val new-val) {}))
+                                     (h/ex-info (:val new-val) {}))
                                     (.complete ret (:val new-val)))
                                   (locking proxy-atom
                                     (if (nil? @proxy-atom)
