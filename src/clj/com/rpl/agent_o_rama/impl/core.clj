@@ -563,9 +563,6 @@
      agent-invoke-pstate-sym
      po/AGENT-INVOKE-PSTATE-SCHEMA
      {:key-partitioner task-id-key-partitioner})
-    ;; TODO: <<<<>>>>> as this is broadcast, how does this get cleaned up?
-    ;;  - if retry num is greater than 0 when GC, need to also broadcast
-    ;;  the delete
     (declare-pstate*
      stream-topology
      agent-valid-invokes-pstate-sym

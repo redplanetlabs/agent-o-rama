@@ -54,8 +54,6 @@
     {:root-invoke-id Long
      :invoke-args    [Object]
      :graph-version  Long
-     ;; TODO: <<<<<>>>>> if no result is ever specified, should error instead
-     ;; of hanging
      :result         AgentResult
      :ack-val        Long
      :retry-num      Long})})
