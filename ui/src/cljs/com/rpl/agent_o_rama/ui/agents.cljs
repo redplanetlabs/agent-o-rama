@@ -63,16 +63,17 @@
       isLoading ($ :div "loading...")
       (not data) ($ :div "no data")
       :else
-      ($ :table
-         ($ :thead ($ :tr ($ :th "invoke id") ($ :th "args") ($ :th "version") ($ :th "result")))
+      ($ :table.w-full
+         ($ :thead.text-left ($ :tr ($ :th "invoke id") ($ :th "args") ($ :th "version") ($ :th "result")))
          ($ :tbody
             (for [invoke (:invokes data)
                   :let [url (str "/agents/" module-id "/" agent-id "/invocations/" (:root-invoke-id invoke))]]
               ($ :tr.bg-gray-200.hover:bg-gray-300.cursor-pointer
-                 {:key url :onClick (fn [e]
-                                      (println e)
-                                      (. e stopPropagation)
-                                      (navigate url))}
+                 {:key url
+                  :onClick (fn [e]
+                             (println e)
+                             (. e stopPropagation)
+                             (navigate url))}
                  ($ :td (:root-invoke-id invoke))
                  ($ :td (common/pp (:invoke-args invoke)))
                  ($ :td (:graph-version invoke))
@@ -126,7 +127,6 @@
 (defui invoke []
   (let [{:strs [module-id agent-id invoke-id]} (js->clj (wouter/useParams))
         [use-pagination? set-use-pagination] (uix/use-state true)
-        [fork? set-fork]                     (uix/use-state false)
         ;; Only fetch initial data - no need to refetch on pagination state changes
         {:keys [data isLoading]}
         (common/use-query {:query-key ["invoke-initial" module-id agent-id invoke-id use-pagination?]
@@ -145,8 +145,7 @@
                   ($ :label.text-sm.text-gray-600 "Pagination")
                   ($ :input.mr-2 {:type "checkbox"
                                   :checked use-pagination?
-                                  :onChange #(set-use-pagination (not use-pagination?))})
-                  ($ :div.bg-gray-50.p-1.border-blue-100.border.rounded.cursor-pointer "Fork")))
+                                  :onChange #(set-use-pagination (not use-pagination?))})))
             ($ graph/graph {:initial-data (:invokes-map data)
                             :api-url (when use-pagination? 
                                        (str "/api/agents/" module-id "/" agent-id "/invocations/" invoke-id "/paginated"))

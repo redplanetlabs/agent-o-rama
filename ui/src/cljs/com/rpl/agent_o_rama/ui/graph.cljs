@@ -35,8 +35,10 @@
   (not (nil? (:agg-state node))))
 
 (defui selected-node-component [{:keys [selected-node graph-data handle-paginate-node loading-nodes flow-nodes set-selected-node set-nodes]}]
-  (let [data (when selected-node 
+  (let [[forking? set-forking?] (uix/use-state false)
+        data (when selected-node 
                (js->clj (.-data selected-node) :keywordize-keys true))
+        [input-text set-input-text] (uix/use-state (:input data))
         node-id (str (:node-id data))
         node-name (:node data)
         input (:input data)
@@ -63,12 +65,20 @@
                
                ;; Input Section
                (when input
-                 ($ :div {:className "bg-green-50 p-3 rounded-md"}
-                    ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
-                    ($ :div {:className "text-sm text-green-600 font-mono break-words"}
-                       (if (array? input)
-                         (pr-str (js->clj input))
-                         (str input)))))
+                 (if forking?
+                   ($ :div {:className "bg-green-50 p-3 rounded-md"}
+                      ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
+                      ($ :textarea {:className "text-sm text-green-600 font-mono break-words bg-white w-full"
+                                    :value input-text
+                                    :onChange (fn [e]
+                                                (set-input-text (.-value e)))
+                                    }))
+                   ($ :div {:className "bg-green-50 p-3 rounded-md"}
+                      ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
+                      ($ :div {:className "text-sm text-green-600 font-mono break-words"}
+                         (if (array? input)
+                           (pr-str (js->clj input))
+                           (str input))))))
                
                ;; Result Section - only show if result is not nil
                (when result
@@ -172,7 +182,18 @@
                                  (str "ID: " emit-id))
                               (when is-loading
                                 ($ :div {:className "text-purple-400 mt-1 text-xs italic"}
-                                   "Loading..."))))))))))))))
+                                   "Loading...")))))))))
+            ($ :div.flex-1.flex.justify-end
+               ($ :div.bg-gray-50.p-1.border-blue-100.border.rounded.cursor-pointer.my-4.w-10
+                  {:onClick #(set-forking? (not forking?))}
+                  (if forking?
+                    "<-"
+                    "Fork"))
+               (when forking?
+                 ($ :div.bg-gray-50.p-1.border-red-100.border.rounded.cursor-pointer.my-4.w-10.ml-4
+                    {:onClick #(set-forking? (not forking?))}
+                    "RUN")))
+               )))))
 
 (defn process-graph-data 
   "Process raw graph data into nodes and edges for React Flow"
