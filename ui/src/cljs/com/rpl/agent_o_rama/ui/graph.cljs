@@ -176,14 +176,15 @@
             
                )))))
 
-(defui forking-input-component [{:keys [selected-node changed-nodes set-changed-nodes]}]
+(defui forking-input-component [{:keys [selected-node changed-nodes set-changed-nodes affected-nodes]}]
   (let [data (when selected-node 
                (js->clj (.-data selected-node) :keywordize-keys true))
         node-id (:node-id data)
         node-name (:node data)
         original-input (:input data)
         current-input (get changed-nodes node-id (str original-input))
-        [input-text set-input-text] (uix/use-state current-input)]
+        [input-text set-input-text] (uix/use-state current-input)
+        is-affected (contains? affected-nodes node-id)]
     
     ;; Update input text when selected node changes
     (uix/use-effect
@@ -201,26 +202,39 @@
          ($ :div {:className "p-6"}
             ($ :div {:className "mb-4"}
                ($ :h3 {:className "text-lg font-medium text-gray-800 mb-2"}
-                  (str "Editing Input for: " node-name))
+                  (str (if is-affected "Affected Node: " "Editing Input for: ") node-name))
                ($ :div {:className "text-sm text-gray-600 mb-2"}
                   (str "Node ID: " node-id)))
             
-            ($ :div {:className "space-y-4"}
-               ($ :div
-                  ($ :label {:className "block text-sm font-medium text-gray-700 mb-2"}
-                     "New Input:")
-                  ($ :textarea {:className "w-full h-32 p-3 border border-gray-300 rounded-md font-mono text-sm resize-y"
-                                :value input-text
-                                :onChange (fn [e]
-                                            (let [new-value (.-value (.-target e))]
-                                              (set-input-text new-value)
-                                              (set-changed-nodes #(assoc % node-id new-value))))
-                                :placeholder "Enter new input value..."}))
-               
-               ($ :div {:className "text-xs text-gray-500"}
-                  ($ :div (str "Original: " (if (array? original-input)
-                                              (pr-str (js->clj original-input))
-                                              (str original-input)))))))))))
+            (if is-affected
+              ;; Show disabled state for affected nodes
+              ($ :div {:className "bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center"}
+                 ($ :div {:className "text-gray-500 mb-2"}
+                    "🚫 This node is affected by upstream changes")
+                 ($ :div {:className "text-sm text-gray-600 mb-4"}
+                    "This node's execution will be re-determined when the fork is executed. Its current state is no longer valid.")
+                 ($ :div {:className "text-xs text-gray-500"}
+                    ($ :div (str "Current input: " (if (array? original-input)
+                                                     (pr-str (js->clj original-input))
+                                                     (str original-input))))))
+              
+              ;; Show normal editing interface for unaffected nodes
+              ($ :div {:className "space-y-4"}
+                 ($ :div
+                    ($ :label {:className "block text-sm font-medium text-gray-700 mb-2"}
+                       "New Input:")
+                    ($ :textarea {:className "w-full h-32 p-3 border border-gray-300 rounded-md font-mono text-sm resize-y"
+                                  :value input-text
+                                  :onChange (fn [e]
+                                              (let [new-value (.-value (.-target e))]
+                                                (set-input-text new-value)
+                                                (set-changed-nodes #(assoc % node-id new-value))))
+                                  :placeholder "Enter new input value..."}))
+                 
+                 ($ :div {:className "text-xs text-gray-500"}
+                    ($ :div (str "Original: " (if (array? original-input)
+                                                (pr-str (js->clj original-input))
+                                                (str original-input))))))))))))
 
 (defui forking-changelist-panel [{:keys [changed-nodes set-changed-nodes graph-data on-execute-fork on-cancel-fork]}]
   ($ :div {:className "w-80 bg-white shadow-lg border-l border-gray-200 p-4"}
@@ -338,6 +352,30 @@
       {:nodes nodes-with-layout
        :edges all-edges})))
 
+(defn find-downstream-nodes 
+  "Find all nodes that are downstream from the given set of modified node IDs"
+  [graph-data modified-node-ids]
+  (loop [to-visit (set modified-node-ids)
+         visited #{}
+         downstream #{}]
+    (if (empty? to-visit)
+      downstream
+      (let [current (first to-visit)
+            remaining (disj to-visit current)]
+        (if (visited current)
+          (recur remaining visited downstream)
+          (let [node-data (get graph-data current)
+                emitted-ids (set (map :invoke-id (:emits node-data)))
+                ;; Add emitted nodes to downstream (but not the original modified nodes)
+                new-downstream (if (contains? modified-node-ids current)
+                                 downstream
+                                 (conj downstream current))
+                ;; Continue traversing from emitted nodes
+                new-to-visit (into remaining emitted-ids)]
+            (recur new-to-visit 
+                   (conj visited current) 
+                   new-downstream)))))))
+
 (defui graph [{:keys [initial-data api-url module-id agent-id invoke-id]}]
   (let [[selected-node set-selected-node] (uix/use-state nil)
         [loading-nodes set-loading-nodes] (uix/use-state #{})
@@ -346,6 +384,10 @@
         ;; Forking mode state
         [forking-mode? set-forking-mode?] (uix/use-state false)
         [changed-nodes set-changed-nodes] (uix/use-state {})
+        
+        ;; Calculate affected downstream nodes in forking mode
+        affected-nodes (when forking-mode?
+                         (find-downstream-nodes graph-data (set (keys changed-nodes))))
         
         ;; Process current graph data
         {:keys [nodes edges]} (process-graph-data graph-data)
@@ -432,7 +474,11 @@
                                                                  node-id (:node-id data)
                                                                  selected (= (when selected-node (.-id selected-node)) id)
                                                                  has-changes (contains? changed-nodes node-id)
+                                                                 is-affected (contains? affected-nodes node-id)
                                                                  base-classes (cond
+                                                                                is-affected
+                                                                                ["bg-gray-300" "text-gray-500" "border-2" "border-gray-400"]
+                                                                                
                                                                                 has-changes
                                                                                 ["bg-orange-500" "text-white" "border-2" "border-orange-600"]
                                                                                 
@@ -444,19 +490,21 @@
 
                                                                                 :else
                                                                                 ["bg-white" "text-gray-800" "border-2" "border-gray-300"])
-                                                                 selection-classes (if selected
+                                                                 selection-classes (if (and selected (not is-affected))
                                                                                      ["ring-4" "ring-blue-400" "ring-opacity-75" "shadow-2xl" "transform" "scale-105"]
                                                                                      ["shadow-lg"])
                                                                  common-classes ["p-3" "rounded-md" "transition-all" "duration-200"]
                                                                  node-className (str/join " " (concat base-classes selection-classes common-classes))]
                                                              ($ :div {:className "relative"}
                                                                 ($ :div {:className node-className
-                                                                         :style {:width "170px" :height "40px"}}
+                                                                         :style {:width "170px" :height "40px" :opacity (if is-affected "0.6" "1.0")}}
                                                                    label)
-                                                                (when (:result data)
+                                                                (when (and (:result data) (not is-affected))
                                                                   ($ :div {:className "absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"}))
                                                                 (when has-changes
                                                                   ($ :div {:className "absolute -top-1 -left-1 w-3 h-3 bg-orange-400 rounded-full border-2 border-white shadow-sm"}))
+                                                                (when is-affected
+                                                                  ($ :div {:className "absolute -top-1 -right-1 w-3 h-3 bg-gray-400 rounded-full border-2 border-white shadow-sm"}))
                                                                 ($ Handle {:type "target" :position "top"})
                                                                 ($ Handle {:type "source" :position "bottom"})))))
                                                         
@@ -474,14 +522,20 @@
                                                                    (:label data))
                                                                 ($ Handle {:type "target" :position "top"})))))})
                                    :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
-                                   :onNodeClick (fn [_ node] (set-selected-node node))}
+                                   :onNodeClick (fn [_ node] 
+                                                  (let [node-data (js->clj (.-data node) :keywordize-keys true)
+                                                        node-id (:node-id node-data)
+                                                        is-affected (contains? affected-nodes node-id)]
+                                                    (when-not is-affected
+                                                      (set-selected-node node))))}
                         ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
                         ($ Controls {:className "fill-gray-500 stroke-gray-500"})))
                   
                   ;; Forking input component
                   ($ forking-input-component {:selected-node selected-node
                                               :changed-nodes changed-nodes
-                                              :set-changed-nodes set-changed-nodes}))
+                                              :set-changed-nodes set-changed-nodes
+                                              :affected-nodes affected-nodes}))
                
                ;; Side panel
                ($ forking-changelist-panel {:changed-nodes changed-nodes
