@@ -94,15 +94,13 @@
        ($ :div.p-4.flex.gap-1
           ($ wouter/Link
              {:href (str "/agents/" module-id "/" agent-id "/run")
-              :key tab-label
               :style {:flex-grow "1"}}
              ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
                 "manually run agent")))
        
        ($ :div.p-4.flex.gap-1
           ($ :div
-             {:key tab-label
-              :style {:flex-grow "1"}
+             {:style {:flex-grow "1"}
               :onClick (fn [_] (navigate (str "/agents/" module-id "/" agent-id "/invocations")))}
              ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
                 "invocations"
@@ -111,7 +109,6 @@
        ($ :div.p-4.flex.gap-1
           ($ wouter/Link
              {:href (str "/agents/" module-id "/" agent-id "/stats")
-              :key tab-label
               :style {:flex-grow "1"}}
              ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
                 "stats summary")))
@@ -119,7 +116,6 @@
        ($ :div.p-4.flex.gap-1
           ($ wouter/Link
              {:href (str "/agents/" module-id "/" agent-id "/alerts")
-              :key tab-label
               :style {:flex-grow "1"}}
              ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
                 "alerts"))))))
