@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.queries :as queries]
+   [com.rpl.agent-o-rama.impl.retries :as retries]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.ops :as ops])
@@ -20,7 +21,7 @@
     StreamingRecorder]
    [com.rpl.agentorama.impl
     RamaClientsTaskGlobal
-    VirtualThreadsTaskGlobal]
+    AgentNodeExecutorTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     AggAckOp
     Node
@@ -55,10 +56,16 @@
   (:> *ret))
 
 (defn submit-virtual-task!
-  [afn]
-  (let [^VirtualThreadsTaskGlobal virtual-exec
-        (declared-object-task-global (po/agents-virtual-threads-name))]
-    (.submitTask virtual-exec afn)))
+  [invoke-id afn]
+  (let [^AgentNodeExecutorTaskGlobal node-exec
+        (declared-object-task-global (po/agent-node-executor-name))]
+    (.submitTask node-exec invoke-id afn)))
+
+(defn mark-virtual-task-complete!
+  [invoke-id]
+  (let [^AgentNodeExecutorTaskGlobal node-exec
+        (declared-object-task-global (po/agent-node-executor-name))]
+    (.removeTrackedInvokeId node-exec invoke-id)))
 
 (defn fetch-graph
   [agent-name]
@@ -280,6 +287,15 @@
                                       {:node      node-name
                                        :invoke-id invoke-id})
                     ;; TODO: <<<<>>>> handle errors properly
+                    ;;  - which errors here are retryable?
+                    ;;    - depot append / topology errors will come through
+                    ;;    here...
+                    ;;  - make exceptions retryable but not errors?
+                    ;;      - NPE shouldn't retry
+                    ;;  - or just retry on any error here?
+
+                    ;; TODO: <<<<<>>>>>
+                    ;;   - need to mark node as complete in this case
                     (throw t)
                   ))
           {:keys [emits result nested-ops]} (agent-node-state agent-node)
@@ -342,6 +358,7 @@
    (local-transform> [(keypath *invoke-id) (term %merger)] $$nodes)
    (|direct *task-id)
    (submit-virtual-task!
+    *invoke-id
     (node-event *name
                 *task-id
                 *invoke-id
@@ -367,6 +384,10 @@
     (this-module-pobject-task-global
      (po/agent-invoke-task-global-name *agent-name))
 
+    $$active
+    (this-module-pobject-task-global
+     (po/agent-active-invokes-task-global-name *agent-name))
+
     $$streaming
     (this-module-pobject-task-global
      (po/agent-streaming-results-task-global-name *agent-name))]
@@ -385,7 +406,11 @@
    (mapv :invoke-id *emits :> *next-invoke-ids)
    (reduce bit-xor *invoke-id *next-invoke-ids :> *ack-val)
    (|direct *graph-task-id)
-
+   (local-transform>
+    [(keypath *graph-id)
+     :last-progress-time-millis
+     (termval (h/current-time-millis))]
+    $$root)
    (<<if (some? *agg-invoke-id)
      (aor-types/->valid-AggAckOp *agg-invoke-id *ack-val :> *op)
      (anchor> <agg-ack-emit>)
@@ -410,6 +435,7 @@
                                              true))]
           $$root))
        (finished-streaming-chunk :> *finished-streaming-chunk)
+       (local-transform> [(keypath *graph-id) NONE>] $$active)
        (local-transform>
         [(keypath *graph-id)
          MAP-VALS
@@ -529,13 +555,16 @@
   (hook:processing-streaming node streaming-index value))
 
 (defn- define-agent!
-  [setup topologies stream-topology name agent-graph]
+  [setup topologies stream-topology mb-topology name agent-graph]
   (let [graph (graph/resolve-agent-graph agent-graph)
         agent-depot-sym (symbol (po/agent-depot-name name))
         agent-streaming-depot-sym (symbol (po/agent-streaming-depot-name name))
         agent-graph-sym (symbol (po/agent-graph-task-global-name name))
         agent-node-pstate-sym (symbol (po/agent-node-task-global-name name))
         agent-invoke-pstate-sym (symbol (po/agent-invoke-task-global-name name))
+
+        agent-active-invokes-pstate-sym
+        (symbol (po/agent-active-invokes-task-global-name name))
 
         agent-valid-invokes-pstate-sym
         (symbol (po/agent-valid-invokes-task-global-name name))
@@ -565,9 +594,9 @@
      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
      stream-topology
-     agent-valid-invokes-pstate-sym
-     po/AGENT-VALID-INVOKES-PSTATE-SCHEMA
-     {:key-partitioner task-id-key-partitioner})
+     agent-active-invokes-pstate-sym
+     po/AGENT-ACTIVE-INVOKES-PSTATE-SCHEMA)
+
     (declare-pstate*
      stream-topology
      agent-streaming-results-pstate-sym
@@ -589,6 +618,19 @@
      Long
      {:initial-value 0})
 
+
+    (declare-tick-depot* setup
+                         (symbol (po/agent-check-tick-depot-name name))
+                         ;; TODO: <<<<>>>> configurable, at least for tests?
+                         10000)
+
+    (declare-pstate*
+     mb-topology
+     agent-valid-invokes-pstate-sym
+     po/AGENT-VALID-INVOKES-PSTATE-SCHEMA
+     {:key-partitioner task-id-key-partitioner})
+
+    (retries/declare-check-impl mb-topology name)
     (queries/declare-tracing-query-topology topologies name)
 
     (<<sources stream-topology
@@ -602,14 +644,18 @@
         (h/random-long :> *invoke-id)
         (fetch-graph-version name :> *version)
         (identity 0 :> *retry-num)
+        (h/current-time-millis :> *current-time-millis)
         (local-transform>
          [(keypath *graph-id)
           (termval {:root-invoke-id *invoke-id
                     :invoke-args    *args
                     :graph-version  *version
                     :ack-val        *invoke-id
+                    :last-progress-time-millis *current-time-millis
                     :retry-num      *retry-num})]
          agent-invoke-pstate-sym)
+        (local-transform> [(keypath *graph-id) (termval true)]
+                          agent-active-invokes-pstate-sym)
         (aor-types/->valid-NodeOp *invoke-id
                                   (get agent-graph-sym :start-node)
                                   *args
@@ -646,6 +692,7 @@
                        agent-node-pstate-sym
                        :> {:keys [*graph-task-id *graph-id *node
                                   *agg-invoke-id]})
+        (mark-virtual-task-complete! *invoke-id)
         (get-node-obj agent-graph-sym *node :> *node-obj)
 
         (<<subsource *node-obj
@@ -725,6 +772,8 @@
          :> {:keys [*start-time-millis]})
         (get-node-obj agent-graph-sym *agg-node-name :> {:keys [*init-fn]})
         ;; TODO: <<<<<>>>>> propagate errors
+        ;;    - failure of this should be total failure of the agent
+        ;;    - append a "NodeFailure" event do the depot to do the recurse?
         (h/invoke *init-fn :> *init-agg-state)
         (local-transform>
          [(keypath *invoke-id) :started-agg? (termval true)]
@@ -756,6 +805,7 @@
                           })
         (filter> (not *agg-finished?))
         ;; TODO: <<<<>>>> catch exceptions and propagate failure
+        ;;  - failure of this should be total failure of the agent
         (apply *update-fn *agg-state *args :> *res)
         (extract-agg-result *res :> {:keys [*new-agg-state *finished?]})
 
@@ -828,7 +878,7 @@
     )))
 
 (defn define-agents!
-  [setup topologies stream-topology agent-graphs store-info]
+  [setup topologies stream-topology mb-topology agent-graphs store-info]
   (declare-object* setup
                    (symbol (po/agents-store-info-name))
                    (aor-types/->valid-StoreInfo store-info {}))
@@ -840,8 +890,8 @@
                         vec)
                     []))
   (declare-object* setup
-                   (symbol (po/agents-virtual-threads-name))
-                   (VirtualThreadsTaskGlobal.))
+                   (symbol (po/agent-node-executor-name))
+                   (AgentNodeExecutorTaskGlobal.))
 
   (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
@@ -860,4 +910,9 @@
                                                       keys
                                                       set))
   (doseq [[name agent-graph] agent-graphs]
-    (define-agent! setup topologies stream-topology name agent-graph)))
+    (define-agent! setup
+                   topologies
+                   stream-topology
+                   mb-topology
+                   name
+                   agent-graph)))

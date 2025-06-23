@@ -14,6 +14,7 @@
     CompletableFuture]))
 
 (def AGENTS-TOPOLOGY-NAME "_agents-topology")
+(def AGENTS-MB-TOPOLOGY-NAME "_agents-mb-topology")
 
 (def NODE-KW :node)
 (def AGG-START-NODE-KW :agg-start-node)
@@ -35,7 +36,10 @@
 
 (drp/defrecord+ AgentInvoke
   [args :- [(s/maybe Object)]
-   time-millis :- Long])
+   time-millis :- Long
+   ;; invoke-id -> new args
+   fork :- (s/maybe {Long [Object]})
+  ])
 
 (drp/defrecord+ AgentResult
   [val :- (s/maybe Object)

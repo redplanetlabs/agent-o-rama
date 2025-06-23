@@ -39,6 +39,8 @@
   (let [^StreamTopology stream-topology (stream-topology
                                          topologies
                                          aor-types/AGENTS-TOPOLOGY-NAME)
+        mb-topology    (microbatch-topology topologies
+                                            aor-types/AGENTS-MB-TOPOLOGY-NAME)
         defined?-vol   (volatile! false)
         agents-vol     (volatile! {})
         store-info-vol (volatile! {})]
@@ -94,6 +96,7 @@
         setup
         topologies
         stream-topology
+        mb-topology
         @agents-vol
         @store-info-vol)
      ))))
@@ -279,7 +282,8 @@
               agent-depot
               (aor-types/->AgentInvoke
                (vec args)
-               (h/current-time-millis)))
+               (h/current-time-millis)
+               nil))
              (h/cf-function [{[graph-task-id graph-id]
                               aor-types/AGENTS-TOPOLOGY-NAME}]
                (AgentInvoke. graph-task-id graph-id)

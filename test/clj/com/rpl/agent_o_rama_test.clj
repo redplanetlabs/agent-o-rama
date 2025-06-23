@@ -770,7 +770,8 @@
 
          (dotimes [_ 10]
            (let [{[graph-task-id graph-id] "_agents-topology"}
-                 (foreign-append! depot (aor-types/->AgentInvoke ["hello"] 0))]
+                 (foreign-append! depot
+                                  (aor-types/->AgentInvoke ["hello"] 0 nil))]
              (is (= 0
                     (foreign-select-one [(keypath graph-id) :graph-version]
                                         invokes-pstate
@@ -813,7 +814,7 @@
          (reset! task-counts-atom {})
          (dotimes [_ 10]
            (let [{[graph-task-id graph-id] "_agents-topology"}
-                 (foreign-append! depot (aor-types/->AgentInvoke [] 0))]
+                 (foreign-append! depot (aor-types/->AgentInvoke [] 0 nil))]
              (is (= 1
                     (foreign-select-one [(keypath graph-id) :graph-version]
                                         invokes-pstate
@@ -2378,6 +2379,19 @@
        ;; verify close is idempotetent
        (close! as)
       ))))
+
+(deftest agent-pending-tracking-test
+         ;; TODO: <<<<<>>>>
+         ;;   - test and verify pending agents, pending nodes, and
+         ;;   last-updated-ack-val times
+         ;;     - actually, is this necessary with how execution will work?
+         ;;       - it should in theory reduce the amount of work the checker
+         ;;       agent does, but does that matter?
+         ;;       - if it's a long-running model call, it won't make a
+         ;;       difference
+         ;;         - though if it's many short model calls, it will make a
+         ;;         difference as those are all separate node invokes
+)
 
 (deftest traced-out-of-band-test
          ;; TODO: <<<<<>>>> do custom CF thing with custom tracing

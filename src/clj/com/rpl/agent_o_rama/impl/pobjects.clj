@@ -20,9 +20,9 @@
   []
   "*_agents-store-info")
 
-(defn agents-virtual-threads-name
+(defn agent-node-executor-name
   []
-  "*_agents-virtual-threads")
+  "*_agent-node-executor")
 
 (defn agent-pstate-write-depot-name
   []
@@ -35,6 +35,11 @@
 (defn agent-streaming-depot-name
   [name]
   (RamaClientsTaskGlobal/agentStreamingDepotName name))
+
+(defn agent-check-tick-depot-name
+  [name]
+  (str "*_agent-check-tick-depot-" name))
+
 
 (defn agents-clients-name
   []
@@ -56,11 +61,19 @@
      :graph-version  Long
      :result         AgentResult
      :ack-val        Long
+     :last-progress-time-millis Long
      :retry-num      Long})})
+
+(defn agent-active-invokes-task-global-name
+  [agent-name]
+  (str "$$_agent-active-invokes-" agent-name))
+
+(def AGENT-ACTIVE-INVOKES-PSTATE-SCHEMA
+  {Long Boolean})
 
 (defn agent-valid-invokes-task-global-name
   [agent-name]
-  (str "$$agent-valid-invokes-" agent-name))
+  (str "$$_agent-valid-invokes-" agent-name))
 
 (def AGENT-VALID-INVOKES-PSTATE-SCHEMA
   ;; root-invoke-id -> valid retry-num
