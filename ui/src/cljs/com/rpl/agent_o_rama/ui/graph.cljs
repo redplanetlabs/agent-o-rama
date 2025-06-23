@@ -185,6 +185,17 @@
         current-input (get changed-nodes node-id (str original-input))
         [input-text set-input-text] (uix/use-state current-input)]
     
+    ;; Update input text when selected node changes
+    (uix/use-effect
+     (fn []
+       (when selected-node
+         (let [data (js->clj (.-data selected-node) :keywordize-keys true)
+               node-id (:node-id data)
+               original-input (:input data)
+               current-input (get changed-nodes node-id (str original-input))]
+           (set-input-text current-input))))
+     [selected-node changed-nodes])
+    
     (when selected-node
       ($ :div {:className "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl"}
          ($ :div {:className "p-6"}
