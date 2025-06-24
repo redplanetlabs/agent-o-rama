@@ -105,8 +105,12 @@
 (drp/defrecord+ RetryAgentInvoke
   [agent-task-id :- Long
    agent-id :- Long
-   ;; nil if it's a retry, map of invoke-id -> new args if it's a fork
-   fork :- (s/maybe {Long [Object]})])
+   expected-retry-num :- Long])
+
+(drp/defrecord+ ForkAgentInvoke
+  [agent-task-id :- Long
+   agent-id :- Long
+   invoke-id->new-args :- {Long [Object]}])
 
 (drp/defrecord+ HistoricalAgentNodeInfo
   [node-type :- clojure.lang.Keyword ; :node, :agg-node, :agg-start-node

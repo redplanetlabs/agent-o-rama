@@ -23,13 +23,21 @@
   [all-invoke-info]
   (dissoc
    (if (contains? all-invoke-info :agg-inputs)
-     (let [ai       (:agg-inputs all-invoke-info)
-           ai-count (count ai)]
+     (let [ai            (:agg-inputs all-invoke-info)
+           ai-count      (count ai)
+           all-ids       (:agg-input-invoke-ids all-invoke-info)
+           all-ids-count (count all-ids)]
        (-> all-invoke-info
            (dissoc :agg-inputs)
+           (dissoc :agg-input-invoke-ids)
            (assoc :agg-input-count ai-count)
            (assoc :agg-inputs-first-10
-                  (select-any (srange 0 (min 10 ai-count)) ai))))
+                  (select-any (srange 0 (min 10 ai-count)) ai))
+           (assoc :agg-input-invoke-ids-count all-ids-count)
+           (assoc :agg-input-invoke-ids-first-10
+                  (into #{}
+                        (select-any (sorted-set-range-from-start 10) all-ids)))
+       ))
      all-invoke-info
    )
    :retry-time-millis))

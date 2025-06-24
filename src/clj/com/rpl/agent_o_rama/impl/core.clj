@@ -666,9 +666,25 @@
                                   :> *op)
 
        (case> (aor-types/RetryAgentInvoke? *data))
-        (identity *data :> {:keys [*agent-task-id *agent-id *fork]})
+        (identity *data
+                  :> {:keys [*agent-task-id
+                             *agent-id
+                             *expected-retry-num]})
         ;; TODO: <<<<>>>>
-        (identity -1 :> *retry-num)
+        ;;   - retry of fork needs to rehydrate invoke-id->new-args
+        (inc *expected-retry-num :> *retry-num)
+        (identity nil :> *op)
+        (filter> false)
+
+       (case> (aor-types/ForkAgentInvoke? *data))
+        (identity *data
+                  :> {:keys [*agent-task-id
+                             *agent-id
+                             *invoke-id->new-args]})
+        ;; TODO: <<<<<>>>>
+        ;;  - need to track on root what this is a fork of, and also what
+        ;;  invoke-id->new-args is for when this gets retried
+        (identity 0 :> *retry-num)
         (identity nil :> *op)
         (filter> false)
 
@@ -685,7 +701,9 @@
         (|direct *agent-task-id)
         (depot-partition-append!
          agent-depot-sym
-         (aor-types/->valid-RetryAgentInvoke *agent-task-id *agent-id nil)
+         (aor-types/->valid-RetryAgentInvoke *agent-task-id
+                                             *agent-id
+                                             *retry-num)
          :append-ack)
         (identity nil :> *op)
         (filter> false)
@@ -815,6 +833,7 @@
                     :start-time-millis   *start-time-millis
                     :agg-invoke-id       *agg-invoke-id
                     :agg-inputs          []
+                    :agg-input-invoke-ids #{}
                     :agg-state           *init-agg-state
                     :agg-ack-val         *invoke-id
                     :agg-start-invoke-id *invoke-id
@@ -832,6 +851,11 @@
                            *agg-start-invoke-id :agg-start-invoke-id
                            *agg-finished?       :agg-finished?
                           })
+        (local-transform> [(keypath *agg-invoke-id)
+                           :agg-input-invoke-ids
+                           NONE-ELEM
+                           (termval *invoke-id)]
+                          agent-node-pstate-sym)
         (filter> (not *agg-finished?))
         ;; TODO: <<<<>>>> catch exceptions and propagate failure
         ;;  - failure of this should be total failure of the agent
