@@ -103,37 +103,35 @@
 (def AGENT-NODE-PSTATE-SCHEMA
   {Long ; invoke-id
    (fixed-keys-schema
-    {:agent-id Long
-     :agent-task-id Long
-     :node String
-     :nested-ops [NestedOpInfo]
-     :emits [AgentNodeEmit]
-     :result AgentResult
-     :start-time-millis Long
+    {:agent-id           Long
+     :agent-task-id      Long
+     :node               String
+     :nested-ops         [NestedOpInfo]
+     :emits              [AgentNodeEmit]
+     :result             AgentResult
+     :start-time-millis  Long
      :finish-time-millis Long
 
      ;; updated on a retry when this node does not need a retry
-     :retry-time-millis Long
-     :agg-invoke-id Long
+     :retry-time-millis  Long
+     :agg-invoke-id      Long
 
      ;; regular node state
-     :input [Object]
+     :input              [Object]
 
      ;; start agg node
-     :started-agg? Boolean
+     :started-agg?       Boolean
 
      ;; invoke of agg node (to make tracing easier)
      :invoked-agg-invoke-id Long
 
      ;; agg state
-     :agg-inputs (vector-schema AggInput {:subindex? true})
-     ;;used so retries checker can tell if an agg input didn't get through
-     :agg-input-invoke-ids (set-schema Long {:subindex? true})
-     :agg-start-res Object
-     :agg-state Object
-     :agg-ack-val Long
+     :agg-inputs         (vector-schema AggInput {:subindex? true})
+     :agg-start-res      Object
+     :agg-state          Object
+     :agg-ack-val        Long
      :agg-start-invoke-id Long
-     :agg-finished? Boolean
+     :agg-finished?      Boolean
 
      ;; TODO: <<<<>>>>
      ;;   - what other stats does langsmith track?

@@ -1721,7 +1721,6 @@
      (bind ret
        (invoke-agent-and-return! depot invokes-pstate []))
 
-
      (is (=
           #{["ca" 15]
             ["cc" 6]

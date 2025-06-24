@@ -833,7 +833,6 @@
                     :start-time-millis   *start-time-millis
                     :agg-invoke-id       *agg-invoke-id
                     :agg-inputs          []
-                    :agg-input-invoke-ids #{}
                     :agg-state           *init-agg-state
                     :agg-ack-val         *invoke-id
                     :agg-start-invoke-id *invoke-id
@@ -851,11 +850,6 @@
                            *agg-start-invoke-id :agg-start-invoke-id
                            *agg-finished?       :agg-finished?
                           })
-        (local-transform> [(keypath *agg-invoke-id)
-                           :agg-input-invoke-ids
-                           NONE-ELEM
-                           (termval *invoke-id)]
-                          agent-node-pstate-sym)
         (filter> (not *agg-finished?))
         ;; TODO: <<<<>>>> catch exceptions and propagate failure
         ;;  - failure of this should be total failure of the agent
