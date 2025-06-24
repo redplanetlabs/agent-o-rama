@@ -15,6 +15,10 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
     _execServResource.getResource().submit((Runnable) f);
   }
 
+  public Set<Long> getRunningInvokeIds() {
+    return _runningInvokeIds;
+  }
+
   @Override
   public void prepareForTask(int taskId, TaskGlobalContext context) {
     _execServResource = new WorkerManagedResource("agentVirtualThreads", context, () -> Executors.newVirtualThreadPerTaskExecutor());

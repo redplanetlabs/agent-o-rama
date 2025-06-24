@@ -4,6 +4,7 @@
         [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [clojure.set :as set]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.graph :as graph]
@@ -14,14 +15,18 @@
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
+   [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
    [loom.attr :as lattr]
    [loom.graph :as lgraph]
    [meander.epsilon :as m])
   (:import
    [com.rpl.agentorama
+    AgentInvoke
     BuiltIn
     StreamingChunk]
+   [com.rpl.agentorama.impl
+    AgentNodeExecutorTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     Node
     NodeAgg
@@ -1901,6 +1906,7 @@
          items))))
 
 (def SEM)
+(def SEM2)
 
 (defn- sc->data
   [chunks]
@@ -2380,20 +2386,249 @@
        (close! as)
       ))))
 
+(defn get-executing-node-ids
+  [^AgentNodeExecutorTaskGlobal node-exec]
+  (.getRunningInvokeIds node-exec))
+
 (deftest agent-pending-tracking-test
-         ;; TODO: <<<<<>>>>
-         ;;   - test and verify pending agents, pending nodes, and
-         ;;   last-updated-ack-val times
-         ;;     - actually, is this necessary with how execution will work?
-         ;;       - it should in theory reduce the amount of work the checker
-         ;;       agent does, but does that matter?
-         ;;       - if it's a long-running model call, it won't make a
-         ;;       difference
-         ;;         - though if it's many short model calls, it will make a
-         ;;         difference as those are all separate node invokes
-)
+  (with-redefs [SEM  (h/mk-semaphore 0)
+                SEM2 (h/mk-semaphore 0)]
+    (with-open [ipc (rtest/create-ipc)
+                _ (TopologyUtils/startSimTime)]
+      (letlocals
+       (bind module
+         (module
+           [setup topologies]
+           (let [topology   (aor/agents-topology setup topologies)
+                 node-exec  (symbol (po/agent-node-executor-name))
+                 active-foo (symbol (po/agent-active-invokes-task-global-name
+                                     "foo"))
+                 active-bar (symbol (po/agent-active-invokes-task-global-name
+                                     "bar"))]
+             (->
+               topology
+               (aor/new-agent "foo")
+               (aor/node
+                "start"
+                "node1"
+                (fn [agent-node]
+                  (TopologyUtils/advanceSimTime 1)
+                  (h/acquire-semaphore SEM 1)
+                  (aor/emit! agent-node "node1")
+                ))
+               (aor/node
+                "node1"
+                nil
+                (fn [agent-node]
+                  (TopologyUtils/advanceSimTime 2)
+                  (h/acquire-semaphore SEM 1)
+                  (aor/result! agent-node "abc")
+                )))
+             (->
+               topology
+               (aor/new-agent "bar")
+               (aor/node
+                "start"
+                "node1"
+                (fn [agent-node]
+                  (TopologyUtils/advanceSimTime 10)
+                  (h/acquire-semaphore SEM2 1)
+                  (aor/emit! agent-node "node1")
+                ))
+               (aor/node
+                "node1"
+                "node2"
+                (fn [agent-node]
+                  (TopologyUtils/advanceSimTime 20)
+                  (h/acquire-semaphore SEM2 1)
+                  (aor/emit! agent-node "node2")
+                ))
+               (aor/agg-start-node
+                "node2"
+                "node3"
+                (fn [agent-node]
+                  (TopologyUtils/advanceSimTime 30)
+                  (h/acquire-semaphore SEM2 1)
+                  (aor/emit! agent-node "node3")
+                  (aor/emit! agent-node "node3")))
+               (aor/node
+                "node3"
+                "node4"
+                (fn [agent-node]
+                  (TopologyUtils/advanceSimTime 1)
+                  (h/acquire-semaphore SEM2 1)
+                  (TopologyUtils/advanceSimTime 40)
+                  (aor/emit! agent-node "node4" 1)))
+               (aor/agg-node
+                "node4"
+                nil
+                aggs/+sum
+                (fn [agent-node agg node-start-res]
+                  (h/acquire-semaphore SEM2 1)
+                  (TopologyUtils/advanceSimTime 10)
+                  (aor/result! agent-node "def"))))
+             (aor/define-agents! topology)
+             (<<query-topology topologies
+               "pending-invoke-ids"
+               [:> *invoke-ids]
+               (|all)
+               (get-executing-node-ids node-exec :> *s)
+               (ops/explode *s :> *invoke-id)
+               (|origin)
+               (aggs/+set-agg *invoke-id :> *invoke-ids))
+             (<<query-topology topologies
+               "pending-agent-count"
+               [:> *res]
+               (|all)
+               (local-select> MAP-KEYS active-foo :> *agent-id)
+               (identity "foo" :> *name)
+               (anchor> <foo>)
+
+               (gen>)
+               (|all)
+               (local-select> MAP-KEYS active-bar :> *agent-id)
+               (identity "bar" :> *name)
+               (anchor> <bar>)
+
+               (unify> <foo> <bar>)
+               (|origin)
+               (+compound {*name (aggs/+count)} :> *res))
+           )))
+       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind pending-invoke-ids
+         (foreign-query ipc module-name "pending-invoke-ids"))
+       (bind pending-invokes
+         (fn []
+           (foreign-invoke-query pending-invoke-ids)))
+       (bind pending-agent-count-q
+         (foreign-query ipc module-name "pending-agent-count"))
+       (bind pending-agent-count
+         (fn []
+           (foreign-invoke-query pending-agent-count-q)))
+       (bind foo-invokes-pstate
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-invoke-task-global-name "foo")))
+       (bind bar-invokes-pstate
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-invoke-task-global-name "bar")))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind foo (aor/agent-client agent-manager "foo"))
+       (bind bar (aor/agent-client agent-manager "bar"))
+
+       (bind last-progress-time
+         (fn [pstate ^AgentInvoke inv]
+           (let [task-id (.getTaskId inv)
+                 inv-id  (.getAgentInvokeId inv)]
+             (foreign-select-one [(keypath inv-id)
+                                  :last-progress-time-millis]
+                                 pstate
+                                 {:pkey task-id}))))
+       (bind release-and-change-invokes!
+         (fn this
+           ([sem]
+            (this sem 0))
+           ([sem delta]
+            (let [invokes (pending-invokes)
+                  c       (count invokes)]
+              (h/release-semaphore sem 1)
+              (when-not
+                (condition-attained?
+                 (let [new-invokes (pending-invokes)]
+                   (and (= (count new-invokes) (+ c delta))
+                        (= (count (set/intersection invokes new-invokes))
+                           (dec c))
+                   )))
+                (throw (ex-info "Failed" {})))
+            ))))
+
+       (bind inv-foo1 (aor/agent-initiate foo))
+
+       (is (condition-attained?
+            (= 1 (count (pending-invokes)))))
+       (is (= 0 (last-progress-time foo-invokes-pstate inv-foo1)))
+       (is (= {"foo" 1} (pending-agent-count)))
+
+       (release-and-change-invokes! SEM)
+       (is (= {"foo" 1} (pending-agent-count)))
+       (is (condition-attained?
+            (= 1 (last-progress-time foo-invokes-pstate inv-foo1))))
+
+       (bind inv-bar1 (aor/agent-initiate bar))
+       (is (condition-attained?
+            (= 2 (count (pending-invokes)))))
+       (is (= 3 (last-progress-time bar-invokes-pstate inv-bar1)))
+       (is (= {"foo" 1 "bar" 1} (pending-agent-count)))
+
+       (release-and-change-invokes! SEM2)
+       (is (= {"foo" 1 "bar" 1} (pending-agent-count)))
+       (is (condition-attained?
+            (= 1 (last-progress-time foo-invokes-pstate inv-foo1))))
+       (is (condition-attained?
+            (= 13 (last-progress-time bar-invokes-pstate inv-bar1))))
+
+       (release-and-change-invokes! SEM2)
+       (is (= {"foo" 1 "bar" 1} (pending-agent-count)))
+       (is (condition-attained?
+            (= 1 (last-progress-time foo-invokes-pstate inv-foo1))))
+       (is (condition-attained?
+            (= 33 (last-progress-time bar-invokes-pstate inv-bar1))))
+
+       (release-and-change-invokes! SEM2 1)
+       (is (= {"foo" 1 "bar" 1} (pending-agent-count)))
+       (is (condition-attained?
+            (= 1 (last-progress-time foo-invokes-pstate inv-foo1))))
+       (is (condition-attained?
+            (= 63 (last-progress-time bar-invokes-pstate inv-bar1))))
+
+       (release-and-change-invokes! SEM -1)
+       (is (= "abc" (aor/agent-result foo inv-foo1)))
+       (is (condition-attained? (= {"bar" 1} (pending-agent-count))))
+       (is (= 65 (last-progress-time foo-invokes-pstate inv-foo1)))
+       (is (condition-attained?
+            (= 63 (last-progress-time bar-invokes-pstate inv-bar1))))
+
+       (release-and-change-invokes! SEM2 -1)
+       (is (= {"bar" 1} (pending-agent-count)))
+       (is (= 65 (last-progress-time foo-invokes-pstate inv-foo1)))
+       (is (condition-attained?
+            (= 105 (last-progress-time bar-invokes-pstate inv-bar1))))
+
+       (release-and-change-invokes! SEM2)
+       (is (= {"bar" 1} (pending-agent-count)))
+       (is (= 65 (last-progress-time foo-invokes-pstate inv-foo1)))
+       (is (condition-attained?
+            (= 145 (last-progress-time bar-invokes-pstate inv-bar1))))
+
+       (release-and-change-invokes! SEM2 -1)
+       (is (= "def" (aor/agent-result bar inv-bar1)))
+       (is (condition-attained? (= {} (pending-agent-count))))
+       (is (= 65 (last-progress-time foo-invokes-pstate inv-foo1)))
+       (is (= 155 (last-progress-time bar-invokes-pstate inv-bar1)))
+
+       (bind inv-foo1 (aor/agent-initiate foo))
+       (bind inv-foo2 (aor/agent-initiate foo))
+       (bind inv-bar1 (aor/agent-initiate bar))
+       (is (condition-attained? (= {"foo" 2 "bar" 1} (pending-agent-count))))
+       (h/release-semaphore SEM 3)
+       (is (condition-attained? (= {"foo" 1 "bar" 1} (pending-agent-count))))
+
+       (h/release-semaphore SEM 1000)
+       (h/release-semaphore SEM2 1000)
+
+       (aor/agent-result foo inv-foo1)
+       (aor/agent-result foo inv-foo2)
+       (aor/agent-result bar inv-bar1)
+
+       ;; TODO: <<<<<>>>>
+       ;;   - test failed node cleans up active node tracking
+      ))))
 
 (deftest traced-out-of-band-test
+
+
          ;; TODO: <<<<<>>>> do custom CF thing with custom tracing
          ;;  - need to make API for this
 )
