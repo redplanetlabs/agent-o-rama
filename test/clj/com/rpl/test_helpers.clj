@@ -40,13 +40,13 @@
 (defn invoke-agent-and-wait!
   [depot invokes-pstate args]
   (let [res   (foreign-append! depot (aor-types/->AgentInvoke args 0 nil))
-        [graph-task-id graph-id] (-> res
+        [agent-task-id agent-id] (-> res
                                      vals
                                      first)
         prom  (promise)
-        proxy (foreign-proxy [(keypath graph-id) :ack-val]
+        proxy (foreign-proxy [(keypath agent-id) :ack-val]
                              invokes-pstate
-                             {:pkey        graph-task-id
+                             {:pkey        agent-task-id
                               :callback-fn (fn [new-val _ _]
                                              (when (= new-val 0)
                                                (deliver prom nil))
@@ -54,18 +54,18 @@
     (when (= ::failed (deref prom 30000 ::failed))
       (throw (ex-info "Agent did not complete" {})))
     (close! proxy)
-    [graph-task-id graph-id]
+    [agent-task-id agent-id]
   ))
 
 (defn invoke-agent-and-return!
   [depot invokes-pstate args]
-  (let [[graph-task-id graph-id] (invoke-agent-and-wait! depot
+  (let [[agent-task-id agent-id] (invoke-agent-and-wait! depot
                                                          invokes-pstate
                                                          args)]
     (foreign-select-one
-     [(keypath graph-id) :result]
+     [(keypath agent-id) :result]
      invokes-pstate
-     {:pkey graph-task-id})
+     {:pkey agent-task-id})
   ))
 
 (defn- parse-var-prefix

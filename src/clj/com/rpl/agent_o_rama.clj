@@ -284,22 +284,22 @@
                (vec args)
                (h/current-time-millis)
                nil))
-             (h/cf-function [{[graph-task-id graph-id]
+             (h/cf-function [{[agent-task-id agent-id]
                               aor-types/AGENTS-TOPOLOGY-NAME}]
-               (AgentInvoke. graph-task-id graph-id)
+               (AgentInvoke. agent-task-id agent-id)
              )))
           (agentResult [this agent-invoke]
             (.get (.agentResultAsync this agent-invoke)))
           (agentResultAsync [this agent-invoke]
-            (let [graph-task-id (.getTaskId ^AgentInvoke agent-invoke)
-                  graph-id      (.getAgentInvokeId ^AgentInvoke agent-invoke)
+            (let [agent-task-id (.getTaskId ^AgentInvoke agent-invoke)
+                  agent-id      (.getAgentInvokeId ^AgentInvoke agent-invoke)
                   ret           (CompletableFuture.)
                   proxy-atom    (atom nil)]
               (.thenApply
                (foreign-proxy-async
-                [(keypath graph-id) :result]
+                [(keypath agent-id) :result]
                 invokes-pstate
-                {:pkey        graph-task-id
+                {:pkey        agent-task-id
                  :callback-fn (fn [new-val _ _]
                                 (when (some? new-val)
                                   (if (:failure? new-val)

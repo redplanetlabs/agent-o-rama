@@ -45,8 +45,8 @@
         nodes-pstate (symbol (po/agent-node-task-global-name name))]
     (<<query-topology topologies
       topo-name
-      [*graph-task-id *task-invoke-pairs *limit :> *res]
-      (|direct *graph-task-id)
+      [*agent-task-id *task-invoke-pairs *limit :> *res]
+      (|direct *agent-task-id)
       (loop<- [*invokes-map {}
                *task-invoke-pairs (to-pqueue *task-invoke-pairs)
                :> *invokes-map *next-task-invoke-pairs]
@@ -59,7 +59,7 @@
           ;; - do it this way so that agg-invokes-map and task-invoke-pairs
           ;; don't have to be potentially copied around the cluster for every
           ;; fetch
-          ;; - only *invoke-id, *graph-task-id, and *invoke-info cross
+          ;; - only *invoke-id, *agent-task-id, and *invoke-info cross
           ;; partitioner boundaries
           (local-transform> (termval {:ti *next-task-invoke-pairs
                                       :m  *invokes-map})
@@ -69,12 +69,12 @@
                          nodes-pstate
                          :> *all-invoke-info)
           (to-trace-invoke-info (into {} *all-invoke-info) :> *invoke-info)
-          (|direct *graph-task-id)
+          (|direct *agent-task-id)
           (local-select> STAY scratch-sym :> {*p :ti *m :m})
           (emits->pairs (get *invoke-info :emits) :> *pairs)
           (<<if (get *invoke-info :started-agg?)
             (conj *pairs
-                  [*graph-task-id (get *invoke-info :agg-invoke-id)]
+                  [*agent-task-id (get *invoke-info :agg-invoke-id)]
                   :> *new-pairs)
            (else>)
             (identity *pairs :> *new-pairs))

@@ -134,7 +134,7 @@
 
 (defn mk-streaming-recorder
   ^StreamingRecorder
-  [graph-task-id graph-id node invoke-id retry-num streaming-depot]
+  [agent-task-id agent-id node invoke-id retry-num streaming-depot]
   (let [index-vol (volatile! 0)
         outstanding-queue-vol (volatile! clojure.lang.PersistentQueue/EMPTY)]
     (reify
@@ -148,8 +148,8 @@
                cf (foreign-append-async!
                    streaming-depot
                    (aor-types/->valid-NodeStreamingResult
-                    graph-task-id
-                    graph-id
+                    agent-task-id
+                    agent-id
                     node
                     invoke-id
                     (identity-retry-num retry-num)
@@ -170,7 +170,7 @@
     )))
 
 (defn mk-agent-node
-  [agent-name agent-graph graph-task-id graph-id curr-node invoke-id retry-num
+  [agent-name agent-graph agent-task-id agent-id curr-node invoke-id retry-num
    store-info ^RamaClientsTaskGlobal rama-clients]
   (let [task-id             (ops/current-task-id)
         result-vol          (volatile! nil)
@@ -189,8 +189,8 @@
         this-module-name    (.getModuleName module-instance-info)
         random-source       (ops/current-random-source)
         streaming-depot     (.getAgentStreamingDepot rama-clients agent-name)
-        streaming-recorder  (mk-streaming-recorder graph-task-id
-                                                   graph-id
+        streaming-recorder  (mk-streaming-recorder agent-task-id
+                                                   agent-id
                                                    curr-node
                                                    invoke-id
                                                    retry-num
@@ -218,7 +218,7 @@
              (if (= emit-count 1)
                task-id
                (next-task-thread-id task-thread-ids-vol module-instance-info))
-             graph-task-id)
+             agent-task-id)
            node
            (vec args)
           ))))
@@ -237,7 +237,7 @@
              (simpl/->valid-StoreParams
               name
               agent-name
-              graph-id
+              agent-id
               retry-num
               false
               (.getLocalPState rama-clients name)
@@ -324,7 +324,7 @@
     (assoc m k v)))
 
 (deframaop handle-node-invoke
-  [*name *graph-task-id *graph-id *node-fn *invoke-id *retry-num *next-node
+  [*name *agent-task-id *agent-id *node-fn *invoke-id *retry-num *next-node
    *args *agg-invoke-id]
   (<<with-substitutions
    [$$nodes
@@ -334,8 +334,8 @@
     *rama-clients (declared-object-task-global (po/agents-clients-name))]
    (mk-agent-node *name
                   *agent-graph
-                  *graph-task-id
-                  *graph-id
+                  *agent-task-id
+                  *agent-id
                   *next-node
                   *invoke-id
                   *retry-num
@@ -351,8 +351,8 @@
      [*m]
      (:> (reduce-kv assoc-if-void
                     *m
-                    {:graph-id      *graph-id
-                     :graph-task-id *graph-task-id
+                    {:agent-id      *agent-id
+                     :agent-task-id *agent-task-id
                      :node          *next-node
                      :start-time-millis *start-time-millis
                      :input         *args
@@ -381,7 +381,7 @@
    iclient/FINISHED))
 
 (deframaop send-emits>
-  [*agent-name *graph-task-id *graph-id *invoke-id *agg-invoke-id *emits]
+  [*agent-name *agent-task-id *agent-id *invoke-id *agg-invoke-id *emits]
   (<<with-substitutions
    [$$root
     (this-module-pobject-task-global
@@ -408,9 +408,9 @@
    (hook> <root>)
    (mapv :invoke-id *emits :> *next-invoke-ids)
    (reduce bit-xor *invoke-id *next-invoke-ids :> *ack-val)
-   (|direct *graph-task-id)
+   (|direct *agent-task-id)
    (local-transform>
-    [(keypath *graph-id)
+    [(keypath *agent-id)
      :last-progress-time-millis
      (termval (h/current-time-millis))]
     $$root)
@@ -422,25 +422,25 @@
        [*v]
        (:> (bit-xor *v *ack-val)))
      (local-transform>
-      [(keypath *graph-id)
+      [(keypath *agent-id)
        :ack-val
        (term %update-ack-val)]
       $$root)
-     (local-select> (keypath *graph-id)
+     (local-select> (keypath *agent-id)
                     $$root
                     :> {*root-ack-val :ack-val *result :result})
      (<<if (= 0 *root-ack-val)
        (<<if (nil? *result)
          (local-transform>
-          [(keypath *graph-id)
+          [(keypath *agent-id)
            :result
            (termval (aor-types/->AgentResult "Agent completed without result"
                                              true))]
           $$root))
        (finished-streaming-chunk :> *finished-streaming-chunk)
-       (local-transform> [(keypath *graph-id) NONE>] $$active)
+       (local-transform> [(keypath *agent-id) NONE>] $$active)
        (local-transform>
-        [(keypath *graph-id)
+        [(keypath *agent-id)
          MAP-VALS
          :all
          AFTER-ELEM
@@ -483,7 +483,7 @@
     *agent-graph (fetch-graph *name)]
    (local-select> (keypath *invoke-id)
                   $$nodes
-                  :> {:keys [*graph-task-id *graph-id *node *agg-ack-val
+                  :> {:keys [*agent-task-id *agent-id *node *agg-ack-val
                              *agg-state *agg-start-res *agg-invoke-id]})
    (local-transform>
     [(keypath *invoke-id) :agg-finished? (termval true)]
@@ -491,8 +491,8 @@
    (get-node-obj *agent-graph *node :> {:keys [*node-fn]})
    (vector *agg-state *agg-start-res :> *args)
    (handle-node-invoke *name
-                       *graph-task-id
-                       *graph-id
+                       *agent-task-id
+                       *agent-id
                        *node-fn
                        *invoke-id
                        *retry-num
@@ -516,18 +516,18 @@
    (complete-agg! *name *invoke-id *retry-num)
    (:>)))
 
-(defn hook:writing-result [graph-task-id graph-id result])
+(defn hook:writing-result [agent-task-id agent-id result])
 
 (deframaop handle-result!
-  [*agent-name *graph-task-id *graph-id *result]
+  [*agent-name *agent-task-id *agent-id *result]
   (<<with-substitutions
    [$$root
     (this-module-pobject-task-global (po/agent-invoke-task-global-name
                                       *agent-name))]
-   (|direct *graph-task-id)
-   (hook:writing-result *graph-task-id *graph-id *result)
+   (|direct *agent-task-id)
+   (hook:writing-result *agent-task-id *agent-id *result)
    (local-transform>
-    [(keypath *graph-id)
+    [(keypath *agent-id)
      :result
      ;; TODO: <<<<<>>>>> what about case of a retry?
      ;;  - what about case where it errors on one branch but has a result
@@ -541,12 +541,12 @@
    (:>)))
 
 (deframaop filter-valid-retry-num>
-  [*agent-name *graph-id *retry-num]
+  [*agent-name *agent-id *retry-num]
   (<<with-substitutions
    [$$valid
     (this-module-pobject-task-global (po/agent-valid-invokes-task-global-name
                                       *agent-name))]
-   (local-select> (keypath *graph-id)
+   (local-select> (keypath *agent-id)
                   $$valid
                   :> *valid-retry-num)
    (filter> (or> (nil? *valid-retry-num) (= *valid-retry-num *retry-num)))
@@ -641,15 +641,15 @@
       (<<cond
        (case> (aor-types/AgentInvoke? *data))
         (get *data :args :> *args)
-        (ops/current-task-id :> *graph-task-id)
-        (gen-id agent-id-gen-pstate-sym :> *graph-id)
-        (ack-return> [*graph-task-id *graph-id])
+        (ops/current-task-id :> *agent-task-id)
+        (gen-id agent-id-gen-pstate-sym :> *agent-id)
+        (ack-return> [*agent-task-id *agent-id])
         (h/random-long :> *invoke-id)
         (fetch-graph-version name :> *version)
         (identity 0 :> *retry-num)
         (h/current-time-millis :> *current-time-millis)
         (local-transform>
-         [(keypath *graph-id)
+         [(keypath *agent-id)
           (termval {:root-invoke-id *invoke-id
                     :invoke-args    *args
                     :graph-version  *version
@@ -657,7 +657,7 @@
                     :last-progress-time-millis *current-time-millis
                     :retry-num      *retry-num})]
          agent-invoke-pstate-sym)
-        (local-transform> [(keypath *graph-id) (termval true)]
+        (local-transform> [(keypath *agent-id) (termval true)]
                           agent-active-invokes-pstate-sym)
         (aor-types/->valid-NodeOp *invoke-id
                                   (get agent-graph-sym :start-node)
@@ -665,24 +665,28 @@
                                   nil
                                   :> *op)
 
+       (case> (aor-types/RetryAgentInvoke? *data))
+        (identity *data :> {:keys [*agent-task-id *agent-id *fork]})
+        ;; TODO: <<<<>>>>
+        (identity -1 :> *retry-num)
+        (identity nil :> *op)
+        (filter> false)
+
        (case> (aor-types/NodeFailure? *data))
         (identity *data
                   :> {:keys [*invoke-id
                              *retry-num]})
         (local-select> (keypath *invoke-id)
                        agent-node-pstate-sym
-                       :> {:keys [*graph-task-id *graph-id]})
-        (filter> (some? *graph-id))
-        (filter-valid-retry-num> name *graph-id *retry-num)
+                       :> {:keys [*agent-task-id *agent-id]})
+        (filter> (some? *agent-id))
+        (filter-valid-retry-num> name *agent-id *retry-num)
         (mark-virtual-task-complete! *invoke-id)
-
-        ;; TODO: <<<<<>>>>>
-        ;;   - trigger a retry back at root
-        ;;   - probably done with a foreign depot append, and it should say
-        ;;   which retry-num it currently is
-        ;;   - retry would have to update the finish times on nodes so it
-        ;;   doesn't do another retry immediately?
-        ;;      - or have another finish time on the node?
+        (|direct *agent-task-id)
+        (depot-partition-append!
+         agent-depot-sym
+         (aor-types/->valid-RetryAgentInvoke *agent-task-id *agent-id nil)
+         :append-ack)
         (identity nil :> *op)
         (filter> false)
 
@@ -696,11 +700,11 @@
                              *nested-ops
                              *finish-time-millis]})
 
-        (local-select> [(keypath *invoke-id) :graph-id]
+        (local-select> [(keypath *invoke-id) :agent-id]
                        agent-node-pstate-sym
-                       :> *graph-id)
-        (filter> (some? *graph-id))
-        (filter-valid-retry-num> name *graph-id *retry-num)
+                       :> *agent-id)
+        (filter> (some? *agent-id))
+        (filter-valid-retry-num> name *agent-id *retry-num)
 
         (<<ramafn %merger
           [*m]
@@ -715,7 +719,7 @@
                           agent-node-pstate-sym)
         (local-select> (keypath *invoke-id)
                        agent-node-pstate-sym
-                       :> {:keys [*graph-task-id *graph-id *node
+                       :> {:keys [*agent-task-id *agent-id *node
                                   *agg-invoke-id]})
         (mark-virtual-task-complete! *invoke-id)
         (get-node-obj agent-graph-sym *node :> *node-obj)
@@ -743,10 +747,10 @@
         ;; AgentNode implementation makes it impossible for there to be both
         ;; emits and result
         (<<if (some? *result)
-          (handle-result! name *graph-task-id *graph-id *result))
+          (handle-result! name *agent-task-id *agent-id *result))
         (send-emits> name
-                     *graph-task-id
-                     *graph-id
+                     *agent-task-id
+                     *agent-id
                      *invoke-id
                      *agg-invoke-id
                      *emits
@@ -755,8 +759,8 @@
        (default> :unify false)
         (throw! (h/ex-info "Unrecognized data type" {:class (class *data)})))
 
-      ;; requires *graph-id, *graph-task-id, *op to be in scope
-      (filter-valid-retry-num> name *graph-id *retry-num)
+      ;; requires *agent-id, *agent-task-id, *retry-num, *op to be in scope
+      (filter-valid-retry-num> name *agent-id *retry-num)
       (<<if (aor-types/NodeOp? *op)
         (get *op :next-node :> *next-node)
         (get-node-obj agent-graph-sym *next-node :> *op-obj)
@@ -771,8 +775,8 @@
                   :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
         (handle-node-invoke
          name
-         *graph-task-id
-         *graph-id
+         *agent-task-id
+         *agent-id
          *node-fn
          *invoke-id
          *retry-num
@@ -786,8 +790,8 @@
         (h/random-long :> *new-agg-invoke-id)
         (handle-node-invoke
          name
-         *graph-task-id
-         *graph-id
+         *agent-task-id
+         *agent-id
          *node-fn
          *invoke-id
          *retry-num
@@ -805,8 +809,8 @@
          agent-node-pstate-sym)
         (local-transform>
          [(keypath *new-agg-invoke-id)
-          (termval {:graph-id            *graph-id
-                    :graph-task-id       *graph-task-id
+          (termval {:agent-id            *agent-id
+                    :agent-task-id       *agent-task-id
                     :node                *agg-node-name
                     :start-time-millis   *start-time-millis
                     :agg-invoke-id       *agg-invoke-id
@@ -923,9 +927,9 @@
     (<<sources stream-topology
      (source> pstate-write-depot-sym
                {:retry-mode :none}
-              :> {:keys [*pstate-name *path *agent-name *graph-id
+              :> {:keys [*pstate-name *path *agent-name *agent-id
                           *retry-num]})
-      (filter-valid-retry-num> *agent-name *graph-id *retry-num)
+      (filter-valid-retry-num> *agent-name *agent-id *retry-num)
       (this-module-pobject-task-global *pstate-name :> $$p)
       (do-transform! *path $$p :> *ret)
       (ack-return> *ret)

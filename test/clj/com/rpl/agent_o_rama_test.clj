@@ -774,13 +774,13 @@
                            (po/graph-history-task-global-name "foo")))
 
          (dotimes [_ 10]
-           (let [{[graph-task-id graph-id] "_agents-topology"}
+           (let [{[agent-task-id agent-id] "_agents-topology"}
                  (foreign-append! depot
                                   (aor-types/->AgentInvoke ["hello"] 0 nil))]
              (is (= 0
-                    (foreign-select-one [(keypath graph-id) :graph-version]
+                    (foreign-select-one [(keypath agent-id) :graph-version]
                                         invokes-pstate
-                                        {:pkey graph-task-id})))))
+                                        {:pkey agent-task-id})))))
          (is (-> @task-counts-atom
                  empty?
                  not))
@@ -818,12 +818,12 @@
 
          (reset! task-counts-atom {})
          (dotimes [_ 10]
-           (let [{[graph-task-id graph-id] "_agents-topology"}
+           (let [{[agent-task-id agent-id] "_agents-topology"}
                  (foreign-append! depot (aor-types/->AgentInvoke [] 0 nil))]
              (is (= 1
-                    (foreign-select-one [(keypath graph-id) :graph-version]
+                    (foreign-select-one [(keypath agent-id) :graph-version]
                                         invokes-pstate
-                                        {:pkey graph-task-id})))))
+                                        {:pkey agent-task-id})))))
          (is (-> @task-counts-atom
                  empty?
                  not))
@@ -850,7 +850,7 @@
 (deftest finish-test
   (let [results-atom (atom [])]
     (with-redefs [i/hook:writing-result
-                  (fn [graph-task-id graph-id result]
+                  (fn [agent-task-id agent-id result]
                     (swap! results-atom conj result)
                   )]
       (with-open [ipc (rtest/create-ipc)]
@@ -980,35 +980,35 @@
                        module-name
                        (po/agent-invoke-task-global-name "bar")))
 
-     (bind [graph-task-id-foo1 graph-id-foo1]
+     (bind [agent-task-id-foo1 agent-id-foo1]
        (invoke-agent-and-wait! depot-foo invokes-pstate-foo [10]))
-     (bind [graph-task-id-foo2 graph-id-foo2]
+     (bind [agent-task-id-foo2 agent-id-foo2]
        (invoke-agent-and-wait! depot-foo invokes-pstate-foo [20]))
-     (bind [graph-task-id-bar1 graph-id-bar1]
+     (bind [agent-task-id-bar1 agent-id-bar1]
        (invoke-agent-and-wait! depot-bar invokes-pstate-bar [5]))
-     (bind [graph-task-id-bar2 graph-id-bar2]
+     (bind [agent-task-id-bar2 agent-id-bar2]
        (invoke-agent-and-wait! depot-bar invokes-pstate-bar [10]))
 
      (is (= 22
             (foreign-select-one
-             [(keypath graph-id-foo1) :result :val]
+             [(keypath agent-id-foo1) :result :val]
              invokes-pstate-foo
-             {:pkey graph-task-id-foo1})))
+             {:pkey agent-task-id-foo1})))
      (is (= 42
             (foreign-select-one
-             [(keypath graph-id-foo2) :result :val]
+             [(keypath agent-id-foo2) :result :val]
              invokes-pstate-foo
-             {:pkey graph-task-id-foo2})))
+             {:pkey agent-task-id-foo2})))
      (is (= 21
             (foreign-select-one
-             [(keypath graph-id-bar1) :result :val]
+             [(keypath agent-id-bar1) :result :val]
              invokes-pstate-bar
-             {:pkey graph-task-id-bar1})))
+             {:pkey agent-task-id-bar1})))
      (is (= 41
             (foreign-select-one
-             [(keypath graph-id-bar2) :result :val]
+             [(keypath agent-id-bar2) :result :val]
              invokes-pstate-bar
-             {:pkey graph-task-id-bar2})))
+             {:pkey agent-task-id-bar2})))
     )))
 
 (deftest stores-test
@@ -1335,16 +1335,16 @@
            (foreign-query ipc
                           module-name
                           (queries/tracing-query-topology-name "foo")))
-         (bind [graph-task-id graph-id]
+         (bind [agent-task-id agent-id]
            (invoke-agent-and-wait! depot invokes-pstate []))
          (bind root-invoke-id
-           (foreign-select-one [(keypath graph-id) :root-invoke-id]
+           (foreign-select-one [(keypath agent-id) :root-invoke-id]
                                invokes-pstate
-                               {:pkey graph-task-id}))
+                               {:pkey agent-task-id}))
          (bind res
            (foreign-invoke-query traces-query
-                                 graph-task-id
-                                 [[graph-task-id root-invoke-id]]
+                                 agent-task-id
+                                 [[agent-task-id root-invoke-id]]
                                  10000))
          (is
           (trace-matches?
@@ -1352,7 +1352,7 @@
            {!id1
             {:agg-invoke-id     nil
              :emits             [{:invoke-id      !id2
-                                  :target-task-id ?graph-task-id
+                                  :target-task-id ?agent-task-id
                                   :node-name      "doc"
                                   :args           []}]
              :node              "kv"
@@ -1379,16 +1379,16 @@
                :finish-time-millis 15
                :info {"type" "store-write" "op" "update" "params" [:d]}}]
              :result            nil
-             :graph-id          ?graph-id
+             :agent-id          ?agent-id
              :input             []
-             :graph-task-id     ?graph-task-id
+             :agent-task-id     ?agent-task-id
              :start-time-millis 0
              :finish-time-millis 15
             }
             !id2
             {:agg-invoke-id     nil
              :emits             [{:invoke-id      !id3
-                                  :target-task-id ?graph-task-id
+                                  :target-task-id ?agent-task-id
                                   :node-name      "pstate"
                                   :args           []}]
              :node              "doc"
@@ -1427,16 +1427,16 @@
                 "op"     "update-document-field"
                 "params" [:m :a]}}]
              :result            nil
-             :graph-id          ?graph-id
+             :agent-id          ?agent-id
              :input             []
-             :graph-task-id     ?graph-task-id
+             :agent-task-id     ?agent-task-id
              :start-time-millis 15
              :finish-time-millis 55
             }
             !id3
             {:agg-invoke-id     nil
              :emits             [{:invoke-id      !id4
-                                  :target-task-id ?graph-task-id
+                                  :target-task-id ?agent-task-id
                                   :node-name      "end"
                                   :args           []}]
              :node              "pstate"
@@ -1478,9 +1478,9 @@
                 "params" [{:pkey :a}]
                 "result" [2]}}]
              :result            nil
-             :graph-id          ?graph-id
+             :agent-id          ?agent-id
              :input             []
-             :graph-task-id     ?graph-task-id
+             :agent-task-id     ?agent-task-id
              :start-time-millis 55
              :finish-time-millis 136
             }
@@ -1490,16 +1490,16 @@
              :node              "end"
              :nested-ops        []
              :result            {:val "done" :failure? false}
-             :graph-id          ?graph-id
+             :agent-id          ?agent-id
              :input             []
-             :graph-task-id     ?graph-task-id
+             :agent-task-id     ?agent-task-id
              :start-time-millis 136
              :finish-time-millis 136
             }
            }
            (m/guard
-            (and (= ?graph-id graph-id)
-                 (= ?graph-task-id graph-task-id)))))
+            (and (= ?agent-id agent-id)
+                 (= ?agent-task-id agent-task-id)))))
         )))))
 
 (deftest looped-test
@@ -1980,8 +1980,8 @@
                (aor/define-agents! topology)
                (<<sources s
                 (source> *reset-depot
-                         :> [*agent-name *graph-task-id *graph-id])
-                 (|direct *graph-task-id)
+                         :> [*agent-name *agent-task-id *agent-id])
+                 (|direct *agent-task-id)
                  (this-module-pobject-task-global
                   (po/agent-invoke-task-global-name *agent-name)
                   :> $$root)
@@ -1989,10 +1989,10 @@
                   (po/agent-streaming-results-task-global-name *agent-name)
                   :> $$streaming)
                  (local-transform>
-                  [(keypath *graph-id) :retry-num (term inc)]
+                  [(keypath *agent-id) :retry-num (term inc)]
                   $$root)
                  (local-transform>
-                  [(keypath *graph-id)
+                  [(keypath *agent-id)
                    MAP-VALS
                    (multi-path [:all NONE>]
                                [:invokes NONE>])]

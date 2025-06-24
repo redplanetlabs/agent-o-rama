@@ -103,8 +103,8 @@
 (def AGENT-NODE-PSTATE-SCHEMA
   {Long ; invoke-id
    (fixed-keys-schema
-    {:graph-id           Long
-     :graph-task-id      Long
+    {:agent-id           Long
+     :agent-task-id      Long
      :node               String
      :nested-ops         [NestedOpInfo]
      :emits              [AgentNodeEmit]

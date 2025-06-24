@@ -169,16 +169,16 @@
        (foreign-query ipc
                       module-name
                       (queries/tracing-query-topology-name "foo")))
-     (bind [graph-task-id graph-id]
+     (bind [agent-task-id agent-id]
        (invoke-agent-and-wait! depot invokes-pstate ["xyz"]))
      (bind root-invoke-id
-       (foreign-select-one [(keypath graph-id) :root-invoke-id]
+       (foreign-select-one [(keypath agent-id) :root-invoke-id]
                            invokes-pstate
-                           {:pkey graph-task-id}))
+                           {:pkey agent-task-id}))
      (bind res
        (foreign-invoke-query traces-query
-                             graph-task-id
-                             [[graph-task-id root-invoke-id]]
+                             agent-task-id
+                             [[agent-task-id root-invoke-id]]
                              10000))
 
      (is (empty? (:next-task-invoke-pairs res)))
@@ -190,20 +190,20 @@
        {!id1  {:agg-invoke-id nil
                :emits
                [{:invoke-id      !id2
-                 :target-task-id ?graph-task-id
+                 :target-task-id ?agent-task-id
                  :node-name      "node1"
                  :args           ["xyz-0"]}]
                :node          "start"
                :nested-ops    []
                :result        nil
-               :graph-id      ?graph-id
+               :agent-id      ?agent-id
                :input         ["xyz"]
-               :graph-task-id ?graph-task-id
+               :agent-task-id ?agent-task-id
               }
         !id2  {:agg-invoke-id nil
                :emits
                [{:invoke-id      !id3
-                 :target-task-id ?graph-task-id
+                 :target-task-id ?agent-task-id
                  :node-name      "node2"
                  :args           ["xyz-0-00"]}
                 {:invoke-id      !id4
@@ -213,25 +213,25 @@
                :node          "node1"
                :nested-ops    []
                :result        nil
-               :graph-id      ?graph-id
+               :agent-id      ?agent-id
                :input         ["xyz-0"]
-               :graph-task-id ?graph-task-id}
+               :agent-task-id ?agent-task-id}
         !id3  {:agg-invoke-id nil
                :emits
                [{:invoke-id      !id5
-                 :target-task-id ?graph-task-id
+                 :target-task-id ?agent-task-id
                  :node-name      "node3"
                  :args           ["xyz-0-00-000"]}]
                :node          "node2"
                :nested-ops    []
                :result        nil
-               :graph-id      ?graph-id
+               :agent-id      ?agent-id
                :input         ["xyz-0-00"]
-               :graph-task-id ?graph-task-id}
+               :agent-task-id ?agent-task-id}
         !id5  {:agg-invoke-id !agg0
                :emits
                [{:invoke-id      !id6
-                 :target-task-id ?graph-task-id
+                 :target-task-id ?agent-task-id
                  :node-name      "node4"
                  :args           [1]}
                 {:invoke-id      !id7
@@ -246,64 +246,64 @@
                :node          "node3"
                :nested-ops    []
                :result        nil
-               :graph-id      ?graph-id
+               :agent-id      ?agent-id
                :input         ["xyz-0-00-000"]
-               :graph-task-id ?graph-task-id}
+               :agent-task-id ?agent-task-id}
         !id6  {:agg-invoke-id !agg0
                :emits
                [{:invoke-id      !id9
-                 :target-task-id ?graph-task-id
+                 :target-task-id ?agent-task-id
                  :node-name      "agg"
                  :args           ["1-a"]}]
                :node          "node4"
                :nested-ops    []
                :result        nil
-               :graph-id      ?graph-id
+               :agent-id      ?agent-id
                :input         [1]
-               :graph-task-id ?graph-task-id}
+               :agent-task-id ?agent-task-id}
         !id9  {:invoked-agg-invoke-id !agg0}
         !id7  {:agg-invoke-id !agg0
                :emits
                [{:invoke-id      !id10
-                 :target-task-id ?graph-task-id
+                 :target-task-id ?agent-task-id
                  :node-name      "agg"
                  :args           ["1-a"]}]
                :node          "node4"
                :nested-ops    []
                :result        nil
-               :graph-id      ?graph-id
+               :agent-id      ?agent-id
                :input         [1]
-               :graph-task-id ?graph-task-id}
+               :agent-task-id ?agent-task-id}
         !id10 {:invoked-agg-invoke-id !agg0}
         !id8  {:agg-invoke-id !agg0
                :emits
                [{:invoke-id      !id11
-                 :target-task-id ?graph-task-id
+                 :target-task-id ?agent-task-id
                  :node-name      "agg"
                  :args           ["1-a"]}]
                :node          "node4"
                :nested-ops    []
                :result        nil
-               :graph-id      ?graph-id
+               :agent-id      ?agent-id
                :input         [1]
-               :graph-task-id ?graph-task-id}
+               :agent-task-id ?agent-task-id}
         !id11 {:invoked-agg-invoke-id !agg0}
         !id4  {:agg-invoke-id nil
                :emits
                [{:invoke-id      !id12
-                 :target-task-id ?graph-task-id
+                 :target-task-id ?agent-task-id
                  :node-name      "node3"
                  :args           ["xyz-0-01-000"]}]
                :node          "node2"
                :nested-ops    []
                :result        nil
-               :graph-id      ?graph-id
+               :agent-id      ?agent-id
                :input         ["xyz-0-01"]
-               :graph-task-id ?graph-task-id}
+               :agent-task-id ?agent-task-id}
         !id12 {:agg-invoke-id !agg1
                :emits
                [{:invoke-id      !id13
-                 :target-task-id ?graph-task-id
+                 :target-task-id ?agent-task-id
                  :node-name      "node4"
                  :args           [1]}
                 {:invoke-id      !id14
@@ -318,47 +318,47 @@
                :node          "node3"
                :nested-ops    []
                :result        nil
-               :graph-id      ?graph-id
+               :agent-id      ?agent-id
                :input         ["xyz-0-01-000"]
-               :graph-task-id ?graph-task-id}
+               :agent-task-id ?agent-task-id}
         !id13 {:agg-invoke-id !agg1
                :emits
                [{:invoke-id      !id16
-                 :target-task-id ?graph-task-id
+                 :target-task-id ?agent-task-id
                  :node-name      "agg"
                  :args           ["1-a"]}]
                :node          "node4"
                :nested-ops    []
                :result        nil
-               :graph-id      ?graph-id
+               :agent-id      ?agent-id
                :input         [1]
-               :graph-task-id ?graph-task-id}
+               :agent-task-id ?agent-task-id}
         !id16 {:invoked-agg-invoke-id !agg1}
         !id14 {:agg-invoke-id !agg1
                :emits
                [{:invoke-id      !id17
-                 :target-task-id ?graph-task-id
+                 :target-task-id ?agent-task-id
                  :node-name      "agg"
                  :args           ["1-a"]}]
                :node          "node4"
                :nested-ops    []
                :result        nil
-               :graph-id      ?graph-id
+               :agent-id      ?agent-id
                :input         [1]
-               :graph-task-id ?graph-task-id}
+               :agent-task-id ?agent-task-id}
         !id17 {:invoked-agg-invoke-id !agg1}
         !id15 {:agg-invoke-id !agg1
                :emits
                [{:invoke-id      !id18
-                 :target-task-id ?graph-task-id
+                 :target-task-id ?agent-task-id
                  :node-name      "agg"
                  :args           ["1-a"]}]
                :node          "node4"
                :nested-ops    []
                :result        nil
-               :graph-id      ?graph-id
+               :agent-id      ?agent-id
                :input         [1]
-               :graph-task-id ?graph-task-id}
+               :agent-task-id ?agent-task-id}
         !id18 {:invoked-agg-invoke-id !agg1}
         !agg0 {:agg-invoke-id   nil
                :agg-input-count 3
@@ -374,12 +374,12 @@
                :result          {:val [["1-a" "1-a" "1-a"]
                                        "xyz-0-00-000-0000"]}
                :agg-finished?   true
-               :graph-id        ?graph-id
+               :agent-id        ?agent-id
                :agg-state       ["1-a" "1-a" "1-a"]
                :input           [["1-a" "1-a" "1-a"]
                                  "xyz-0-00-000-0000"]
                :agg-start-invoke-id !id5
-               :graph-task-id   ?graph-task-id}
+               :agent-task-id   ?agent-task-id}
         !agg1 {:agg-invoke-id   nil
                :agg-input-count 3
                :agg-start-res   "xyz-0-01-000-0000"
@@ -394,16 +394,16 @@
                :result          {:val [["1-a" "1-a" "1-a"]
                                        "xyz-0-01-000-0000"]}
                :agg-finished?   true
-               :graph-id        ?graph-id
+               :agent-id        ?agent-id
                :agg-state       ["1-a" "1-a" "1-a"]
                :input           [["1-a" "1-a" "1-a"]
                                  "xyz-0-01-000-0000"]
                :agg-start-invoke-id !id12
-               :graph-task-id   ?graph-task-id}
+               :agent-task-id   ?agent-task-id}
        }
        (m/guard
-        (and (= ?graph-id graph-id)
-             (= ?graph-task-id graph-task-id)
+        (and (= ?agent-id agent-id)
+             (= ?agent-task-id agent-task-id)
              (= !id1 root-invoke-id)))
        (m/guard
         (and (= #{!id9 !id10 !id11} #{!id9' !id10' !id11'})
@@ -470,28 +470,28 @@
        (foreign-query ipc
                       module-name
                       (queries/tracing-query-topology-name "foo")))
-     (bind [graph-task-id graph-id]
+     (bind [agent-task-id agent-id]
        (invoke-agent-and-wait! depot invokes-pstate ["xy" "-z"]))
-     (bind [graph-task-id2 graph-id2]
+     (bind [agent-task-id2 agent-id2]
        (invoke-agent-and-wait! depot invokes-pstate ["a" "b"]))
      (bind root-invoke-id
-       (foreign-select-one [(keypath graph-id) :root-invoke-id]
+       (foreign-select-one [(keypath agent-id) :root-invoke-id]
                            invokes-pstate
-                           {:pkey graph-task-id}))
+                           {:pkey agent-task-id}))
      (bind root-invoke-id2
-       (foreign-select-one [(keypath graph-id2) :root-invoke-id]
+       (foreign-select-one [(keypath agent-id2) :root-invoke-id]
                            invokes-pstate
-                           {:pkey graph-task-id2}))
+                           {:pkey agent-task-id2}))
      (bind res
        (foreign-invoke-query traces-query
-                             graph-task-id
-                             [[graph-task-id root-invoke-id]]
+                             agent-task-id
+                             [[agent-task-id root-invoke-id]]
                              3))
 
      (bind res10
        (foreign-invoke-query traces-query
-                             graph-task-id2
-                             [[graph-task-id2 root-invoke-id2]]
+                             agent-task-id2
+                             [[agent-task-id2 root-invoke-id2]]
                              3))
 
      (is
@@ -502,7 +502,7 @@
        {!id1 {:agg-invoke-id nil
               :emits
               [{:invoke-id      !id2
-                :target-task-id ?graph-task-id
+                :target-task-id ?agent-task-id
                 :node-name      "node1"
                 :args           ["xy-z-0"]}
                {:invoke-id      !id3
@@ -512,14 +512,14 @@
               :node          "start"
               :nested-ops    []
               :result        nil
-              :graph-id      ?graph-id
+              :agent-id      ?agent-id
               :input         ["xy" "-z"]
-              :graph-task-id ?graph-task-id
+              :agent-task-id ?agent-task-id
              }
         !id2 {:agg-invoke-id nil
               :emits
               [{:invoke-id      !id4
-                :target-task-id ?graph-task-id
+                :target-task-id ?agent-task-id
                 :node-name      "node3"
                 :args           ["xy-z-0-a0"]}
                {:invoke-id      !id5
@@ -529,9 +529,9 @@
               :node          "node1"
               :nested-ops    []
               :result        nil
-              :graph-id      ?graph-id
+              :agent-id      ?agent-id
               :input         ["xy-z-0"]
-              :graph-task-id ?graph-task-id
+              :agent-task-id ?agent-task-id
              }
         !id3 {:agg-invoke-id nil
               :emits
@@ -546,14 +546,14 @@
               :node          "node2"
               :nested-ops    []
               :result        nil
-              :graph-id      ?graph-id
+              :agent-id      ?agent-id
               :input         ["-zxy-1"]
-              :graph-task-id ?graph-task-id
+              :agent-task-id ?agent-task-id
              }
        }
        (m/guard
-        (and (= ?graph-id graph-id)
-             (= ?graph-task-id graph-task-id)
+        (and (= ?agent-id agent-id)
+             (= ?agent-task-id agent-task-id)
              (= !id1 root-invoke-id)))))
      (is (= 3
             (-> res
@@ -562,7 +562,7 @@
 
      (bind res2
        (foreign-invoke-query traces-query
-                             graph-task-id
+                             agent-task-id
                              (:next-task-invoke-pairs res)
                              3))
      (is
@@ -575,32 +575,32 @@
               :node          "node3"
               :nested-ops    []
               :result        nil
-              :graph-id      ?graph-id
+              :agent-id      ?agent-id
               :input         ["xy-z-0-a0"]
-              :graph-task-id ?graph-task-id
+              :agent-task-id ?agent-task-id
              }
         !id2 {:agg-invoke-id nil
               :emits         []
               :node          "node4"
               :nested-ops    []
               :result        nil
-              :graph-id      ?graph-id
+              :agent-id      ?agent-id
               :input         ["xy-z-0-a1"]
-              :graph-task-id ?graph-task-id
+              :agent-task-id ?agent-task-id
              }
         !id3 {:agg-invoke-id nil
               :emits         []
               :node          "node5"
               :nested-ops    []
               :result        nil
-              :graph-id      ?graph-id
+              :agent-id      ?agent-id
               :input         ["-zxy-1-b0"]
-              :graph-task-id ?graph-task-id
+              :agent-task-id ?agent-task-id
              }
        }
        (m/guard
-        (and (= ?graph-id graph-id)
-             (= ?graph-task-id graph-task-id)))))
+        (and (= ?agent-id agent-id)
+             (= ?agent-task-id agent-task-id)))))
      (is (= 3
             (-> res2
                 :invokes-map
@@ -609,7 +609,7 @@
 
      (bind res3
        (foreign-invoke-query traces-query
-                             graph-task-id
+                             agent-task-id
                              (:next-task-invoke-pairs res2)
                              3))
      (is
@@ -622,14 +622,14 @@
               :node          "node6"
               :nested-ops    []
               :result        {:val ["done" "-zxy-1-b1"]}
-              :graph-id      ?graph-id
+              :agent-id      ?agent-id
               :input         ["-zxy-1-b1"]
-              :graph-task-id ?graph-task-id
+              :agent-task-id ?agent-task-id
              }
        }
        (m/guard
-        (and (= ?graph-id graph-id)
-             (= ?graph-task-id graph-task-id)))))
+        (and (= ?agent-id agent-id)
+             (= ?agent-task-id agent-task-id)))))
      (is (= 1
             (-> res3
                 :invokes-map
@@ -649,7 +649,7 @@
        {!id1 {:agg-invoke-id nil
               :emits
               [{:invoke-id      !id2
-                :target-task-id ?graph-task-id
+                :target-task-id ?agent-task-id
                 :node-name      "node1"
                 :args           ["ab-0"]}
                {:invoke-id      !id3
@@ -659,14 +659,14 @@
               :node          "start"
               :nested-ops    []
               :result        nil
-              :graph-id      ?graph-id
+              :agent-id      ?agent-id
               :input         ["a" "b"]
-              :graph-task-id ?graph-task-id
+              :agent-task-id ?agent-task-id
              }
         !id2 {:agg-invoke-id nil
               :emits
               [{:invoke-id      !id4
-                :target-task-id ?graph-task-id
+                :target-task-id ?agent-task-id
                 :node-name      "node3"
                 :args           ["ab-0-a0"]}
                {:invoke-id      !id5
@@ -676,9 +676,9 @@
               :node          "node1"
               :nested-ops    []
               :result        nil
-              :graph-id      ?graph-id
+              :agent-id      ?agent-id
               :input         ["ab-0"]
-              :graph-task-id ?graph-task-id
+              :agent-task-id ?agent-task-id
              }
         !id3 {:agg-invoke-id nil
               :emits
@@ -693,14 +693,14 @@
               :node          "node2"
               :nested-ops    []
               :result        nil
-              :graph-id      ?graph-id
+              :agent-id      ?agent-id
               :input         ["ba-1"]
-              :graph-task-id ?graph-task-id
+              :agent-task-id ?agent-task-id
              }
        }
        (m/guard
-        (and (= ?graph-id graph-id2)
-             (= ?graph-task-id graph-task-id2)
+        (and (= ?agent-id agent-id2)
+             (= ?agent-task-id agent-task-id2)
              (= !id1 root-invoke-id2)))))
      (is (= 3
             (-> res10
@@ -709,7 +709,7 @@
 
      (bind res11
        (foreign-invoke-query traces-query
-                             graph-task-id
+                             agent-task-id
                              (:next-task-invoke-pairs res10)
                              3))
      (is
@@ -722,32 +722,32 @@
               :node          "node3"
               :nested-ops    []
               :result        nil
-              :graph-id      ?graph-id
+              :agent-id      ?agent-id
               :input         ["ab-0-a0"]
-              :graph-task-id ?graph-task-id
+              :agent-task-id ?agent-task-id
              }
         !id2 {:agg-invoke-id nil
               :emits         []
               :node          "node4"
               :nested-ops    []
               :result        nil
-              :graph-id      ?graph-id
+              :agent-id      ?agent-id
               :input         ["ab-0-a1"]
-              :graph-task-id ?graph-task-id
+              :agent-task-id ?agent-task-id
              }
         !id3 {:agg-invoke-id nil
               :emits         []
               :node          "node5"
               :nested-ops    []
               :result        nil
-              :graph-id      ?graph-id
+              :agent-id      ?agent-id
               :input         ["ba-1-b0"]
-              :graph-task-id ?graph-task-id
+              :agent-task-id ?agent-task-id
              }
        }
        (m/guard
-        (and (= ?graph-id graph-id2)
-             (= ?graph-task-id graph-task-id2)))))
+        (and (= ?agent-id agent-id2)
+             (= ?agent-task-id agent-task-id2)))))
      (is (= 3
             (-> res11
                 :invokes-map
@@ -756,7 +756,7 @@
 
      (bind res12
        (foreign-invoke-query traces-query
-                             graph-task-id
+                             agent-task-id
                              (:next-task-invoke-pairs res11)
                              3))
      (is
@@ -769,14 +769,14 @@
               :node          "node6"
               :nested-ops    []
               :result        {:val ["done" "ba-1-b1"]}
-              :graph-id      ?graph-id
+              :agent-id      ?agent-id
               :input         ["ba-1-b1"]
-              :graph-task-id ?graph-task-id
+              :agent-task-id ?agent-task-id
              }
        }
        (m/guard
-        (and (= ?graph-id graph-id2)
-             (= ?graph-task-id graph-task-id2)))))
+        (and (= ?agent-id agent-id2)
+             (= ?agent-task-id agent-task-id2)))))
      (is (= 1
             (-> res12
                 :invokes-map
@@ -838,16 +838,16 @@
        (foreign-query ipc
                       module-name
                       (queries/tracing-query-topology-name "foo")))
-     (bind [graph-task-id graph-id]
+     (bind [agent-task-id agent-id]
        (invoke-agent-and-wait! depot invokes-pstate []))
      (bind root-invoke-id
-       (foreign-select-one [(keypath graph-id) :root-invoke-id]
+       (foreign-select-one [(keypath agent-id) :root-invoke-id]
                            invokes-pstate
-                           {:pkey graph-task-id}))
+                           {:pkey agent-task-id}))
      (bind res
        (foreign-invoke-query traces-query
-                             graph-task-id
-                             [[graph-task-id root-invoke-id]]
+                             agent-task-id
+                             [[agent-task-id root-invoke-id]]
                              100))
 
      (is
@@ -855,34 +855,34 @@
        (:invokes-map res)
        {!id1  {:agg-invoke-id     nil
                :emits             [{:invoke-id      !id2
-                                    :target-task-id ?graph-task-id
+                                    :target-task-id ?agent-task-id
                                     :node-name      "node1"
                                     :args           []}]
                :node              "start"
                :nested-ops        []
                :result            nil
-               :graph-id          ?graph-id
+               :agent-id          ?agent-id
                :input             []
-               :graph-task-id     ?graph-task-id
+               :agent-task-id     ?agent-task-id
                :start-time-millis 0
                :finish-time-millis 5
               }
         !id2  {:started-agg?      true
                :agg-invoke-id     !id5
                :emits             [{:invoke-id      !id3
-                                    :target-task-id ?graph-task-id
+                                    :target-task-id ?agent-task-id
                                     :node-name      "agg"
                                     :args           [1]}
                                    {:invoke-id      !id4
-                                    :target-task-id ?graph-task-id
+                                    :target-task-id ?agent-task-id
                                     :node-name      "agg"
                                     :args           [2]}]
                :node              "node1"
                :nested-ops        []
                :result            nil
-               :graph-id          ?graph-id
+               :agent-id          ?agent-id
                :input             []
-               :graph-task-id     ?graph-task-id
+               :agent-task-id     ?agent-task-id
                :start-time-millis 5
                :finish-time-millis 11
               }
@@ -898,9 +898,9 @@
                :node               "agg"
                :agg-ack-val        0
                :nested-ops         []
-               :graph-id           ?graph-id
+               :agent-id           ?agent-id
                :input              [3 nil]
-               :graph-task-id      ?graph-task-id
+               :agent-task-id      ?agent-task-id
                :agg-state          3
                :agg-start-invoke-id !id2
                :agg-finished?      true
@@ -910,6 +910,6 @@
               }
        }
        (m/guard
-        (and (= ?graph-id graph-id)
-             (= ?graph-task-id graph-task-id)))))
+        (and (= ?agent-id agent-id)
+             (= ?agent-task-id agent-task-id)))))
     )))

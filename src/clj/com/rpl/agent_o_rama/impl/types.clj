@@ -102,6 +102,12 @@
    finish-time-millis :- Long
   ])
 
+(drp/defrecord+ RetryAgentInvoke
+  [agent-task-id :- Long
+   agent-id :- Long
+   ;; nil if it's a retry, map of invoke-id -> new args if it's a fork
+   fork :- (s/maybe {Long [Object]})])
+
 (drp/defrecord+ HistoricalAgentNodeInfo
   [node-type :- clojure.lang.Keyword ; :node, :agg-node, :agg-start-node
    output-nodes :- #{String}
@@ -136,7 +142,7 @@
 
 (drp/defrecord+ PStateWrite
   [agent-name :- String
-   graph-id :- Long
+   agent-id :- Long
    retry-num :- Long
    pstate-name :- String
    path :- s/Any

@@ -31,8 +31,8 @@
 
 (defn agent-stream-impl
   [streaming-pstate ^AgentInvoke agent-invoke node callback-fn]
-  (let [graph-task-id (.getTaskId agent-invoke)
-        graph-id      (.getAgentInvokeId agent-invoke)
+  (let [agent-task-id (.getTaskId agent-invoke)
+        agent-id      (.getAgentInvokeId agent-invoke)
         results-vol   (volatile! [])
         resets-vol    (volatile! 0)
         ps-vol        (volatile! nil)
@@ -90,11 +90,11 @@
 
         ps
         (foreign-proxy
-         [(keypath graph-id node :all)
+         [(keypath agent-id node :all)
           (srange-dynamic h/start-index
                           h/srange-dynamic-end-index)]
          streaming-pstate
-         {:pkey        graph-task-id
+         {:pkey        agent-task-id
           :callback-fn pcallback-fn})]
     (locking ps-vol
       (if (= ::finished @ps-vol)
