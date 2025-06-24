@@ -276,7 +276,8 @@
    ^AgentNode agent-node args
    ^RamaClientsTaskGlobal rama-clients]
   (fn []
-    (let [res   (try
+    (let [depot (.getAgentDepot rama-clients agent-name)
+          res   (try
                   (h/returning (apply node-fn agent-node args)
                     (-> agent-node
                         get-streaming-recorder
@@ -286,20 +287,17 @@
                                       "Error during agent node execution"
                                       {:node      node-name
                                        :invoke-id invoke-id})
-                    ;; TODO: <<<<>>>> handle errors properly
-                    ;;  - which errors here are retryable?
-                    ;;    - depot append / topology errors will come through
-                    ;;    here...
-                    ;;  - make exceptions retryable but not errors?
-                    ;;      - NPE shouldn't retry
-                    ;;  - or just retry on any error here?
-
-                    ;; TODO: <<<<<>>>>>
-                    ;;   - need to mark node as complete in this case
+                    (foreign-append!
+                     depot
+                     (aor-types/->valid-NodeFailure
+                      task-id
+                      invoke-id
+                      retry-num
+                      (h/current-time-millis))
+                     :append-ack)
                     (throw t)
                   ))
-          {:keys [emits result nested-ops]} (agent-node-state agent-node)
-          depot (.getAgentDepot rama-clients agent-name)]
+          {:keys [emits result nested-ops]} (agent-node-state agent-node)]
       (foreign-append!
        depot
        (aor-types/->valid-NodeComplete
@@ -662,6 +660,27 @@
                                   nil
                                   :> *op)
 
+       (case> (aor-types/NodeFailure? *data))
+        (identity *data
+                  :> {:keys [*invoke-id
+                             *retry-num]})
+        (local-select> (keypath *invoke-id)
+                       agent-node-pstate-sym
+                       :> {:keys [*graph-task-id *graph-id]})
+        (filter> (some? *graph-id))
+        (filter-valid-retry-num> name *graph-id *retry-num)
+        (mark-virtual-task-complete! *invoke-id)
+
+        ;; TODO: <<<<<>>>>>
+        ;;   - trigger a retry back at root
+        ;;   - probably done with a foreign depot append, and it should say
+        ;;   which retry-num it currently is
+        ;;   - retry would have to update the finish times on nodes so it
+        ;;   doesn't do another retry immediately?
+        ;;      - or have another finish time on the node?
+        (identity nil :> *op)
+        (filter> false)
+
        (case> (aor-types/NodeComplete? *data))
         (identity *data
                   :> {:keys [*invoke-id
@@ -685,7 +704,8 @@
                          {:emits      *emits
                           :result     *result
                           :nested-ops *nested-ops
-                          :finish-time-millis *finish-time-millis})))
+                          :finish-time-millis *finish-time-millis
+                          :retry-time-millis *finish-time-millis})))
         (local-transform> [(keypath *invoke-id) (term %merger)]
                           agent-node-pstate-sym)
         (local-select> (keypath *invoke-id)

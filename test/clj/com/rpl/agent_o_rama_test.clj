@@ -2622,6 +2622,20 @@
        (aor/agent-result foo inv-foo2)
        (aor/agent-result bar inv-bar1)
 
+
+
+
+       ;; TODO: <<<<<>>>>
+       ;;   - test and verify pending agents, pending nodes, and
+       ;;   last-updated-ack-val times
+       ;;     - actually, is this necessary with how execution will work?
+       ;;       - it should in theory reduce the amount of work the checker
+       ;;       agent does, but does that matter?
+       ;;       - if it's a long-running model call, it won't make a
+       ;;       difference
+       ;;         - though if it's many short model calls, it will make a
+       ;;         difference as those are all separate node invokes
+
        ;; TODO: <<<<<>>>>
        ;;   - test failed node cleans up active node tracking
       ))))

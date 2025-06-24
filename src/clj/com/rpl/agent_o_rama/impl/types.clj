@@ -95,6 +95,13 @@
    finish-time-millis :- Long
   ])
 
+(drp/defrecord+ NodeFailure
+  [task-id :- Long
+   invoke-id :- Long
+   retry-num :- Long
+   finish-time-millis :- Long
+  ])
+
 (drp/defrecord+ HistoricalAgentNodeInfo
   [node-type :- clojure.lang.Keyword ; :node, :agg-node, :agg-start-node
    output-nodes :- #{String}
