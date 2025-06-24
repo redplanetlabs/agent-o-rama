@@ -45,7 +45,8 @@
 
 (defdepotpartitioner agent-depot-partitioner
   [data num-partitions]
-  (if (aor-types/NodeComplete? data)
+  (if (or (aor-types/NodeComplete? data)
+          (aor-types/NodeFailure? data))
     (:task-id data)
     (rand-int num-partitions)))
 
@@ -271,6 +272,10 @@
   (select-any [:node-map (keypath node) :node (view aor-types/node->type-kw)]
               graph))
 
+(defn log-node-error
+  [t msg data]
+  (cljlogging/error t msg data))
+
 (defn node-event
   [agent-name task-id invoke-id retry-num node-name node-fn
    ^AgentNode agent-node args
@@ -283,10 +288,10 @@
                         get-streaming-recorder
                         waitFinish))
                   (catch Throwable t
-                    (cljlogging/error t
-                                      "Error during agent node execution"
-                                      {:node      node-name
-                                       :invoke-id invoke-id})
+                    (log-node-error t
+                                    "Error during agent node execution"
+                                    {:node      node-name
+                                     :invoke-id invoke-id})
                     (foreign-append!
                      depot
                      (aor-types/->valid-NodeFailure

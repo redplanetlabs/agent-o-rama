@@ -2390,9 +2390,12 @@
   [^AgentNodeExecutorTaskGlobal node-exec]
   (.getRunningInvokeIds node-exec))
 
+;; TODO: <<<<<>>>> when retries are in place, this will need to do some sort
+;; of redef or config to make it so there are no retries of failed agents
 (deftest agent-pending-tracking-test
   (with-redefs [SEM  (h/mk-semaphore 0)
-                SEM2 (h/mk-semaphore 0)]
+                SEM2 (h/mk-semaphore 0)
+                i/log-node-error (fn [& args])]
     (with-open [ipc (rtest/create-ipc)
                 _ (TopologyUtils/startSimTime)]
       (letlocals
@@ -2467,6 +2470,16 @@
                   (h/acquire-semaphore SEM2 1)
                   (TopologyUtils/advanceSimTime 10)
                   (aor/result! agent-node "def"))))
+             (->
+               topology
+               (aor/new-agent "car")
+               (aor/node
+                "start"
+                nil
+                (fn [agent-node]
+                  (h/acquire-semaphore SEM 1)
+                  (throw (ex-info "fail" {}))
+                )))
              (aor/define-agents! topology)
              (<<query-topology topologies
                "pending-invoke-ids"
@@ -2517,6 +2530,7 @@
        (bind agent-manager (aor/agent-manager ipc module-name))
        (bind foo (aor/agent-client agent-manager "foo"))
        (bind bar (aor/agent-client agent-manager "bar"))
+       (bind car (aor/agent-client agent-manager "car"))
 
        (bind last-progress-time
          (fn [pstate ^AgentInvoke inv]
@@ -2615,29 +2629,18 @@
        (h/release-semaphore SEM 3)
        (is (condition-attained? (= {"foo" 1 "bar" 1} (pending-agent-count))))
 
-       (h/release-semaphore SEM 1000)
+       (h/release-semaphore SEM 1)
        (h/release-semaphore SEM2 1000)
 
        (aor/agent-result foo inv-foo1)
        (aor/agent-result foo inv-foo2)
        (aor/agent-result bar inv-bar1)
 
-
-
-
-       ;; TODO: <<<<<>>>>
-       ;;   - test and verify pending agents, pending nodes, and
-       ;;   last-updated-ack-val times
-       ;;     - actually, is this necessary with how execution will work?
-       ;;       - it should in theory reduce the amount of work the checker
-       ;;       agent does, but does that matter?
-       ;;       - if it's a long-running model call, it won't make a
-       ;;       difference
-       ;;         - though if it's many short model calls, it will make a
-       ;;         difference as those are all separate node invokes
-
-       ;; TODO: <<<<<>>>>
-       ;;   - test failed node cleans up active node tracking
+       ;; verify failed nodes get cleaned up
+       (bind inv-car (aor/agent-initiate car))
+       (is (= 1 (count (pending-invokes))))
+       (h/release-semaphore SEM 1)
+       (is (condition-attained? (empty? (pending-invokes))))
       ))))
 
 (deftest traced-out-of-band-test
