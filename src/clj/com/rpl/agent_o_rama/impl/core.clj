@@ -850,6 +850,10 @@
                            *agg-start-invoke-id :agg-start-invoke-id
                            *agg-finished?       :agg-finished?
                           })
+        (local-transform> [(keypath *invoke-id)
+                           :invoked-agg-invoke-id
+                           (termval *agg-invoke-id)]
+                          agent-node-pstate-sym)
         (filter> (not *agg-finished?))
         ;; TODO: <<<<>>>> catch exceptions and propagate failure
         ;;  - failure of this should be total failure of the agent
@@ -863,10 +867,6 @@
                        (termval (aor-types/->valid-AggInput *invoke-id
                                                             *args))])]
          agent-node-pstate-sym)
-        (local-transform> [(keypath *invoke-id)
-                           :invoked-agg-invoke-id
-                           (termval *agg-invoke-id)]
-                          agent-node-pstate-sym)
 
         (<<if *finished?
           (complete-agg! name *agg-invoke-id *retry-num)

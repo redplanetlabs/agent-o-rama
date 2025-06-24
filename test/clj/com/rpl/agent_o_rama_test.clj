@@ -1631,6 +1631,25 @@
      (bind module
        (aor/agentmodule
         [topology]
+        (-> topology
+            (aor/new-agent "bar")
+            (aor/agg-start-node
+             "start"
+             "agg"
+             (fn [agent-node]
+               (aor/emit! agent-node "agg" 1)
+               (aor/emit! agent-node "agg" 3)
+               (aor/emit! agent-node "agg" 7)
+               (aor/emit! agent-node "agg" 2)
+               (aor/emit! agent-node "agg" 100)
+             ))
+            (aor/agg-node
+             "agg"
+             nil
+             +early-sum-accum
+             (fn [agent-node agg node-start-res]
+               (aor/result! agent-node agg)
+             )))
         (let [g
               (->
                 topology
@@ -1729,6 +1748,107 @@
             ["ma" 21]
            }
           (:val ret)))
+
+     ;; now test tracing with early returns includes :invoked-agg-invoke-id
+     ;; recording for invokes that didn't make it through
+     (bind bar-depot
+       (foreign-depot ipc
+                      module-name
+                      (po/agent-depot-name "bar")))
+     (bind bar-invokes-pstate
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-invoke-task-global-name "bar")))
+     (bind bar-nodes-pstate
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-node-task-global-name "bar")))
+     (bind bar-traces-query
+       (foreign-query ipc
+                      module-name
+                      (queries/tracing-query-topology-name "bar")))
+
+     (bind [agent-task-id agent-id]
+       (invoke-agent-and-wait! bar-depot bar-invokes-pstate []))
+
+     (bind root
+       (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                           bar-invokes-pstate
+                           {:pkey agent-task-id}))
+
+     (bind agg-invoke-id
+       (foreign-select-one [(keypath root) :agg-invoke-id]
+                           bar-nodes-pstate
+                           {:pkey agent-task-id}))
+     (bind res
+       (foreign-invoke-query bar-traces-query
+                             agent-task-id
+                             [[agent-task-id root]]
+                             10000))
+     ;; because of early return, subsequent recordings of :invoked-agg-invoke-id
+     ;; are async
+     (is
+      (condition-attained?
+       (trace-matches?
+        (:invokes-map res)
+        {!id1
+         {:started-agg?  true
+          :agg-invoke-id !id2
+          :agent-id      ?agent-id
+          :emits
+          [{:invoke-id      !id3
+            :target-task-id ?agent-task-id
+            :node-name      "agg"
+            :args           [1]}
+           {:invoke-id      !id4
+            :target-task-id ?agent-task-id
+            :node-name      "agg"
+            :args           [3]}
+           {:invoke-id      !id5
+            :target-task-id ?agent-task-id
+            :node-name      "agg"
+            :args           [7]}
+           {:invoke-id      !id6
+            :target-task-id ?agent-task-id
+            :node-name      "agg"
+            :args           [2]}
+           {:invoke-id      !id7
+            :target-task-id ?agent-task-id
+            :node-name      "agg"
+            :args           [100]}]
+          :agent-task-id ?agent-task-id
+          :node          "start"
+          :result        nil
+          :nested-ops    []
+          :input         []}
+         !id3 {:invoked-agg-invoke-id !id2}
+         !id4 {:invoked-agg-invoke-id !id2}
+         !id5 {:invoked-agg-invoke-id !id2}
+         !id6 {:invoked-agg-invoke-id !id2}
+         !id7 {:invoked-agg-invoke-id !id2}
+         !id2
+         {:agg-invoke-id   nil
+          :agg-input-count 3
+          :agent-id        0
+          :agg-start-res   nil
+          :emits           []
+          :agent-task-id   ?agent-task-id
+          :node            "agg"
+          :agg-inputs-first-10
+          [{:invoke-id !id3 :args [1]}
+           {:invoke-id !id4 :args [3]}
+           {:invoke-id !id5 :args [7]}]
+          :agg-ack-val     !ack-val
+          :result          {:val 11 :failure? false}
+          :agg-finished?   true
+          :nested-ops      []
+          :agg-state       11
+          :input           [11 nil]
+          :agg-start-invoke-id !id1}}
+        (m/guard
+         (and (= ?agent-id agent-id)
+              (= ?agent-task-id agent-task-id)))
+       )))
     )))
 
 (deftest multi-agg-test
