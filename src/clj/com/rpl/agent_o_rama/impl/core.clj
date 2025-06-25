@@ -557,6 +557,10 @@
 (defn hook:processing-streaming*
   [node streaming-index value]
   (hook:processing-streaming node streaming-index value))
+(defn hook:received-retry [agent-task-id agent-id retry-num])
+(defn hook:received-retry*
+  [agent-task-id agent-id retry-num]
+  (hook:received-retry agent-task-id agent-id retry-num))
 
 (defn- define-agent!
   [setup topologies stream-topology mb-topology name agent-graph]
@@ -676,6 +680,7 @@
                   :> {:keys [*agent-task-id
                              *agent-id
                              *expected-retry-num]})
+        (hook:received-retry* *agent-task-id *agent-id *expected-retry-num)
         ;; TODO: <<<<>>>>
         ;;   - retry of fork needs to rehydrate invoke-id->new-args
         (inc *expected-retry-num :> *retry-num)
