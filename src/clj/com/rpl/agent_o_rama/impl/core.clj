@@ -237,6 +237,7 @@
              (simpl/->valid-StoreParams
               name
               agent-name
+              agent-task-id
               agent-id
               retry-num
               false
@@ -541,12 +542,12 @@
    (:>)))
 
 (deframaop filter-valid-retry-num>
-  [*agent-name *agent-id *retry-num]
+  [*agent-name *agent-task-id *agent-id *retry-num]
   (<<with-substitutions
    [$$valid
     (this-module-pobject-task-global (po/agent-valid-invokes-task-global-name
                                       *agent-name))]
-   (local-select> (keypath *agent-id)
+   (local-select> (keypath [*agent-task-id *agent-id])
                   $$valid
                   :> *valid-retry-num)
    (filter> (or> (nil? *valid-retry-num) (= *valid-retry-num *retry-num)))
@@ -562,6 +563,7 @@
   (let [graph (graph/resolve-agent-graph agent-graph)
         agent-depot-sym (symbol (po/agent-depot-name name))
         agent-streaming-depot-sym (symbol (po/agent-streaming-depot-name name))
+        failure-depot-sym (symbol (po/agent-failures-depot-name name))
         agent-graph-sym (symbol (po/agent-graph-task-global-name name))
         agent-node-pstate-sym (symbol (po/agent-node-task-global-name name))
         agent-invoke-pstate-sym (symbol (po/agent-invoke-task-global-name name))
@@ -626,6 +628,9 @@
                          (symbol (po/agent-check-tick-depot-name name))
                          ;; TODO: <<<<>>>> configurable, at least for tests?
                          10000)
+    (declare-depot* setup
+                    (symbol (po/agent-failures-depot-name name))
+                    :disallow)
 
     (declare-pstate*
      mb-topology
@@ -650,12 +655,13 @@
         (h/current-time-millis :> *current-time-millis)
         (local-transform>
          [(keypath *agent-id)
-          (termval {:root-invoke-id *invoke-id
-                    :invoke-args    *args
-                    :graph-version  *version
-                    :ack-val        *invoke-id
+          (termval {:root-invoke-id    *invoke-id
+                    :invoke-args       *args
+                    :graph-version     *version
+                    :ack-val           *invoke-id
                     :last-progress-time-millis *current-time-millis
-                    :retry-num      *retry-num})]
+                    :retry-num         *retry-num
+                    :start-time-millis *current-time-millis})]
          agent-invoke-pstate-sym)
         (local-transform> [(keypath *agent-id) (termval true)]
                           agent-active-invokes-pstate-sym)
@@ -675,6 +681,20 @@
         (inc *expected-retry-num :> *retry-num)
         (identity nil :> *op)
         (filter> false)
+        ;; TODO: <<<<>>>> should be failing agents with the wrong version for
+        ;; the retry?
+        ;;   - no other choice? or can it be based on graph structure
+        ;;   being the same?
+        ;;      - arguments might not be the same...
+        ;;      - it can just let them fail a few times if there's an
+        ;;      incompatability
+        ;;      - but retry can be really iffy if graph structure
+        ;;      changed...
+        ;;        - the mb can detect and initiate retry, and the retry
+        ;;        event
+        ;;        can decide what to do
+        ;;            - maybe max one retry if there's a version
+        ;;            difference
 
        (case> (aor-types/ForkAgentInvoke? *data))
         (identity *data
@@ -696,14 +716,13 @@
                        agent-node-pstate-sym
                        :> {:keys [*agent-task-id *agent-id]})
         (filter> (some? *agent-id))
-        (filter-valid-retry-num> name *agent-id *retry-num)
+        (filter-valid-retry-num> name *agent-task-id *agent-id *retry-num)
         (mark-virtual-task-complete! *invoke-id)
-        (|direct *agent-task-id)
         (depot-partition-append!
-         agent-depot-sym
-         (aor-types/->valid-RetryAgentInvoke *agent-task-id
-                                             *agent-id
-                                             *retry-num)
+         failure-depot-sym
+         (aor-types/->valid-AgentFailure *agent-task-id
+                                         *agent-id
+                                         *retry-num)
          :append-ack)
         (identity nil :> *op)
         (filter> false)
@@ -718,11 +737,12 @@
                              *nested-ops
                              *finish-time-millis]})
 
-        (local-select> [(keypath *invoke-id) :agent-id]
+        (local-select> (keypath *invoke-id)
                        agent-node-pstate-sym
-                       :> *agent-id)
+                       :> {:keys [*agent-task-id *agent-id *node
+                                  *agg-invoke-id]})
         (filter> (some? *agent-id))
-        (filter-valid-retry-num> name *agent-id *retry-num)
+        (filter-valid-retry-num> name *agent-task-id *agent-id *retry-num)
 
         (<<ramafn %merger
           [*m]
@@ -735,10 +755,6 @@
                           :retry-time-millis *finish-time-millis})))
         (local-transform> [(keypath *invoke-id) (term %merger)]
                           agent-node-pstate-sym)
-        (local-select> (keypath *invoke-id)
-                       agent-node-pstate-sym
-                       :> {:keys [*agent-task-id *agent-id *node
-                                  *agg-invoke-id]})
         (mark-virtual-task-complete! *invoke-id)
         (get-node-obj agent-graph-sym *node :> *node-obj)
 
@@ -778,7 +794,7 @@
         (throw! (h/ex-info "Unrecognized data type" {:class (class *data)})))
 
       ;; requires *agent-id, *agent-task-id, *retry-num, *op to be in scope
-      (filter-valid-retry-num> name *agent-id *retry-num)
+      (filter-valid-retry-num> name *agent-task-id *agent-id *retry-num)
       (<<if (aor-types/NodeOp? *op)
         (get *op :next-node :> *next-node)
         (get-node-obj agent-graph-sym *next-node :> *op-obj)
@@ -945,9 +961,9 @@
     (<<sources stream-topology
      (source> pstate-write-depot-sym
                {:retry-mode :none}
-              :> {:keys [*pstate-name *path *agent-name *agent-id
-                          *retry-num]})
-      (filter-valid-retry-num> *agent-name *agent-id *retry-num)
+              :> {:keys [*pstate-name *path *agent-name *agent-task-id
+                          *agent-id *retry-num]})
+      (filter-valid-retry-num> *agent-name *agent-task-id *agent-id *retry-num)
       (this-module-pobject-task-global *pstate-name :> $$p)
       (do-transform! *path $$p :> *ret)
       (ack-return> *ret)

@@ -102,6 +102,11 @@
    finish-time-millis :- Long
   ])
 
+(drp/defrecord+ AgentFailure
+  [agent-task-id :- Long
+   agent-id :- Long
+   retry-num :- Long])
+
 (drp/defrecord+ RetryAgentInvoke
   [agent-task-id :- Long
    agent-id :- Long
@@ -146,6 +151,7 @@
 
 (drp/defrecord+ PStateWrite
   [agent-name :- String
+   agent-task-id :- Long
    agent-id :- Long
    retry-num :- Long
    pstate-name :- String

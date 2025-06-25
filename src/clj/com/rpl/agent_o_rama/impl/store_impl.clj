@@ -21,6 +21,7 @@
 (drp/defrecord+ StoreParams
   [pstate-name :- String
    agent-name :- String
+   agent-task-id :- Long
    agent-id :- Long
    retry-num :- Long
    mirror? :- Boolean
@@ -57,6 +58,7 @@
          (:write-depot store-params)
          (aor-types/->PStateWrite
           (:agent-name store-params)
+          (:agent-task-id store-params)
           (:agent-id store-params)
           (:retry-num store-params)
           (:pstate-name store-params)

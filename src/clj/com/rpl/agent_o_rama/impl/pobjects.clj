@@ -40,6 +40,9 @@
   [name]
   (str "*_agent-check-tick-depot-" name))
 
+(defn agent-failures-depot-name
+  [name]
+  (str "*_agent-failures-depot-" name))
 
 (defn agents-clients-name
   []
@@ -56,13 +59,14 @@
 (def AGENT-INVOKE-PSTATE-SCHEMA
   {Long
    (fixed-keys-schema
-    {:root-invoke-id Long
-     :invoke-args    [Object]
-     :graph-version  Long
-     :result         AgentResult
-     :ack-val        Long
+    {:root-invoke-id    Long
+     :invoke-args       [Object]
+     :graph-version     Long
+     :result            AgentResult
+     :ack-val           Long
+     :start-time-millis Long
      :last-progress-time-millis Long
-     :retry-num      Long})})
+     :retry-num         Long})})
 
 (defn agent-active-invokes-task-global-name
   [agent-name]
