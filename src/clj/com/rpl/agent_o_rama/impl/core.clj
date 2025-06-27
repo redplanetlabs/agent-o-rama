@@ -388,10 +388,6 @@
     (this-module-pobject-task-global
      (po/agent-invoke-task-global-name *agent-name))
 
-    $$active
-    (this-module-pobject-task-global
-     (po/agent-active-invokes-task-global-name *agent-name))
-
     $$streaming
     (this-module-pobject-task-global
      (po/agent-streaming-results-task-global-name *agent-name))]
@@ -439,7 +435,6 @@
                                              true))]
           $$root))
        (finished-streaming-chunk :> *finished-streaming-chunk)
-       (local-transform> [(keypath *agent-id) NONE>] $$active)
        (local-transform>
         [(keypath *agent-id)
          MAP-VALS
@@ -524,21 +519,22 @@
   (<<with-substitutions
    [$$root
     (this-module-pobject-task-global (po/agent-invoke-task-global-name
-                                      *agent-name))]
+                                      *agent-name))
+    $$active
+    (this-module-pobject-task-global
+     (po/agent-active-invokes-task-global-name *agent-name))]
    (|direct *agent-task-id)
    (hook:writing-result *agent-task-id *agent-id *result)
    (local-transform>
     [(keypath *agent-id)
      :result
-     ;; TODO: <<<<<>>>>> what about case of a retry?
-     ;;  - what about case where it errors on one branch but has a result
-     ;;  in the other branch?
-     ;;  - seems like need "execution ID" so that it can only be
-     ;;  overridden on a fresh retry
-     ;;    - or just clear this on the retry
+     ;; if race with retry and it happened to have finished, don't change the
+     ;; result here – this can happen if the agent has other branches that fail
+     ;; besides the one that created the result
      nil?
      (termval *result)]
     $$root)
+   (local-transform> [(keypath *agent-id) NONE>] $$active)
    (:>)))
 
 (deframaop filter-valid-retry-num>
@@ -630,8 +626,7 @@
 
     (declare-tick-depot* setup
                          (symbol (po/agent-check-tick-depot-name name))
-                         ;; TODO: <<<<>>>> configurable, at least for tests?
-                         10000)
+                         retries/DEFAULT-CHECKER-TICK-MILLIS)
     (declare-depot* setup
                     (symbol (po/agent-failures-depot-name name))
                     :disallow)
@@ -641,6 +636,10 @@
      agent-valid-invokes-pstate-sym
      po/AGENT-VALID-INVOKES-PSTATE-SCHEMA
      {:key-partitioner task-id-key-partitioner})
+    (declare-pstate*
+     mb-topology
+     (symbol (po/pending-retries-task-global-name name))
+     po/PENDING-RETRIES-PSTATE-SCHEMA)
 
     (retries/declare-check-impl mb-topology name)
     (queries/declare-tracing-query-topology topologies name)
@@ -683,6 +682,9 @@
         (hook:received-retry* *agent-task-id *agent-id *expected-retry-num)
         ;; TODO: <<<<>>>>
         ;;   - retry of fork needs to rehydrate invoke-id->new-args
+        ;;   - on retry, check if it's already completed (got a result). if so
+        ;;   just remove agent from active-agents – this is unnecessary since
+        ;;   those happen together atomically – comment on this
         (inc *expected-retry-num :> *retry-num)
         (identity nil :> *op)
         (filter> false)
@@ -722,7 +724,6 @@
                        :> {:keys [*agent-task-id *agent-id]})
         (filter> (some? *agent-id))
         (filter-valid-retry-num> name *agent-task-id *agent-id *retry-num)
-        (mark-virtual-task-complete! *invoke-id)
         (depot-partition-append!
          failure-depot-sym
          (aor-types/->valid-AgentFailure *agent-task-id
@@ -741,7 +742,7 @@
                              *result
                              *nested-ops
                              *finish-time-millis]})
-
+        (mark-virtual-task-complete! *invoke-id)
         (local-select> (keypath *invoke-id)
                        agent-node-pstate-sym
                        :> {:keys [*agent-task-id *agent-id *node
@@ -760,7 +761,6 @@
                           :retry-time-millis *finish-time-millis})))
         (local-transform> [(keypath *invoke-id) (term %merger)]
                           agent-node-pstate-sym)
-        (mark-virtual-task-complete! *invoke-id)
         (get-node-obj agent-graph-sym *node :> *node-obj)
 
         (<<subsource *node-obj

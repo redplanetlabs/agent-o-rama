@@ -11,10 +11,17 @@
    [com.rpl.agentorama.impl
     AgentNodeExecutorTaskGlobal]))
 
-(deframafn invalid-time-delta?
-  [*time-millis]
-  ;; TODO: <<<<<>>>>> make configurable
-  (:> (>= (- (h/current-time-millis) *time-millis) 10000)))
+(def DEFAULT-CHECKER-TICK-MILLIS 10000)
+
+(deframafn checker-threshold-millis
+  []
+  ;; TODO: <<<<<>>>>> make configurable via a PState
+  10000)
+
+(defn invalid-time-delta?
+  [time-millis]
+  (>= (- (h/current-time-millis) time-millis)
+      (checker-threshold-millis)))
 
 (defn invoke-id-executing?
   [^AgentNodeExecutorTaskGlobal node-exec invoke-id]
@@ -30,6 +37,9 @@
 
         agent-active-invokes-pstate-sym
         (symbol (po/agent-active-invokes-task-global-name name))
+
+        pending-retries-pstate-sym
+        (symbol (po/pending-retries-task-global-name name))
 
         node-exec (symbol (po/agent-node-executor-name))]
     (batch<- [*agent-task-id *agent-id *retry-num]
@@ -118,6 +128,22 @@
          :append-ack))
 
      (source> failure-depot-sym :> %microbatch)
+      ;; this needs to happen here so that the updates to valid-invokes-pstate
+      ;; in the previous mcirobatch commit have been committed
+      (<<batch
+        (|all)
+        (local-select> MAP-KEYS
+                       pending-retries-pstate-sym
+                       {:allow-yield? true}
+                       :> [*agent-task-id *agent-id *retry-num :as *tuple])
+        (local-transform> [(keypath *tuple) NONE>] pending-retries-pstate-sym)
+        (depot-partition-append!
+         agent-depot-sym
+         (aor-types/->valid-RetryAgentInvoke
+          *agent-task-id
+          *agent-id
+          *retry-num)
+         :append-ack))
       (<<batch
         (%microbatch :> {:keys [*agent-task-id *agent-id *retry-num]})
         (+group-by [*agent-task-id *agent-id]
@@ -128,19 +154,12 @@
         (|direct *agent-task-id)
         (local-select> [(keypath *agent-id) :retry-num (pred= *retry-num)]
                        agent-invoke-pstate-sym)
-        (materialize> *agent-task-id *agent-id *retry-num :> $$retries)
+        (local-transform> [(keypath [*agent-task-id *agent-id *retry-num])
+                           (termval nil)]
+                          pending-retries-pstate-sym)
         (inc *retry-num :> *next-retry-num)
         (|all)
         (local-transform> [(keypath [*agent-task-id *agent-id])
                            (termval *next-retry-num)]
                           agent-valid-invokes-pstate-sym))
-      (<<batch
-        ($$retries :> *agent-task-id *agent-id *retry-num)
-        (depot-partition-append!
-         agent-depot-sym
-         (aor-types/->valid-RetryAgentInvoke
-          *agent-task-id
-          *agent-id
-          *retry-num)
-         :append-ack))
     )))

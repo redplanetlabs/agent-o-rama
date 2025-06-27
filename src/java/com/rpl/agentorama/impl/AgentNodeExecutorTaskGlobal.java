@@ -8,6 +8,8 @@ import com.rpl.rama.integration.*;
 
 public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
   WorkerManagedResource<ExecutorService> _execServResource;
+
+  // TODO: <<<<>>>> have it remove from here on exception during execution
   Set<Long> _runningInvokeIds;
 
   public void submitTask(long invokeId, clojure.lang.AFn f) {

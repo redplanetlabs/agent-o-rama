@@ -147,3 +147,11 @@
 
 (def GRAPH-HISTORY-PSTATE-SCHEMA
   {Long HistoricalAgentGraphInfo})
+
+(defn pending-retries-task-global-name
+  [agent-name]
+  (str "$$_agent-pending-retries-" agent-name))
+
+(def PENDING-RETRIES-PSTATE-SCHEMA
+  ;; [agent-task-id agent-id retry-num]
+  {java.util.List Object})
