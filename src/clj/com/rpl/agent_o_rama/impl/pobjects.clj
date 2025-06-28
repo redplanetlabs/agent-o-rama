@@ -80,8 +80,8 @@
   (str "$$_agent-valid-invokes-" agent-name))
 
 (def AGENT-VALID-INVOKES-PSTATE-SCHEMA
-  ;; root-invoke-id -> valid retry-num
-  {Long Long})
+  ;; [agent-task-id agent-id] -> valid retry-num
+  {java.util.List Long})
 
 (defn agent-streaming-results-task-global-name
   [agent-name]

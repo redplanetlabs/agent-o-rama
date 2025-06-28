@@ -16,7 +16,7 @@
 (deframafn checker-threshold-millis
   []
   ;; TODO: <<<<<>>>>> make configurable via a PState
-  10000)
+  (:> 10000))
 
 (defn invalid-time-delta?
   [time-millis]
@@ -113,7 +113,10 @@
         (symbol (po/agent-invoke-task-global-name name))
 
         agent-valid-invokes-pstate-sym
-        (symbol (po/agent-valid-invokes-task-global-name name))]
+        (symbol (po/agent-valid-invokes-task-global-name name))
+
+        pending-retries-pstate-sym
+        (symbol (po/pending-retries-task-global-name name))]
     (<<sources mb-topology
      (source> check-tick-sym :> %microbatch)
       (<<batch
