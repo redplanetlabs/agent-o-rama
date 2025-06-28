@@ -12,6 +12,7 @@
     AgentNodeExecutorTaskGlobal]))
 
 (def DEFAULT-CHECKER-TICK-MILLIS 10000)
+(def SUBSTITUTE-TICK-DEPOT false)
 
 (deframafn checker-threshold-millis
   []
@@ -103,6 +104,13 @@
           ))
       ))))
 
+(defn hook:checker-finished [])
+(defn hook:checker-finished* [] (hook:checker-finished))
+(defn hook:stall-detected [agent-task-id agent-id retry-num])
+(defn hook:stall-detected*
+  [agent-task-id agent-id retry-num]
+  (hook:stall-detected agent-task-id agent-id retry-num))
+
 (defn declare-check-impl
   [mb-topology name]
   (let [check-tick-sym          (symbol (po/agent-check-tick-depot-name name))
@@ -125,14 +133,16 @@
                            :> *agent-task-id *agent-id *retry-num)
         (+group-by [*agent-task-id *agent-id]
           (aggs/+max *retry-num :> *retry-num))
+        (hook:stall-detected* *agent-task-id *agent-id *retry-num)
         (depot-partition-append!
          failure-depot-sym
          (aor-types/->valid-AgentFailure *agent-task-id *agent-id *retry-num)
          :append-ack))
+      (hook:checker-finished*)
 
      (source> failure-depot-sym :> %microbatch)
       ;; this needs to happen here so that the updates to valid-invokes-pstate
-      ;; in the previous mcirobatch commit have been committed
+      ;; in the previous microbatch commit have been committed
       (<<batch
         (|all)
         (local-select> MAP-KEYS

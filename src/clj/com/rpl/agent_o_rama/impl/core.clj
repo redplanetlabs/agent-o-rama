@@ -623,10 +623,14 @@
      Long
      {:initial-value 0})
 
-
-    (declare-tick-depot* setup
-                         (symbol (po/agent-check-tick-depot-name name))
-                         retries/DEFAULT-CHECKER-TICK-MILLIS)
+    (if retries/SUBSTITUTE-TICK-DEPOT
+      (declare-depot* setup
+                      (symbol (po/agent-check-tick-depot-name name))
+                      :random
+                      {:global? true})
+      (declare-tick-depot* setup
+                           (symbol (po/agent-check-tick-depot-name name))
+                           retries/DEFAULT-CHECKER-TICK-MILLIS))
     (declare-depot* setup
                     (symbol (po/agent-failures-depot-name name))
                     :disallow)
