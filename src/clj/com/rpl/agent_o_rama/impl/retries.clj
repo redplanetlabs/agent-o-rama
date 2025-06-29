@@ -29,7 +29,7 @@
   (contains? (.getRunningInvokeIds node-exec) invoke-id))
 
 (defgenerator stalled-agent-ids
-  [microbatch name]
+  [name]
   (let [agent-node-pstate-sym
         (symbol (po/agent-node-task-global-name name))
 
@@ -44,7 +44,6 @@
 
         node-exec (symbol (po/agent-node-executor-name))]
     (batch<- [*agent-task-id *agent-id *retry-num]
-      (%microbatch)
       (|all)
       (ops/current-task-id :> *agent-task-id)
       (local-select> MAP-KEYS
@@ -127,9 +126,9 @@
         (symbol (po/pending-retries-task-global-name name))]
     (<<sources mb-topology
      (source> check-tick-sym :> %microbatch)
+      (%microbatch)
       (<<batch
-        (stalled-agent-ids %microbatch
-                           name
+        (stalled-agent-ids name
                            :> *agent-task-id *agent-id *retry-num)
         (+group-by [*agent-task-id *agent-id]
           (aggs/+max *retry-num :> *retry-num))

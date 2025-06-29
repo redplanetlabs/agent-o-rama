@@ -385,6 +385,10 @@
   [*emit]
   (:>))
 
+(deframaop hook:update-last-progress>
+  []
+  (:>))
+
 (deframaop send-emits>
   [*agent-name *agent-task-id *agent-id *invoke-id *agg-invoke-id *emits]
   (<<with-substitutions
@@ -412,11 +416,13 @@
    (mapv :invoke-id *emits :> *next-invoke-ids)
    (reduce bit-xor *invoke-id *next-invoke-ids :> *ack-val)
    (|direct *agent-task-id)
-   (local-transform>
-    [(keypath *agent-id)
-     :last-progress-time-millis
-     (termval (h/current-time-millis))]
-    $$root)
+   (<<atomic
+     (hook:update-last-progress>)
+     (local-transform>
+      [(keypath *agent-id)
+       :last-progress-time-millis
+       (termval (h/current-time-millis))]
+      $$root))
    (<<if (some? *agg-invoke-id)
      (aor-types/->valid-AggAckOp *agg-invoke-id *ack-val :> *op)
      (anchor> <agg-ack-emit>)

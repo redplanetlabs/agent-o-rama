@@ -40,6 +40,9 @@
       (:>)))
   (:> %ret))
 
+(deframaop no-progress-update>
+  [])
+
 ;; TODO: <<<<<>>>> this test will need to set max retries to 0
 (deftest retries-checker-test
   (let [orig-foreign-append!  foreign-append!
@@ -61,6 +64,8 @@
        (fn [& args] (swap! stalls-atom inc))
 
        i/hook:emit> (emits-dropper drop-emits-atom filters-atom)
+
+       i/hook:update-last-progress> no-progress-update>
 
        i/hook:received-retry
        (fn [agent-task-id agent-id expected-retry-num]
@@ -117,6 +122,11 @@
                     (aor/emit! agent-node "agg" 1)))
                  (aor/node
                   "node3"
+                  "node4"
+                  (fn [agent-node]
+                    (aor/emit! agent-node "node4")))
+                 (aor/node
+                  "node4"
                   "agg"
                   (fn [agent-node]
                     (aor/emit! agent-node "agg" 10)))
@@ -244,6 +254,22 @@
                     first
                     last)))
 
+         ;; now check stall happening within an agg graph
+         (reset-test!)
+         (reset! stall-emit-nodes-atom #{"node4"})
+         (reset! drop-emits-atom #{"agg"})
+         (bind inv (aor/agent-initiate foo))
+         (is (condition-attained? (= 3 @filters-atom)))
+         (is (condition-attained? (= 1 (foreign-invoke-query clear-q))))
+         (TopologyUtils/advanceSimTime 100)
+         (checker-progress!)
+         (is (= 1 @stalls-atom))
+         (is (condition-attained? (= 1 (count @received-atom))))
+         (is (= 1
+                (-> @received-atom
+                    first
+                    last)))
+
          ; (rtest/pause-microbatch-topology! ipc
          ;                                   module-name
          ;                                   aor-types/AGENTS-MB-TOPOLOGY-NAME)
@@ -253,9 +279,6 @@
          ;; TODO: <<<<<>>>>>
          ;;   - verify failures going to retry checker
          ;;   - verify it uniques failure requests
-         ;;   - check stalling on:
-         ;;      - agg graph stall
-         ;;      - multiple stalls in one agent run get deduplicated
          ;;  - check that it does the broadcast
          ;;  - check that events from prior executions get filtered
          ;;      - can use semaphore to stall the virtual thread invoke, then
