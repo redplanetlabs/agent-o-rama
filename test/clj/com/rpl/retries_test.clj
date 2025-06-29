@@ -30,11 +30,13 @@
   (.getRunningInvokeIds node-exec))
 
 (deframafn emits-dropper
-  [*atom]
+  [*atom *filters-atom]
   (<<ramaop %ret
     [*emit]
     (get *emit :node-name :> *node)
-    (<<if (not (contains? @*atom *node))
+    (<<if (contains? @*atom *node)
+      (swap! *filters-atom inc)
+     (else>)
       (:>)))
   (:> %ret))
 
@@ -43,6 +45,7 @@
   (let [orig-foreign-append!  foreign-append!
         stall-emit-nodes-atom (atom #{})
         drop-emits-atom       (atom #{})
+        filters-atom          (atom 0)
         received-atom         (atom {})
         checks-atom           (atom 0)
         stalls-atom           (atom 0)]
@@ -58,7 +61,7 @@
        retries/hook:stall-detected
        (fn [& args] (swap! stalls-atom inc))
 
-       i/hook:emit> (emits-dropper drop-emits-atom)
+       i/hook:emit> (emits-dropper drop-emits-atom filters-atom)
 
        i/hook:received-retry
        (fn [agent-task-id agent-id expected-retry-num]
@@ -75,7 +78,9 @@
                    (selected-any? [:emits ALL :node-name
                                    #(contains? @stall-emit-nodes-atom %)]
                                   data))
-            {}
+            (do
+              (swap! filters-atom inc)
+              {})
             (orig-foreign-append! depot data ack-level)
           )))]
       (with-open [ipc (rtest/create-ipc)
@@ -88,7 +93,9 @@
              (let [topology  (aor/agents-topology setup topologies)
                    s         (aor/underlying-stream-topology topology)
                    node-exec (symbol (po/agent-node-executor-name))
-                   root-sym  (symbol (po/agent-invoke-task-global-name "foo"))]
+                   root-sym  (symbol (po/agent-invoke-task-global-name "foo"))
+                   agent-active-invokes-pstate-sym
+                   (symbol (po/agent-active-invokes-task-global-name "foo"))]
                (->
                  topology
                  (aor/new-agent "foo")
@@ -135,7 +142,9 @@
                (<<sources s
                 (source> *reset-depot :> _)
                  (|all)
-                 (local-transform> [MAP-VALS NONE>] root-sym))
+                 (local-transform> [MAP-VALS NONE>] root-sym)
+                 (local-transform> [MAP-VALS NONE>]
+                                   agent-active-invokes-pstate-sym))
                (<<query-topology topologies
                  "clear-pending"
                  [:> *res]
@@ -165,16 +174,20 @@
                (is (condition-attained? (= (+ 1 s) @checks-atom)))
              )))
 
-         (bind reset-agent!
+         (bind reset-test!
            (fn []
              (reset! received-atom {})
              (reset! stalls-atom 0)
              (reset! checks-atom 0)
+             (reset! stall-emit-nodes-atom #{})
+             (reset! drop-emits-atom #{})
+             (reset! filters-atom 0)
              (foreign-append! reset-depot nil)))
 
          (reset! stall-emit-nodes-atom #{"node1"})
 
          (bind inv (aor/agent-initiate foo))
+         (is (condition-attained? (= 1 @filters-atom)))
 
          (checker-progress!)
          (is (= 0 @stalls-atom))
@@ -191,7 +204,22 @@
                     first
                     last)))
 
-         (reset-agent!)
+         (reset-test!)
+         (reset! drop-emits-atom #{"next2"})
+         (bind inv (aor/agent-initiate foo))
+         (is (condition-attained? (= 1 @filters-atom)))
+
+         (checker-progress!)
+         (is (= 0 @stalls-atom))
+         (TopologyUtils/advanceSimTime 100)
+         (checker-progress!)
+         ;; because this time it cleared the execution state on its own
+         (is (condition-attained? (= 1 @stalls-atom)))
+         (is (condition-attained? (= 1 (count @received-atom))))
+         (is (= 1
+                (-> @received-atom
+                    first
+                    last)))
 
          ; (rtest/pause-microbatch-topology! ipc
          ;                                   module-name
