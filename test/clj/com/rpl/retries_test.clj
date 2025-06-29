@@ -52,7 +52,6 @@
     (with-redefs
       [SEM (h/mk-semaphore 0)
        retries/SUBSTITUTE-TICK-DEPOT true
-       retries/DEFAULT-CHECKER-TICK-MILLIS 10
        retries/checker-threshold-millis short-checker-threshold-millis
 
        retries/hook:checker-finished
@@ -186,6 +185,7 @@
 
          (reset! stall-emit-nodes-atom #{"node1"})
 
+         ;; check stall on a node not completing execution
          (bind inv (aor/agent-initiate foo))
          (is (condition-attained? (= 1 @filters-atom)))
 
@@ -204,6 +204,8 @@
                     first
                     last)))
 
+         ;; now check stall happening on an emit from a finished node not making
+         ;; it
          (reset-test!)
          (reset! drop-emits-atom #{"next2"})
          (bind inv (aor/agent-initiate foo))
@@ -221,6 +223,27 @@
                     first
                     last)))
 
+         ;; now check stall happening on agg node execution
+         (reset-test!)
+         (reset! stall-emit-nodes-atom #{"next1"})
+         (bind inv (aor/agent-initiate foo))
+         (is (condition-attained? (= 1 @filters-atom)))
+
+         (checker-progress!)
+         (is (= 0 @stalls-atom))
+         (TopologyUtils/advanceSimTime 100)
+         (checker-progress!)
+         ;; because haven't cleared the execution state yet
+         (is (= 0 @stalls-atom))
+         (is (condition-attained? (= 1 (foreign-invoke-query clear-q))))
+         (checker-progress!)
+         (is (= 1 @stalls-atom))
+         (is (condition-attained? (= 1 (count @received-atom))))
+         (is (= 1
+                (-> @received-atom
+                    first
+                    last)))
+
          ; (rtest/pause-microbatch-topology! ipc
          ;                                   module-name
          ;                                   aor-types/AGENTS-MB-TOPOLOGY-NAME)
@@ -231,10 +254,6 @@
          ;;   - verify failures going to retry checker
          ;;   - verify it uniques failure requests
          ;;   - check stalling on:
-         ;;      - regular node execution
-         ;;      - regular node never being received (after the 10s timeout)
-         ;;      - agg node execution
-         ;;      - something after agg node (verify it keeps going on emits)
          ;;      - agg graph stall
          ;;      - multiple stalls in one agent run get deduplicated
          ;;  - check that it does the broadcast
