@@ -570,6 +570,9 @@
   [agent-task-id agent-id retry-num]
   (hook:received-retry agent-task-id agent-id retry-num))
 
+(defn init-retry-num [] 0)
+(defn init-retry-num* [] (init-retry-num))
+
 (defn- define-agent!
   [setup topologies stream-topology mb-topology name agent-graph]
   (let [graph (graph/resolve-agent-graph agent-graph)
@@ -670,7 +673,7 @@
         (ack-return> [*agent-task-id *agent-id])
         (h/random-long :> *invoke-id)
         (fetch-graph-version name :> *version)
-        (identity 0 :> *retry-num)
+        (init-retry-num* :> *retry-num)
         (h/current-time-millis :> *current-time-millis)
         (local-transform>
          [(keypath *agent-id)

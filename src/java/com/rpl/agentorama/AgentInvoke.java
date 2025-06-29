@@ -1,15 +1,15 @@
 package com.rpl.agentorama;
 
 public class AgentInvoke {
-  int _taskId;
+  long _taskId;
   long _agentInvokeId;
 
-  public AgentInvoke(int taskId, long agentInvokeId) {
+  public AgentInvoke(long taskId, long agentInvokeId) {
     _taskId = taskId;
     _agentInvokeId = agentInvokeId;
   }
 
-  public int getTaskId() {
+  public long getTaskId() {
     return _taskId;
   }
 

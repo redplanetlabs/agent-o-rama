@@ -14,6 +14,8 @@
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest])
   (:import
+   [com.rpl.agentorama
+    AgentInvoke]
    [com.rpl.agentorama.impl
     AgentNodeExecutorTaskGlobal]
    [com.rpl.rama.helpers
@@ -51,7 +53,8 @@
         filters-atom          (atom 0)
         received-atom         (atom {})
         checks-atom           (atom 0)
-        stalls-atom           (atom 0)]
+        stalls-atom           (atom 0)
+        init-retry-num-atom   (atom 0)]
     (with-redefs
       [SEM (h/mk-semaphore 0)
        retries/SUBSTITUTE-TICK-DEPOT true
@@ -66,6 +69,8 @@
        i/hook:emit> (emits-dropper drop-emits-atom filters-atom)
 
        i/hook:update-last-progress> no-progress-update>
+
+       i/init-retry-num (fn [] @init-retry-num-atom)
 
        i/hook:received-retry
        (fn [agent-task-id agent-id expected-retry-num]
@@ -170,6 +175,10 @@
            (foreign-depot ipc
                           module-name
                           (po/agent-check-tick-depot-name "foo")))
+         (bind valid-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-valid-invokes-task-global-name "foo")))
          (bind reset-depot (foreign-depot ipc module-name "*reset-depot"))
          (bind agent-manager (aor/agent-manager ipc module-name))
          (bind foo (aor/agent-client agent-manager "foo"))
@@ -193,9 +202,22 @@
              (reset! filters-atom 0)
              (foreign-append! reset-depot nil)))
 
-         (reset! stall-emit-nodes-atom #{"node1"})
+         (bind all-tasks-retry-num?
+           (fn [^AgentInvoke inv retry-num]
+             (let [agent-task-id (.getTaskId inv)
+                   invoke-id     (.getAgentInvokeId inv)]
+               (every?
+                (fn [task-id]
+                  (= retry-num
+                     (foreign-select-one
+                      (keypath [agent-task-id invoke-id])
+                      valid-pstate
+                      {:pkey task-id})
+                  ))
+                (range 4)))))
 
          ;; check stall on a node not completing execution
+         (reset! stall-emit-nodes-atom #{"node1"})
          (bind inv (aor/agent-initiate foo))
          (is (condition-attained? (= 1 @filters-atom)))
 
@@ -209,6 +231,7 @@
          (checker-progress!)
          (is (= 1 @stalls-atom))
          (is (condition-attained? (= 1 (count @received-atom))))
+         (is (all-tasks-retry-num? inv 1))
          (is (= 1
                 (-> @received-atom
                     first
@@ -217,6 +240,7 @@
          ;; now check stall happening on an emit from a finished node not making
          ;; it
          (reset-test!)
+         (reset! init-retry-num-atom 2)
          (reset! drop-emits-atom #{"next2"})
          (bind inv (aor/agent-initiate foo))
          (is (condition-attained? (= 1 @filters-atom)))
@@ -232,6 +256,8 @@
                 (-> @received-atom
                     first
                     last)))
+         (is (all-tasks-retry-num? inv 3))
+
 
          ;; now check stall happening on agg node execution
          (reset-test!)
@@ -278,8 +304,11 @@
          ;                                    aor-types/AGENTS-MB-TOPOLOGY-NAME)
          ;; TODO: <<<<<>>>>>
          ;;   - verify failures going to retry checker
+         ;;       - exception in node
+         ;;       - exception in agg update
+         ;;       - exception in agg init fn
+         ;;       - maybe these should run in virtual nodes...
          ;;   - verify it uniques failure requests
-         ;;  - check that it does the broadcast
          ;;  - check that events from prior executions get filtered
          ;;      - can use semaphore to stall the virtual thread invoke, then
          ;;      manually cause a stall and release
