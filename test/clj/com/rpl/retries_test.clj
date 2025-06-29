@@ -29,10 +29,20 @@
   [^AgentNodeExecutorTaskGlobal node-exec]
   (.getRunningInvokeIds node-exec))
 
+(deframafn emits-dropper
+  [*atom]
+  (<<ramaop %ret
+    [*emit]
+    (get *emit :node-name :> *node)
+    (<<if (not (contains? @*atom *node))
+      (:>)))
+  (:> %ret))
+
 ;; TODO: <<<<<>>>> this test will need to set max retries to 0
 (deftest retries-checker-test
   (let [orig-foreign-append!  foreign-append!
         stall-emit-nodes-atom (atom #{})
+        drop-emits-atom       (atom #{})
         received-atom         (atom {})
         checks-atom           (atom 0)
         stalls-atom           (atom 0)]
@@ -47,6 +57,8 @@
 
        retries/hook:stall-detected
        (fn [& args] (swap! stalls-atom inc))
+
+       i/hook:emit> (emits-dropper drop-emits-atom)
 
        i/hook:received-retry
        (fn [agent-task-id agent-id expected-retry-num]

@@ -381,6 +381,10 @@
    -1
    iclient/FINISHED))
 
+(deframaop hook:emit>
+  [*emit]
+  (:>))
+
 (deframaop send-emits>
   [*agent-name *agent-task-id *agent-id *invoke-id *agg-invoke-id *emits]
   (<<with-substitutions
@@ -393,7 +397,9 @@
      (po/agent-streaming-results-task-global-name *agent-name))]
    (anchor> <root>)
    (ops/explode *emits
-                :> {:keys [*invoke-id *target-task-id *node-name *args]})
+                :> {:keys [*invoke-id *target-task-id *node-name *args]
+                    :as   *emit})
+   (hook:emit> *emit)
    (|direct *target-task-id)
    (aor-types/->valid-NodeOp *invoke-id
                              *node-name
