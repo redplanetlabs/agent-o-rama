@@ -679,7 +679,7 @@
                            retries/DEFAULT-CHECKER-TICK-MILLIS))
     (declare-depot* setup
                     (symbol (po/agent-failures-depot-name name))
-                    :disallow)
+                    :random)
 
     (declare-pstate*
      mb-topology

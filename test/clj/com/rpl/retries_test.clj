@@ -321,12 +321,16 @@
       [retries/SUBSTITUTE-TICK-DEPOT true
        i/init-retry-num      (fn [] @init-retry-num-atom)
 
+       i/log-node-error      (fn [& args])
+
        i/hook:appended-agent-failure (fn [& args]
                                        (swap! failure-appends-atom inc))
 
        i/hook:received-retry
        (fn [agent-task-id agent-id expected-retry-num]
-         (transform [ATOM (keypath [agent-task-id agent-id]) (nil->val 0)]
+         (transform [ATOM
+                     (keypath [agent-task-id agent-id expected-retry-num])
+                     (nil->val 0)]
                     inc
                     received-atom))]
       (with-open [ipc (rtest/create-ipc)
@@ -377,7 +381,6 @@
                   "node1"
                   "agg"
                   (fn [agent-node]
-                    (aor/emit! agent-node "agg" 1)
                     (aor/emit! agent-node "agg" 1)))
                  (aor/agg-node
                   "agg"
@@ -390,6 +393,10 @@
              )))
          (rtest/launch-module! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
+         (bind bar-failures-depot
+           (foreign-depot ipc
+                          module-name
+                          (po/agent-failures-depot-name "bar")))
          (bind agent-manager (aor/agent-manager ipc module-name))
          (bind foo (aor/agent-client agent-manager "foo"))
          (bind bar (aor/agent-client agent-manager "bar"))
@@ -399,13 +406,6 @@
            (fn []
              (reset! failure-appends-atom 0)
              (reset! received-atom {})))
-
-         ; (rtest/pause-microbatch-topology! ipc
-         ;                                   module-name
-         ;                                   aor-types/AGENTS-MB-TOPOLOGY-NAME)
-         ; (rtest/resume-microbatch-topology! ipc
-         ;                                    module-name
-         ;                                    aor-types/AGENTS-MB-TOPOLOGY-NAME)
 
          (bind inv (aor/agent-initiate foo :fail))
          (is (condition-attained? (= 1 @failure-appends-atom)))
@@ -420,18 +420,67 @@
          (aor/agent-initiate foo 1)
          (is (condition-attained? (= 1 @failure-appends-atom)))
          (is (condition-attained? (= 1 (count @received-atom))))
-         ;; TODO: <<<<>>>>
+
+         (reset-test!)
+         (aor/agent-initiate bar)
+         (is (condition-attained? (= 1 @failure-appends-atom)))
+         (is (condition-attained? (= 1 (count @received-atom))))
+
+
+
+
+         ;; verify mutiple failures for same invoke only result in one retry
+         (reset-test!)
+         (rtest/pause-microbatch-topology! ipc
+                                           module-name
+                                           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+         (bind inv (aor/agent-initiate bar))
+         (is (condition-attained? (= 1 @failure-appends-atom)))
+
+         (dotimes [_ 2]
+           (foreign-append! bar-failures-depot
+                            (aor-types/->AgentFailure
+                             (.getTaskId inv)
+                             (.getAgentInvokeId inv)
+                             0)))
+         (rtest/resume-microbatch-topology! ipc
+                                            module-name
+                                            aor-types/AGENTS-MB-TOPOLOGY-NAME)
+
+         (is (condition-attained? (= 1 (count @received-atom))))
+         (is (= {[(.getTaskId inv)
+                  (.getAgentInvokeId inv)
+                  0]
+                 1}
+                @received-atom))
+
+         ;; verify when retry num is off, it does not issue the retry
+         (reset-test!)
+         (rtest/pause-microbatch-topology! ipc
+                                           module-name
+                                           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+         (reset! init-retry-num-atom 2)
+         (bind inv2 (aor/agent-initiate bar))
+         (is (condition-attained? (= 1 @failure-appends-atom)))
+         (foreign-append! bar-failures-depot
+                          (aor-types/->AgentFailure
+                           (.getTaskId inv)
+                           (.getAgentInvokeId inv)
+                           1))
+         (rtest/resume-microbatch-topology! ipc
+                                            module-name
+                                            aor-types/AGENTS-MB-TOPOLOGY-NAME)
+         (is (condition-attained? (= 1 (count @received-atom))))
+         (is (= {[(.getTaskId inv2)
+                  (.getAgentInvokeId inv2)
+                  2]
+                 1}
+                @received-atom))
+
+
+
 
          ;; TODO: <<<<<>>>>>
-         ;;   - verify failures going to retry checker
-         ;;       - exception in agg update
-         ;;       - exception in agg init fn
-         ;;   - verify it uniques failure requests
-         ;;     - pause failure processor while have multiple failures in one
-         ;;     agent
-         ;;       - or manually append
-         ;;  - failure checker ignores requests for the wrong retry num
-         ;;     - can manually append to it
          ;;  - check that events from prior executions get filtered
          ;;      - can use semaphore to stall the virtual thread invoke, then
          ;;      manually cause a stall and release
