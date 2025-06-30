@@ -236,7 +236,7 @@
                                                 (pr-str (js->clj original-input))
                                                 (str original-input))))))))))))
 
-(defui forking-changelist-panel [{:keys [changed-nodes set-changed-nodes graph-data on-execute-fork on-cancel-fork]}]
+(defui forking-changelist-panel [{:keys [changed-nodes set-changed-nodes graph-data on-execute-fork on-cancel-fork affected-nodes]}]
   ($ :div {:className "w-80 bg-white shadow-lg border-l border-gray-200 p-4"}
      ($ :div {:className "flex justify-between items-center mb-4"}
         ($ :h3 {:className "text-lg font-semibold text-gray-800"} "Fork Changes")
@@ -252,13 +252,20 @@
           ;; Changed nodes list
           (for [[node-id new-input] changed-nodes]
             (let [node-data (get graph-data node-id)
-                  node-name (:node node-data)]
+                  node-name (:node node-data)
+                  is-overridden (contains? affected-nodes node-id)]
               ($ :div {:key node-id
-                       :className "bg-gray-50 border border-gray-200 rounded-lg p-3"}
+                       :className (str "border rounded-lg p-3 " 
+                                       (if is-overridden 
+                                         "bg-yellow-50 border-yellow-300" 
+                                         "bg-gray-50 border-gray-200"))}
                  ($ :div {:className "flex justify-between items-start mb-2"}
                     ($ :div
                        ($ :div {:className "font-medium text-gray-800 text-sm"} node-name)
-                       ($ :div {:className "text-xs text-gray-500 font-mono"} (str "ID: " node-id)))
+                       ($ :div {:className "text-xs text-gray-500 font-mono"} (str "ID: " node-id))
+                       (when is-overridden
+                         ($ :div {:className "bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded mt-1 font-medium"}
+                            "⚠️ This will be overridden")))
                     ($ :button {:className "text-red-500 hover:text-red-700 text-sm"
                                 :onClick (fn [_] (set-changed-nodes #(dissoc % node-id)))}
                        "Remove"))
@@ -353,28 +360,35 @@
        :edges all-edges})))
 
 (defn find-downstream-nodes 
-  "Find all nodes that are downstream from the given set of modified node IDs"
+  "Find all nodes that are downstream from the given set of modified node IDs.
+   This includes nodes that are both modified AND downstream (overridden nodes)."
   [graph-data modified-node-ids]
-  (loop [to-visit (set modified-node-ids)
-         visited #{}
-         downstream #{}]
-    (if (empty? to-visit)
-      downstream
-      (let [current (first to-visit)
-            remaining (disj to-visit current)]
-        (if (visited current)
-          (recur remaining visited downstream)
-          (let [node-data (get graph-data current)
-                emitted-ids (set (map :invoke-id (:emits node-data)))
-                ;; Add emitted nodes to downstream (but not the original modified nodes)
-                new-downstream (if (contains? modified-node-ids current)
-                                 downstream
-                                 (conj downstream current))
-                ;; Continue traversing from emitted nodes
-                new-to-visit (into remaining emitted-ids)]
-            (recur new-to-visit 
-                   (conj visited current) 
-                   new-downstream)))))))
+  (let [;; For each modified node, find all nodes downstream from it
+        get-downstream-from-node (fn [start-node-id]
+                                   (loop [to-visit #{start-node-id}
+                                          visited #{}
+                                          downstream #{}]
+                                     (if (empty? to-visit)
+                                       downstream
+                                       (let [current (first to-visit)
+                                             remaining (disj to-visit current)]
+                                         (if (visited current)
+                                           (recur remaining visited downstream)
+                                           (let [node-data (get graph-data current)
+                                                 emitted-ids (set (map :invoke-id (:emits node-data)))
+                                                 ;; Add emitted nodes to downstream (but not the starting node)
+                                                 new-downstream (if (= current start-node-id)
+                                                                  downstream
+                                                                  (conj downstream current))
+                                                 new-to-visit (into remaining emitted-ids)]
+                                             (recur new-to-visit 
+                                                    (conj visited current) 
+                                                    new-downstream)))))))]
+    ;; Collect downstream nodes from all modified nodes
+    (reduce (fn [all-downstream modified-node-id]
+              (into all-downstream (get-downstream-from-node modified-node-id)))
+            #{}
+            modified-node-ids)))
 
 (defui graph [{:keys [initial-data api-url module-id agent-id invoke-id]}]
   (let [[selected-node set-selected-node] (uix/use-state nil)
@@ -542,7 +556,8 @@
                                             :set-changed-nodes set-changed-nodes
                                             :graph-data graph-data
                                             :on-execute-fork handle-execute-fork
-                                            :on-cancel-fork handle-cancel-fork}))
+                                            :on-cancel-fork handle-cancel-fork
+                                            :affected-nodes affected-nodes}))
             
             ;; Normal mode layout
             ($ :<>
