@@ -237,7 +237,7 @@
                                                 (str original-input))))))))))))
 
 (defui forking-changelist-panel [{:keys [changed-nodes set-changed-nodes graph-data on-execute-fork on-cancel-fork affected-nodes flow-nodes set-selected-node]}]
-  ($ :div {:className "fixed right-0 top-20 h-[calc(100vh-5rem)] w-80 bg-white shadow-lg border-l border-gray-200 p-4 overflow-y-auto z-40"}
+  ($ :div {:className "fixed right-0 top-32 h-[calc(100vh-8rem)] w-80 bg-white shadow-lg border-l border-gray-200 p-4 overflow-y-auto z-40"}
      ($ :div {:className "flex justify-between items-center mb-4"}
         ($ :h3 {:className "text-lg font-semibold text-gray-800"} "Fork Changes")
         ($ :button {:className "text-gray-500 hover:text-gray-700"
