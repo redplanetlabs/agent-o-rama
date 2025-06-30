@@ -517,7 +517,7 @@
 
                                                                                 :else
                                                                                 ["bg-white" "text-gray-800" "border-2" "border-gray-300"])
-                                                                 selection-classes (if (and selected (not is-affected))
+                                                                 selection-classes (if selected
                                                                                      ["ring-4" "ring-blue-400" "ring-opacity-75" "shadow-2xl" "transform" "scale-105"]
                                                                                      ["shadow-lg"])
                                                                  common-classes ["p-3" "rounded-md" "transition-all" "duration-200"]
@@ -549,12 +549,7 @@
                                                                    (:label data))
                                                                 ($ Handle {:type "target" :position "top"})))))})
                                    :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
-                                   :onNodeClick (fn [_ node] 
-                                                  (let [node-data (js->clj (.-data node) :keywordize-keys true)
-                                                        node-id (:node-id node-data)
-                                                        is-affected (contains? affected-nodes node-id)]
-                                                    (when-not is-affected
-                                                      (set-selected-node node))))}
+                                   :onNodeClick (fn [_ node] (set-selected-node node))}
                         ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
                         ($ Controls {:className "fill-gray-500 stroke-gray-500"})))
                   
