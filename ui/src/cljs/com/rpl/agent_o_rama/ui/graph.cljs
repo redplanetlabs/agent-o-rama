@@ -403,13 +403,12 @@
             #{}
             modified-node-ids)))
 
-(defui graph [{:keys [initial-data api-url module-id agent-id invoke-id]}]
+(defui graph [{:keys [initial-data api-url module-id agent-id invoke-id forking-mode? set-forking-mode?]}]
   (let [[selected-node set-selected-node] (uix/use-state nil)
         [loading-nodes set-loading-nodes] (uix/use-state #{})
         [graph-data set-graph-data] (uix/use-state initial-data)
         
-        ;; Forking mode state
-        [forking-mode? set-forking-mode?] (uix/use-state false)
+        ;; Forking mode state - now controlled by parent
         [changed-nodes set-changed-nodes] (uix/use-state {})
         
         ;; Calculate affected downstream nodes in forking mode
@@ -458,29 +457,24 @@
                                (set-forking-mode? false)
                                (set-changed-nodes {})
                                (set-selected-node nil))
-                             [changed-nodes])
+                             [changed-nodes set-forking-mode?])
         
         handle-cancel-fork (uix/use-callback
                            (fn []
                              (set-forking-mode? false)
                              (set-changed-nodes {})
                              (set-selected-node nil))
-                           [])]
+                           [set-forking-mode?])]
+    
+    ;; Reset local forking state when parent turns off forking mode
+    (uix/use-effect
+     (fn []
+       (when-not forking-mode?
+         (set-changed-nodes {})
+         (set-selected-node nil)))
+     [forking-mode?])
     
     ($ :<>
-       ($ :div {:className "rounded-lg overflow-hidden"}
-          ;; Header with title and forking toggle
-          ($ :div {:className "flex justify-between items-center mb-4"}
-             ($ :h2 {:className "text-2xl font-semibold text-gray-700"} "Agent Invocation Graph")
-             ($ :button {:className (str "px-4 py-2 rounded-md font-medium transition-colors "
-                                         (if forking-mode?
-                                           "bg-red-600 hover:bg-red-700 text-white"
-                                           "bg-blue-600 hover:bg-blue-700 text-white"))
-                         :onClick (fn [_] 
-                                    (if forking-mode?
-                                      (handle-cancel-fork)
-                                      (set-forking-mode? true)))}
-                (if forking-mode? "Cancel" "Fork")))
           
           (if forking-mode?
             ;; Forking mode layout
@@ -632,5 +626,5 @@
                                              :loading-nodes loading-nodes
                                              :flow-nodes flow-nodes
                                              :set-nodes set-nodes
-                                             :set-selected-node set-selected-node}))))))))
+                                             :set-selected-node set-selected-node})))))))
 

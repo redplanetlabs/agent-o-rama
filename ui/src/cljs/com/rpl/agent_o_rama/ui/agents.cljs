@@ -123,6 +123,7 @@
 (defui invoke []
   (let [{:strs [module-id agent-id invoke-id]} (js->clj (wouter/useParams))
         [use-pagination? set-use-pagination] (uix/use-state true)
+        [forking-mode? set-forking-mode?] (uix/use-state false)
         ;; Only fetch initial data - no need to refetch on pagination state changes
         {:keys [data isLoading]}
         (common/use-query {:query-key ["invoke-initial" module-id agent-id invoke-id use-pagination?]
@@ -134,19 +135,32 @@
       (not data) ($ :div "no data")
       :else 
       ($ :div
-         ($ :div.bg-white.p-6.rounded-lg.shadow
-            ($ :div.flex.justify-between.items-center.mb-4
-               ($ :h2.text-2xl.font-semibold.text-gray-700 "Invocation Details")
-               ($ :div.flex.items-center.gap-2
-                  ($ :label.text-sm.text-gray-600 "Pagination")
-                  ($ :input.mr-2 {:type "checkbox"
-                                  :checked use-pagination?
-                                  :onChange #(set-use-pagination (not use-pagination?))})))
+         ;; Sticky header with all controls
+         ($ :div.sticky.top-0.z-50.bg-white.border-b.border-gray-200.shadow-sm.p-6
+            ($ :div.flex.justify-between.items-center
+               ($ :h2.text-2xl.font-semibold.text-gray-700 "Agent Invocation Graph")
+               ($ :div.flex.items-center.gap-4
+                  ($ :div.flex.items-center.gap-2
+                     ($ :label.text-sm.text-gray-600 "Pagination")
+                     ($ :input.mr-2 {:type "checkbox"
+                                     :checked use-pagination?
+                                     :onChange #(set-use-pagination (not use-pagination?))}))
+                  ($ :button {:className (str "px-4 py-2 rounded-md font-medium transition-colors "
+                                              (if forking-mode?
+                                                "bg-red-600 hover:bg-red-700 text-white"
+                                                "bg-blue-600 hover:bg-blue-700 text-white"))
+                              :onClick (fn [_] (set-forking-mode? (not forking-mode?)))}
+                     (if forking-mode? "Cancel" "Fork")))))
+         
+         ;; Graph content
+         ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
             ($ graph/graph {:initial-data (:invokes-map data)
                             :api-url (when use-pagination? 
                                        (str "/api/agents/" module-id "/" agent-id "/invocations/" invoke-id "/paginated"))
                             :module-id module-id
                             :agent-id agent-id
-                            :invoke-id invoke-id}))))))
+                            :invoke-id invoke-id
+                            :forking-mode? forking-mode?
+                            :set-forking-mode? set-forking-mode?}))))))
 
 
