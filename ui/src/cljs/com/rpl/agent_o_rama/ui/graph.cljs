@@ -453,7 +453,7 @@
                                     (if forking-mode?
                                       (handle-cancel-fork)
                                       (set-forking-mode? true)))}
-                (if forking-mode? "Exit Fork Mode" "Enter Fork Mode")))
+                (if forking-mode? "Cancel" "Fork")))
           
           (if forking-mode?
             ;; Forking mode layout
