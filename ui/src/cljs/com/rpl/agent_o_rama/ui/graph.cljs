@@ -237,7 +237,7 @@
                                                 (str original-input))))))))))))
 
 (defui forking-changelist-panel [{:keys [changed-nodes set-changed-nodes graph-data on-execute-fork on-cancel-fork affected-nodes flow-nodes set-selected-node]}]
-  ($ :div {:className "w-80 bg-white shadow-lg border-l border-gray-200 p-4"}
+  ($ :div {:className "fixed right-0 top-20 h-[calc(100vh-5rem)] w-80 bg-white shadow-lg border-l border-gray-200 p-4 overflow-y-auto z-40"}
      ($ :div {:className "flex justify-between items-center mb-4"}
         ($ :h3 {:className "text-lg font-semibold text-gray-800"} "Fork Changes")
         ($ :button {:className "text-gray-500 hover:text-gray-700"
@@ -478,9 +478,9 @@
           
           (if forking-mode?
             ;; Forking mode layout
-            ($ :div {:className "flex gap-4"}
+            ($ :div {:className "mr-80"}
                ;; Main content area
-               ($ :div {:className "flex-1"}
+               ($ :div
                   ($ :div {:style {:width "100%" :height "500px"}}
                      ($ ReactFlow {:nodes flow-nodes 
                                    :edges flow-edges
