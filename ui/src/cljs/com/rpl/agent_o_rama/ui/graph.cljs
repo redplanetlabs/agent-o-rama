@@ -236,7 +236,7 @@
                                                 (pr-str (js->clj original-input))
                                                 (str original-input))))))))))))
 
-(defui forking-changelist-panel [{:keys [changed-nodes set-changed-nodes graph-data on-execute-fork on-cancel-fork affected-nodes]}]
+(defui forking-changelist-panel [{:keys [changed-nodes set-changed-nodes graph-data on-execute-fork on-cancel-fork affected-nodes flow-nodes set-selected-node]}]
   ($ :div {:className "w-80 bg-white shadow-lg border-l border-gray-200 p-4"}
      ($ :div {:className "flex justify-between items-center mb-4"}
         ($ :h3 {:className "text-lg font-semibold text-gray-800"} "Fork Changes")
@@ -253,21 +253,34 @@
           (for [[node-id new-input] changed-nodes]
             (let [node-data (get graph-data node-id)
                   node-name (:node node-data)
-                  is-overridden (contains? affected-nodes node-id)]
+                  is-overridden (contains? affected-nodes node-id)
+                  handle-select-node (fn [e]
+                                       (.stopPropagation e)
+                                       ;; Find the corresponding flow node and select it
+                                       (let [nodes (js->clj flow-nodes :keywordize-keys true)
+                                             target-node (->> nodes
+                                                              (filter #(= (-> % :data :node-id) node-id))
+                                                              first)]
+                                         (when target-node
+                                           (set-selected-node (clj->js target-node)))))]
               ($ :div {:key node-id
-                       :className (str "border rounded-lg p-3 " 
+                       :className (str "border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow " 
                                        (if is-overridden 
-                                         "bg-yellow-50 border-yellow-300" 
-                                         "bg-gray-50 border-gray-200"))}
+                                         "bg-yellow-50 border-yellow-300 hover:bg-yellow-100" 
+                                         "bg-gray-50 border-gray-200 hover:bg-gray-100"))
+                       :onClick handle-select-node}
                  ($ :div {:className "flex justify-between items-start mb-2"}
                     ($ :div
-                       ($ :div {:className "font-medium text-gray-800 text-sm"} node-name)
+                       ($ :div {:className "font-medium text-gray-800 text-sm flex items-center gap-2"} 
+                          node-name)
                        ($ :div {:className "text-xs text-gray-500 font-mono"} (str "ID: " node-id))
                        (when is-overridden
                          ($ :div {:className "bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded mt-1 font-medium"}
                             "⚠️ This will be overridden")))
                     ($ :button {:className "text-red-500 hover:text-red-700 text-sm"
-                                :onClick (fn [_] (set-changed-nodes #(dissoc % node-id)))}
+                                :onClick (fn [e] 
+                                           (.stopPropagation e)
+                                           (set-changed-nodes #(dissoc % node-id)))}
                        "Remove"))
                  
                  ($ :div {:className "text-xs"}
@@ -557,7 +570,9 @@
                                             :graph-data graph-data
                                             :on-execute-fork handle-execute-fork
                                             :on-cancel-fork handle-cancel-fork
-                                            :affected-nodes affected-nodes}))
+                                            :affected-nodes affected-nodes
+                                            :flow-nodes flow-nodes
+                                            :set-selected-node set-selected-node}))
             
             ;; Normal mode layout
             ($ :<>
