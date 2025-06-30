@@ -307,7 +307,6 @@
          ;;       - exception in node
          ;;       - exception in agg update
          ;;       - exception in agg init fn
-         ;;       - maybe these should run in virtual nodes...
          ;;   - verify it uniques failure requests
          ;;  - check that events from prior executions get filtered
          ;;      - can use semaphore to stall the virtual thread invoke, then

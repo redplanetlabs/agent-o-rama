@@ -561,6 +561,28 @@
    (filter> (or> (nil? *valid-retry-num) (= *valid-retry-num *retry-num)))
    (:>)))
 
+(defn invoke-or-error
+  [afn info]
+  (try
+    (afn)
+    (catch Throwable t
+      (log-node-error t "Error invoking function" {:info info})
+      ::error)))
+
+(deframaop invoke-on-task-thread
+  [*agent-name *agent-task-id *agent-id *retry-num *afn *info]
+  (<<with-substitutions
+   [*failure-depot (symbol (po/agent-failures-depot-name *agent-name))]
+   (invoke-or-error *afn *info :> *res)
+   (<<if (= *res ::error)
+     (depot-partition-append!
+      *failure-depot
+      (aor-types/->valid-AgentFailure *agent-task-id *agent-id *retry-num)
+      :append-ack)
+    (else>)
+     (:> *res)
+   )))
+
 (defn hook:processing-streaming [node streaming-index value])
 (defn hook:processing-streaming*
   [node streaming-index value]
@@ -858,10 +880,13 @@
          *new-agg-invoke-id
          :> {:keys [*start-time-millis]})
         (get-node-obj agent-graph-sym *agg-node-name :> {:keys [*init-fn]})
-        ;; TODO: <<<<<>>>>> propagate errors
-        ;;    - failure of this should be total failure of the agent
-        ;;    - append a "NodeFailure" event do the depot to do the recurse?
-        (h/invoke *init-fn :> *init-agg-state)
+        (invoke-on-task-thread name
+                               *agent-task-id
+                               *agent-id
+                               *retry-num
+                               *init-fn
+                               :agg-init
+                               :> *init-agg-state)
         (local-transform>
          [(keypath *invoke-id) :started-agg? (termval true)]
          agent-node-pstate-sym)
@@ -895,9 +920,16 @@
                            (termval *agg-invoke-id)]
                           agent-node-pstate-sym)
         (filter> (not *agg-finished?))
-        ;; TODO: <<<<>>>> catch exceptions and propagate failure
-        ;;  - failure of this should be total failure of the agent
-        (apply *update-fn *agg-state *args :> *res)
+        (<<ramafn %update-fn
+          []
+          (:> (apply *update-fn *agg-state *args)))
+        (invoke-on-task-thread name
+                               *agent-task-id
+                               *agent-id
+                               *retry-num
+                               %update-fn
+                               :agg-update
+                               :> *res)
         (extract-agg-result *res :> {:keys [*new-agg-state *finished?]})
 
         (local-transform>
