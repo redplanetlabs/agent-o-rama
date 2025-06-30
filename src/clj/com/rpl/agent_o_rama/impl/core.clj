@@ -279,8 +279,7 @@
 
 (defn node-event
   [agent-name task-id invoke-id retry-num node-name node-fn
-   ^AgentNode agent-node args
-   ^RamaClientsTaskGlobal rama-clients]
+   ^AgentNode agent-node args ^RamaClientsTaskGlobal rama-clients]
   (fn []
     (let [depot (.getAgentDepot rama-clients agent-name)
           res   (try
@@ -569,16 +568,26 @@
       (log-node-error t "Error invoking function" {:info info})
       ::error)))
 
+(defn hook:appended-agent-failure [agent-task-id agent-id retry-num])
+(defn hook:appended-agent-failure*
+  [agent-task-id agent-id retry-num]
+  (hook:appended-agent-failure agent-task-id agent-id retry-num))
+
 (deframaop invoke-on-task-thread
   [*agent-name *agent-task-id *agent-id *retry-num *afn *info]
   (<<with-substitutions
-   [*failure-depot (symbol (po/agent-failures-depot-name *agent-name))]
+   [*failure-depot
+    (this-module-pobject-task-global (po/agent-failures-depot-name
+                                      *agent-name))]
    (invoke-or-error *afn *info :> *res)
    (<<if (= *res ::error)
      (depot-partition-append!
       *failure-depot
       (aor-types/->valid-AgentFailure *agent-task-id *agent-id *retry-num)
       :append-ack)
+     (hook:appended-agent-failure* *agent-task-id
+                                   *agent-id
+                                   *retry-num)
     (else>)
      (:> *res)
    )))
@@ -771,6 +780,9 @@
                                          *agent-id
                                          *retry-num)
          :append-ack)
+        (hook:appended-agent-failure* *agent-task-id
+                                      *agent-id
+                                      *retry-num)
         (identity nil :> *op)
         (filter> false)
 
@@ -809,7 +821,6 @@
           (identity *invoke-id :> *invoke-id)
 
          (case> NodeAggStart)
-          ;; TODO: <<<<>>>> it's possible this initialization didn't happen
           (local-transform> [(keypath *agg-invoke-id)
                              :agg-start-res
                              (termval *node-fn-res)]
@@ -868,17 +879,9 @@
         (identity *op
                   :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
         (h/random-long :> *new-agg-invoke-id)
-        (handle-node-invoke
-         name
-         *agent-task-id
-         *agent-id
-         *node-fn
-         *invoke-id
-         *retry-num
-         *next-node
-         *args
-         *new-agg-invoke-id
-         :> {:keys [*start-time-millis]})
+        (local-transform>
+         [(keypath *invoke-id) :started-agg? (termval true)]
+         agent-node-pstate-sym)
         (get-node-obj agent-graph-sym *agg-node-name :> {:keys [*init-fn]})
         (invoke-on-task-thread name
                                *agent-task-id
@@ -888,14 +891,11 @@
                                :agg-init
                                :> *init-agg-state)
         (local-transform>
-         [(keypath *invoke-id) :started-agg? (termval true)]
-         agent-node-pstate-sym)
-        (local-transform>
          [(keypath *new-agg-invoke-id)
           (termval {:agent-id            *agent-id
                     :agent-task-id       *agent-task-id
                     :node                *agg-node-name
-                    :start-time-millis   *start-time-millis
+                    :start-time-millis   (h/current-time-millis)
                     :agg-invoke-id       *agg-invoke-id
                     :agg-inputs          []
                     :agg-state           *init-agg-state
@@ -903,6 +903,17 @@
                     :agg-start-invoke-id *invoke-id
                    })]
          agent-node-pstate-sym)
+        (handle-node-invoke
+         name
+         *agent-task-id
+         *agent-id
+         *node-fn
+         *invoke-id
+         *retry-num
+         *next-node
+         *args
+         *new-agg-invoke-id)
+
 
        (case> NodeAgg :> {:keys [*update-fn]})
         (identity *op

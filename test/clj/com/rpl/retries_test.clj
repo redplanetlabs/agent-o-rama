@@ -56,8 +56,7 @@
         stalls-atom           (atom 0)
         init-retry-num-atom   (atom 0)]
     (with-redefs
-      [SEM (h/mk-semaphore 0)
-       retries/SUBSTITUTE-TICK-DEPOT true
+      [retries/SUBSTITUTE-TICK-DEPOT true
        retries/checker-threshold-millis short-checker-threshold-millis
 
        retries/hook:checker-finished
@@ -295,6 +294,111 @@
                 (-> @received-atom
                     first
                     last)))
+        )))))
+
+(def +bad-init-agg
+  (accumulator
+   (fn [v]
+     (term inc))
+   :init-fn
+   (fn []
+     (throw (ex-info "fail init" {})))))
+
+(def +bad-update-agg
+  (accumulator
+   (fn [v]
+     (throw (ex-info "bad update" {})))
+   :init-fn
+   (fn [] 0)))
+
+
+;; TODO: <<<<<>>>>> set retries to 0
+(deftest failure-processing-test
+  (let [received-atom        (atom {})
+        failure-appends-atom (atom 0)
+        init-retry-num-atom  (atom 0)]
+    (with-redefs
+      [retries/SUBSTITUTE-TICK-DEPOT true
+       i/init-retry-num      (fn [] @init-retry-num-atom)
+
+       i/hook:appended-agent-failure (fn [& args]
+                                       (swap! failure-appends-atom inc))
+
+       i/hook:received-retry
+       (fn [agent-task-id agent-id expected-retry-num]
+         (transform [ATOM (keypath [agent-task-id agent-id]) (nil->val 0)]
+                    inc
+                    received-atom))]
+      (with-open [ipc (rtest/create-ipc)
+                  _ (TopologyUtils/startSimTime)]
+        (letlocals
+         (bind module
+           (module
+             [setup topologies]
+             (declare-depot setup *reset-depot :random {:global? true})
+             (let [topology  (aor/agents-topology setup topologies)
+                   s         (aor/underlying-stream-topology topology)
+                   node-exec (symbol (po/agent-node-executor-name))
+                   root-sym  (symbol (po/agent-invoke-task-global-name "foo"))
+                   agent-active-invokes-pstate-sym
+                   (symbol (po/agent-active-invokes-task-global-name "foo"))]
+               (->
+                 topology
+                 (aor/new-agent "foo")
+                 (aor/node
+                  "start"
+                  "node1"
+                  (fn [agent-node v]
+                    (when (= v :fail)
+                      (throw (ex-info "fail node" {})))
+                    (aor/emit! agent-node "node1")))
+                 (aor/agg-start-node
+                  "node1"
+                  "agg"
+                  (fn [agent-node]
+                    (aor/emit! agent-node "agg" 1)
+                    (aor/emit! agent-node "agg" 1)))
+                 (aor/agg-node
+                  "agg"
+                  nil
+                  +bad-init-agg
+                  (fn [agent-node agg node-start-res]
+                    (aor/result! agent-node agg)))
+               )
+               (->
+                 topology
+                 (aor/new-agent "bar")
+                 (aor/node
+                  "start"
+                  "node1"
+                  (fn [agent-node]
+                    (aor/emit! agent-node "node1")))
+                 (aor/agg-start-node
+                  "node1"
+                  "agg"
+                  (fn [agent-node]
+                    (aor/emit! agent-node "agg" 1)
+                    (aor/emit! agent-node "agg" 1)))
+                 (aor/agg-node
+                  "agg"
+                  nil
+                  +bad-update-agg
+                  (fn [agent-node agg node-start-res]
+                    (aor/result! agent-node agg)))
+               )
+               (aor/define-agents! topology)
+             )))
+         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (bind module-name (get-module-name module))
+         (bind agent-manager (aor/agent-manager ipc module-name))
+         (bind foo (aor/agent-client agent-manager "foo"))
+         (bind bar (aor/agent-client agent-manager "bar"))
+
+
+         (bind reset-test!
+           (fn []
+             (reset! failure-appends-atom 0)
+             (reset! received-atom {})))
 
          ; (rtest/pause-microbatch-topology! ipc
          ;                                   module-name
@@ -302,12 +406,32 @@
          ; (rtest/resume-microbatch-topology! ipc
          ;                                    module-name
          ;                                    aor-types/AGENTS-MB-TOPOLOGY-NAME)
+
+         (bind inv (aor/agent-initiate foo :fail))
+         (is (condition-attained? (= 1 @failure-appends-atom)))
+         (is (condition-attained? (= 1 (count @received-atom))))
+         (is (= 1
+                (-> @received-atom
+                    first
+                    last)))
+
+
+         (reset-test!)
+         (aor/agent-initiate foo 1)
+         (is (condition-attained? (= 1 @failure-appends-atom)))
+         (is (condition-attained? (= 1 (count @received-atom))))
+         ;; TODO: <<<<>>>>
+
          ;; TODO: <<<<<>>>>>
          ;;   - verify failures going to retry checker
-         ;;       - exception in node
          ;;       - exception in agg update
          ;;       - exception in agg init fn
          ;;   - verify it uniques failure requests
+         ;;     - pause failure processor while have multiple failures in one
+         ;;     agent
+         ;;       - or manually append
+         ;;  - failure checker ignores requests for the wrong retry num
+         ;;     - can manually append to it
          ;;  - check that events from prior executions get filtered
          ;;      - can use semaphore to stall the virtual thread invoke, then
          ;;      manually cause a stall and release
