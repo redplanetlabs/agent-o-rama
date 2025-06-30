@@ -1,3 +1,19 @@
+investigate what the lock button does xyflow
+overall _invocation_ stats { (side panel collapsible)
+  execution time
+  tokens
+  writes/reads to stores
+  model calls
+}
+
+remove react flow label 
+edn=>json (and label that says its json)
+
+remove pagination?
+
+tests for webserver backend
+
+
 agent page (boxes with expand links)
 
 link to run page (not interactive), agent graph (pretty small, zoom) , stats summary, recent invokes (all invockes button), alerts box
