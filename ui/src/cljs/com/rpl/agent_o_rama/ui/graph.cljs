@@ -254,49 +254,55 @@
        ;; Metrics grid
        ($ :div {:className "grid grid-cols-1 gap-3"}
           ;; Execution time
-          ($ :div {:className "bg-blue-50 p-3 rounded-lg border border-blue-200"}
+          ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
              ($ :div {:className "flex justify-between items-center"}
                 ($ :div
-                   ($ :div {:className "text-sm font-medium text-blue-700"} "Execution Time")
-                   ($ :div {:className "text-xs text-blue-600"} "Total runtime"))
+                   ($ :div {:className "text-sm font-medium text-gray-700"} "Execution Time")
+                   ($ :div {:className "text-xs text-gray-600"} "Total runtime"))
                 ($ :div {:className "text-right"}
-                   ($ :div {:className "text-lg font-bold text-blue-800"} (str total-execution-time "ms"))
-                   ($ :div {:className "text-xs text-blue-600"} (str (/ total-execution-time 1000.0) "s")))))
+                   ($ :div {:className "text-lg font-bold text-gray-800"} (str total-execution-time "ms"))
+                   ($ :div {:className "text-xs text-gray-600"} (str (/ total-execution-time 1000.0) "s")))))
           
           ;; Tokens
-          ($ :div {:className "bg-green-50 p-3 rounded-lg border border-green-200"}
+          ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
              ($ :div {:className "flex justify-between items-center"}
                 ($ :div
-                   ($ :div {:className "text-sm font-medium text-green-700"} "Tokens")
-                   ($ :div {:className "text-xs text-green-600"} "Total processed"))
+                   ($ :div {:className "text-sm font-medium text-gray-700"} "Tokens")
+                   ($ :div {:className "text-xs text-gray-600"} "Total processed"))
                 ($ :div {:className "text-right"}
-                   ($ :div {:className "text-lg font-bold text-green-800"} (str (.toLocaleString total-tokens)))
-                   ($ :div {:className "text-xs text-green-600"} "tokens"))))
+                   ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens)))
+                   ($ :div {:className "text-xs text-gray-600"} "tokens"))))
           
           ;; Store operations
-          ($ :div {:className "bg-purple-50 p-3 rounded-lg border border-purple-200"}
+          ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
              ($ :div
-                ($ :div {:className "text-sm font-medium text-purple-700 mb-2"} "Store Operations")
+                ($ :div {:className "text-sm font-medium text-gray-700 mb-2"} "Store Operations")
                 ($ :div {:className "flex justify-between items-center"}
                    ($ :div
-                      ($ :div {:className "text-xs text-purple-600"} "Reads")
-                      ($ :div {:className "text-lg font-bold text-purple-800"} store-reads))
+                      ($ :div {:className "text-xs text-gray-600"} "Reads")
+                      ($ :div {:className "text-lg font-bold text-gray-800"} store-reads))
                    ($ :div
-                      ($ :div {:className "text-xs text-purple-600"} "Writes") 
-                      ($ :div {:className "text-lg font-bold text-purple-800"} store-writes)))))
+                      ($ :div {:className "text-xs text-gray-600"} "Writes") 
+                      ($ :div {:className "text-lg font-bold text-gray-800"} store-writes)))))
           
           ;; Model calls
-          ($ :div {:className "bg-orange-50 p-3 rounded-lg border border-orange-200"}
+          ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
              ($ :div {:className "flex justify-between items-center"}
                 ($ :div
-                   ($ :div {:className "text-sm font-medium text-orange-700"} "Model Calls")
-                   ($ :div {:className "text-xs text-orange-600"} "API requests"))
+                   ($ :div {:className "text-sm font-medium text-gray-700"} "Model Calls")
+                   ($ :div {:className "text-xs text-gray-600"} "API requests"))
                 ($ :div {:className "text-right"}
-                   ($ :div {:className "text-lg font-bold text-orange-800"} model-calls)
-                   ($ :div {:className "text-xs text-orange-600"} "calls"))))))))
+                   ($ :div {:className "text-lg font-bold text-gray-800"} model-calls)
+                   ($ :div {:className "text-xs text-gray-600"} "calls"))))))))
 
-(defui right-panel [{:keys [graph-data changed-nodes set-changed-nodes affected-nodes flow-nodes set-selected-node on-execute-fork on-clear-fork]}]
+(defui right-panel [{:keys [graph-data changed-nodes set-changed-nodes affected-nodes flow-nodes set-selected-node on-execute-fork on-clear-fork forking-mode? set-forking-mode?]}]
   (let [[active-tab set-active-tab] (uix/use-state :stats)]
+    
+    ;; Update forking mode when tab changes
+    (uix/use-effect
+     (fn []
+       (set-forking-mode? (= active-tab :fork)))
+     [active-tab set-forking-mode?])
     
     ($ :div {:className "fixed right-0 top-32 h-[calc(100vh-8rem)] w-80 bg-white shadow-lg border-l border-gray-200 overflow-hidden z-40"}
        ;; Tab header
@@ -353,7 +359,7 @@
                                     (when is-overridden
                                       ($ :div {:className "bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded mt-1 font-medium"}
                                          "⚠️ This will be overridden")))
-                                 ($ :button {:className "text-red-500 hover:text-red-700 text-sm"
+                                 ($ :button {:className "cursor-pointer text-red-500 hover:text-red-700 text-sm"
                                              :onClick (fn [e] 
                                                         (.stopPropagation e)
                                                         (set-changed-nodes #(dissoc % node-id)))}
@@ -533,18 +539,16 @@
                              (fn []
                                ;; TODO: Implement fork execution API call
                                (js/console.log "Execute fork with changes:" (clj->js changed-nodes))
-                               ;; Reset forking mode after execution
-                               (set-forking-mode? false)
+                               ;; Clear changes after execution
                                (set-changed-nodes {})
                                (set-selected-node nil))
-                             [changed-nodes set-forking-mode?])
+                             [changed-nodes])
         
         handle-cancel-fork (uix/use-callback
                            (fn []
-                             (set-forking-mode? false)
                              (set-changed-nodes {})
                              (set-selected-node nil))
-                           [set-forking-mode?])
+                           [])
         
         handle-clear-fork (uix/use-callback
                            (fn []
@@ -552,13 +556,7 @@
                              (set-selected-node nil))
                            [])]
     
-    ;; Reset local forking state when parent turns off forking mode
-    (uix/use-effect
-     (fn []
-       (when-not forking-mode?
-         (set-changed-nodes {})
-         (set-selected-node nil)))
-     [forking-mode?])
+
     
     ($ :<>
        ;; Main content area with right margin for the stats panel
@@ -650,5 +648,7 @@
                        :flow-nodes flow-nodes
                        :set-selected-node set-selected-node
                        :on-execute-fork handle-execute-fork
-                       :on-clear-fork handle-clear-fork}))))
+                       :on-clear-fork handle-clear-fork
+                       :forking-mode? forking-mode?
+                       :set-forking-mode? set-forking-mode?}))))
 

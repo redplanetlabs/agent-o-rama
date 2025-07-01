@@ -144,13 +144,7 @@
                      ($ :label.text-sm.text-gray-600 "Pagination")
                      ($ :input.mr-2 {:type "checkbox"
                                      :checked use-pagination?
-                                     :onChange #(set-use-pagination (not use-pagination?))}))
-                  ($ :button {:className (str "px-4 py-2 rounded-md font-medium transition-colors "
-                                              (if forking-mode?
-                                                "bg-red-600 hover:bg-red-700 text-white"
-                                                "bg-blue-600 hover:bg-blue-700 text-white"))
-                              :onClick (fn [_] (set-forking-mode? (not forking-mode?)))}
-                     (if forking-mode? "Cancel" "Fork")))))
+                                     :onChange #(set-use-pagination (not use-pagination?))})))))
          
          ;; Graph content
          ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
