@@ -8,23 +8,29 @@ import com.rpl.rama.integration.*;
 
 public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
   WorkerManagedResource<ExecutorService> _execServResource;
-
-  // TODO: <<<<>>>> have it remove from here on exception during execution
-  Set<Long> _runningInvokeIds;
+  ConcurrentHashMap<Long, Object> _runningInvokeIds;
 
   public void submitTask(long invokeId, clojure.lang.AFn f) {
-    _runningInvokeIds.add(invokeId);
-    _execServResource.getResource().submit((Runnable) f);
+    _runningInvokeIds.put(invokeId, true);
+    Runnable wrappedTask = () -> {
+      try {
+        f.run();
+      } catch (Throwable t) {
+        _runningInvokeIds.remove(invokeId);
+        throw t;
+      }
+    };
+    _execServResource.getResource().submit(wrappedTask);
   }
 
   public Set<Long> getRunningInvokeIds() {
-    return _runningInvokeIds;
+    return new HashSet(_runningInvokeIds.keySet());
   }
 
   @Override
   public void prepareForTask(int taskId, TaskGlobalContext context) {
     _execServResource = new WorkerManagedResource("agentVirtualThreads", context, () -> Executors.newVirtualThreadPerTaskExecutor());
-    _runningInvokeIds = new HashSet();
+    _runningInvokeIds = new ConcurrentHashMap();
   }
 
   public void removeTrackedInvokeId(long invokeId) {
@@ -33,7 +39,7 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
 
   @Override
   public void gainedLeadership() {
-    _runningInvokeIds = new HashSet();
+    _runningInvokeIds = new ConcurrentHashMap();
   }
 
   @Override

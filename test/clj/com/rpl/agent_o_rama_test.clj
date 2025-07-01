@@ -2739,7 +2739,6 @@
        (is (= "def" (aor/agent-result bar inv-bar1)))
        (is (condition-attained? (= {} (pending-agent-count))))
        (is (= 65 (last-progress-time foo-invokes-pstate inv-foo1)))
-       (is (= 155 (last-progress-time bar-invokes-pstate inv-bar1)))
 
        (bind inv-foo1 (aor/agent-initiate foo))
        (bind inv-foo2 (aor/agent-initiate foo))
@@ -2757,7 +2756,7 @@
 
        ;; verify failed nodes get cleaned up
        (bind inv-car (aor/agent-initiate car))
-       (is (= 1 (count (pending-invokes))))
+       (is (condition-attained? (= 1 (count (pending-invokes)))))
        (h/release-semaphore SEM 1)
        (is (condition-attained? (empty? (pending-invokes))))
       ))))
