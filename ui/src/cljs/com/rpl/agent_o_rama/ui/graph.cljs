@@ -524,8 +524,6 @@
                                                                   ($ :div {:className "absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"}))
                                                                 (when has-changes
                                                                   ($ :div {:className "absolute -top-1 -left-1 w-3 h-3 bg-orange-400 rounded-full border-2 border-white shadow-sm"}))
-                                                                (when is-affected
-                                                                  ($ :div {:className "absolute -top-1 -right-1 w-3 h-3 bg-gray-400 rounded-full border-2 border-white shadow-sm"}))
                                                                 ($ Handle {:type "target" :position "top"})
                                                                 ($ Handle {:type "source" :position "bottom"})))))
                                                         
