@@ -486,7 +486,7 @@
                                    :edges flow-edges
                                    :onNodesChange on-nodes-change
                                    :onEdgesChange on-edges-change
-                                   :proOptions {:hideAttribution true}
+                                   :proOptions (clj->js{:hideAttribution true})
                                    :nodeTypes (clj->js {"custom"
                                                         (uix.core/as-react
                                                          (fn [{:keys [data id]}]
@@ -568,7 +568,7 @@
                                 :edges flow-edges
                                 :onNodesChange on-nodes-change
                                 :onEdgesChange on-edges-change
-                                :proOptions {:hideAttribution true}
+                                :proOptions (clj->js {:hideAttribution true})
                                 :nodeTypes (clj->js {"custom"
                                                      (uix.core/as-react
                                                       (fn [{:keys [data id]}]
