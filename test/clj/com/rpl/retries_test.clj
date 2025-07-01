@@ -476,16 +476,28 @@
                   2]
                  1}
                 @received-atom))
-
-
-
-
-         ;; TODO: <<<<<>>>>>
-         ;;  - check that events from prior executions get filtered
-         ;;      - can use semaphore to stall the virtual thread invoke, then
-         ;;      manually cause a stall and release
-         ;;      - store writes
-         ;;      - subsequent node invokes
-         ;;      - check prime between NodeComplete and processing of emit
-         ;;      (there's a filter there)
         )))))
+
+(deftest
+  filtered-events-test
+  ;; TODO: <<<<>>>>>
+  ;;  - use semaphore to stall a virtual thread invoke
+  ;;  - cause failure in another parallel node that causes priming/retry
+  ;;  - unblock semaphore
+  ;;  - issue store write
+  ;;  - block semaphore and verify filtering of store write
+  ;;  - unblock semaphore
+  ;;  - verify filtering of NodeComplete event
+  ;;  - have another parallel node blocked on sem, and it throws exception when
+  ;;  released
+  ;;    - verify NodeFailure event is filtered
+
+  ;; TODO: <<<<<>>>>>
+  ;;  - check that events from prior executions get filtered
+  ;;      - can use semaphore to stall the virtual thread invoke, and
+  ;;      have a failure in another node
+  ;;      - store writes
+  ;;      - subsequent node invokes
+  ;;      - check prime between NodeComplete and processing of emit
+  ;;      (there's a filter there)
+)

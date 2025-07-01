@@ -323,6 +323,24 @@
     m
     (assoc m k v)))
 
+(deframaop filter-valid-retry-num>
+  [*agent-name *agent-task-id *agent-id *retry-num]
+  (<<with-substitutions
+   [$$valid
+    (this-module-pobject-task-global (po/agent-valid-invokes-task-global-name
+                                      *agent-name))]
+   (local-select> (keypath [*agent-task-id *agent-id])
+                  $$valid
+                  :> *valid-retry-num)
+   (filter> (or> (nil? *valid-retry-num) (= *valid-retry-num *retry-num)))
+   (:>)))
+
+(defbasicblocksegmacro |aor
+  [:<* [[agent-name agent-task-id agent-id retry-num] & partitioner+args]]
+  [(vec partitioner+args)
+   [filter-valid-retry-num> agent-name agent-task-id agent-id retry-num]])
+
+
 (deframaop handle-node-invoke
   [*name *agent-task-id *agent-id *node-fn *invoke-id *retry-num *next-node
    *args *agg-invoke-id]
@@ -359,7 +377,7 @@
                      :agg-invoke-id *agg-invoke-id
                     })))
    (local-transform> [(keypath *invoke-id) (term %merger)] $$nodes)
-   (|direct *task-id)
+   (|aor [*name *agent-task-id *agent-id *retry-num] |direct *task-id)
    (submit-virtual-task!
     *invoke-id
     (node-event *name
@@ -389,7 +407,8 @@
   (:>))
 
 (deframaop send-emits>
-  [*agent-name *agent-task-id *agent-id *invoke-id *agg-invoke-id *emits]
+  [*agent-name *agent-task-id *agent-id *retry-num *invoke-id *agg-invoke-id
+   *emits]
   (<<with-substitutions
    [$$root
     (this-module-pobject-task-global
@@ -403,7 +422,9 @@
                 :> {:keys [*invoke-id *target-task-id *node-name *args]
                     :as   *emit})
    (hook:emit> *emit)
-   (|direct *target-task-id)
+   (|aor [*agent-name *agent-task-id *agent-id *retry-num]
+         |direct
+         *target-task-id)
    (aor-types/->valid-NodeOp *invoke-id
                              *node-name
                              *args
@@ -414,7 +435,9 @@
    (hook> <root>)
    (mapv :invoke-id *emits :> *next-invoke-ids)
    (reduce bit-xor *invoke-id *next-invoke-ids :> *ack-val)
-   (|direct *agent-task-id)
+   (|aor [*agent-name *agent-task-id *agent-id *retry-num]
+         |direct
+         *agent-task-id)
    (<<atomic
      (hook:update-last-progress>)
      (local-transform>
@@ -526,7 +549,7 @@
 (defn hook:writing-result [agent-task-id agent-id result])
 
 (deframaop handle-result!
-  [*agent-name *agent-task-id *agent-id *result]
+  [*agent-name *agent-task-id *agent-id *retry-num *result]
   (<<with-substitutions
    [$$root
     (this-module-pobject-task-global (po/agent-invoke-task-global-name
@@ -534,7 +557,9 @@
     $$active
     (this-module-pobject-task-global
      (po/agent-active-invokes-task-global-name *agent-name))]
-   (|direct *agent-task-id)
+   (|aor [*agent-name *agent-task-id *agent-id *retry-num]
+         |direct
+         *agent-task-id)
    (hook:writing-result *agent-task-id *agent-id *result)
    (local-transform>
     [(keypath *agent-id)
@@ -546,18 +571,6 @@
      (termval *result)]
     $$root)
    (local-transform> [(keypath *agent-id) NONE>] $$active)
-   (:>)))
-
-(deframaop filter-valid-retry-num>
-  [*agent-name *agent-task-id *agent-id *retry-num]
-  (<<with-substitutions
-   [$$valid
-    (this-module-pobject-task-global (po/agent-valid-invokes-task-global-name
-                                      *agent-name))]
-   (local-select> (keypath [*agent-task-id *agent-id])
-                  $$valid
-                  :> *valid-retry-num)
-   (filter> (or> (nil? *valid-retry-num) (= *valid-retry-num *retry-num)))
    (:>)))
 
 (defn invoke-or-error
@@ -838,10 +851,11 @@
         ;; AgentNode implementation makes it impossible for there to be both
         ;; emits and result
         (<<if (some? *result)
-          (handle-result! name *agent-task-id *agent-id *result))
+          (handle-result! name *agent-task-id *agent-id *retry-num *result))
         (send-emits> name
                      *agent-task-id
                      *agent-id
+                     *retry-num
                      *invoke-id
                      *agg-invoke-id
                      *emits
