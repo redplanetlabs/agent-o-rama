@@ -236,65 +236,145 @@
                                                 (pr-str (js->clj original-input))
                                                 (str original-input))))))))))))
 
-(defui forking-changelist-panel [{:keys [changed-nodes set-changed-nodes graph-data on-execute-fork on-cancel-fork affected-nodes flow-nodes set-selected-node]}]
-  ($ :div {:className "fixed right-0 top-32 h-[calc(100vh-8rem)] w-80 bg-white shadow-lg border-l border-gray-200 p-4 overflow-y-auto z-40"}
-     ($ :div {:className "flex justify-between items-center mb-4"}
-        ($ :h3 {:className "text-lg font-semibold text-gray-800"} "Fork Changes")
-        ($ :button {:className "text-gray-500 hover:text-gray-700"
-                    :onClick on-cancel-fork}
-           "✕"))
-     
-     (if (empty? changed-nodes)
-       ($ :div {:className "text-gray-500 text-center py-8"}
-          "No changes yet. Select a node to edit its input.")
+(defui stats-panel [{:keys [graph-data]}]
+  (let [total-nodes (count graph-data)
+        ;; Dummy values for now
+        total-execution-time 2347
+        total-tokens 45892
+        store-reads 127
+        store-writes 23
+        model-calls 156]
+    
+    ($ :div {:className "space-y-4"}
+       ;; Header
+       ($ :div {:className "border-b border-gray-200 pb-3"}
+          ($ :h4 {:className "text-lg font-semibold text-gray-800"} "Invocation Stats")
+          ($ :div {:className "text-sm text-gray-500"} (str total-nodes " nodes executed")))
        
-       ($ :div {:className "space-y-3"}
-          ;; Changed nodes list
-          (for [[node-id new-input] changed-nodes]
-            (let [node-data (get graph-data node-id)
-                  node-name (:node node-data)
-                  is-overridden (contains? affected-nodes node-id)
-                  handle-select-node (fn [e]
-                                       (.stopPropagation e)
-                                       ;; Find the corresponding flow node and select it
-                                       (let [nodes (js->clj flow-nodes :keywordize-keys true)
-                                             target-node (->> nodes
-                                                              (filter #(= (-> % :data :node-id) node-id))
-                                                              first)]
-                                         (when target-node
-                                           (set-selected-node (clj->js target-node)))))]
-              ($ :div {:key node-id
-                       :className (str "border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow " 
-                                       (if is-overridden 
-                                         "bg-yellow-50 border-yellow-300 hover:bg-yellow-100" 
-                                         "bg-gray-50 border-gray-200 hover:bg-gray-100"))
-                       :onClick handle-select-node}
-                 ($ :div {:className "flex justify-between items-start mb-2"}
-                    ($ :div
-                       ($ :div {:className "font-medium text-gray-800 text-sm flex items-center gap-2"} 
-                          node-name)
-                       ($ :div {:className "text-xs text-gray-500 font-mono"} (str "ID: " node-id))
-                       (when is-overridden
-                         ($ :div {:className "bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded mt-1 font-medium"}
-                            "⚠️ This will be overridden")))
-                    ($ :button {:className "text-red-500 hover:text-red-700 text-sm"
-                                :onClick (fn [e] 
-                                           (.stopPropagation e)
-                                           (set-changed-nodes #(dissoc % node-id)))}
-                       "Remove"))
-                 
-                 ($ :div {:className "text-xs"}
-                    ($ :div {:className "text-gray-600 mb-1"} "New input:")
-                    ($ :div {:className "bg-white p-2 rounded border font-mono text-gray-800 break-all"}
-                       (if (> (count new-input) 100)
-                         (str (subs new-input 0 100) "...")
-                         new-input))))))
+       ;; Metrics grid
+       ($ :div {:className "grid grid-cols-1 gap-3"}
+          ;; Execution time
+          ($ :div {:className "bg-blue-50 p-3 rounded-lg border border-blue-200"}
+             ($ :div {:className "flex justify-between items-center"}
+                ($ :div
+                   ($ :div {:className "text-sm font-medium text-blue-700"} "Execution Time")
+                   ($ :div {:className "text-xs text-blue-600"} "Total runtime"))
+                ($ :div {:className "text-right"}
+                   ($ :div {:className "text-lg font-bold text-blue-800"} (str total-execution-time "ms"))
+                   ($ :div {:className "text-xs text-blue-600"} (str (/ total-execution-time 1000.0) "s")))))
           
-          ;; Execute button
-          ($ :div {:className "pt-4 border-t border-gray-200"}
-             ($ :button {:className "w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
-                         :onClick on-execute-fork}
-                (str "Execute Fork (" (count changed-nodes) " changes)")))))))
+          ;; Tokens
+          ($ :div {:className "bg-green-50 p-3 rounded-lg border border-green-200"}
+             ($ :div {:className "flex justify-between items-center"}
+                ($ :div
+                   ($ :div {:className "text-sm font-medium text-green-700"} "Tokens")
+                   ($ :div {:className "text-xs text-green-600"} "Total processed"))
+                ($ :div {:className "text-right"}
+                   ($ :div {:className "text-lg font-bold text-green-800"} (str (.toLocaleString total-tokens)))
+                   ($ :div {:className "text-xs text-green-600"} "tokens"))))
+          
+          ;; Store operations
+          ($ :div {:className "bg-purple-50 p-3 rounded-lg border border-purple-200"}
+             ($ :div
+                ($ :div {:className "text-sm font-medium text-purple-700 mb-2"} "Store Operations")
+                ($ :div {:className "flex justify-between items-center"}
+                   ($ :div
+                      ($ :div {:className "text-xs text-purple-600"} "Reads")
+                      ($ :div {:className "text-lg font-bold text-purple-800"} store-reads))
+                   ($ :div
+                      ($ :div {:className "text-xs text-purple-600"} "Writes") 
+                      ($ :div {:className "text-lg font-bold text-purple-800"} store-writes)))))
+          
+          ;; Model calls
+          ($ :div {:className "bg-orange-50 p-3 rounded-lg border border-orange-200"}
+             ($ :div {:className "flex justify-between items-center"}
+                ($ :div
+                   ($ :div {:className "text-sm font-medium text-orange-700"} "Model Calls")
+                   ($ :div {:className "text-xs text-orange-600"} "API requests"))
+                ($ :div {:className "text-right"}
+                   ($ :div {:className "text-lg font-bold text-orange-800"} model-calls)
+                   ($ :div {:className "text-xs text-orange-600"} "calls"))))))))
+
+(defui right-panel [{:keys [graph-data changed-nodes set-changed-nodes affected-nodes flow-nodes set-selected-node on-execute-fork on-clear-fork]}]
+  (let [[active-tab set-active-tab] (uix/use-state :stats)]
+    
+    ($ :div {:className "fixed right-0 top-32 h-[calc(100vh-8rem)] w-80 bg-white shadow-lg border-l border-gray-200 overflow-hidden z-40"}
+       ;; Tab header
+       ($ :div {:className "border-b border-gray-200 p-4"}
+          ($ :div {:className "flex space-x-1 bg-gray-100 rounded-lg p-1"}
+             ($ :button {:className (str "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors "
+                                         (if (= active-tab :stats)
+                                           "bg-white text-gray-900 shadow-sm"
+                                           "text-gray-600 hover:text-gray-900"))
+                         :onClick #(set-active-tab :stats)}
+                "Stats")
+             ($ :button {:className (str "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors "
+                                         (if (= active-tab :fork)
+                                           "bg-white text-gray-900 shadow-sm"
+                                           "text-gray-600 hover:text-gray-900"))
+                         :onClick #(set-active-tab :fork)}
+                (str "Fork" (when (> (count changed-nodes) 0) (str " (" (count changed-nodes) ")"))))))
+       
+       ;; Tab content
+       ($ :div {:className "p-4 h-full overflow-y-auto"}
+          (case active-tab
+            :stats ($ stats-panel {:graph-data graph-data})
+            
+            :fork (if (empty? changed-nodes)
+                    ($ :div {:className "text-gray-500 text-center py-8"}
+                       "No changes yet. Select a node to edit its input.")
+                    
+                    ($ :div {:className "space-y-3"}
+                       ;; Changed nodes list
+                       (for [[node-id new-input] changed-nodes]
+                         (let [node-data (get graph-data node-id)
+                               node-name (:node node-data)
+                               is-overridden (contains? affected-nodes node-id)
+                               handle-select-node (fn [e]
+                                                    (.stopPropagation e)
+                                                    ;; Find the corresponding flow node and select it
+                                                    (let [nodes (js->clj flow-nodes :keywordize-keys true)
+                                                          target-node (->> nodes
+                                                                           (filter #(= (-> % :data :node-id) node-id))
+                                                                           first)]
+                                                      (when target-node
+                                                        (set-selected-node (clj->js target-node)))))]
+                           ($ :div {:key node-id
+                                    :className (str "border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow " 
+                                                    (if is-overridden 
+                                                      "bg-yellow-50 border-yellow-300 hover:bg-yellow-100" 
+                                                      "bg-gray-50 border-gray-200 hover:bg-gray-100"))
+                                    :onClick handle-select-node}
+                              ($ :div {:className "flex justify-between items-start mb-2"}
+                                 ($ :div
+                                    ($ :div {:className "font-medium text-gray-800 text-sm flex items-center gap-2"} 
+                                       node-name)
+                                    ($ :div {:className "text-xs text-gray-500 font-mono"} (str "ID: " node-id))
+                                    (when is-overridden
+                                      ($ :div {:className "bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded mt-1 font-medium"}
+                                         "⚠️ This will be overridden")))
+                                 ($ :button {:className "text-red-500 hover:text-red-700 text-sm"
+                                             :onClick (fn [e] 
+                                                        (.stopPropagation e)
+                                                        (set-changed-nodes #(dissoc % node-id)))}
+                                    "Remove"))
+                              
+                              ($ :div {:className "text-xs"}
+                                 ($ :div {:className "text-gray-600 mb-1"} "New input:")
+                                 ($ :div {:className "bg-white p-2 rounded border font-mono text-gray-800 break-all"}
+                                    (if (> (count new-input) 100)
+                                      (str (subs new-input 0 100) "...")
+                                      new-input))))))
+                       
+                       ;; Action buttons
+                       ($ :div {:className "pt-4 border-t border-gray-200 space-y-2"}
+                          ($ :button {:className "w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+                                      :onClick on-execute-fork}
+                             (str "Execute Fork (" (count changed-nodes) " changes)"))
+                          ($ :button {:className "w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors"
+                                      :onClick on-clear-fork}
+                             "Clear All Changes")))))))))
+
 
 (defn process-graph-data 
   "Process raw graph data into nodes and edges for React Flow"
@@ -464,7 +544,13 @@
                              (set-forking-mode? false)
                              (set-changed-nodes {})
                              (set-selected-node nil))
-                           [set-forking-mode?])]
+                           [set-forking-mode?])
+        
+        handle-clear-fork (uix/use-callback
+                           (fn []
+                             (set-changed-nodes {})
+                             (set-selected-node nil))
+                           [])]
     
     ;; Reset local forking state when parent turns off forking mode
     (uix/use-effect
@@ -475,154 +561,94 @@
      [forking-mode?])
     
     ($ :<>
+       ;; Main content area with right margin for the stats panel
+       ($ :div {:className "mr-80"}
+          ($ :div {:style {:width "100%" :height "500px"}}
+             ($ ReactFlow {:nodes flow-nodes 
+                           :edges flow-edges
+                           :onNodesChange on-nodes-change
+                           :onEdgesChange on-edges-change
+                           :proOptions (clj->js {:hideAttribution true})
+                           :nodeTypes (clj->js {"custom"
+                                                (uix.core/as-react
+                                                 (fn [{:keys [data id]}]
+                                                   (let [data (js->clj data :keywordize-keys true)
+                                                         label (:label data)
+                                                         node-id (:node-id data)
+                                                         selected (= (when selected-node (.-id selected-node)) id)
+                                                         has-changes (contains? changed-nodes node-id)
+                                                         is-affected (and forking-mode? (contains? affected-nodes node-id))
+                                                         base-classes (cond
+                                                                        is-affected
+                                                                        ["bg-gray-300" "text-gray-500" "border-2" "border-gray-400"]
+                                                                        
+                                                                        has-changes
+                                                                        ["bg-orange-500" "text-white" "border-2" "border-orange-600"]
+                                                                        
+                                                                        (agg-node? data)
+                                                                        ["bg-yellow-500" "text-white" "border-2" "border-yellow-600"]
+
+                                                                        (starter-node? data)
+                                                                        ["bg-green-500" "text-white" "border-2" "border-green-600"]
+
+                                                                        :else
+                                                                        ["bg-white" "text-gray-800" "border-2" "border-gray-300"])
+                                                         selection-classes (if selected
+                                                                             ["ring-4" "ring-blue-400" "ring-opacity-75" "shadow-2xl" "transform" "scale-105"]
+                                                                             ["shadow-lg"])
+                                                         common-classes ["p-3" "rounded-md" "transition-all" "duration-200"]
+                                                         node-className (str/join " " (concat base-classes selection-classes common-classes))]
+                                                     ($ :div {:className "relative"}
+                                                        ($ :div {:className node-className
+                                                                 :style {:width "170px" :height "40px" :opacity (if is-affected "0.6" "1.0")}}
+                                                           label)
+                                                        (when (and (:result data) (not is-affected))
+                                                          ($ :div {:className "absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"}))
+                                                        (when has-changes
+                                                          ($ :div {:className "absolute -top-1 -left-1 w-3 h-3 bg-orange-400 rounded-full border-2 border-white shadow-sm"}))
+                                                        ($ Handle {:type "target" :position "top"})
+                                                        ($ Handle {:type "source" :position "bottom"})))))
+                                                
+                                                "phantom"
+                                                (uix.core/as-react
+                                                 (fn [{:keys [data]}]
+                                                   (let [data (js->clj data :keywordize-keys true)
+                                                         parent-node-id (:parent-node-id data)]
+                                                     ($ :div {:className "relative cursor-pointer"
+                                                              :onClick (fn [e]
+                                                                         (.stopPropagation e)
+                                                                         (handle-paginate-node parent-node-id))}
+                                                        ($ :div {:className "bg-gray-100 text-gray-600 p-3 rounded-md shadow-lg border-2 border-dashed border-gray-400 hover:bg-gray-200 transition-colors"
+                                                                 :style {:width "170px" :height "40px"}}
+                                                           (:label data))
+                                                        ($ Handle {:type "target" :position "top"})))))})
+                           :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
+                           :onNodeClick (fn [_ node] (set-selected-node node))}
+                ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
+                ($ Controls {:className "fill-gray-500 stroke-gray-500"})))
           
-          (if forking-mode?
-            ;; Forking mode layout
-            ($ :div {:className "mr-80"}
-               ;; Main content area
-               ($ :div
-                  ($ :div {:style {:width "100%" :height "500px"}}
-                     ($ ReactFlow {:nodes flow-nodes 
-                                   :edges flow-edges
-                                   :onNodesChange on-nodes-change
-                                   :onEdgesChange on-edges-change
-                                   :proOptions (clj->js{:hideAttribution true})
-                                   :nodeTypes (clj->js {"custom"
-                                                        (uix.core/as-react
-                                                         (fn [{:keys [data id]}]
-                                                           (let [data (js->clj data :keywordize-keys true)
-                                                                 label (:label data)
-                                                                 node-id (:node-id data)
-                                                                 selected (= (when selected-node (.-id selected-node)) id)
-                                                                 has-changes (contains? changed-nodes node-id)
-                                                                 is-affected (contains? affected-nodes node-id)
-                                                                 base-classes (cond
-                                                                                is-affected
-                                                                                ["bg-gray-300" "text-gray-500" "border-2" "border-gray-400"]
-                                                                                
-                                                                                has-changes
-                                                                                ["bg-orange-500" "text-white" "border-2" "border-orange-600"]
-                                                                                
-                                                                                (agg-node? data)
-                                                                                ["bg-yellow-500" "text-white" "border-2" "border-yellow-600"]
-
-                                                                                (starter-node? data)
-                                                                                ["bg-green-500" "text-white" "border-2" "border-green-600"]
-
-                                                                                :else
-                                                                                ["bg-white" "text-gray-800" "border-2" "border-gray-300"])
-                                                                 selection-classes (if selected
-                                                                                     ["ring-4" "ring-blue-400" "ring-opacity-75" "shadow-2xl" "transform" "scale-105"]
-                                                                                     ["shadow-lg"])
-                                                                 common-classes ["p-3" "rounded-md" "transition-all" "duration-200"]
-                                                                 node-className (str/join " " (concat base-classes selection-classes common-classes))]
-                                                             ($ :div {:className "relative"}
-                                                                ($ :div {:className node-className
-                                                                         :style {:width "170px" :height "40px" :opacity (if is-affected "0.6" "1.0")}}
-                                                                   label)
-                                                                (when (and (:result data) (not is-affected))
-                                                                  ($ :div {:className "absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"}))
-                                                                (when has-changes
-                                                                  ($ :div {:className "absolute -top-1 -left-1 w-3 h-3 bg-orange-400 rounded-full border-2 border-white shadow-sm"}))
-                                                                ($ Handle {:type "target" :position "top"})
-                                                                ($ Handle {:type "source" :position "bottom"})))))
-                                                        
-                                                        "phantom"
-                                                        (uix.core/as-react
-                                                         (fn [{:keys [data]}]
-                                                           (let [data (js->clj data :keywordize-keys true)
-                                                                 parent-node-id (:parent-node-id data)]
-                                                             ($ :div {:className "relative cursor-pointer"
-                                                                      :onClick (fn [e]
-                                                                                 (.stopPropagation e)
-                                                                                 (handle-paginate-node parent-node-id))}
-                                                                ($ :div {:className "bg-gray-100 text-gray-600 p-3 rounded-md shadow-lg border-2 border-dashed border-gray-400 hover:bg-gray-200 transition-colors"
-                                                                         :style {:width "170px" :height "40px"}}
-                                                                   (:label data))
-                                                                ($ Handle {:type "target" :position "top"})))))})
-                                   :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
-                                   :onNodeClick (fn [_ node] (set-selected-node node))}
-                        ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
-                        ($ Controls {:className "fill-gray-500 stroke-gray-500"})))
-                  
-                  ;; Forking input component
-                  ($ forking-input-component {:selected-node selected-node
-                                              :changed-nodes changed-nodes
-                                              :set-changed-nodes set-changed-nodes
-                                              :affected-nodes affected-nodes}))
-               
-               ;; Side panel
-               ($ forking-changelist-panel {:changed-nodes changed-nodes
-                                            :set-changed-nodes set-changed-nodes
-                                            :graph-data graph-data
-                                            :on-execute-fork handle-execute-fork
-                                            :on-cancel-fork handle-cancel-fork
-                                            :affected-nodes affected-nodes
-                                            :flow-nodes flow-nodes
-                                            :set-selected-node set-selected-node}))
-            
-            ;; Normal mode layout
-            ($ :<>
-               ($ :div {:style {:width "100%" :height "500px"}}
-                  ($ ReactFlow {:nodes flow-nodes 
-                                :edges flow-edges
-                                :onNodesChange on-nodes-change
-                                :onEdgesChange on-edges-change
-                                :proOptions (clj->js {:hideAttribution true})
-                                :nodeTypes (clj->js {"custom"
-                                                     (uix.core/as-react
-                                                      (fn [{:keys [data id]}]
-                                                        (let [data (js->clj data :keywordize-keys true)
-                                                              label (:label data)
-                                                              selected (= (when selected-node (.-id selected-node)) id)
-                                                              base-classes (cond
-                                                                             (agg-node? data)
-                                                                             ["bg-yellow-500" "text-white" "border-2" "border-yellow-600"]
-
-                                                                             (starter-node? data)
-                                                                             ["bg-green-500" "text-white" "border-2" "border-green-600"]
-
-                                                                             :else
-                                                                             ["bg-white" "text-gray-800" "border-2" "border-gray-300"])
-                                                              selection-classes (if selected
-                                                                                  ["ring-4" "ring-blue-400" "ring-opacity-75" "shadow-2xl" "transform" "scale-105"]
-                                                                                  ["shadow-lg"])
-                                                              common-classes ["p-3" "rounded-md" "transition-all" "duration-200"]
-                                                              node-className (str/join " " (concat base-classes selection-classes common-classes))]
-                                                          ($ :div {:className "relative"}
-                                                             ($ :div {:className node-className
-                                                                      :style {:width "170px" :height "40px"}}
-                                                                label)
-                                                             (when (:result data)
-                                                               ($ :div {:className "absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"}))
-                                                             ($ Handle {:type "target" :position "top"})
-                                                             ($ Handle {:type "source" :position "bottom"})))))
-                                                     
-                                                     "phantom"
-                                                     (uix.core/as-react
-                                                      (fn [{:keys [data]}]
-                                                        (let [data (js->clj data :keywordize-keys true)
-                                                              parent-node-id (:parent-node-id data)]
-                                                          ($ :div {:className "relative cursor-pointer"
-                                                                   :onClick (fn [e]
-                                                                              (.stopPropagation e)
-                                                                              (handle-paginate-node parent-node-id))}
-                                                             ($ :div {:className "bg-gray-100 text-gray-600 p-3 rounded-md shadow-lg border-2 border-dashed border-gray-400 hover:bg-gray-200 transition-colors"
-                                                                      :style {:width "170px" :height "40px"}}
-                                                                (:label data))
-                                                             ($ Handle {:type "target" :position "top"})))))})
-                                :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
-                                :onNodeClick (fn [_ node] (set-selected-node node))}
-                     ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
-                     ($ Controls {:className "fill-gray-500 stroke-gray-500"})))
-               
-               ;; Normal selected node component
-               (when selected-node
-                 ($ selected-node-component {:selected-node selected-node
-                                             :graph-data graph-data
-                                             :handle-paginate-node handle-paginate-node
-                                             :loading-nodes loading-nodes
-                                             :flow-nodes flow-nodes
-                                             :set-nodes set-nodes
-                                             :set-selected-node set-selected-node})))))))
+          ;; Show selected node details or forking input component
+          (when selected-node
+            (if forking-mode?
+              ($ forking-input-component {:selected-node selected-node
+                                          :changed-nodes changed-nodes
+                                          :set-changed-nodes set-changed-nodes
+                                          :affected-nodes affected-nodes})
+              ($ selected-node-component {:selected-node selected-node
+                                          :graph-data graph-data
+                                          :handle-paginate-node handle-paginate-node
+                                          :loading-nodes loading-nodes
+                                          :flow-nodes flow-nodes
+                                          :set-nodes set-nodes
+                                          :set-selected-node set-selected-node}))))
+       
+       ;; Always-visible right panel with tabs
+       ($ right-panel {:graph-data graph-data
+                       :changed-nodes changed-nodes
+                       :set-changed-nodes set-changed-nodes
+                       :affected-nodes affected-nodes
+                       :flow-nodes flow-nodes
+                       :set-selected-node set-selected-node
+                       :on-execute-fork handle-execute-fork
+                       :on-clear-fork handle-clear-fork}))))
 
