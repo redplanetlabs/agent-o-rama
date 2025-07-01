@@ -11,9 +11,8 @@
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
   :profiles {:dev      {:resource-paths ["test/resources/"]
                         :dependencies   [[meander/epsilon "0.0.650"]]}
-             ;; TODO: <<<<<>>>> update this to proper version
              :provided {:dependencies
-                        [[com.rpl/rama "0.0.6-SNAPSHOT"]
+                        [[com.rpl/rama "1.1.0"]
                          [org.apache.logging.log4j/log4j-slf4j18-impl
                           "2.16.0"]]}
              :gen      {:prep-tasks   []

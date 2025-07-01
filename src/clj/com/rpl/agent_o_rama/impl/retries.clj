@@ -123,7 +123,9 @@
         (symbol (po/agent-valid-invokes-task-global-name name))
 
         pending-retries-pstate-sym
-        (symbol (po/pending-retries-task-global-name name))]
+        (symbol (po/pending-retries-task-global-name name))
+
+        uniqued-sym             (symbol (str "$$uniqued-" name))]
     (<<sources mb-topology
      (source> check-tick-sym :> %microbatch)
       (%microbatch)
@@ -144,6 +146,7 @@
       ;; in the previous microbatch commit have been committed
       (<<batch
         (|all)
+        (local-select> (subselect MAP-KEYS) pending-retries-pstate-sym :> *v)
         (local-select> MAP-KEYS
                        pending-retries-pstate-sym
                        {:allow-yield? true}
@@ -157,12 +160,14 @@
           *retry-num)
          :append-ack))
       (<<batch
-        (%microbatch :> {:keys [*agent-task-id *agent-id *retry-num]})
+        (%microbatch :> *data)
+        (filter> (not (keyword? *data)))
+        (identity *data :> {:keys [*agent-task-id *agent-id *retry-num]})
         (+group-by [*agent-task-id *agent-id]
           (aggs/+max *retry-num :> *retry-num))
-        (materialize> *agent-task-id *agent-id *retry-num :> $$uniqued))
+        (materialize> *agent-task-id *agent-id *retry-num :> uniqued-sym))
       (<<batch
-        ($$uniqued :> *agent-task-id *agent-id *retry-num)
+        (uniqued-sym :> *agent-task-id *agent-id *retry-num)
         (|direct *agent-task-id)
         (local-select> [(keypath *agent-id) :retry-num (pred= *retry-num)]
                        agent-invoke-pstate-sym)
@@ -174,4 +179,13 @@
         (local-transform> [(keypath [*agent-task-id *agent-id])
                            (termval *next-retry-num)]
                           agent-valid-invokes-pstate-sym))
+      (<<batch
+        (uniqued-sym :> *agent-task-id *agent-id *retry-num)
+        (|global)
+        (aggs/+count :> *num-pending)
+        (<<if (> *num-pending 0)
+          (depot-partition-append!
+           failure-depot-sym
+           ::trigger
+           :append-ack)))
     )))

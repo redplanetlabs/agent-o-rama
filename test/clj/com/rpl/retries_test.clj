@@ -401,7 +401,6 @@
          (bind foo (aor/agent-client agent-manager "foo"))
          (bind bar (aor/agent-client agent-manager "bar"))
 
-
          (bind reset-test!
            (fn []
              (reset! failure-appends-atom 0)
@@ -425,9 +424,6 @@
          (aor/agent-initiate bar)
          (is (condition-attained? (= 1 @failure-appends-atom)))
          (is (condition-attained? (= 1 (count @received-atom))))
-
-
-
 
          ;; verify mutiple failures for same invoke only result in one retry
          (reset-test!)
