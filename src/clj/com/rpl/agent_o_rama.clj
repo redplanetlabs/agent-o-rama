@@ -302,14 +302,20 @@
                 {:pkey        agent-task-id
                  :callback-fn (fn [new-val _ _]
                                 (when (some? new-val)
-                                  (if (:failure? new-val)
-                                    (.completeExceptionally
-                                     ret
-                                     (h/ex-info (:val new-val) {}))
-                                    (.complete ret (:val new-val)))
+                                  (when-not (.isDone ret)
+                                    (if (:failure? new-val)
+                                      (.completeExceptionally
+                                       ret
+                                       (h/ex-info (:val new-val) {}))
+                                      (.complete ret (:val new-val))))
                                   (locking proxy-atom
-                                    (if (nil? @proxy-atom)
+                                    (cond
+                                      (nil? @proxy-atom)
                                       (reset! proxy-atom ::close)
+
+                                      (keyword? @proxy-atom) nil
+
+                                      :else
                                       (do
                                         (close! @proxy-atom)
                                         (reset! proxy-atom ::done)
