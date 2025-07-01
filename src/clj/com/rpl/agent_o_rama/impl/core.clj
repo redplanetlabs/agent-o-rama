@@ -323,7 +323,9 @@
     m
     (assoc m k v)))
 
-(deframaop filter-valid-retry-num>
+(defn hook:filtered-event [agent-task-id agent-id retry-num])
+
+(deframafn valid-retry-num?
   [*agent-name *agent-task-id *agent-id *retry-num]
   (<<with-substitutions
    [$$valid
@@ -332,8 +334,14 @@
    (local-select> (keypath [*agent-task-id *agent-id])
                   $$valid
                   :> *valid-retry-num)
-   (filter> (or> (nil? *valid-retry-num) (= *valid-retry-num *retry-num)))
-   (:>)))
+   (:> (or> (nil? *valid-retry-num) (= *valid-retry-num *retry-num)))))
+
+(deframaop filter-valid-retry-num>
+  [*agent-name *agent-task-id *agent-id *retry-num]
+  (<<if (valid-retry-num? *agent-name *agent-task-id *agent-id *retry-num)
+    (:>)
+   (else>)
+    (hook:filtered-event *agent-task-id *agent-id *retry-num)))
 
 (defbasicblocksegmacro |aor
   [:<* [[agent-name agent-task-id agent-id retry-num] & partitioner+args]]
@@ -865,7 +873,6 @@
         (throw! (h/ex-info "Unrecognized data type" {:class (class *data)})))
 
       ;; requires *agent-id, *agent-task-id, *retry-num, *op to be in scope
-      (filter-valid-retry-num> name *agent-task-id *agent-id *retry-num)
       (<<if (aor-types/NodeOp? *op)
         (get *op :next-node :> *next-node)
         (get-node-obj agent-graph-sym *next-node :> *op-obj)
@@ -1044,11 +1051,14 @@
                {:retry-mode :none}
               :> {:keys [*pstate-name *path *agent-name *agent-task-id
                           *agent-id *retry-num]})
-      (filter-valid-retry-num> *agent-name *agent-task-id *agent-id *retry-num)
-      (this-module-pobject-task-global *pstate-name :> $$p)
-      (do-transform! *path $$p :> *ret)
-      (ack-return> *ret)
-    ))
+      (<<if (valid-retry-num? *agent-name *agent-task-id *agent-id *retry-num)
+        (this-module-pobject-task-global *pstate-name :> $$p)
+        (do-transform! *path $$p :> *ret)
+        (ack-return> *ret)
+       (else>)
+        (ack-return> {:type      :failure
+                      :exception (ex-info "Agent invoke has been retried" {})})
+      )))
   (queries/declare-agent-get-names-query-topology topologies
                                                   (-> agent-graphs
                                                       keys

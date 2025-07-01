@@ -10,6 +10,7 @@
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.retries :as retries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.store :as store]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest])
@@ -22,6 +23,8 @@
     TopologyUtils]))
 
 (def SEM)
+(def SEM2)
+(def SEM3)
 
 (deframafn short-checker-threshold-millis
   []
@@ -474,26 +477,100 @@
                 @received-atom))
         )))))
 
-(deftest
-  filtered-events-test
-  ;; TODO: <<<<>>>>>
-  ;;  - use semaphore to stall a virtual thread invoke
-  ;;  - cause failure in another parallel node that causes priming/retry
-  ;;  - unblock semaphore
-  ;;  - issue store write
-  ;;  - block semaphore and verify filtering of store write
-  ;;  - unblock semaphore
-  ;;  - verify filtering of NodeComplete event
-  ;;  - have another parallel node blocked on sem, and it throws exception when
-  ;;  released
-  ;;    - verify NodeFailure event is filtered
+(def BLOCKED-NODES-ATOM)
+(def EVENTS-ATOM)
 
-  ;; TODO: <<<<<>>>>>
-  ;;  - check that events from prior executions get filtered
-  ;;      - can use semaphore to stall the virtual thread invoke, and
-  ;;      have a failure in another node
-  ;;      - store writes
-  ;;      - subsequent node invokes
-  ;;      - check prime between NodeComplete and processing of emit
-  ;;      (there's a filter there)
-)
+;; TODO: <<<<>>>> set retries to 0
+(deftest filtered-events-test
+  (let [retries-atom (atom 0)]
+    (with-redefs
+      [SEM (h/mk-semaphore 0)
+       SEM2 (h/mk-semaphore 0)
+       SEM3 (h/mk-semaphore 0)
+
+       BLOCKED-NODES-ATOM (atom 0)
+       EVENTS-ATOM (atom [])
+
+       i/log-node-error (fn [& args])
+
+       retries/SUBSTITUTE-TICK-DEPOT true
+
+       i/hook:filtered-event (fn [& args] (swap! EVENTS-ATOM conj :filter))
+
+       i/hook:received-retry
+       (fn [agent-task-id agent-id expected-retry-num]
+         (swap! retries-atom inc))]
+      (with-open [ipc (rtest/create-ipc)
+                  _ (TopologyUtils/startSimTime)]
+        (letlocals
+         (bind module
+           (module
+             [setup topologies]
+             (let [topology (aor/agents-topology setup topologies)]
+               (aor/declare-key-value-store
+                topology
+                "$$kv"
+                clojure.lang.Keyword
+                Object)
+               (->
+                 topology
+                 (aor/new-agent "foo")
+                 (aor/node
+                  "start"
+                  ["node1" "node2" "node3"]
+                  (fn [agent-node]
+                    (aor/emit! agent-node "node1")
+                    (aor/emit! agent-node "node2")
+                    (aor/emit! agent-node "node3")
+                  ))
+                 (aor/node
+                  "node1"
+                  nil
+                  (fn [agent-node]
+                    (let [kv (aor/get-store agent-node "$$kv")]
+                      (store/put! kv :a 1)
+                      (swap! BLOCKED-NODES-ATOM inc)
+                      (h/acquire-semaphore SEM 1)
+                      (swap! EVENTS-ATOM conj (store/get kv :a))
+                      (try
+                        (store/put! kv :a 10)
+                        (catch Exception e
+                          (swap! EVENTS-ATOM conj :exc)
+                        ))
+                    )))
+                 (aor/node
+                  "node2"
+                  nil
+                  (fn [agent-node]
+                    (h/acquire-semaphore SEM2 1)
+                    (throw (ex-info "fail" {}))
+                  ))
+                 (aor/node
+                  "node3"
+                  nil
+                  (fn [agent-node]
+                    (swap! BLOCKED-NODES-ATOM inc)
+                    (h/acquire-semaphore SEM3 1)
+                    (throw (ex-info "another fail" {}))
+                  ))
+               )
+               (aor/define-agents! topology)
+             )))
+         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (bind module-name (get-module-name module))
+         (bind agent-manager (aor/agent-manager ipc module-name))
+         (bind foo (aor/agent-client agent-manager "foo"))
+
+         (bind inv (aor/agent-initiate foo))
+         (is (condition-attained? (= 2 @BLOCKED-NODES-ATOM)))
+         (h/release-semaphore SEM2 1)
+         ;; this means tasks have all been primed
+         (is (condition-attained? (= 1 @retries-atom)))
+         (h/release-semaphore SEM 1)
+
+         (is (condition-attained? (= @EVENTS-ATOM [1 :exc :filter])))
+
+         (reset! EVENTS-ATOM [])
+         (h/release-semaphore SEM3 1)
+         (is (condition-attained? (= @EVENTS-ATOM [:filter])))
+        )))))
