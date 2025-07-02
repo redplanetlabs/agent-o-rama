@@ -52,6 +52,10 @@
   [agent-name]
   (str "*_agent-graph-" agent-name))
 
+(defn agent-id-gen-task-global-name
+  [name]
+  (str "$$_agent-id-gen-" name))
+
 (defn agent-invoke-task-global-name
   [agent-name]
   (str "$$_agent-invoke-" agent-name))

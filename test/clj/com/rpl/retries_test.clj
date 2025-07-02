@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.retries :as retries]
+   [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.store :as store]
    [com.rpl.rama.aggs :as aggs]
@@ -68,13 +69,13 @@
        retries/hook:stall-detected
        (fn [& args] (swap! stalls-atom inc))
 
-       i/hook:emit> (emits-dropper drop-emits-atom filters-atom)
+       at/hook:emit> (emits-dropper drop-emits-atom filters-atom)
 
-       i/hook:update-last-progress> no-progress-update>
+       at/hook:update-last-progress> no-progress-update>
 
-       i/init-retry-num (fn [] @init-retry-num-atom)
+       at/init-retry-num (fn [] @init-retry-num-atom)
 
-       i/hook:received-retry
+       at/hook:received-retry
        (fn [agent-task-id agent-id expected-retry-num]
          (transform [ATOM (keypath [agent-task-id agent-id]) (nil->val 0)]
                     inc
@@ -167,7 +168,7 @@
                  (|all)
                  (get-executing-node-ids node-exec :> *invoke-ids)
                  (ops/explode *invoke-ids :> *invoke-id)
-                 (i/mark-virtual-task-complete! *invoke-id)
+                 (at/mark-virtual-task-complete! *invoke-id)
                  (|origin)
                  (aggs/+count :> *res))
              )))
@@ -322,14 +323,14 @@
         init-retry-num-atom  (atom 0)]
     (with-redefs
       [retries/SUBSTITUTE-TICK-DEPOT true
-       i/init-retry-num      (fn [] @init-retry-num-atom)
+       at/init-retry-num      (fn [] @init-retry-num-atom)
 
-       i/log-node-error      (fn [& args])
+       i/log-node-error       (fn [& args])
 
-       i/hook:appended-agent-failure (fn [& args]
-                                       (swap! failure-appends-atom inc))
+       at/hook:appended-agent-failure (fn [& args]
+                                        (swap! failure-appends-atom inc))
 
-       i/hook:received-retry
+       at/hook:received-retry
        (fn [agent-task-id agent-id expected-retry-num]
          (transform [ATOM
                      (keypath [agent-task-id agent-id expected-retry-num])
@@ -495,9 +496,9 @@
 
        retries/SUBSTITUTE-TICK-DEPOT true
 
-       i/hook:filtered-event (fn [& args] (swap! EVENTS-ATOM conj :filter))
+       at/hook:filtered-event (fn [& args] (swap! EVENTS-ATOM conj :filter))
 
-       i/hook:received-retry
+       at/hook:received-retry
        (fn [agent-task-id agent-id expected-retry-num]
          (swap! retries-atom inc))]
       (with-open [ipc (rtest/create-ipc)

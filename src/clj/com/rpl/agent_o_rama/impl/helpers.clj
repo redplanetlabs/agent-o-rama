@@ -151,3 +151,9 @@
   (let [c (count v)]
     (if (not= c 0)
       (nth v (dec c)))))
+
+(defn assoc-if-void
+  [m k v]
+  (if (contains? m k)
+    m
+    (assoc m k v)))

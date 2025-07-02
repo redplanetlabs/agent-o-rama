@@ -13,6 +13,7 @@
    [com.rpl.agent-o-rama.store :as store]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
+   [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
@@ -727,7 +728,7 @@
 
 (deftest graph-versioning-test
   (let [task-counts-atom (atom {})]
-    (with-redefs [i/hook:finding-graph-version
+    (with-redefs [at/hook:finding-graph-version
                   (fn [task-id]
                     (swap! task-counts-atom
                       #(transform [(keypath task-id) (nil->val 0)]
@@ -849,7 +850,7 @@
 
 (deftest finish-test
   (let [results-atom (atom [])]
-    (with-redefs [i/hook:writing-result
+    (with-redefs [at/hook:writing-result
                   (fn [agent-task-id agent-id result]
                     (swap! results-atom conj result)
                   )]
@@ -1952,7 +1953,7 @@
                   close! (fn [item]
                            (swap! closes-atom conj item)
                            (orig-close! item))
-                  i/hook:writing-result (fn [& args] (swap! results-vol inc))]
+                  at/hook:writing-result (fn [& args] (swap! results-vol inc))]
       (with-open [ipc (rtest/create-ipc)]
         (letlocals
          (bind module
