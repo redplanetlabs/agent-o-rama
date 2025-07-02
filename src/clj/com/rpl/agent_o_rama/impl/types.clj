@@ -54,6 +54,7 @@
 (drp/defrecord+ AgentGraph
   [node-map :- NippyMap ; {String AgentNode}
    start-node :- String
+   update-mode :- (s/enum :continue :retry :drop)
    uuid :- String]
   TaskGlobalObject
   (prepareForTask [this task-id context])

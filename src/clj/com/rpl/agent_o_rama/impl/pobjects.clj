@@ -83,6 +83,13 @@
   ;; [agent-task-id agent-id] -> valid retry-num
   {java.util.List Long})
 
+(defn agent-gc-invokes-task-global-name
+  [agent-name]
+  (str "$$_agent-gc-invokes-" agent-name))
+
+(def AGENT-GC-ROOT-INVOKES-PSTATE-SCHEMA
+  {Long Object})
+
 (defn agent-streaming-results-task-global-name
   [agent-name]
   (str "$$_agent-streaming-" agent-name))

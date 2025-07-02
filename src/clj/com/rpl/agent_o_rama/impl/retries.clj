@@ -143,10 +143,9 @@
 
      (source> failure-depot-sym :> %microbatch)
       ;; this needs to happen here so that the updates to valid-invokes-pstate
-      ;; in the previous microbatch commit have been committed
+      ;; in the previous microbatch have been committed
       (<<batch
         (|all)
-        (local-select> (subselect MAP-KEYS) pending-retries-pstate-sym :> *v)
         (local-select> MAP-KEYS
                        pending-retries-pstate-sym
                        {:allow-yield? true}

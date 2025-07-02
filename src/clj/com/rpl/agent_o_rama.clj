@@ -20,7 +20,8 @@
     AgentNode
     AgentsTopology
     AgentStream
-    MultiAgg$Impl]
+    MultiAgg$Impl
+    UpdateMode]
    [com.rpl.rama
     PState$Declaration
     PState$Schema]
@@ -159,6 +160,12 @@
    output-nodes-spec
    agg
    node-fn))
+
+(defn set-update-mode
+  [^AgentGraph agent-graph mode]
+  (.setUpdateMode
+   agent-graph
+   (graph/convert-update-mode->java mode)))
 
 (defmacro multi-agg
   [& body]

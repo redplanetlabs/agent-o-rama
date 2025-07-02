@@ -613,6 +613,27 @@
      (:> *res)
    )))
 
+(deframaop init-root
+  [*agent-name *agent-id *retry-num *args]
+  (<<with-substitutions
+   [$$root
+    (this-module-pobject-task-global (po/agent-invoke-task-global-name
+                                      *agent-name))]
+   (fetch-graph-version *agent-name :> *version)
+   (h/random-long :> *invoke-id)
+   (h/current-time-millis :> *current-time-millis)
+   (local-transform>
+    [(keypath *agent-id)
+     (termval {:root-invoke-id    *invoke-id
+               :invoke-args       *args
+               :graph-version     *version
+               :ack-val           *invoke-id
+               :last-progress-time-millis *current-time-millis
+               :retry-num         *retry-num
+               :start-time-millis *current-time-millis})]
+    $$root)
+   (:> *invoke-id)))
+
 (defn hook:processing-streaming [node streaming-index value])
 (defn hook:processing-streaming*
   [node streaming-index value]
@@ -625,6 +646,7 @@
 (defn init-retry-num [] 0)
 (defn init-retry-num* [] (init-retry-num))
 
+
 (defn- define-agent!
   [setup topologies stream-topology mb-topology name agent-graph]
   (let [graph (graph/resolve-agent-graph agent-graph)
@@ -634,6 +656,9 @@
         agent-graph-sym (symbol (po/agent-graph-task-global-name name))
         agent-node-pstate-sym (symbol (po/agent-node-task-global-name name))
         agent-invoke-pstate-sym (symbol (po/agent-invoke-task-global-name name))
+
+        agent-gc-invokes-pstate-sym
+        (symbol (po/agent-gc-invokes-task-global-name name))
 
         agent-active-invokes-pstate-sym
         (symbol (po/agent-active-invokes-task-global-name name))
@@ -668,7 +693,10 @@
      stream-topology
      agent-active-invokes-pstate-sym
      po/AGENT-ACTIVE-INVOKES-PSTATE-SCHEMA)
-
+    (declare-pstate*
+     stream-topology
+     agent-gc-invokes-pstate-sym
+     po/AGENT-GC-ROOT-INVOKES-PSTATE-SCHEMA)
     (declare-pstate*
      stream-topology
      agent-streaming-results-pstate-sym
@@ -723,20 +751,8 @@
         (ops/current-task-id :> *agent-task-id)
         (gen-id agent-id-gen-pstate-sym :> *agent-id)
         (ack-return> [*agent-task-id *agent-id])
-        (h/random-long :> *invoke-id)
-        (fetch-graph-version name :> *version)
         (init-retry-num* :> *retry-num)
-        (h/current-time-millis :> *current-time-millis)
-        (local-transform>
-         [(keypath *agent-id)
-          (termval {:root-invoke-id    *invoke-id
-                    :invoke-args       *args
-                    :graph-version     *version
-                    :ack-val           *invoke-id
-                    :last-progress-time-millis *current-time-millis
-                    :retry-num         *retry-num
-                    :start-time-millis *current-time-millis})]
-         agent-invoke-pstate-sym)
+        (init-root name *agent-id *retry-num *args :> *invoke-id)
         (local-transform> [(keypath *agent-id) (termval true)]
                           agent-active-invokes-pstate-sym)
         (aor-types/->valid-NodeOp *invoke-id
@@ -751,28 +767,71 @@
                              *agent-id
                              *expected-retry-num]})
         (hook:received-retry* *agent-task-id *agent-id *expected-retry-num)
+        (local-select> (keypath *agent-id)
+                       agent-invoke-pstate-sym
+                       :> {*root-invoke-id :root-invoke-id
+                           *curr-retry-num :retry-num
+                           *graph-version  :graph-version
+                           *args           :args})
+        ;; if it got GC'd, ignore
+        (filter> (some? *root-invoke-id))
+        (filter> (= *expected-retry-num *curr-retry-num))
+        (fetch-graph-version name :> *curr-graph-version)
+        (<<cond
+         (case> (= *curr-graph-version *graph-version))
+          (identity :continue :> *handle-mode)
+
+         (case> (= *curr-graph-version (inc *graph-version)))
+          (fetch-graph name :> {*handle-mode :update-mode})
+
+         (default>)
+          ;; if somehow to module updates got through before the retry could be
+          ;; processed, drop the retry since don't know if it's valid to
+          ;; continue it
+          (identity :drop :> *handle-mode))
+
+
+        (<<if (= :drop *handle-mode)
+          (local-transform>
+           ;; TODO: <<<<>>>> probably need to update finish-time as well
+           [(keypath *agent-id)
+            :result
+            (termval (aor-types/->valid-AgentResult "Retry dropped" true))]
+           agent-invoke-pstate-sym)
+          (filter> false))
+        (<<if (= :retry *handle-mode)
+          (local-transform> [(keypath *root-invoke-id) (termval nil)]
+                            agent-gc-invokes-pstate-sym)
+          (init-retry-num* :> *retry-num)
+          (init-root name *agent-id *retry-num *args :> *root-invoke-id)
+         (else>)
+          (inc *expected-retry-num :> *retry-num)
+          (identity *root-invoke-id :> *root-invoke-id))
+
+        ;; TODO: <<<<>>>>
+        ;;   - write new retry num
+        ;;   - continue where it left off
+        ;;     - share code with forking
+        ;;   - increment retry num
+
+
         ;; TODO: <<<<>>>>
         ;;   - retry of fork needs to rehydrate invoke-id->new-args
         ;;   - on retry, check if it's already completed (got a result). if so
         ;;   just remove agent from active-agents – this is unnecessary since
         ;;   those happen together atomically – comment on this
-        (inc *expected-retry-num :> *retry-num)
         (identity nil :> *op)
         (filter> false)
-        ;; TODO: <<<<>>>> should be failing agents with the wrong version for
-        ;; the retry?
-        ;;   - no other choice? or can it be based on graph structure
-        ;;   being the same?
-        ;;      - arguments might not be the same...
-        ;;      - it can just let them fail a few times if there's an
-        ;;      incompatability
-        ;;      - but retry can be really iffy if graph structure
-        ;;      changed...
-        ;;        - the mb can detect and initiate retry, and the retry
-        ;;        event
-        ;;        can decide what to do
-        ;;            - maybe max one retry if there's a version
-        ;;            difference
+        ;; TODO: <<<<>>>>
+        ;;   - look at update mode in AgentGraph to determine how to handle
+        ;;   version difference
+        ;;      - if version difference is more than one, then log and drop
+        ;;      - for retry mode, it's actually a full retry that should
+        ;;      disregard current state
+        ;;        - how does it GC the current state?
+        ;;          - maybe write it's current root invoke ID to a special
+        ;;          PState for later GC by tick
+        ;;          - and then overwrite the node
 
        (case> (aor-types/ForkAgentInvoke? *data))
         (identity *data

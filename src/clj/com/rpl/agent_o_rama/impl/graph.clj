@@ -10,7 +10,8 @@
   (:import
    [com.rpl.agentorama
     AgentGraph
-    MultiAgg$Impl]
+    MultiAgg$Impl
+    UpdateMode]
    [com.rpl.agentorama.impl
     BuiltInAgg
     NippyMap]
@@ -130,7 +131,7 @@
 
 (defn resolve-agent-graph
   [agent-graph]
-  (let [{:keys [nodes start-node]} (agent-graph-state agent-graph)
+  (let [{:keys [nodes start-node update-mode]} (agent-graph-state agent-graph)
         graph     (nodes->graph nodes)
         agg-graph (annotate-aggs graph start-node)]
     (aor-types/->valid-AgentGraph
@@ -153,6 +154,7 @@
        {}
        (lgraph/nodes agg-graph)))
      start-node
+     update-mode
      (str (UUID/randomUUID)))))
 
 
@@ -232,62 +234,87 @@
    agg
    (h/convert-void-jfn jfn)))
 
+(defn convert-update-mode->clj
+  [mode]
+  (condp = mode
+    UpdateMode/CONTINUE :continue
+    UpdateMode/RETRY :retry
+    UpdateMode/DROP :drop
+    (throw (ex-info "Invalid mode" {:mode mode}))))
+
+(defn convert-update-mode->java
+  [mode]
+  (condp = mode
+    :continue UpdateMode/CONTINUE
+    :retry UpdateMode/RETRY
+    :drop UpdateMode/DROP
+    (throw (ex-info "Invalid mode" {:mode mode}))))
+
 (defn mk-agent-graph
   []
   (let [nodes-vol      (volatile! {})
-        start-node-vol (volatile! nil)]
+        start-node-vol (volatile! nil)
+        mode-vol       (volatile! nil)]
     (reify-AgentGraph
-     (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec
-                           ^RamaAccumulatorAgg agg ^RamaVoidFunction3 impl]
-                          (internal-add-agg-node-java!
-                           this
-                           name
-                           outputNodesSpec
-                           agg
-                           impl))
-     (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec
-                           ^RamaCombinerAgg agg ^RamaVoidFunction3 impl]
-                          (internal-add-agg-node-java!
-                           this
-                           name
-                           outputNodesSpec
-                           agg
-                           impl))
-     (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec
-                           ^MultiAgg$Impl agg ^RamaVoidFunction3 impl]
-                          (internal-add-agg-node-java!
-                           this
-                           name
-                           outputNodesSpec
-                           agg
-                           impl))
-     (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec
-                           ^BuiltInAgg agg ^RamaVoidFunction3 impl]
-                          (internal-add-agg-node-java!
-                           this
-                           name
-                           outputNodesSpec
-                           agg
-                           impl))
-     AgentGraphInternal
-     (internal-add-node!
-      [this name output-nodes-spec node-obj]
-      (when (or (nil? name) (= "" name))
-        (throw (h/ex-info "Node name cannot be nil or empty string"
-                          {:name name})))
-      (when (contains? @nodes-vol name)
-        (throw (h/ex-info "Node already exists" {:name name})))
-      (when (nil? @start-node-vol)
-        (vreset! start-node-vol name))
-      (vswap! nodes-vol
-              assoc
-              name
-              {:node-obj     node-obj
-               :output-nodes (normalize-output-nodes output-nodes-spec)})
-      this)
-     (agent-graph-state [this]
-                        {:nodes      @nodes-vol
-                         :start-node @start-node-vol})
+      (setUpdateMode
+       [this mode]
+       (if (nil? @mode-vol)
+         (vreset! mode-vol (convert-update-mode->clj mode))
+         (throw (ex-info "Update mode already set" {:mode @mode-vol})))
+       this)
+      (^AgentGraph aggNode
+       [this ^String name ^Object outputNodesSpec ^RamaAccumulatorAgg agg
+        ^RamaVoidFunction3 impl]
+       (internal-add-agg-node-java!
+        this
+        name
+        outputNodesSpec
+        agg
+        impl))
+      (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec
+                            ^RamaCombinerAgg agg ^RamaVoidFunction3 impl]
+        (internal-add-agg-node-java!
+         this
+         name
+         outputNodesSpec
+         agg
+         impl))
+      (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec
+                            ^MultiAgg$Impl agg ^RamaVoidFunction3 impl]
+        (internal-add-agg-node-java!
+         this
+         name
+         outputNodesSpec
+         agg
+         impl))
+      (^AgentGraph aggNode [this ^String name ^Object outputNodesSpec
+                            ^BuiltInAgg agg ^RamaVoidFunction3 impl]
+        (internal-add-agg-node-java!
+         this
+         name
+         outputNodesSpec
+         agg
+         impl))
+      AgentGraphInternal
+      (internal-add-node!
+        [this name output-nodes-spec node-obj]
+        (when (or (nil? name) (= "" name))
+          (throw (h/ex-info "Node name cannot be nil or empty string"
+                            {:name name})))
+        (when (contains? @nodes-vol name)
+          (throw (h/ex-info "Node already exists" {:name name})))
+        (when (nil? @start-node-vol)
+          (vreset! start-node-vol name))
+        (vswap! nodes-vol
+                assoc
+                name
+                {:node-obj     node-obj
+                 :output-nodes (normalize-output-nodes output-nodes-spec)})
+        this)
+      (agent-graph-state [this]
+        {:nodes       @nodes-vol
+         :start-node  @start-node-vol
+         :update-mode (or @mode-vol :continue)})
     )))
 
 (defn graph->historical-graph-info
