@@ -381,10 +381,6 @@
       (log-node-error t "Error invoking function" {:info info})
       ::error)))
 
-(defn hook:appended-agent-failure*
-  [agent-task-id agent-id retry-num]
-  (at/hook:appended-agent-failure agent-task-id agent-id retry-num))
-
 (deframaop invoke-on-task-thread
   [*agent-name *agent-task-id *agent-id *retry-num *afn *info]
   (<<with-substitutions
@@ -397,19 +393,12 @@
       *failure-depot
       (aor-types/->valid-AgentFailure *agent-task-id *agent-id *retry-num)
       :append-ack)
-     (hook:appended-agent-failure* *agent-task-id
-                                   *agent-id
-                                   *retry-num)
+     (at/hook:appended-agent-failure *agent-task-id
+                                     *agent-id
+                                     *retry-num)
     (else>)
      (:> *res)
    )))
-
-
-(defn hook:processing-streaming [node streaming-index value])
-(defn hook:processing-streaming*
-  [node streaming-index value]
-  (hook:processing-streaming node streaming-index value))
-
 
 (defn- define-agent!
   [setup topologies stream-topology mb-topology name agent-graph]
@@ -419,11 +408,7 @@
                                            name))
         agent-node-pstate-sym     (symbol (po/agent-node-task-global-name name))
         agent-invoke-pstate-sym   (symbol (po/agent-invoke-task-global-name
-                                           name))
-
-        agent-streaming-results-pstate-sym
-        (symbol (po/agent-streaming-results-task-global-name name))
-       ]
+                                           name))]
     (declare-depot* setup agent-depot-sym agent-depot-partitioner)
     (declare-depot* setup
                     agent-streaming-depot-sym
@@ -452,7 +437,7 @@
      po/AGENT-GC-ROOT-INVOKES-PSTATE-SCHEMA)
     (declare-pstate*
      stream-topology
-     agent-streaming-results-pstate-sym
+     (symbol (po/agent-streaming-results-task-global-name name))
      po/AGENT-STREAMING-PSTATE-SCHEMA
      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
@@ -638,38 +623,9 @@
         (ack-agg! name *agg-invoke-id *retry-num *ack-val)
       )
 
-     (source> agent-streaming-depot-sym
-              :> {:keys [*agent-id
-                          *node
-                          *invoke-id
-                          *retry-num
-                          *streaming-index
-                          *value]})
-      (hook:processing-streaming* *node *streaming-index *value)
-      (local-select> [(keypath *agent-id) :retry-num (pred= *retry-num)]
-                     agent-invoke-pstate-sym)
-      ;; this ensures idempotence
-      (<<ramafn %correct-index?
-        [*v]
-        (:> (= (inc *v) *streaming-index)))
-      (aor-types/mk-StreamingChunk
-       *invoke-id
-       *streaming-index
-       *value
-       :> *chunk)
-      (local-transform>
-       [(keypath *agent-id *node)
-        (selected?
-         :invokes
-         (keypath *invoke-id)
-         (nil->val -1)
-         (pred %correct-index?))
-        (multi-path
-         [:all AFTER-ELEM (termval *chunk)]
-         [:invokes (keypath *invoke-id) (termval *streaming-index)])]
-       agent-streaming-results-pstate-sym)
-    )
-  ))
+     (source> agent-streaming-depot-sym :> *data)
+      (at/handle-streaming name *data)
+    )))
 
 (deframafn do-transform!*
   [*path $$p]

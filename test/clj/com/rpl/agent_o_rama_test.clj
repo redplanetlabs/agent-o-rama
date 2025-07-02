@@ -2045,7 +2045,7 @@
         streaming-index-mod-atom (atom 0)
         override-retry-num-atom (atom nil)]
     (with-redefs [SEM (h/mk-semaphore 0)
-                  i/hook:processing-streaming
+                  at/hook:processing-streaming
                   (fn [_ streaming-index value]
                     (swap! processed-atom conj [streaming-index value])
                   )

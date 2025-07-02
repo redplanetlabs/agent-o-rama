@@ -458,3 +458,46 @@
                 :> *op)
    (:> *agent-task-id *agent-id *retry-num *op)
   ))
+
+(defn hook:processing-streaming [node streaming-index value])
+
+(deframaop handle-streaming
+  [*agent-name *data]
+  (<<with-substitutions
+   [$$root
+    (this-module-pobject-task-global
+     (po/agent-invoke-task-global-name *agent-name))
+
+    $$streaming
+    (this-module-pobject-task-global
+     (po/agent-streaming-results-task-global-name *agent-name))]
+   (identity *data
+             :> {:keys [*agent-id
+                        *node
+                        *invoke-id
+                        *retry-num
+                        *streaming-index
+                        *value]})
+   (hook:processing-streaming *node *streaming-index *value)
+   (local-select> [(keypath *agent-id) :retry-num (pred= *retry-num)] $$root)
+   ;; this ensures idempotence
+   (<<ramafn %correct-index?
+     [*v]
+     (:> (= (inc *v) *streaming-index)))
+   (aor-types/mk-StreamingChunk
+    *invoke-id
+    *streaming-index
+    *value
+    :> *chunk)
+   (local-transform>
+    [(keypath *agent-id *node)
+     (selected?
+      :invokes
+      (keypath *invoke-id)
+      (nil->val -1)
+      (pred %correct-index?))
+     (multi-path
+      [:all AFTER-ELEM (termval *chunk)]
+      [:invokes (keypath *invoke-id) (termval *streaming-index)])]
+    $$streaming)
+  ))
