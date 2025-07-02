@@ -2,8 +2,6 @@
   (:use [com.rpl.rama]
         [com.rpl.rama path])
   (:require
-   [clojure.set :as set]
-   [clojure.tools.logging :as cljlogging]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
@@ -12,7 +10,6 @@
    [com.rpl.rama.ops :as ops])
   (:import
    [com.rpl.agent_o_rama.impl.types
-    AggAckOp
     Node
     NodeAgg
     NodeAggStart]
