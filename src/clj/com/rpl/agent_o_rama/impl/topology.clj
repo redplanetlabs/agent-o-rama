@@ -266,6 +266,17 @@
 
 (defn hook:received-retry [agent-task-id agent-id retry-num])
 
+(deframafn complete-with-failure!
+  [$$root *agent-id *message]
+  (local-transform>
+   ;; TODO: <<<<>>>> probably need to update finish-time as well
+   ;;    - factor this into helper "complete-with-failure!"
+   [(keypath *agent-id)
+    :result
+    (termval (aor-types/->valid-AgentResult *message true))]
+   $$root)
+  (:>))
+
 (deframaop intake-retry
   [*agent-name {:keys [*agent-task-id *agent-id *expected-retry-num]}]
   (<<with-substitutions
@@ -302,12 +313,7 @@
 
 
    (<<if (= :drop *handle-mode)
-     (local-transform>
-      ;; TODO: <<<<>>>> probably need to update finish-time as well
-      [(keypath *agent-id)
-       :result
-       (termval (aor-types/->valid-AgentResult "Retry dropped" true))]
-      $$root)
+     (complete-with-failure! $$root *agent-id "Retry dropped")
      (filter> false))
    (<<if (= :retry *handle-mode)
      (local-transform> [(keypath *root-invoke-id) (termval nil)]
@@ -318,36 +324,35 @@
      (inc *expected-retry-num :> *retry-num)
      (identity *root-invoke-id :> *root-invoke-id))
 
-
    (read-config *agent-name aor-types/MAX-RETRIES-CONFIG :> *max-retries)
+   (<<if (> *retry-num *max-retries)
+     (complete-with-failure! $$root *agent-id "Max retry limit exceeded")
+    (else>)
+     ;; TODO: <<<<>>>>
+     ;;   - write new retry num
+     ;;   - continue where it left off
+     ;;     - share code with forking
 
-   ;; TODO: <<<<>>>>
-   ;;   - if at max retries, then write failure and finish
-   ;;   - write new retry num
-   ;;   - continue where it left off
-   ;;     - share code with forking
-   ;;   - increment retry num
 
-
-   ;; TODO: <<<<>>>>
-   ;;   - retry of fork needs to rehydrate invoke-id->new-args
-   ;;   - on retry, check if it's already completed (got a result). if so
-   ;;   just remove agent from active-agents – this is unnecessary since
-   ;;   those happen together atomically – comment on this
-   (identity nil :> *op)
-   (filter> false)
-   ;; TODO: <<<<>>>>
-   ;;   - look at update mode in AgentGraph to determine how to handle
-   ;;   version difference
-   ;;      - if version difference is more than one, then log and drop
-   ;;      - for retry mode, it's actually a full retry that should
-   ;;      disregard current state
-   ;;        - how does it GC the current state?
-   ;;          - maybe write it's current root invoke ID to a special
-   ;;          PState for later GC by tick
-   ;;          - and then overwrite the node
-   (:> *agent-task-id *agent-id *retry-num *op)
-  ))
+     ;; TODO: <<<<>>>>
+     ;;   - retry of fork needs to rehydrate invoke-id->new-args
+     ;;   - on retry, check if it's already completed (got a result). if so
+     ;;   just remove agent from active-agents – this is unnecessary since
+     ;;   those happen together atomically – comment on this
+     (identity nil :> *op)
+     (filter> false)
+     ;; TODO: <<<<>>>>
+     ;;   - look at update mode in AgentGraph to determine how to handle
+     ;;   version difference
+     ;;      - if version difference is more than one, then log and drop
+     ;;      - for retry mode, it's actually a full retry that should
+     ;;      disregard current state
+     ;;        - how does it GC the current state?
+     ;;          - maybe write it's current root invoke ID to a special
+     ;;          PState for later GC by tick
+     ;;          - and then overwrite the node
+     (:> *agent-task-id *agent-id *retry-num *op)
+   )))
 
 (deframaop intake-fork
   [*agent-name {:keys [*agent-task-id *agent-id *invoke-id->new-args]}]
