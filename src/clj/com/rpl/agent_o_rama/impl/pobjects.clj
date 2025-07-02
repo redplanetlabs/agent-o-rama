@@ -36,6 +36,10 @@
   [name]
   (RamaClientsTaskGlobal/agentStreamingDepotName name))
 
+(defn agent-config-depot-name
+  [name]
+  (str "*_agent-config-depot-" name))
+
 (defn agent-check-tick-depot-name
   [name]
   (str "*_agent-check-tick-depot-" name))
@@ -166,3 +170,10 @@
 (def PENDING-RETRIES-PSTATE-SCHEMA
   ;; [agent-task-id agent-id retry-num]
   {java.util.List Object})
+
+(defn agent-config-task-global-name
+  [agent-name]
+  (str "$$_agent-config-" agent-name))
+
+(def AGENT-CONFIG-PSTATE-SCHEMA
+  java.util.Map)

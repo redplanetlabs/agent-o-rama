@@ -165,3 +165,15 @@
 
 (defprotocol AgentClientInternal
   (stream-internal [this agent-invoke node callback-fn]))
+
+(drp/defrecord+ ChangeConfig
+  [key :- clojure.lang.Keyword
+   val :- Object])
+
+(def MAX-RETRIES-CONFIG :max-retries)
+
+(defn change-max-retries
+  [amount]
+  (when-not (instance? Long amount)
+    (throw (ex-info "Invalid max retries" {:val-type (class amount)})))
+  (->ChangeConfig MAX-RETRIES-CONFIG amount))

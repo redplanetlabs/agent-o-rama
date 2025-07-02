@@ -404,6 +404,8 @@
   [setup topologies stream-topology mb-topology name agent-graph]
   (let [agent-depot-sym           (symbol (po/agent-depot-name name))
         agent-streaming-depot-sym (symbol (po/agent-streaming-depot-name name))
+        agent-config-depot-sym    (symbol (po/agent-config-depot-name name))
+
         agent-graph-sym           (symbol (po/agent-graph-task-global-name
                                            name))
         agent-node-pstate-sym     (symbol (po/agent-node-task-global-name name))
@@ -413,6 +415,10 @@
     (declare-depot* setup
                     agent-streaming-depot-sym
                     agent-streaming-depot-partitioner)
+    (declare-depot* setup
+                    agent-config-depot-sym
+                    :random
+                    {:global? true})
 
     (declare-object* setup
                      agent-graph-sym
@@ -455,6 +461,10 @@
      (symbol (po/agent-id-gen-task-global-name name))
      Long
      {:initial-value 0})
+    (declare-pstate*
+     stream-topology
+     (symbol (po/agent-config-task-global-name name))
+     po/AGENT-CONFIG-PSTATE-SCHEMA)
 
     (if retries/SUBSTITUTE-TICK-DEPOT
       (declare-depot* setup
@@ -482,8 +492,15 @@
     (queries/declare-tracing-query-topology topologies name)
 
     (<<sources stream-topology
+     (source> agent-config-depot-sym {:retry-mode :all-after} :> *data)
+      (at/handle-config name *data)
+
      (source> agent-streaming-depot-sym :> *data)
       (at/handle-streaming name *data)
+
+      ;; TODO: <<<<<>>>> add case here for GC
+      ;; - each iteration delete node and write to PState the next ones to
+      ;; delete and where – can probably be same PState as one used by retry
 
      (source> agent-depot-sym {:retry-mode :none} :> *data)
       (at/intake-agent-depot name

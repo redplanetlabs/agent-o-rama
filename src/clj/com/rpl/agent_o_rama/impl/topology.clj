@@ -18,6 +18,15 @@
    [com.rpl.agentorama.impl
     AgentNodeExecutorTaskGlobal]))
 
+(deframafn read-config
+  [*agent-name *k]
+  (<<with-substitutions
+   [$$config
+    (this-module-pobject-task-global
+     (po/agent-config-task-global-name *agent-name))]
+   (local-select> (keypath *k) $$config :> *ret)
+   (:> *ret)))
+
 (defn get-node-obj
   [agent-graph node]
   (select-any [:node-map (keypath node) :node]
@@ -258,7 +267,7 @@
 (defn hook:received-retry [agent-task-id agent-id retry-num])
 
 (deframaop intake-retry
-  [*agent-name *data]
+  [*agent-name {:keys [*agent-task-id *agent-id *expected-retry-num]}]
   (<<with-substitutions
    [$$root
     (this-module-pobject-task-global
@@ -267,10 +276,6 @@
     $$gc-invokes
     (this-module-pobject-task-global (po/agent-gc-invokes-task-global-name
                                       *agent-name))]
-   (identity *data
-             :> {:keys [*agent-task-id
-                        *agent-id
-                        *expected-retry-num]})
    (hook:received-retry *agent-task-id *agent-id *expected-retry-num)
    (local-select> (keypath *agent-id)
                   $$root
@@ -313,7 +318,11 @@
      (inc *expected-retry-num :> *retry-num)
      (identity *root-invoke-id :> *root-invoke-id))
 
+
+   (read-config *agent-name aor-types/MAX-RETRIES-CONFIG :> *max-retries)
+
    ;; TODO: <<<<>>>>
+   ;;   - if at max retries, then write failure and finish
    ;;   - write new retry num
    ;;   - continue where it left off
    ;;     - share code with forking
@@ -341,11 +350,7 @@
   ))
 
 (deframaop intake-fork
-  [*agent-name *data]
-  (identity *data
-            :> {:keys [*agent-task-id
-                       *agent-id
-                       *invoke-id->new-args]})
+  [*agent-name {:keys [*agent-task-id *agent-id *invoke-id->new-args]}]
   ;; TODO: <<<<<>>>>
   ;;  - need to track on root what this is a fork of, and also what
   ;;  invoke-id->new-args is for when this gets retried
@@ -356,7 +361,7 @@
 (defn hook:appended-agent-failure [agent-task-id agent-id retry-num])
 
 (deframaop intake-node-failure
-  [*agent-name *data]
+  [*agent-name {:keys [*invoke-id *retry-num]}]
   (<<with-substitutions
    [$$nodes
     (this-module-pobject-task-global (po/agent-node-task-global-name
@@ -365,7 +370,6 @@
     *failure-depot
     (this-module-pobject-task-global (po/agent-failures-depot-name
                                       *agent-name))]
-   (identity *data :> {:keys [*invoke-id *retry-num]})
    (local-select> (keypath *invoke-id)
                   $$nodes
                   :> {:keys [*agent-task-id *agent-id]})
@@ -389,19 +393,18 @@
     (.removeTrackedInvokeId node-exec invoke-id)))
 
 (deframaop intake-node-complete
-  [*agent-name *data]
+  [*agent-name
+   {:keys [*invoke-id
+           *retry-num
+           *node-fn-res
+           *emits
+           *result
+           *nested-ops
+           *finish-time-millis]}]
   (<<with-substitutions
    [$$nodes
     (this-module-pobject-task-global (po/agent-node-task-global-name
                                       *agent-name))]
-   (identity *data
-             :> {:keys [*invoke-id
-                        *retry-num
-                        *node-fn-res
-                        *emits
-                        *result
-                        *nested-ops
-                        *finish-time-millis]})
    (mark-virtual-task-complete! *invoke-id)
    (local-select> (keypath *invoke-id)
                   $$nodes
@@ -494,7 +497,13 @@
 (defn hook:processing-streaming [node streaming-index value])
 
 (deframaop handle-streaming
-  [*agent-name *data]
+  [*agent-name
+   {:keys [*agent-id
+           *node
+           *invoke-id
+           *retry-num
+           *streaming-index
+           *value]}]
   (<<with-substitutions
    [$$root
     (this-module-pobject-task-global
@@ -503,13 +512,6 @@
     $$streaming
     (this-module-pobject-task-global
      (po/agent-streaming-results-task-global-name *agent-name))]
-   (identity *data
-             :> {:keys [*agent-id
-                        *node
-                        *invoke-id
-                        *retry-num
-                        *streaming-index
-                        *value]})
    (hook:processing-streaming *node *streaming-index *value)
    (local-select> [(keypath *agent-id) :retry-num (pred= *retry-num)] $$root)
    ;; this ensures idempotence
@@ -533,3 +535,12 @@
       [:invokes (keypath *invoke-id) (termval *streaming-index)])]
     $$streaming)
   ))
+
+(deframaop handle-config
+  [*agent-name {:keys [*key *val]}]
+  (<<with-substitutions
+   [$$config
+    (this-module-pobject-task-global
+     (po/agent-config-task-global-name *agent-name))]
+   (|all)
+   (local-transform> [(keypath *key) (termval *val)] $$config)))
