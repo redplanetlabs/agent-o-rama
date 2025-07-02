@@ -483,39 +483,10 @@
 
     (<<sources stream-topology
      (source> agent-depot-sym {:retry-mode :none} :> *data)
-      (<<cond
-       (case> (aor-types/AgentInvoke? *data))
-        (at/intake-agent-invoke name
-                                *data
-                                :> *agent-task-id *agent-id *retry-num *op)
-        (ack-return> [*agent-task-id *agent-id])
+      (at/intake-agent-depot name
+                             *data
+                             :> *agent-task-id *agent-id *retry-num *op)
 
-       (case> (aor-types/RetryAgentInvoke? *data))
-        (at/intake-retry name
-                         *data
-                         :> *agent-task-id *agent-id *retry-num *op)
-
-
-       (case> (aor-types/ForkAgentInvoke? *data))
-        (at/intake-fork name
-                        *data
-                        :> *agent-task-id *agent-id *retry-num *op)
-
-       (case> (aor-types/NodeFailure? *data))
-        ;; doesn't actually emit here, but emit needed for unification
-        (at/intake-node-failure name
-                                *data
-                                :> *agent-task-id *agent-id *retry-num *op)
-
-       (case> (aor-types/NodeComplete? *data))
-        (at/intake-node-complete name
-                                 *data
-                                 :> *agent-task-id *agent-id *retry-num *op)
-
-       (default> :unify false)
-        (throw! (h/ex-info "Unrecognized data type" {:class (class *data)})))
-
-      ;; requires *agent-id, *agent-task-id, *retry-num, *op to be in scope
       (<<if (aor-types/NodeOp? *op)
         (at/get-node-obj agent-graph-sym (get *op :next-node) :> *op-obj)
        (else>)

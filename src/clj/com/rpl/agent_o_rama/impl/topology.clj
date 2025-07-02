@@ -459,6 +459,41 @@
    (:> *agent-task-id *agent-id *retry-num *op)
   ))
 
+(deframaop intake-agent-depot
+  [*agent-name *data]
+  (<<cond
+   (case> (aor-types/AgentInvoke? *data))
+    (intake-agent-invoke *agent-name
+                         *data
+                         :> *agent-task-id *agent-id *retry-num *op)
+    (ack-return> [*agent-task-id *agent-id])
+
+   (case> (aor-types/RetryAgentInvoke? *data))
+    (intake-retry *agent-name
+                  *data
+                  :> *agent-task-id *agent-id *retry-num *op)
+
+
+   (case> (aor-types/ForkAgentInvoke? *data))
+    (intake-fork *agent-name
+                 *data
+                 :> *agent-task-id *agent-id *retry-num *op)
+
+   (case> (aor-types/NodeFailure? *data))
+    ;; doesn't actually emit here, but emit needed for unification
+    (intake-node-failure *agent-name
+                         *data
+                         :> *agent-task-id *agent-id *retry-num *op)
+
+   (case> (aor-types/NodeComplete? *data))
+    (intake-node-complete *agent-name
+                          *data
+                          :> *agent-task-id *agent-id *retry-num *op)
+
+   (default> :unify false)
+    (throw! (h/ex-info "Unrecognized data type" {:class (class *data)})))
+  (:> *agent-task-id *agent-id *retry-num *op))
+
 (defn hook:processing-streaming [node streaming-index value])
 
 (deframaop handle-streaming
