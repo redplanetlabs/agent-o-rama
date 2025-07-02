@@ -482,6 +482,9 @@
     (queries/declare-tracing-query-topology topologies name)
 
     (<<sources stream-topology
+     (source> agent-streaming-depot-sym :> *data)
+      (at/handle-streaming name *data)
+
      (source> agent-depot-sym {:retry-mode :none} :> *data)
       (at/intake-agent-depot name
                              *data
@@ -593,9 +596,6 @@
        (case> AggAckOp :> {:keys [*agg-invoke-id *ack-val]})
         (ack-agg! name *agg-invoke-id *retry-num *ack-val)
       )
-
-     (source> agent-streaming-depot-sym :> *data)
-      (at/handle-streaming name *data)
     )))
 
 (deframafn do-transform!*
