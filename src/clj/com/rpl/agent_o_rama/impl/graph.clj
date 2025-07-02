@@ -240,7 +240,7 @@
     UpdateMode/CONTINUE :continue
     UpdateMode/RETRY :retry
     UpdateMode/DROP :drop
-    (throw (ex-info "Invalid mode" {:mode mode}))))
+    (throw (h/ex-info "Invalid mode" {:mode mode}))))
 
 (defn convert-update-mode->java
   [mode]
@@ -248,7 +248,7 @@
     :continue UpdateMode/CONTINUE
     :retry UpdateMode/RETRY
     :drop UpdateMode/DROP
-    (throw (ex-info "Invalid mode" {:mode mode}))))
+    (throw (h/ex-info "Invalid mode" {:mode mode}))))
 
 (defn mk-agent-graph
   []
@@ -260,7 +260,7 @@
        [this mode]
        (if (nil? @mode-vol)
          (vreset! mode-vol (convert-update-mode->clj mode))
-         (throw (ex-info "Update mode already set" {:mode @mode-vol})))
+         (throw (h/ex-info "Update mode already set" {:mode @mode-vol})))
        this)
       (^AgentGraph aggNode
        [this ^String name ^Object outputNodesSpec ^RamaAccumulatorAgg agg

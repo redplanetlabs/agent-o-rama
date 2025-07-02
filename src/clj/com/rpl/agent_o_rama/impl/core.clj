@@ -644,7 +644,8 @@
         (ack-return> *ret)
        (else>)
         (ack-return> {:type      :failure
-                      :exception (ex-info "Agent invoke has been retried" {})})
+                      :exception (h/ex-info "Agent invoke has been retried"
+                                            {})})
       )))
   (queries/declare-agent-get-names-query-topology topologies
                                                   (-> agent-graphs
