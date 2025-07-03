@@ -22,8 +22,8 @@
   [*agent-name *k]
   (<<with-substitutions
    [$$config (po/agent-config-task-global *agent-name)]
-   (local-select> (keypath *k) $$config :> *ret)
-   (:> *ret)))
+   (local-select> STAY $$config :> *config)
+   (:> (get *config *k (aor-types/config-default *k)))))
 
 (defn get-node-obj
   [agent-graph node]

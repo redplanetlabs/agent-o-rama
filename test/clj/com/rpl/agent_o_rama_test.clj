@@ -765,10 +765,10 @@
            (foreign-depot ipc
                           module-name
                           (po/agent-depot-name "foo")))
-         (bind invokes-pstate
+         (bind root-pstate
            (foreign-pstate ipc
                            module-name
-                           (po/agent-invoke-task-global-name "foo")))
+                           (po/agent-root-task-global-name "foo")))
          (bind graph-history-pstate
            (foreign-pstate ipc
                            module-name
@@ -780,7 +780,7 @@
                                   (aor-types/->AgentInvoke ["hello"] 0 nil))]
              (is (= 0
                     (foreign-select-one [(keypath agent-id) :graph-version]
-                                        invokes-pstate
+                                        root-pstate
                                         {:pkey agent-task-id})))))
          (is (-> @task-counts-atom
                  empty?
@@ -823,7 +823,7 @@
                  (foreign-append! depot (aor-types/->AgentInvoke [] 0 nil))]
              (is (= 1
                     (foreign-select-one [(keypath agent-id) :graph-version]
-                                        invokes-pstate
+                                        root-pstate
                                         {:pkey agent-task-id})))))
          (is (-> @task-counts-atom
                  empty?
@@ -910,18 +910,18 @@
            (foreign-depot ipc
                           module-name
                           (po/agent-depot-name "foo")))
-         (bind invokes-pstate
+         (bind root-pstate
            (foreign-pstate ipc
                            module-name
-                           (po/agent-invoke-task-global-name "foo")))
+                           (po/agent-root-task-global-name "foo")))
 
          (is (= (aor-types/->AgentResult "result1" false)
-                (invoke-agent-and-return! depot invokes-pstate [:regular])))
+                (invoke-agent-and-return! depot root-pstate [:regular])))
          (is (= (aor-types/->AgentResult "Agent completed without result" true)
-                (invoke-agent-and-return! depot invokes-pstate [:halt])))
+                (invoke-agent-and-return! depot root-pstate [:halt])))
 
          (reset! results-atom [])
-         (bind res (invoke-agent-and-return! depot invokes-pstate [:fork]))
+         (bind res (invoke-agent-and-return! depot root-pstate [:fork]))
          (is (or (= (aor-types/->AgentResult "result2" false) res)
                  (= (aor-types/->AgentResult "result3" false) res)))
          (is (= (first @results-atom) res))
@@ -968,47 +968,47 @@
        (foreign-depot ipc
                       module-name
                       (po/agent-depot-name "foo")))
-     (bind invokes-pstate-foo
+     (bind root-pstate-foo
        (foreign-pstate ipc
                        module-name
-                       (po/agent-invoke-task-global-name "foo")))
+                       (po/agent-root-task-global-name "foo")))
      (bind depot-bar
        (foreign-depot ipc
                       module-name
                       (po/agent-depot-name "bar")))
-     (bind invokes-pstate-bar
+     (bind root-pstate-bar
        (foreign-pstate ipc
                        module-name
-                       (po/agent-invoke-task-global-name "bar")))
+                       (po/agent-root-task-global-name "bar")))
 
      (bind [agent-task-id-foo1 agent-id-foo1]
-       (invoke-agent-and-wait! depot-foo invokes-pstate-foo [10]))
+       (invoke-agent-and-wait! depot-foo root-pstate-foo [10]))
      (bind [agent-task-id-foo2 agent-id-foo2]
-       (invoke-agent-and-wait! depot-foo invokes-pstate-foo [20]))
+       (invoke-agent-and-wait! depot-foo root-pstate-foo [20]))
      (bind [agent-task-id-bar1 agent-id-bar1]
-       (invoke-agent-and-wait! depot-bar invokes-pstate-bar [5]))
+       (invoke-agent-and-wait! depot-bar root-pstate-bar [5]))
      (bind [agent-task-id-bar2 agent-id-bar2]
-       (invoke-agent-and-wait! depot-bar invokes-pstate-bar [10]))
+       (invoke-agent-and-wait! depot-bar root-pstate-bar [10]))
 
      (is (= 22
             (foreign-select-one
              [(keypath agent-id-foo1) :result :val]
-             invokes-pstate-foo
+             root-pstate-foo
              {:pkey agent-task-id-foo1})))
      (is (= 42
             (foreign-select-one
              [(keypath agent-id-foo2) :result :val]
-             invokes-pstate-foo
+             root-pstate-foo
              {:pkey agent-task-id-foo2})))
      (is (= 21
             (foreign-select-one
              [(keypath agent-id-bar1) :result :val]
-             invokes-pstate-bar
+             root-pstate-bar
              {:pkey agent-task-id-bar1})))
      (is (= 41
             (foreign-select-one
              [(keypath agent-id-bar2) :result :val]
-             invokes-pstate-bar
+             root-pstate-bar
              {:pkey agent-task-id-bar2})))
     )))
 
@@ -1156,10 +1156,10 @@
        (foreign-depot ipc
                       module-name
                       (po/agent-depot-name "foo")))
-     (bind invokes-pstate
+     (bind root-pstate
        (foreign-pstate ipc
                        module-name
-                       (po/agent-invoke-task-global-name "foo")))
+                       (po/agent-root-task-global-name "foo")))
      (bind kv
        (foreign-pstate ipc
                        module-name
@@ -1206,7 +1206,7 @@
                       :k0   53
                       :zz0  [[3] [nil]]
                       :zz02 [3 nil]}}
-            (:val (invoke-agent-and-return! depot invokes-pstate [3]))))
+            (:val (invoke-agent-and-return! depot root-pstate [3]))))
      (is (= {:kv     {:a 1
                       :b [3 1]
                       :c nil
@@ -1240,7 +1240,7 @@
                       :k0   54
                       :zz0  [[1] [nil]]
                       :zz02 [1 nil]}}
-            (:val (invoke-agent-and-return! depot invokes-pstate [1]))))
+            (:val (invoke-agent-and-return! depot root-pstate [1]))))
      (is (= 1 (foreign-select-one :a kv)))
      (is (= [3 1] (foreign-select-one :b kv)))
      (is (= [10 3 1] (foreign-select-one [:s :b] doc)))
@@ -1328,19 +1328,19 @@
            (foreign-depot ipc
                           module-name
                           (po/agent-depot-name "foo")))
-         (bind invokes-pstate
+         (bind root-pstate
            (foreign-pstate ipc
                            module-name
-                           (po/agent-invoke-task-global-name "foo")))
+                           (po/agent-root-task-global-name "foo")))
          (bind traces-query
            (foreign-query ipc
                           module-name
                           (queries/tracing-query-topology-name "foo")))
          (bind [agent-task-id agent-id]
-           (invoke-agent-and-wait! depot invokes-pstate []))
+           (invoke-agent-and-wait! depot root-pstate []))
          (bind root-invoke-id
            (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                               invokes-pstate
+                               root-pstate
                                {:pkey agent-task-id}))
          (bind res
            (foreign-invoke-query traces-query
@@ -1592,13 +1592,13 @@
        (foreign-depot ipc
                       module-name
                       (po/agent-depot-name "foo")))
-     (bind invokes-pstate
+     (bind root-pstate
        (foreign-pstate ipc
                        module-name
-                       (po/agent-invoke-task-global-name "foo")))
+                       (po/agent-root-task-global-name "foo")))
 
      (is (= ["start" "node1" "start" "node1" "start" 15]
-            (:val (invoke-agent-and-return! depot invokes-pstate [0 []]))))
+            (:val (invoke-agent-and-return! depot root-pstate [0 []]))))
     )))
 
 
@@ -1733,13 +1733,13 @@
        (foreign-depot ipc
                       module-name
                       (po/agent-depot-name "foo")))
-     (bind invokes-pstate
+     (bind root-pstate
        (foreign-pstate ipc
                        module-name
-                       (po/agent-invoke-task-global-name "foo")))
+                       (po/agent-root-task-global-name "foo")))
 
      (bind ret
-       (invoke-agent-and-return! depot invokes-pstate []))
+       (invoke-agent-and-return! depot root-pstate []))
 
      (is (=
           #{["ca" 15]
@@ -1756,10 +1756,10 @@
        (foreign-depot ipc
                       module-name
                       (po/agent-depot-name "bar")))
-     (bind bar-invokes-pstate
+     (bind bar-root-pstate
        (foreign-pstate ipc
                        module-name
-                       (po/agent-invoke-task-global-name "bar")))
+                       (po/agent-root-task-global-name "bar")))
      (bind bar-nodes-pstate
        (foreign-pstate ipc
                        module-name
@@ -1770,11 +1770,11 @@
                       (queries/tracing-query-topology-name "bar")))
 
      (bind [agent-task-id agent-id]
-       (invoke-agent-and-wait! bar-depot bar-invokes-pstate []))
+       (invoke-agent-and-wait! bar-depot bar-root-pstate []))
 
      (bind root
        (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                           bar-invokes-pstate
+                           bar-root-pstate
                            {:pkey agent-task-id}))
 
      (bind agg-invoke-id
@@ -1912,13 +1912,13 @@
        (foreign-depot ipc
                       module-name
                       (po/agent-depot-name "foo")))
-     (bind invokes-pstate
+     (bind root-pstate
        (foreign-pstate ipc
                        module-name
-                       (po/agent-invoke-task-global-name "foo")))
+                       (po/agent-root-task-global-name "foo")))
 
      (bind ret
-       (:val (invoke-agent-and-return! depot invokes-pstate [])))
+       (:val (invoke-agent-and-return! depot root-pstate [])))
 
      (is (= 3 (count ret)))
      (bind [a b c] ret)
@@ -2103,7 +2103,7 @@
                          :> [*agent-name *agent-task-id *agent-id])
                  (|direct *agent-task-id)
                  (this-module-pobject-task-global
-                  (po/agent-invoke-task-global-name *agent-name)
+                  (po/agent-root-task-global-name *agent-name)
                   :> $$root)
                  (this-module-pobject-task-global
                   (po/agent-streaming-results-task-global-name *agent-name)
@@ -2639,14 +2639,14 @@
        (bind pending-agent-count
          (fn []
            (foreign-invoke-query pending-agent-count-q)))
-       (bind foo-invokes-pstate
+       (bind foo-root-pstate
          (foreign-pstate ipc
                          module-name
-                         (po/agent-invoke-task-global-name "foo")))
-       (bind bar-invokes-pstate
+                         (po/agent-root-task-global-name "foo")))
+       (bind bar-root-pstate
          (foreign-pstate ipc
                          module-name
-                         (po/agent-invoke-task-global-name "bar")))
+                         (po/agent-root-task-global-name "bar")))
        (bind agent-manager (aor/agent-manager ipc module-name))
        (bind foo (aor/agent-client agent-manager "foo"))
        (bind bar (aor/agent-client agent-manager "bar"))
@@ -2682,64 +2682,64 @@
 
        (is (condition-attained?
             (= 1 (count (pending-invokes)))))
-       (is (= 0 (last-progress-time foo-invokes-pstate inv-foo1)))
+       (is (= 0 (last-progress-time foo-root-pstate inv-foo1)))
        (is (= {"foo" 1} (pending-agent-count)))
 
        (release-and-change-invokes! SEM)
        (is (= {"foo" 1} (pending-agent-count)))
        (is (condition-attained?
-            (= 1 (last-progress-time foo-invokes-pstate inv-foo1))))
+            (= 1 (last-progress-time foo-root-pstate inv-foo1))))
 
        (bind inv-bar1 (aor/agent-initiate bar))
        (is (condition-attained?
             (= 2 (count (pending-invokes)))))
-       (is (= 3 (last-progress-time bar-invokes-pstate inv-bar1)))
+       (is (= 3 (last-progress-time bar-root-pstate inv-bar1)))
        (is (= {"foo" 1 "bar" 1} (pending-agent-count)))
 
        (release-and-change-invokes! SEM2)
        (is (= {"foo" 1 "bar" 1} (pending-agent-count)))
        (is (condition-attained?
-            (= 1 (last-progress-time foo-invokes-pstate inv-foo1))))
+            (= 1 (last-progress-time foo-root-pstate inv-foo1))))
        (is (condition-attained?
-            (= 13 (last-progress-time bar-invokes-pstate inv-bar1))))
+            (= 13 (last-progress-time bar-root-pstate inv-bar1))))
 
        (release-and-change-invokes! SEM2)
        (is (= {"foo" 1 "bar" 1} (pending-agent-count)))
        (is (condition-attained?
-            (= 1 (last-progress-time foo-invokes-pstate inv-foo1))))
+            (= 1 (last-progress-time foo-root-pstate inv-foo1))))
        (is (condition-attained?
-            (= 33 (last-progress-time bar-invokes-pstate inv-bar1))))
+            (= 33 (last-progress-time bar-root-pstate inv-bar1))))
 
        (release-and-change-invokes! SEM2 1)
        (is (= {"foo" 1 "bar" 1} (pending-agent-count)))
        (is (condition-attained?
-            (= 1 (last-progress-time foo-invokes-pstate inv-foo1))))
+            (= 1 (last-progress-time foo-root-pstate inv-foo1))))
        (is (condition-attained?
-            (= 63 (last-progress-time bar-invokes-pstate inv-bar1))))
+            (= 63 (last-progress-time bar-root-pstate inv-bar1))))
 
        (release-and-change-invokes! SEM -1)
        (is (= "abc" (aor/agent-result foo inv-foo1)))
        (is (condition-attained? (= {"bar" 1} (pending-agent-count))))
-       (is (= 65 (last-progress-time foo-invokes-pstate inv-foo1)))
+       (is (= 65 (last-progress-time foo-root-pstate inv-foo1)))
        (is (condition-attained?
-            (= 63 (last-progress-time bar-invokes-pstate inv-bar1))))
+            (= 63 (last-progress-time bar-root-pstate inv-bar1))))
 
        (release-and-change-invokes! SEM2 -1)
        (is (= {"bar" 1} (pending-agent-count)))
-       (is (= 65 (last-progress-time foo-invokes-pstate inv-foo1)))
+       (is (= 65 (last-progress-time foo-root-pstate inv-foo1)))
        (is (condition-attained?
-            (= 105 (last-progress-time bar-invokes-pstate inv-bar1))))
+            (= 105 (last-progress-time bar-root-pstate inv-bar1))))
 
        (release-and-change-invokes! SEM2)
        (is (= {"bar" 1} (pending-agent-count)))
-       (is (= 65 (last-progress-time foo-invokes-pstate inv-foo1)))
+       (is (= 65 (last-progress-time foo-root-pstate inv-foo1)))
        (is (condition-attained?
-            (= 145 (last-progress-time bar-invokes-pstate inv-bar1))))
+            (= 145 (last-progress-time bar-root-pstate inv-bar1))))
 
        (release-and-change-invokes! SEM2 -1)
        (is (= "def" (aor/agent-result bar inv-bar1)))
        (is (condition-attained? (= {} (pending-agent-count))))
-       (is (= 65 (last-progress-time foo-invokes-pstate inv-foo1)))
+       (is (= 65 (last-progress-time foo-root-pstate inv-foo1)))
 
        (bind inv-foo1 (aor/agent-initiate foo))
        (bind inv-foo2 (aor/agent-initiate foo))

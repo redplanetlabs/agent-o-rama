@@ -60,9 +60,9 @@
   [name]
   (str "$$_agent-id-gen-" name))
 
-(defn agent-invoke-task-global-name
+(defn agent-root-task-global-name
   [agent-name]
-  (str "$$_agent-invoke-" agent-name))
+  (str "$$_agent-root-" agent-name))
 
 (def AGENT-INVOKE-PSTATE-SCHEMA
   {Long
@@ -209,7 +209,7 @@
 
 (defn agent-root-task-global
   [name]
-  (this-module-pobject-task-global (agent-invoke-task-global-name name)))
+  (this-module-pobject-task-global (agent-root-task-global-name name)))
 
 (defn agent-active-invokes-task-global
   [name]

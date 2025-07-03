@@ -255,7 +255,7 @@
              invokes-pstate       (foreign-pstate
                                    cluster
                                    module-name
-                                   (po/agent-invoke-task-global-name agentName))
+                                   (po/agent-root-task-global-name agentName))
              streaming-pstate     (foreign-pstate
                                    cluster
                                    module-name

@@ -33,8 +33,8 @@
   (let [agent-node-pstate-sym
         (symbol (po/agent-node-task-global-name name))
 
-        agent-invoke-pstate-sym
-        (symbol (po/agent-invoke-task-global-name name))
+        agent-root-pstate-sym
+        (symbol (po/agent-root-task-global-name name))
 
         agent-active-invokes-pstate-sym
         (symbol (po/agent-active-invokes-task-global-name name))
@@ -51,7 +51,7 @@
                      {:allow-yield? true}
                      :> *agent-id)
       (local-select> (keypath *agent-id)
-                     agent-invoke-pstate-sym
+                     agent-root-pstate-sym
                      :> {:keys [*root-invoke-id
                                 *start-time-millis
                                 *last-progress-time-millis
@@ -112,12 +112,10 @@
 
 (defn declare-check-impl
   [mb-topology name]
-  (let [check-tick-sym          (symbol (po/agent-check-tick-depot-name name))
-        agent-depot-sym         (symbol (po/agent-depot-name name))
-        failure-depot-sym       (symbol (po/agent-failures-depot-name name))
-
-        agent-invoke-pstate-sym
-        (symbol (po/agent-invoke-task-global-name name))
+  (let [check-tick-sym        (symbol (po/agent-check-tick-depot-name name))
+        agent-depot-sym       (symbol (po/agent-depot-name name))
+        failure-depot-sym     (symbol (po/agent-failures-depot-name name))
+        agent-root-pstate-sym (symbol (po/agent-root-task-global-name name))
 
         agent-valid-invokes-pstate-sym
         (symbol (po/agent-valid-invokes-task-global-name name))
@@ -125,7 +123,7 @@
         pending-retries-pstate-sym
         (symbol (po/pending-retries-task-global-name name))
 
-        uniqued-sym             (symbol (str "$$uniqued-" name))]
+        uniqued-sym           (symbol (str "$$uniqued-" name))]
     (<<sources mb-topology
      (source> check-tick-sym :> %microbatch)
       (%microbatch)
@@ -169,7 +167,7 @@
         (uniqued-sym :> *agent-task-id *agent-id *retry-num)
         (|direct *agent-task-id)
         (local-select> [(keypath *agent-id) :retry-num (pred= *retry-num)]
-                       agent-invoke-pstate-sym)
+                       agent-root-pstate-sym)
         (local-transform> [(keypath [*agent-task-id *agent-id *retry-num])
                            (termval nil)]
                           pending-retries-pstate-sym)

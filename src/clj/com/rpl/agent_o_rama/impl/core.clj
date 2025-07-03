@@ -403,8 +403,7 @@
 
         agent-graph-sym           (symbol (po/agent-graph-task-global-name
                                            name))
-        agent-node-pstate-sym     (symbol (po/agent-node-task-global-name name))
-        agent-invoke-pstate-sym   (symbol (po/agent-invoke-task-global-name
+        agent-node-pstate-sym     (symbol (po/agent-node-task-global-name
                                            name))]
     (declare-depot* setup agent-depot-sym agent-depot-partitioner)
     (declare-depot* setup
@@ -425,7 +424,7 @@
     ;;    there by looking at min and max
     (declare-pstate*
      stream-topology
-     agent-invoke-pstate-sym
+     (symbol (po/agent-root-task-global-name name))
      po/AGENT-INVOKE-PSTATE-SCHEMA
      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*

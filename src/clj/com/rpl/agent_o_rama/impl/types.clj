@@ -172,6 +172,10 @@
 
 (def MAX-RETRIES-CONFIG :max-retries)
 
+(defn config-default
+  [k]
+  (get {MAX-RETRIES-CONFIG 3} k))
+
 (defn change-max-retries
   [amount]
   (when-not (instance? Long amount)

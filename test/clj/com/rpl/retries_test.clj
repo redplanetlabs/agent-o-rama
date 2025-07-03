@@ -105,7 +105,7 @@
              (let [topology  (aor/agents-topology setup topologies)
                    s         (aor/underlying-stream-topology topology)
                    node-exec (symbol (po/agent-node-executor-name))
-                   root-sym  (symbol (po/agent-invoke-task-global-name "foo"))
+                   root-sym  (symbol (po/agent-root-task-global-name "foo"))
                    agent-active-invokes-pstate-sym
                    (symbol (po/agent-active-invokes-task-global-name "foo"))]
                (->
@@ -347,7 +347,7 @@
              (let [topology  (aor/agents-topology setup topologies)
                    s         (aor/underlying-stream-topology topology)
                    node-exec (symbol (po/agent-node-executor-name))
-                   root-sym  (symbol (po/agent-invoke-task-global-name "foo"))
+                   root-sym  (symbol (po/agent-root-task-global-name "foo"))
                    agent-active-invokes-pstate-sym
                    (symbol (po/agent-active-invokes-task-global-name "foo"))]
                (->

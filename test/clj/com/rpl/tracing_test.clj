@@ -161,19 +161,19 @@
        (foreign-depot ipc
                       module-name
                       (po/agent-depot-name "foo")))
-     (bind invokes-pstate
+     (bind root-pstate
        (foreign-pstate ipc
                        module-name
-                       (po/agent-invoke-task-global-name "foo")))
+                       (po/agent-root-task-global-name "foo")))
      (bind traces-query
        (foreign-query ipc
                       module-name
                       (queries/tracing-query-topology-name "foo")))
      (bind [agent-task-id agent-id]
-       (invoke-agent-and-wait! depot invokes-pstate ["xyz"]))
+       (invoke-agent-and-wait! depot root-pstate ["xyz"]))
      (bind root-invoke-id
        (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                           invokes-pstate
+                           root-pstate
                            {:pkey agent-task-id}))
      (bind res
        (foreign-invoke-query traces-query
@@ -462,25 +462,25 @@
        (foreign-depot ipc
                       module-name
                       (po/agent-depot-name "foo")))
-     (bind invokes-pstate
+     (bind root-pstate
        (foreign-pstate ipc
                        module-name
-                       (po/agent-invoke-task-global-name "foo")))
+                       (po/agent-root-task-global-name "foo")))
      (bind traces-query
        (foreign-query ipc
                       module-name
                       (queries/tracing-query-topology-name "foo")))
      (bind [agent-task-id agent-id]
-       (invoke-agent-and-wait! depot invokes-pstate ["xy" "-z"]))
+       (invoke-agent-and-wait! depot root-pstate ["xy" "-z"]))
      (bind [agent-task-id2 agent-id2]
-       (invoke-agent-and-wait! depot invokes-pstate ["a" "b"]))
+       (invoke-agent-and-wait! depot root-pstate ["a" "b"]))
      (bind root-invoke-id
        (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                           invokes-pstate
+                           root-pstate
                            {:pkey agent-task-id}))
      (bind root-invoke-id2
        (foreign-select-one [(keypath agent-id2) :root-invoke-id]
-                           invokes-pstate
+                           root-pstate
                            {:pkey agent-task-id2}))
      (bind res
        (foreign-invoke-query traces-query
@@ -830,19 +830,19 @@
        (foreign-depot ipc
                       module-name
                       (po/agent-depot-name "foo")))
-     (bind invokes-pstate
+     (bind root-pstate
        (foreign-pstate ipc
                        module-name
-                       (po/agent-invoke-task-global-name "foo")))
+                       (po/agent-root-task-global-name "foo")))
      (bind traces-query
        (foreign-query ipc
                       module-name
                       (queries/tracing-query-topology-name "foo")))
      (bind [agent-task-id agent-id]
-       (invoke-agent-and-wait! depot invokes-pstate []))
+       (invoke-agent-and-wait! depot root-pstate []))
      (bind root-invoke-id
        (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                           invokes-pstate
+                           root-pstate
                            {:pkey agent-task-id}))
      (bind res
        (foreign-invoke-query traces-query
