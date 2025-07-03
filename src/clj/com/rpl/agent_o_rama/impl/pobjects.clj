@@ -177,3 +177,66 @@
 
 (def AGENT-CONFIG-PSTATE-SCHEMA
   java.util.Map)
+
+
+
+
+;; Task global fetch helpers
+
+(defn agent-node-executor-task-global
+  []
+  (declared-object-task-global (agent-node-executor-name)))
+
+(defn agent-store-info-task-global
+  []
+  (declared-object-task-global (agents-store-info-name)))
+
+(defn agent-failures-depot-task-global
+  [name]
+  (this-module-pobject-task-global (agent-failures-depot-name name)))
+
+(defn agents-clients-task-global
+  []
+  (declared-object-task-global (agents-clients-name)))
+
+(defn agent-graph-task-global
+  [name]
+  (declared-object-task-global (agent-graph-task-global-name name)))
+
+(defn agent-id-gen-task-global
+  [name]
+  (this-module-pobject-task-global (agent-id-gen-task-global-name name)))
+
+(defn agent-root-task-global
+  [name]
+  (this-module-pobject-task-global (agent-invoke-task-global-name name)))
+
+(defn agent-active-invokes-task-global
+  [name]
+  (this-module-pobject-task-global (agent-active-invokes-task-global-name
+                                    name)))
+
+(defn agent-valid-invokes-task-global
+  [name]
+  (this-module-pobject-task-global (agent-valid-invokes-task-global-name name)))
+
+(defn agent-gc-invokes-task-global
+  [name]
+  (this-module-pobject-task-global (agent-gc-invokes-task-global-name name)))
+
+(defn agent-streaming-results-task-global
+  [name]
+  (this-module-pobject-task-global (agent-streaming-results-task-global-name
+                                    name)))
+
+(defn agent-node-task-global
+  [name]
+  (this-module-pobject-task-global (agent-node-task-global-name name)))
+
+(defn graph-history-task-global
+  [name]
+  (this-module-pobject-task-global (graph-history-task-global-name name)))
+
+(defn agent-config-task-global
+  [name]
+  (this-module-pobject-task-global (agent-config-task-global-name name)))

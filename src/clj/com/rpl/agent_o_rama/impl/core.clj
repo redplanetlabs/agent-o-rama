@@ -46,7 +46,7 @@
 (defn submit-virtual-task!
   [invoke-id afn]
   (let [^AgentNodeExecutorTaskGlobal node-exec
-        (declared-object-task-global (po/agent-node-executor-name))]
+        (po/agent-node-executor-task-global)]
     (.submitTask node-exec invoke-id afn)))
 
 (defn next-task-thread-id
@@ -261,11 +261,10 @@
   [*name *agent-task-id *agent-id *node-fn *invoke-id *retry-num *next-node
    *args *agg-invoke-id]
   (<<with-substitutions
-   [$$nodes
-    (this-module-pobject-task-global (po/agent-node-task-global-name *name))
-    *agent-graph (at/fetch-graph *name)
-    *store-info (declared-object-task-global (po/agents-store-info-name))
-    *rama-clients (declared-object-task-global (po/agents-clients-name))]
+   [$$nodes (po/agent-node-task-global *name)
+    *agent-graph (po/agent-graph-task-global *name)
+    *store-info (po/agent-store-info-task-global)
+    *rama-clients (po/agents-clients-task-global)]
    (mk-agent-node *name
                   *agent-graph
                   *agent-task-id
@@ -334,9 +333,8 @@
 (deframaop complete-agg!
   [*name *invoke-id *retry-num]
   (<<with-substitutions
-   [$$nodes
-    (this-module-pobject-task-global (po/agent-node-task-global-name *name))
-    *agent-graph (at/fetch-graph *name)]
+   [$$nodes (po/agent-node-task-global *name)
+    *agent-graph (po/agent-graph-task-global *name)]
    (local-select> (keypath *invoke-id)
                   $$nodes
                   :> {:keys [*agent-task-id *agent-id *node *agg-ack-val
@@ -360,9 +358,8 @@
 (deframaop ack-agg!
   [*name *invoke-id *retry-num *ack-val]
   (<<with-substitutions
-   [$$nodes
-    (this-module-pobject-task-global (po/agent-node-task-global-name *name))
-    *agent-graph (at/fetch-graph *name)]
+   [$$nodes (po/agent-node-task-global *name)
+    *agent-graph (po/agent-graph-task-global *name)]
    (local-select> [(keypath *invoke-id) :agg-ack-val] $$nodes :> *agg-ack-val)
    (bit-xor *ack-val *agg-ack-val :> *new-ack-val)
    (local-transform>
@@ -384,9 +381,7 @@
 (deframaop invoke-on-task-thread
   [*agent-name *agent-task-id *agent-id *retry-num *afn *info]
   (<<with-substitutions
-   [*failure-depot
-    (this-module-pobject-task-global (po/agent-failures-depot-name
-                                      *agent-name))]
+   [*failure-depot (po/agent-failures-depot-task-global *agent-name)]
    (invoke-or-error *afn *info :> *res)
    (<<if (= *res ::error)
      (depot-partition-append!
