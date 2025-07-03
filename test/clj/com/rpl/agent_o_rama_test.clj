@@ -2510,12 +2510,11 @@
   [^AgentNodeExecutorTaskGlobal node-exec]
   (.getRunningInvokeIds node-exec))
 
-;; TODO: <<<<<>>>> when retries are in place, this will need to do some sort
-;; of redef or config to make it so there are no retries of failed agents
 (deftest agent-pending-tracking-test
-  (with-redefs [SEM  (h/mk-semaphore 0)
+  (with-redefs [SEM (h/mk-semaphore 0)
                 SEM2 (h/mk-semaphore 0)
-                i/log-node-error (fn [& args])]
+                i/log-node-error (fn [& args])
+                aor-types/DEFAULT-MAX-RETRIES 0]
     (with-open [ipc (rtest/create-ipc)
                 _ (TopologyUtils/startSimTime)]
       (letlocals
@@ -2763,8 +2762,6 @@
       ))))
 
 (deftest traced-out-of-band-test
-
-
          ;; TODO: <<<<<>>>> do custom CF thing with custom tracing
          ;;  - need to make API for this
 )

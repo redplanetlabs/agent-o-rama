@@ -172,10 +172,11 @@
    val :- Object])
 
 (def MAX-RETRIES-CONFIG :max-retries)
+(def DEFAULT-MAX-RETRIES 3)
 
 (defn config-default
   [k]
-  (get {MAX-RETRIES-CONFIG 3} k))
+  (get {MAX-RETRIES-CONFIG DEFAULT-MAX-RETRIES} k))
 
 (defn change-max-retries
   [amount]

@@ -49,7 +49,6 @@
 (deframaop no-progress-update>
   [])
 
-;; TODO: <<<<<>>>> this test will need to set max retries to 0
 (deftest retries-checker-test
   (let [orig-foreign-append!  foreign-append!
         stall-emit-nodes-atom (atom #{})
@@ -62,6 +61,8 @@
     (with-redefs
       [retries/SUBSTITUTE-TICK-DEPOT true
        retries/checker-threshold-millis short-checker-threshold-millis
+
+       aor-types/DEFAULT-MAX-RETRIES 0
 
        retries/hook:checker-finished
        (fn [] (swap! checks-atom inc))
@@ -316,16 +317,17 @@
    (fn [] 0)))
 
 
-;; TODO: <<<<<>>>>> set retries to 0
 (deftest failure-processing-test
   (let [received-atom        (atom {})
         failure-appends-atom (atom 0)
         init-retry-num-atom  (atom 0)]
     (with-redefs
       [retries/SUBSTITUTE-TICK-DEPOT true
-       at/init-retry-num      (fn [] @init-retry-num-atom)
+       at/init-retry-num (fn [] @init-retry-num-atom)
 
-       i/log-node-error       (fn [& args])
+       aor-types/DEFAULT-MAX-RETRIES 0
+
+       i/log-node-error (fn [& args])
 
        at/hook:appended-agent-failure (fn [& args]
                                         (swap! failure-appends-atom inc))
@@ -481,7 +483,6 @@
 (def BLOCKED-NODES-ATOM)
 (def EVENTS-ATOM)
 
-;; TODO: <<<<>>>> set retries to 0
 (deftest filtered-events-test
   (let [retries-atom (atom 0)]
     (with-redefs
@@ -491,6 +492,8 @@
 
        BLOCKED-NODES-ATOM (atom 0)
        EVENTS-ATOM (atom [])
+
+       aor-types/DEFAULT-MAX-RETRIES 0
 
        i/log-node-error (fn [& args])
 
