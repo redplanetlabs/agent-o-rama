@@ -142,6 +142,7 @@
 
 (drp/defrecord+ NodeOp
   [invoke-id :- Long
+   fork-invoke-id :- (s/maybe Long)
    next-node :- String
    args :- [(s/maybe Object)]
    agg-invoke-id :- (s/maybe Long)])

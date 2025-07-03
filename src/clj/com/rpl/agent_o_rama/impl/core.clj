@@ -258,14 +258,14 @@
     )))
 
 (deframaop handle-node-invoke
-  [*name *agent-task-id *agent-id *node-fn *invoke-id *retry-num *next-node
-   *args *agg-invoke-id]
+  [*agent-name *agent-task-id *agent-id *node-fn *invoke-id *retry-num
+   *next-node *args *agg-invoke-id]
   (<<with-substitutions
-   [$$nodes (po/agent-node-task-global *name)
-    *agent-graph (po/agent-graph-task-global *name)
+   [$$nodes (po/agent-node-task-global *agent-name)
+    *agent-graph (po/agent-graph-task-global *agent-name)
     *store-info (po/agent-store-info-task-global)
     *rama-clients (po/agents-clients-task-global)]
-   (mk-agent-node *name
+   (mk-agent-node *agent-name
                   *agent-graph
                   *agent-task-id
                   *agent-id
@@ -292,10 +292,10 @@
                      :agg-invoke-id *agg-invoke-id
                     })))
    (local-transform> [(keypath *invoke-id) (term %merger)] $$nodes)
-   (at/|aor [*name *agent-task-id *agent-id *retry-num] |direct *task-id)
+   (at/|aor [*agent-name *agent-task-id *agent-id *retry-num] |direct *task-id)
    (submit-virtual-task!
     *invoke-id
-    (node-event *name
+    (node-event *agent-name
                 *task-id
                 *invoke-id
                 *retry-num
@@ -331,10 +331,10 @@
      :finished?     false}))
 
 (deframaop complete-agg!
-  [*name *invoke-id *retry-num]
+  [*agent-name *invoke-id *retry-num]
   (<<with-substitutions
-   [$$nodes (po/agent-node-task-global *name)
-    *agent-graph (po/agent-graph-task-global *name)]
+   [$$nodes (po/agent-node-task-global *agent-name)
+    *agent-graph (po/agent-graph-task-global *agent-name)]
    (local-select> (keypath *invoke-id)
                   $$nodes
                   :> {:keys [*agent-task-id *agent-id *node *agg-ack-val
@@ -344,7 +344,7 @@
     $$nodes)
    (at/get-node-obj *agent-graph *node :> {:keys [*node-fn]})
    (vector *agg-state *agg-start-res :> *args)
-   (handle-node-invoke *name
+   (handle-node-invoke *agent-name
                        *agent-task-id
                        *agent-id
                        *node-fn
@@ -356,17 +356,17 @@
    (:>)))
 
 (deframaop ack-agg!
-  [*name *invoke-id *retry-num *ack-val]
+  [*agent-name *invoke-id *retry-num *ack-val]
   (<<with-substitutions
-   [$$nodes (po/agent-node-task-global *name)
-    *agent-graph (po/agent-graph-task-global *name)]
+   [$$nodes (po/agent-node-task-global *agent-name)
+    *agent-graph (po/agent-graph-task-global *agent-name)]
    (local-select> [(keypath *invoke-id) :agg-ack-val] $$nodes :> *agg-ack-val)
    (bit-xor *ack-val *agg-ack-val :> *new-ack-val)
    (local-transform>
     [(keypath *invoke-id) :agg-ack-val (termval *new-ack-val)]
     $$nodes)
    (filter> (= 0 *new-ack-val))
-   (complete-agg! *name *invoke-id *retry-num)
+   (complete-agg! *agent-name *invoke-id *retry-num)
    (:>)))
 
 
@@ -396,15 +396,17 @@
    )))
 
 (defn- define-agent!
-  [setup topologies stream-topology mb-topology name agent-graph]
-  (let [agent-depot-sym           (symbol (po/agent-depot-name name))
-        agent-streaming-depot-sym (symbol (po/agent-streaming-depot-name name))
-        agent-config-depot-sym    (symbol (po/agent-config-depot-name name))
+  [agent-name setup topologies stream-topology mb-topology agent-graph]
+  (let [agent-depot-sym           (symbol (po/agent-depot-name agent-name))
+        agent-streaming-depot-sym (symbol (po/agent-streaming-depot-name
+                                           agent-name))
+        agent-config-depot-sym    (symbol (po/agent-config-depot-name
+                                           agent-name))
 
         agent-graph-sym           (symbol (po/agent-graph-task-global-name
-                                           name))
+                                           agent-name))
         agent-node-pstate-sym     (symbol (po/agent-node-task-global-name
-                                           name))]
+                                           agent-name))]
     (declare-depot* setup agent-depot-sym agent-depot-partitioner)
     (declare-depot* setup
                     agent-streaming-depot-sym
@@ -424,20 +426,20 @@
     ;;    there by looking at min and max
     (declare-pstate*
      stream-topology
-     (symbol (po/agent-root-task-global-name name))
+     (symbol (po/agent-root-task-global-name agent-name))
      po/AGENT-INVOKE-PSTATE-SCHEMA
      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
      stream-topology
-     (symbol (po/agent-active-invokes-task-global-name name))
+     (symbol (po/agent-active-invokes-task-global-name agent-name))
      po/AGENT-ACTIVE-INVOKES-PSTATE-SCHEMA)
     (declare-pstate*
      stream-topology
-     (symbol (po/agent-gc-invokes-task-global-name name))
+     (symbol (po/agent-gc-invokes-task-global-name agent-name))
      po/AGENT-GC-ROOT-INVOKES-PSTATE-SCHEMA)
     (declare-pstate*
      stream-topology
-     (symbol (po/agent-streaming-results-task-global-name name))
+     (symbol (po/agent-streaming-results-task-global-name agent-name))
      po/AGENT-STREAMING-PSTATE-SCHEMA
      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
@@ -447,57 +449,57 @@
      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
      stream-topology
-     (symbol (po/graph-history-task-global-name name))
+     (symbol (po/graph-history-task-global-name agent-name))
      po/GRAPH-HISTORY-PSTATE-SCHEMA
      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
      stream-topology
-     (symbol (po/agent-id-gen-task-global-name name))
+     (symbol (po/agent-id-gen-task-global-name agent-name))
      Long
      {:initial-value 0})
     (declare-pstate*
      stream-topology
-     (symbol (po/agent-config-task-global-name name))
+     (symbol (po/agent-config-task-global-name agent-name))
      po/AGENT-CONFIG-PSTATE-SCHEMA)
 
     (if retries/SUBSTITUTE-TICK-DEPOT
       (declare-depot* setup
-                      (symbol (po/agent-check-tick-depot-name name))
+                      (symbol (po/agent-check-tick-depot-name agent-name))
                       :random
                       {:global? true})
       (declare-tick-depot* setup
-                           (symbol (po/agent-check-tick-depot-name name))
+                           (symbol (po/agent-check-tick-depot-name agent-name))
                            retries/DEFAULT-CHECKER-TICK-MILLIS))
     (declare-depot* setup
-                    (symbol (po/agent-failures-depot-name name))
+                    (symbol (po/agent-failures-depot-name agent-name))
                     :random)
 
     (declare-pstate*
      mb-topology
-     (symbol (po/agent-valid-invokes-task-global-name name))
+     (symbol (po/agent-valid-invokes-task-global-name agent-name))
      po/AGENT-VALID-INVOKES-PSTATE-SCHEMA
      {:key-partitioner task-id-key-partitioner})
     (declare-pstate*
      mb-topology
-     (symbol (po/pending-retries-task-global-name name))
+     (symbol (po/pending-retries-task-global-name agent-name))
      po/PENDING-RETRIES-PSTATE-SCHEMA)
 
-    (retries/declare-check-impl mb-topology name)
-    (queries/declare-tracing-query-topology topologies name)
+    (retries/declare-check-impl mb-topology agent-name)
+    (queries/declare-tracing-query-topology topologies agent-name)
 
     (<<sources stream-topology
      (source> agent-config-depot-sym {:retry-mode :all-after} :> *data)
-      (at/handle-config name *data)
+      (at/handle-config agent-name *data)
 
      (source> agent-streaming-depot-sym :> *data)
-      (at/handle-streaming name *data)
+      (at/handle-streaming agent-name *data)
 
       ;; TODO: <<<<<>>>> add case here for GC
       ;; - each iteration delete node and write to PState the next ones to
       ;; delete and where – can probably be same PState as one used by retry
 
      (source> agent-depot-sym {:retry-mode :none} :> *data)
-      (at/intake-agent-depot name
+      (at/intake-agent-depot agent-name
                              *data
                              :> *agent-task-id *agent-id *retry-num *op)
 
@@ -513,7 +515,7 @@
         (identity *op
                   :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
         (handle-node-invoke
-         name
+         agent-name
          *agent-task-id
          *agent-id
          *node-fn
@@ -531,7 +533,7 @@
          [(keypath *invoke-id) :started-agg? (termval true)]
          agent-node-pstate-sym)
         (at/get-node-obj agent-graph-sym *agg-node-name :> {:keys [*init-fn]})
-        (invoke-on-task-thread name
+        (invoke-on-task-thread agent-name
                                *agent-task-id
                                *agent-id
                                *retry-num
@@ -552,7 +554,7 @@
                    })]
          agent-node-pstate-sym)
         (handle-node-invoke
-         name
+         agent-name
          *agent-task-id
          *agent-id
          *node-fn
@@ -582,7 +584,7 @@
         (<<ramafn %update-fn
           []
           (:> (apply *update-fn *agg-state *args)))
-        (invoke-on-task-thread name
+        (invoke-on-task-thread agent-name
                                *agent-task-id
                                *agent-id
                                *retry-num
@@ -600,12 +602,12 @@
          agent-node-pstate-sym)
 
         (<<if *finished?
-          (complete-agg! name *agg-invoke-id *retry-num)
+          (complete-agg! agent-name *agg-invoke-id *retry-num)
          (else>)
-          (ack-agg! name *agg-invoke-id *retry-num *invoke-id))
+          (ack-agg! agent-name *agg-invoke-id *retry-num *invoke-id))
 
        (case> AggAckOp :> {:keys [*agg-invoke-id *ack-val]})
-        (ack-agg! name *agg-invoke-id *retry-num *ack-val)
+        (ack-agg! agent-name *agg-invoke-id *retry-num *ack-val)
       )
     )))
 
@@ -662,10 +664,10 @@
                                                   (-> agent-graphs
                                                       keys
                                                       set))
-  (doseq [[name agent-graph] agent-graphs]
-    (define-agent! setup
+  (doseq [[agent-name agent-graph] agent-graphs]
+    (define-agent! agent-name
+                   setup
                    topologies
                    stream-topology
                    mb-topology
-                   name
                    agent-graph)))

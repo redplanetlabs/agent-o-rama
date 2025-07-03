@@ -179,8 +179,6 @@
   java.util.Map)
 
 
-
-
 ;; Task global fetch helpers
 
 (defn agent-node-executor-task-global

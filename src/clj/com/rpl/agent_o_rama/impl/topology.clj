@@ -113,6 +113,8 @@
          |direct
          *target-task-id)
    (aor-types/->valid-NodeOp *invoke-id
+                             ;; TODO: <<<<>>>> probably need original emits
+                             nil
                              *node-name
                              *args
                              *agg-invoke-id
@@ -233,6 +235,7 @@
    (local-transform> [(keypath *agent-id) (termval true)]
                      $$active)
    (aor-types/->valid-NodeOp *invoke-id
+                             nil
                              (get *agent-graph :start-node)
                              *args
                              nil
@@ -330,6 +333,7 @@
      ;; TODO: <<<<>>>>
      ;;   - retry of fork needs to rehydrate invoke-id->new-args
      (aor-types/->valid-NodeOp *root-invoke-id
+                               nil
                                (get *agent-graph :start-node)
                                *args
                                nil
