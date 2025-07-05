@@ -14,6 +14,8 @@
   (:import
    [com.rpl.agentorama
     AgentClient
+    AgentClient$StreamAllCallback
+    AgentClient$StreamCallback
     AgentGraph
     AgentInvoke
     AgentManager
@@ -367,7 +369,7 @@
              node
              (when stream-all-callback
                (fn [all-chunks new-chunks reset-invoke-ids complete?]
-                 (.onUpdate ^AgentClient$StreamCallback
+                 (.onUpdate ^AgentClient$StreamAllCallback
                             all-chunks
                             new-chunks
                             reset-invoke-ids

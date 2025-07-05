@@ -20,7 +20,7 @@ public interface AgentClient {
   <T> T agentResult(AgentInvoke invoke);
   <T> CompletableFuture<T> agentResultAsync(AgentInvoke invoke);
   AgentStream stream(AgentInvoke invoke, String node);
-  <T> AgentStream stream(AgentInvoke invoke, String node, StreamCallback<T>);
+  <T> AgentStream stream(AgentInvoke invoke, String node, StreamCallback<T> callback);
   AgentStreamByInvoke streamAll(AgentInvoke invoke, String node);
   <T> AgentStreamByInvoke streamAll(AgentInvoke invoke,
                                     String node,
