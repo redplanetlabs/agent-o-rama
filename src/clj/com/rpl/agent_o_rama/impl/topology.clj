@@ -13,8 +13,6 @@
     Node
     NodeAgg
     NodeAggStart]
-   [com.rpl.agentorama
-    StreamingChunk]
    [com.rpl.agentorama.impl
     AgentNodeExecutorTaskGlobal]))
 
@@ -93,10 +91,7 @@
 
 (defn finished-streaming-chunk
   []
-  (StreamingChunk.
-   -1
-   -1
-   iclient/FINISHED))
+  (aor-types/->StreamingChunk -1 -1 iclient/FINISHED))
 
 (deframaop send-emits>
   [*agent-name *agent-task-id *agent-id *retry-num *invoke-id *agg-invoke-id
@@ -112,13 +107,22 @@
    (|aor [*agent-name *agent-task-id *agent-id *retry-num]
          |direct
          *target-task-id)
-   (aor-types/->valid-NodeOp *invoke-id
-                             ;; TODO: <<<<>>>> probably need original emits
-                             nil
-                             *node-name
-                             *args
-                             *agg-invoke-id
-                             :> *op)
+   (aor-types/->valid-NodeOp
+    *invoke-id
+    ;; TODO: <<<<>>>> probably need original emits
+    ;; to fill in fork-invoke-id
+    ;;   - actually, generation of emits should
+    ;;   do that when handling fork
+    ;;     - will take previous emits and generate
+    ;;     replacement invoke-ids while moving current
+    ;;     invoke-id to the fork-invoke-id spot
+    ;;   - this fragment needs invoke-id->new-args as an argument
+    nil
+    nil
+    *node-name
+    *args
+    *agg-invoke-id
+    :> *op)
    (anchor> <regular-emit>)
 
    (hook> <root>)
@@ -236,6 +240,7 @@
                      $$active)
    (aor-types/->valid-NodeOp *invoke-id
                              nil
+                             nil
                              (get *agent-graph :start-node)
                              *args
                              nil
@@ -270,9 +275,13 @@
                   $$root
                   :> {*root-invoke-id :root-invoke-id
                       *curr-retry-num :retry-num
-                      *graph-version  :graph-version
-                      *args           :args
-                      *result         :result})
+                      *graph-version :graph-version
+                      *args :args
+                      *result :result
+
+                      {:keys [*invoke-id->new-args
+                              *parent-root-invoke-id]}
+                      :fork-of})
    ;; - this is mostly a sanity check, though it is technically possible for
    ;; multiple retries to come through from stall checker if it runs multiple
    ;; times before any retries are processed (e.g. stream topology is paused)
@@ -317,23 +326,10 @@
                         (multi-path [:retry-num (termval *retry-num)]
                                     [:ack-val (termval *root-invoke-id)])]
                        $$root)
-     ;; TODO: <<<<>>>>
-     ;;   - continue where it left off
-     ;;     - share code with forking
-     ;;     - shouldn't need to emit anything actually...
-     ;;       - processing code just skips and appends RetryNodeComplete if it's
-     ;;       already done, and RetryNodeComplete just sends out emits/result
-     ;;         - when determining whether to do RetryNodeComplete or not,
-     ;;         should just re-create and re-execute the node if the node name
-     ;;         isn't the same
-     ;;     - for fork, need other vars emitted which is
-     ;;     "corresponding-invoke-id" and invoke-id->new-args
 
-
-     ;; TODO: <<<<>>>>
-     ;;   - retry of fork needs to rehydrate invoke-id->new-args
      (aor-types/->valid-NodeOp *root-invoke-id
-                               nil
+                               *parent-root-invoke-id
+                               *invoke-id->new-args
                                (get *agent-graph :start-node)
                                *args
                                nil
@@ -497,8 +493,9 @@
    ;; this ensures idempotence
    (<<ramafn %correct-index?
      [*v]
-     (:> (= (inc *v) *streaming-index)))
-   (aor-types/mk-StreamingChunk
+     (:> (or> (= *streaming-index 0)
+              (= (inc *v) *streaming-index))))
+   (aor-types/->StreamingChunk
     *invoke-id
     *streaming-index
     *value

@@ -1,10 +1,18 @@
 package com.rpl.agentorama;
 
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import com.rpl.agentorama.ops.*;
 
 public interface AgentClient {
+  interface StreamCallback<T> {
+    void onUpdate(List<T> allChunks, List<T> newChunks, boolean isReset, boolean isComplete);
+  }
+
+  interface StreamAllCallback<T> {
+    void onUpdate(Map<Long, List<T>> allChunks, Map<Long, List<T>> newChunks, Set<Long> resetInvokeIds, boolean isComplete);
+  }
+
   <T> T invoke(Object... args);
   <T> CompletableFuture<T> invokeAsync(Object... args);
   AgentInvoke initiate(Object... args);
@@ -12,10 +20,11 @@ public interface AgentClient {
   <T> T agentResult(AgentInvoke invoke);
   <T> CompletableFuture<T> agentResultAsync(AgentInvoke invoke);
   AgentStream stream(AgentInvoke invoke, String node);
-  // callback takes in [all items, new items, reset?, finished?]
-  <T> AgentStream stream(AgentInvoke invoke,
-                         String node,
-                         RamaVoidFunction4<List<StreamingChunk<T>>, List<StreamingChunk<T>>, Boolean, Boolean> callback);
+  <T> AgentStream stream(AgentInvoke invoke, String node, StreamCallback<T>);
+  AgentStreamByInvoke streamAll(AgentInvoke invoke, String node);
+  <T> AgentStreamByInvoke streamAll(AgentInvoke invoke,
+                                    String node,
+                                    StreamAllCallback<T> callback);
   // TODO: methods to get trace info
   //  - needs to be paginated
   //  - should be exact same as query topology

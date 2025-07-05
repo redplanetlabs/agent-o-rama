@@ -20,6 +20,7 @@
     AgentNode
     AgentsTopology
     AgentStream
+    AgentStreamByInvoke
     MultiAgg$Impl
     UpdateMode]
    [com.rpl.rama
@@ -343,21 +344,50 @@
             ))
           (stream [this agent-invoke node]
             (.stream this agent-invoke node nil))
-          (stream [this agent-invoke node callback-void-jfn]
-            (aor-types/stream-internal this
-                                       agent-invoke
-                                       node
-                                       (when callback-void-jfn
-                                         (h/convert-void-jfn
-                                          callback-void-jfn))))
+          (stream [this agent-invoke node stream-callback]
+            (aor-types/stream-internal
+             this
+             agent-invoke
+             node
+             (when stream-callback
+               (fn [all-chunks new-chunks reset? complete?]
+                 (.onUpdate ^AgentClient$StreamCallback
+                            all-chunks
+                            new-chunks
+                            reset?
+                            complete?)))))
+
+
+          (streamAll [this agent-invoke node]
+            (.streamAll this agent-invoke node nil))
+          (streamAll [this agent-invoke node stream-all-callback]
+            (aor-types/stream-internal
+             this
+             agent-invoke
+             node
+             (when stream-all-callback
+               (fn [all-chunks new-chunks reset-invoke-ids complete?]
+                 (.onUpdate ^AgentClient$StreamCallback
+                            all-chunks
+                            new-chunks
+                            reset-invoke-ids
+                            complete?)))))
+
           ;; TODO: <<<<>>> methods for getting graph history
           ;;    - just max version and method to get historicalgraphinfo at a
           ;;    particular version
           ;;    - need historicalgraphinfo to be a java type
 
+
           aor-types/AgentClientInternal
           (stream-internal [this agent-invoke node callback-fn]
             (iclient/agent-stream-impl
+             streaming-pstate
+             agent-invoke
+             node
+             callback-fn))
+          (stream-all-internal [this agent-invoke node callback-fn]
+            (iclient/agent-stream-all-impl
              streaming-pstate
              agent-invoke
              node
@@ -402,8 +432,21 @@
   (^AgentStream [^AgentClient agent-client agent-invoke node callback-fn]
    (aor-types/stream-internal agent-client agent-invoke node callback-fn)))
 
-(defn agent-stream-num-resets
-  [^AgentStream stream]
-  (.numResets stream))
+(defn agent-stream-all
+  (^AgentStreamByInvoke [^AgentClient agent-client agent-invoke node]
+   (.streamAll agent-client agent-invoke node))
+  (^AgentStreamByInvoke
+   [^AgentClient agent-client agent-invoke node callback-fn]
+   (aor-types/stream-all-internal agent-client agent-invoke node callback-fn)))
+
+(defn agent-stream-reset-info
+  [stream]
+  (cond (instance? AgentStream stream)
+        (.numResets ^AgentStream stream)
+
+        (instance? AgentStreamByInvoke stream)
+        (.numResetsByInvoke ^AgentStreamByInvoke stream)
+
+        :else (throw (h/ex-info "Unknown type" {:class (class stream)}))))
 
 ;; TODO: <<<<>>>> need to define Clojure API for any other methods

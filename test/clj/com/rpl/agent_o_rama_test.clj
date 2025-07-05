@@ -24,8 +24,7 @@
   (:import
    [com.rpl.agentorama
     AgentInvoke
-    BuiltIn
-    StreamingChunk]
+    BuiltIn]
    [com.rpl.agentorama.impl
     AgentNodeExecutorTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
@@ -2028,6 +2027,8 @@
 (def SEM)
 (def SEM2)
 
+
+;; TODO: <<<<>>>> update all these tests
 (defn- sc->data
   [chunks]
   (mapv (fn [^StreamingChunk sc]

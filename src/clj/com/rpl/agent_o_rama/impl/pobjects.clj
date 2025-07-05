@@ -1,8 +1,6 @@
 (ns com.rpl.agent-o-rama.impl.pobjects
   (:use [com.rpl.rama])
   (:import
-   [com.rpl.agentorama
-    StreamingChunk]
    [com.rpl.agentorama.impl
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
@@ -13,7 +11,8 @@
     HistoricalAgentGraphInfo
     Node
     NodeAgg
-    NodeAggStart]))
+    NodeAggStart
+    StreamingChunk]))
 
 
 (defn agents-store-info-name
@@ -74,7 +73,12 @@
      :ack-val           Long
      :start-time-millis Long
      :last-progress-time-millis Long
-     :retry-num         Long})})
+     :retry-num         Long
+     :fork-of           (fixed-keys-schema
+                         {:parent-root-invoke-id Long
+                          :invoke-id->new-args   {Long [Object]}})
+     :forks             (set-schema Long {:subindex? true}) ; root-invoke ids
+    })})
 
 (defn agent-active-invokes-task-global-name
   [agent-name]

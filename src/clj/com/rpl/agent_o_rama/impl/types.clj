@@ -4,8 +4,6 @@
    [com.rpl.ramaspecter.defrecord-plus :as drp]
    [rpl.schema.core :as s])
   (:import
-   [com.rpl.agentorama
-    StreamingChunk]
    [com.rpl.agentorama.impl
     NippyMap]
    [com.rpl.rama.integration
@@ -94,6 +92,7 @@
    result :- (s/maybe AgentResult)
    nested-ops :- [NestedOpInfo]
    finish-time-millis :- Long
+   invoke-id->new-args :- (s/maybe {Long [Object]})
   ])
 
 (drp/defrecord+ NodeFailure
@@ -140,9 +139,15 @@
    streaming-index :- Long
    value :- Object])
 
+(drp/defrecord+ StreamingChunk
+  [invoke-id :- Long
+   index :- Long
+   chunk :- Object])
+
 (drp/defrecord+ NodeOp
   [invoke-id :- Long
    fork-invoke-id :- (s/maybe Long)
+   invoke-id->new-args :- (s/maybe {Long [Object]})
    next-node :- String
    args :- [(s/maybe Object)]
    agg-invoke-id :- (s/maybe Long)])
@@ -160,12 +165,9 @@
    path :- s/Any
    key :- s/Any])
 
-(defn mk-StreamingChunk
-  [invoke-id index chunk]
-  (StreamingChunk. invoke-id index chunk))
-
 (defprotocol AgentClientInternal
-  (stream-internal [this agent-invoke node callback-fn]))
+  (stream-internal [this agent-invoke node callback-fn])
+  (stream-all-internal [this agent-invoke node callback-fn]))
 
 (drp/defrecord+ ChangeConfig
   [key :- clojure.lang.Keyword

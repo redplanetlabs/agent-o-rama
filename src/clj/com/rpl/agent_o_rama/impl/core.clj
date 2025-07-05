@@ -4,6 +4,7 @@
   (:require
    [clojure.set :as set]
    [clojure.tools.logging :as cljlogging]
+   [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
@@ -110,6 +111,19 @@
          )))
      StreamingRecorderInternal
      (waitFinish [this]
+       (when (> @index-vol 0)
+         (vswap! outstanding-queue-vol
+                 conj
+                 (foreign-append-async!
+                  streaming-depot
+                  (aor-types/->valid-NodeStreamingResult
+                   agent-task-id
+                   agent-id
+                   node
+                   invoke-id
+                   (identity-retry-num retry-num)
+                   @index-vol
+                   iclient/FINISHED-INVOKE))))
        (doseq [cf @outstanding-queue-vol]
          (verify-successful-cf! cf)))
     )))
@@ -219,7 +233,8 @@
 
 (defn node-event
   [agent-name task-id invoke-id retry-num node-name node-fn
-   ^AgentNode agent-node args ^RamaClientsTaskGlobal rama-clients]
+   ^AgentNode agent-node args ^RamaClientsTaskGlobal rama-clients
+   invoke-id->new-args]
   (fn []
     (let [depot (.getAgentDepot rama-clients agent-name)
           res   (try
@@ -253,13 +268,14 @@
         emits
         result
         nested-ops
-        (h/current-time-millis))
+        (h/current-time-millis)
+        invoke-id->new-args)
        :append-ack)
     )))
 
 (deframaop handle-node-invoke
   [*agent-name *agent-task-id *agent-id *node-fn *invoke-id *retry-num
-   *next-node *args *agg-invoke-id]
+   *next-node *args *agg-invoke-id *invoke-id->new-args]
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)
@@ -303,7 +319,8 @@
                 *node-fn
                 *agent-node
                 *args
-                *rama-clients))
+                *rama-clients
+                *invoke-id->new-args))
    (:> {:start-time-millis *start-time-millis})))
 
 (defn- node-type
@@ -333,12 +350,17 @@
 (deframaop complete-agg!
   [*agent-name *invoke-id *retry-num]
   (<<with-substitutions
-   [$$nodes (po/agent-node-task-global *agent-name)
+   [$$root (po/agent-root-task-global *agent-name)
+    $$nodes (po/agent-node-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
    (local-select> (keypath *invoke-id)
                   $$nodes
                   :> {:keys [*agent-task-id *agent-id *node *agg-ack-val
                              *agg-state *agg-start-res *agg-invoke-id]})
+   ;; since agg state is colocated with root of graph invoke
+   (local-select> [(keypath *agent-id) :fork-of :invoke-id->new-args]
+                  $$root
+                  :> *invoke-id->new-args)
    (local-transform>
     [(keypath *invoke-id) :agg-finished? (termval true)]
     $$nodes)
@@ -352,7 +374,8 @@
                        *retry-num
                        *node
                        *args
-                       *agg-invoke-id)
+                       *agg-invoke-id
+                       *invoke-id->new-args)
    (:>)))
 
 (deframaop ack-agg!
@@ -491,7 +514,7 @@
      (source> agent-config-depot-sym {:retry-mode :all-after} :> *data)
       (at/handle-config agent-name *data)
 
-     (source> agent-streaming-depot-sym :> *data)
+     (source> agent-streaming-depot-sym {:retry-mode :all-after} :> *data)
       (at/handle-streaming agent-name *data)
 
       ;; TODO: <<<<<>>>> add case here for GC
@@ -507,13 +530,34 @@
         (at/get-node-obj agent-graph-sym (get *op :next-node) :> *op-obj)
        (else>)
         (identity *op :> *op-obj))
+
       ;; TODO: <<<<>>>> if this is a retry, need to clear streaming results if
       ;; the node didn't finish
+      ;;  - which involves partitioning back to agent-task-id
+      ;;  - but streaming results are accumulation across ALL node invokes
+      ;;    - some of which may have succeeded, some of which may have been
+      ;;    partial, and some of which may not have started
+      ;;      - so would need to iterate through streaming results and filter
+      ;;      out if it failed, and reset index to 0
+      ;;  - maybe streaming should work like this:
+      ;;     - (fn [invoke-id->chunks invoke-id->new-chunks
+      ;;     reset-invoke-id-set complete?])
+      ;;    - this is "streamAll"
+      ;;    - "stream" ONLY does the first invoke ID and ignores the rest
+      ;;      (fn [chunks new-chunks reset? complete?])
+      ;;    - maybe stream could take a "join" function that would present
+      ;;    results as a single list in the case of LLMs
+      ;;  - so here, it just needs to reset the streaming index for this invoke
+      ;;  ID
+      ;;  - don't need to reset here...
+      ;;    - if it's 0, then let it go through no matter what
+      ;;      - and client treats this as a reset
 
       (<<subsource *op-obj
        (case> Node :> {:keys [*node-fn]})
         (identity *op
-                  :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
+                  :> {:keys [*invoke-id *next-node *args *agg-invoke-id
+                             *invoke-id->new-args]})
         (handle-node-invoke
          agent-name
          *agent-task-id
@@ -523,11 +567,13 @@
          *retry-num
          *next-node
          *args
-         *agg-invoke-id)
+         *agg-invoke-id
+         *invoke-id->new-args)
 
        (case> NodeAggStart :> {:keys [*node-fn *agg-node-name]})
         (identity *op
-                  :> {:keys [*invoke-id *next-node *args *agg-invoke-id]})
+                  :> {:keys [*invoke-id *next-node *args *agg-invoke-id
+                             *invoke-id->new-args]})
         (h/random-long :> *new-agg-invoke-id)
         (local-transform>
          [(keypath *invoke-id) :started-agg? (termval true)]
@@ -562,7 +608,8 @@
          *retry-num
          *next-node
          *args
-         *new-agg-invoke-id)
+         *new-agg-invoke-id
+         *invoke-id->new-args)
 
 
        (case> NodeAgg :> {:keys [*update-fn]})

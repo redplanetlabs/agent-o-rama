@@ -7,12 +7,10 @@
    [com.rpl.agentorama
     AgentInvoke
     AgentStream
-    StreamingChunk]
+    AgentStreamByInvoke]
    [com.rpl.rama.diffs
     DestroyedDiff
-    Diff
-    Diff$Processor
-    SequenceInsertDiff$Processor]))
+    Diff]))
 
 (defn- new-items
   [new-chunks old-chunks]
@@ -21,51 +19,82 @@
   (subvec new-chunks (count old-chunks)))
 
 (def FINISHED ::finished)
+(def FINISHED-INVOKE ::finished-invoke)
 
 (defn- finished-stream?
   [chunks]
   (if-let [item (h/lastv chunks)]
-    (= FINISHED (.getChunk ^StreamingChunk item))
+    (= FINISHED (:chunk item))
     false
   ))
 
-(defn agent-stream-impl
+(defn- agent-stream-all-impl*
+  ^AgentStreamByInvoke
   [streaming-pstate ^AgentInvoke agent-invoke node callback-fn]
-  (let [agent-task-id (.getTaskId agent-invoke)
-        agent-id      (.getAgentInvokeId agent-invoke)
-        results-vol   (volatile! [])
-        resets-vol    (volatile! 0)
-        ps-vol        (volatile! nil)
+  (let [agent-task-id  (.getTaskId agent-invoke)
+        agent-id       (.getAgentInvokeId agent-invoke)
+        results-vol    (volatile! {})
+        old-chunks-vol (volatile! [])
+        resets-vol     (volatile! {})
+        ;; TODO: <<<<>>>> new impl:
+        ;;  - for regular stream, don't wnat to hold onto state for other
+        ;;  invokes... though it doesn't make a difference as still
+        ;;  materializing the full stream in the underlying proxy
+        ;;  - now have finished? for each one individually, which will only be
+        ;;  used for regular stream()
+        ps-vol         (volatile! nil)
         pcallback-fn
         (fn [new-chunks ^Diff diff _]
           (when-not (instance? DestroyedDiff diff)
-            (let [new-chunks   (or new-chunks [])
-                  old-chunks   @results-vol
-                  unknown?-vol (volatile! false)
-                  finished?    (finished-stream? new-chunks)
-                  new-chunks   (if finished?
-                                 (pop new-chunks)
-                                 new-chunks)
-                  _ (.process
-                     diff
-                     (reify
-                      Diff$Processor
-                      (unhandled [this]
-                        (vreset! unknown?-vol true))
+            (let [new-chunks              (or new-chunks [])
+                  old-chunks              @old-chunks-vol
+                  unknown?-vol            (volatile! false)
+                  finished?               (finished-stream? new-chunks)
+                  new-chunks              (if finished?
+                                            (pop new-chunks)
+                                            new-chunks)
+                  delta-chunks            (new-items new-chunks old-chunks)
 
-                      SequenceInsertDiff$Processor
-                      (processSequenceInsertDiff [this diff])
+                  reset-now-vol           (volatile! #{})
+                  delta-chunks-map-vol    (volatile! {})
+                  finished-invoke-ids-vol (volatile! #{})
+                  new-results
+                  (reduce
+                   (fn [m {:keys [invoke-id index chunk]}]
+                     (let [m (if (= index 0)
+                               ;; check original value at start and not m in
+                               ;; case the first invocation of this callback
+                               ;; also contained a reset, which shouldn't be
+                               ;; a reset for the user
+                               (if (contains? @results-vol invoke-id)
+                                 (do
+                                   (vswap! reset-now-vol conj invoke-id)
+                                   (transform [h/VOLATILE (keypath invoke-id)
+                                               (nil->val 0)]
+                                              inc
+                                              resets-vol)
+                                   (setval [h/VOLATILE (keypath invoke-id)]
+                                           []
+                                           delta-chunks-map-vol)
+                                   (assoc m invoke-id []))
+                                 m)
+                               m)]
+                       (if (= FINISHED-INVOKE chunk)
+                         (do
+                           (vswap! finished-invoke-ids-vol conj invoke-id)
+                           m)
+                         (do
+                           (setval [h/VOLATILE (keypath invoke-id) (nil->val [])
+                                    AFTER-ELEM]
+                                   chunk
+                                   delta-chunks-map-vol)
+                           (setval [(keypath invoke-id) (nil->val [])
+                                    AFTER-ELEM]
+                                   chunk
+                                   m)))
                      ))
-
-                  reset?
-                  (or (< (count new-chunks)
-                         (count old-chunks))
-                      (not= old-chunks
-                            (subvec new-chunks
-                                    0
-                                    (count old-chunks))))]
-              (when reset?
-                (vswap! resets-vol inc))
+                   @results-vol
+                   delta-chunks)]
               (when finished?
                 (locking ps-vol
                   (if-let [ps @ps-vol]
@@ -73,20 +102,14 @@
                       (close! ps))
                     (vreset! ps-vol ::finished)
                   )))
-              (vreset! results-vol new-chunks)
+              (vreset! results-vol new-results)
               (when callback-fn
-                (if reset?
-                  (callback-fn
-                   new-chunks
-                   new-chunks
-                   true
-                   finished?)
-                  (callback-fn
-                   new-chunks
-                   (new-items new-chunks
-                              old-chunks)
-                   false
-                   finished?))))))
+                (callback-fn
+                 new-results
+                 @delta-chunks-map-vol
+                 @reset-now-vol
+                 @finished-invoke-ids-vol
+                 finished?)))))
 
         ps
         (foreign-proxy
@@ -101,9 +124,9 @@
         (close! ps)
         (vreset! ps-vol ps)))
     (reify
-     AgentStream
+     AgentStreamByInvoke
      (get [this] @results-vol)
-     (numResets [this] @resets-vol)
+     (numResetsByInvoke [this] @resets-vol)
      (close [this]
        (locking ps-vol
          (when-not (= ::finished @ps-vol)
@@ -111,3 +134,62 @@
            (close! ps))))
      clojure.lang.IDeref
      (deref [this] (.get this)))))
+
+(defn agent-stream-all-impl
+  [streaming-pstate agent-invoke node callback-fn]
+  (agent-stream-all-impl*
+   streaming-pstate
+   agent-invoke
+   node
+   (fn [invoke-id->chunks invoke-id->new-chunks reset-invoke-ids
+        finished-invoke-ids finished?]
+     (callback-fn invoke-id->chunks
+                  invoke-id->new-chunks
+                  reset-invoke-ids
+                  finished?))))
+
+(defn agent-stream-impl
+  [streaming-pstate agent-invoke node callback-fn]
+  (let [first-invoke-id-vol (volatile! nil)
+        done-vol (volatile! false)
+        delegate
+        (agent-stream-all-impl*
+         streaming-pstate
+         agent-invoke
+         node
+         (fn [invoke-id->chunks invoke-id->new-chunks reset-invoke-ids
+              finished-invoke-ids _]
+           (when-not @done-vol
+             (if (and (nil? @first-invoke-id-vol)
+                      (-> invoke-id->chunks
+                          empty?
+                          not))
+               (vreset! first-invoke-id-vol
+                        (select-any MAP-KEYS invoke-id->chunks)))
+             (let [finished? (contains? finished-invoke-ids
+                                        @first-invoke-id-vol)]
+               (when finished?
+                 (vreset! done-vol true))
+               (when (or finished?
+                         (contains? invoke-id->new-chunks @first-invoke-id-vol))
+                 (callback-fn
+                  (get invoke-id->chunks @first-invoke-id-vol)
+                  (get invoke-id->new-chunks @first-invoke-id-vol)
+                  (contains? reset-invoke-ids @first-invoke-id-vol)
+                  finished?))
+             ))))]
+    (reify
+     AgentStream
+     (get [this]
+       (get @delegate @first-invoke-id-vol []))
+     (numResets [this]
+       (get (.numResetsByInvoke delegate) @first-invoke-id-vol 0))
+     (close [this]
+       (.close delegate))
+     clojure.lang.IDeref
+     (deref [this] (.get this)))
+  ))
+
+;; TODO: <<<<>>>>
+;;  - test first invoke ID and being finished at the same time
+;;  - also similar test for stream-all

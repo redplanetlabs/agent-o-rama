@@ -157,3 +157,11 @@
   (if (contains? m k)
     m
     (assoc m k v)))
+
+(defnav VOLATILE
+  []
+  (select* [_this structure next-fn]
+           (next-fn @structure))
+  (transform* [_this structure next-fn]
+              (vswap! structure next-fn)
+              structure))
