@@ -531,28 +531,6 @@
        (else>)
         (identity *op :> *op-obj))
 
-      ;; TODO: <<<<>>>> if this is a retry, need to clear streaming results if
-      ;; the node didn't finish
-      ;;  - which involves partitioning back to agent-task-id
-      ;;  - but streaming results are accumulation across ALL node invokes
-      ;;    - some of which may have succeeded, some of which may have been
-      ;;    partial, and some of which may not have started
-      ;;      - so would need to iterate through streaming results and filter
-      ;;      out if it failed, and reset index to 0
-      ;;  - maybe streaming should work like this:
-      ;;     - (fn [invoke-id->chunks invoke-id->new-chunks
-      ;;     reset-invoke-id-set complete?])
-      ;;    - this is "streamAll"
-      ;;    - "stream" ONLY does the first invoke ID and ignores the rest
-      ;;      (fn [chunks new-chunks reset? complete?])
-      ;;    - maybe stream could take a "join" function that would present
-      ;;    results as a single list in the case of LLMs
-      ;;  - so here, it just needs to reset the streaming index for this invoke
-      ;;  ID
-      ;;  - don't need to reset here...
-      ;;    - if it's 0, then let it go through no matter what
-      ;;      - and client treats this as a reset
-
       (<<subsource *op-obj
        (case> Node :> {:keys [*node-fn]})
         (identity *op

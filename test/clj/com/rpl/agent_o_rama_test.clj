@@ -2439,7 +2439,6 @@
          (doseq [[_ [elems]] (separate-by-invoke-id [@as])]
            (is (= foo-node1-expected elems)))
 
-         (println "AAA")
          (bind res-atom (atom []))
          (bind as
            (aor/agent-stream-all
@@ -2460,10 +2459,75 @@
          (is (= true (nth res 3)))
         )))))
 
-;; TODO: <<<<>>>>
-;;  - agent-stream with multiple invokes to the same node ignores streaming
-;   events to the other invoke
-;;     - whether in parallel or in serial
+(deftest agent-stream-multiple-invokes-test
+  (with-redefs [SEM  (h/mk-semaphore 0)
+                SEM2 (h/mk-semaphore 0)]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (->
+            topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             ["node1" "node2"]
+             (fn [agent-node]
+               (aor/emit! agent-node "node1" 1)
+               (aor/emit! agent-node "node2")
+             ))
+            (aor/node
+             "node1"
+             "node1"
+             (fn [agent-node i]
+               (aor/stream-chunk! agent-node i)
+               (h/acquire-semaphore SEM2 1)
+               (aor/stream-chunk! agent-node (+ i 1))
+               (aor/stream-chunk! agent-node (+ i 2))
+               (cond (= i 1) (aor/emit! agent-node "node1" 0)
+                     (= i 10)
+                     (aor/result! agent-node "abc")
+               )))
+            (aor/node
+             "node2"
+             "node1"
+             (fn [agent-node]
+               (h/acquire-semaphore SEM 1)
+               (aor/emit! agent-node "node1" 10)
+             ))
+          )
+         ))
+       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (bind module-name (get-module-name module))
+
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind foo (aor/agent-client agent-manager "foo"))
+
+       (bind inv (aor/agent-initiate foo))
+       (bind res-atom (atom []))
+       (bind as
+         (aor/agent-stream
+          foo
+          inv
+          "node1"
+          (fn [all-chunks new-chunks reset? complete?]
+            (swap! res-atom conj
+              [all-chunks new-chunks reset? complete?])
+          )))
+       (is (condition-attained? (= @res-atom [[[1] [1] false false]])))
+       (h/release-semaphore SEM 1)
+       (h/release-semaphore SEM2 10000)
+       (is (= (aor/agent-result foo inv) "abc"))
+       (is (condition-attained? (= @as [1 2 3])))
+       (is (matching-ascending-seq? (mapv first @res-atom) [1 2 3] <=))
+       (is (= [1 2 3] (apply concat (mapv second @res-atom))))
+       (bind metas (mapv #(select-any (srange 2 4) %) @res-atom))
+       (is (= [false true] (last metas)))
+       (is (every? #(= % [false false]) (butlast metas)))
+       (bind as (aor/agent-stream foo inv "node1"))
+       (is (= @as [1 2 3]))
+      ))))
 
 (deftest stream-close-test
   (with-redefs [SEM (h/mk-semaphore 0)]
