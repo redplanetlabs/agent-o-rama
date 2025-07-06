@@ -136,12 +136,13 @@
    streaming-pstate
    agent-invoke
    node
-   (fn [invoke-id->chunks invoke-id->new-chunks reset-invoke-ids
-        finished-invoke-ids finished?]
-     (callback-fn invoke-id->chunks
-                  invoke-id->new-chunks
-                  reset-invoke-ids
-                  finished?))))
+   (when callback-fn
+     (fn [invoke-id->chunks invoke-id->new-chunks reset-invoke-ids
+          finished-invoke-ids finished?]
+       (callback-fn invoke-id->chunks
+                    invoke-id->new-chunks
+                    reset-invoke-ids
+                    finished?)))))
 
 (defn agent-stream-impl
   [streaming-pstate agent-invoke node callback-fn]
@@ -152,27 +153,29 @@
          streaming-pstate
          agent-invoke
          node
-         (fn [invoke-id->chunks invoke-id->new-chunks reset-invoke-ids
-              finished-invoke-ids _]
-           (when-not @done-vol
-             (if (and (nil? @first-invoke-id-vol)
-                      (-> invoke-id->chunks
-                          empty?
-                          not))
-               (vreset! first-invoke-id-vol
-                        (select-any MAP-KEYS invoke-id->chunks)))
-             (let [finished? (contains? finished-invoke-ids
-                                        @first-invoke-id-vol)]
-               (when finished?
-                 (vreset! done-vol true))
-               (when (or finished?
-                         (contains? invoke-id->new-chunks @first-invoke-id-vol))
-                 (callback-fn
-                  (get invoke-id->chunks @first-invoke-id-vol)
-                  (get invoke-id->new-chunks @first-invoke-id-vol)
-                  (contains? reset-invoke-ids @first-invoke-id-vol)
-                  finished?))
-             ))))]
+         (when callback-fn
+           (fn [invoke-id->chunks invoke-id->new-chunks reset-invoke-ids
+                finished-invoke-ids _]
+             (when-not @done-vol
+               (if (and (nil? @first-invoke-id-vol)
+                        (-> invoke-id->chunks
+                            empty?
+                            not))
+                 (vreset! first-invoke-id-vol
+                          (select-any MAP-KEYS invoke-id->chunks)))
+               (let [finished? (contains? finished-invoke-ids
+                                          @first-invoke-id-vol)]
+                 (when finished?
+                   (vreset! done-vol true))
+                 (when (or finished?
+                           (contains? invoke-id->new-chunks
+                                      @first-invoke-id-vol))
+                   (callback-fn
+                    (get invoke-id->chunks @first-invoke-id-vol)
+                    (get invoke-id->new-chunks @first-invoke-id-vol)
+                    (contains? reset-invoke-ids @first-invoke-id-vol)
+                    finished?))
+               )))))]
     (reify
      AgentStream
      (get [this]

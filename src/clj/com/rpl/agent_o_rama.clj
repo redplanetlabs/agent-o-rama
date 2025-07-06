@@ -354,6 +354,7 @@
              (when stream-callback
                (fn [all-chunks new-chunks reset? complete?]
                  (.onUpdate ^AgentClient$StreamCallback
+                            stream-callback
                             all-chunks
                             new-chunks
                             reset?
@@ -363,13 +364,14 @@
           (streamAll [this agent-invoke node]
             (.streamAll this agent-invoke node nil))
           (streamAll [this agent-invoke node stream-all-callback]
-            (aor-types/stream-internal
+            (aor-types/stream-all-internal
              this
              agent-invoke
              node
              (when stream-all-callback
                (fn [all-chunks new-chunks reset-invoke-ids complete?]
                  (.onUpdate ^AgentClient$StreamAllCallback
+                            stream-all-callback
                             all-chunks
                             new-chunks
                             reset-invoke-ids
