@@ -2402,7 +2402,6 @@
                 [all-chunks new-chunks reset-invoke-ids complete?])
             )))
          (is (= 14 @closes-atom))
-         ;; TODO: <<<<>>>> failing here
          (is (= 1 (count @res-atom)))
          (bind res (first @res-atom))
          (doseq [data [@as (first res) (second res)]]
