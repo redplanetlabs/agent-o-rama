@@ -186,6 +186,14 @@
 
 (defn change-max-retries
   [amount]
-  (when-not (instance? Long amount)
-    (throw (ex-info "Invalid max retries" {:val-type (class amount)})))
+  (when-not (and (instance? Long amount) (>= amount 0))
+    (throw (ex-info "Invalid max.retries"
+                    {:val-type (class amount) :val amount})))
   (->ChangeConfig MAX-RETRIES-CONFIG amount))
+
+(defn change-stall-checker-threshold-millis
+  [amount]
+  (when-not (and (instance? Long amount) (> amount 0))
+    (throw (ex-info "Invalid stall.checker.threshold.millis"
+                    {:val-type (class amount) :val amount})))
+  (->ChangeConfig STALL-CHECKER-THRESHOLD-MILLIS amount))
