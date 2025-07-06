@@ -36,12 +36,6 @@
         results-vol    (volatile! {})
         old-chunks-vol (volatile! [])
         resets-vol     (volatile! {})
-        ;; TODO: <<<<>>>> new impl:
-        ;;  - for regular stream, don't wnat to hold onto state for other
-        ;;  invokes... though it doesn't make a difference as still
-        ;;  materializing the full stream in the underlying proxy
-        ;;  - now have finished? for each one individually, which will only be
-        ;;  used for regular stream()
         ps-vol         (volatile! nil)
         pcallback-fn
         (fn [new-chunks ^Diff diff _]
@@ -103,6 +97,7 @@
                     (vreset! ps-vol ::finished)
                   )))
               (vreset! results-vol new-results)
+              (vreset! old-chunks-vol new-chunks)
               (when callback-fn
                 (callback-fn
                  new-results

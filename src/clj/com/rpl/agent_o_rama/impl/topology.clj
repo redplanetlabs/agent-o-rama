@@ -276,7 +276,7 @@
                   :> {*root-invoke-id :root-invoke-id
                       *curr-retry-num :retry-num
                       *graph-version :graph-version
-                      *args :args
+                      *args :invoke-args
                       *result :result
 
                       {:keys [*invoke-id->new-args

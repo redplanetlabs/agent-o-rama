@@ -122,7 +122,7 @@
                    node
                    invoke-id
                    (identity-retry-num retry-num)
-                   @index-vol
+                   (identity-streaming-index @index-vol)
                    iclient/FINISHED-INVOKE))))
        (doseq [cf @outstanding-queue-vol]
          (verify-successful-cf! cf)))
