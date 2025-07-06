@@ -256,7 +256,6 @@
     $$active (po/agent-active-invokes-task-global *agent-name)]
    (local-transform>
     ;; TODO: <<<<>>>> probably need to update finish-time as well
-    ;;    - factor this into helper "complete-with-failure!"
     [(keypath *agent-id)
      :result
      (termval (aor-types/->valid-AgentResult *message true))]

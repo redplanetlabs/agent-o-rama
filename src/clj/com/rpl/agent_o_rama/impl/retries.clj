@@ -2,6 +2,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
@@ -15,32 +16,31 @@
 (def SUBSTITUTE-TICK-DEPOT false)
 
 (deframafn checker-threshold-millis
-  []
-  ;; TODO: <<<<<>>>>> make configurable via a PState
-  (:> 10000))
+  [*agent-name]
+  (:> (at/read-config *agent-name aor-types/STALL-CHECKER-THRESHOLD-MILLIS)))
 
 (defn invalid-time-delta?
-  [time-millis]
+  [agent-name time-millis]
   (>= (- (h/current-time-millis) time-millis)
-      (checker-threshold-millis)))
+      (checker-threshold-millis agent-name)))
 
 (defn invoke-id-executing?
   [^AgentNodeExecutorTaskGlobal node-exec invoke-id]
   (contains? (.getRunningInvokeIds node-exec) invoke-id))
 
 (defgenerator stalled-agent-ids
-  [name]
+  [agent-name]
   (let [agent-node-pstate-sym
-        (symbol (po/agent-node-task-global-name name))
+        (symbol (po/agent-node-task-global-name agent-name))
 
         agent-root-pstate-sym
-        (symbol (po/agent-root-task-global-name name))
+        (symbol (po/agent-root-task-global-name agent-name))
 
         agent-active-invokes-pstate-sym
-        (symbol (po/agent-active-invokes-task-global-name name))
+        (symbol (po/agent-active-invokes-task-global-name agent-name))
 
         pending-retries-pstate-sym
-        (symbol (po/pending-retries-task-global-name name))
+        (symbol (po/pending-retries-task-global-name agent-name))
 
         node-exec (symbol (po/agent-node-executor-name))]
     (batch<- [*agent-task-id *agent-id *retry-num]
@@ -56,7 +56,7 @@
                                 *start-time-millis
                                 *last-progress-time-millis
                                 *retry-num]})
-      (filter> (invalid-time-delta? *last-progress-time-millis))
+      (filter> (invalid-time-delta? agent-name *last-progress-time-millis))
       (loop<- [*invoke-id *root-invoke-id
                *emitted-millis *start-time-millis]
         (local-select> (keypath *invoke-id)
@@ -97,7 +97,7 @@
          (else>)
           (<<if (or>
                  (and> (nil? *start-time-millis)
-                       (invalid-time-delta? *emitted-millis))
+                       (invalid-time-delta? agent-name *emitted-millis))
                  (not (invoke-id-executing? node-exec *invoke-id)))
             (:>)
           ))
@@ -111,24 +111,26 @@
   (hook:stall-detected agent-task-id agent-id retry-num))
 
 (defn declare-check-impl
-  [mb-topology name]
-  (let [check-tick-sym        (symbol (po/agent-check-tick-depot-name name))
-        agent-depot-sym       (symbol (po/agent-depot-name name))
-        failure-depot-sym     (symbol (po/agent-failures-depot-name name))
-        agent-root-pstate-sym (symbol (po/agent-root-task-global-name name))
+  [mb-topology agent-name]
+  (let [check-tick-sym        (symbol (po/agent-check-tick-depot-name
+                                       agent-name))
+        agent-depot-sym       (symbol (po/agent-depot-name agent-name))
+        failure-depot-sym     (symbol (po/agent-failures-depot-name agent-name))
+        agent-root-pstate-sym (symbol (po/agent-root-task-global-name
+                                       agent-name))
 
         agent-valid-invokes-pstate-sym
-        (symbol (po/agent-valid-invokes-task-global-name name))
+        (symbol (po/agent-valid-invokes-task-global-name agent-name))
 
         pending-retries-pstate-sym
-        (symbol (po/pending-retries-task-global-name name))
+        (symbol (po/pending-retries-task-global-name agent-name))
 
-        uniqued-sym           (symbol (str "$$uniqued-" name))]
+        uniqued-sym           (symbol (str "$$uniqued-" agent-name))]
     (<<sources mb-topology
      (source> check-tick-sym :> %microbatch)
       (%microbatch)
       (<<batch
-        (stalled-agent-ids name
+        (stalled-agent-ids agent-name
                            :> *agent-task-id *agent-id *retry-num)
         (+group-by [*agent-task-id *agent-id]
           (aggs/+max *retry-num :> *retry-num))

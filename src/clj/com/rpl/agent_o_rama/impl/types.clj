@@ -173,12 +173,16 @@
   [key :- clojure.lang.Keyword
    val :- Object])
 
-(def MAX-RETRIES-CONFIG :max-retries)
+(def MAX-RETRIES-CONFIG "max.retries")
 (def DEFAULT-MAX-RETRIES 3)
+(def STALL-CHECKER-THRESHOLD-MILLIS "stall.checker.threshold.millis")
+(def DEFAULT-STALL-CHECKER-THRESHOLD-MILLIS 10000)
 
 (defn config-default
   [k]
-  (get {MAX-RETRIES-CONFIG DEFAULT-MAX-RETRIES} k))
+  (get {MAX-RETRIES-CONFIG DEFAULT-MAX-RETRIES
+        STALL-CHECKER-THRESHOLD-MILLIS DEFAULT-STALL-CHECKER-THRESHOLD-MILLIS}
+       k))
 
 (defn change-max-retries
   [amount]

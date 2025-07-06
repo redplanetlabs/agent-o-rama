@@ -28,7 +28,7 @@
 (def SEM3)
 
 (deframafn short-checker-threshold-millis
-  []
+  [*agent-name]
   (:> 100))
 
 (defn get-executing-node-ids
