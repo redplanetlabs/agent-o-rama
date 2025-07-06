@@ -2186,6 +2186,55 @@
          (is (= [["i" "j"]] @all-chunks-atom))
          (is (= [] @chunks-atom))
          (is (= ["i" "j"] @as))
+
+         (clear!)
+         (bind as
+           (aor/agent-stream
+            foo
+            inv
+            "start"
+            (fn [all-chunks new-chunks reset? complete?]
+              (swap! all-chunks-atom conj all-chunks)
+              (swap! meta-atom conj [reset? complete?])
+              (doseq [c new-chunks]
+                (swap! chunks-atom conj c))
+            )))
+         (is (= ["i" "j"] @as))
+         (is (condition-attained? (= 1 (count @meta-atom))))
+         (is (= [[false true]] @meta-atom))
+         (is (= [["i" "j"]] @all-chunks-atom))
+         (is (= ["i" "j"] @chunks-atom))
+
+
+         ;; test with no callback fn
+         (bind as
+           (aor/agent-stream
+            foo
+            inv
+            "start"))
+         (is (= ["i" "j"] @as))
+
+
+         (reset! streaming-index-mod-atom 0)
+         (reset! override-retry-num-atom 0)
+         (bind inv (aor/agent-initiate foo))
+         (bind as
+           (aor/agent-stream
+            foo
+            inv
+            "start"))
+         (is (condition-attained? (= ["a" "b" "c"] @as)))
+         (h/release-semaphore SEM 1)
+         (is (condition-attained? (= ["a" "b" "c" "d" "e"] @as)))
+         (h/release-semaphore SEM 1)
+         (is (condition-attained? (= ["a" "b" "c" "d" "e" "f" "g"] @as)))
+         (h/release-semaphore SEM 1)
+         (is (condition-attained? (= ["a" "b" "c" "d" "e" "f" "g" "h"] @as)))
+         (h/release-semaphore SEM 1)
+         (is (condition-attained? (= ["a" "b" "c" "d" "e" "f" "g" "h" "i" "j"]
+                                     @as)))
+         (h/release-semaphore SEM 1)
+         (is (= "abcd" (aor/agent-result foo inv)))
         )))))
 
 (deftest many-nodes-streaming-test
@@ -2412,12 +2461,9 @@
         )))))
 
 ;; TODO: <<<<>>>>
-;;  - test agent-stream with no callback-fn
 ;;  - agent-stream with multiple invokes to the same node ignores streaming
 ;   events to the other invoke
 ;;     - whether in parallel or in serial
-;;  - test first invoke ID and being finished at the same time
-;;      - just agent-stream after it's already done
 
 (deftest stream-close-test
   (with-redefs [SEM (h/mk-semaphore 0)]

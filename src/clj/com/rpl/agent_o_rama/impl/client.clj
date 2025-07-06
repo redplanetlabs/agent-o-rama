@@ -57,13 +57,15 @@
                   (reduce
                    (fn [m {:keys [invoke-id index chunk]}]
                      (let [m (if (= index 0)
-                               ;; check original value at start and not m in
-                               ;; case the first invocation of this callback
-                               ;; also contained a reset, which shouldn't be
-                               ;; a reset for the user
-                               (if (contains? @results-vol invoke-id)
+
+                               (if (contains? m invoke-id)
                                  (do
-                                   (vswap! reset-now-vol conj invoke-id)
+                                   ;; check original value at start and not m in
+                                   ;; case the first invocation of this callback
+                                   ;; also contained a reset, which shouldn't be
+                                   ;; a reset for the user
+                                   (when (contains? @results-vol invoke-id)
+                                     (vswap! reset-now-vol conj invoke-id))
                                    (transform [h/VOLATILE (keypath invoke-id)
                                                (nil->val 0)]
                                               inc
@@ -163,29 +165,29 @@
          streaming-pstate
          agent-invoke
          node
-         (when callback-fn
-           (fn [invoke-id->chunks invoke-id->new-chunks reset-invoke-ids
-                finished-invoke-ids _]
-             (when-not @done-vol
-               (if (and (nil? @first-invoke-id-vol)
-                        (-> invoke-id->chunks
-                            empty?
-                            not))
-                 (vreset! first-invoke-id-vol
-                          (select-any MAP-KEYS invoke-id->chunks)))
-               (let [finished? (contains? finished-invoke-ids
-                                          @first-invoke-id-vol)]
-                 (when finished?
-                   (vreset! done-vol true))
-                 (when (or finished?
-                           (contains? invoke-id->new-chunks
-                                      @first-invoke-id-vol))
-                   (callback-fn
-                    (get invoke-id->chunks @first-invoke-id-vol)
-                    (get invoke-id->new-chunks @first-invoke-id-vol)
-                    (contains? reset-invoke-ids @first-invoke-id-vol)
-                    finished?))
-               )))))]
+         (fn [invoke-id->chunks invoke-id->new-chunks reset-invoke-ids
+              finished-invoke-ids _]
+           (when-not @done-vol
+             (if (and (nil? @first-invoke-id-vol)
+                      (-> invoke-id->chunks
+                          empty?
+                          not))
+               (vreset! first-invoke-id-vol
+                        (select-any MAP-KEYS invoke-id->chunks)))
+             (let [finished? (contains? finished-invoke-ids
+                                        @first-invoke-id-vol)]
+               (when finished?
+                 (vreset! done-vol true))
+               (when (and callback-fn
+                          (or finished?
+                              (contains? invoke-id->new-chunks
+                                         @first-invoke-id-vol)))
+                 (callback-fn
+                  (get invoke-id->chunks @first-invoke-id-vol)
+                  (get invoke-id->new-chunks @first-invoke-id-vol)
+                  (contains? reset-invoke-ids @first-invoke-id-vol)
+                  finished?))
+             ))))]
     (reify
      AgentStream
      (get [this]
