@@ -2377,14 +2377,14 @@
                   (is (= expected (apply concat inv-chunks))))
                ))))
 
+         ;; 4 for results, 8 for streams
+         (is (= 12 @closes-atom))
+
+         (bind as
+           (aor/agent-stream-all foo (select-any (keypath "foo" 0) m) "node1"))
+         (is (= 13 @closes-atom))
+
          ;; TODO: <<<<>>>>
-         ; ;; 4 for results, 8 for streams
-         ; (is (= 12 @closes-atom))
-         ;
-         ; (bind as
-         ;   (aor/agent-stream foo (select-any (keypath "foo" 0) m) "node1"))
-         ; (is (= 13 @closes-atom))
-         ;
          ; (bind foo-node1-expected
          ;   (select-any (keypath "foo" "node1") expected-map))
          ;
