@@ -52,6 +52,7 @@
                   reset-now-vol           (volatile! #{})
                   delta-chunks-map-vol    (volatile! {})
                   finished-invoke-ids-vol (volatile! #{})
+                  already-done?           (= ::finished @ps-vol)
                   new-results
                   (reduce
                    (fn [m {:keys [invoke-id index chunk]}]
@@ -98,7 +99,16 @@
                   )))
               (vreset! results-vol new-results)
               (vreset! old-chunks-vol new-chunks)
-              (when callback-fn
+              (when
+                (and callback-fn
+                     (not already-done?)
+                     (or finished?
+                         (-> @finished-invoke-ids-vol
+                             empty?
+                             not)
+                         (-> @delta-chunks-map-vol
+                             empty?
+                             not)))
                 (callback-fn
                  new-results
                  @delta-chunks-map-vol
@@ -187,7 +197,3 @@
      clojure.lang.IDeref
      (deref [this] (.get this)))
   ))
-
-;; TODO: <<<<>>>>
-;;  - test first invoke ID and being finished at the same time
-;;  - also similar test for stream-all

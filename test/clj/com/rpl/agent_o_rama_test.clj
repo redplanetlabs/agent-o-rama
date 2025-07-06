@@ -2390,6 +2390,7 @@
          (doseq [[_ [elems]] (separate-by-invoke-id [@as])]
            (is (= foo-node1-expected elems)))
 
+         (println "AAA")
          (bind res-atom (atom []))
          (bind as
            (aor/agent-stream-all
@@ -2401,6 +2402,7 @@
                 [all-chunks new-chunks reset-invoke-ids complete?])
             )))
          (is (= 14 @closes-atom))
+         ;; TODO: <<<<>>>> failing here
          (is (= 1 (count @res-atom)))
          (bind res (first @res-atom))
          (doseq [data [@as (first res) (second res)]]
@@ -2409,6 +2411,14 @@
          (is (= #{} (nth res 2)))
          (is (= true (nth res 3)))
         )))))
+
+;; TODO: <<<<>>>>
+;;  - test agent-stream with no callback-fn
+;;  - agent-stream with multiple invokes to the same node ignores streaming
+;   events to the other invoke
+;;     - whether in parallel or in serial
+;;  - test first invoke ID and being finished at the same time
+;;      - just agent-stream after it's already done
 
 (deftest stream-close-test
   (with-redefs [SEM (h/mk-semaphore 0)]
