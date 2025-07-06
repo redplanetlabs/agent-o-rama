@@ -2384,31 +2384,30 @@
            (aor/agent-stream-all foo (select-any (keypath "foo" 0) m) "node1"))
          (is (= 13 @closes-atom))
 
-         ;; TODO: <<<<>>>>
-         ; (bind foo-node1-expected
-         ;   (select-any (keypath "foo" "node1") expected-map))
-         ;
-         ; (doseq [[_ [elems]] (separate-by-invoke-id [(sc->full-data @as)])]
-         ;   (is (= foo-node1-expected elems)))
-         ;
-         ; (bind res-atom (atom []))
-         ; (bind as
-         ;   (aor/agent-stream foo
-         ;                     (select-any (keypath "foo" 0) m)
-         ;                     "node1"
-         ;                     (fn [all-chunks new-chunks reset? complete?]
-         ;                       (swap! res-atom conj
-         ;                         [all-chunks new-chunks reset? complete?])
-         ;                     )))
-         ; (is (= 14 @closes-atom))
-         ; (is (= 1 (count @res-atom)))
-         ; (bind res (first @res-atom))
-         ; (doseq [data [@as (first res) (second res)]]
-         ;   (doseq [[_ [elems]] (separate-by-invoke-id [(sc->full-data
-         ;   data)])]
-         ;     (is (= foo-node1-expected elems))))
-         ; (is (= false (nth res 2)))
-         ; (is (= true (nth res 3)))
+         (bind foo-node1-expected
+           (select-any (keypath "foo" "node1") expected-map))
+
+         (doseq [[_ [elems]] (separate-by-invoke-id [@as])]
+           (is (= foo-node1-expected elems)))
+
+         (bind res-atom (atom []))
+         (bind as
+           (aor/agent-stream-all
+            foo
+            (select-any (keypath "foo" 0) m)
+            "node1"
+            (fn [all-chunks new-chunks reset-invoke-ids complete?]
+              (swap! res-atom conj
+                [all-chunks new-chunks reset-invoke-ids complete?])
+            )))
+         (is (= 14 @closes-atom))
+         (is (= 1 (count @res-atom)))
+         (bind res (first @res-atom))
+         (doseq [data [@as (first res) (second res)]]
+           (doseq [[_ [elems]] (separate-by-invoke-id [data])]
+             (is (= foo-node1-expected elems))))
+         (is (= #{} (nth res 2)))
+         (is (= true (nth res 3)))
         )))))
 
 (deftest stream-close-test
