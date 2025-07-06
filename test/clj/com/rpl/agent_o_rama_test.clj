@@ -2419,60 +2419,61 @@
 ;          (is (= 1 (count @res-atom)))
 ;          (bind res (first @res-atom))
 ;          (doseq [data [@as (first res) (second res)]]
-;            (doseq [[_ [elems]] (separate-by-invoke-id [(sc->full-data data)])]
+;            (doseq [[_ [elems]] (separate-by-invoke-id [(sc->full-data
+;            data)])]
 ;              (is (= foo-node1-expected elems))))
 ;          (is (= false (nth res 2)))
 ;          (is (= true (nth res 3)))
 ;         )))))
-;
-; (deftest stream-close-test
-;   (with-redefs [SEM (h/mk-semaphore 0)]
-;     (with-open [ipc (rtest/create-ipc)]
-;       (letlocals
-;        (bind module
-;          (aor/agentmodule
-;           [topology]
-;           (->
-;             topology
-;             (aor/new-agent "foo")
-;             (aor/node
-;              "start"
-;              nil
-;              (fn [agent-node]
-;                (aor/stream-chunk! agent-node "a")
-;                (aor/stream-chunk! agent-node "b")
-;                (aor/stream-chunk! agent-node "c")
-;                (h/acquire-semaphore SEM 1)
-;                (aor/stream-chunk! agent-node "d")
-;                (aor/stream-chunk! agent-node "e")
-;                (aor/result! agent-node "abcd")
-;              )))))
-;        (rtest/launch-module! ipc module {:tasks 4 :threads 2})
-;        (bind module-name (get-module-name module))
-;
-;        (bind agent-manager (aor/agent-manager ipc module-name))
-;        (bind foo (aor/agent-client agent-manager "foo"))
-;
-;        (bind inv (aor/agent-initiate foo))
-;        (bind res-atom (atom []))
-;        (bind as
-;          (aor/agent-stream foo
-;                            inv
-;                            "start"
-;                            (fn [all-chunks new-chunks reset? complete?]
-;                              (swap! res-atom conj (sc->data new-chunks))
-;                            )))
-;
-;        (is (condition-attained? (= [[0 "a"] [1 "b"] [2 "c"]]
-;                                    (apply concat @res-atom))))
-;        (close! as)
-;        (reset! res-atom [])
-;        (h/release-semaphore SEM 1)
-;        (is (= "abcd" (aor/agent-result foo inv)))
-;        (is (empty? @res-atom))
-;        ;; verify close is idempotetent
-;        (close! as)
-;       ))))
+
+(deftest stream-close-test
+  (with-redefs [SEM (h/mk-semaphore 0)]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (->
+            topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node]
+               (aor/stream-chunk! agent-node "a")
+               (aor/stream-chunk! agent-node "b")
+               (aor/stream-chunk! agent-node "c")
+               (h/acquire-semaphore SEM 1)
+               (aor/stream-chunk! agent-node "d")
+               (aor/stream-chunk! agent-node "e")
+               (aor/result! agent-node "abcd")
+             )))))
+       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (bind module-name (get-module-name module))
+
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind foo (aor/agent-client agent-manager "foo"))
+
+       (bind inv (aor/agent-initiate foo))
+       (bind res-atom (atom []))
+       (bind as
+         (aor/agent-stream foo
+                           inv
+                           "start"
+                           (fn [all-chunks new-chunks reset? complete?]
+                             (swap! res-atom conj new-chunks)
+                           )))
+
+       (is (condition-attained? (= ["a" "b" "c"]
+                                   (apply concat @res-atom))))
+       (close! as)
+       (reset! res-atom [])
+       (h/release-semaphore SEM 1)
+       (is (= "abcd" (aor/agent-result foo inv)))
+       (is (empty? @res-atom))
+       ;; verify close is idempotetent
+       (close! as)
+      ))))
 
 (defn get-executing-node-ids
   [^AgentNodeExecutorTaskGlobal node-exec]
