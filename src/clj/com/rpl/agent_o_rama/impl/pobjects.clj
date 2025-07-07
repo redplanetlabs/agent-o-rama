@@ -75,8 +75,8 @@
      :last-progress-time-millis Long
      :retry-num         Long
      :fork-of           (fixed-keys-schema
-                         {:parent-root-invoke-id Long
-                          :invoke-id->new-args   {Long [Object]}})
+                         {:parent-agent-id     Long
+                          :invoke-id->new-args {Long [Object]}})
      :forks             (set-schema Long {:subindex? true}) ; root-invoke ids
     })})
 
