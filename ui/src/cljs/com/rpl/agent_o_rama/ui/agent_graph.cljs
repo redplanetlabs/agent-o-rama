@@ -14,8 +14,36 @@
    ["@dagrejs/dagre" :as Dagre]))
 
 (defn process-graph-data [{:keys [graph]}]
-  (println "data!!" graph)
-  {:nodes [] :edges []})
+  (println "data!!" (:node-map graph))
+  (let [g (new (.. Dagre -graphlib -Graph))
+
+        nodes (s/select [:node-map
+                         s/MAP-KEYS
+                         (s/view
+                          (fn [k]
+                            {:id k
+                             :type "custom"
+                             :draggable false
+                             :data {:label k :node-id k}}))]
+                        graph)
+        
+        edges (s/select
+               [:node-map
+                s/ALL
+                (s/collect-one s/FIRST)
+                s/LAST
+                :output-nodes
+                s/ALL]
+               graph)]
+    (.setDefaultEdgeLabel g (fn [] #js {}))
+    (.setGraph g #js {})
+
+    (doall (for [[frm to] edges] (.setEdge g frm to)))
+    (doall (for [node nodes] (.setNode g (:id node) (clj->js node))))
+    
+    (Dagre/layout g)
+    (let [nodes-with-layout (for [node nodes] (assoc node :position (.node g (:id node))))]
+      {:nodes nodes-with-layout :edges edges})))
 
 (defui graph [{:keys [initial-data]}]
   (let [[selected-node set-selected-node] (uix/use-state nil)
