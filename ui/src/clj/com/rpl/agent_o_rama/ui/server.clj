@@ -39,6 +39,8 @@
       {:get {:handler #'agents/index}}]
      ["/agents/:module-id/:agent-id/invocations"
       {:get {:handler #'agents/get-invokes}}]
+     ["/agents/:module-id/:agent-id/graph"
+      {:get {:handler #'agents/get-graph}}]
      ["/agents/:module-id/:agent-id/invocations/:invoke-id"
       {:get {:handler #'agents/invoke}}]
      ["/agents/:module-id/:agent-id/invocations/:invoke-id/paginated"
@@ -84,4 +86,4 @@
             :coercion rcm/coercion}})
    default-handler))
 
-(def handler (app-routes))
+(def handler (#'app-routes))

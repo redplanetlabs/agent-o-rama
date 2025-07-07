@@ -10,6 +10,23 @@
     {:module-id "ModuleA" :agent-id "support"}
     {:module-id "ModuleB" :agent-id "research"}]})
 
+(defn get-graph [{{:keys [module-id agent-id]} :path-params}]
+  {:status
+   200
+   
+   :body
+   {:graph
+    {:node-map {"node1" {:node-type :agg-start-node
+                         :output-nodes #{"node2" "node3"}}
+                "node3" {:node-type :node
+                         :output-nodes #{"final"}}
+                "node2" {:node-type :node
+                         :output-nodes #{"final"}}
+                "final" {:node-type :agg-node
+                         :output-nodes #{}}}
+     :start-node "node1"
+     :uuid "15e8c43e-0b5f-4d36-9424-1b1165b89404"}}})
+
 (defn get-invokes [{{:keys [module-id agent-id]} :path-params}]
   {:status
    200

@@ -85,12 +85,20 @@
        ($ :h2.text-xl.font-semibold.mb-4 "Evaluations")
        ($ :div.text-gray-500 "Evaluations functionality coming soon..."))))
 
+(defui agent-graph []
+  (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
+        {:keys [data isLoading]}
+        (common/use-query {:query-key ["agent" module-id agent-id "graph"]
+                           :query-url (str "/api/agents/" module-id "/" agent-id "/graph")})]
+    (str "data:" (common/pp (:graph data)))))
+
 (defui agent []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
         [location navigate] (useLocation)]
-    
+
     ($ :div.p-4
        ($ :div.text-xl.font-semibold.mb-4 "Agent Details")
+       ($ agent-graph)
        ($ :div.p-4.flex.gap-1
           ($ wouter/Link
              {:href (str "/agents/" module-id "/" agent-id "/run")
