@@ -8,14 +8,13 @@ stats page has xyflowgraph rendering for agent {
 
 two graph views (one has invocation specific stats, one has global stats)
 
-overidden => this change will not be reached
-
 collapsible side panel (left)
 
-tokens sohuld be next to model calls (under it)
-cut api calls, "calls"
-make stats panel more concise / shorter
-
+stats {
+  tokens sohuld be next to model calls (under it)
+  cut api calls, "calls"
+  make stats panel more concise / shorter
+}
 
 agentgraph replaces invocation graph
 

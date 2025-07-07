@@ -358,7 +358,7 @@
                                     ($ :div {:className "text-xs text-gray-500 font-mono"} (str "ID: " node-id))
                                     (when is-overridden
                                       ($ :div {:className "bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded mt-1 font-medium"}
-                                         "⚠️ This will be overridden")))
+                                         "⚠️ This change will not be reached")))
                                  ($ :button {:className "cursor-pointer text-red-500 hover:text-red-700 text-sm"
                                              :onClick (fn [e] 
                                                         (.stopPropagation e)
