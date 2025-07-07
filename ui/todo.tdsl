@@ -1,3 +1,5 @@
+agent graph on agent page, not invocation page (not sure about this)
+
 trace / graph / fork {
   (with a little text explaining under)
 }
@@ -10,8 +12,6 @@ two graph views (one has invocation specific stats, one has global stats)
 
 stats {
   tokens sohuld be next to model calls (under it)
-  cut api calls, "calls"
-  make stats panel more concise / shorter
 }
 
 agentgraph replaces invocation graph
