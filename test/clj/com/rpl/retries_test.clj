@@ -62,7 +62,7 @@
       [retries/SUBSTITUTE-TICK-DEPOT true
        retries/checker-threshold-millis short-checker-threshold-millis
 
-       aor-types/DEFAULT-MAX-RETRIES 0
+       aor-types/get-config ZERO-MAX-RETRIES-OVERRIDE
 
        retries/hook:checker-finished
        (fn [] (swap! checks-atom inc))
@@ -323,11 +323,11 @@
         init-retry-num-atom  (atom 0)]
     (with-redefs
       [retries/SUBSTITUTE-TICK-DEPOT true
-       at/init-retry-num (fn [] @init-retry-num-atom)
+       at/init-retry-num      (fn [] @init-retry-num-atom)
 
-       aor-types/DEFAULT-MAX-RETRIES 0
+       aor-types/get-config   ZERO-MAX-RETRIES-OVERRIDE
 
-       i/log-node-error (fn [& args])
+       i/log-node-error       (fn [& args])
 
        at/hook:appended-agent-failure (fn [& args]
                                         (swap! failure-appends-atom inc))
@@ -493,7 +493,7 @@
        BLOCKED-NODES-ATOM (atom 0)
        EVENTS-ATOM (atom [])
 
-       aor-types/DEFAULT-MAX-RETRIES 0
+       aor-types/get-config ZERO-MAX-RETRIES-OVERRIDE
 
        i/log-node-error (fn [& args])
 

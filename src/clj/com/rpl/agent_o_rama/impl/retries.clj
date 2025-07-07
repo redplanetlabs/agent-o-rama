@@ -17,7 +17,8 @@
 
 (deframafn checker-threshold-millis
   [*agent-name]
-  (:> (at/read-config *agent-name aor-types/STALL-CHECKER-THRESHOLD-MILLIS)))
+  (:> (at/read-config *agent-name
+                      aor-types/STALL-CHECKER-THRESHOLD-MILLIS-CONFIG)))
 
 (defn invalid-time-delta?
   [agent-name time-millis]

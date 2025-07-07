@@ -17,11 +17,11 @@
     AgentNodeExecutorTaskGlobal]))
 
 (deframafn read-config
-  [*agent-name *k]
+  [*agent-name *config]
   (<<with-substitutions
    [$$config (po/agent-config-task-global *agent-name)]
-   (local-select> STAY $$config :> *config)
-   (:> (get *config *k (aor-types/config-default *k)))))
+   (local-select> STAY $$config :> *config-map)
+   (:> (aor-types/get-config *config-map *config))))
 
 (defn get-node-obj
   [agent-graph node]

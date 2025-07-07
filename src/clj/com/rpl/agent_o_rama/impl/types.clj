@@ -1,5 +1,7 @@
 (ns com.rpl.agent-o-rama.impl.types
+  (:use [com.rpl.rama.path])
   (:require
+   [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.ramaspecter.defrecord-plus :as drp]
    [rpl.schema.core :as s])
@@ -170,30 +172,58 @@
   (stream-all-internal [this agent-invoke node callback-fn]))
 
 (drp/defrecord+ ChangeConfig
-  [key :- clojure.lang.Keyword
+  [key :- String
    val :- Object])
 
-(def MAX-RETRIES-CONFIG "max.retries")
-(def DEFAULT-MAX-RETRIES 3)
-(def STALL-CHECKER-THRESHOLD-MILLIS "stall.checker.threshold.millis")
-(def DEFAULT-STALL-CHECKER-THRESHOLD-MILLIS 10000)
+(def ALL-CONFIGS #{})
 
-(defn config-default
-  [k]
-  (get {MAX-RETRIES-CONFIG DEFAULT-MAX-RETRIES
-        STALL-CHECKER-THRESHOLD-MILLIS DEFAULT-STALL-CHECKER-THRESHOLD-MILLIS}
-       k))
+(defmacro defconfig
+  [name schema-fn config-default]
+  (let [cname      (-> name
+                       str
+                       str/lower-case
+                       (str/replace "-" "."))
+        csym       (setval [NAME END] "-CONFIG" name)
+        change-sym (->> name
+                        str
+                        str/lower-case
+                        (str "change-")
+                        symbol)]
+    `(do
+       (def ~csym
+         {:name      ~cname
+          :schema-fn ~schema-fn
+          :default   ~config-default})
+       (alter-var-root (var ALL-CONFIGS) conj ~cname)
+       (defn ~change-sym
+         [value#]
+         (let [schema-fn# ~schema-fn]
+           (when-not (schema-fn# value#)
+             (throw
+              (h/ex-info
+               "Invalid config"
+               {:name ~cname :value value# :value-type (class value#)})))
+           (->ChangeConfig ~cname value#)
+         ))
+     )))
 
-(defn change-max-retries
-  [amount]
-  (when-not (and (instance? Long amount) (>= amount 0))
-    (throw (ex-info "Invalid max.retries"
-                    {:val-type (class amount) :val amount})))
-  (->ChangeConfig MAX-RETRIES-CONFIG amount))
+(defn get-config
+  [m config]
+  (get m (:name config) (:default config)))
 
-(defn change-stall-checker-threshold-millis
-  [amount]
-  (when-not (and (instance? Long amount) (> amount 0))
-    (throw (ex-info "Invalid stall.checker.threshold.millis"
-                    {:val-type (class amount) :val amount})))
-  (->ChangeConfig STALL-CHECKER-THRESHOLD-MILLIS amount))
+(defn natural-long?
+  [v]
+  (and (instance? Long v) (>= v 0)))
+
+(defn positive-long?
+  [v]
+  (and (instance? Long v) (> v 0)))
+
+
+(defconfig MAX-RETRIES
+           natural-long?
+           3)
+
+(defconfig STALL-CHECKER-THRESHOLD-MILLIS
+           positive-long?
+           10000)

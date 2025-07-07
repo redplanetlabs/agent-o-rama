@@ -2586,7 +2586,7 @@
   (with-redefs [SEM (h/mk-semaphore 0)
                 SEM2 (h/mk-semaphore 0)
                 i/log-node-error (fn [& args])
-                aor-types/DEFAULT-MAX-RETRIES 0]
+                aor-types/get-config ZERO-MAX-RETRIES-OVERRIDE]
     (with-open [ipc (rtest/create-ipc)
                 _ (TopologyUtils/startSimTime)]
       (letlocals
