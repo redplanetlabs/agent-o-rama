@@ -175,7 +175,7 @@
   [key :- String
    val :- Object])
 
-(def ALL-CONFIGS #{})
+(def ALL-CONFIGS {})
 
 (defmacro defconfig
   [name schema-fn config-default]
@@ -194,7 +194,7 @@
          {:name      ~cname
           :schema-fn ~schema-fn
           :default   ~config-default})
-       (alter-var-root (var ALL-CONFIGS) conj ~cname)
+       (alter-var-root (var ALL-CONFIGS) assoc ~cname ~csym)
        (defn ~change-sym
          [value#]
          (let [schema-fn# ~schema-fn]
