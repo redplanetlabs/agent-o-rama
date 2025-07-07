@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.agents
   (:require
-   [com.rpl.agent-o-rama.ui.invocationgraph :as invocation-graph]
+   [com.rpl.agent-o-rama.ui.invocation-graph :as invocation-graph]
+   [com.rpl.agent-o-rama.ui.agent-graph :as agent-graph]
    
    [uix.core :as uix :refer [defui defhook $]]
    ["axios" :as axios]
@@ -11,11 +12,11 @@
    [com.rpl.agent-o-rama.ui.common :as common]))
 
 (defui index []
-  (let [{:keys [data isLoading]}
+  (let [{:keys [data loading?]}
         (common/use-query {:query-key ["agents"]
                            :query-url "/api/agents"})]
     (cond
-      isLoading ($ :div "loading...")
+      loading? ($ :div "loading...")
       (not data) ($ :div "no data")
       :else ($ :div.p-4
               (for [agent data
@@ -32,11 +33,11 @@
 
 (defui invocations []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
-        {:keys [data isLoading]}
+        {:keys [data loading?]}
         (common/use-query {:query-key ["agent" module-id agent-id]
                            :query-url (str "/api/agents/" module-id "/" agent-id "/invocations")})]
     (cond
-      isLoading ($ :div "loading...")
+      loading? ($ :div "loading...")
       (not data) ($ :div "no data")
       :else 
       (for [invoke (:invokes data)
@@ -50,17 +51,13 @@
 
 (defui mini-invocations []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
-        {:keys [data isLoading]}
+        {:keys [data loading?]}
         (common/use-query {:query-key ["agent" module-id agent-id]
                            :query-url (str "/api/agents/" module-id "/" agent-id "/invocations")})
 
         [location navigate] (useLocation)]
-    {:root-invoke-id 121,
-     :invoke-args ["CUSTOMER-123"],
-     :graph-version 0, 
-     :result {:success true}}
     (cond
-      isLoading ($ :div "loading...")
+      loading? ($ :div "loading...")
       (not data) ($ :div "no data")
       :else
       ($ :table.w-full
@@ -87,10 +84,12 @@
 
 (defui agent-graph []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
-        {:keys [data isLoading]}
+        {:keys [data loading?]}
         (common/use-query {:query-key ["agent" module-id agent-id "graph"]
                            :query-url (str "/api/agents/" module-id "/" agent-id "/graph")})]
-    (str "data:" (common/pp (:graph data)))))
+    (if loading?
+      "...loading"
+      ($ agent-graph/graph {:initial-data data}))))
 
 (defui agent []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
@@ -133,13 +132,13 @@
         [use-pagination? set-use-pagination] (uix/use-state true)
         [forking-mode? set-forking-mode?] (uix/use-state false)
         ;; Only fetch initial data - no need to refetch on pagination state changes
-        {:keys [data isLoading]}
+        {:keys [data loading?]}
         (common/use-query {:query-key ["invoke-initial" module-id agent-id invoke-id use-pagination?]
                            :query-url (if use-pagination?
                                         (str "/api/agents/" module-id "/" agent-id "/invocations/" invoke-id "/paginated?depth=1")
                                         (str "/api/agents/" module-id "/" agent-id "/invocations/" invoke-id))})]
     (cond
-      isLoading ($ :div "loading...")
+      loading? ($ :div "loading...")
       (not data) ($ :div "no data")
       :else 
       ($ :div
