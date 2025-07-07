@@ -603,3 +603,121 @@
    (filter> (= 0 *new-ack-val))
    (complete-agg! *agent-name *invoke-id *retry-num)
    (:>)))
+
+(deframaop handle-node-op
+  [*agent-name
+   *agent-task-id
+   *agent-id
+   *retry-num
+   {:keys [*invoke-id *next-node *args *agg-invoke-id
+           *invoke-id->new-args]}]
+  (<<with-substitutions
+   [$$nodes (po/agent-node-task-global *agent-name)
+    *agent-graph (po/agent-graph-task-global *agent-name)]
+   ;; TODO: <<<<>>>>>
+   ;;    - how to handle retries/forks here?
+   ;;      - can an agg node be forked? - probably not
+   ;;    - just check here if node is already finished, and continue with its
+   ;;    emits
+   ;;      - if it's a fork, write the new invoke ID with everything copied
+   ;;      over
+   ;;        - copy over agg inputs?
+   ;;        - if there was a result, need to send the result back
+   ;;          - this would be in "NodeComplete"
+   ;;          - for retries, need to send it over still and only write it if
+   ;;          it's not there
+   ;;     - so if it's finished here, it's either NodeComplete for fork or
+   ;;     RetryNodeComplete
+   (get-node-obj *agent-graph *next-node :> *op-obj)
+   (<<subsource *op-obj
+    (case> Node :> {:keys [*node-fn]})
+     (anode/handle-node-invoke
+      *agent-name
+      *agent-task-id
+      *agent-id
+      *node-fn
+      *invoke-id
+      *retry-num
+      *next-node
+      *args
+      *agg-invoke-id
+      *invoke-id->new-args)
+
+    (case> NodeAggStart :> {:keys [*node-fn *agg-node-name]})
+     (h/random-long :> *new-agg-invoke-id)
+     (local-transform>
+      [(keypath *invoke-id) :started-agg? (termval true)]
+      $$nodes)
+     (get-node-obj *agent-graph *agg-node-name :> {:keys [*init-fn]})
+     (anode/invoke-on-task-thread *agent-name
+                                  *agent-task-id
+                                  *agent-id
+                                  *retry-num
+                                  *init-fn
+                                  :agg-init
+                                  :> *init-agg-state)
+     (local-transform>
+      [(keypath *new-agg-invoke-id)
+       (termval {:agent-id            *agent-id
+                 :agent-task-id       *agent-task-id
+                 :node                *agg-node-name
+                 :start-time-millis   (h/current-time-millis)
+                 :agg-invoke-id       *agg-invoke-id
+                 :agg-inputs          []
+                 :agg-state           *init-agg-state
+                 :agg-ack-val         *invoke-id
+                 :agg-start-invoke-id *invoke-id
+                })]
+      $$nodes)
+     (anode/handle-node-invoke
+      *agent-name
+      *agent-task-id
+      *agent-id
+      *node-fn
+      *invoke-id
+      *retry-num
+      *next-node
+      *args
+      *new-agg-invoke-id
+      *invoke-id->new-args)
+
+
+    (case> NodeAgg :> {:keys [*update-fn]})
+     (assert! (some? *agg-invoke-id))
+     (local-select> (keypath *agg-invoke-id)
+                    $$nodes
+                    :> {*agg-state           :agg-state
+                        *parent-agg-invoke-id :agg-invoke-id
+                        *agg-start-invoke-id :agg-start-invoke-id
+                        *agg-finished?       :agg-finished?
+                       })
+     (local-transform> [(keypath *invoke-id)
+                        :invoked-agg-invoke-id
+                        (termval *agg-invoke-id)]
+                       $$nodes)
+     (filter> (not *agg-finished?))
+     (<<ramafn %update-fn
+       []
+       (:> (apply *update-fn *agg-state *args)))
+     (anode/invoke-on-task-thread *agent-name
+                                  *agent-task-id
+                                  *agent-id
+                                  *retry-num
+                                  %update-fn
+                                  :agg-update
+                                  :> *res)
+     (extract-agg-result *res :> {:keys [*new-agg-state *finished?]})
+
+     (local-transform>
+      [(keypath *agg-invoke-id)
+       (multi-path [:agg-state (termval *new-agg-state)]
+                   [:agg-inputs AFTER-ELEM
+                    (termval (aor-types/->valid-AggInput *invoke-id
+                                                         *args))])]
+      $$nodes)
+
+     (<<if *finished?
+       (complete-agg! *agent-name *agg-invoke-id *retry-num)
+      (else>)
+       (ack-agg! *agent-name *agg-invoke-id *retry-num *invoke-id))
+   )))
