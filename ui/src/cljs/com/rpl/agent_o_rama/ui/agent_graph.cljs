@@ -87,6 +87,9 @@
                                        ($ Handle {:type "target" :position "top"})
                                        ($ Handle {:type "source" :position "bottom"})))))})
                      :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
-                     :onNodeClick (fn [_ node] (set-selected-node node))}
+                     :onNodeClick (fn [_ node]
+                                    (if (and selected-node (= (.-id node) (.-id selected-node)))
+                                      (set-selected-node nil)
+                                      (set-selected-node node)))}
           ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
           ($ Controls {:className "fill-gray-500 stroke-gray-500"})))))
