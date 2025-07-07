@@ -48,9 +48,8 @@
           edges (for [[frm to] edges] {:id (str frm to) :source frm :target to})]
       {:nodes nodes-with-layout :edges edges})))
 
-(defui graph [{:keys [initial-data]}]
-  (let [[selected-node set-selected-node] (uix/use-state nil)
-        ;; Process current graph data
+(defui graph [{:keys [initial-data height selected-node set-selected-node]}]
+  (let [;; Process current graph data
         {:keys [nodes edges]} (process-graph-data initial-data)
         
         ;; Use React Flow's state management hooks
@@ -59,7 +58,7 @@
     
 
     
-    ($ :div {:style {:width "100%" :height "200px"}}
+    ($ :div {:style {:width "100%" :height height}}
        ($ ReactFlow {:nodes flow-nodes 
                      :edges flow-edges
                      :onNodesChange on-nodes-change

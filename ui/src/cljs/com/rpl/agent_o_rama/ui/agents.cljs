@@ -89,7 +89,10 @@
                            :query-url (str "/api/agents/" module-id "/" agent-id "/graph")})]
     (if loading?
       "...loading"
-      ($ agent-graph/graph {:initial-data data}))))
+      ($ agent-graph/graph {:initial-data data
+                            :height "200px"
+                            :selected-node nil
+                            :set-selected-node (fn [_])}))))
 
 (defui agent []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))

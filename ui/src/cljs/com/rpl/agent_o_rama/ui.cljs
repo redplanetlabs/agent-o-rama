@@ -9,7 +9,8 @@
    ["@tanstack/react-query" :refer [QueryClient QueryClientProvider]]
    ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon Bars3Icon XMarkIcon]]
    
-   [com.rpl.agent-o-rama.ui.datasets :as datasets]))
+   [com.rpl.agent-o-rama.ui.datasets :as datasets]
+   [com.rpl.agent-o-rama.ui.stats :as stats]))
 
 (def query-client (QueryClient.))
 
@@ -149,6 +150,7 @@
            ($ Route {:path "/agents/:module-id/:agent-id/invocations" :component agents/invocations})
            ($ Route {:path "/agents/:module-id/:agent-id/invocations/:invoke-id" :component agents/invoke})
            ($ Route {:path "/agents/:module-id/:agent-id/evaluations" :component agents/evaluations})
+           ($ Route {:path "/agents/:module-id/:agent-id/stats" :component stats/stats})
            ($ Route {:path "/agents/:module-id/:agent-id" :component agents/agent})
            ($ Route {:path "/agents" :component agents/index})
            
