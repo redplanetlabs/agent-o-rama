@@ -246,32 +246,16 @@
         model-calls 156]
     
     ($ :div {:className "space-y-4"}
-       ;; Header
-       ($ :div {:className "border-b border-gray-200 pb-3"}
-          ($ :h4 {:className "text-lg font-semibold text-gray-800"} "Invocation Stats")
-          ($ :div {:className "text-sm text-gray-500"} (str total-nodes " nodes executed")))
-       
        ;; Metrics grid
        ($ :div {:className "grid grid-cols-1 gap-3"}
           ;; Execution time
           ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
              ($ :div {:className "flex justify-between items-center"}
                 ($ :div
-                   ($ :div {:className "text-sm font-medium text-gray-700"} "Execution Time")
-                   ($ :div {:className "text-xs text-gray-600"} "Total runtime"))
+                   ($ :div {:className "text-sm font-medium text-gray-700"} "Execution Time"))
                 ($ :div {:className "text-right"}
-                   ($ :div {:className "text-lg font-bold text-gray-800"} (str total-execution-time "ms"))
-                   ($ :div {:className "text-xs text-gray-600"} (str (/ total-execution-time 1000.0) "s")))))
+                   ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-execution-time) "ms")))))
           
-          ;; Tokens
-          ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
-             ($ :div {:className "flex justify-between items-center"}
-                ($ :div
-                   ($ :div {:className "text-sm font-medium text-gray-700"} "Tokens")
-                   ($ :div {:className "text-xs text-gray-600"} "Total processed"))
-                ($ :div {:className "text-right"}
-                   ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens)))
-                   ($ :div {:className "text-xs text-gray-600"} "tokens"))))
           
           ;; Store operations
           ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
@@ -290,10 +274,17 @@
              ($ :div {:className "flex justify-between items-center"}
                 ($ :div
                    ($ :div {:className "text-sm font-medium text-gray-700"} "Model Calls")
-                   ($ :div {:className "text-xs text-gray-600"} "API requests"))
+                   )
                 ($ :div {:className "text-right"}
-                   ($ :div {:className "text-lg font-bold text-gray-800"} model-calls)
-                   ($ :div {:className "text-xs text-gray-600"} "calls"))))))))
+                   ($ :div {:className "text-lg font-bold text-gray-800"} model-calls))))
+
+          ;; Tokens
+          ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
+             ($ :div {:className "flex justify-between items-center"}
+                ($ :div
+                   ($ :div {:className "text-sm font-medium text-gray-700"} "Tokens"))
+                ($ :div {:className "text-right"}
+                   ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens))))))))))
 
 (defui right-panel [{:keys [graph-data changed-nodes set-changed-nodes affected-nodes flow-nodes set-selected-node on-execute-fork on-clear-fork forking-mode? set-forking-mode?]}]
   (let [[active-tab set-active-tab] (uix/use-state :stats)]
