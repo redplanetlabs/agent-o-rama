@@ -1,6 +1,6 @@
 (ns com.rpl.agent-o-rama.ui.agents
   (:require
-   [com.rpl.agent-o-rama.ui.graph :as graph]
+   [com.rpl.agent-o-rama.ui.invocationgraph :as invocation-graph]
    
    [uix.core :as uix :refer [defui defhook $]]
    ["axios" :as axios]
@@ -156,13 +156,13 @@
          
          ;; Graph content
          ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
-            ($ graph/graph {:initial-data (:invokes-map data)
-                            :api-url (when use-pagination? 
-                                       (str "/api/agents/" module-id "/" agent-id "/invocations/" invoke-id "/paginated"))
-                            :module-id module-id
-                            :agent-id agent-id
-                            :invoke-id invoke-id
-                            :forking-mode? forking-mode?
-                            :set-forking-mode? set-forking-mode?}))))))
+            ($ invocationgraph/graph {:initial-data (:invokes-map data)
+                                      :api-url (when use-pagination? 
+                                                 (str "/api/agents/" module-id "/" agent-id "/invocations/" invoke-id "/paginated"))
+                                      :module-id module-id
+                                      :agent-id agent-id
+                                      :invoke-id invoke-id
+                                      :forking-mode? forking-mode?
+                                      :set-forking-mode? set-forking-mode?}))))))
 
 

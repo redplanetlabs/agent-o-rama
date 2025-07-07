@@ -1,4 +1,4 @@
-(ns com.rpl.agent-o-rama.ui.graph
+(ns com.rpl.agent-o-rama.ui.invocation-graph
   (:require
    [com.rpl.agent-o-rama.ui.common :as common]
    [clojure.string :as str]
