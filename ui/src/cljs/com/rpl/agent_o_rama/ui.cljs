@@ -7,6 +7,7 @@
    [com.rpl.agent-o-rama.ui.agents :as agents]
    ["wouter" :refer [Link Route Switch Router useLocation useRoute]]
    ["@tanstack/react-query" :refer [QueryClient QueryClientProvider]]
+   ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon Bars3Icon XMarkIcon]]
    
    [com.rpl.agent-o-rama.ui.datasets :as datasets]))
 
@@ -14,33 +15,66 @@
 
 ;; Sidebar navigation component
 (defui sidebar-nav []
-  (let [[location _] (useLocation)]
-    ($ :div.w-64.h-screen.flex.flex-col.bg-gray-100
-       ($ :nav.flex-1.p-4
+  (let [[location _] (useLocation)
+        [collapsed set-collapsed] (uix/use-state false)
+        toggle-collapsed #(set-collapsed not)]
+    ($ :div {:className (str "h-screen flex flex-col bg-gray-100 transition-all duration-300 "
+                             (if collapsed "w-16" "w-64"))}
+       ;; Header with toggle button
+       ($ :div.flex.items-center.justify-between.p-4.border-b.border-gray-200
+          (when-not collapsed
+            ($ :h1.text-lg.font-semibold.text-gray-800 "Agent-O-Rama"))
+          ($ :button
+             {:onClick toggle-collapsed
+              :className "p-2 rounded-md hover:bg-gray-200 transition-colors"
+              :title (if collapsed "Expand sidebar" "Collapse sidebar")}
+             (if collapsed
+               ($ Bars3Icon {:className "h-5 w-5"})
+               ($ XMarkIcon {:className "h-5 w-5"}))))
+       
+       ;; Navigation
+       ($ :nav.flex-1.p-3
           ($ :div.space-y-2
+             ;; Overview link
              ($ Link
                 {:href "/"
-                 :className (str "flex items-center px-3 py-2 transition-colors "
+                 :className (str "flex items-center px-3 py-2 rounded-md transition-colors "
+                                 (if collapsed "justify-center" "")
                                  (if (= location "/")
-                                   "bg-gray-300"
-                                   "hover:bg-gray-200"))}
-                "Overview")
+                                   "bg-gray-300 text-gray-900"
+                                   "hover:bg-gray-200 text-gray-700"))
+                 :title (when collapsed "Overview")}
+                ($ HomeIcon {:className "h-5 w-5 flex-shrink-0"})
+                (when-not collapsed
+                  ($ :span.ml-3 "Overview")))
+             
+             ;; Agents link
              ($ Link
                 {:href "/agents"
-                 :className (str "flex items-center px-3 py-2 transition-colors "
+                 :className (str "flex items-center px-3 py-2 rounded-md transition-colors "
+                                 (if collapsed "justify-center" "")
                                  (if (or (= location "/agents") 
                                          (.startsWith location "/agents/"))
-                                   "bg-gray-300"
-                                   "hover:bg-gray-200"))}
-                "Agents")
+                                   "bg-gray-300 text-gray-900"
+                                   "hover:bg-gray-200 text-gray-700"))
+                 :title (when collapsed "Agents")}
+                ($ CpuChipIcon {:className "h-5 w-5 flex-shrink-0"})
+                (when-not collapsed
+                  ($ :span.ml-3 "Agents")))
+             
+             ;; Datasets link
              ($ Link
                 {:href "/datasets"
-                 :className (str "flex items-center px-3 py-2 transition-colors "
+                 :className (str "flex items-center px-3 py-2 rounded-md transition-colors "
+                                 (if collapsed "justify-center" "")
                                  (if (or (= location "/datasets")
                                          (.startsWith location "/datasets/"))
-                                   "bg-gray-300"
-                                   "hover:bg-gray-200"))}
-                "Datasets"))))))
+                                   "bg-gray-300 text-gray-900"
+                                   "hover:bg-gray-200 text-gray-700"))
+                 :title (when collapsed "Datasets")}
+                ($ CircleStackIcon {:className "h-5 w-5 flex-shrink-0"})
+                (when-not collapsed
+                  ($ :span.ml-3 "Datasets"))))))))
 
 ;; Breadcrumb for sub-navigation within sections
 (defui breadcrumb []
