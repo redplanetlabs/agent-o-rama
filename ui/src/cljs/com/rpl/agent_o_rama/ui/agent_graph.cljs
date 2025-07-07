@@ -14,7 +14,6 @@
    ["@dagrejs/dagre" :as Dagre]))
 
 (defn process-graph-data [{:keys [graph]}]
-  (println "data!!" (:node-map graph))
   (let [g (new (.. Dagre -graphlib -Graph))
 
         nodes (s/select [:node-map
@@ -24,7 +23,9 @@
                             {:id k
                              :type "custom"
                              :draggable false
-                             :data {:label k :node-id k}}))]
+                             :data {:label k :node-id k}
+                             :width 170
+                             :height 40}))]
                         graph)
         
         edges (s/select
@@ -42,7 +43,9 @@
     (doall (for [node nodes] (.setNode g (:id node) (clj->js node))))
     
     (Dagre/layout g)
-    (let [nodes-with-layout (for [node nodes] (assoc node :position (.node g (:id node))))]
+    
+    (let [nodes-with-layout (for [node nodes] (assoc node :position (.node g (:id node))))
+          edges (for [[frm to] edges] {:id (str frm to) :source frm :target to})]
       {:nodes nodes-with-layout :edges edges})))
 
 (defui graph [{:keys [initial-data]}]

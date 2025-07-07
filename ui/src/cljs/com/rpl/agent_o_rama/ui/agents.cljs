@@ -155,7 +155,7 @@
          
          ;; Graph content
          ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
-            ($ invocationgraph/graph {:initial-data (:invokes-map data)
+            ($ invocation-graph/graph {:initial-data (:invokes-map data)
                                       :api-url (when use-pagination? 
                                                  (str "/api/agents/" module-id "/" agent-id "/invocations/" invoke-id "/paginated"))
                                       :module-id module-id
