@@ -299,9 +299,9 @@
      (po/agent-graph-task-global *agent-name :> {*handle-mode :update-mode})
 
     (default>)
-     ;; if somehow to module updates got through before the retry could be
-     ;; processed, drop the retry since don't know if it's valid to
-     ;; continue it
+     ;; if somehow two or more module updates got through before the retry could
+     ;; be processed, drop the retry since don't know if it's valid to continue
+     ;; it
      (identity :drop :> *handle-mode))
 
 
@@ -338,12 +338,48 @@
 
 (deframaop intake-fork
   [*agent-name {:keys [*agent-task-id *agent-id *invoke-id->new-args]}]
-  ;; TODO: <<<<<>>>>
-  ;;  - need to track on root what this is a fork of, and also what
-  ;;  invoke-id->new-args is for when this gets retried
-  (identity 0 :> *retry-num)
-  (identity nil :> *op)
-  (filter> false))
+  (<<with-substitutions
+   [$$root (po/agent-root-task-global *agent-name)
+    $$id-gen (po/agent-id-gen-task-global *agent-name)
+    $$active (po/agent-active-invokes-task-global *agent-name)
+    *agent-graph (po/agent-graph-task-global *agent-name)]
+   (local-select> (keypath *agent-id)
+                  $$root
+                  :> {:keys [*root-invoke-id *invoke-args *graph-version]})
+   (<<if (nil? *invoke-args)
+     (h/throw! (h/ex-info "Forked agent ID does not exist"
+                          {:agent-id *agent-id})))
+   (gen-id $$id-gen :> *fork-agent-id)
+   (init-retry-num* :> *retry-num)
+   (init-root *agent-name
+              *fork-agent-id
+              *retry-num
+              *invoke-args
+              :> *invoke-id)
+   (local-select> [(keypath *fork-agent-id) :graph-version]
+                  $$root
+                  :> *fork-graph-version)
+   (<<if (not= *graph-version *fork-graph-version)
+     (h/throw! (h/ex-info "Cannot fork a run from an old version"
+                          {:current-version *fork-graph-version
+                           :old-version     *graph-version})))
+   (local-transform> [(keypath *fork-agent-id) (termval true)]
+                     $$active)
+   (local-transform> [(keypath *agent-id) :forks NONE-ELEM
+                      (termval *fork-agent-id)]
+                     $$root)
+   (local-transform> [(keypath *fork-agent-id) :fork-of
+                      (termval {:parent-agent-id     *agent-id
+                                :invoke-id->new-args *invoke-id->new-args})]
+                     $$root)
+   (aor-types/->valid-NodeOp *invoke-id
+                             *root-invoke-id
+                             *invoke-id->new-args
+                             (get *agent-graph :start-node)
+                             *invoke-args
+                             nil
+                             :> *op)
+   (:> *agent-task-id *agent-id *retry-num *op)))
 
 (defn hook:appended-agent-failure [agent-task-id agent-id retry-num])
 

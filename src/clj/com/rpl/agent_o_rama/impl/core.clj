@@ -39,10 +39,15 @@
 
 (defdepotpartitioner agent-depot-partitioner
   [data num-partitions]
-  (if (or (aor-types/NodeComplete? data)
-          (aor-types/NodeFailure? data))
-    (:task-id data)
-    (rand-int num-partitions)))
+  (cond (or (aor-types/NodeComplete? data)
+            (aor-types/NodeFailure? data))
+        (:task-id data)
+
+        (aor-types/ForkAgentInvoke? data)
+        (:agent-task-id data)
+
+        :else
+        (rand-int num-partitions)))
 
 (defn submit-virtual-task!
   [invoke-id afn]
