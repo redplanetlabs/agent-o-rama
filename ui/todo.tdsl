@@ -1,4 +1,24 @@
-investigate what the lock button does xyflow
+trace / graph / fork {
+  (with a little text explaining under)
+}
+
+stats page has xyflowgraph rendering for agent {
+  has version dropdown (includes "overall" option)
+}
+
+two graph views (one has invocation specific stats, one has global stats)
+
+overidden => this change will not be reached
+
+collapsible side panel (left)
+
+tokens sohuld be next to model calls (under it)
+cut api calls, "calls"
+make stats panel more concise / shorter
+
+
+agentgraph replaces invocation graph
+
 overall _invocation_ stats { (side panel collapsible)
   execution time
   tokens
@@ -6,7 +26,6 @@ overall _invocation_ stats { (side panel collapsible)
   model calls
 }
 
-remove react flow label 
 edn=>json (and label that says its json)
 
 remove pagination?
@@ -17,14 +36,6 @@ tests for webserver backend
 agent page (boxes with expand links)
 
 link to run page (not interactive), agent graph (pretty small, zoom) , stats summary, recent invokes (all invockes button), alerts box
-
-fork ui {
-  fork button next to graph, ui in fork mode. (editable node inputs)
-  dirty node indicator (downstream in trace are grayed out)
-  execute forked button on the bottom
-  
-  normal nodes cannot fork a node as well as one of its ancestors
-}
 
 retries with the llm api provider (retry-after header) integrated with node retries
   include retry stats in the stats
@@ -44,3 +55,5 @@ waterfall view
 user/username/login flow
 
 version dropdown (default to latest version)
+
+display retries in the node

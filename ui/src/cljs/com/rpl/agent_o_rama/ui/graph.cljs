@@ -212,7 +212,7 @@
                  ($ :div {:className "text-gray-500 mb-2"}
                     "🚫 This node is affected by upstream changes")
                  ($ :div {:className "text-sm text-gray-600 mb-4"}
-                    "This node's execution will be re-determined when the fork is executed. Its current state is no longer valid.")
+                    "This node's execution will be re-determined when the fork is executed.")
                  ($ :div {:className "text-xs text-gray-500"}
                     ($ :div (str "Current input: " (if (array? original-input)
                                                      (pr-str (js->clj original-input))
