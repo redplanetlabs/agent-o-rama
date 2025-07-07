@@ -382,7 +382,7 @@
                              *invoke-args
                              nil
                              :> *op)
-   (:> *agent-task-id *agent-id *retry-num *op)))
+   (:> *agent-task-id *fork-agent-id *retry-num *op)))
 
 (defn hook:appended-agent-failure [agent-task-id agent-id retry-num])
 
@@ -497,6 +497,7 @@
     (intake-fork *agent-name
                  *data
                  :> *agent-task-id *agent-id *retry-num *op)
+    (ack-return> [*agent-task-id *agent-id])
 
    (case> (aor-types/NodeFailure? *data))
     ;; doesn't actually emit here, but emit needed for unification
