@@ -365,10 +365,13 @@
                            :old-version     *graph-version})))
    (local-transform> [(keypath *fork-agent-id) (termval true)]
                      $$active)
-   (local-transform> [(keypath *agent-id) :forks NONE-ELEM
+   (local-transform> [(keypath *agent-id)
+                      :forks
+                      NONE-ELEM
                       (termval *fork-agent-id)]
                      $$root)
-   (local-transform> [(keypath *fork-agent-id) :fork-of
+   (local-transform> [(keypath *fork-agent-id)
+                      :fork-of
                       (termval {:parent-agent-id     *agent-id
                                 :invoke-id->new-args *invoke-id->new-args})]
                      $$root)
