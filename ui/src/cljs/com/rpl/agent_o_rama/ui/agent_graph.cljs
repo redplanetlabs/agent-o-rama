@@ -59,7 +59,7 @@
     
 
     
-    ($ :div {:style {:width "100%" :height "500px"}}
+    ($ :div {:style {:width "100%" :height "200px"}}
        ($ ReactFlow {:nodes flow-nodes 
                      :edges flow-edges
                      :onNodesChange on-nodes-change
