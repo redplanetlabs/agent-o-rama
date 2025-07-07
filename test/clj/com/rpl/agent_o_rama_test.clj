@@ -6,6 +6,7 @@
   (:require
    [clojure.set :as set]
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -2037,11 +2038,11 @@
                     (swap! processed-atom conj [streaming-index value])
                   )
 
-                  i/identity-streaming-index
+                  anode/identity-streaming-index
                   (fn [v]
                     (- v @streaming-index-mod-atom))
 
-                  i/identity-retry-num
+                  anode/identity-retry-num
                   (fn [v]
                     (if @override-retry-num-atom
                       @override-retry-num-atom
@@ -2583,9 +2584,9 @@
   (.getRunningInvokeIds node-exec))
 
 (deftest agent-pending-tracking-test
-  (with-redefs [SEM (h/mk-semaphore 0)
+  (with-redefs [SEM  (h/mk-semaphore 0)
                 SEM2 (h/mk-semaphore 0)
-                i/log-node-error (fn [& args])
+                anode/log-node-error (fn [& args])
                 aor-types/get-config ZERO-MAX-RETRIES-OVERRIDE]
     (with-open [ipc (rtest/create-ipc)
                 _ (TopologyUtils/startSimTime)]

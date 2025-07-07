@@ -2,13 +2,17 @@
   (:use [com.rpl.rama]
         [com.rpl.rama path])
   (:require
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
+   [com.rpl.agent-o-rama.impl.partitioner :as apart]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.ops :as ops])
   (:import
+   [com.rpl.agentorama
+    FinishedAgg]
    [com.rpl.agent_o_rama.impl.types
     Node
     NodeAgg
@@ -27,29 +31,6 @@
   [agent-graph node]
   (select-any [:node-map (keypath node) :node]
               agent-graph))
-
-(defn hook:filtered-event [agent-task-id agent-id retry-num])
-
-(deframafn valid-retry-num?
-  [*agent-name *agent-task-id *agent-id *retry-num]
-  (<<with-substitutions
-   [$$valid (po/agent-valid-invokes-task-global *agent-name)]
-   (local-select> (keypath [*agent-task-id *agent-id])
-                  $$valid
-                  :> *valid-retry-num)
-   (:> (or> (nil? *valid-retry-num) (= *valid-retry-num *retry-num)))))
-
-(deframaop filter-valid-retry-num>
-  [*agent-name *agent-task-id *agent-id *retry-num]
-  (<<if (valid-retry-num? *agent-name *agent-task-id *agent-id *retry-num)
-    (:>)
-   (else>)
-    (hook:filtered-event *agent-task-id *agent-id *retry-num)))
-
-(defbasicblocksegmacro |aor
-  [:<* [[agent-name agent-task-id agent-id retry-num] & partitioner+args]]
-  [(vec partitioner+args)
-   [filter-valid-retry-num> agent-name agent-task-id agent-id retry-num]])
 
 (defn hook:finding-graph-version [starting-task-id])
 
@@ -104,9 +85,9 @@
                 :> {:keys [*invoke-id *target-task-id *node-name *args]
                     :as   *emit})
    (hook:emit> *emit)
-   (|aor [*agent-name *agent-task-id *agent-id *retry-num]
-         |direct
-         *target-task-id)
+   (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
+               |direct
+               *target-task-id)
    (aor-types/->valid-NodeOp
     *invoke-id
     ;; TODO: <<<<>>>> probably need original emits
@@ -128,9 +109,9 @@
    (hook> <root>)
    (mapv :invoke-id *emits :> *next-invoke-ids)
    (reduce bit-xor *invoke-id *next-invoke-ids :> *ack-val)
-   (|aor [*agent-name *agent-task-id *agent-id *retry-num]
-         |direct
-         *agent-task-id)
+   (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
+               |direct
+               *agent-task-id)
    (<<atomic
      (hook:update-last-progress>)
      (local-transform>
@@ -181,9 +162,9 @@
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
     $$active (po/agent-active-invokes-task-global *agent-name)]
-   (|aor [*agent-name *agent-task-id *agent-id *retry-num]
-         |direct
-         *agent-task-id)
+   (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
+               |direct
+               *agent-task-id)
    (hook:writing-result *agent-task-id *agent-id *result)
    (local-transform>
     [(keypath *agent-id)
@@ -384,8 +365,6 @@
                              :> *op)
    (:> *agent-task-id *fork-agent-id *retry-num *op)))
 
-(defn hook:appended-agent-failure [agent-task-id agent-id retry-num])
-
 (deframaop intake-node-failure
   [*agent-name {:keys [*invoke-id *retry-num]}]
   (<<with-substitutions
@@ -395,16 +374,19 @@
                   $$nodes
                   :> {:keys [*agent-task-id *agent-id]})
    (filter> (some? *agent-id))
-   (filter-valid-retry-num> *agent-name *agent-task-id *agent-id *retry-num)
+   (apart/filter-valid-retry-num> *agent-name
+                                  *agent-task-id
+                                  *agent-id
+                                  *retry-num)
    (depot-partition-append!
     *failure-depot
     (aor-types/->valid-AgentFailure *agent-task-id
                                     *agent-id
                                     *retry-num)
     :append-ack)
-   (hook:appended-agent-failure *agent-task-id
-                                *agent-id
-                                *retry-num)
+   (anode/hook:appended-agent-failure *agent-task-id
+                                      *agent-id
+                                      *retry-num)
    (filter> false)))
 
 (defn mark-virtual-task-complete!
@@ -430,7 +412,10 @@
                   :> {:keys [*agent-task-id *agent-id *node
                              *agg-invoke-id]})
    (filter> (some? *agent-id))
-   (filter-valid-retry-num> *agent-name *agent-task-id *agent-id *retry-num)
+   (apart/filter-valid-retry-num> *agent-name
+                                  *agent-task-id
+                                  *agent-id
+                                  *retry-num)
 
    (<<ramafn %merger
      [*m]
@@ -491,7 +476,6 @@
     (intake-retry *agent-name
                   *data
                   :> *agent-task-id *agent-id *retry-num *op)
-
 
    (case> (aor-types/ForkAgentInvoke? *data))
     (intake-fork *agent-name
@@ -558,3 +542,64 @@
    [$$config (po/agent-config-task-global *agent-name)]
    (|all)
    (local-transform> [(keypath *key) (termval *val)] $$config)))
+
+
+(defn extract-agg-result
+  [res]
+  (cond
+    (reduced? res)
+    {:new-agg-state @res
+     :finished?     true}
+
+    (instance? FinishedAgg res)
+    {:new-agg-state (.getValue ^FinishedAgg res)
+     :finished?     true}
+
+    :else
+    {:new-agg-state res
+     :finished?     false}))
+
+(deframaop complete-agg!
+  [*agent-name *invoke-id *retry-num]
+  (<<with-substitutions
+   [$$root (po/agent-root-task-global *agent-name)
+    $$nodes (po/agent-node-task-global *agent-name)
+    *agent-graph (po/agent-graph-task-global *agent-name)]
+   (local-select> (keypath *invoke-id)
+                  $$nodes
+                  :> {:keys [*agent-task-id *agent-id *node *agg-ack-val
+                             *agg-state *agg-start-res *agg-invoke-id]})
+   ;; since agg state is colocated with root of graph invoke
+   (local-select> [(keypath *agent-id) :fork-of :invoke-id->new-args]
+                  $$root
+                  :> *invoke-id->new-args)
+   (local-transform>
+    [(keypath *invoke-id) :agg-finished? (termval true)]
+    $$nodes)
+   (get-node-obj *agent-graph *node :> {:keys [*node-fn]})
+   (vector *agg-state *agg-start-res :> *args)
+   (anode/handle-node-invoke *agent-name
+                             *agent-task-id
+                             *agent-id
+                             *node-fn
+                             *invoke-id
+                             *retry-num
+                             *node
+                             *args
+                             *agg-invoke-id
+                             *invoke-id->new-args)
+   (:>)))
+
+(deframaop ack-agg!
+  [*agent-name *invoke-id *retry-num *ack-val]
+  (<<with-substitutions
+   [$$nodes (po/agent-node-task-global *agent-name)
+    *agent-graph (po/agent-graph-task-global *agent-name)]
+   (local-select> [(keypath *invoke-id) :agg-ack-val] $$nodes :> *agg-ack-val)
+   (bit-xor *ack-val *agg-ack-val :> *new-ack-val)
+   (local-transform>
+    [(keypath *invoke-id) :agg-ack-val (termval *new-ack-val)]
+    $$nodes)
+   (filter> (= 0 *new-ack-val))
+   (complete-agg! *agent-name *invoke-id *retry-num)
+   (:>)))

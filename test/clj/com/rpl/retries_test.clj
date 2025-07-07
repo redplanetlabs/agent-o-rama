@@ -5,8 +5,10 @@
         [com.rpl.rama.path])
   (:require
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.partitioner :as apart]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.retries :as retries]
    [com.rpl.agent-o-rama.impl.topology :as at]
@@ -323,14 +325,14 @@
         init-retry-num-atom  (atom 0)]
     (with-redefs
       [retries/SUBSTITUTE-TICK-DEPOT true
-       at/init-retry-num      (fn [] @init-retry-num-atom)
+       at/init-retry-num             (fn [] @init-retry-num-atom)
 
-       aor-types/get-config   ZERO-MAX-RETRIES-OVERRIDE
+       aor-types/get-config          ZERO-MAX-RETRIES-OVERRIDE
 
-       i/log-node-error       (fn [& args])
+       anode/log-node-error          (fn [& args])
 
-       at/hook:appended-agent-failure (fn [& args]
-                                        (swap! failure-appends-atom inc))
+       anode/hook:appended-agent-failure (fn [& args]
+                                           (swap! failure-appends-atom inc))
 
        at/hook:received-retry
        (fn [agent-task-id agent-id expected-retry-num]
@@ -495,11 +497,11 @@
 
        aor-types/get-config ZERO-MAX-RETRIES-OVERRIDE
 
-       i/log-node-error (fn [& args])
+       anode/log-node-error (fn [& args])
 
        retries/SUBSTITUTE-TICK-DEPOT true
 
-       at/hook:filtered-event (fn [& args] (swap! EVENTS-ATOM conj :filter))
+       apart/hook:filtered-event (fn [& args] (swap! EVENTS-ATOM conj :filter))
 
        at/hook:received-retry
        (fn [agent-task-id agent-id expected-retry-num]
