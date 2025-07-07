@@ -483,7 +483,8 @@
     (declare-pstate*
      stream-topology
      (symbol (po/agent-config-task-global-name agent-name))
-     po/AGENT-CONFIG-PSTATE-SCHEMA)
+     po/AGENT-CONFIG-PSTATE-SCHEMA
+     {:key-partitioner task-id-key-partitioner})
 
     (if retries/SUBSTITUTE-TICK-DEPOT
       (declare-depot* setup
