@@ -714,28 +714,77 @@
                                            10000)))
 
      (bind inv-id
-       (fn [trace node]
+       (fn [node]
          (select-one! [ALL (selected? LAST :node (pred= node)) FIRST]
                       trace)))
 
-     (clojure.pprint/pprint trace)
+     (bind start1 (inv-id "start1"))
+     (bind start2 (inv-id "start2"))
+     (bind start3 (inv-id "start3"))
 
+     (is (= #{start2 start3}
+            (foreign-invoke-query affected-aggs-query
+                                  agent-task-id
+                                  agent-id
+                                  #{(inv-id "b2")})))
 
-     (println "start1" (inv-id trace "start1"))
-     (println "start2" (inv-id trace "start2"))
-     (println "start3" (inv-id trace "start3"))
+     (is (= #{start2}
+            (foreign-invoke-query affected-aggs-query
+                                  agent-task-id
+                                  agent-id
+                                  #{(inv-id "b3")})))
 
-     (println "RES"
-              (foreign-invoke-query affected-aggs-query
-                                    agent-task-id
-                                    agent-id
-                                    #{(inv-id trace "b2")}))
+     (is (empty?
+          (foreign-invoke-query affected-aggs-query
+                                agent-task-id
+                                agent-id
+                                #{(inv-id "b4")})))
 
+     (is (empty?
+          (foreign-invoke-query affected-aggs-query
+                                agent-task-id
+                                agent-id
+                                #{(inv-id "start")})))
+     (is (empty?
+          (foreign-invoke-query affected-aggs-query
+                                agent-task-id
+                                agent-id
+                                #{(inv-id "b4") (inv-id "node1")
+                                  (inv-id "node2")})))
 
+     (is (= #{start2}
+            (foreign-invoke-query affected-aggs-query
+                                  agent-task-id
+                                  agent-id
+                                  #{start2})))
 
-     ;; TODO: <<<<>>>>
-     ;;   - make agent graph with multiple levels of nesting and forking both
-     ;;   within and after aggs
-     ;;   - use tracing query topology and unique result on each node to
-     ;;   identity invoke IDs
+     (is (= #{start2 start3}
+            (foreign-invoke-query affected-aggs-query
+                                  agent-task-id
+                                  agent-id
+                                  #{start3})))
+
+     (is (empty?
+          (foreign-invoke-query affected-aggs-query
+                                agent-task-id
+                                agent-id
+                                #{(inv-id "agg")})))
+
+     (is (empty?
+          (foreign-invoke-query affected-aggs-query
+                                agent-task-id
+                                agent-id
+                                #{(inv-id "agg3")})))
+
+     (is (= #{start2}
+            (foreign-invoke-query affected-aggs-query
+                                  agent-task-id
+                                  agent-id
+                                  #{(inv-id "agg2")})))
+
+     (is (= #{start1 start2}
+            (foreign-invoke-query affected-aggs-query
+                                  agent-task-id
+                                  agent-id
+                                  #{(inv-id "a1") (inv-id "b1")})))
     )))
