@@ -85,6 +85,11 @@
    args :- [(s/maybe Object)]
   ])
 
+(drp/defrecord+ ForkContext
+  [invoke-id->new-args :- {Long [Object]}
+   affected-aggs :- #{Long} ; agg-start-node invoke-ids
+  ])
+
 (drp/defrecord+ NodeComplete
   [task-id :- Long
    invoke-id :- Long
@@ -94,7 +99,7 @@
    result :- (s/maybe AgentResult)
    nested-ops :- [NestedOpInfo]
    finish-time-millis :- Long
-   invoke-id->new-args :- (s/maybe {Long [Object]})
+   fork-context :- (s/maybe ForkContext)
   ])
 
 (drp/defrecord+ NodeFailure
@@ -149,7 +154,7 @@
 (drp/defrecord+ NodeOp
   [invoke-id :- Long
    fork-invoke-id :- (s/maybe Long)
-   invoke-id->new-args :- (s/maybe {Long [Object]})
+   fork-context :- (s/maybe ForkContext)
    next-node :- String
    args :- [(s/maybe Object)]
    agg-invoke-id :- (s/maybe Long)])

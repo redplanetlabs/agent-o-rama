@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.partitioner :as apart]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.ops :as ops])
   (:import
@@ -259,7 +260,7 @@
                       *args :invoke-args
                       *result :result
 
-                      {:keys [*invoke-id->new-args
+                      {:keys [*fork-context
                               *parent-root-invoke-id]}
                       :fork-of})
    ;; - this is mostly a sanity check, though it is technically possible for
@@ -309,7 +310,7 @@
 
      (aor-types/->valid-NodeOp *root-invoke-id
                                *parent-root-invoke-id
-                               *invoke-id->new-args
+                               *fork-context
                                (get *agent-graph :start-node)
                                *args
                                nil
@@ -317,19 +318,32 @@
      (:> *agent-task-id *agent-id *retry-num *op)
    )))
 
+;; TODO: <<<<>>>> how to refer to agent-get-fork-affected-aggs-query-name?
+;; (symbol (str "%" query-target))
+;;    - can't really get this dynamically...
 (deframaop intake-fork
   [*agent-name {:keys [*agent-task-id *agent-id *invoke-id->new-args]}]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
     $$id-gen (po/agent-id-gen-task-global *agent-name)
     $$active (po/agent-active-invokes-task-global *agent-name)
-    *agent-graph (po/agent-graph-task-global *agent-name)]
+    *agent-graph (po/agent-graph-task-global *agent-name)
+    %affected-aggs (queries/fork-affected-aggs-query-task-global *agent-name)]
    (local-select> (keypath *agent-id)
                   $$root
                   :> {:keys [*root-invoke-id *invoke-args *graph-version]})
    (<<if (nil? *invoke-args)
      (h/throw! (h/ex-info "Forked agent ID does not exist"
                           {:agent-id *agent-id})))
+   (%affected-aggs *agent-task-id
+                   *agent-id
+                   (-> *invoke-id->new-args
+                       keys
+                       set)
+                   :> *affected-aggs)
+   (aor-types/->ForkContext *invoke-id->new-args
+                            *affected-aggs
+                            :> *fork-context)
    (gen-id $$id-gen :> *fork-agent-id)
    (init-retry-num* :> *retry-num)
    (init-root *agent-name
@@ -353,8 +367,8 @@
                      $$root)
    (local-transform> [(keypath *fork-agent-id)
                       :fork-of
-                      (termval {:parent-agent-id     *agent-id
-                                :invoke-id->new-args *invoke-id->new-args})]
+                      (termval {:parent-agent-id *agent-id
+                                :fork-context    *fork-context})]
                      $$root)
    (aor-types/->valid-NodeOp *invoke-id
                              *root-invoke-id
@@ -570,9 +584,9 @@
                   :> {:keys [*agent-task-id *agent-id *node *agg-ack-val
                              *agg-state *agg-start-res *agg-invoke-id]})
    ;; since agg state is colocated with root of graph invoke
-   (local-select> [(keypath *agent-id) :fork-of :invoke-id->new-args]
+   (local-select> [(keypath *agent-id) :fork-of :fork-context]
                   $$root
-                  :> *invoke-id->new-args)
+                  :> *fork-context)
    (local-transform>
     [(keypath *invoke-id) :agg-finished? (termval true)]
     $$nodes)
@@ -587,7 +601,7 @@
                              *node
                              *args
                              *agg-invoke-id
-                             *invoke-id->new-args)
+                             *fork-context)
    (:>)))
 
 (deframaop ack-agg!
@@ -613,7 +627,7 @@
    *agent-id
    *retry-num
    {:keys [*invoke-id *next-node *args *agg-invoke-id
-           *fork-invoke-id *invoke-id->new-args]}]
+           *fork-invoke-id *fork-context]}]
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
@@ -683,7 +697,7 @@
       *next-node
       *args
       *agg-invoke-id
-      *invoke-id->new-args)
+      *fork-context)
 
     (case> NodeAggStart :> {:keys [*node-fn *agg-node-name]})
      (h/random-long :> *new-agg-invoke-id)
@@ -721,7 +735,7 @@
       *next-node
       *args
       *new-agg-invoke-id
-      *invoke-id->new-args)
+      *fork-context)
 
 
     (case> NodeAgg :> {:keys [*update-fn]})

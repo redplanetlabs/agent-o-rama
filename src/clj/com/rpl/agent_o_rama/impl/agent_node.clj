@@ -213,7 +213,7 @@
 (defn node-event
   [agent-name task-id invoke-id retry-num node-name node-fn
    ^AgentNode agent-node args ^RamaClientsTaskGlobal rama-clients
-   invoke-id->new-args]
+   fork-context]
   (fn []
     (let [depot (.getAgentDepot rama-clients agent-name)
           res   (try
@@ -248,13 +248,13 @@
         result
         nested-ops
         (h/current-time-millis)
-        invoke-id->new-args)
+        fork-context)
        :append-ack)
     )))
 
 (deframaop handle-node-invoke
   [*agent-name *agent-task-id *agent-id *node-fn *invoke-id *retry-num
-   *next-node *args *agg-invoke-id *invoke-id->new-args]
+   *next-node *args *agg-invoke-id *fork-context]
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)
@@ -301,7 +301,7 @@
                 *agent-node
                 *args
                 *rama-clients
-                *invoke-id->new-args))
+                *fork-context))
    (:> {:start-time-millis *start-time-millis})))
 
 (defn- invoke-or-error

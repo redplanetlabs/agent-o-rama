@@ -21,6 +21,11 @@
   [agent-name]
   (str "_agent-get-fork-affected-aggs-" agent-name))
 
+(defn fork-affected-aggs-query-task-global
+  [agent-name]
+  (this-module-query-topology-task-global
+   (agent-get-fork-affected-aggs-query-name agent-name)))
+
 (defn- to-pqueue
   [coll]
   (reduce conj PersistentQueue/EMPTY coll))

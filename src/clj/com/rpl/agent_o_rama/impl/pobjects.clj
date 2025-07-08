@@ -7,6 +7,7 @@
     AgentNodeEmit
     AgentResult
     AggInput
+    ForkContext
     NestedOpInfo
     HistoricalAgentGraphInfo
     Node
@@ -75,8 +76,8 @@
      :last-progress-time-millis Long
      :retry-num         Long
      :fork-of           (fixed-keys-schema
-                         {:parent-agent-id     Long
-                          :invoke-id->new-args {Long [Object]}})
+                         {:parent-agent-id Long
+                          :fork-context    ForkContext})
      :forks             (set-schema Long {:subindex? true}) ; root-invoke ids
     })})
 
