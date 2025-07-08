@@ -168,7 +168,7 @@
      (bind traces-query
        (foreign-query ipc
                       module-name
-                      (queries/tracing-query-topology-name "foo")))
+                      (queries/tracing-query-name "foo")))
      (bind [agent-task-id agent-id]
        (invoke-agent-and-wait! depot root-pstate ["xyz"]))
      (bind root-invoke-id
@@ -469,7 +469,7 @@
      (bind traces-query
        (foreign-query ipc
                       module-name
-                      (queries/tracing-query-topology-name "foo")))
+                      (queries/tracing-query-name "foo")))
      (bind [agent-task-id agent-id]
        (invoke-agent-and-wait! depot root-pstate ["xy" "-z"]))
      (bind [agent-task-id2 agent-id2]
@@ -837,7 +837,7 @@
      (bind traces-query
        (foreign-query ipc
                       module-name
-                      (queries/tracing-query-topology-name "foo")))
+                      (queries/tracing-query-name "foo")))
      (bind [agent-task-id agent-id]
        (invoke-agent-and-wait! depot root-pstate []))
      (bind root-invoke-id

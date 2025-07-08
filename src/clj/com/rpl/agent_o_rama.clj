@@ -272,7 +272,7 @@
              tracing-query        (foreign-query
                                    cluster
                                    module-name
-                                   (queries/tracing-query-topology-name
+                                   (queries/tracing-query-name
                                     agentName))]
 
          (reify

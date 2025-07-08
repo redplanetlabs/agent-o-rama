@@ -43,10 +43,6 @@
                      (symbol (po/agent-graph-task-global-name agent-name))
                      (graph/resolve-agent-graph agent-graph))
 
-    ;; TODO: <<<<>>>>
-    ;; - and ordered IDs is perfect for GC!
-    ;;    - especially since they're sequential, so know exactly how many are in
-    ;;    there by looking at min and max
     (declare-pstate*
      stream-topology
      (symbol (po/agent-root-task-global-name agent-name))
@@ -110,6 +106,7 @@
 
     (retries/declare-check-impl mb-topology agent-name)
     (queries/declare-tracing-query-topology topologies agent-name)
+    (queries/declare-fork-affected-aggs-query-topology topologies agent-name)
 
     (<<sources stream-topology
      (source> agent-config-depot-sym {:retry-mode :all-after} :> *data)
@@ -121,6 +118,9 @@
       ;; TODO: <<<<<>>>> add case here for GC
       ;; - each iteration delete node and write to PState the next ones to
       ;; delete and where – can probably be same PState as one used by retry
+      ;; - ordered IDs is perfect for GC
+      ;;    - especially since they're sequential, so know exactly how many are
+      ;;    in there by looking at min and max
 
      (source> agent-depot-sym {:retry-mode :none} :> *data)
       (at/intake-agent-depot agent-name

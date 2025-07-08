@@ -601,6 +601,9 @@
     [(keypath *invoke-id) :agg-ack-val (termval *new-ack-val)]
     $$nodes)
    (filter> (= 0 *new-ack-val))
+   ;; replicate the new ack val before executing it to make potential retries
+   ;; do less work
+   (|direct (ops/current-task-id))
    (complete-agg! *agent-name *invoke-id *retry-num)
    (:>)))
 
@@ -610,13 +613,53 @@
    *agent-id
    *retry-num
    {:keys [*invoke-id *next-node *args *agg-invoke-id
-           *invoke-id->new-args]}]
+           *fork-invoke-id *invoke-id->new-args]}]
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
+   ;; TODO: <<<<>>>>
+   ;;   - if invoke-id already exists
+   ;;     - if finished-time-millis is written, then do RetryNodeComplete
+   ;;         - just contains: invoke-id, retry-num, invoke-id->new-args
+   ;;     - if not complete, then need to reset it's state?
+   ;;       - just delete it and then continue like normal?
+   ;;           - what about retry of an agg node?
+   ;;     - maybe like this for aggs:
+   ;;       - for retry, when get to agg-start-node, if the agg node is already
+   ;;       done, just move on from there
+   ;;         - if agg node is not done, but its ack val is 0, then just execute
+   ;;         the agg node
+   ;;       - otherwise, reset the agg node and agg-start-node completely
+   ;;       and re-execute
+   ;;  - if invoke-id does not exist:
+   ;;     - if fork-invoke-id is set and that node exists:
+   ;;        - check if fork-invoke-id is in invoke-id->new-args
+   ;;        - if so, override args
+
+   ;; TODO: <<<<<>>>>>>
+   ;;  - fork of a node within agg graph needs to change that agg input...
+   ;;     - ordering of agg inputs is random though with parallelization, so
+   ;;     don't want to reorder if there's no fork there
+   ;;       - maybe fork could say which agg-start-node invoke IDs are affected
+   ;;     - seems like forks should just repeat everything and potentially
+   ;;     change the order
+   ;;     - another possibility is for forks to first walk the graph to
+   ;;     determine aggs associated with each fork, and then execute it
+   ;;         - so it would be invoke-id->[new-args, start-agg-invoke-id]
+   ;;         - it can be a query topology to do the walk at the beginning
+   ;;     - the fork can affect any number of aggregation subgraphs that it's
+   ;;     nested within...
+   ;;       - so any one with a fork inside needs to recompute
+   ;;       - output of query topology is actually just a set of affected
+   ;;       start-agg-node invoke IDs
+   ;;         - on fork, they create brand new agg invoke ID state from scratch
+
+
    ;; TODO: <<<<>>>>>
    ;;    - how to handle retries/forks here?
-   ;;      - can an agg node be forked? - probably not
+   ;;      - can an agg node be forked?
+   ;;        - yes, it's forking the input (agg val + agg-start-res), not the
+   ;;        agg-inputs
    ;;    - just check here if node is already finished, and continue with its
    ;;    emits
    ;;      - if it's a fork, write the new invoke ID with everything copied
@@ -628,8 +671,7 @@
    ;;          it's not there
    ;;     - so if it's finished here, it's either NodeComplete for fork or
    ;;     RetryNodeComplete
-   (get-node-obj *agent-graph *next-node :> *op-obj)
-   (<<subsource *op-obj
+   (<<subsource (get-node-obj *agent-graph *next-node)
     (case> Node :> {:keys [*node-fn]})
      (anode/handle-node-invoke
       *agent-name

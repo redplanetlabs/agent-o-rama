@@ -139,7 +139,7 @@
      :retry-time-millis  Long
      :agg-invoke-id      Long
 
-     ;; regular node state
+     ;; input to regular node
      :input              [Object]
 
      ;; start agg node
