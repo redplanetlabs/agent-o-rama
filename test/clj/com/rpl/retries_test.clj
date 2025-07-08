@@ -10,6 +10,7 @@
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.partitioner :as apart]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.retries :as retries]
    [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
@@ -580,3 +581,161 @@
          (h/release-semaphore SEM3 1)
          (is (condition-attained? (= @EVENTS-ATOM [:filter])))
         )))))
+
+(deftest fork-affected-aggs-query-test
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (module
+         [setup topologies]
+         (let [topology (aor/agents-topology setup topologies)]
+           (->
+             topology
+             (aor/new-agent "foo")
+             (aor/node
+              "start"
+              ["node1" "node2"]
+              (fn [agent-node]
+                (aor/emit! agent-node "node1")
+                (aor/emit! agent-node "node2")))
+             (aor/node
+              "node1"
+              "start1"
+              (fn [agent-node]
+                (aor/emit! agent-node "start1")))
+             (aor/agg-start-node
+              "start1"
+              ["a1" "a2"]
+              (fn [agent-node]
+                (aor/emit! agent-node "a1")
+                (aor/emit! agent-node "a2")))
+             (aor/node
+              "a1"
+              "agg"
+              (fn [agent-node]
+                (aor/emit! agent-node "agg" 1)))
+             (aor/node
+              "a2"
+              "agg"
+              (fn [agent-node]
+                (aor/emit! agent-node "agg" 2)))
+             (aor/agg-node
+              "agg"
+              "node3"
+              aggs/+vec-agg
+              (fn [agent-node agg node-start-res]
+                (aor/emit! agent-node "node3")))
+             (aor/node
+              "node3"
+              nil
+              (fn [agent-node]
+                (aor/result! agent-node "abc")))
+
+             (aor/node
+              "node2"
+              "start2"
+              (fn [agent-node]
+                (aor/emit! agent-node "start2")))
+             (aor/agg-start-node
+              "start2"
+              "b1"
+              (fn [agent-node]
+                (aor/emit! agent-node "b1")))
+             (aor/node
+              "b1"
+              "start3"
+              (fn [agent-node]
+                (aor/emit! agent-node "start3")))
+             (aor/agg-start-node
+              "start3"
+              "b2"
+              (fn [agent-node]
+                (aor/emit! agent-node "b2")))
+             (aor/node
+              "b2"
+              "agg2"
+              (fn [agent-node]
+                (aor/emit! agent-node "agg2" 1)))
+             (aor/agg-node
+              "agg2"
+              "b3"
+              aggs/+vec-agg
+              (fn [agent-node agg node-start-res]
+                (aor/emit! agent-node "b3")))
+             (aor/node
+              "b3"
+              "agg3"
+              (fn [agent-node]
+                (aor/emit! agent-node "agg3" 1)))
+             (aor/agg-node
+              "agg3"
+              "b4"
+              aggs/+vec-agg
+              (fn [agent-node agg node-start-res]
+                (aor/emit! agent-node "b4")))
+             (aor/node
+              "b4"
+              nil
+              (fn [agent-node]
+              ))
+           )
+           (aor/define-agents! topology)
+         )))
+     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (bind module-name (get-module-name module))
+     (bind depot
+       (foreign-depot ipc
+                      module-name
+                      (po/agent-depot-name "foo")))
+     (bind root-pstate
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-root-task-global-name "foo")))
+     (bind traces-query
+       (foreign-query ipc
+                      module-name
+                      (queries/tracing-query-name "foo")))
+     (bind affected-aggs-query
+       (foreign-query ipc
+                      module-name
+                      (queries/agent-get-fork-affected-aggs-query-name "foo")))
+
+     (bind [agent-task-id agent-id]
+       (invoke-agent-and-wait! depot root-pstate []))
+
+     (bind root-invoke-id
+       (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                           root-pstate
+                           {:pkey agent-task-id}))
+     (bind trace
+       (:invokes-map (foreign-invoke-query traces-query
+                                           agent-task-id
+                                           [[agent-task-id root-invoke-id]]
+                                           10000)))
+
+     (bind inv-id
+       (fn [trace node]
+         (select-one! [ALL (selected? LAST :node (pred= node)) FIRST]
+                      trace)))
+
+     (clojure.pprint/pprint trace)
+
+
+     (println "start1" (inv-id trace "start1"))
+     (println "start2" (inv-id trace "start2"))
+     (println "start3" (inv-id trace "start3"))
+
+     (println "RES"
+              (foreign-invoke-query affected-aggs-query
+                                    agent-task-id
+                                    agent-id
+                                    #{(inv-id trace "b2")}))
+
+
+
+     ;; TODO: <<<<>>>>
+     ;;   - make agent graph with multiple levels of nesting and forking both
+     ;;   within and after aggs
+     ;;   - use tracing query topology and unique result on each node to
+     ;;   identity invoke IDs
+    )))

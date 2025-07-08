@@ -109,21 +109,28 @@
       (loop<- [*invoke-id *root-invoke-id
                *agg-context #{}
                :> *agg-context]
-        (<<if (contains? *forked-invoke-ids-set *invoke-id)
-          (:> *agg-context))
         (local-select> (keypath *invoke-id)
                        nodes-sym
-                       :> {:keys [*started-agg? *emits *agg-invoke-id]})
+                       :> {:keys [*started-agg? *emits *agg-invoke-id *node]})
+        (<<if *started-agg?
+          (conj *agg-context *invoke-id :> *curr-agg-context)
+         (else>)
+          (identity *agg-context :> *curr-agg-context))
+        (<<if (contains? *forked-invoke-ids-set *invoke-id)
+          (:> *curr-agg-context))
+        (anchor> <root>)
         (<<if *started-agg?
           (identity *agg-invoke-id :> *next-invoke-id)
           (identity *agg-context :> *next-agg-context)
           (anchor> <agg>))
+        (hook> <root>)
         (ops/explode *emits
                      :> {*next-invoke-id :invoke-id
                          *task-id        :target-task-id})
-        (conj *agg-context *invoke-id :> *next-agg-context)
+        (identity *curr-agg-context :> *next-agg-context)
         (|direct *task-id)
         (anchor> <reg>)
+
         (unify> <agg> <reg>)
         (continue> *next-invoke-id *next-agg-context))
       (ops/explode *agg-context :> *invoke-id)
