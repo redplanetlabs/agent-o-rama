@@ -318,9 +318,6 @@
      (:> *agent-task-id *agent-id *retry-num *op)
    )))
 
-;; TODO: <<<<>>>> how to refer to agent-get-fork-affected-aggs-query-name?
-;; (symbol (str "%" query-target))
-;;    - can't really get this dynamically...
 (deframaop intake-fork
   [*agent-name {:keys [*agent-task-id *agent-id *invoke-id->new-args]}]
   (<<with-substitutions
@@ -372,7 +369,7 @@
                      $$root)
    (aor-types/->valid-NodeOp *invoke-id
                              *root-invoke-id
-                             *invoke-id->new-args
+                             *fork-context
                              (get *agent-graph :start-node)
                              *invoke-args
                              nil
@@ -634,10 +631,11 @@
    ;; TODO: <<<<>>>>
    ;;   - if invoke-id already exists
    ;;     - if finished-time-millis is written, then do RetryNodeComplete
-   ;;         - just contains: invoke-id, retry-num, invoke-id->new-args
+   ;;         - just contains: invoke-id, retry-num, fork-context
    ;;     - if not complete, then need to reset it's state?
    ;;       - just delete it and then continue like normal?
    ;;           - what about retry of an agg node?
+   ;;           - just run it?
    ;;     - maybe like this for aggs:
    ;;       - for retry, when get to agg-start-node, if the agg node is already
    ;;       done, just move on from there
@@ -649,24 +647,6 @@
    ;;     - if fork-invoke-id is set and that node exists:
    ;;        - check if fork-invoke-id is in invoke-id->new-args
    ;;        - if so, override args
-
-   ;; TODO: <<<<<>>>>>>
-   ;;  - fork of a node within agg graph needs to change that agg input...
-   ;;     - ordering of agg inputs is random though with parallelization, so
-   ;;     don't want to reorder if there's no fork there
-   ;;       - maybe fork could say which agg-start-node invoke IDs are affected
-   ;;     - seems like forks should just repeat everything and potentially
-   ;;     change the order
-   ;;     - another possibility is for forks to first walk the graph to
-   ;;     determine aggs associated with each fork, and then execute it
-   ;;         - so it would be invoke-id->[new-args, start-agg-invoke-id]
-   ;;         - it can be a query topology to do the walk at the beginning
-   ;;     - the fork can affect any number of aggregation subgraphs that it's
-   ;;     nested within...
-   ;;       - so any one with a fork inside needs to recompute
-   ;;       - output of query topology is actually just a set of affected
-   ;;       start-agg-node invoke IDs
-   ;;         - on fork, they create brand new agg invoke ID state from scratch
 
 
    ;; TODO: <<<<>>>>>
@@ -685,6 +665,8 @@
    ;;          it's not there
    ;;     - so if it's finished here, it's either NodeComplete for fork or
    ;;     RetryNodeComplete
+   ;;     - want the trace of the fork to contain the other nodes though...
+   ;;       - but they wouldn't write their inputs to the agg node
    (<<subsource (get-node-obj *agent-graph *next-node)
     (case> Node :> {:keys [*node-fn]})
      (anode/handle-node-invoke
