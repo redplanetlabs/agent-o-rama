@@ -35,19 +35,28 @@
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
         {:keys [data loading?]}
         (common/use-query {:query-key ["agent" module-id agent-id]
-                           :query-url (str "/api/agents/" module-id "/" agent-id "/invocations")})]
+                           :query-url (str "/api/agents/" module-id "/" agent-id "/invocations")})
+        [location navigate] (useLocation)]
     (cond
       loading? ($ :div "loading...")
       (not data) ($ :div "no data")
-      :else 
-      (for [invoke (:invokes data)
-            :let [url (str "/agents/" module-id "/" agent-id "/invocations/" (:root-invoke-id invoke))]]
-        ($ wouter/Link {:href url :key url}
-           ($ :div.bg-white.p-6 {:class "hover:bg-gray-100"}
-              ($ :div.flex.justify-between.items-center.mb-2
-                 ($ :div.text-indigo-600.font-medium.text-sm
-                    "Explore Invocation"))
-              ($ :pre.text-xs.bg-gray-100.p-2.rounded.overflow-x-auto (common/pp invoke))))))))
+      :else
+      ($ :div.p-4
+         ($ :table.w-full
+            ($ :thead.text-left ($ :tr ($ :th "invoke id") ($ :th "args") ($ :th "version") ($ :th "result")))
+            ($ :tbody
+               (for [invoke (:invokes data)
+                     :let [url (str "/agents/" module-id "/" agent-id "/invocations/" (:root-invoke-id invoke))]]
+                 ($ :tr.bg-gray-200.hover:bg-gray-300.cursor-pointer
+                    {:key url
+                     :onClick (fn [e]
+                                (println e)
+                                (. e stopPropagation)
+                                (navigate url))}
+                    ($ :td (:root-invoke-id invoke))
+                    ($ :td (common/pp (:invoke-args invoke)))
+                    ($ :td (:graph-version invoke))
+                    ($ :td (common/pp (:result invoke)))))))))))
 
 (defui mini-invocations []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))

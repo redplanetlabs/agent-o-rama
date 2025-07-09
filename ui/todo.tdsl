@@ -10,27 +10,13 @@ stats page has xyflowgraph rendering for agent {
 
 two graph views (one has invocation specific stats, one has global stats)
 
-stats {
-  tokens sohuld be next to model calls (under it)
-}
-
 agentgraph replaces invocation graph
-
-overall _invocation_ stats { (side panel collapsible)
-  execution time
-  tokens
-  writes/reads to stores
-  model calls
-}
 
 edn=>json (and label that says its json)
 
 remove pagination?
 
 tests for webserver backend
-
-
-agent page (boxes with expand links)
 
 link to run page (not interactive), agent graph (pretty small, zoom) , stats summary, recent invokes (all invockes button), alerts box
 
@@ -39,15 +25,9 @@ retries with the llm api provider (retry-after header) integrated with node retr
 
 tracing currently in flight (polling, indicator, pagination complicates this)
 
-get rid of intermediate agent info screen
-react-query/mutationify the mutations for agent creation
 use a library for form state (the one recommended by uix readme)
 "add current trace to dataset" button 
 depth mapping by node count, not depth count (query topology does that automatically)
-
-agg-invoke-id groups?
-
-waterfall view
 
 user/username/login flow
 
