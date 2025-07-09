@@ -9,6 +9,52 @@
    
    [com.rpl.agent-o-rama.ui.common :as common]))
 
+;; Dummy git SHA data
+(def dummy-versions
+  [{:sha "a1b2c3d" :message "feat: add new agent functionality" :date "2024-01-15"}
+   {:sha "e4f5g6h" :message "fix: resolve connection timeout issues" :date "2024-01-14"}
+   {:sha "i7j8k9l" :message "refactor: optimize graph rendering performance" :date "2024-01-13"}
+   {:sha "m0n1o2p" :message "feat: implement multi-agent coordination" :date "2024-01-12"}
+   {:sha "q3r4s5t" :message "fix: handle edge case in token counting" :date "2024-01-11"}
+   {:sha "u6v7w8x" :message "docs: update API documentation" :date "2024-01-10"}])
+
+(defui version-dropdown []
+  (let [[selected-version set-selected-version] (uix/use-state (first dummy-versions))
+        [is-open set-is-open] (uix/use-state false)]
+    ($ :div {:className "relative inline-block text-left mb-6"}
+       ($ :div
+          ($ :button {:type "button"
+                      :className "inline-flex w-full justify-between gap-x-1.5 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 min-w-80"
+                      :onClick #(set-is-open (not is-open))}
+             ($ :div {:className "flex flex-col items-start"}
+                ($ :div {:className "font-mono text-sm"}
+                   (str "Version: " (:sha selected-version)))
+                ($ :div {:className "text-xs text-gray-500 truncate max-w-64"}
+                   (:message selected-version)))
+             ($ :svg {:className "h-5 w-5 text-gray-400" :viewBox "0 0 20 20" :fill "currentColor"}
+                ($ :path {:fillRule "evenodd" 
+                          :d "M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" 
+                          :clipRule "evenodd"}))))
+       
+       (when is-open
+         ($ :div {:className "absolute right-0 z-10 mt-2 w-80 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"}
+            ($ :div {:className "py-1"}
+               (for [version dummy-versions]
+                 ($ :button {:key (:sha version)
+                             :className (str "block w-full px-4 py-3 text-left text-sm hover:bg-gray-100 "
+                                           (when (= (:sha version) (:sha selected-version))
+                                             "bg-gray-50"))
+                             :onClick #(do (set-selected-version version)
+                                         (set-is-open false))}
+                    ($ :div {:className "flex justify-between items-start"}
+                       ($ :div {:className "flex-1"}
+                          ($ :div {:className "font-mono text-sm font-medium text-gray-900"}
+                             (:sha version))
+                          ($ :div {:className "text-xs text-gray-600 mt-1 pr-2"}
+                             (:message version)))
+                       ($ :div {:className "text-xs text-gray-400"}
+                          (:date version)))))))))))
+
 ;; Generate dummy stats data for a selected node
 (defn generate-dummy-stats [node-id]
   {:execution-time (+ 50 (rand-int 500)) ; 50-550ms
@@ -137,4 +183,5 @@
 
 (defui stats []
   ($ :div.p-4
+     ($ version-dropdown)
      ($ agent-graph)))

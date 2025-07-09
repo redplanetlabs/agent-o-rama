@@ -6,6 +6,7 @@ trace / graph / fork {
 
 stats page has xyflowgraph rendering for agent {
   has version dropdown (includes "overall" option)
+  has graphs/distributions
 }
 
 two graph views (one has invocation specific stats, one has global stats)
