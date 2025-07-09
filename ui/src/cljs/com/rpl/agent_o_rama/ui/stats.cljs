@@ -18,9 +18,8 @@
    {:sha "q3r4s5t" :message "fix: handle edge case in token counting" :date "2024-01-11"}
    {:sha "u6v7w8x" :message "docs: update API documentation" :date "2024-01-10"}])
 
-(defui version-dropdown []
-  (let [[selected-version set-selected-version] (uix/use-state (first dummy-versions))
-        [is-open set-is-open] (uix/use-state false)]
+(defui version-dropdown [{:keys [selected-version set-selected-version]}]
+  (let [[is-open set-is-open] (uix/use-state false)]
     ($ :div {:className "relative inline-block text-left mb-6"}
        ($ :div
           ($ :button {:type "button"
@@ -55,30 +54,34 @@
                        ($ :div {:className "text-xs text-gray-400"}
                           (:date version)))))))))))
 
-;; Generate dummy stats data for a selected node
-(defn generate-dummy-stats [node-id]
-  {:execution-time (+ 50 (rand-int 500)) ; 50-550ms
-   :tokens {:input (+ 100 (rand-int 1000))
-            :output (+ 50 (rand-int 800))}
-   :store-operations {:reads (rand-int 20)
-                      :writes (rand-int 10)}
-   :model-calls (+ 1 (rand-int 5))})
+;; Generate dummy stats data for a selected node, varying by version
+(defn generate-dummy-stats [node-id version]
+  (let [version-seed (hash (:sha version))
+        base-seed (hash node-id)
+        combined-seed (+ version-seed base-seed)]
+    {:execution-time (+ 50 (mod (* combined-seed 13) 500)) ; 50-550ms
+     :tokens {:input (+ 100 (mod (* combined-seed 17) 1000))
+              :output (+ 50 (mod (* combined-seed 19) 800))}
+     :store-operations {:reads (mod (* combined-seed 7) 20)
+                        :writes (mod (* combined-seed 11) 10)}
+     :model-calls (+ 1 (mod (* combined-seed 23) 5))}))
 
-;; Generate dummy overall stats for the entire graph
-(defn generate-overall-stats []
-  {:total-execution-time (+ 500 (rand-int 2000)) ; 500-2500ms
-   :total-tokens {:input (+ 2000 (rand-int 5000))
-                  :output (+ 1000 (rand-int 4000))}
-   :total-store-operations {:reads (+ 50 (rand-int 100))
-                            :writes (+ 20 (rand-int 50))}
-   :total-model-calls (+ 10 (rand-int 20))
-   :nodes-executed (+ 5 (rand-int 10))})
+;; Generate dummy overall stats for the entire graph, varying by version
+(defn generate-overall-stats [version]
+  (let [version-seed (hash (:sha version))]
+    {:total-execution-time (+ 500 (mod (* version-seed 29) 2000)) ; 500-2500ms
+     :total-tokens {:input (+ 2000 (mod (* version-seed 31) 5000))
+                    :output (+ 1000 (mod (* version-seed 37) 4000))}
+     :total-store-operations {:reads (+ 50 (mod (* version-seed 41) 100))
+                              :writes (+ 20 (mod (* version-seed 43) 50))}
+     :total-model-calls (+ 10 (mod (* version-seed 47) 20))
+     :nodes-executed (+ 5 (mod (* version-seed 53) 10))}))
 
-(defui stats-panel [{:keys [selected-node]}]
+(defui stats-panel [{:keys [selected-node selected-version]}]
   (if selected-node
     ;; Show individual node stats
     (let [node-id (.-id selected-node)
-          stats (generate-dummy-stats node-id)]
+          stats (generate-dummy-stats node-id selected-version)]
       ($ :div {:className "mt-6 p-6"}
          ($ :h3 {:className "text-lg font-semibold text-gray-800 mb-4"}
             (str "Stats for Node: " node-id))
@@ -118,7 +121,7 @@
                   (str "W: " (get-in stats [:store-operations :writes])))))))
     
     ;; Show overall stats when no node is selected
-    (let [stats (generate-overall-stats)]
+    (let [stats (generate-overall-stats selected-version)]
       ($ :div {:className "mt-6 p-6"}
          ($ :h3 {:className "text-lg font-semibold text-gray-800 mb-2"}
             "Overall Agent Graph Stats")
@@ -166,7 +169,7 @@
                ($ :div {:className "text-lg font-bold text-orange-900"}
                   (str "W: " (get-in stats [:total-store-operations :writes])))))))))
 
-(defui agent-graph []
+(defui agent-graph [{:keys [selected-version]}]
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
         {:keys [data loading?]}
         (common/use-query {:query-key ["agent" module-id agent-id "graph"]
@@ -179,9 +182,12 @@
                                :height "500px"
                                :selected-node selected-node
                                :set-selected-node set-selected-node})
-         ($ stats-panel {:selected-node selected-node})))))
+         ($ stats-panel {:selected-node selected-node 
+                         :selected-version selected-version})))))
 
 (defui stats []
-  ($ :div.p-4
-     ($ version-dropdown)
-     ($ agent-graph)))
+  (let [[selected-version set-selected-version] (uix/use-state (first dummy-versions))]
+    ($ :div.p-4
+       ($ version-dropdown {:selected-version selected-version 
+                            :set-selected-version set-selected-version})
+       ($ agent-graph {:selected-version selected-version}))))
