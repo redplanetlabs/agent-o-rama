@@ -31,7 +31,4 @@ use a library for form state (the one recommended by uix readme)
 depth mapping by node count, not depth count (query topology does that automatically)
 
 user/username/login flow
-
-version dropdown (default to latest version)
-
 display retries in the node
