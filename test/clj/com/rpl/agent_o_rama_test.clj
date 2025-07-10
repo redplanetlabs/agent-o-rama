@@ -44,6 +44,9 @@
    [java.util.concurrent
     CompletableFuture]))
 
+(def SEM)
+(def SEM2)
+
 (deftest graph-test
   (letlocals
    (bind res (volatile! []))
@@ -1627,230 +1630,271 @@
    (constantly 0)))
 
 (deftest early-aggs-test
-  (with-open [ipc (rtest/create-ipc)]
-    (letlocals
-     (bind module
-       (aor/agentmodule
-        [topology]
-        (-> topology
-            (aor/new-agent "bar")
-            (aor/agg-start-node
-             "start"
-             "agg"
-             (fn [agent-node]
-               (aor/emit! agent-node "agg" 1)
-               (aor/emit! agent-node "agg" 3)
-               (aor/emit! agent-node "agg" 7)
-               (aor/emit! agent-node "agg" 2)
-               (aor/emit! agent-node "agg" 100)
-             ))
-            (aor/agg-node
-             "agg"
-             nil
-             +early-sum-accum
-             (fn [agent-node agg node-start-res]
-               (aor/result! agent-node agg)
-             )))
-        (let [g
-              (->
-                topology
-                (aor/new-agent "foo")
+  (let [completions-atom (atom 0)]
+    (with-redefs [SEM (h/mk-semaphore 0)
+                  at/hook:running-complete-agg! (fn [& args]
+                                                  (swap! completions-atom inc))]
+      (with-open [ipc (rtest/create-ipc)]
+        (letlocals
+         (bind module
+           (aor/agentmodule
+            [topology]
+            (-> topology
+                (aor/new-agent "car")
                 (aor/agg-start-node
                  "start"
-                 ["ca" "cc" "ja" "jc" "ma"]
+                 "node1"
                  (fn [agent-node]
-                   (aor/emit! agent-node "ca")
-                   (aor/emit! agent-node "cc")
-                   (aor/emit! agent-node "ja")
-                   (aor/emit! agent-node "jc")
-                   (aor/emit! agent-node "ma")
-                 ))
+                   (aor/emit! agent-node "node1" 1)
+                   (aor/emit! agent-node "node1" 2)))
+                ;; the second node execution will try to ack the agg after it's
+                ;; complete (once semaphore is released)
+                (aor/node
+                 "node1"
+                 "agg"
+                 (fn [agent-node v]
+                   (if (= v 1)
+                     (h/acquire-semaphore SEM 1)
+                     (aor/emit! agent-node "agg" 20)
+                   )))
+                (aor/agg-node
+                 "agg"
+                 nil
+                 +early-sum-accum
+                 (fn [agent-node agg node-start-res]
+                   (aor/result! agent-node agg)
+                 )))
+            (-> topology
+                (aor/new-agent "bar")
                 (aor/agg-start-node
-                 "ma"
-                 "ma-agg"
+                 "start"
+                 "agg"
                  (fn [agent-node]
-                   (dotimes [i 5]
-                     (aor/emit! agent-node "ma-agg" "a" i)
-                     (aor/emit! agent-node "ma-agg" "b" i)
-                     (aor/emit! agent-node "ma-agg" "c" i))
+                   (aor/emit! agent-node "agg" 1)
+                   (aor/emit! agent-node "agg" 3)
+                   (aor/emit! agent-node "agg" 7)
+                   (aor/emit! agent-node "agg" 2)
+                   (aor/emit! agent-node "agg" 100)
                  ))
                 (aor/agg-node
-                 "ma-agg"
                  "agg"
-                 (aor/multi-agg
-                  (init [] 0)
-                  (on "a"
-                      [curr v]
-                      (let [ret (+ curr v)]
-                        (if (> ret 20)
-                          (reduced ret)
-                          ret)))
-                  (on "b"
-                      [curr v]
-                      (let [ret (+ curr (* 2 v))]
-                        (if (> ret 20)
-                          (reduced ret)
-                          ret)))
-                  (on "c"
-                      [curr v]
-                      (let [ret (+ curr (* 3 v))]
-                        (if (> ret 20)
-                          (reduced ret)
-                          ret))))
+                 nil
+                 +early-sum-accum
                  (fn [agent-node agg node-start-res]
-                   (aor/emit! agent-node "agg" ["ma" agg])))
-              )]
-          (doseq [[label the-agg] [["ca" +early-sum-accum]
-                                   ["cc" +early-sum-combiner]
-                                   ["ja" (EarlySumAccum.)]
-                                   ["jc" (EarlySumCombiner.)]]]
-            (let [agg-label (str label "-agg")]
-              (-> g
-                  (aor/agg-start-node label
-                                      agg-label
-                                      (fn [agent-node]
-                                        (dotimes [i 7]
-                                          (aor/emit! agent-node agg-label i))
-                                      ))
-                  (aor/agg-node agg-label
-                                "agg"
-                                the-agg
-                                (fn [agent-node agg node-start-res]
-                                  (aor/emit! agent-node "agg" [label agg])
-                                )))
-            ))
-          (aor/agg-node
-           g
-           "agg"
-           nil
-           aggs/+set-agg
-           (fn [agent-node agg node-start-res]
-             (aor/result! agent-node agg)))
-        )))
-     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
-     (bind module-name (get-module-name module))
-     (bind depot
-       (foreign-depot ipc
-                      module-name
-                      (po/agent-depot-name "foo")))
-     (bind root-pstate
-       (foreign-pstate ipc
-                       module-name
-                       (po/agent-root-task-global-name "foo")))
+                   (aor/result! agent-node agg)
+                 )))
+            (let [g
+                  (->
+                    topology
+                    (aor/new-agent "foo")
+                    (aor/agg-start-node
+                     "start"
+                     ["ca" "cc" "ja" "jc" "ma"]
+                     (fn [agent-node]
+                       (aor/emit! agent-node "ca")
+                       (aor/emit! agent-node "cc")
+                       (aor/emit! agent-node "ja")
+                       (aor/emit! agent-node "jc")
+                       (aor/emit! agent-node "ma")
+                     ))
+                    (aor/agg-start-node
+                     "ma"
+                     "ma-agg"
+                     (fn [agent-node]
+                       (dotimes [i 5]
+                         (aor/emit! agent-node "ma-agg" "a" i)
+                         (aor/emit! agent-node "ma-agg" "b" i)
+                         (aor/emit! agent-node "ma-agg" "c" i))
+                     ))
+                    (aor/agg-node
+                     "ma-agg"
+                     "agg"
+                     (aor/multi-agg
+                      (init [] 0)
+                      (on "a"
+                          [curr v]
+                          (let [ret (+ curr v)]
+                            (if (> ret 20)
+                              (reduced ret)
+                              ret)))
+                      (on "b"
+                          [curr v]
+                          (let [ret (+ curr (* 2 v))]
+                            (if (> ret 20)
+                              (reduced ret)
+                              ret)))
+                      (on "c"
+                          [curr v]
+                          (let [ret (+ curr (* 3 v))]
+                            (if (> ret 20)
+                              (reduced ret)
+                              ret))))
+                     (fn [agent-node agg node-start-res]
+                       (aor/emit! agent-node "agg" ["ma" agg])))
+                  )]
+              (doseq [[label the-agg] [["ca" +early-sum-accum]
+                                       ["cc" +early-sum-combiner]
+                                       ["ja" (EarlySumAccum.)]
+                                       ["jc" (EarlySumCombiner.)]]]
+                (let [agg-label (str label "-agg")]
+                  (->
+                    g
+                    (aor/agg-start-node label
+                                        agg-label
+                                        (fn [agent-node]
+                                          (dotimes [i 7]
+                                            (aor/emit! agent-node agg-label i))
+                                        ))
+                    (aor/agg-node agg-label
+                                  "agg"
+                                  the-agg
+                                  (fn [agent-node agg node-start-res]
+                                    (aor/emit! agent-node "agg" [label agg])
+                                  )))
+                ))
+              (aor/agg-node
+               g
+               "agg"
+               nil
+               aggs/+set-agg
+               (fn [agent-node agg node-start-res]
+                 (aor/result! agent-node agg)))
+            )))
+         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (bind module-name (get-module-name module))
+         (bind depot
+           (foreign-depot ipc
+                          module-name
+                          (po/agent-depot-name "foo")))
+         (bind root-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name "foo")))
 
-     (bind ret
-       (invoke-agent-and-return! depot root-pstate []))
+         (bind ret
+           (invoke-agent-and-return! depot root-pstate []))
 
-     (is (=
-          #{["ca" 15]
-            ["cc" 6]
-            ["ja" 15]
-            ["jc" 6]
-            ["ma" 21]
-           }
-          (:val ret)))
+         (is (=
+              #{["ca" 15]
+                ["cc" 6]
+                ["ja" 15]
+                ["jc" 6]
+                ["ma" 21]
+               }
+              (:val ret)))
 
-     ;; now test tracing with early returns includes :invoked-agg-invoke-id
-     ;; recording for invokes that didn't make it through
-     (bind bar-depot
-       (foreign-depot ipc
-                      module-name
-                      (po/agent-depot-name "bar")))
-     (bind bar-root-pstate
-       (foreign-pstate ipc
-                       module-name
-                       (po/agent-root-task-global-name "bar")))
-     (bind bar-nodes-pstate
-       (foreign-pstate ipc
-                       module-name
-                       (po/agent-node-task-global-name "bar")))
-     (bind bar-traces-query
-       (foreign-query ipc
-                      module-name
-                      (queries/tracing-query-name "bar")))
+         ;; now test tracing with early returns includes :invoked-agg-invoke-id
+         ;; recording for invokes that didn't make it through
+         (bind bar-depot
+           (foreign-depot ipc
+                          module-name
+                          (po/agent-depot-name "bar")))
+         (bind bar-root-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name "bar")))
+         (bind bar-nodes-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-node-task-global-name "bar")))
+         (bind bar-traces-query
+           (foreign-query ipc
+                          module-name
+                          (queries/tracing-query-name "bar")))
 
-     (bind [agent-task-id agent-id]
-       (invoke-agent-and-wait! bar-depot bar-root-pstate []))
+         (bind [agent-task-id agent-id]
+           (invoke-agent-and-wait! bar-depot bar-root-pstate []))
 
-     (bind root
-       (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                           bar-root-pstate
-                           {:pkey agent-task-id}))
+         (bind root
+           (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                               bar-root-pstate
+                               {:pkey agent-task-id}))
 
-     (bind agg-invoke-id
-       (foreign-select-one [(keypath root) :agg-invoke-id]
-                           bar-nodes-pstate
-                           {:pkey agent-task-id}))
-     (bind res
-       (foreign-invoke-query bar-traces-query
-                             agent-task-id
-                             [[agent-task-id root]]
-                             10000))
-     ;; because of early return, subsequent recordings of :invoked-agg-invoke-id
-     ;; are async
-     (is
-      (condition-attained?
-       (trace-matches?
-        (:invokes-map res)
-        {!id1
-         {:started-agg?  true
-          :agg-invoke-id !id2
-          :agent-id      ?agent-id
-          :emits
-          [{:invoke-id      !id3
-            :target-task-id ?agent-task-id
-            :node-name      "agg"
-            :args           [1]}
-           {:invoke-id      !id4
-            :target-task-id ?agent-task-id
-            :node-name      "agg"
-            :args           [3]}
-           {:invoke-id      !id5
-            :target-task-id ?agent-task-id
-            :node-name      "agg"
-            :args           [7]}
-           {:invoke-id      !id6
-            :target-task-id ?agent-task-id
-            :node-name      "agg"
-            :args           [2]}
-           {:invoke-id      !id7
-            :target-task-id ?agent-task-id
-            :node-name      "agg"
-            :args           [100]}]
-          :agent-task-id ?agent-task-id
-          :node          "start"
-          :result        nil
-          :nested-ops    []
-          :input         []}
-         !id3 {:invoked-agg-invoke-id !id2}
-         !id4 {:invoked-agg-invoke-id !id2}
-         !id5 {:invoked-agg-invoke-id !id2}
-         !id6 {:invoked-agg-invoke-id !id2}
-         !id7 {:invoked-agg-invoke-id !id2}
-         !id2
-         {:agg-invoke-id   nil
-          :agg-input-count 3
-          :agent-id        0
-          :agg-start-res   nil
-          :emits           []
-          :agent-task-id   ?agent-task-id
-          :node            "agg"
-          :agg-inputs-first-10
-          [{:invoke-id !id3 :args [1]}
-           {:invoke-id !id4 :args [3]}
-           {:invoke-id !id5 :args [7]}]
-          :agg-ack-val     !ack-val
-          :result          {:val 11 :failure? false}
-          :agg-finished?   true
-          :nested-ops      []
-          :agg-state       11
-          :input           [11 nil]
-          :agg-start-invoke-id !id1}}
-        (m/guard
-         (and (= ?agent-id agent-id)
-              (= ?agent-task-id agent-task-id)))
-       )))
-    )))
+         (bind agg-invoke-id
+           (foreign-select-one [(keypath root) :agg-invoke-id]
+                               bar-nodes-pstate
+                               {:pkey agent-task-id}))
+         (bind res
+           (foreign-invoke-query bar-traces-query
+                                 agent-task-id
+                                 [[agent-task-id root]]
+                                 10000))
+         ;; because of early return, subsequent recordings of
+         ;; :invoked-agg-invoke-id
+         ;; are async
+         (is
+          (condition-attained?
+           (trace-matches?
+            (:invokes-map res)
+            {!id1
+             {:started-agg?  true
+              :agg-invoke-id !id2
+              :agent-id      ?agent-id
+              :emits
+              [{:invoke-id      !id3
+                :target-task-id ?agent-task-id
+                :node-name      "agg"
+                :args           [1]}
+               {:invoke-id      !id4
+                :target-task-id ?agent-task-id
+                :node-name      "agg"
+                :args           [3]}
+               {:invoke-id      !id5
+                :target-task-id ?agent-task-id
+                :node-name      "agg"
+                :args           [7]}
+               {:invoke-id      !id6
+                :target-task-id ?agent-task-id
+                :node-name      "agg"
+                :args           [2]}
+               {:invoke-id      !id7
+                :target-task-id ?agent-task-id
+                :node-name      "agg"
+                :args           [100]}]
+              :agent-task-id ?agent-task-id
+              :node          "start"
+              :result        nil
+              :nested-ops    []
+              :input         []}
+             !id3 {:invoked-agg-invoke-id !id2}
+             !id4 {:invoked-agg-invoke-id !id2}
+             !id5 {:invoked-agg-invoke-id !id2}
+             !id6 {:invoked-agg-invoke-id !id2}
+             !id7 {:invoked-agg-invoke-id !id2}
+             !id2
+             {:agg-invoke-id   nil
+              :agg-input-count 3
+              :agent-id        0
+              :agg-start-res   nil
+              :emits           []
+              :agent-task-id   ?agent-task-id
+              :node            "agg"
+              :agg-inputs-first-10
+              [{:invoke-id !id3 :args [1]}
+               {:invoke-id !id4 :args [3]}
+               {:invoke-id !id5 :args [7]}]
+              :agg-ack-val     !ack-val
+              :result          {:val 11 :failure? false}
+              :agg-finished?   true
+              :nested-ops      []
+              :agg-state       11
+              :input           [11 nil]
+              :agg-start-invoke-id !id1}}
+            (m/guard
+             (and (= ?agent-id agent-id)
+                  (= ?agent-task-id agent-task-id)))
+           )))
+
+         (reset! completions-atom 0)
+         (bind agent-manager (aor/agent-manager ipc module-name))
+         (bind car (aor/agent-client agent-manager "car"))
+
+         (bind inv (aor/agent-initiate car))
+         (is (= 20 (aor/agent-result car inv)))
+         (h/release-semaphore SEM 1)
+         (Thread/sleep 500)
+         (is (= 1 @completions-atom))
+        )))))
 
 (deftest multi-agg-test
   (with-open [ipc (rtest/create-ipc)]
@@ -2025,8 +2069,6 @@
            (= s (subvec final-seq 0 (count s))))
          items))))
 
-(def SEM)
-(def SEM2)
 
 (deftest node-streaming-fault-tolerance-test
   (let [processed-atom (atom [])

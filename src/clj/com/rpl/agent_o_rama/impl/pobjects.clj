@@ -78,7 +78,7 @@
      :fork-of           (fixed-keys-schema
                          {:parent-agent-id Long
                           :fork-context    ForkContext})
-     :forks             (set-schema Long {:subindex? true}) ; root-invoke ids
+     :forks             (set-schema Long {:subindex? true}) ; agent ids
     })})
 
 (defn agent-active-invokes-task-global-name
@@ -193,6 +193,10 @@
 (defn agent-store-info-task-global
   []
   (declared-object-task-global (agents-store-info-name)))
+
+(defn agent-depot-task-global
+  [name]
+  (this-module-pobject-task-global (agent-depot-name name)))
 
 (defn agent-failures-depot-task-global
   [name]

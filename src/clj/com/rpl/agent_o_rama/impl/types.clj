@@ -24,6 +24,9 @@
 (defrecord NodeAggStart [node-fn agg-node-name])
 (defrecord NodeAgg [init-fn update-fn node-fn])
 
+(defn NodeAggStart? [o] (instance? NodeAggStart o))
+(defn NodeAgg? [o] (instance? NodeAgg o))
+
 (defn node->type-kw
   [node]
   (cond (instance? Node node) NODE-KW
@@ -99,6 +102,12 @@
    result :- (s/maybe AgentResult)
    nested-ops :- [NestedOpInfo]
    finish-time-millis :- Long
+   fork-context :- (s/maybe ForkContext)
+  ])
+
+(drp/defrecord+ RetryNodeComplete
+  [invoke-id :- Long
+   retry-num :- Long
    fork-context :- (s/maybe ForkContext)
   ])
 

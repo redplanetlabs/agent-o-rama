@@ -406,15 +406,8 @@
         (po/agent-node-executor-task-global)]
     (.removeTrackedInvokeId node-exec invoke-id)))
 
-(deframaop intake-node-complete
-  [*agent-name
-   {:keys [*invoke-id
-           *retry-num
-           *node-fn-res
-           *emits
-           *result
-           *nested-ops
-           *finish-time-millis]}]
+(deframaop begin-node-complete
+  [*agent-name *invoke-id *retry-num]
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)]
    (mark-virtual-task-complete! *invoke-id)
@@ -427,31 +420,19 @@
                                   *agent-task-id
                                   *agent-id
                                   *retry-num)
+   (:> *agent-task-id *agent-id *node *agg-invoke-id)))
 
-   (<<ramafn %merger
-     [*m]
-     (:> (reduce-kv assoc
-                    *m
-                    {:emits      *emits
-                     :result     *result
-                     :nested-ops *nested-ops
-                     :finish-time-millis *finish-time-millis
-                     :retry-time-millis *finish-time-millis})))
-   (local-transform> [(keypath *invoke-id) (term %merger)]
-                     $$nodes)
-   (get-node-obj (po/agent-graph-task-global *agent-name) *node :> *node-obj)
-
-   (<<subsource *node-obj
+(deframaop handle-node-complete-emits
+  [*agent-name *agent-task-id *agent-id *retry-num *node *invoke-id
+   *agg-invoke-id *result *emits]
+  (<<with-substitutions
+   [$$nodes (po/agent-node-task-global *agent-name)]
+   (<<subsource (get-node-obj (po/agent-graph-task-global *agent-name) *node)
     (case> Node)
      (identity *invoke-id :> *invoke-id)
 
     (case> NodeAggStart)
-     (local-transform> [(keypath *agg-invoke-id)
-                        :agg-start-res
-                        (termval *node-fn-res)]
-                       $$nodes)
      (identity *invoke-id :> *invoke-id)
-
 
     (case> NodeAgg)
      (local-select> (keypath *invoke-id)
@@ -471,8 +452,81 @@
                 *agg-invoke-id
                 *emits
                 :> *op)
+   (:> *op)))
+
+(deframaop intake-node-complete
+  [*agent-name
+   {:keys [*invoke-id
+           *retry-num
+           *node-fn-res
+           *emits
+           *result
+           *nested-ops
+           *finish-time-millis]}]
+  (<<with-substitutions
+   [$$nodes (po/agent-node-task-global *agent-name)]
+   (begin-node-complete *agent-name
+                        *invoke-id
+                        *retry-num
+                        :> *agent-task-id *agent-id *node *agg-invoke-id)
+   (<<ramafn %merger
+     [*m]
+     (:> (reduce-kv assoc
+                    *m
+                    {:emits      *emits
+                     :result     *result
+                     :nested-ops *nested-ops
+                     :finish-time-millis *finish-time-millis
+                     :retry-time-millis *finish-time-millis})))
+   (local-transform> [(keypath *invoke-id) (term %merger)]
+                     $$nodes)
+
+   (<<if (-> (po/agent-graph-task-global *agent-name)
+             (get-node-obj *node)
+             aor-types/NodeAggStart?)
+     (local-transform> [(keypath *agg-invoke-id)
+                        :agg-start-res
+                        (termval *node-fn-res)]
+                       $$nodes))
+   (handle-node-complete-emits
+    *agent-name
+    *agent-task-id
+    *agent-id
+    *retry-num
+    *node
+    *invoke-id
+    *agg-invoke-id
+    *result
+    *emits
+    :> *op)
    (:> *agent-task-id *agent-id *retry-num *op)
   ))
+
+(deframaop intake-retry-node-complete
+  [*agent-name {:keys [*invoke-id *retry-num *fork-context]}]
+  (<<with-substitutions
+   [$$nodes (po/agent-node-task-global *agent-name)]
+   (begin-node-complete *agent-name
+                        *invoke-id
+                        *retry-num
+                        :> *agent-task-id *agent-id *node *agg-invoke-id)
+
+   (local-select> (keypath *invoke-id)
+                  $$nodes
+                  :> {:keys [*result *emits]})
+
+   (handle-node-complete-emits
+    *agent-name
+    *agent-task-id
+    *agent-id
+    *retry-num
+    *node
+    *invoke-id
+    *agg-invoke-id
+    *result
+    *emits
+    :> *op)
+   (:> *agent-task-id *agent-id *retry-num *op)))
 
 (deframaop intake-agent-depot
   [*agent-name *data]
@@ -504,6 +558,11 @@
     (intake-node-complete *agent-name
                           *data
                           :> *agent-task-id *agent-id *retry-num *op)
+
+   (case> (aor-types/RetryNodeComplete? *data))
+    (intake-retry-node-complete *agent-name
+                                *data
+                                :> *agent-task-id *agent-id *retry-num *op)
 
    (default> :unify false)
     (throw! (h/ex-info "Unrecognized data type" {:class (class *data)})))
@@ -570,12 +629,15 @@
     {:new-agg-state res
      :finished?     false}))
 
+(defn hook:running-complete-agg! [])
+
 (deframaop complete-agg!
   [*agent-name *invoke-id *retry-num]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
     $$nodes (po/agent-node-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
+   (hook:running-complete-agg!)
    (local-select> (keypath *invoke-id)
                   $$nodes
                   :> {:keys [*agent-task-id *agent-id *node *agg-ack-val
@@ -618,7 +680,34 @@
    (complete-agg! *agent-name *invoke-id *retry-num)
    (:>)))
 
-(deframaop handle-node-op
+(deframafn node-complete?
+  [*agent-name *next-node *invoke-id]
+  (<<with-substitutions
+   [$$nodes (po/agent-node-task-global *agent-name)
+    *agent-graph (po/agent-graph-task-global *agent-name)]
+   (<<if (aor-types/NodeAgg? (get-node-obj *agent-graph *next-node))
+     ;; Four cases here:
+     ;;  - This node doesn't exist, which means it definitely was not applied
+     ;;  - The node exists and this is a retry. In that case, the agg state was
+     ;;  cleared and this needs to be applied again even if the node exists
+     ;;  (which was written atomically with the agg update on a previous
+     ;;  attempt).
+     ;;  - This is a retry of a fork on an unmodified part of the graph, in
+     ;;  which case it's just copying nodes over. In this case, the attempt to
+     ;;  apply the node will be a no-op since it will filter itself out when it
+     ;;  sees aggregation is already finished (since the fork of the unmodified
+     ;;  graph copies the agg state).
+     ;;  - This is a retry of a fork of a modified part of the graph. This is
+     ;;  the same as case #2.
+     (:> false)
+    (else>)
+     (local-select> (keypath *invoke-id)
+                    $$nodes
+                    :> {:keys [*finish-time-millis]})
+     (:> (some? *finish-time-millis))
+   )))
+
+(deframaop execute-node-op
   [*agent-name
    *agent-task-id
    *agent-id
@@ -628,14 +717,45 @@
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
+
+   ;; TODO: <<<<>>>>
+   ;;  - complete? is always false for NodeAgg, so compelte? here is only for
+   ;;  regular nodes, so it's just RetrynodeComplete
+   ;;   - if not complete, just execute the node
+
+   ;; - in incomplete case, need to handle fork
+   ;;   - if fork Id matches, then copy over to new ID (can repeat this even if
+   ;;   it hasn't already)
+   ;;     - then it's RetryNodeComplete for the node to move on?
+   ;;       - the copying process needs to match up invoke-id with
+   ;;       fork-invoke-id?
+   ;;         - and then send-emits> has info it needs?
+
    ;; TODO: <<<<>>>>
    ;;   - if invoke-id already exists
+   ;;     - regular node:
+   ;;       - if finish-time-millis is written, then run RetrynodeComplete
+   ;;       - if not, then run the node
+   ;;         - check handle-node-invoke on whether it should overwrite the
+   ;;         state
+   ;;           - input should be equal (assert?)
+   ;;           - should start-time-millis be force overwridden?
+   ;;     - agg-start-node:
+   ;;       - if agg node is alraedy complete, then just continue with that
+   ;;         - how does ack val work if it's part of another agg?
+   ;;           - looks like when NodeAgg completes, it uses the agg-start-node
+   ;;           invoke id in the ack val along with its emits
+   ;;             - (which ties it in on how it entered that graph, with the
+   ;;             agg-start-node invoke id "hanging")
+
    ;;     - if finished-time-millis is written, then do RetryNodeComplete
    ;;         - just contains: invoke-id, retry-num, fork-context
-   ;;     - if not complete, then need to reset it's state?
-   ;;       - just delete it and then continue like normal?
-   ;;           - what about retry of an agg node?
-   ;;           - just run it?
+   ;;     - if not complete, just run it
+   ;;     - how to handle partial agg completion?
+   ;;       - it's possible an ack val didn't get through, so impossible to
+   ;;       detect
+   ;;         - retries need to do whole agg graph again...
+   ;;            - don't need to redo the node, but need to resend the ack vals
    ;;     - maybe like this for aggs:
    ;;       - for retry, when get to agg-start-node, if the agg node is already
    ;;       done, just move on from there
@@ -719,7 +839,6 @@
       *new-agg-invoke-id
       *fork-context)
 
-
     (case> NodeAgg :> {:keys [*update-fn]})
      (assert! (some? *agg-invoke-id))
      (local-select> (keypath *agg-invoke-id)
@@ -754,8 +873,33 @@
                                                          *args))])]
       $$nodes)
 
+     ;; by not acking here and going straight go complete-agg!, it also prevents
+     ;; rest of agg subgraph from ever completing and calling complete-agg!
+     ;; again
      (<<if *finished?
        (complete-agg! *agent-name *agg-invoke-id *retry-num)
       (else>)
        (ack-agg! *agent-name *agg-invoke-id *retry-num *invoke-id))
    )))
+
+(deframaop handle-node-complete
+  [*agent-name
+   *retry-num
+   {:keys [*invoke-id *fork-context]}]
+  (<<with-substitutions
+   [*agent-depot (po/agent-depot-task-global *agent-name)]
+   (depot-partition-append!
+    *agent-depot
+    (aor-types/->valid-RetryNodeComplete *invoke-id *retry-num *fork-context)
+    :append-ack)))
+
+(deframaop handle-node-op
+  [*agent-name
+   *agent-task-id
+   *agent-id
+   *retry-num
+   {:keys [*next-node *invoke-id] :as *node-op}]
+  (<<if (node-complete? *agent-name *next-node *invoke-id)
+    (handle-node-complete *agent-name *retry-num *node-op)
+   (else>)
+    (execute-node-op *agent-name *agent-task-id *agent-id *retry-num *node-op)))
