@@ -143,6 +143,7 @@
           conj
           (aor-types/->valid-AgentNodeEmit
            (h/random-long random-source)
+           nil
            (if (selected-any? [:node-map (keypath node) :node
                                #(instance? Node %)]
                               agent-graph)
@@ -273,19 +274,21 @@
 
    (h/current-time-millis :> *start-time-millis)
    (ops/current-task-id :> *task-id)
-   ;; merge instead of overwrite since agg nodes run completion function on
+   ;; - merge instead of overwrite since agg nodes run completion function on
    ;; already existing node
+   ;; - in retries, this is mostly redundant except for update of
+   ;; start-time-millis
    (<<ramafn %merger
      [*m]
-     (:> (reduce-kv h/assoc-if-void
-                    *m
-                    {:agent-id      *agent-id
-                     :agent-task-id *agent-task-id
-                     :node          *next-node
-                     :start-time-millis *start-time-millis
-                     :input         *args
-                     :agg-invoke-id *agg-invoke-id
-                    })))
+     (:> (merge
+          *m
+          {:agent-id      *agent-id
+           :agent-task-id *agent-task-id
+           :node          *next-node
+           :start-time-millis *start-time-millis
+           :input         *args
+           :agg-invoke-id *agg-invoke-id
+          })))
    (local-transform> [(keypath *invoke-id) (term %merger)] $$nodes)
    (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
                |direct
