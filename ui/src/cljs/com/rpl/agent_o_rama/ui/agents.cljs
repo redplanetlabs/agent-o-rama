@@ -83,7 +83,13 @@
                  ($ :td (:root-invoke-id invoke))
                  ($ :td (common/pp (:invoke-args invoke)))
                  ($ :td (:graph-version invoke))
-                 ($ :td (common/pp (:result invoke))))))))))
+                 ($ :td (common/pp (:result invoke))))))
+         ($ :tfoot 
+            ($ :tr 
+               ($ :th.hover:bg-gray-200.cursor-pointer {:colspan 4} 
+                  ($ wouter/Link
+                     {:href (str "/agents/" module-id "/" agent-id "/invocations")}
+                     "See all invocations"))))))))
 
 (defui evaluations []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))]
@@ -119,9 +125,8 @@
        
        ($ :div.p-4.flex.gap-1
           ($ :div
-             {:style {:flex-grow "1"}
-              :onClick (fn [_] (navigate (str "/agents/" module-id "/" agent-id "/invocations")))}
-             ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
+             {:style {:flex-grow "1"} }
+             ($ :div.bg-gray-100.flex-1.p-4
                 "invocations"
                 ($ mini-invocations))))
        
