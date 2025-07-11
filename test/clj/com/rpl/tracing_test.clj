@@ -904,9 +904,6 @@
               :agg-state          3
               :agg-start-invoke-id !id2
               :agg-finished?      true
-              ;; TODO: <<<<>>>> this is now the time it took to just excecute
-              ;; the aggregation once it completed...
-              ;;   - how to overwrite on retry but not normally?
               :start-time-millis  14
               :finish-time-millis 24
               :result             {:val 3 :failure? false}
