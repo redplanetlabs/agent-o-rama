@@ -63,6 +63,7 @@
                      :edges flow-edges
                      :onNodesChange on-nodes-change
                      :onEdgesChange on-edges-change
+                     :fitView true
                      :proOptions (clj->js {:hideAttribution true})
                      :nodeTypes
                      (clj->js {"custom"

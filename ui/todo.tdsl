@@ -1,7 +1,20 @@
-agent graph on agent page, not invocation page (not sure about this)
+mini invocations -> see all, not background click
+add more styles 
 
-trace / graph / fork {
-  (with a little text explaining under)
+next to agent graph, toplevel stats on right {
+  avg token used, avg latency , in last 10000 runs
+  zoom out the graph
+  two panels (top = stats, bottom = alerts (preview, with button to see all))
+}
+
+fork textarea split into individual arg boxes (arg1, arg2 labels)
+
+manually run. no longer a page link,
+   its a widget with box per arg and submit button
+   placeholder=arg1, arg2, arg3
+
+timeseries graphs on agent stats page {
+  like rama cluster ui, scroll of many timeseries (granularity like rama cluster ui)
 }
 
 stats page has xyflowgraph rendering for agent {
@@ -11,15 +24,11 @@ stats page has xyflowgraph rendering for agent {
 
 two graph views (one has invocation specific stats, one has global stats)
 
-agentgraph replaces invocation graph
-
 edn=>json (and label that says its json)
 
 remove pagination?
 
 tests for webserver backend
-
-link to run page (not interactive), agent graph (pretty small, zoom) , stats summary, recent invokes (all invockes button), alerts box
 
 retries with the llm api provider (retry-after header) integrated with node retries
   include retry stats in the stats
@@ -32,3 +41,7 @@ depth mapping by node count, not depth count (query topology does that automatic
 
 user/username/login flow
 display retries in the node
+
+langgraph {
+  what happens when a single node is simultaneously executing at the same time (a loop)
+}
