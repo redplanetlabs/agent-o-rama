@@ -48,7 +48,7 @@
           edges (for [[frm to] edges] {:id (str frm to) :source frm :target to})]
       {:nodes nodes-with-layout :edges edges})))
 
-(defui graph [{:keys [initial-data height selected-node set-selected-node]}]
+(defui graph [{:keys [initial-data height selected-node set-selected-node fitView]}]
   (let [;; Process current graph data
         {:keys [nodes edges]} (process-graph-data initial-data)
         
@@ -63,7 +63,7 @@
                      :edges flow-edges
                      :onNodesChange on-nodes-change
                      :onEdgesChange on-edges-change
-                     :fitView true
+                     :fitView fitView
                      :proOptions (clj->js {:hideAttribution true})
                      :nodeTypes
                      (clj->js {"custom"

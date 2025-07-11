@@ -103,7 +103,8 @@
       ($ agent-graph/graph {:initial-data data
                             :height "200px"
                             :selected-node nil
-                            :set-selected-node (fn [_])}))))
+                            :set-selected-node (fn [_])
+                            :fitView true}))))
 
 (defui stats-summary [{:keys [module-id agent-id]}]
   ($ :div.p-4.flex.gap-1

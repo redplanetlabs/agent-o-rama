@@ -181,7 +181,8 @@
          ($ agent-graph/graph {:initial-data data
                                :height "500px"
                                :selected-node selected-node
-                               :set-selected-node set-selected-node})
+                               :set-selected-node set-selected-node
+                               :fitView false})
          ($ stats-panel {:selected-node selected-node 
                          :selected-version selected-version})))))
 
