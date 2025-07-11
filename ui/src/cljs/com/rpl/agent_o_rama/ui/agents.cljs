@@ -105,6 +105,22 @@
                             :selected-node nil
                             :set-selected-node (fn [_])}))))
 
+(defui stats-summary [{:keys [module-id agent-id]}]
+  ($ :div.p-4.flex.gap-1
+     ($ wouter/Link
+        {:href (str "/agents/" module-id "/" agent-id "/stats")
+         :style {:flex-grow "1"}}
+        ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
+           "stats summary"))))
+
+(defui alerts [{:keys [module-id agent-id]}]
+  ($ :div.p-4.flex.gap-1
+     ($ wouter/Link
+        {:href (str "/agents/" module-id "/" agent-id "/alerts")
+         :style {:flex-grow "1"}}
+        ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
+           "alerts"))))
+
 (defui agent []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
         [location navigate] (useLocation)]
@@ -114,18 +130,8 @@
        ($ :div.flex
           ($ :div {:className "w-1/2"} ($ agent-graph))
           ($ :div {:className "w-1/2"}
-             ($ :div.p-4.flex.gap-1
-                ($ wouter/Link
-                   {:href (str "/agents/" module-id "/" agent-id "/stats")
-                    :style {:flex-grow "1"}}
-                   ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
-                      "stats summary")))
-             ($ :div.p-4.flex.gap-1
-                ($ wouter/Link
-                   {:href (str "/agents/" module-id "/" agent-id "/alerts")
-                    :style {:flex-grow "1"}}
-                   ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
-                      "alerts")))))
+             ($ stats-summary {:module-id module-id :agent-id agent-id})
+             ($ alerts {:module-id module-id :agent-id agent-id})))
        ($ :div.p-4.flex.gap-1
           ($ wouter/Link
              {:href (str "/agents/" module-id "/" agent-id "/run")
