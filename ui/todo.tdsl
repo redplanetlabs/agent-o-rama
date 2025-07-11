@@ -3,7 +3,6 @@ add more styles
 
 next to agent graph, toplevel stats on right {
   avg token used, avg latency , in last 10000 runs
-  zoom out the graph
   two panels (top = stats, bottom = alerts (preview, with button to see all))
 }
 

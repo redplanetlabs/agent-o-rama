@@ -111,7 +111,21 @@
 
     ($ :div.p-4
        ($ :div.text-xl.font-semibold.mb-4 "Agent Details")
-       ($ agent-graph)
+       ($ :div.flex
+          ($ :div {:className "w-1/2"} ($ agent-graph))
+          ($ :div {:className "w-1/2"}
+             ($ :div.p-4.flex.gap-1
+                ($ wouter/Link
+                   {:href (str "/agents/" module-id "/" agent-id "/stats")
+                    :style {:flex-grow "1"}}
+                   ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
+                      "stats summary")))
+             ($ :div.p-4.flex.gap-1
+                ($ wouter/Link
+                   {:href (str "/agents/" module-id "/" agent-id "/alerts")
+                    :style {:flex-grow "1"}}
+                   ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
+                      "alerts")))))
        ($ :div.p-4.flex.gap-1
           ($ wouter/Link
              {:href (str "/agents/" module-id "/" agent-id "/run")
@@ -124,21 +138,7 @@
              {:style {:flex-grow "1"} }
              ($ :div.bg-gray-100.flex-1.p-4
                 "invocations"
-                ($ mini-invocations))))
-       
-       ($ :div.p-4.flex.gap-1
-          ($ wouter/Link
-             {:href (str "/agents/" module-id "/" agent-id "/stats")
-              :style {:flex-grow "1"}}
-             ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
-                "stats summary")))
-       
-       ($ :div.p-4.flex.gap-1
-          ($ wouter/Link
-             {:href (str "/agents/" module-id "/" agent-id "/alerts")
-              :style {:flex-grow "1"}}
-             ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
-                "alerts"))))))
+                ($ mini-invocations)))))))
 
 (defui invoke []
   (let [{:strs [module-id agent-id invoke-id]} (js->clj (wouter/useParams))
