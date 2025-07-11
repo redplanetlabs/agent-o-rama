@@ -6,6 +6,7 @@ import com.rpl.agentorama.ops.*;
 import com.rpl.rama.ops.*;
 
 public interface AgentGraph {
+  AgentGraph setUpdateMode(UpdateMode mode);
    AgentGraph node(String name, Object outputNodesSpec, RamaVoidFunction1<AgentNode> impl);
   <T0> AgentGraph node(String name, Object outputNodesSpec, RamaVoidFunction2<AgentNode,T0> impl);
   <T0,T1> AgentGraph node(String name, Object outputNodesSpec, RamaVoidFunction3<AgentNode,T0,T1> impl);

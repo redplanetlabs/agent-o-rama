@@ -7,18 +7,18 @@ import com.rpl.rama.module.*;
 
 public interface AgentsTopology {
 
-  public static AgentsTopology create(String name, Setup setup, Topologies topologies) {
-    return (AgentsTopology) AORHelpers.CREATE_AGENTS_TOPOLOGY.invoke(name, setup, topologies);
+  public static AgentsTopology create(Setup setup, Topologies topologies) {
+    return (AgentsTopology) AORHelpers.CREATE_AGENTS_TOPOLOGY.invoke(setup, topologies);
   }
 
   AgentGraph newAgent(String name);
 
   void declareKeyValueStore(String name, Class keyClass, Class valClass);
-  void declareDocumentStore(String name, Class keyClass, Class... keyValClasses);
+  void declareDocumentStore(String name, Class keyClass, Object... keyAndValClasses);
   // TODO: what other stores? column-oriented?
   //    - there should be a text search store
-  PState.Declaration declarePState(String name, Class schema);
-  PState.Declaration declarePState(String name,  PState.Schema schema);
+  PState.Declaration declarePStateStore(String name, Class schema);
+  PState.Declaration declarePStateStore(String name,  PState.Schema schema);
 
   // TODO: document how to make LLMs
   void declareAgentObject(String name, Object o);

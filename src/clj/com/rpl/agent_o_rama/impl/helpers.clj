@@ -1,17 +1,33 @@
-(ns com.rpl.agent-o-rama.helpers
+(ns com.rpl.agent-o-rama.impl.helpers
+  (:refer-clojure :exclude [ex-info])
   (:use [com.rpl.rama.path])
-  (:require ;; TODO: <<<<>>>> expose current-random-source in public API and use that
-            [rpl.rama.distributed.core :as d])
-  (:import [com.rpl.rama.helpers TopologyUtils]))
+  (:require
+   [com.rpl.rama.ops :as ops])
+  (:import
+   [com.rpl.agentorama.impl
+    AORExceptionInfo]
+   [com.rpl.rama.helpers
+    TopologyUtils]
+   [java.util.concurrent
+    Semaphore]
+   [java.util.function
+    Function]))
 
 (def MAX-ARITY 8)
+
+(defn ex-info
+  ([message data]
+   (AORExceptionInfo. message data))
+  ([message data cause]
+   (AORExceptionInfo. message data cause)))
 
 (defmacro dofor
   "Shortcut for `doall` and `for`."
   [& body]
   `(doall (for ~@body)))
 
-(defn current-time-millis []
+(defn current-time-millis
+  []
   (TopologyUtils/currentTimeMillis))
 
 (defn type-hinted
@@ -20,9 +36,6 @@
     {:tag (-> class
               .getTypeName
               symbol)}))
-
-(defn clj-transform [compiled-path obj]
-  (multi-transform ^:direct-nav compiled-path obj))
 
 (defn rama-void-function-class-symbol
   [i]
@@ -70,8 +83,10 @@
 
 (mk-jfn-converter)
 
-(defn random-long []
-  (.nextLong ^java.util.Random (d/current-random-source)))
+(defn random-long
+  ([] (random-long (ops/current-random-source)))
+  ([random-source]
+   (.nextLong ^java.util.Random random-source)))
 
 (defn invoke
   ([afn] (afn))
@@ -91,3 +106,60 @@
   ([afn a b c d e f g h i j k l m n] (afn a b c d e f g h i j k l m n))
   ([afn a b c d e f g h i j k l m n o] (afn a b c d e f g h i j k l m n o))
   ([afn a b c d e f g h i j k l m n o p] (afn a b c d e f g h i j k l m n o p)))
+
+
+(defmacro cf-function
+  [& body]
+  `(let [afn# (fn ~@body)]
+     (reify
+      Function
+      (apply [_ arg#]
+        (afn# arg#)))))
+
+(defn start-index [s] 0)
+(defn srange-dynamic-end-index
+  [s start-index]
+  (count s))
+
+(defmacro returning
+  [expr & body]
+  `(let [rv# ~expr]
+     ~@body
+     rv#))
+
+(defn mk-semaphore
+  (^Semaphore [permits] (mk-semaphore permits false))
+  (^Semaphore [permits fair?] (Semaphore. permits fair?)))
+
+(defn acquire-semaphore
+  ([^Semaphore s] (.acquire s))
+  ([^Semaphore s amt] (.acquire s amt))
+  ([^Semaphore s amt timeout-millis]
+   (or (.tryAcquire s
+                    amt
+                    timeout-millis
+                    java.util.concurrent.TimeUnit/MILLISECONDS)
+       (throw (ex-info "Semaphore timed out"
+                       {:amt amt :timeout-millis timeout-millis})))))
+
+(defn release-semaphore
+  ([^Semaphore s] (.release s))
+  ([^Semaphore s amt] (.release s amt)))
+
+(defn lastv
+  [v]
+  (let [c (count v)]
+    (if (not= c 0)
+      (nth v (dec c)))))
+
+(defnav VOLATILE
+  []
+  (select* [_this structure next-fn]
+           (next-fn @structure))
+  (transform* [_this structure next-fn]
+              (vswap! structure next-fn)
+              structure))
+
+(defn throw!
+  [e]
+  (throw e))

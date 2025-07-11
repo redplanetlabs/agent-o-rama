@@ -1,4 +1,10 @@
-(ns com.rpl.test-helpers)
+(ns com.rpl.test-helpers
+  (:use [clojure.test]
+        [com.rpl.rama]
+        [com.rpl.rama.path])
+  (:require
+   [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.ramaspecter :refer [walker]]))
 
 (defmacro letlocals
   [& body]
@@ -20,3 +26,142 @@
               tobind))]
     `(let ~binded
           ~last-expr)))
+
+(defmacro ex-info-thrown?
+  [re data & body]
+  `(try
+     ~@body
+     (is false "Did not throw exception")
+     (catch clojure.lang.ExceptionInfo e#
+       (is (re-matches ~re (ex-message e#)))
+       (is (= ~data (ex-data e#)))
+     )))
+
+(defn invoke-agent-and-wait!
+  [depot invokes-pstate args]
+  (let [res   (foreign-append! depot (aor-types/->AgentInvoke args 0 nil))
+        [agent-task-id agent-id] (-> res
+                                     vals
+                                     first)
+        prom  (promise)
+        proxy (foreign-proxy [(keypath agent-id) :ack-val]
+                             invokes-pstate
+                             {:pkey        agent-task-id
+                              :callback-fn (fn [new-val _ _]
+                                             (when (= new-val 0)
+                                               (deliver prom nil))
+                                           )})]
+    (when (= ::failed (deref prom 30000 ::failed))
+      (throw (ex-info "Agent did not complete" {})))
+    (close! proxy)
+    [agent-task-id agent-id]
+  ))
+
+(defn invoke-agent-and-return!
+  [depot invokes-pstate args]
+  (let [[agent-task-id agent-id] (invoke-agent-and-wait! depot
+                                                         invokes-pstate
+                                                         args)]
+    (foreign-select-one
+     [(keypath agent-id) :result]
+     invokes-pstate
+     {:pkey agent-task-id})
+  ))
+
+(defn- parse-var-prefix
+  [sym]
+  (let [s (name sym)]
+    (if-let [[_ prefix] (re-matches #"^(.*?)[0-9]+$" s)]
+      prefix
+      s)))
+
+(defmacro trace-matches?
+  [data & bindings]
+  (let [unique-syms   (set (select [(walker symbol?)
+                                    #(= \!
+                                        (-> %
+                                            str
+                                            first))]
+                                   bindings))
+        unique-syms   (setval [ALL NAME FIRST] \? unique-syms)
+        unique-groups (vals (group-by parse-var-prefix unique-syms))
+        unique-guards (for [group unique-groups]
+                        `(m/guard (= ~(count group)
+                                     (count (set ~(vec group))))))
+        bindings      (setval [(walker symbol?)
+                               NAME
+                               FIRST
+                               #(= \! %)]
+                              \?
+                              bindings)]
+    `(m/find
+      ~data
+      (m/and
+       ~@bindings
+       ~@unique-guards)
+      true)))
+
+(defn trace-time-deltas
+  [trace]
+  (transform [MAP-VALS
+              (multi-path
+               STAY
+               [(must :nested-ops) ALL (view #(into {} %))])
+              (submap [:start-time-millis :finish-time-millis])
+              #(= 2 (count %))]
+             (fn [{:keys [start-time-millis finish-time-millis]}]
+               {:delta-millis (- finish-time-millis start-time-millis)})
+             trace))
+
+(defn trace-no-times
+  [trace]
+  (setval [MAP-VALS
+           (multi-path
+            STAY
+            [(must :nested-ops) ALL (view #(into {} %))])
+           (submap [:start-time-millis :finish-time-millis])]
+          {}
+          trace))
+
+(defn condition-attained?*
+  ([f] (condition-attained?* f {}))
+  ([f
+    {:keys [max-wait max-delay initial-delay backoff-factor retry-on-exception
+            context]
+     :or   {max-wait           10000
+            max-delay          100
+            initial-delay      10
+            backoff-factor     2
+            retry-on-exception false
+           }}]
+   (let [start-time-millis (System/currentTimeMillis)]
+     (loop [delay    (long initial-delay)
+            wait     0
+            attempts 1]
+       (let [[res e] (if retry-on-exception
+                       (try
+                         [(f) nil]
+                         (catch Exception e
+                           [false e]))
+                       [(f) nil])]
+         (if (or e (not res))
+           (if (< (- (System/currentTimeMillis) start-time-millis) max-wait)
+             (do
+               (Thread/sleep delay)
+               (recur (long (min (* delay backoff-factor) max-delay))
+                      (long (+ wait delay))
+                      (inc attempts)))
+             false)
+           true))))))
+
+(defmacro condition-attained?
+  [& body]
+  `(condition-attained?* (fn [] ~@body)))
+
+
+(let [prev aor-types/get-config]
+  (defn ZERO-MAX-RETRIES-OVERRIDE
+    [m config]
+    (if (= (:name config) (:name aor-types/MAX-RETRIES-CONFIG))
+      0
+      (prev m config))))
