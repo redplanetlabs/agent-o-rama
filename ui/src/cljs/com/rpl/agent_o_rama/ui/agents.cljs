@@ -153,6 +153,31 @@
                                 :d "M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
                                 :clipRule "evenodd"})))))))))
 
+(defui manual-run [{:keys [module-id agent-id num-args]
+                    :or {num-args 3}}]
+  (let [[args set-args] (uix/use-state (vec (repeat num-args "")))
+        update-arg (fn [index value]
+                     (set-args #(assoc % index value)))
+        handle-submit (fn [e]
+                        (.preventDefault e)
+                        ;; TODO: Implement actual API call
+                        (println "Running agent with args:" args))]
+    ($ :div.bg-gray-100.flex-1.p-4
+       ($ :form {:onSubmit handle-submit}
+          ($ :div.text-sm.text-gray-600.mb-3 "Manually Run Agent")
+          ($ :div.flex.gap-2.justify-between
+             ($ :div.flex.gap-2
+                (for [i (range num-args)]
+                  ($ :textarea.flex-1.max-w-32.p-2.border.border-gray-300.rounded.text-sm.resize-none
+                     {:key i
+                      :placeholder (str "arg" (inc i) " (json)")
+                      :value (get args i "")
+                      :onChange #(update-arg i (.. % -target -value))
+                      :rows 2})))
+             ($ :button.w-32.h-16.bg-green-600.text-white.px-4.rounded.hover:bg-green-700.text-sm.font-medium
+                {:type "submit"}
+                "Submit"))))))
+
 (defui agent []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
         [location navigate] (useLocation)]
@@ -165,11 +190,9 @@
              ($ stats-summary {:module-id module-id :agent-id agent-id})
              ($ alerts {:module-id module-id :agent-id agent-id})))
        ($ :div.p-4.flex.gap-1
-          ($ wouter/Link
-             {:href (str "/agents/" module-id "/" agent-id "/run")
-              :style {:flex-grow "1"}}
-             ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
-                "manually run agent")))
+          ($ :div
+             {:style {:flex-grow "1"}}
+             ($ manual-run {:module-id module-id :agent-id agent-id})))
        
        ($ :div.p-4.flex.gap-1
           ($ :div
