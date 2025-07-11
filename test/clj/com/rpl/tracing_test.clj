@@ -853,61 +853,64 @@
      (is
       (trace-matches?
        (:invokes-map res)
-       {!id1  {:agg-invoke-id     nil
-               :emits             [{:invoke-id      !id2
-                                    :target-task-id ?agent-task-id
-                                    :node-name      "node1"
-                                    :args           []}]
-               :node              "start"
-               :nested-ops        []
-               :result            nil
-               :agent-id          ?agent-id
-               :input             []
-               :agent-task-id     ?agent-task-id
-               :start-time-millis 0
-               :finish-time-millis 5
-              }
-        !id2  {:started-agg?      true
-               :agg-invoke-id     !id5
-               :emits             [{:invoke-id      !id3
-                                    :target-task-id ?agent-task-id
-                                    :node-name      "agg"
-                                    :args           [1]}
-                                   {:invoke-id      !id4
-                                    :target-task-id ?agent-task-id
-                                    :node-name      "agg"
-                                    :args           [2]}]
-               :node              "node1"
-               :nested-ops        []
-               :result            nil
-               :agent-id          ?agent-id
-               :input             []
-               :agent-task-id     ?agent-task-id
-               :start-time-millis 5
-               :finish-time-millis 11
-              }
-        !id3  {:invoked-agg-invoke-id !id5}
-        !id4  {:invoked-agg-invoke-id !id5}
-        !!id5 {:agg-invoke-id      nil
-               :emits              []
-               :agg-input-count    2
-               :agg-inputs-first-10
-               [{:invoke-id !id3 :args [1]}
-                {:invoke-id !id4 :args [2]}]
-               :agg-start-res      nil
-               :node               "agg"
-               :agg-ack-val        0
-               :nested-ops         []
-               :agent-id           ?agent-id
-               :input              [3 nil]
-               :agent-task-id      ?agent-task-id
-               :agg-state          3
-               :agg-start-invoke-id !id2
-               :agg-finished?      true
-               :start-time-millis  5
-               :finish-time-millis 24
-               :result             {:val 3 :failure? false}
-              }
+       {!id1 {:agg-invoke-id     nil
+              :emits             [{:invoke-id      !id2
+                                   :target-task-id ?agent-task-id
+                                   :node-name      "node1"
+                                   :args           []}]
+              :node              "start"
+              :nested-ops        []
+              :result            nil
+              :agent-id          ?agent-id
+              :input             []
+              :agent-task-id     ?agent-task-id
+              :start-time-millis 0
+              :finish-time-millis 5
+             }
+        !id2 {:started-agg?      true
+              :agg-invoke-id     !id5
+              :emits             [{:invoke-id      !id3
+                                   :target-task-id ?agent-task-id
+                                   :node-name      "agg"
+                                   :args           [1]}
+                                  {:invoke-id      !id4
+                                   :target-task-id ?agent-task-id
+                                   :node-name      "agg"
+                                   :args           [2]}]
+              :node              "node1"
+              :nested-ops        []
+              :result            nil
+              :agent-id          ?agent-id
+              :input             []
+              :agent-task-id     ?agent-task-id
+              :start-time-millis 5
+              :finish-time-millis 11
+             }
+        !id3 {:invoked-agg-invoke-id !id5}
+        !id4 {:invoked-agg-invoke-id !id5}
+        !id5 {:agg-invoke-id      nil
+              :emits              []
+              :agg-input-count    2
+              :agg-inputs-first-10
+              [{:invoke-id !id3 :args [1]}
+               {:invoke-id !id4 :args [2]}]
+              :agg-start-res      nil
+              :node               "agg"
+              :agg-ack-val        0
+              :nested-ops         []
+              :agent-id           ?agent-id
+              :input              [3 nil]
+              :agent-task-id      ?agent-task-id
+              :agg-state          3
+              :agg-start-invoke-id !id2
+              :agg-finished?      true
+              ;; TODO: <<<<>>>> this is now the time it took to just excecute
+              ;; the aggregation once it completed...
+              ;;   - how to overwrite on retry but not normally?
+              :start-time-millis  14
+              :finish-time-millis 24
+              :result             {:val 3 :failure? false}
+             }
        }
        (m/guard
         (and (= ?agent-id agent-id)

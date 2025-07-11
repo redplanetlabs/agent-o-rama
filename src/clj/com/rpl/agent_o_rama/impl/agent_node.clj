@@ -280,7 +280,8 @@
    ;; start-time-millis
    (<<ramafn %merger
      [*m]
-     (:> (merge
+     (:> (reduce-kv
+          assoc
           *m
           {:agent-id      *agent-id
            :agent-task-id *agent-task-id
@@ -305,7 +306,7 @@
                 *args
                 *rama-clients
                 *fork-context))
-   (:> {:start-time-millis *start-time-millis})))
+   (:>)))
 
 (defn- invoke-or-error
   [afn info]

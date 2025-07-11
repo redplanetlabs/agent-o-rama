@@ -83,7 +83,7 @@
 
 (drp/defrecord+ AgentNodeEmit
   [invoke-id :- Long
-   fork-invoke-id :- Long
+   fork-invoke-id :- (s/maybe Long)
    target-task-id :- Long
    node-name :- String
    args :- [(s/maybe Object)]

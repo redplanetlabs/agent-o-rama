@@ -32,18 +32,16 @@
 
 (defn- to-trace-invoke-info
   [all-invoke-info]
-  (dissoc
-   (if (contains? all-invoke-info :agg-inputs)
-     (let [ai       (:agg-inputs all-invoke-info)
-           ai-count (count ai)]
-       (-> all-invoke-info
-           (dissoc :agg-inputs)
-           (assoc :agg-input-count ai-count)
-           (assoc :agg-inputs-first-10
-                  (select-any (srange 0 (min 10 ai-count)) ai))))
-     all-invoke-info
-   )
-   :retry-time-millis))
+  (if (contains? all-invoke-info :agg-inputs)
+    (let [ai       (:agg-inputs all-invoke-info)
+          ai-count (count ai)]
+      (-> all-invoke-info
+          (dissoc :agg-inputs)
+          (assoc :agg-input-count ai-count)
+          (assoc :agg-inputs-first-10
+                 (select-any (srange 0 (min 10 ai-count)) ai))))
+    all-invoke-info
+  ))
 
 (defn- emits->pairs
   [emits]
