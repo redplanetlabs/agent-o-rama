@@ -4,6 +4,7 @@
         [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.core :as i]
@@ -788,3 +789,138 @@
                                   agent-id
                                   #{(inv-id "a1") (inv-id "b1")})))
     )))
+
+
+(def FAIL-NODES-ATOM)
+(def RAN-NODES-ATOM)
+(def RESULT-NODE-ATOM)
+
+(defn run-node!
+  [agent-node n]
+  (transform [ATOM (keypath n) (nil->val 0)] inc RAN-NODES-ATOM)
+  (when (contains? @FAIL-NODES-ATOM n)
+    (throw (ex-info "Intentional" {})))
+  (when (= @RESULT-NODE-ATOM n)
+    (aor/result! agent-node n)))
+
+(deftest retry-on-failure-test
+  (let [failures-atom (atom 0)]
+    (with-redefs [FAIL-NODES-ATOM  (atom #{})
+                  RAN-NODES-ATOM   (atom {})
+                  RESULT-NODE-ATOM (atom nil)
+
+                  anode/hook:appended-agent-failure
+                  (fn [& args] (swap! failures-atom inc))]
+      (with-open [ipc (rtest/create-ipc)]
+        (letlocals
+         (bind mk-node
+           (fn [topology name outputs]
+             (let [outputs   (cond (nil? outputs) []
+                                   (vector? outputs) outputs
+                                   :else [outputs])
+                   node-impl
+                   (fn [agent-node & args]
+                     (run-node! agent-node name)
+                     (doseq [n outputs]
+                       (if (str/starts-with? n "agg")
+                         (aor/emit! agent-node n 1)
+                         (aor/emit! agent-node n))))]
+               (if (str/starts-with? name "agg")
+                 (aor/agg-node
+                  topology
+                  name
+                  outputs
+                  aggs/+vec-agg
+                  node-impl)
+                 ((if (str/starts-with? name "start")
+                    aor/agg-start-node
+                    aor/node)
+                  topology
+                  name
+                  outputs
+                  node-impl))
+             )))
+         (bind module
+           (aor/agentmodule
+            [topology]
+            (->
+              topology
+              (aor/new-agent "foo")
+              (mk-node "begin" ["node1" "node2"])
+              (mk-node "node1" "start1")
+              (mk-node "start1" ["a1" "a2"])
+              (mk-node "a1" "agg")
+              (mk-node "a2" "agg")
+              (mk-node "agg" "node3")
+              (mk-node "node3" nil)
+
+              (mk-node "node2" "start2")
+              (mk-node "start2" "b1")
+              (mk-node "b1" "start3")
+              (mk-node "start3" "b2")
+              (mk-node "b2" "agg2")
+              (mk-node "agg2" "b3")
+              (mk-node "b3" "agg3")
+              (mk-node "agg3" "b4")
+              (mk-node "b4" nil)
+            )))
+         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (bind module-name (get-module-name module))
+
+         (bind agent-manager (aor/agent-manager ipc module-name))
+         (bind foo (aor/agent-client agent-manager "foo"))
+
+         (bind fail-and-retry!
+           (fn [result-node nodes]
+             (letlocals
+              (reset! FAIL-NODES-ATOM (set nodes))
+              (reset! RAN-NODES-ATOM {})
+              (reset! RESULT-NODE-ATOM result-node)
+              (reset! failures-atom 0)
+              (rtest/pause-microbatch-topology!
+               ipc
+               module-name
+               aor-types/AGENTS-MB-TOPOLOGY-NAME)
+              (bind inv (aor/agent-initiate foo))
+              (is (condition-attained? (= (count nodes) @failures-atom)))
+              (reset! FAIL-NODES-ATOM #{})
+              (rtest/resume-microbatch-topology!
+               ipc
+               module-name
+               aor-types/AGENTS-MB-TOPOLOGY-NAME)
+              inv
+             )))
+
+         (bind ran-matches!
+           (fn [m]
+             (doseq [[k v] m]
+               (let [actual (get @RAN-NODES-ATOM k)]
+                 (when (not= v actual)
+                   (throw (ex-info "Matches failed!"
+                                   {:node k :expected v :actual actual})))
+               ))))
+
+         (bind inv (fail-and-retry! "node3" ["node1"]))
+         (is (= "node3" (aor/agent-result foo inv)))
+         (ran-matches! {"node1" 2 "begin" 1})
+
+         ;; TODO: <<<<>>>>
+         ;;  - have result come from other branch sometimes
+         ;;  - or make result node a config, that affect run-node! (which needs
+         ;;  agent-node)
+
+
+         ;(println "RAN" @RAN-NODES-ATOM)
+         ;; TODO: <<<<>>>>
+         ;;  - cause stall or failure on:
+         ;;    - regular node
+         ;;    - agg node execution after agg is complete
+         ;;    - agg node execution after agg is complete that's within another
+         ;;    agg
+         ;;    - agg start node
+         ;;    - agg start node within another agg
+         ;;    - multiple failures within the same execution on parallel
+         ;;    branches
+         ;;       - would need to pause the failure checker to let them all go
+         ;;       through
+        )))))
