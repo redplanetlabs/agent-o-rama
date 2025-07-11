@@ -76,20 +76,16 @@
                   :let [url (str "/agents/" module-id "/" agent-id "/invocations/" (:root-invoke-id invoke))]]
               ($ :tr.bg-gray-200.hover:bg-gray-300.cursor-pointer
                  {:key url
-                  :onClick (fn [e]
-                             (println e)
-                             (. e stopPropagation)
-                             (navigate url))}
+                  :onClick (fn [_] (navigate url))}
                  ($ :td (:root-invoke-id invoke))
                  ($ :td (common/pp (:invoke-args invoke)))
                  ($ :td (:graph-version invoke))
                  ($ :td (common/pp (:result invoke))))))
          ($ :tfoot 
-            ($ :tr 
+            ($ :tr
+               {:onClick (fn [_] (navigate (str "/agents/" module-id "/" agent-id "/invocations")))}
                ($ :th.hover:bg-gray-200.cursor-pointer {:colspan 4} 
-                  ($ wouter/Link
-                     {:href (str "/agents/" module-id "/" agent-id "/invocations")}
-                     "See all invocations"))))))))
+                  "See all invocations")))))))
 
 (defui evaluations []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))]
