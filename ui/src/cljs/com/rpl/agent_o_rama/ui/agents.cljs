@@ -110,8 +110,22 @@
      ($ wouter/Link
         {:href (str "/agents/" module-id "/" agent-id "/stats")
          :style {:flex-grow "1"}}
-        ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer
-           "stats summary"))))
+        ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer.relative
+           ($ :div.flex.justify-between.items-start
+              ($ :div
+                 ($ :div.text-sm.text-gray-600.mb-2 "Last 10,000 runs")
+                 ($ :div.flex.flex-row.gap-2
+                    ($ :div.flex.justify-between
+                       ($ :span.text-sm.text-gray-700 "Avg Tokens:")
+                       ($ :span.text-sm.font-medium.text-gray-900 "1,247.3"))
+                    ($ :div.flex.justify-between
+                       ($ :span.text-sm.text-gray-700 "Avg Latency:")
+                       ($ :span.text-sm.font-medium.text-gray-900 "342ms"))))
+              ($ :div.text-gray-400.hover:text-gray-600
+                 ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
+                    ($ :path {:fillRule "evenodd"
+                              :d "M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                              :clipRule "evenodd"}))))))))
 
 (defui alerts [{:keys [module-id agent-id]}]
   ($ :div.p-4.flex.gap-1
