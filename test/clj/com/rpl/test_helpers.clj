@@ -160,8 +160,9 @@
 
 
 (let [prev aor-types/get-config]
-  (defn ZERO-MAX-RETRIES-OVERRIDE
-    [m config]
-    (if (= (:name config) (:name aor-types/MAX-RETRIES-CONFIG))
-      0
-      (prev m config))))
+  (defn max-retries-override
+    [max-retries]
+    (fn [m config]
+      (if (= (:name config) (:name aor-types/MAX-RETRIES-CONFIG))
+        max-retries
+        (prev m config)))))

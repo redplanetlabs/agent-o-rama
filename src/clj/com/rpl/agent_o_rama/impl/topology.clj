@@ -223,6 +223,7 @@
    (:> *agent-task-id *agent-id *retry-num *op)))
 
 (defn hook:received-retry [agent-task-id agent-id retry-num])
+(defn hook:running-retry [agent-task-id agent-id retry-num])
 
 (deframafn complete-with-failure!
   [*agent-name *agent-id *message]
@@ -265,6 +266,7 @@
    ;; if it got GC'd, ignore
    (filter> (some? *root-invoke-id))
    (filter> (= *expected-retry-num *curr-retry-num))
+   (hook:running-retry *agent-task-id *agent-id *expected-retry-num)
    (fetch-graph-version *agent-name :> *curr-graph-version)
    (<<cond
     (case> (= *curr-graph-version *graph-version))
@@ -283,7 +285,7 @@
    (<<if (= :drop *handle-mode)
      (complete-with-failure! *agent-name *agent-id "Retry dropped")
      (filter> false))
-   (<<if (= :retry *handle-mode)
+   (<<if (= :restart *handle-mode)
      (local-transform> [(keypath *root-invoke-id) (termval nil)]
                        $$gc-invokes)
      (init-retry-num* :> *retry-num)

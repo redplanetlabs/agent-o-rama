@@ -66,7 +66,7 @@
       [retries/SUBSTITUTE-TICK-DEPOT true
        retries/checker-threshold-millis short-checker-threshold-millis
 
-       aor-types/get-config ZERO-MAX-RETRIES-OVERRIDE
+       aor-types/get-config (max-retries-override 0)
 
        retries/hook:checker-finished
        (fn [] (swap! checks-atom inc))
@@ -329,7 +329,7 @@
       [retries/SUBSTITUTE-TICK-DEPOT true
        at/init-retry-num             (fn [] @init-retry-num-atom)
 
-       aor-types/get-config          ZERO-MAX-RETRIES-OVERRIDE
+       aor-types/get-config          (max-retries-override 0)
 
        anode/log-node-error          (fn [& args])
 
@@ -497,7 +497,7 @@
        BLOCKED-NODES-ATOM (atom 0)
        EVENTS-ATOM (atom [])
 
-       aor-types/get-config ZERO-MAX-RETRIES-OVERRIDE
+       aor-types/get-config (max-retries-override 0)
 
        anode/log-node-error (fn [& args])
 
@@ -805,9 +805,16 @@
 
 (deftest retry-on-failure-test
   (let [failures-atom (atom 0)]
-    (with-redefs [FAIL-NODES-ATOM  (atom #{})
-                  RAN-NODES-ATOM   (atom {})
+    (with-redefs [FAIL-NODES-ATOM (atom #{})
+                  RAN-NODES-ATOM (atom {})
                   RESULT-NODE-ATOM (atom nil)
+                  SEM (h/mk-semaphore 0)
+
+                  anode/log-node-error (fn [& args])
+
+                  at/hook:running-retry
+                  (fn [& args]
+                    (h/acquire-semaphore SEM 1))
 
                   anode/hook:appended-agent-failure
                   (fn [& args] (swap! failures-atom inc))]
@@ -871,23 +878,22 @@
          (bind foo (aor/agent-client agent-manager "foo"))
 
          (bind fail-and-retry!
-           (fn [result-node nodes]
+           (fn [result-node num-fails nodes]
              (letlocals
               (reset! FAIL-NODES-ATOM (set nodes))
               (reset! RAN-NODES-ATOM {})
               (reset! RESULT-NODE-ATOM result-node)
               (reset! failures-atom 0)
-              (rtest/pause-microbatch-topology!
-               ipc
-               module-name
-               aor-types/AGENTS-MB-TOPOLOGY-NAME)
               (bind inv (aor/agent-initiate foo))
-              (is (condition-attained? (= (count nodes) @failures-atom)))
+              (when-not (condition-attained? (= (count nodes) @failures-atom))
+                (throw (ex-info "Didn't reach initial failures" {})))
+              (dotimes [i (min (dec num-fails) 3)]
+                (reset! failures-atom 0)
+                (h/release-semaphore SEM 1)
+                (when-not (condition-attained? (= (count nodes) @failures-atom))
+                  (throw (ex-info "Didn't reach failures" {}))))
               (reset! FAIL-NODES-ATOM #{})
-              (rtest/resume-microbatch-topology!
-               ipc
-               module-name
-               aor-types/AGENTS-MB-TOPOLOGY-NAME)
+              (h/release-semaphore SEM 1)
               inv
              )))
 
@@ -900,14 +906,25 @@
                                    {:node k :expected v :actual actual})))
                ))))
 
-         (bind inv (fail-and-retry! "node3" ["node1"]))
+         (bind inv (fail-and-retry! "node3" 1 ["node1"]))
          (is (= "node3" (aor/agent-result foo inv)))
          (ran-matches! {"node1" 2 "begin" 1})
 
+         (bind inv (fail-and-retry! "node3" 2 ["node1"]))
+         (is (= "node3" (aor/agent-result foo inv)))
+         (ran-matches! {"node1" 3 "begin" 1})
+
+         (bind inv (fail-and-retry! "node3" 3 ["node1"]))
+         (is (= "node3" (aor/agent-result foo inv)))
+         (ran-matches! {"node1" 4 "begin" 1})
+
+         (bind inv (fail-and-retry! "node3" 4 ["node1"]))
+         (is (thrown? Exception (aor/agent-result foo inv)))
+
+         (println "SSS" (.availablePermits SEM))
+
          ;; TODO: <<<<>>>>
-         ;;  - have result come from other branch sometimes
-         ;;  - or make result node a config, that affect run-node! (which needs
-         ;;  agent-node)
+         ;;  - can make "begin" node block on a semaphore
 
 
          ;(println "RAN" @RAN-NODES-ATOM)
