@@ -892,6 +892,26 @@
 
          (bind agent-manager (aor/agent-manager ipc module-name))
          (bind foo (aor/agent-client agent-manager "foo"))
+         (bind active-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-active-invokes-task-global-name "foo")))
+         (bind ks (rtest/gen-hashing-index-keys 4))
+
+         (bind check-active!
+           (fn [expected]
+             (let [c (reduce
+                      (fn [c k]
+                        (+ c
+                           (foreign-select-one (view count)
+                                               active-pstate
+                                               {:pkey k})))
+                      0
+                      ks)]
+               (when-not (= c expected)
+                 (throw (ex-info "Mismatched active count"
+                                 {:expected expected :count c})))
+             )))
 
          (bind fail-and-retry!
            (fn [result-node num-fails nodes]
@@ -914,6 +934,7 @@
                module-name
                aor-types/AGENTS-MB-TOPOLOGY-NAME)
               (dotimes [i (min (dec num-fails) 3)]
+                (check-active! 1)
                 (reset! failures-atom 0)
                 (when-not (condition-attained? (some? @CF-ATOM))
                   (throw (ex-info "Did not reach CF" {})))
@@ -945,6 +966,7 @@
                    (throw (ex-info "Matches failed!"
                                    {:node k :expected v :actual actual})))
                ))
+             (check-active! 0)
              (when-not (condition-attained?
                         (= @AGG-RESULTS-ATOM
                            {"agg" [1 1] "agg2" [1] "agg3" [1]}))
