@@ -283,7 +283,6 @@
      ;; it
      (identity :drop :> *handle-mode))
 
-
    (<<if (= :drop *handle-mode)
      (complete-with-failure! *agent-name *agent-id "Retry dropped")
      (filter> false))
