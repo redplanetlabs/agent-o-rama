@@ -298,6 +298,29 @@
                               aor-types/AGENTS-TOPOLOGY-NAME}]
                (AgentInvoke. agent-task-id agent-id)
              )))
+
+          (fork [this invoke nodeInvokeIdToNewArgs]
+            (.get (.forkAsync this invoke nodeInvokeIdToNewArgs)))
+          (forkAsync [this invoke nodeInvokeIdToNewArgs]
+            (.thenCompose
+             (.initiateForkAsync this invoke nodeInvokeIdToNewArgs)
+             (h/cf-function [agent-invoke]
+               (.agentResultAsync this agent-invoke))))
+          (initiateFork [this invoke nodeInvokeIdToNewArgs]
+            (.get (.initiateForkAsync this invoke nodeInvokeIdToNewArgs)))
+          (initiateForkAsync [this invoke invokeIdToNewArgs]
+            (.thenApply
+             (foreign-append-async!
+              agent-depot
+              (aor-types/->ForkAgentInvoke
+               (.getTaskId invoke)
+               (.getAgentInvokeId invoke)
+               invokeIdToNewArgs))
+             (h/cf-function [{[agent-task-id agent-id]
+                              aor-types/AGENTS-TOPOLOGY-NAME}]
+               (AgentInvoke. agent-task-id agent-id)
+             )))
+
           (agentResult [this agent-invoke]
             (.get (.agentResultAsync this agent-invoke)))
           (agentResultAsync [this agent-invoke]
@@ -421,6 +444,25 @@
 (defn agent-initiate-async
   ^CompletableFuture [^AgentClient agent-client & args]
   (.initiateAsync agent-client (into-array Object args)))
+
+(defn agent-fork
+  [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
+  (.fork agent-client invoke node-invoke-id->new-args))
+
+(defn agent-fork-async
+  ^CompletableFuture
+  [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
+  (.forkAsync agent-client invoke node-invoke-id->new-args))
+
+(defn agent-initiate-fork
+  ^AgentInvoke
+  [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
+  (.initiateFork agent-client invoke node-invoke-id->new-args))
+
+(defn agent-initiate-fork-async
+  ^CompletableFuture
+  [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
+  (.initiateForkAsync agent-client invoke node-invoke-id->new-args))
 
 (defn agent-result
   [^AgentClient agent-client agent-invoke]

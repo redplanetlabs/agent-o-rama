@@ -17,6 +17,12 @@ public interface AgentClient {
   <T> CompletableFuture<T> invokeAsync(Object... args);
   AgentInvoke initiate(Object... args);
   CompletableFuture<AgentInvoke> initiateAsync(Object... args);
+
+  <T> T fork(AgentInvoke invoke, Map<Long, List> nodeInvokeIdToNewArgs);
+  <T> CompletableFuture<T> forkAsync(AgentInvoke invoke, Map<Long, List> nodeInvokeIdToNewArgs);
+  AgentInvoke initiateFork(AgentInvoke invoke, Map<Long, List> nodeInvokeIdToNewArgs);
+  CompletableFuture<AgentInvoke> initiateForkAsync(AgentInvoke invoke, Map<Long, List> nodeInvokeIdToNewArgs);
+
   <T> T agentResult(AgentInvoke invoke);
   <T> CompletableFuture<T> agentResultAsync(AgentInvoke invoke);
   AgentStream stream(AgentInvoke invoke, String node);

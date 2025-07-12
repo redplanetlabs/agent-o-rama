@@ -888,44 +888,32 @@
     (aor-types/->valid-RetryNodeComplete *invoke-id *retry-num *fork-context)
     :append-ack)))
 
-(deframaop copy-unforked-agg-state
-  [*agent-name *agent-task-id *agent-id *retry-num *from-agg-invoke-id
-   *agg-invoke-id]
-  (<<with-substitutions
-   [$$nodes (po/agent-node-task-global *agent-name)]
-   (local-select> [(keypath *from-agg-invoke-id)
-                   (submap [:nested-ops :emits :result :start-time-millis
-                            :finish-time-millis :input :agg-state :agg-ack-val
-                            :agg-finished?])]
-                  $$nodes
-                  :> *sm)
-   (<<ramafn %merger
-     [*m]
-     (:> (reduce-kv assoc *m *sm)))
-   (local-transform> [(keypath *agg-invoke-id) (term %merger)] $$nodes)
+(deframafn copy-unforked-agg-state
+  [$$nodes *from-agg-invoke-id *agg-invoke-id]
+  (local-select> [(keypath *from-agg-invoke-id)
+                  (submap [:nested-ops :emits :result :start-time-millis
+                           :finish-time-millis :input :agg-state :agg-ack-val
+                           :agg-finished?])]
+                 $$nodes
+                 :> *sm)
+  (<<ramafn %merger
+    [*m]
+    (:> (reduce-kv assoc *m *sm)))
+  (local-transform> [(keypath *agg-invoke-id) (term %merger)] $$nodes)
 
-   (local-select> [(keypath *from-agg-invoke-id) :agg-inputs (view count)]
-                  $$nodes
-                  :> *amt)
-   (loop<- [*i 0]
-     (<<if (= *i *amt)
-       (:>)
-      (else>)
-       (yield-if-overtime)
-       (apart/filter-valid-retry-num> *agent-name
-                                      *agent-task-id
-                                      *agent-id
-                                      *retry-num)
-       (min (+ *i 1000) *amt :> *endi)
-       (local-select> [(keypath *from-agg-invoke-id) :agg-inputs
-                       (srange *i *endi)]
-                      $$nodes
-                      :> *v)
-       (local-transform> [(keypath *agg-invoke-id) :agg-inputs END (termval *v)]
-                         $$nodes)
-       (continue> *endi)
-     ))
-   (:>)))
+  (local-select> [(keypath *from-agg-invoke-id) :agg-inputs (view count)]
+                 $$nodes
+                 :> *amt)
+
+  ;; tracing only grabs first 10, so don't bother copying over everything in
+  ;; this case
+  (min *amt 100 :> *endi)
+  (local-select> [(keypath *from-agg-invoke-id) :agg-inputs (srange 0 *endi)]
+                 $$nodes
+                 :> *v)
+  (local-transform> [(keypath *agg-invoke-id) :agg-inputs (termval *v)]
+                    $$nodes)
+  (:>))
 
 (deframaop handle-node-op
   [*agent-name
@@ -1007,10 +995,7 @@
                          [:agg-start-res (termval *new-agg-start-res)])]
             $$nodes)
           (else>)
-           (copy-unforked-agg-state *agent-name
-                                    *agent-task-id
-                                    *agent-id
-                                    *retry-num
+           (copy-unforked-agg-state $$nodes
                                     *fork-agg-invoke-id
                                     *new-agg-invoke-id)
          )))
