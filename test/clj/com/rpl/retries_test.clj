@@ -985,20 +985,50 @@
                    "agg3"   1
                    "b4"     1})
 
+         (bind inv (fail-and-retry! "b4" 2 ["agg2"]))
+         (is (= "b4" (aor/agent-result foo inv)))
+         (verify! {"begin"  1
+                   "node2"  1
+                   "start2" 1
+                   "b1"     1
+                   "start3" 1
+                   "b2"     1
+                   "agg2"   3
+                   "b3"     1
+                   "agg3"   1
+                   "b4"     1})
 
+         (bind inv (fail-and-retry! "b4" 1 ["start3"]))
+         (is (= "b4" (aor/agent-result foo inv)))
+         (verify! {"begin"  1
+                   "node2"  1
+                   "start2" 1
+                   "b1"     1
+                   "start3" 2
+                   "b2"     1
+                   "agg2"   1
+                   "b3"     1
+                   "agg3"   1
+                   "b4"     1})
 
+         (bind inv (fail-and-retry! "b4" 1 ["start2" "agg"]))
+         (is (= "b4" (aor/agent-result foo inv)))
+         (verify! {"begin"  1
+                   "node2"  1
+                   "start2" 2
+                   "b1"     1
+                   "start3" 1
+                   "b2"     1
+                   "agg2"   1
+                   "b3"     1
+                   "agg3"   1
+                   "b4"     1
 
-         ;(println "RAN" @RAN-NODES-ATOM)
-         ;; TODO: <<<<>>>>
-         ;;  - cause stall or failure on:
-         ;;    - regular node
-         ;;    - agg node execution after agg is complete
-         ;;    - agg node execution after agg is complete that's within another
-         ;;    agg
-         ;;    - agg start node
-         ;;    - agg start node within another agg
-         ;;    - multiple failures within the same execution on parallel
-         ;;    branches
-         ;;       - would need to pause the failure checker to let them all go
-         ;;       through
+                   "node1"  1
+                   "start1" 1
+                   "a1"     1
+                   "a2"     1
+                   ;; since completion is on other path, can't say for sure how
+                   ;; many times reset of this path runs
+                  })
         )))))
