@@ -25,7 +25,9 @@
    [com.rpl.agentorama.impl
     AgentNodeExecutorTaskGlobal]
    [com.rpl.rama.helpers
-    TopologyUtils]))
+    TopologyUtils]
+   [java.util.concurrent
+    CompletableFuture]))
 
 (def SEM)
 (def SEM2)
@@ -794,6 +796,7 @@
 (def FAIL-NODES-ATOM)
 (def RAN-NODES-ATOM)
 (def RESULT-NODE-ATOM)
+(def CF-ATOM)
 
 (defn run-node!
   [agent-node n]
@@ -803,18 +806,25 @@
   (when (= @RESULT-NODE-ATOM n)
     (aor/result! agent-node n)))
 
+(defn mk-cf [] (CompletableFuture.))
+(defn complete-cf! [^CompletableFuture cf v] (.complete cf v))
+
+(deframaop cf-running-retry>
+  [*agent-task-id *agent-id *retry-num]
+  (mk-cf :> *cf)
+  (reset! (var-get (clj! var CF-ATOM)) *cf)
+  (completable-future> *cf)
+  (:>))
+
 (deftest retry-on-failure-test
   (let [failures-atom (atom 0)]
     (with-redefs [FAIL-NODES-ATOM (atom #{})
                   RAN-NODES-ATOM (atom {})
                   RESULT-NODE-ATOM (atom nil)
                   SEM (h/mk-semaphore 0)
-
+                  CF-ATOM (atom nil)
                   anode/log-node-error (fn [& args])
-
-                  at/hook:running-retry
-                  (fn [& args]
-                    (h/acquire-semaphore SEM 1))
+                  at/hook:running-retry> cf-running-retry>
 
                   anode/hook:appended-agent-failure
                   (fn [& args] (swap! failures-atom inc))]
@@ -884,16 +894,39 @@
               (reset! RAN-NODES-ATOM {})
               (reset! RESULT-NODE-ATOM result-node)
               (reset! failures-atom 0)
+              (reset! CF-ATOM nil)
+              (rtest/pause-microbatch-topology!
+               ipc
+               module-name
+               aor-types/AGENTS-MB-TOPOLOGY-NAME)
               (bind inv (aor/agent-initiate foo))
               (when-not (condition-attained? (= (count nodes) @failures-atom))
                 (throw (ex-info "Didn't reach initial failures" {})))
+              (rtest/resume-microbatch-topology!
+               ipc
+               module-name
+               aor-types/AGENTS-MB-TOPOLOGY-NAME)
               (dotimes [i (min (dec num-fails) 3)]
                 (reset! failures-atom 0)
-                (h/release-semaphore SEM 1)
+                (when-not (condition-attained? (some? @CF-ATOM))
+                  (throw (ex-info "Did not reach CF" {})))
+                (rtest/pause-microbatch-topology!
+                 ipc
+                 module-name
+                 aor-types/AGENTS-MB-TOPOLOGY-NAME)
+                (complete-cf! @CF-ATOM true)
                 (when-not (condition-attained? (= (count nodes) @failures-atom))
-                  (throw (ex-info "Didn't reach failures" {}))))
+                  (throw (ex-info "Didn't reach failures" {})))
+                (reset! CF-ATOM nil)
+                (rtest/resume-microbatch-topology!
+                 ipc
+                 module-name
+                 aor-types/AGENTS-MB-TOPOLOGY-NAME)
+              )
               (reset! FAIL-NODES-ATOM #{})
-              (h/release-semaphore SEM 1)
+              (when-not (condition-attained? (some? @CF-ATOM))
+                (throw (ex-info "Did not reach CF at end" {})))
+              (complete-cf! @CF-ATOM true)
               inv
              )))
 
@@ -921,10 +954,7 @@
          (bind inv (fail-and-retry! "node3" 4 ["node1"]))
          (is (thrown? Exception (aor/agent-result foo inv)))
 
-         (println "SSS" (.availablePermits SEM))
 
-         ;; TODO: <<<<>>>>
-         ;;  - can make "begin" node block on a semaphore
 
 
          ;(println "RAN" @RAN-NODES-ATOM)
