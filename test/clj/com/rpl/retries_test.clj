@@ -797,6 +797,7 @@
 (def RAN-NODES-ATOM)
 (def RESULT-NODE-ATOM)
 (def CF-ATOM)
+(def AGG-RESULTS-ATOM)
 
 (defn run-node!
   [agent-node n]
@@ -823,6 +824,7 @@
                   RESULT-NODE-ATOM (atom nil)
                   SEM (h/mk-semaphore 0)
                   CF-ATOM (atom nil)
+                  AGG-RESULTS-ATOM (atom {})
                   anode/log-node-error (fn [& args])
                   at/hook:running-retry> cf-running-retry>
 
@@ -838,6 +840,10 @@
                    node-impl
                    (fn [agent-node & args]
                      (run-node! agent-node name)
+                     (when (str/starts-with? name "agg")
+                       (setval [ATOM (keypath name)]
+                               (nth args 0)
+                               AGG-RESULTS-ATOM))
                      (doseq [n outputs]
                        (if (str/starts-with? n "agg")
                          (aor/emit! agent-node n 1)
@@ -890,6 +896,7 @@
          (bind fail-and-retry!
            (fn [result-node num-fails nodes]
              (letlocals
+              (reset! AGG-RESULTS-ATOM {})
               (reset! FAIL-NODES-ATOM (set nodes))
               (reset! RAN-NODES-ATOM {})
               (reset! RESULT-NODE-ATOM result-node)
@@ -930,29 +937,53 @@
               inv
              )))
 
-         (bind ran-matches!
+         (bind verify!
            (fn [m]
              (doseq [[k v] m]
                (let [actual (get @RAN-NODES-ATOM k)]
                  (when (not= v actual)
                    (throw (ex-info "Matches failed!"
                                    {:node k :expected v :actual actual})))
-               ))))
+               ))
+             (when-not (condition-attained?
+                        (= @AGG-RESULTS-ATOM
+                           {"agg" [1 1] "agg2" [1] "agg3" [1]}))
+               (throw (ex-info "Agg failed" {:result @AGG-RESULTS-ATOM})))
+           ))
 
          (bind inv (fail-and-retry! "node3" 1 ["node1"]))
          (is (= "node3" (aor/agent-result foo inv)))
-         (ran-matches! {"node1" 2 "begin" 1})
+         (verify! {"node1" 2 "begin" 1})
 
          (bind inv (fail-and-retry! "node3" 2 ["node1"]))
          (is (= "node3" (aor/agent-result foo inv)))
-         (ran-matches! {"node1" 3 "begin" 1})
+         (verify! {"node1" 3 "begin" 1})
 
          (bind inv (fail-and-retry! "node3" 3 ["node1"]))
          (is (= "node3" (aor/agent-result foo inv)))
-         (ran-matches! {"node1" 4 "begin" 1})
+         (verify! {"node1" 4 "begin" 1})
 
          (bind inv (fail-and-retry! "node3" 4 ["node1"]))
          (is (thrown? Exception (aor/agent-result foo inv)))
+
+         ;; this one can partially aggregate, so it verifies the retry resets
+         ;; properly
+         (bind inv (fail-and-retry! "node3" 1 ["a2"]))
+         (is (= "node3" (aor/agent-result foo inv)))
+         (verify! {"begin" 1 "node1" 1 "start1" 1 "a2" 2 "agg" 1 "node3" 1})
+
+         (bind inv (fail-and-retry! "b4" 2 ["b1"]))
+         (is (= "b4" (aor/agent-result foo inv)))
+         (verify! {"begin"  1
+                   "node2"  1
+                   "start2" 1
+                   "b1"     3
+                   "start3" 1
+                   "b2"     1
+                   "agg2"   1
+                   "b3"     1
+                   "agg3"   1
+                   "b4"     1})
 
 
 
