@@ -69,12 +69,12 @@
               "special3"
               "special4"
               (fn [agent-node]
-                (aor/emit! agent-node "special4" @GLOBAL-ATOM)
+                (aor/emit! agent-node "special4" ["aaa" @GLOBAL-ATOM])
                 (swap! GLOBAL-ATOM dec)))
              (aor/node
               "special4"
               ["special2" "b5"]
-              (fn [agent-node v]
+              (fn [agent-node [_ v]]
                 (if (> v 0)
                   (aor/emit! agent-node "special2" v)
                   (aor/emit! agent-node "b5"))))
@@ -94,7 +94,18 @@
                          module-name
                          (queries/tracing-query-name "foo")))
 
-        (reset! GLOBAL-ATOM 1)
+        (bind of-input
+          (fn [trace v]
+            (select-one!
+             [ALL (selected? LAST :input FIRST (pred= v)) FIRST]
+             trace)))
+        (bind of-name
+          (fn [trace n]
+            (select-one!
+             [ALL (selected? LAST :node (pred= n)) FIRST]
+             trace)))
+
+        (reset! GLOBAL-ATOM 2)
         (bind inv (aor/agent-initiate foo))
         (bind agent-task-id (.getTaskId inv))
         (bind agent-id (.getAgentInvokeId inv))
@@ -113,6 +124,9 @@
                                  10000)))
 
         (clojure.pprint/pprint trace)
+        (println "aaa 1" (of-input trace ["aaa" 1]))
+        (println "2" (of-input trace 2))
+        (println "special1" (of-name trace "special1"))
 
         ;; TODO: <<<<>>>>
         ;;  - make graph similar to retries graph with pluggable node that does
