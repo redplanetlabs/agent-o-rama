@@ -1,27 +1,8 @@
-mini invocations -> see all, not background click
-add more styles 
-
-next to agent graph, toplevel stats on right {
-  avg token used, avg latency , in last 10000 runs
-  two panels (top = stats, bottom = alerts (preview, with button to see all))
-}
-
 fork textarea split into individual arg boxes (arg1, arg2 labels)
-
-manually run. no longer a page link,
-   its a widget with box per arg and submit button
-   placeholder=arg1, arg2, arg3
 
 timeseries graphs on agent stats page {
   like rama cluster ui, scroll of many timeseries (granularity like rama cluster ui)
 }
-
-stats page has xyflowgraph rendering for agent {
-  has version dropdown (includes "overall" option)
-  has graphs/distributions
-}
-
-two graph views (one has invocation specific stats, one has global stats)
 
 edn=>json (and label that says its json)
 
