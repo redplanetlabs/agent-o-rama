@@ -174,7 +174,7 @@
                       :value (get args i "")
                       :onChange #(update-arg i (.. % -target -value))
                       :rows 2})))
-             ($ :button.w-32.h-16.bg-green-600.text-white.px-4.rounded.hover:bg-green-700.text-sm.font-medium
+             ($ :button.w-32.h-16.bg-green-600.text-white.px-4.rounded.hover:bg-green-700.text-sm.font-medium.cursor-pointer
                 {:type "submit"}
                 "Submit"))))))
 
