@@ -1,8 +1,6 @@
 (ns com.rpl.agent-o-rama.impl.topology
   (:use [com.rpl.rama]
-        [com.rpl.rama path]
-        ;; TODO: <<<<>>>> remove
-        [rpl.rama.util.helpers :refer [atomic-println]])
+        [com.rpl.rama path])
   (:require
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.client :as iclient]
@@ -105,12 +103,6 @@
    (hook> <root>)
    (mapv :invoke-id *emits :> *next-invoke-ids)
    (reduce bit-xor *invoke-id *next-invoke-ids :> *ack-val)
-
-
-   ;; TODO: <<<<>>> delete
-   (po/agent-node-task-global *agent-name :> $$nodes)
-   (local-select> [(keypath *invoke-id) :node] $$nodes :> *node-name)
-
    (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
                |direct
                *agent-task-id)
@@ -125,10 +117,6 @@
      (aor-types/->valid-AggAckOp *agg-invoke-id *ack-val :> *op)
      (anchor> <agg-ack-emit>)
     (else>)
-     ;; TODO: <<<<>>> delete
-     (local-select> (keypath *agent-id)
-                    $$root
-                    :> {*orig-ack-val :ack-val})
      (<<ramafn %update-ack-val
        [*v]
        (:> (bit-xor *v *ack-val)))
@@ -140,12 +128,6 @@
      (local-select> (keypath *agent-id)
                     $$root
                     :> {*root-ack-val :ack-val *result :result})
-     (atomic-println "UPDATING ROOT ACK VAL"
-                     *node-name
-                     *invoke-id
-                     *next-invoke-ids
-                     *orig-ack-val
-                     *root-ack-val)
      (<<if (= 0 *root-ack-val)
        (<<if (nil? *result)
          (local-transform>
@@ -642,7 +624,7 @@
    (get-node-obj *agent-graph *node :> *node-obj)
    (local-select> (keypath *invoke-id)
                   $$nodes
-                  :> {:keys [*result *emits *node]}) ; TODO: <<<<>>> del *node
+                  :> {:keys [*result *emits]})
 
    (<<if (aor-types/NodeAggStart? *node-obj)
      (local-select> (keypath *agg-invoke-id)
@@ -906,17 +888,26 @@
     (aor-types/->valid-RetryNodeComplete *invoke-id *retry-num *fork-context)
     :append-ack)))
 
+(deframafn update-forked-emits
+  [*emits]
+  (ops/current-random-source :> *random-source)
+  (<<ramafn %update-emit
+    [{*emit-invoke-id :invoke-id :as *emit}]
+    (:>
+     (assoc *emit
+      :fork-invoke-id *emit-invoke-id
+      :invoke-id (h/random-long *random-source))))
+  (:> (mapv %update-emit *emits)))
+
 (deframafn copy-unforked-agg-state
   [$$nodes *from-agg-invoke-id *agg-invoke-id]
-  ;; TODO: <<<<>>>> copying emits seems wrong, or at least they need to be
-  ;; modified...
-  ;;    - need to separate that out into a helper
   (local-select> [(keypath *from-agg-invoke-id)
                   (submap [:nested-ops :emits :result :start-time-millis
                            :finish-time-millis :input :agg-state :agg-ack-val
                            :agg-finished?])]
                  $$nodes
                  :> *sm)
+  (update *sm :emits update-forked-emits :> *sm)
   (<<ramafn %merger
     [*m]
     (:> (reduce-kv assoc *m *sm)))
@@ -971,14 +962,7 @@
                     :> {*emits :emits
                         *fork-agg-invoke-id :agg-invoke-id
                         :as    *curr-data})
-     (ops/current-random-source :> *random-source)
-     (<<ramafn %update-emit
-       [{*emit-invoke-id :invoke-id :as *emit}]
-       (:>
-        (assoc *emit
-         :fork-invoke-id *emit-invoke-id
-         :invoke-id (h/random-long *random-source))))
-     (mapv %update-emit *emits :> *new-emits)
+     (update-forked-emits *emits :> *new-emits)
      (local-transform> [(keypath *invoke-id)
                         (termval (assoc *curr-data
                                   :agent-task-id *agent-task-id
@@ -989,7 +973,7 @@
                                   :agg-invoke-id *agg-invoke-id))]
                        $$nodes)
      (<<if (aor-types/NodeAggStart? *node-obj)
-       (h/random-long *random-source :> *new-agg-invoke-id)
+       (h/random-long (ops/current-random-source) :> *new-agg-invoke-id)
        (local-select> (keypath *fork-agg-invoke-id)
                       $$nodes
                       :> {*agg-node      :node

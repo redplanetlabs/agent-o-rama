@@ -148,8 +148,6 @@
         (bind finv (aor/agent-initiate-fork foo inv {a2 []}))
         (bind agent-task-id (.getTaskId finv))
         (bind agent-id (.getAgentInvokeId finv))
-        ;; TODO: <<<<<>>>>> not completing...
-        ;;    - ack vals not getting through?
         (wait-agent-finished! root-pstate agent-task-id agent-id)
         (bind root-invoke-id
           (foreign-select-one [(keypath agent-id) :root-invoke-id]
