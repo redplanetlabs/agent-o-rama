@@ -26,10 +26,14 @@
     CompletableFuture]))
 
 (def GLOBAL-ATOM)
+(def GLOBAL-ATOM2)
+(def GLOBAL-ATOM3)
 
 (deftest forking-test
   (tc/with-auto-builder
-   (with-redefs [GLOBAL-ATOM (atom 0)]
+   (with-redefs [GLOBAL-ATOM  (atom 0)
+                 GLOBAL-ATOM2 (atom 0)
+                 GLOBAL-ATOM3 (atom 9)]
      (with-open [ipc (rtest/create-ipc)]
        (letlocals
         (bind module
@@ -41,8 +45,16 @@
              (tc/auto-node "begin" ["node1" "node2"])
              (tc/auto-node "node1" "start1")
              (tc/auto-node "start1" ["a1" "a2"])
-             (tc/auto-node "a1" "agg")
-             (tc/auto-node "a2" "agg")
+             (aor/node
+              "a1"
+              "agg"
+              (fn [agent-node]
+                (aor/emit! agent-node "agg" (- @GLOBAL-ATOM3))))
+             (aor/node
+              "a2"
+              "agg"
+              (fn [agent-node]
+                (aor/emit! agent-node "agg" @GLOBAL-ATOM3)))
              (tc/auto-node "agg" "node3")
              (tc/auto-node "node3" nil)
 
@@ -69,12 +81,15 @@
               "special3"
               "special4"
               (fn [agent-node]
-                (aor/emit! agent-node "special4" ["aaa" @GLOBAL-ATOM])
+                (swap! GLOBAL-ATOM2 inc)
+                (aor/emit! agent-node
+                           "special4"
+                           ["aaa" @GLOBAL-ATOM @GLOBAL-ATOM2])
                 (swap! GLOBAL-ATOM dec)))
              (aor/node
               "special4"
               ["special2" "b5"]
-              (fn [agent-node [_ v]]
+              (fn [agent-node [_ v _]]
                 (if (> v 0)
                   (aor/emit! agent-node "special2" v)
                   (aor/emit! agent-node "b5"))))
@@ -124,9 +139,35 @@
                                  10000)))
 
         (clojure.pprint/pprint trace)
-        (println "aaa 1" (of-input trace ["aaa" 1]))
-        (println "2" (of-input trace 2))
-        (println "special1" (of-name trace "special1"))
+        (println "\n\n")
+
+        (reset! GLOBAL-ATOM3 7)
+
+        (bind a2 (of-name trace "a2"))
+
+        (bind finv (aor/agent-initiate-fork foo inv {a2 []}))
+        (bind agent-task-id (.getTaskId finv))
+        (bind agent-id (.getAgentInvokeId finv))
+        ;; TODO: <<<<<>>>>> not completing...
+        ;;    - ack vals not getting through?
+        (wait-agent-finished! root-pstate agent-task-id agent-id)
+        (bind root-invoke-id
+          (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                              root-pstate
+                              {:pkey agent-task-id}))
+        (bind trace2
+          (:invokes-map
+           (foreign-invoke-query traces-query
+                                 agent-task-id
+                                 [[agent-task-id root-invoke-id]]
+                                 10000)))
+        (println "FORK TRACE")
+        (clojure.pprint/pprint trace2)
+
+
+        ;; TODO: <<<<<>>>>
+        ;;  - fork node in the middle of an aggregation, verify it reuses
+        ;;  previous output
 
         ;; TODO: <<<<>>>>
         ;;  - make graph similar to retries graph with pluggable node that does

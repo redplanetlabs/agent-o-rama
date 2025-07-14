@@ -1,6 +1,8 @@
 (ns com.rpl.agent-o-rama.impl.topology
   (:use [com.rpl.rama]
-        [com.rpl.rama path])
+        [com.rpl.rama path]
+        ;; TODO: <<<<>>>> remove
+        [rpl.rama.util.helpers :refer [atomic-println]])
   (:require
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.client :as iclient]
@@ -103,6 +105,12 @@
    (hook> <root>)
    (mapv :invoke-id *emits :> *next-invoke-ids)
    (reduce bit-xor *invoke-id *next-invoke-ids :> *ack-val)
+
+
+   ;; TODO: <<<<>>> delete
+   (po/agent-node-task-global *agent-name :> $$nodes)
+   (local-select> [(keypath *invoke-id) :node] $$nodes :> *node-name)
+
    (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
                |direct
                *agent-task-id)
@@ -117,6 +125,10 @@
      (aor-types/->valid-AggAckOp *agg-invoke-id *ack-val :> *op)
      (anchor> <agg-ack-emit>)
     (else>)
+     ;; TODO: <<<<>>> delete
+     (local-select> (keypath *agent-id)
+                    $$root
+                    :> {*orig-ack-val :ack-val})
      (<<ramafn %update-ack-val
        [*v]
        (:> (bit-xor *v *ack-val)))
@@ -128,6 +140,12 @@
      (local-select> (keypath *agent-id)
                     $$root
                     :> {*root-ack-val :ack-val *result :result})
+     (atomic-println "UPDATING ROOT ACK VAL"
+                     *node-name
+                     *invoke-id
+                     *next-invoke-ids
+                     *orig-ack-val
+                     *root-ack-val)
      (<<if (= 0 *root-ack-val)
        (<<if (nil? *result)
          (local-transform>
@@ -410,7 +428,8 @@
    (local-select> (keypath *invoke-id)
                   $$nodes
                   :> {:keys [*agent-task-id *agent-id *node
-                             *agg-invoke-id]})
+                             *agg-invoke-id]
+                      :as   *all-data})
    (filter> (some? *agent-id))
    (apart/filter-valid-retry-num> *agent-name
                                   *agent-task-id
@@ -623,7 +642,7 @@
    (get-node-obj *agent-graph *node :> *node-obj)
    (local-select> (keypath *invoke-id)
                   $$nodes
-                  :> {:keys [*result *emits]})
+                  :> {:keys [*result *emits *node]}) ; TODO: <<<<>>> del *node
 
    (<<if (aor-types/NodeAggStart? *node-obj)
      (local-select> (keypath *agg-invoke-id)
@@ -790,8 +809,6 @@
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
-
-
    (<<subsource (get-node-obj *agent-graph *next-node)
     (case> Node :> {:keys [*node-fn]})
      (anode/handle-node-invoke
@@ -867,6 +884,7 @@
                     (termval (aor-types/->valid-AggInput *invoke-id
                                                          *args))])]
       $$nodes)
+     (local-select> (keypath *agg-invoke-id) $$nodes :> *tmp)
 
      ;; by not acking here and going straight go complete-agg!, it also prevents
      ;; rest of agg subgraph from ever completing and calling complete-agg!
@@ -890,6 +908,9 @@
 
 (deframafn copy-unforked-agg-state
   [$$nodes *from-agg-invoke-id *agg-invoke-id]
+  ;; TODO: <<<<>>>> copying emits seems wrong, or at least they need to be
+  ;; modified...
+  ;;    - need to separate that out into a helper
   (local-select> [(keypath *from-agg-invoke-id)
                   (submap [:nested-ops :emits :result :start-time-millis
                            :finish-time-millis :input :agg-state :agg-ack-val
@@ -943,8 +964,9 @@
                        :args
                        (get *invoke-id->new-args *fork-invoke-id)))
 
-    (case> (some? *fork-context))
-     (local-select> (keypath *fork-invoke-id)
+    (case> (and> (some? *fork-context)
+                 (not (aor-types/NodeAgg? *node-obj))))
+     (local-select> [(keypath *fork-invoke-id) (view h/into-map)]
                     $$nodes
                     :> {*emits :emits
                         *fork-agg-invoke-id :agg-invoke-id
@@ -962,7 +984,7 @@
                                   :agent-task-id *agent-task-id
                                   :agent-id *agent-id
                                   :emits *new-emits
-                                  ;; this will be overwridden below if it's
+                                  ;; this will be overwritten below if it's
                                   ;; NodeAggStart
                                   :agg-invoke-id *agg-invoke-id))]
                        $$nodes)
@@ -985,6 +1007,10 @@
                           (termval *new-agg-invoke-id)]
                          $$nodes)
        (<<if (not (contains? *affected-aggs *fork-invoke-id))
+         (copy-unforked-agg-state $$nodes
+                                  *fork-agg-invoke-id
+                                  *new-agg-invoke-id)
+        (else>)
          (<<if (contains? *invoke-id->new-args *fork-agg-invoke-id)
            (get *invoke-id->new-args
                 *fork-agg-invoke-id
@@ -994,11 +1020,10 @@
              (multi-path [:agg-state (termval *new-agg-state)]
                          [:agg-start-res (termval *new-agg-start-res)])]
             $$nodes)
-          (else>)
-           (copy-unforked-agg-state $$nodes
-                                    *fork-agg-invoke-id
-                                    *new-agg-invoke-id)
          )))
+     ;; replicate writes before initiating RetryNodeComplete
+     (|direct (ops/current-task-id))
+     (local-select> [(keypath *invoke-id) :emits] $$nodes :> *tmp)
      (depot-partition-append!
       *agent-depot
       (aor-types/->valid-RetryNodeComplete *invoke-id
