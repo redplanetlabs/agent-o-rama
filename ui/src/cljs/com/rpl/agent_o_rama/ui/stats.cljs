@@ -5,6 +5,7 @@
    [uix.core :as uix :refer [defui defhook $]]
    ["axios" :as axios]
    ["wouter" :as wouter :refer [useLocation]]
+   ["uplot" :default uplot]
 
    
    [com.rpl.agent-o-rama.ui.common :as common]))
@@ -186,11 +187,40 @@
          ($ stats-panel {:selected-node selected-node 
                          :selected-version selected-version})))))
 
-(defui chart [{:keys [dimension]}]
-  ($ :div dimension))
+;; Generate sinusoidal data for charts
+(defn generate-sine-data [frequency amplitude phase-offset points]
+  (let [time-data (range 0 (* 2 Math/PI) (/ (* 2 Math/PI) points))
+        sine-data (map #(+ amplitude (* amplitude (Math/sin (+ (* frequency %) phase-offset)))) time-data)]
+    [time-data sine-data]))
+
+;; Generate different sinusoidal patterns for different metrics
+(defn generate-metric-data [metric-name points]
+  (case metric-name
+    "execution time" (generate-sine-data 2 100 0 points) ; Higher frequency, moderate amplitude
+    "tokens" (generate-sine-data 1.5 500 0.5 points)     ; Medium frequency, high amplitude
+    "latency" (generate-sine-data 3 50 1 points)         ; High frequency, low amplitude
+    "model calls" (generate-sine-data 0.8 10 0.2 points) ; Low frequency, low amplitude
+    "nodes executed" (generate-sine-data 1.2 8 0.8 points) ; Medium frequency, low amplitude
+    (generate-sine-data 1 100 0 points))) ; Default
+
+(defui chart [{:keys [dimension data]}]
+  (let [chart-ref (uix/use-ref)]
+    ($ :div {:className "bg-white p-4 rounded-lg shadow-sm border"
+             :ref chart-ref})))
+
 (defui stats-timeseries []
-  (for [dimension ["execution time" "tokens" "latency" "model calls" "nodes executed"]]
-    ($ chart {:dimension dimension})))
+  (let [points 100
+        chart-data (into {}
+                         (for [dimension ["execution time" "tokens" "latency" "model calls" "nodes executed"]]
+                           [dimension (generate-metric-data dimension points)]))]
+    ($ :div {:className "mt-6"}
+       ($ :h3 {:className "text-lg font-semibold text-gray-800 mb-4"}
+          "Performance Metrics Over Time")
+       ($ :div {:className "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"}
+          (for [[dimension data] chart-data]
+            ($ chart {:key dimension
+                      :dimension dimension
+                      :data data}))))))
 
 (defui stats []
   (let [[selected-version set-selected-version] (uix/use-state (first dummy-versions))]
