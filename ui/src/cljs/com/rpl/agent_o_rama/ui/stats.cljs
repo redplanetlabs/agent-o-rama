@@ -186,9 +186,16 @@
          ($ stats-panel {:selected-node selected-node 
                          :selected-version selected-version})))))
 
+(defui chart [{:keys [dimension]}]
+  ($ :div dimension))
+(defui stats-timeseries []
+  (for [dimension ["execution time" "tokens" "latency" "model calls" "nodes executed"]]
+    ($ chart {:dimension dimension})))
+
 (defui stats []
   (let [[selected-version set-selected-version] (uix/use-state (first dummy-versions))]
     ($ :div.p-4
        ($ version-dropdown {:selected-version selected-version 
                             :set-selected-version set-selected-version})
-       ($ agent-graph {:selected-version selected-version}))))
+       ($ agent-graph {:selected-version selected-version})
+       ($ stats-timeseries))))
