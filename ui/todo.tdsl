@@ -1,5 +1,3 @@
-fork textarea split into individual arg boxes (arg1, arg2 labels)
-
 timeseries graphs on agent stats page {
   like rama cluster ui, scroll of many timeseries (granularity like rama cluster ui)
 }
