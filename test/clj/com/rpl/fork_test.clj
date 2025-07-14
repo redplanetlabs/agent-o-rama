@@ -29,6 +29,18 @@
 (def GLOBAL-ATOM2)
 (def GLOBAL-ATOM3)
 
+(defn of-input
+  [trace v]
+  (select-one!
+   [ALL (selected? LAST :input FIRST (pred= v)) FIRST]
+   trace))
+
+(defn of-name
+  [trace n]
+  (select-one!
+   [ALL (selected? LAST :node (pred= n)) FIRST]
+   trace))
+
 (deftest forking-test
   (tc/with-auto-builder
    (with-redefs [GLOBAL-ATOM  (atom 0)
@@ -109,57 +121,36 @@
                          module-name
                          (queries/tracing-query-name "foo")))
 
-        (bind of-input
-          (fn [trace v]
-            (select-one!
-             [ALL (selected? LAST :input FIRST (pred= v)) FIRST]
-             trace)))
-        (bind of-name
-          (fn [trace n]
-            (select-one!
-             [ALL (selected? LAST :node (pred= n)) FIRST]
-             trace)))
+        (bind get-trace
+          (fn [^AgentInvoke inv]
+            (let [agent-task-id  (.getTaskId inv)
+                  agent-id       (.getAgentInvokeId inv)
+                  root-invoke-id
+                  (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                                      root-pstate
+                                      {:pkey agent-task-id})]
+              (wait-agent-finished! root-pstate agent-task-id agent-id)
+              (:invokes-map
+               (foreign-invoke-query traces-query
+                                     agent-task-id
+                                     [[agent-task-id root-invoke-id]]
+                                     10000))
+            )))
+
 
         (reset! GLOBAL-ATOM 2)
+
         (bind inv (aor/agent-initiate foo))
-        (bind agent-task-id (.getTaskId inv))
-        (bind agent-id (.getAgentInvokeId inv))
-        (wait-agent-finished! root-pstate agent-task-id agent-id)
-
-        (bind root-invoke-id
-          (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                              root-pstate
-                              {:pkey agent-task-id}))
-
-        (bind trace
-          (:invokes-map
-           (foreign-invoke-query traces-query
-                                 agent-task-id
-                                 [[agent-task-id root-invoke-id]]
-                                 10000)))
-
+        (bind trace (get-trace inv))
+        (println "TRACE" (count trace))
         (clojure.pprint/pprint trace)
         (println "\n\n")
 
         (reset! GLOBAL-ATOM3 7)
-
         (bind a2 (of-name trace "a2"))
-
         (bind finv (aor/agent-initiate-fork foo inv {a2 []}))
-        (bind agent-task-id (.getTaskId finv))
-        (bind agent-id (.getAgentInvokeId finv))
-        (wait-agent-finished! root-pstate agent-task-id agent-id)
-        (bind root-invoke-id
-          (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                              root-pstate
-                              {:pkey agent-task-id}))
-        (bind trace2
-          (:invokes-map
-           (foreign-invoke-query traces-query
-                                 agent-task-id
-                                 [[agent-task-id root-invoke-id]]
-                                 10000)))
-        (println "FORK TRACE")
+        (bind trace2 (get-trace finv))
+        (println "FORK TRACE" (count trace2))
         (clojure.pprint/pprint trace2)
 
 
