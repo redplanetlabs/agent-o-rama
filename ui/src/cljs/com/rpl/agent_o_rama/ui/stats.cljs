@@ -5,7 +5,7 @@
    [uix.core :as uix :refer [defui defhook $]]
    ["axios" :as axios]
    ["wouter" :as wouter :refer [useLocation]]
-   ["uplot" :default uplot]
+   ["uplot" :as uplot]
 
    
    [com.rpl.agent-o-rama.ui.common :as common]))
@@ -204,7 +204,76 @@
     (generate-sine-data 1 100 0 points))) ; Default
 
 (defui chart [{:keys [dimension data]}]
-  (let [chart-ref (uix/use-ref)]
+  (let [chart-ref (uix/use-ref)
+        [time-data sine-data] data]
+    
+    ;; Initialize uPlot chart
+    (uix/use-effect
+     (fn []
+       (when (and chart-ref (.-current chart-ref))
+         (let [;; Format data for uPlot: [[x-values], [y-values]]
+               chart-data (clj->js [time-data sine-data])
+               
+               ;; Chart options
+               opts (clj->js
+                     {:width (.-offsetWidth (.-current chart-ref))
+                      :height 250
+                      :title dimension
+                      :scales {:x {:time false}
+                               :y {}}
+                      :series [{} ;; X-axis series
+                               {:label dimension
+                                :stroke (case dimension
+                                          "execution time" "#3b82f6" ;; blue
+                                          "tokens" "#8b5cf6" ;; purple
+                                          "latency" "#ef4444" ;; red
+                                          "model calls" "#10b981" ;; green
+                                          "nodes executed" "#f59e0b" ;; orange
+                                          "#6b7280") ;; gray default
+                                :width 2
+                                :fill (case dimension
+                                        "execution time" "rgba(59, 130, 246, 0.1)"
+                                        "tokens" "rgba(139, 92, 246, 0.1)"
+                                        "latency" "rgba(239, 68, 68, 0.1)"
+                                        "model calls" "rgba(16, 185, 129, 0.1)"
+                                        "nodes executed" "rgba(245, 158, 11, 0.1)"
+                                        "rgba(107, 114, 128, 0.1)")}]
+                      :axes [{:label "Time"
+                              :labelSize 12
+                              :stroke "#6b7280"
+                              :grid {:stroke "rgba(107, 114, 128, 0.1)"}}
+                             {:label (case dimension
+                                       "execution time" "Time (ms)"
+                                       "tokens" "Token Count"
+                                       "latency" "Latency (ms)"
+                                       "model calls" "Calls"
+                                       "nodes executed" "Nodes"
+                                       "Value")
+                              :labelSize 12
+                              :stroke "#6b7280"
+                              :grid {:stroke "rgba(107, 114, 128, 0.1)"}}]
+                      :cursor {:show true
+                               :points {:show true
+                                        :size 8}}})
+               
+               ;; Create chart instance
+               chart-instance (uplot. opts chart-data (.-current chart-ref))]
+           
+           ;; Handle window resize
+           (let [handle-resize (fn []
+                                 (when (and chart-instance (.-current chart-ref))
+                                   (.setSize chart-instance
+                                             (clj->js {:width (.-offsetWidth (.-current chart-ref))
+                                                       :height 250}))))]
+             (js/window.addEventListener "resize" handle-resize)
+             
+             ;; Cleanup function
+             (fn []
+               (js/window.removeEventListener "resize" handle-resize)
+               (when chart-instance
+                 (.destroy chart-instance)))))))
+     #js [dimension data])
+    
     ($ :div {:className "bg-white p-4 rounded-lg shadow-sm border"
              :ref chart-ref})))
 
