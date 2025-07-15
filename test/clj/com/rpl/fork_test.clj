@@ -194,16 +194,11 @@
 
         (bind inv (aor/agent-initiate foo))
         (bind trace (get-trace inv))
-        (println "TRACE" (count trace))
-        (clojure.pprint/pprint trace)
-        (println "\n\n")
 
         (reset! GLOBAL-ATOM3 7)
         (bind a2 (of-name trace "a2"))
         (bind finv (aor/agent-initiate-fork foo inv {a2 []}))
         (bind trace2 (get-trace finv))
-        (println "FORK TRACE" (count trace2))
-        (clojure.pprint/pprint trace2)
 
         (is (empty? (set/intersection (-> trace
                                           keys
