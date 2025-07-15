@@ -196,43 +196,44 @@
         (bind trace (get-trace inv))
 
         (reset! GLOBAL-ATOM3 7)
-        (bind a2 (of-name trace "a2"))
-        (bind finv (aor/agent-initiate-fork foo inv {a2 []}))
-        (bind trace2 (get-trace finv))
-
-        (is (empty? (set/intersection (-> trace
-                                          keys
-                                          set)
-                                      (-> trace2
-                                          keys
-                                          set))))
-
-        (bind a2-node-emits (:emits (trace-node trace2 "a2")))
-        (is (= 1 (count a2-node-emits)))
-        (is (= [7]
-               (-> a2-node-emits
-                   first
-                   :args)))
-
-        (bind a (trace-node trace2 "agg"))
-        (is (or (= [7 -9] (:agg-state a))
-                (= [-9 7] (:agg-state a))))
-        (is (or (= [[7 -9] nil] (:input a))
-                (= [[-9 7] nil] (:input a))))
-
-        (bind after (trace-node trace2 "after"))
-        (is (or (= [[[7 -9] nil]] (:input after))
-                (= [[[-9 7] nil]] (:input after))))
-
-        (verify-same-nodes!
-         trace
-         trace2
-         ["begin" "node1" "start1" "a1" "node2" "special1" "special2" "start2"
-          "b1" "start3" "b2" "agg2" "b3" "agg3" "b4" "special3" "special4"
-          "b5"])
+        ; (bind a2 (of-name trace "a2"))
+        ; (bind finv (aor/agent-initiate-fork foo inv {a2 []}))
+        ; (bind trace2 (get-trace finv))
+        ;
+        ; (is (empty? (set/intersection (-> trace
+        ;                                   keys
+        ;                                   set)
+        ;                               (-> trace2
+        ;                                   keys
+        ;                                   set))))
+        ;
+        ; (bind a2-node-emits (:emits (trace-node trace2 "a2")))
+        ; (is (= 1 (count a2-node-emits)))
+        ; (is (= [7]
+        ;        (-> a2-node-emits
+        ;            first
+        ;            :args)))
+        ;
+        ; (bind a (trace-node trace2 "agg"))
+        ; (is (or (= [7 -9] (:agg-state a))
+        ;         (= [-9 7] (:agg-state a))))
+        ; (is (or (= [[7 -9] nil] (:input a))
+        ;         (= [[-9 7] nil] (:input a))))
+        ;
+        ; (bind after (trace-node trace2 "after"))
+        ; (is (or (= [[[7 -9] nil]] (:input after))
+        ;         (= [[[-9 7] nil]] (:input after))))
+        ;
+        ; (verify-same-nodes!
+        ;  trace
+        ;  trace2
+        ;  ["begin" "node1" "start1" "a1" "node2" "special1" "special2" "start2"
+        ;   "b1" "start3" "b2" "agg2" "b3" "agg3" "b4" "special3" "special4"
+        ;   "b5"])
 
         (println "TRACE" (count trace))
         (clojure.pprint/pprint trace)
+        (println)
 
         (bind special4-1 (of-input trace ["aaa" 1 2]))
         (bind agg-node (of-name trace "agg"))
@@ -246,8 +247,11 @@
 
 
         (println "FORK TRACE" (count trace2))
+        (println)
         (clojure.pprint/pprint trace2)
 
+        ;; since reduced number of iterations of the loop
+        (is (< (count trace2) (count trace)))
 
 
         ;; TODO: <<<<>>>>

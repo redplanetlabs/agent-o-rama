@@ -940,7 +940,6 @@
     *agent-depot (po/agent-depot-task-global *agent-name)]
    (identity *fork-context :> {:keys [*affected-aggs *invoke-id->new-args]})
    (get-node-obj *agent-graph *next-node :> *node-obj)
-
    (<<cond
     (case> (node-complete? *agent-name *next-node *invoke-id))
      (handle-node-already-complete *agent-name *retry-num *node-op)
@@ -991,19 +990,22 @@
                           (termval *new-agg-invoke-id)]
                          $$nodes)
        (<<if (not (contains? *affected-aggs *fork-invoke-id))
-         (copy-unforked-agg-state $$nodes
-                                  *fork-agg-invoke-id
-                                  *new-agg-invoke-id)
-        (else>)
          (<<if (contains? *invoke-id->new-args *fork-agg-invoke-id)
+           ;; the RetryNodeComplete on the start agg node will see that this
+           ;; node isn't finished and will call complete-agg! on it
            (get *invoke-id->new-args
                 *fork-agg-invoke-id
                 :> [*new-agg-state *new-agg-start-res])
            (local-transform>
             [(keypath *new-agg-invoke-id)
              (multi-path [:agg-state (termval *new-agg-state)]
-                         [:agg-start-res (termval *new-agg-start-res)])]
+                         [:agg-start-res (termval *new-agg-start-res)]
+                         [:agg-finished? (termval true)])]
             $$nodes)
+          (else>)
+           (copy-unforked-agg-state $$nodes
+                                    *fork-agg-invoke-id
+                                    *new-agg-invoke-id)
          )))
      ;; replicate writes before initiating RetryNodeComplete
      (|direct (ops/current-task-id))
