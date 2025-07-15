@@ -84,7 +84,7 @@
          ($ :tfoot 
             ($ :tr
                {:onClick (fn [_] (navigate (str "/agents/" module-id "/" agent-id "/invocations")))}
-               ($ :th.hover:bg-gray-200.cursor-pointer {:colspan 4} 
+               ($ :th.hover:bg-gray-200.cursor-pointer {:colSpan 4} 
                   "See all invocations")))))))
 
 (defui evaluations []

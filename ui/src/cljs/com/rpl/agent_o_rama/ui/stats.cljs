@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.stats
   (:require
    [com.rpl.agent-o-rama.ui.agent-graph :as agent-graph]
+   [clojure.string :as str]
    
    [uix.core :as uix :refer [defui defhook $]]
    ["axios" :as axios]
@@ -205,23 +206,28 @@
 
 (defui chart [{:keys [dimension data]}]
   (let [chart-ref (uix/use-ref)
+        container-ref (uix/use-ref)
         [time-data sine-data] data]
     
     ;; Initialize uPlot chart
     (uix/use-effect
      (fn []
-       (when (and chart-ref (.-current chart-ref))
-         (let [;; Format data for uPlot: [[x-values], [y-values]]
-               chart-data (clj->js [time-data sine-data])
+       (when (and chart-ref (.-current chart-ref) (.-current container-ref))
+         (let [container-width (.-offsetWidth (.-current container-ref))
+               chart-width (- container-width 32) ; Account for padding
+               
+               ;; Format data for uPlot: [[x-values], [y-values]]
+               chart-data (clj->js [(js/Array.from time-data) (js/Array.from sine-data)])
                
                ;; Chart options
                opts (clj->js
-                     {:width (.-offsetWidth (.-current chart-ref))
-                      :height 250
+                     {:width chart-width
+                      :height 200
                       :title dimension
+                      :pxAlign false ; Prevent blurriness
                       :scales {:x {:time false}
                                :y {}}
-                      :series [{} ;; X-axis series
+                      :series [{:label "Time"} ;; X-axis series
                                {:label dimension
                                 :stroke (case dimension
                                           "execution time" "#3b82f6" ;; blue
@@ -230,41 +236,22 @@
                                           "model calls" "#10b981" ;; green
                                           "nodes executed" "#f59e0b" ;; orange
                                           "#6b7280") ;; gray default
-                                :width 2
-                                :fill (case dimension
-                                        "execution time" "rgba(59, 130, 246, 0.1)"
-                                        "tokens" "rgba(139, 92, 246, 0.1)"
-                                        "latency" "rgba(239, 68, 68, 0.1)"
-                                        "model calls" "rgba(16, 185, 129, 0.1)"
-                                        "nodes executed" "rgba(245, 158, 11, 0.1)"
-                                        "rgba(107, 114, 128, 0.1)")}]
-                      :axes [{:label "Time"
-                              :labelSize 12
-                              :stroke "#6b7280"
-                              :grid {:stroke "rgba(107, 114, 128, 0.1)"}}
-                             {:label (case dimension
-                                       "execution time" "Time (ms)"
-                                       "tokens" "Token Count"
-                                       "latency" "Latency (ms)"
-                                       "model calls" "Calls"
-                                       "nodes executed" "Nodes"
-                                       "Value")
-                              :labelSize 12
-                              :stroke "#6b7280"
-                              :grid {:stroke "rgba(107, 114, 128, 0.1)"}}]
-                      :cursor {:show true
-                               :points {:show true
-                                        :size 8}}})
+                                :width 2}]
+                      :axes [{:stroke "#e5e7eb"
+                              :grid {:stroke "#f3f4f6"}}
+                             {:stroke "#e5e7eb"
+                              :grid {:stroke "#f3f4f6"}}]})
                
                ;; Create chart instance
                chart-instance (uplot. opts chart-data (.-current chart-ref))]
            
            ;; Handle window resize
            (let [handle-resize (fn []
-                                 (when (and chart-instance (.-current chart-ref))
-                                   (.setSize chart-instance
-                                             (clj->js {:width (.-offsetWidth (.-current chart-ref))
-                                                       :height 250}))))]
+                                 (when (and chart-instance (.-current container-ref))
+                                   (let [new-width (- (.-offsetWidth (.-current container-ref)) 32)]
+                                     (.setSize chart-instance
+                                               (clj->js {:width new-width
+                                                         :height 200})))))]
              (js/window.addEventListener "resize" handle-resize)
              
              ;; Cleanup function
@@ -275,7 +262,11 @@
      #js [dimension data])
     
     ($ :div {:className "bg-white p-4 rounded-lg shadow-sm border"
-             :ref chart-ref})))
+             :ref container-ref}
+       ($ :h4 {:className "text-sm font-medium text-gray-700 mb-2"}
+          (str (str/capitalize dimension) " Over Time"))
+       ($ :div {:ref chart-ref
+                :style {:width "100%" :height "200px"}}))))
 
 (defui stats-timeseries []
   (let [points 100
@@ -285,7 +276,7 @@
     ($ :div {:className "mt-6"}
        ($ :h3 {:className "text-lg font-semibold text-gray-800 mb-4"}
           "Performance Metrics Over Time")
-       ($ :div {:className "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"}
+       ($ :div {:className "space-y-6"}
           (for [[dimension data] chart-data]
             ($ chart {:key dimension
                       :dimension dimension
