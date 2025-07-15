@@ -4,6 +4,7 @@
         [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [clojure.set :as set]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.core :as i]
@@ -41,6 +42,47 @@
    [ALL (selected? LAST :node (pred= n)) FIRST]
    trace))
 
+(defn trace-node
+  [trace n]
+  (select-one!
+   [ALL (selected? LAST :node (pred= n)) LAST]
+   trace))
+
+(defn trace-nodes
+  [trace n]
+  (select
+   [ALL (selected? LAST :node (pred= n)) LAST]
+   trace))
+
+(defn normalize-node
+  [node]
+  (let [m (select-keys node
+                       [:node :nested-ops :emits :result :input :started-agg?
+                        :invoked-agg-invoke-id :agg-input-count
+                        :agg-inputs-first-10 :agg-start-res :agg-state
+                        :agg-finished?])]
+    (->> m
+         (setval [(must :emits) ALL :invoke-id] 0)
+         (setval [(must :emits) ALL :fork-invoke-id] nil)
+         (setval (must :invoked-agg-invoke-id) 0)
+         (setval (must :invoked-agg-invoke-id) 0)
+         (setval [(must :agg-inputs-first-10) ALL :invoke-id] 0))))
+
+(defn verify-same-nodes!
+  [trace1 trace2 nodes]
+  (doseq [n nodes]
+    (let [orig   (trace-nodes trace1 n)
+          forked (trace-nodes trace2 n)]
+      (when-not (= (->> orig
+                        (mapv normalize-node)
+                        frequencies)
+                   (->> forked
+                        (mapv normalize-node)
+                        frequencies))
+        (throw (ex-info "Mismatch on same nodes"
+                        {:orig orig :forked forked})))
+    )))
+
 (deftest forking-test
   (tc/with-auto-builder
    (with-redefs [GLOBAL-ATOM  (atom 0)
@@ -67,7 +109,16 @@
               "agg"
               (fn [agent-node]
                 (aor/emit! agent-node "agg" @GLOBAL-ATOM3)))
-             (tc/auto-node "agg" "node3")
+             (aor/agg-node
+              "agg"
+              "after"
+              aggs/+vec-agg
+              (fn [agent-node agg node-start-res]
+                (aor/emit! agent-node "after" agg)))
+             (aor/node
+              "after"
+              "node3"
+              (fn [agent-node v] (aor/emit! agent-node "node3")))
              (tc/auto-node "node3" nil)
 
              (tc/auto-node "node2" "special1")
@@ -138,6 +189,7 @@
             )))
 
 
+
         (reset! GLOBAL-ATOM 2)
 
         (bind inv (aor/agent-initiate foo))
@@ -153,10 +205,38 @@
         (println "FORK TRACE" (count trace2))
         (clojure.pprint/pprint trace2)
 
+        (is (empty? (set/intersection (-> trace
+                                          keys
+                                          set)
+                                      (-> trace2
+                                          keys
+                                          set))))
 
-        ;; TODO: <<<<<>>>>
-        ;;  - fork node in the middle of an aggregation, verify it reuses
-        ;;  previous output
+        (bind a2-node-emits (:emits (trace-node trace2 "a2")))
+        (is (= 1 (count a2-node-emits)))
+        (is (= [7]
+               (-> a2-node-emits
+                   first
+                   :args)))
+
+        (bind a (trace-node trace2 "agg"))
+        (is (or (= [7 -9] (:agg-state a))
+                (= [-9 7] (:agg-state a))))
+        (is (or (= [[7 -9] nil] (:input a))
+                (= [[-9 7] nil] (:input a))))
+
+        (bind after (trace-node trace2 "after"))
+        (is (or (= [[7 -9]] (:input after))
+                (= [[-9 7]] (:input after))))
+
+        (verify-same-nodes!
+         trace
+         trace2
+         ["begin" "node1" "start1" "a1" "node2" "special1" "special2" "start2"
+          "b1" "start3" "b2" "agg2" "b3" "agg3" "b4" "special3" "special4"
+          "b5"])
+
+
 
         ;; TODO: <<<<>>>>
         ;;  - make graph similar to retries graph with pluggable node that does
