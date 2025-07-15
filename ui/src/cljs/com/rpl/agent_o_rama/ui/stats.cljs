@@ -7,6 +7,7 @@
    ["axios" :as axios]
    ["wouter" :as wouter :refer [useLocation]]
    ["uplot" :as uplot]
+   ["css-element-queries/src/ResizeSensor" :as ResizeSensor]
 
    
    [com.rpl.agent-o-rama.ui.common :as common]))
@@ -204,17 +205,25 @@
     "nodes executed" (generate-sine-data 1.2 8 0.8 points) ; Medium frequency, low amplitude
     (generate-sine-data 1 100 0 points))) ; Default
 
+(defn- element-available-content-width
+  [element]
+  (let [computed-style       (js/getComputedStyle element)
+        padding-left         (js/parseInt (.-paddingLeft computed-style))
+        padding-right        (js/parseInt (.-paddingRight computed-style))
+        element-client-width (.-clientWidth element)]
+    (- element-client-width padding-left padding-right)))
+
 (defui chart [{:keys [dimension data]}]
   (let [chart-ref (uix/use-ref)
         container-ref (uix/use-ref)
+        chart-instance-ref (uix/use-ref)
         [time-data sine-data] data]
     
     ;; Initialize uPlot chart
     (uix/use-effect
      (fn []
-       (when (and chart-ref (.-current chart-ref) (.-current container-ref))
-         (let [container-width (.-offsetWidth (.-current container-ref))
-               chart-width (- container-width 32) ; Account for padding
+       (when (and (.-current container-ref) (not (.-current chart-instance-ref)))
+         (let [chart-width (element-available-content-width (.-current container-ref))
                
                ;; Format data for uPlot: [[x-values], [y-values]]
                chart-data (clj->js [(js/Array.from time-data) (js/Array.from sine-data)])
@@ -224,7 +233,6 @@
                      {:width chart-width
                       :height 200
                       :title dimension
-                      :pxAlign false ; Prevent blurriness
                       :scales {:x {:time false}
                                :y {}}
                       :series [{:label "Time"} ;; X-axis series
@@ -244,27 +252,37 @@
                
                ;; Create chart instance
                chart-instance (uplot. opts chart-data (.-current chart-ref))]
-           
-           ;; Handle window resize
-           (let [handle-resize (fn []
-                                 (when (and chart-instance (.-current container-ref))
-                                   (let [new-width (- (.-offsetWidth (.-current container-ref)) 32)]
-                                     (.setSize chart-instance
-                                               (clj->js {:width new-width
-                                                         :height 200})))))]
-             (js/window.addEventListener "resize" handle-resize)
-             
-             ;; Cleanup function
-             (fn []
-               (js/window.removeEventListener "resize" handle-resize)
-               (when chart-instance
-                 (.destroy chart-instance)))))))
+           (set! (.-current chart-instance-ref) chart-instance)
+           ))
+       ;; Cleanup function
+       (fn []
+         (when-let [chart-instance (.-current chart-instance-ref)]
+           (.destroy chart-instance)
+           (set! (.-current chart-instance-ref) nil))))
      #js [dimension data])
-    
-    ($ :div {:className "bg-white p-4 rounded-lg shadow-sm border"
+
+    ;; Automatic plot resizing effect
+    (uix/use-effect
+      (fn []
+        (let [container-element (.-current container-ref)]
+          (when container-element
+            (let [resize-sensor (ResizeSensor.
+                                  container-element
+                                  (fn []
+                                    (when-let [chart-instance (.-current chart-instance-ref)]
+                                      (.setSize
+                                        chart-instance
+                                        (clj->js
+                                          {:width (element-available-content-width container-element)
+                                           :height 200})))))]
+              ;; Return cleanup function
+              (fn []
+                (.detach resize-sensor))))))
+      #js [(.-current container-ref)])
+
+
+    ($ :div {:className "bg-white p-4 rounded-lg shadow-sm border w-full"
              :ref container-ref}
-       ($ :h4 {:className "text-sm font-medium text-gray-700 mb-2"}
-          (str (str/capitalize dimension) " Over Time"))
        ($ :div {:ref chart-ref
                 :style {:width "100%" :height "200px"}}))))
 
