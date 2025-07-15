@@ -64,6 +64,7 @@
     (->> m
          (setval [(must :emits) ALL :invoke-id] 0)
          (setval [(must :emits) ALL :fork-invoke-id] nil)
+         (setval [(must :emits) ALL :target-task-id] 0)
          (setval (must :invoked-agg-invoke-id) 0)
          (setval (must :invoked-agg-invoke-id) 0)
          (setval [(must :agg-inputs-first-10) ALL :invoke-id] 0))))
@@ -196,40 +197,40 @@
         (bind trace (get-trace inv))
 
         (reset! GLOBAL-ATOM3 7)
-        ; (bind a2 (of-name trace "a2"))
-        ; (bind finv (aor/agent-initiate-fork foo inv {a2 []}))
-        ; (bind trace2 (get-trace finv))
-        ;
-        ; (is (empty? (set/intersection (-> trace
-        ;                                   keys
-        ;                                   set)
-        ;                               (-> trace2
-        ;                                   keys
-        ;                                   set))))
-        ;
-        ; (bind a2-node-emits (:emits (trace-node trace2 "a2")))
-        ; (is (= 1 (count a2-node-emits)))
-        ; (is (= [7]
-        ;        (-> a2-node-emits
-        ;            first
-        ;            :args)))
-        ;
-        ; (bind a (trace-node trace2 "agg"))
-        ; (is (or (= [7 -9] (:agg-state a))
-        ;         (= [-9 7] (:agg-state a))))
-        ; (is (or (= [[7 -9] nil] (:input a))
-        ;         (= [[-9 7] nil] (:input a))))
-        ;
-        ; (bind after (trace-node trace2 "after"))
-        ; (is (or (= [[[7 -9] nil]] (:input after))
-        ;         (= [[[-9 7] nil]] (:input after))))
-        ;
-        ; (verify-same-nodes!
-        ;  trace
-        ;  trace2
-        ;  ["begin" "node1" "start1" "a1" "node2" "special1" "special2" "start2"
-        ;   "b1" "start3" "b2" "agg2" "b3" "agg3" "b4" "special3" "special4"
-        ;   "b5"])
+        (bind a2 (of-name trace "a2"))
+        (bind finv (aor/agent-initiate-fork foo inv {a2 []}))
+        (bind trace2 (get-trace finv))
+
+        (is (empty? (set/intersection (-> trace
+                                          keys
+                                          set)
+                                      (-> trace2
+                                          keys
+                                          set))))
+
+        (bind a2-node-emits (:emits (trace-node trace2 "a2")))
+        (is (= 1 (count a2-node-emits)))
+        (is (= [7]
+               (-> a2-node-emits
+                   first
+                   :args)))
+
+        (bind a (trace-node trace2 "agg"))
+        (is (or (= [7 -9] (:agg-state a))
+                (= [-9 7] (:agg-state a))))
+        (is (or (= [[7 -9] nil] (:input a))
+                (= [[-9 7] nil] (:input a))))
+
+        (bind after (trace-node trace2 "after"))
+        (is (or (= [[[7 -9] nil]] (:input after))
+                (= [[[-9 7] nil]] (:input after))))
+
+        (verify-same-nodes!
+         trace
+         trace2
+         ["begin" "node1" "start1" "a1" "node2" "special1" "special2" "start2"
+          "b1" "start3" "b2" "agg2" "b3" "agg3" "b4" "special3" "special4"
+          "b5"])
 
         (bind special4-1 (of-input trace ["aaa" 1 2]))
         (bind agg-node (of-name trace "agg"))
@@ -238,20 +239,8 @@
           (aor/agent-initiate-fork foo
                                    inv
                                    {special4-1 [["aaa" 0 10]]
-                                    agg-node   [[1 2 3 4] nil]}))
+                                    agg-node   [[1 2 3 4] :a]}))
         (bind trace2 (get-trace finv))
-
-
-        ;; TODO: <<<<>>>> for nodes that are the same but repeated less, just
-        ;; get their count from trace-nodes, and verify they're the same as from
-        ;; orig
-
-        ; (println "TRACE" (count trace))
-        ; (clojure.pprint/pprint trace)
-        ; (println)
-        ; (println "FORK TRACE" (count trace2))
-        ; (println)
-        ; (clojure.pprint/pprint trace2)
 
         ;; since reduced number of iterations of the loop
         (is (< (count trace2) (count trace)))
@@ -272,11 +261,86 @@
                               {:node n :count (count nodes)})))
           ))
 
-        ;; TODO: <<<<>>>>
-        ;;  - special check of special2, special3, agg, after, special4
+        (bind an (trace-node trace2 "agg"))
+        (is (= (normalize-node an)
+               {:node          "agg"
+                :nested-ops    []
+                :emits
+                [(aor-types/->AgentNodeEmit 0 nil 0 "after" [[[1 2 3 4] :a]])]
+                :result        nil
+                :input         [[1 2 3 4] :a]
+                :agg-start-res :a
+                :agg-state     [1 2 3 4]
+                :agg-finished? true}
+            ))
+
+        (bind an (trace-node trace2 "after"))
+        (is (= (normalize-node an)
+               {:node       "after"
+                :nested-ops []
+                :emits
+                [(aor-types/->AgentNodeEmit 0 nil 0 "node3" [])]
+                :result     nil
+                :input      [[[1 2 3 4] :a]]}
+            ))
+
+        (bind nodes (trace-nodes trace2 "special2"))
+        (is (= 2 (count nodes)))
+        (is (= #{[:begin] [2]}
+               (->> nodes
+                    (mapv :input)
+                    set)))
+
+        (bind nodes (trace-nodes trace2 "special3"))
+        (is (= 2 (count nodes)))
+        (is (= (->> nodes
+                    (mapv normalize-node)
+                    frequencies)
+               {{:node       "special3"
+                 :nested-ops []
+                 :emits
+                 [(aor-types/->AgentNodeEmit 0 nil 0 "special4" [["aaa" 2 1]])]
+                 :result     nil
+                 :input      []}
+                1
+
+                {:node       "special3"
+                 :nested-ops []
+                 :emits
+                 [(aor-types/->AgentNodeEmit 0 nil 0 "special4" [["aaa" 1 2]])]
+                 :result     nil
+                 :input      []}
+                1}))
+
+        (bind nodes (trace-nodes trace2 "special4"))
+        (is (= 2 (count nodes)))
+        (is (= (->> nodes
+                    (mapv normalize-node)
+                    frequencies)
+               {{:node "special4"
+                 :nested-ops []
+                 :emits [(aor-types/->AgentNodeEmit 0 nil 0 "special2" [2])]
+                 :result nil
+                 :input [["aaa" 2 1]]}
+                1
+
+                {:node       "special4"
+                 :nested-ops []
+                 :emits      [(aor-types/->AgentNodeEmit 0 nil 0 "b5" [])]
+                 :result     nil
+                 :input      [["aaa" 0 10]]}
+                1
+               }))
+
+
+        ; (println "TRACE" (count trace))
+        ; (clojure.pprint/pprint trace)
+        ; (println)
+        ; (println "FORK TRACE" (count trace2))
+        ; (println)
+        ; (clojure.pprint/pprint trace2)
 
         ;; TODO: <<<<>>>>
-        ;;  - fork regular node, start agg node within another agg, start agg
-        ;;  node not within another agg, agg node within another agg, agg node
-        ;;  not within another agg, and combination
+        ;;  - start agg node within another agg, start agg
+        ;;  node not within another agg, agg node within another agg
        )))))
