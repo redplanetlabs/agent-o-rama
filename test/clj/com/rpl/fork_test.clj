@@ -114,7 +114,7 @@
               "after"
               aggs/+vec-agg
               (fn [agent-node agg node-start-res]
-                (aor/emit! agent-node "after" agg)))
+                (aor/emit! agent-node "after" [agg node-start-res])))
              (aor/node
               "after"
               "node3"
@@ -221,8 +221,8 @@
                 (= [[-9 7] nil] (:input a))))
 
         (bind after (trace-node trace2 "after"))
-        (is (or (= [[7 -9]] (:input after))
-                (= [[-9 7]] (:input after))))
+        (is (or (= [[[7 -9] nil]] (:input after))
+                (= [[[-9 7] nil]] (:input after))))
 
         (verify-same-nodes!
          trace
@@ -230,6 +230,23 @@
          ["begin" "node1" "start1" "a1" "node2" "special1" "special2" "start2"
           "b1" "start3" "b2" "agg2" "b3" "agg3" "b4" "special3" "special4"
           "b5"])
+
+        (println "TRACE" (count trace))
+        (clojure.pprint/pprint trace)
+
+        (bind special4-1 (of-input trace ["aaa" 1 2]))
+        (bind agg-node (of-name trace "agg"))
+
+        (bind finv
+          (aor/agent-initiate-fork foo
+                                   inv
+                                   {special4-1 [["aaa" 0 10]]
+                                    agg-node   [[1 2 3 4] nil]}))
+        (bind trace2 (get-trace finv))
+
+
+        (println "FORK TRACE" (count trace2))
+        (clojure.pprint/pprint trace2)
 
 
 

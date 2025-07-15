@@ -54,7 +54,7 @@
 
 (defn invoke-agent-and-wait!
   [depot root-pstate args]
-  (let [res (foreign-append! depot (aor-types/->AgentInvoke args 0 nil))
+  (let [res (foreign-append! depot (aor-types/->AgentInvoke args 0))
         [agent-task-id agent-id] (-> res
                                      vals
                                      first)]

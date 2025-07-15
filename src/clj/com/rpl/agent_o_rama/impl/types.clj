@@ -38,14 +38,12 @@
 ;; library? or just some of them?
 
 (drp/defrecord+ AgentInvoke
-  [args :- [(s/maybe Object)]
+  [args :- [s/Any]
    time-millis :- Long
-   ;; invoke-id -> new args
-   fork :- (s/maybe {Long [Object]})
   ])
 
 (drp/defrecord+ AgentResult
-  [val :- (s/maybe Object)
+  [val :- s/Any
    failure? :- Boolean])
 
 
@@ -73,32 +71,32 @@
 
 (drp/defrecord+ AggInput
   [invoke-id :- Long
-   args :- [(s/maybe Object)]])
+   args :- [s/Any]])
 
 (drp/defrecord+ NestedOpInfo
   [start-time-millis :- Long
    finish-time-millis :- Long
    ;; info for models contains token stats, input prompt, output, etc.
-   info :- (s/maybe {String (s/maybe Object)})])
+   info :- (s/maybe {String s/Any})])
 
 (drp/defrecord+ AgentNodeEmit
   [invoke-id :- Long
    fork-invoke-id :- (s/maybe Long)
    target-task-id :- Long
    node-name :- String
-   args :- [(s/maybe Object)]
+   args :- [s/Any]
   ])
 
 (drp/defrecord+ ForkContext
-  [invoke-id->new-args :- {Long [Object]}
-   affected-aggs :- #{Long} ; agg-start-node invoke-ids
+  [invoke-id->new-args :- {Long [s/Any]}
+   affected-aggs :- (s/maybe #{Long}) ; agg-start-node invoke-ids
   ])
 
 (drp/defrecord+ NodeComplete
   [task-id :- Long
    invoke-id :- Long
    retry-num :- Long
-   node-fn-res :- (s/maybe Object)
+   node-fn-res :- s/Any
    emits :- [AgentNodeEmit]
    result :- (s/maybe AgentResult)
    nested-ops :- [NestedOpInfo]
@@ -132,7 +130,7 @@
 (drp/defrecord+ ForkAgentInvoke
   [agent-task-id :- Long
    agent-id :- Long
-   invoke-id->new-args :- {Long [Object]}])
+   invoke-id->new-args :- {Long [s/Any]}])
 
 (drp/defrecord+ HistoricalAgentNodeInfo
   [node-type :- clojure.lang.Keyword ; :node, :agg-node, :agg-start-node
@@ -166,7 +164,7 @@
    fork-invoke-id :- (s/maybe Long)
    fork-context :- (s/maybe ForkContext)
    next-node :- String
-   args :- [(s/maybe Object)]
+   args :- [s/Any]
    agg-invoke-id :- (s/maybe Long)])
 
 (drp/defrecord+ AggAckOp
