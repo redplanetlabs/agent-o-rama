@@ -222,8 +222,8 @@
     ;; Initialize uPlot chart
     (uix/use-effect
      (fn []
-       (when (and (.-current container-ref) (not (.-current chart-instance-ref)))
-         (let [chart-width (element-available-content-width (.-current container-ref))
+       (when (and @container-ref (not @chart-instance-ref))
+         (let [chart-width (element-available-content-width @container-ref)
                
                ;; Format data for uPlot: [[x-values], [y-values]]
                chart-data (clj->js [(js/Array.from time-data) (js/Array.from sine-data)])
@@ -232,10 +232,10 @@
                opts (clj->js
                      {:width chart-width
                       :height 200
-                      :title dimension
                       :scales {:x {:time false}
                                :y {}}
-                      :series [{:label "Time"} ;; X-axis series
+                      :series [{:font "12px sans-serif"
+                                :label "Time"} ;; X-axis series
                                {:label dimension
                                 :stroke (case dimension
                                           "execution time" "#3b82f6" ;; blue
@@ -245,31 +245,34 @@
                                           "nodes executed" "#f59e0b" ;; orange
                                           "#6b7280") ;; gray default
                                 :width 2}]
-                      :axes [{:stroke "#e5e7eb"
-                              :grid {:stroke "#f3f4f6"}}
-                             {:stroke "#e5e7eb"
-                              :grid {:stroke "#f3f4f6"}}]})
+                      :axes [{:font "12px sans-serif"
+                              :stroke "#e5e7eb"
+                              :grid {:stroke "#f3f4f6"}
+                              :size 35}
+                             {:font "12px sans-serif"
+                              :stroke "#e5e7eb"
+                              :grid {:stroke "#f3f4f6"}
+                              :size 60}]})
                
                ;; Create chart instance
-               chart-instance (uplot. opts chart-data (.-current chart-ref))]
-           (set! (.-current chart-instance-ref) chart-instance)
-           ))
+               chart-instance (uplot. opts chart-data @chart-ref)]
+           (reset! chart-instance-ref chart-instance)))
        ;; Cleanup function
        (fn []
-         (when-let [chart-instance (.-current chart-instance-ref)]
+         (when-let [chart-instance @chart-instance-ref]
            (.destroy chart-instance)
-           (set! (.-current chart-instance-ref) nil))))
+           (reset! chart-instance-ref nil))))
      #js [dimension data])
 
     ;; Automatic plot resizing effect
     (uix/use-effect
       (fn []
-        (let [container-element (.-current container-ref)]
+        (let [container-element @container-ref]
           (when container-element
             (let [resize-sensor (ResizeSensor.
                                   container-element
                                   (fn []
-                                    (when-let [chart-instance (.-current chart-instance-ref)]
+                                    (when-let [chart-instance @chart-instance-ref]
                                       (.setSize
                                         chart-instance
                                         (clj->js
@@ -278,7 +281,7 @@
               ;; Return cleanup function
               (fn []
                 (.detach resize-sensor))))))
-      #js [(.-current container-ref)])
+      #js [@container-ref])
 
 
     ($ :div {:className "bg-white p-4 rounded-lg shadow-sm border w-full"
@@ -289,7 +292,9 @@
 (defui stats-timeseries []
   (let [points 100
         chart-data (into {}
-                         (for [dimension ["execution time" "tokens" "latency" "model calls" "nodes executed"]]
+                         (for [dimension
+                               #_["execution time" "tokens" "latency" "model calls" "nodes executed"]
+                               ["execution time"]]
                            [dimension (generate-metric-data dimension points)]))]
     ($ :div {:className "mt-6"}
        ($ :h3 {:className "text-lg font-semibold text-gray-800 mb-4"}
