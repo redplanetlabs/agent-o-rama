@@ -80,7 +80,7 @@
                         (mapv normalize-node)
                         frequencies))
         (throw (ex-info "Mismatch on same nodes"
-                        {:orig orig :forked forked})))
+                        {:node n :orig orig :forked forked})))
     )))
 
 (deftest forking-test
@@ -231,10 +231,6 @@
         ;   "b1" "start3" "b2" "agg2" "b3" "agg3" "b4" "special3" "special4"
         ;   "b5"])
 
-        (println "TRACE" (count trace))
-        (clojure.pprint/pprint trace)
-        (println)
-
         (bind special4-1 (of-input trace ["aaa" 1 2]))
         (bind agg-node (of-name trace "agg"))
 
@@ -246,21 +242,40 @@
         (bind trace2 (get-trace finv))
 
 
-        (println "FORK TRACE" (count trace2))
-        (println)
-        (clojure.pprint/pprint trace2)
+        ;; TODO: <<<<>>>> for nodes that are the same but repeated less, just
+        ;; get their count from trace-nodes, and verify they're the same as from
+        ;; orig
+
+        ; (println "TRACE" (count trace))
+        ; (clojure.pprint/pprint trace)
+        ; (println)
+        ; (println "FORK TRACE" (count trace2))
+        ; (println)
+        ; (clojure.pprint/pprint trace2)
 
         ;; since reduced number of iterations of the loop
         (is (< (count trace2) (count trace)))
-
+        (verify-same-nodes!
+         trace
+         trace2
+         ["begin" "node1" "start1" "a1" "a2" "node3" "node2" "special1" "b5"])
+        (doseq [n ["start2" "b1" "start3" "b2" "agg2" "b3" "agg3" "b4"]]
+          (let [nodes (mapv normalize-node (trace-nodes trace2 n))
+                orig  (-> (trace-nodes trace n)
+                          first
+                          normalize-node)]
+            (when-not (every? #(= orig %) nodes)
+              (throw (ex-info "Not equal to orig"
+                              {:node n :orig orig :nodes nodes})))
+            (when (not= 2 (count nodes))
+              (throw (ex-info "Mismatched count"
+                              {:node n :count (count nodes)})))
+          ))
 
         ;; TODO: <<<<>>>>
-        ;;  - make graph similar to retries graph with pluggable node that does
-        ;;  the actual result
-        ;;      - graph should have a loop in it
-        ;;  - get trace, make function to extract invoke IDs for specific nodes
-        ;;      - how to target which invocation of a node...
-        ;;        - can be based on looking at the input of the node
+        ;;  - special check of special2, special3, agg, after, special4
+
+        ;; TODO: <<<<>>>>
         ;;  - fork regular node, start agg node within another agg, start agg
         ;;  node not within another agg, agg node within another agg, agg node
         ;;  not within another agg, and combination
