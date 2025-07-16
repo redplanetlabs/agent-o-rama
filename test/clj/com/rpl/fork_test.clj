@@ -29,6 +29,7 @@
 (def GLOBAL-ATOM)
 (def GLOBAL-ATOM2)
 (def GLOBAL-ATOM3)
+(def START3-EXTRA-EMIT)
 
 (defn of-input
   [trace v]
@@ -52,6 +53,12 @@
   [trace n]
   (select
    [ALL (selected? LAST :node (pred= n)) LAST]
+   trace))
+
+(defn trace-node-ids
+  [trace n]
+  (select
+   [ALL (selected? LAST :node (pred= n)) FIRST]
    trace))
 
 (defn normalize-node
@@ -86,9 +93,10 @@
 
 (deftest forking-test
   (tc/with-auto-builder
-   (with-redefs [GLOBAL-ATOM  (atom 0)
-                 GLOBAL-ATOM2 (atom 0)
-                 GLOBAL-ATOM3 (atom 9)]
+   (with-redefs [GLOBAL-ATOM       (atom 0)
+                 GLOBAL-ATOM2      (atom 0)
+                 GLOBAL-ATOM3      (atom 9)
+                 START3-EXTRA-EMIT (atom 0)]
      (with-open [ipc (rtest/create-ipc)]
        (letlocals
         (bind module
@@ -135,7 +143,16 @@
                 (aor/emit! agent-node "start2")))
              (tc/auto-node "start2" "b1")
              (tc/auto-node "b1" "start3")
-             (tc/auto-node "start3" "b2")
+             (aor/agg-start-node
+              "start3"
+              "b2"
+              (fn [agent-node]
+                (aor/emit! agent-node "b2")
+                (when (> @START3-EXTRA-EMIT 0)
+                  (dotimes [_ @START3-EXTRA-EMIT]
+                    (aor/emit! agent-node "b2"))
+                  (swap! START3-EXTRA-EMIT dec))
+              ))
              (tc/auto-node "b2" "agg2")
              (tc/auto-node "agg2" "b3")
              (tc/auto-node "b3" "agg3")
@@ -192,14 +209,17 @@
 
 
         (reset! GLOBAL-ATOM 2)
+        (reset! tc/RESULT-NODE-ATOM "b5")
 
         (bind inv (aor/agent-initiate foo))
         (bind trace (get-trace inv))
+        (is (= "b5" (aor/agent-result foo inv)))
 
         (reset! GLOBAL-ATOM3 7)
         (bind a2 (of-name trace "a2"))
         (bind finv (aor/agent-initiate-fork foo inv {a2 []}))
         (bind trace2 (get-trace finv))
+        (is (= "b5" (aor/agent-result foo finv)))
 
         (is (empty? (set/intersection (-> trace
                                           keys
@@ -241,6 +261,7 @@
                                    {special4-1 [["aaa" 0 10]]
                                     agg-node   [[1 2 3 4] :a]}))
         (bind trace2 (get-trace finv))
+        (is (= "b5" (aor/agent-result foo finv)))
 
         ;; since reduced number of iterations of the loop
         (is (< (count trace2) (count trace)))
@@ -333,14 +354,73 @@
                }))
 
 
-        ; (println "TRACE" (count trace))
-        ; (clojure.pprint/pprint trace)
-        ; (println)
-        ; (println "FORK TRACE" (count trace2))
-        ; (println)
-        ; (clojure.pprint/pprint trace2)
+        (reset! GLOBAL-ATOM 4)
+        (reset! START3-EXTRA-EMIT 3)
+        (reset! tc/AGG-RESULTS-ATOM {})
+        (bind start3 (rand-nth (trace-node-ids trace "start3")))
+        (bind finv
+          (aor/agent-initiate-fork foo
+                                   inv
+                                   {start3 []}))
+        (bind trace2 (get-trace finv))
+        (is (= "b5" (aor/agent-result foo finv)))
+        (is (= @tc/AGG-RESULTS-ATOM
+               {"agg2" [[1 1 1 1] [1 1 1] [1 1] [1] [1]]
+                "agg3" [[1] [1] [1] [1] [1]]}))
+        (is (> (count trace2) (count trace)))
+
+        (bind nodes (mapv normalize-node (trace-nodes trace2 "start3")))
+        (bind total (count nodes))
+        (bind one-emit (aor-types/->AgentNodeEmit 0 nil 0 "b2" []))
+        (bind base-start3
+          {:node         "start3"
+           :nested-ops   []
+           :result       nil
+           :input        []
+           :started-agg? true})
+        (bind mk-start3
+          (fn [amt]
+            (assoc base-start3 :emits (vec (repeat amt one-emit)))))
+        (is (= {(mk-start3 4) 1
+                (mk-start3 3) 1
+                (mk-start3 2) 1
+                (mk-start3 1) (- total 3)}
+               (frequencies nodes)))
+
+        (bind nodes (mapv normalize-node (trace-nodes trace2 "agg2")))
+
+        (bind base-agg2
+          {:emits         [(aor-types/->AgentNodeEmit 0 nil 0 "b3" [])]
+           :node          "agg2"
+           :result        nil
+           :agg-finished? true
+           :nested-ops    []})
+        (bind mk-agg2
+          (fn [amt]
+            (let [s   (vec (repeat amt 1))
+                  asr (if (>= amt 2) (- amt 2))]
+              (assoc base-agg2
+               :agg-start-res asr
+               :agg-input-count amt
+               :agg-inputs-first-10 (vec (repeat amt
+                                                 (aor-types/->AggInput 0 [1])))
+               :agg-state s
+               :input [s asr]
+              ))))
+
+        (is (= {(mk-agg2 4) 1
+                (mk-agg2 3) 1
+                (mk-agg2 2) 1
+                (mk-agg2 1) (- total 3)}
+               (frequencies nodes)))
+        ;; TODO: <<<<>>>>
+        ;; - check nodes for agg2
+
+
+        ; (doseq [n nodes]
+        ;   (println "AGG2")
+        ;   (clojure.pprint/pprint n))
 
         ;; TODO: <<<<>>>>
-        ;;  - start agg node within another agg, start agg
-        ;;  node not within another agg, agg node within another agg
+        ;;  - fork agg node within another agg
        )))))

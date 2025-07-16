@@ -42,7 +42,7 @@
         (fn [agent-node & args]
           (run-node! agent-node name)
           (when (str/starts-with? name "agg")
-            (setval [ATOM (keypath name)]
+            (setval [ATOM (keypath name) NIL->VECTOR AFTER-ELEM]
                     (nth args 0)
                     AGG-RESULTS-ATOM))
           (doseq [n outputs]
