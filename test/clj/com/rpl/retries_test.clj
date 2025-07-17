@@ -818,6 +818,8 @@
              (->
                topology
                (aor/new-agent "foo")
+               ;; verify this is ignored
+               (aor/set-update-mode (rand-nth [:drop :continue :restart]))
                (tc/auto-node "begin" ["node1" "node2"])
                (tc/auto-node "node1" "start1")
                (tc/auto-node "start1" ["a1" "a2"])
@@ -1005,7 +1007,64 @@
                    })
          ))))))
 
+(def FORCED-VERSION-ATOM)
+
+(deframaop forced-graph-version
+  [*agent-name]
+  (deref (var-get #'FORCED-VERSION-ATOM) :> *ret)
+  (:> *ret))
+
 (deftest update-mode-tests
-         ;; TODO: <<<<>>>> set update mode on the agent, use redef to force
-         ;; graph version to change
-)
+  (with-redefs [FORCED-VERSION-ATOM    (atom 0)
+                at/fetch-graph-version forced-graph-version]
+    (tc/with-auto-builder
+     (with-open [ipc (rtest/create-ipc)]
+       (letlocals
+        (bind module
+          (aor/agentmodule
+           [topology]
+           (->
+             topology
+             (aor/new-agent "foo")
+             (aor/set-update-mode :continue)
+             (tc/auto-node "begin" "node1")
+             (tc/auto-node "node1" "node2")
+             (tc/auto-node "node2" nil))
+           (->
+             topology
+             (aor/new-agent "bar")
+             (aor/set-update-mode :restart)
+             (tc/auto-node "begin" "node1")
+             (tc/auto-node "node1" "node2")
+             (tc/auto-node "node2" nil))
+           (->
+             topology
+             (aor/new-agent "car")
+             (aor/set-update-mode :drop)
+             (tc/auto-node "begin" "node1")
+             (tc/auto-node "node1" "node2")
+             (tc/auto-node "node2" nil))
+          ))
+        (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+        (bind module-name (get-module-name module))
+
+        (bind agent-manager (aor/agent-manager ipc module-name))
+        (bind foo (aor/agent-client agent-manager "foo"))
+        (bind bar (aor/agent-client agent-manager "bar"))
+        (bind car (aor/agent-client agent-manager "car"))
+
+        (reset! tc/RESULT-NODE-ATOM "node2")
+        (reset! tc/FAIL-NODES-ATOM #{"node1"})
+        ;; TODO: <<<<>>>> set update mode on the agent, use redef to force
+        ;; graph version to change
+        ;; - just redef fetch-graph-version to be a ramaop that uses an atom
+        ;;   - starts at 0, then change to 1 for the retry
+        ;;   - have one agent of restart and one agent of drop to verify
+        ;;   behavior
+        ;; - change version by 2 and verify it drops in every case
+        ;; - check in case of drop that it's removed from active-invokes
+        ; (rtest/pause-microbatch-topology!
+        ;  ipc
+        ;  module-name
+        ;  aor-types/AGENTS-MB-TOPOLOGY-NAME)
+       )))))
