@@ -289,36 +289,38 @@
      ;; it
      (identity :drop :> *handle-mode))
 
+   (inc *expected-retry-num :> *retry-num)
+
    (<<if (= :drop *handle-mode)
      (complete-with-failure! *agent-name *agent-id "Retry dropped")
-     (filter> false))
-   (<<if (= :restart *handle-mode)
-     (local-transform> [(keypath *root-invoke-id) (termval nil)]
-                       $$gc-invokes)
-     (init-retry-num* :> *retry-num)
-     (init-root *agent-name *agent-id *retry-num *args :> *root-invoke-id)
     (else>)
-     (inc *expected-retry-num :> *retry-num)
-     (identity *root-invoke-id :> *root-invoke-id))
+     (<<if (= :restart *handle-mode)
+       (local-transform> [(keypath *root-invoke-id) (termval nil)]
+                         $$gc-invokes)
+       (init-root *agent-name *agent-id *retry-num *args :> *root-invoke-id)
+      (else>)
+       (identity *root-invoke-id :> *root-invoke-id))
 
-   (read-config *agent-name aor-types/MAX-RETRIES-CONFIG :> *max-retries)
-   (<<if (> *retry-num *max-retries)
-     (complete-with-failure! *agent-name *agent-id "Max retry limit exceeded")
-    (else>)
-     (local-transform> [(keypath *agent-id)
-                        (multi-path [:retry-num (termval *retry-num)]
-                                    [:ack-val (termval *root-invoke-id)])]
-                       $$root)
+     (read-config *agent-name aor-types/MAX-RETRIES-CONFIG :> *max-retries)
+     (<<if (> *retry-num *max-retries)
+       (complete-with-failure! *agent-name *agent-id "Max retry limit exceeded")
+      (else>)
+       (local-transform> [(keypath *agent-id)
+                          (multi-path [:retry-num (termval *retry-num)]
+                                      [:graph-version
+                                       (termval *curr-graph-version)]
+                                      [:ack-val (termval *root-invoke-id)])]
+                         $$root)
 
-     (aor-types/->valid-NodeOp *root-invoke-id
-                               *parent-root-invoke-id
-                               *fork-context
-                               (get *agent-graph :start-node)
-                               *args
-                               nil
-                               :> *op)
-     (:> *agent-task-id *agent-id *retry-num *op)
-   )))
+       (aor-types/->valid-NodeOp *root-invoke-id
+                                 *parent-root-invoke-id
+                                 *fork-context
+                                 (get *agent-graph :start-node)
+                                 *args
+                                 nil
+                                 :> *op)
+       (:> *agent-task-id *agent-id *retry-num *op)
+     ))))
 
 (deframaop intake-fork
   [*agent-name {:keys [*agent-task-id *agent-id *invoke-id->new-args]}]
