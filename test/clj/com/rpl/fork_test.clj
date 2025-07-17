@@ -534,7 +534,6 @@
           ))
         (is (= expected (frequencies nodes)))
 
-
         (bind mk-agg3
           (fn [amt]
             {:agg-input-count amt

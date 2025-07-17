@@ -130,11 +130,14 @@
                     :> {*root-ack-val :ack-val *result :result})
      (<<if (= 0 *root-ack-val)
        (<<if (nil? *result)
+         (h/current-time-millis :> *finish-time-millis)
          (local-transform>
           [(keypath *agent-id)
-           :result
-           (termval (aor-types/->AgentResult "Agent completed without result"
-                                             true))]
+           (multi-path [:result
+                        (termval (aor-types/->AgentResult
+                                  "Agent completed without result"
+                                  true))]
+                       [:finish-time-millis (termval *finish-time-millis)])]
           $$root))
        (finished-streaming-chunk :> *finished-streaming-chunk)
        (local-transform>
@@ -160,14 +163,15 @@
                |direct
                *agent-task-id)
    (hook:writing-result *agent-task-id *agent-id *result)
+   ;; if race with retry and it happened to have finished, don't change the
+   ;; result here – this can happen if the agent has other branches that fail
+   ;; besides the one that created the result
+   (h/current-time-millis :> *finish-time-millis)
    (local-transform>
     [(keypath *agent-id)
-     :result
-     ;; if race with retry and it happened to have finished, don't change the
-     ;; result here – this can happen if the agent has other branches that fail
-     ;; besides the one that created the result
-     nil?
-     (termval *result)]
+     (selected? :result nil?)
+     (multi-path [:result (termval *result)]
+                 [:finish-time-millis (termval *finish-time-millis)])]
     $$root)
    (local-transform> [(keypath *agent-id) NONE>] $$active)
    (:>)))
@@ -232,11 +236,13 @@
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
     $$active (po/agent-active-invokes-task-global *agent-name)]
+   (h/current-time-millis :> *finish-time-millis)
    (local-transform>
-    ;; TODO: <<<<>>>> probably need to update finish-time as well
     [(keypath *agent-id)
-     :result
-     (termval (aor-types/->valid-AgentResult *message true))]
+     (multi-path
+      [:result
+       (termval (aor-types/->valid-AgentResult *message true))]
+      [:finish-time-millis (termval *finish-time-millis)])]
     $$root)
    (local-transform> [(keypath *agent-id) NONE>] $$active)
    (:>)))

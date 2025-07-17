@@ -1004,3 +1004,8 @@
                     ;; many times reset of this path runs
                    })
          ))))))
+
+(deftest update-mode-tests
+         ;; TODO: <<<<>>>> set update mode on the agent, use redef to force
+         ;; graph version to change
+)
