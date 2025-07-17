@@ -32,6 +32,11 @@
   (when (= @RESULT-NODE-ATOM n)
     (aor/result! agent-node n)))
 
+(defn record-agg!
+  [name res]
+  (setval [ATOM (keypath name) NIL->VECTOR AFTER-ELEM]
+          res
+          AGG-RESULTS-ATOM))
 
 (defn auto-node
   [topology name outputs]
@@ -42,9 +47,7 @@
         (fn [agent-node & args]
           (run-node! agent-node name)
           (when (str/starts-with? name "agg")
-            (setval [ATOM (keypath name) NIL->VECTOR AFTER-ELEM]
-                    (nth args 0)
-                    AGG-RESULTS-ATOM))
+            (record-agg! name (nth args 0)))
           (doseq [n outputs]
             (if (str/starts-with? n "agg")
               (aor/emit! agent-node n 1)

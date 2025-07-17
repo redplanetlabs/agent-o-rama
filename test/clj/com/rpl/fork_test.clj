@@ -30,6 +30,7 @@
 (def GLOBAL-ATOM2)
 (def GLOBAL-ATOM3)
 (def START3-EXTRA-EMIT)
+(def AGG2-EXTRA-EMIT)
 
 (defn of-input
   [trace v]
@@ -96,7 +97,8 @@
    (with-redefs [GLOBAL-ATOM       (atom 0)
                  GLOBAL-ATOM2      (atom 0)
                  GLOBAL-ATOM3      (atom 9)
-                 START3-EXTRA-EMIT (atom 0)]
+                 START3-EXTRA-EMIT (atom 0)
+                 AGG2-EXTRA-EMIT   (atom false)]
      (with-open [ipc (rtest/create-ipc)]
        (letlocals
         (bind module
@@ -154,7 +156,16 @@
                   (swap! START3-EXTRA-EMIT dec))
               ))
              (tc/auto-node "b2" "agg2")
-             (tc/auto-node "agg2" "b3")
+             (aor/agg-node
+              "agg2"
+              "b3"
+              aggs/+vec-agg
+              (fn [agent-node agg-state agg-start-res]
+                (tc/record-agg! "agg2" agg-state)
+                (aor/emit! agent-node "b3")
+                (when @AGG2-EXTRA-EMIT
+                  (aor/emit! agent-node "b3"))
+              ))
              (tc/auto-node "b3" "agg3")
              (tc/auto-node "agg3" "b4")
              (tc/auto-node "b4" "special3")
@@ -215,11 +226,34 @@
         (bind trace (get-trace inv))
         (is (= "b5" (aor/agent-result foo inv)))
 
+        (bind base-agent-task-id (.getTaskId inv))
+        (bind base-agent-id (.getAgentInvokeId inv))
+        (is (= []
+               (foreign-select [(keypath base-agent-id) :forks ALL]
+                               root-pstate
+                               {:pkey base-agent-task-id})))
+        (is (= nil
+               (foreign-select-one [(keypath base-agent-id) :fork-of]
+                                   root-pstate
+                                   {:pkey base-agent-task-id})))
+
         (reset! GLOBAL-ATOM3 7)
         (bind a2 (of-name trace "a2"))
         (bind finv (aor/agent-initiate-fork foo inv {a2 []}))
         (bind trace2 (get-trace finv))
         (is (= "b5" (aor/agent-result foo finv)))
+        (bind fagent-task-id (.getTaskId finv))
+        (bind fagent-id1 (.getAgentInvokeId finv))
+        (is (= fagent-task-id base-agent-task-id))
+        (is (= [fagent-id1]
+               (foreign-select [(keypath base-agent-id) :forks ALL]
+                               root-pstate
+                               {:pkey base-agent-task-id})))
+        (is (= base-agent-id
+               (foreign-select-one [(keypath fagent-id1) :fork-of
+                                    :parent-agent-id]
+                                   root-pstate
+                                   {:pkey base-agent-task-id})))
 
         (is (empty? (set/intersection (-> trace
                                           keys
@@ -262,6 +296,19 @@
                                     agg-node   [[1 2 3 4] :a]}))
         (bind trace2 (get-trace finv))
         (is (= "b5" (aor/agent-result foo finv)))
+        (bind fagent-task-id (.getTaskId finv))
+        (bind fagent-id2 (.getAgentInvokeId finv))
+        (is (= fagent-task-id base-agent-task-id))
+        (is (= [fagent-id1 fagent-id2]
+               (foreign-select [(keypath base-agent-id) :forks ALL]
+                               root-pstate
+                               {:pkey base-agent-task-id})))
+        (is (= base-agent-id
+               (foreign-select-one [(keypath fagent-id2) :fork-of
+                                    :parent-agent-id]
+                                   root-pstate
+                                   {:pkey base-agent-task-id})))
+
 
         ;; since reduced number of iterations of the loop
         (is (< (count trace2) (count trace)))
@@ -364,6 +411,19 @@
                                    {start3 []}))
         (bind trace2 (get-trace finv))
         (is (= "b5" (aor/agent-result foo finv)))
+        (bind fagent-task-id (.getTaskId finv))
+        (bind fagent-id3 (.getAgentInvokeId finv))
+        (is (= fagent-task-id base-agent-task-id))
+        (is (= [fagent-id1 fagent-id2 fagent-id3]
+               (foreign-select [(keypath base-agent-id) :forks ALL]
+                               root-pstate
+                               {:pkey base-agent-task-id})))
+        (is (= base-agent-id
+               (foreign-select-one [(keypath fagent-id3) :fork-of
+                                    :parent-agent-id]
+                                   root-pstate
+                                   {:pkey base-agent-task-id})))
+
         (is (= @tc/AGG-RESULTS-ATOM
                {"agg2" [[1 1 1 1] [1 1 1] [1 1] [1] [1]]
                 "agg3" [[1] [1] [1] [1] [1]]}))
@@ -413,14 +473,92 @@
                 (mk-agg2 2) 1
                 (mk-agg2 1) (- total 3)}
                (frequencies nodes)))
-        ;; TODO: <<<<>>>>
-        ;; - check nodes for agg2
 
 
-        ; (doseq [n nodes]
-        ;   (println "AGG2")
-        ;   (clojure.pprint/pprint n))
+        (reset! AGG2-EXTRA-EMIT true)
+        (reset! tc/AGG-RESULTS-ATOM {})
+        (bind agg2 (rand-nth (trace-node-ids trace "agg2")))
+        (bind finv
+          (aor/agent-initiate-fork foo
+                                   inv
+                                   {agg2 [[:x] 123]}))
+        (bind trace2 (get-trace finv))
+        (bind fagent-task-id (.getTaskId finv))
+        (bind fagent-id4 (.getAgentInvokeId finv))
+        (is (= fagent-task-id base-agent-task-id))
+        (is (= [fagent-id1 fagent-id2 fagent-id3 fagent-id4]
+               (foreign-select [(keypath base-agent-id) :forks ALL]
+                               root-pstate
+                               {:pkey base-agent-task-id})))
+        (is (= base-agent-id
+               (foreign-select-one [(keypath fagent-id4) :fork-of
+                                    :parent-agent-id]
+                                   root-pstate
+                                   {:pkey base-agent-task-id})))
 
-        ;; TODO: <<<<>>>>
-        ;;  - fork agg node within another agg
+        (is (= "b5" (aor/agent-result foo finv)))
+        (is (= @tc/AGG-RESULTS-ATOM {"agg2" [[:x]] "agg3" [[1 1]]}))
+
+        (bind changed
+          {:node          "agg2"
+           :nested-ops    []
+           :emits         (vec (repeat
+                                2
+                                (aor-types/->AgentNodeEmit 0 nil 0 "b3" [])))
+           :result        nil
+           :input         [[:x] 123]
+           :agg-start-res 123
+           :agg-state     [:x]
+           :agg-finished? true})
+        (bind unchanged
+          {:agg-input-count 1
+           :agg-start-res   nil
+           :emits           [(aor-types/->AgentNodeEmit 0 nil 0 "b3" [])]
+           :node            "agg2"
+           :agg-inputs-first-10 [(aor-types/->AggInput 0 [1])]
+           :result          nil
+           :agg-finished?   true
+           :nested-ops      []
+           :agg-state       [1]
+           :input           [[1] nil]})
+
+        (bind nodes (mapv normalize-node (trace-nodes trace2 "agg2")))
+        (is (<= 1 (count nodes) 3))
+        (bind expected
+          (if (> (count nodes) 1)
+            {changed   1
+             unchanged (-> nodes
+                           count
+                           dec)}
+            {changed 1}
+          ))
+        (is (= expected (frequencies nodes)))
+
+
+        (bind mk-agg3
+          (fn [amt]
+            {:agg-input-count amt
+             :agg-start-res   nil
+             :emits
+             [(aor-types/->AgentNodeEmit 0 nil 0 "b4" [])]
+             :node            "agg3"
+             :agg-inputs-first-10 (vec (repeat amt
+                                               (aor-types/->AggInput 0 [1])))
+             :result          nil
+             :agg-finished?   true
+             :nested-ops      []
+             :agg-state       (vec (repeat amt 1))
+             :input           [(vec (repeat amt 1)) nil]}
+          ))
+
+        (bind nodes (mapv normalize-node (trace-nodes trace2 "agg3")))
+        (bind expected
+          (if (> (count nodes) 1)
+            {(mk-agg3 2) 1
+             (mk-agg3 1) (-> nodes
+                             count
+                             dec)}
+            {(mk-agg3 2) 1}
+          ))
+        (is (= expected (frequencies nodes)))
        )))))
