@@ -582,9 +582,9 @@
             (fn [agent-node v]
               (aor/emit! agent-node "b" v)
               (aor/emit! agent-node "b" v)))
-           (aor/auto-node "b" "agg2")
-           (aor/auto-node "agg2" "agg1")
-           (aor/auto-node "agg1" "end")
+           (tc/auto-node "b" "agg2")
+           (tc/auto-node "agg2" "agg1")
+           (tc/auto-node "agg1" "end")
            (aor/node
             "end"
             nil
@@ -630,7 +630,7 @@
       ;;   - easier to put hook to wrap nodes and throw
       ;;   - want tracking of which nodes were executed...
       ;;     - auto-node would be perfect if it emitted elements down
-      (bind finv (aor/initiate-fork foo inv {}))
+      (bind finv (aor/agent-initiate-fork foo inv {}))
 
 
       ;(clojure.pprint/pprint trace)
