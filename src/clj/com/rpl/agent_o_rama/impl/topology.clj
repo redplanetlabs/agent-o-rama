@@ -963,6 +963,7 @@
                        (get *invoke-id->new-args *fork-invoke-id)))
 
     (case> (and> (some? *fork-context)
+                 (some? *fork-invoke-id)
                  (not (aor-types/NodeAgg? *node-obj))))
      (local-select> [(keypath *fork-invoke-id) (view h/into-map)]
                     $$nodes

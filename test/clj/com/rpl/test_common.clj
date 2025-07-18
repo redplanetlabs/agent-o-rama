@@ -23,11 +23,14 @@
 (def RAN-NODES-ATOM)
 (def RESULT-NODE-ATOM)
 (def AGG-RESULTS-ATOM)
+(def AUTO-REMOVE-FAIL-NODE-ATOM)
 
 (defn run-node!
   [agent-node n]
   (transform [ATOM (keypath n) (nil->val 0)] inc RAN-NODES-ATOM)
   (when (contains? @FAIL-NODES-ATOM n)
+    (when @AUTO-REMOVE-FAIL-NODE-ATOM
+      (swap! FAIL-NODES-ATOM disj n))
     (throw (ex-info "Intentional" {})))
   (when (= @RESULT-NODE-ATOM n)
     (aor/result! agent-node n)))
@@ -70,10 +73,11 @@
 
 (defmacro with-auto-builder
   [& body]
-  `(with-redefs [FAIL-NODES-ATOM  (atom #{})
-                 RAN-NODES-ATOM   (atom {})
-                 RESULT-NODE-ATOM (atom nil)
-                 AGG-RESULTS-ATOM (atom {})]
+  `(with-redefs [FAIL-NODES-ATOM            (atom #{})
+                 RAN-NODES-ATOM             (atom {})
+                 RESULT-NODE-ATOM           (atom nil)
+                 AGG-RESULTS-ATOM           (atom {})
+                 AUTO-REMOVE-FAIL-NODE-ATOM (atom false)]
      ~@body
    ))
 

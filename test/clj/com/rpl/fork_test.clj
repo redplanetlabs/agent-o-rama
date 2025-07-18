@@ -563,90 +563,99 @@
 
 
 (deftest retry-fork-test
-  (tc/with-auto-builder
-   (with-open [ipc (rtest/create-ipc)]
-     (letlocals
-      (bind module
-        (aor/agentmodule
-         [topology]
-         (->
-           topology
-           (aor/new-agent "foo")
-           (tc/auto-node "begin" "node1")
-           (tc/auto-node "node1" "start1")
-           (tc/auto-node "start1" "a")
-           (tc/auto-node "a" "start2")
-           (aor/agg-start-node
-            "start2"
-            "b"
-            (fn [agent-node v]
-              (aor/emit! agent-node "b" v)
-              (aor/emit! agent-node "b" v)))
-           (tc/auto-node "b" "agg2")
-           (tc/auto-node "agg2" "agg1")
-           (tc/auto-node "agg1" "end")
-           (aor/node
-            "end"
-            nil
-            (fn [agent-node v]
-              (aor/result! agent-node v)))
-         )))
-      (rtest/launch-module! ipc module {:tasks 4 :threads 2})
-      (bind module-name (get-module-name module))
+  (let [retries-atom (atom 0)]
+    (with-redefs [at/hook:received-retry (fn [& args] (swap! retries-atom inc))]
+      (tc/with-auto-builder
+       (with-open [ipc (rtest/create-ipc)]
+         (letlocals
+          (bind module
+            (aor/agentmodule
+             [topology]
+             (->
+               topology
+               (aor/new-agent "foo")
+               (tc/auto-node "begin" "node1")
+               (tc/auto-node "node1" "start1")
+               (tc/auto-node "start1" "a")
+               (tc/auto-node "a" "start2")
+               (aor/agg-start-node
+                "start2"
+                "b"
+                (fn [agent-node v]
+                  (aor/emit! agent-node "b" v)
+                  (aor/emit! agent-node "b" v)))
+               (tc/auto-node "b" "agg2")
+               (tc/auto-node "agg2" "agg1")
+               (tc/auto-node "agg1" "end")
+               (aor/node
+                "end"
+                nil
+                (fn [agent-node v]
+                  (aor/result! agent-node v)))
+             )))
+          (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+          (bind module-name (get-module-name module))
 
-      (bind agent-manager (aor/agent-manager ipc module-name))
-      (bind foo (aor/agent-client agent-manager "foo"))
-      (bind root-pstate
-        (foreign-pstate ipc
-                        module-name
-                        (po/agent-root-task-global-name "foo")))
-      (bind traces-query
-        (foreign-query ipc
-                       module-name
-                       (queries/tracing-query-name "foo")))
+          (bind agent-manager (aor/agent-manager ipc module-name))
+          (bind foo (aor/agent-client agent-manager "foo"))
+          (bind root-pstate
+            (foreign-pstate ipc
+                            module-name
+                            (po/agent-root-task-global-name "foo")))
+          (bind traces-query
+            (foreign-query ipc
+                           module-name
+                           (queries/tracing-query-name "foo")))
 
-      (bind get-trace
-        (fn [^AgentInvoke inv]
-          (let [agent-task-id  (.getTaskId inv)
-                agent-id       (.getAgentInvokeId inv)
-                root-invoke-id
-                (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                                    root-pstate
-                                    {:pkey agent-task-id})]
-            (wait-agent-finished! root-pstate agent-task-id agent-id)
-            (:invokes-map
-             (foreign-invoke-query traces-query
-                                   agent-task-id
-                                   [[agent-task-id root-invoke-id]]
-                                   10000))
-          )))
-
-
-
-      (bind inv (aor/agent-initiate foo))
-      (bind trace (get-trace inv))
-
-      ;; TODO: <<<<>>>>> how to force retry
-      ;;   - easier to put hook to wrap nodes and throw
-      ;;   - want tracking of which nodes were executed...
-      ;;     - auto-node would be perfect if it emitted elements down
-      (bind finv (aor/agent-initiate-fork foo inv {}))
+          (bind get-trace
+            (fn [^AgentInvoke inv]
+              (let [agent-task-id  (.getTaskId inv)
+                    agent-id       (.getAgentInvokeId inv)
+                    root-invoke-id
+                    (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                                        root-pstate
+                                        {:pkey agent-task-id})]
+                (wait-agent-finished! root-pstate agent-task-id agent-id)
+                (:invokes-map
+                 (foreign-invoke-query traces-query
+                                       agent-task-id
+                                       [[agent-task-id root-invoke-id]]
+                                       10000))
+              )))
 
 
-      ;(clojure.pprint/pprint trace)
 
-      ;; TODO: <<<<>>>>>
-      ;; - test retry of fork where agg is complete
-      ;; - test retry of fork where agg is not complete (something inside was
-      ;; forked so it has to retry)
-      ;;   - verify subsequent aggregation goes through fine, as fork context
-      ;;   will  be set where it normally isn't
-      ;; - test retry of agg start node where agg node was forked but it never
-      ;; completed, so it has to retry with the forked args
-      ;;   - verifies node-agg-res and agg-state were overridden correctly in
-      ;;   the PState
-      ;; - test retry of agg subgraph for COMPLETED FORKED AGG
-      ;;   - so it has to go down and traverse, but shouldn't ack the agg at
-      ;;   all
+          (bind inv (aor/agent-initiate foo 1))
+          (bind trace (get-trace inv))
 
-     ))))
+          (reset! tc/AUTO-REMOVE-FAIL-NODE-ATOM true)
+
+
+          (bind begin (of-name trace "begin"))
+          (reset! tc/FAIL-NODES-ATOM #{"node1"})
+          (bind finv (aor/agent-initiate-fork foo inv {begin [2]}))
+          (is (= [[2 2]] (aor/agent-result foo finv)))
+          (is (= 1 @retries-atom))
+
+
+          ;(clojure.pprint/pprint trace)
+
+          ;; TODO: <<<<>>>>>
+          ;; - test retry of fork where agg is complete
+          ;; - test retry of fork where agg is not complete (something inside
+          ;; was
+          ;; forked so it has to retry)
+          ;;   - verify subsequent aggregation goes through fine, as fork
+          ;;   context
+          ;;   will  be set where it normally isn't
+          ;; - test retry of agg start node where agg node was forked but it
+          ;; never
+          ;; completed, so it has to retry with the forked args
+          ;;   - verifies node-agg-res and agg-state were overridden correctly
+          ;;   in
+          ;;   the PState
+          ;; - test retry of agg subgraph for COMPLETED FORKED AGG
+          ;;   - so it has to go down and traverse, but shouldn't ack the agg at
+          ;;   all
+
+         ))))))
