@@ -2875,8 +2875,3 @@
        (h/release-semaphore SEM 1)
        (is (condition-attained? (empty? (pending-invokes))))
       ))))
-
-(deftest traced-out-of-band-test
-         ;; TODO: <<<<<>>>> do custom CF thing with custom tracing
-         ;;  - need to make API for this
-)

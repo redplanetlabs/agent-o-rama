@@ -155,9 +155,6 @@
      :agg-ack-val         Long
      :agg-start-invoke-id Long
      :agg-finished?       Boolean
-
-     ;; TODO: <<<<>>>>
-     ;;   - what other stats does langsmith track?
     })})
 
 (defn graph-history-task-global-name

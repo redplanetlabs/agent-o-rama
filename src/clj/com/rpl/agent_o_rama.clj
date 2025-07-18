@@ -493,5 +493,3 @@
         (.numResetsByInvoke ^AgentStreamByInvoke stream)
 
         :else (throw (h/ex-info "Unknown type" {:class (class stream)}))))
-
-;; TODO: <<<<>>>> need to define Clojure API for any other methods
