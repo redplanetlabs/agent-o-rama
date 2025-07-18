@@ -50,8 +50,8 @@
             (record-agg! name (nth args 0)))
           (doseq [n outputs]
             (if (str/starts-with? n "agg")
-              (aor/emit! agent-node n 1)
-              (aor/emit! agent-node n))))]
+              (aor/emit! agent-node n (nth args 0))
+              (aor/emit! agent-node n (nth args 0)))))]
     (if (str/starts-with? name "agg")
       (aor/agg-node
        topology

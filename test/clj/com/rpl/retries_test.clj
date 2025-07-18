@@ -877,7 +877,7 @@
                 ipc
                 module-name
                 aor-types/AGENTS-MB-TOPOLOGY-NAME)
-               (bind inv (aor/agent-initiate foo))
+               (bind inv (aor/agent-initiate foo 1))
                (when-not (condition-attained? (= (count nodes) @failures-atom))
                  (throw (ex-info "Didn't reach initial failures" {})))
                (rtest/resume-microbatch-topology!
@@ -921,7 +921,7 @@
               (check-active! 0)
               (when-not (condition-attained?
                          (= @tc/AGG-RESULTS-ATOM
-                            {"agg" [[1 1]] "agg2" [[1]] "agg3" [[1]]}))
+                            {"agg" [[1 1]] "agg2" [[1]] "agg3" [[[1]]]}))
                 (throw (ex-info "Agg failed" {:result @tc/AGG-RESULTS-ATOM})))
             ))
 

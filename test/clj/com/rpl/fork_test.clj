@@ -113,12 +113,12 @@
              (aor/node
               "a1"
               "agg"
-              (fn [agent-node]
+              (fn [agent-node v]
                 (aor/emit! agent-node "agg" (- @GLOBAL-ATOM3))))
              (aor/node
               "a2"
               "agg"
-              (fn [agent-node]
+              (fn [agent-node v]
                 (aor/emit! agent-node "agg" @GLOBAL-ATOM3)))
              (aor/agg-node
               "agg"
@@ -129,30 +129,30 @@
              (aor/node
               "after"
               "node3"
-              (fn [agent-node v] (aor/emit! agent-node "node3")))
+              (fn [agent-node v] (aor/emit! agent-node "node3" 1)))
              (tc/auto-node "node3" nil)
 
              (tc/auto-node "node2" "special1")
              (aor/node
               "special1"
               "special2"
-              (fn [agent-node]
+              (fn [agent-node v]
                 (aor/emit! agent-node "special2" :begin)))
              (aor/node
               "special2"
               "start2"
               (fn [agent-node v]
-                (aor/emit! agent-node "start2")))
+                (aor/emit! agent-node "start2" 1)))
              (tc/auto-node "start2" "b1")
              (tc/auto-node "b1" "start3")
              (aor/agg-start-node
               "start3"
               "b2"
-              (fn [agent-node]
-                (aor/emit! agent-node "b2")
+              (fn [agent-node v]
+                (aor/emit! agent-node "b2" 1)
                 (when (> @START3-EXTRA-EMIT 0)
                   (dotimes [_ @START3-EXTRA-EMIT]
-                    (aor/emit! agent-node "b2"))
+                    (aor/emit! agent-node "b2" 1))
                   (swap! START3-EXTRA-EMIT dec))
               ))
              (tc/auto-node "b2" "agg2")
@@ -162,9 +162,9 @@
               aggs/+vec-agg
               (fn [agent-node agg-state agg-start-res]
                 (tc/record-agg! "agg2" agg-state)
-                (aor/emit! agent-node "b3")
+                (aor/emit! agent-node "b3" 1)
                 (when @AGG2-EXTRA-EMIT
-                  (aor/emit! agent-node "b3"))
+                  (aor/emit! agent-node "b3" 1))
               ))
              (tc/auto-node "b3" "agg3")
              (tc/auto-node "agg3" "b4")
@@ -172,7 +172,7 @@
              (aor/node
               "special3"
               "special4"
-              (fn [agent-node]
+              (fn [agent-node v]
                 (swap! GLOBAL-ATOM2 inc)
                 (aor/emit! agent-node
                            "special4"
@@ -184,7 +184,7 @@
               (fn [agent-node [_ v _]]
                 (if (> v 0)
                   (aor/emit! agent-node "special2" v)
-                  (aor/emit! agent-node "b5"))))
+                  (aor/emit! agent-node "b5" 1))))
              (tc/auto-node "b5" nil)
            )))
         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
@@ -220,7 +220,7 @@
         (reset! GLOBAL-ATOM 2)
         (reset! tc/RESULT-NODE-ATOM "b5")
 
-        (bind inv (aor/agent-initiate foo))
+        (bind inv (aor/agent-initiate foo 1))
         (bind trace (get-trace inv))
         (is (= "b5" (aor/agent-result foo inv)))
 
@@ -237,7 +237,7 @@
 
         (reset! GLOBAL-ATOM3 7)
         (bind a2 (of-name trace "a2"))
-        (bind finv (aor/agent-initiate-fork foo inv {a2 []}))
+        (bind finv (aor/agent-initiate-fork foo inv {a2 [1]}))
         (bind trace2 (get-trace finv))
         (is (= "b5" (aor/agent-result foo finv)))
         (bind fagent-task-id (.getTaskId finv))
@@ -345,7 +345,7 @@
                {:node       "after"
                 :nested-ops []
                 :emits
-                [(aor-types/->AgentNodeEmit 0 nil 0 "node3" [])]
+                [(aor-types/->AgentNodeEmit 0 nil 0 "node3" [1])]
                 :result     nil
                 :input      [[[1 2 3 4] :a]]}
             ))
@@ -367,7 +367,7 @@
                  :emits
                  [(aor-types/->AgentNodeEmit 0 nil 0 "special4" [["aaa" 2 1]])]
                  :result     nil
-                 :input      []}
+                 :input      [[1]]}
                 1
 
                 {:node       "special3"
@@ -375,7 +375,7 @@
                  :emits
                  [(aor-types/->AgentNodeEmit 0 nil 0 "special4" [["aaa" 1 2]])]
                  :result     nil
-                 :input      []}
+                 :input      [[1]]}
                 1}))
 
         (bind nodes (trace-nodes trace2 "special4"))
@@ -392,7 +392,7 @@
 
                 {:node       "special4"
                  :nested-ops []
-                 :emits      [(aor-types/->AgentNodeEmit 0 nil 0 "b5" [])]
+                 :emits      [(aor-types/->AgentNodeEmit 0 nil 0 "b5" [1])]
                  :result     nil
                  :input      [["aaa" 0 10]]}
                 1
@@ -406,7 +406,7 @@
         (bind finv
           (aor/agent-initiate-fork foo
                                    inv
-                                   {start3 []}))
+                                   {start3 [1]}))
         (bind trace2 (get-trace finv))
         (is (= "b5" (aor/agent-result foo finv)))
         (bind fagent-task-id (.getTaskId finv))
@@ -429,12 +429,12 @@
 
         (bind nodes (mapv normalize-node (trace-nodes trace2 "start3")))
         (bind total (count nodes))
-        (bind one-emit (aor-types/->AgentNodeEmit 0 nil 0 "b2" []))
+        (bind one-emit (aor-types/->AgentNodeEmit 0 nil 0 "b2" [1]))
         (bind base-start3
           {:node         "start3"
            :nested-ops   []
            :result       nil
-           :input        []
+           :input        [1]
            :started-agg? true})
         (bind mk-start3
           (fn [amt]
@@ -448,7 +448,7 @@
         (bind nodes (mapv normalize-node (trace-nodes trace2 "agg2")))
 
         (bind base-agg2
-          {:emits         [(aor-types/->AgentNodeEmit 0 nil 0 "b3" [])]
+          {:emits         [(aor-types/->AgentNodeEmit 0 nil 0 "b3" [1])]
            :node          "agg2"
            :result        nil
            :agg-finished? true
@@ -502,7 +502,7 @@
            :nested-ops    []
            :emits         (vec (repeat
                                 2
-                                (aor-types/->AgentNodeEmit 0 nil 0 "b3" [])))
+                                (aor-types/->AgentNodeEmit 0 nil 0 "b3" [1])))
            :result        nil
            :input         [[:x] 123]
            :agg-start-res 123
@@ -511,7 +511,7 @@
         (bind unchanged
           {:agg-input-count 1
            :agg-start-res   nil
-           :emits           [(aor-types/->AgentNodeEmit 0 nil 0 "b3" [])]
+           :emits           [(aor-types/->AgentNodeEmit 0 nil 0 "b3" [1])]
            :node            "agg2"
            :agg-inputs-first-10 [(aor-types/->AggInput 0 [1])]
            :result          nil
@@ -537,7 +537,7 @@
             {:agg-input-count amt
              :agg-start-res   nil
              :emits
-             [(aor-types/->AgentNodeEmit 0 nil 0 "b4" [])]
+             [(aor-types/->AgentNodeEmit 0 nil 0 "b4" [[1 1]])]
              :node            "agg3"
              :agg-inputs-first-10 (vec (repeat amt
                                                (aor-types/->AggInput 0 [1])))
@@ -561,106 +561,92 @@
        )))))
 
 
+
 (deftest retry-fork-test
-  (with-redefs []
-    (with-open [ipc (rtest/create-ipc)]
-      (letlocals
-       (bind module
-         (aor/agentmodule
-          [topology]
-          (->
-            topology
-            (aor/new-agent "foo")
-            (aor/node
-             "begin"
-             "node1"
-             (fn [agent-node] (aor/emit! agent-node "node1" 1)))
-            (aor/node
-             "node1"
-             "start1"
-             (fn [agent-node v] (aor/emit! agent-node "start1" v)))
-            (aor/agg-start-node
-             "start1"
-             "a"
-             (fn [agent-node v] (aor/emit! agent-node "a" v)))
-            (aor/node
-             "a"
-             "start2"
-             (fn [agent-node v] (aor/emit! agent-node "start2" v)))
-            (aor/agg-start-node
-             "start2"
-             "b"
-             (fn [agent-node v]
-               (aor/emit! agent-node "b" v)
-               (aor/emit! agent-node "b" v)))
-            (aor/node
-             "b"
-             "agg2"
-             (fn [agent-node v] (aor/emit! agent-node "agg2" v)))
-            (aor/agg-node
-             "agg2"
-             "agg1"
-             aggs/+vec-agg
-             (fn [agent-node agg agg-start-res]
-               (aor/emit! agent-node "agg1" agg)))
-            (aor/agg-node
-             "agg1"
-             "end"
-             aggs/+vec-agg
-             (fn [agent-node agg agg-start-res]
-               (aor/emit! agent-node "end" agg)))
-            (aor/node
-             "end"
-             nil
-             (fn [agent-node v]
-               (aor/result! agent-node v)))
-          )))
-       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
-       (bind module-name (get-module-name module))
+  (tc/with-auto-builder
+   (with-open [ipc (rtest/create-ipc)]
+     (letlocals
+      (bind module
+        (aor/agentmodule
+         [topology]
+         (->
+           topology
+           (aor/new-agent "foo")
+           (tc/auto-node "begin" "node1")
+           (tc/auto-node "node1" "start1")
+           (tc/auto-node "start1" "a")
+           (tc/auto-node "a" "start2")
+           (aor/agg-start-node
+            "start2"
+            "b"
+            (fn [agent-node v]
+              (aor/emit! agent-node "b" v)
+              (aor/emit! agent-node "b" v)))
+           (aor/auto-node "b" "agg2")
+           (aor/auto-node "agg2" "agg1")
+           (aor/auto-node "agg1" "end")
+           (aor/node
+            "end"
+            nil
+            (fn [agent-node v]
+              (aor/result! agent-node v)))
+         )))
+      (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+      (bind module-name (get-module-name module))
 
-       (bind agent-manager (aor/agent-manager ipc module-name))
-       (bind foo (aor/agent-client agent-manager "foo"))
-       (bind root-pstate
-         (foreign-pstate ipc
-                         module-name
-                         (po/agent-root-task-global-name "foo")))
-       (bind traces-query
-         (foreign-query ipc
+      (bind agent-manager (aor/agent-manager ipc module-name))
+      (bind foo (aor/agent-client agent-manager "foo"))
+      (bind root-pstate
+        (foreign-pstate ipc
                         module-name
-                        (queries/tracing-query-name "foo")))
+                        (po/agent-root-task-global-name "foo")))
+      (bind traces-query
+        (foreign-query ipc
+                       module-name
+                       (queries/tracing-query-name "foo")))
 
-       (bind get-trace
-         (fn [^AgentInvoke inv]
-           (let [agent-task-id  (.getTaskId inv)
-                 agent-id       (.getAgentInvokeId inv)
-                 root-invoke-id
-                 (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                                     root-pstate
-                                     {:pkey agent-task-id})]
-             (wait-agent-finished! root-pstate agent-task-id agent-id)
-             (:invokes-map
-              (foreign-invoke-query traces-query
-                                    agent-task-id
-                                    [[agent-task-id root-invoke-id]]
-                                    10000))
-           )))
+      (bind get-trace
+        (fn [^AgentInvoke inv]
+          (let [agent-task-id  (.getTaskId inv)
+                agent-id       (.getAgentInvokeId inv)
+                root-invoke-id
+                (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                                    root-pstate
+                                    {:pkey agent-task-id})]
+            (wait-agent-finished! root-pstate agent-task-id agent-id)
+            (:invokes-map
+             (foreign-invoke-query traces-query
+                                   agent-task-id
+                                   [[agent-task-id root-invoke-id]]
+                                   10000))
+          )))
 
 
-       (bind inv (aor/agent-initiate foo))
-       (bind trace (get-trace inv))
-       ;; TODO: <<<<>>>>>
-       ;; - test retry of fork where agg is complete
-       ;; - test retry of fork where agg is not complete (something inside was
-       ;; forked so it has to retry)
-       ;;   - verify subsequent aggregation goes through fine, as fork context
-       ;;   will
-       ;;   be set where it normally isn't
-       ;; - test retry of agg start node where agg node was forked but it never
-       ;; completed, so it has to retry with the forked args
-       ;;   - verifies node-agg-res and agg-state were overridden correctly in
-       ;;   the PState
-       ;; - test retry of agg subgraph for COMPLETED FORKED AGG
-       ;;   - so it has to go down and traverse, but shouldn't ack the agg at
-       ;;   all
 
-      ))))
+      (bind inv (aor/agent-initiate foo))
+      (bind trace (get-trace inv))
+
+      ;; TODO: <<<<>>>>> how to force retry
+      ;;   - easier to put hook to wrap nodes and throw
+      ;;   - want tracking of which nodes were executed...
+      ;;     - auto-node would be perfect if it emitted elements down
+      (bind finv (aor/initiate-fork foo inv {}))
+
+
+      ;(clojure.pprint/pprint trace)
+
+      ;; TODO: <<<<>>>>>
+      ;; - test retry of fork where agg is complete
+      ;; - test retry of fork where agg is not complete (something inside was
+      ;; forked so it has to retry)
+      ;;   - verify subsequent aggregation goes through fine, as fork context
+      ;;   will  be set where it normally isn't
+      ;; - test retry of agg start node where agg node was forked but it never
+      ;; completed, so it has to retry with the forked args
+      ;;   - verifies node-agg-res and agg-state were overridden correctly in
+      ;;   the PState
+      ;; - test retry of agg subgraph for COMPLETED FORKED AGG
+      ;;   - so it has to go down and traverse, but shouldn't ack the agg at
+      ;;   all
+
+     ))))
