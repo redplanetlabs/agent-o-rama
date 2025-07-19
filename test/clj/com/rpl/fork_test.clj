@@ -582,6 +582,7 @@
                 "start2"
                 "b"
                 (fn [agent-node v]
+                  (tc/run-node! agent-node "start2")
                   (aor/emit! agent-node "b" v)
                   (aor/emit! agent-node "b" v)))
                (tc/auto-node "b" "agg2")

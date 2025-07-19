@@ -196,7 +196,6 @@
    (:> *invoke-id)))
 
 (defn init-retry-num [] 0)
-(defn init-retry-num* [] (init-retry-num))
 
 (deframaop gen-id
   [$$id]
@@ -213,7 +212,7 @@
    (get *data :args :> *args)
    (ops/current-task-id :> *agent-task-id)
    (gen-id $$id-gen :> *agent-id)
-   (init-retry-num* :> *retry-num)
+   (init-retry-num :> *retry-num)
    (init-root *agent-name *agent-id *retry-num *args :> *invoke-id)
    (local-transform> [(keypath *agent-id) (termval true)]
                      $$active)
@@ -346,7 +345,7 @@
                             *affected-aggs
                             :> *fork-context)
    (gen-id $$id-gen :> *fork-agent-id)
-   (init-retry-num* :> *retry-num)
+   (init-retry-num :> *retry-num)
    (init-root *agent-name
               *fork-agent-id
               *retry-num
