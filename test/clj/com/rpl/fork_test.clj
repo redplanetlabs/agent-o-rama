@@ -592,6 +592,7 @@
                 "end"
                 nil
                 (fn [agent-node v]
+                  (tc/run-node! agent-node "end")
                   (aor/result! agent-node v)))
              )))
           (rtest/launch-module! ipc module {:tasks 4 :threads 2})
@@ -630,13 +631,30 @@
           (bind trace (get-trace inv))
 
           (reset! tc/AUTO-REMOVE-FAIL-NODE-ATOM true)
+          (bind prepare!
+            (fn [fail-nodes]
+              (reset! tc/FAIL-NODES-ATOM fail-nodes)
+              (reset! retries-atom 0)
+              (reset! tc/RAN-NODES-ATOM {})))
 
 
           (bind begin (of-name trace "begin"))
-          (reset! tc/FAIL-NODES-ATOM #{"node1"})
+          (prepare! #{"node1"})
           (bind finv (aor/agent-initiate-fork foo inv {begin [2]}))
           (is (= [[2 2]] (aor/agent-result foo finv)))
           (is (= 1 @retries-atom))
+          (is (= @tc/RAN-NODES-ATOM
+                 {"begin"  1
+                  "node1"  2
+                  "start1" 1
+                  "a"      1
+                  "start2" 1
+                  "b"      2
+                  "agg2"   1
+                  "agg1"   1
+                  "end"    1}))
+
+          (prepare! #{})
 
 
           ;(clojure.pprint/pprint trace)
@@ -644,8 +662,7 @@
           ;; TODO: <<<<>>>>>
           ;; - test retry of fork where agg is complete
           ;; - test retry of fork where agg is not complete (something inside
-          ;; was
-          ;; forked so it has to retry)
+          ;; was forked so it has to retry)
           ;;   - verify subsequent aggregation goes through fine, as fork
           ;;   context
           ;;   will  be set where it normally isn't
