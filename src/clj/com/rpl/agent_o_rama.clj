@@ -58,8 +58,8 @@
          ret))
      (getStreamTopology [this] stream-topology)
 
-     ;; TODO: need methods for getting mirror agents, and will also need methods
-     ;; for invoking mirror agents
+     ;; TODO: <<<<>>>> need methods for getting mirror agents, and will also
+     ;; need methods for invoking mirror agents
      ;;    - should invoking a mirror agent be a node, or should it just be an
      ;;    invoke?
      ;;      - feels like an invoke
@@ -113,11 +113,6 @@
   [^AgentsTopology at]
   (.define at))
 
-
-; (declareKeyValueStore [this name key-class val-class]
-; (declareDocumentStore [this name key-class key-val-classes]
-; (^PState$Declaration declarePStateStore [this ^String name ^Class schema]
-
 (defn declare-key-value-store
   [^AgentsTopology agents-topology name key-class val-class]
   (.declareKeyValueStore agents-topology name key-class val-class))
@@ -132,8 +127,6 @@
 (defn declare-pstate-store
   [^AgentsTopology agents-topology name schema]
   (declare-pstate* (.getStreamTopology agents-topology) (symbol name) schema))
-
-;; TODO: all the declare methods
 
 (defn new-agent
   [^AgentsTopology agents-topology name]
