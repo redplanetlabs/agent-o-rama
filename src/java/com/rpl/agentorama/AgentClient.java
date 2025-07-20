@@ -1,10 +1,11 @@
 package com.rpl.agentorama;
 
+import java.io.Closeable;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import com.rpl.agentorama.ops.*;
 
-public interface AgentClient {
+public interface AgentClient extends Closeable {
   interface StreamCallback<T> {
     void onUpdate(List<T> allChunks, List<T> newChunks, boolean isReset, boolean isComplete);
   }
@@ -31,7 +32,4 @@ public interface AgentClient {
   <T> AgentStreamByInvoke streamAll(AgentInvoke invoke,
                                     String node,
                                     StreamAllCallback<T> callback);
-  // TODO: methods to get trace info
-  //  - needs to be paginated
-  //  - should be exact same as query topology
 }

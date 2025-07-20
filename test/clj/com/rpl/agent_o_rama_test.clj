@@ -2057,6 +2057,9 @@
 
          (is (= (count @opens-atom) 6))
          (is (opens-matches-closes? @opens-atom @closes-atom))
+
+         (close! foo)
+         (close! bar)
         )))))
 
 (defn matching-ascending-seq?

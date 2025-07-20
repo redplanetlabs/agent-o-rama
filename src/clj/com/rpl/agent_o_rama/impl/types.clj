@@ -181,7 +181,8 @@
 
 (defprotocol AgentClientInternal
   (stream-internal [this agent-invoke node callback-fn])
-  (stream-all-internal [this agent-invoke node callback-fn]))
+  (stream-all-internal [this agent-invoke node callback-fn])
+  (underlying-objects [this]))
 
 (drp/defrecord+ ChangeConfig
   [key :- String

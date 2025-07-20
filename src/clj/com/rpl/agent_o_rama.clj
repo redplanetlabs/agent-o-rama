@@ -248,7 +248,15 @@
                                                  module-name
                                                  (po/agent-depot-name
                                                   agentName))
-             invokes-pstate       (foreign-pstate
+             agent-config-depot   (foreign-depot cluster
+                                                 module-name
+                                                 (po/agent-config-depot-name
+                                                  agentName))
+             config-pstate        (foreign-pstate
+                                   cluster
+                                   module-name
+                                   (po/agent-config-task-global-name agentName))
+             root-pstate          (foreign-pstate
                                    cluster
                                    module-name
                                    (po/agent-root-task-global-name agentName))
@@ -323,7 +331,7 @@
               (.thenApply
                (foreign-proxy-async
                 [(keypath agent-id) :result]
-                invokes-pstate
+                root-pstate
                 {:pkey        agent-task-id
                  :callback-fn (fn [new-val _ _]
                                 (when (some? new-val)
@@ -391,13 +399,9 @@
                             new-chunks
                             reset-invoke-ids
                             complete?)))))
-
-          ;; TODO: <<<<>>> methods for getting graph history
-          ;;    - just max version and method to get historicalgraphinfo at a
-          ;;    particular version
-          ;;    - need historicalgraphinfo to be a java type
-
-
+          (close [this]
+            (close! agent-depot)
+            (close! agent-config-depot))
           aor-types/AgentClientInternal
           (stream-internal [this agent-invoke node callback-fn]
             (iclient/agent-stream-impl
@@ -411,6 +415,14 @@
              agent-invoke
              node
              callback-fn))
+          (underlying-objects [this]
+            {:agent-depot          agent-depot
+             :agent-config-depot   agent-config-depot
+             :config-pstate        config-pstate
+             :root-pstate          root-pstate
+             :streaming-pstate     streaming-pstate
+             :graph-history-pstate graph-history-pstate
+             :tracing-query        tracing-query})
          ))))))
 
 (defn agent-client
