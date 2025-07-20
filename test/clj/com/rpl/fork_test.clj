@@ -560,11 +560,28 @@
         (is (= expected (frequencies nodes)))
        )))))
 
+(deframaop force-retry-node-failure
+  [*agent-name *node *invoke-id *retry-num]
+  (<<with-substitutions
+   [*depot (po/agent-depot-task-global *agent-name)]
+   (var-get (clj! var tc/FAIL-NODES-ATOM) :> *fail-nodes-atom)
+   (<<if (contains? @*fail-nodes-atom *node)
+     (swap! *fail-nodes-atom disj *node)
+     (depot-partition-append!
+      *depot
+      (aor-types/->NodeFailure (ops/current-task-id) *invoke-id *retry-num)
+      :append-ack)
+    (else>)
+     (:>)
+   )))
 
 
 (deftest retry-fork-test
   (let [retries-atom (atom 0)]
-    (with-redefs [at/hook:received-retry (fn [& args] (swap! retries-atom inc))]
+    (with-redefs [at/hook:received-retry (fn [& args] (swap! retries-atom inc))
+
+                  at/hook:handling-retry-node-complete>
+                  force-retry-node-failure]
       (tc/with-auto-builder
        (with-open [ipc (rtest/create-ipc)]
          (letlocals
@@ -587,7 +604,8 @@
                   (aor/emit! agent-node "b" v)))
                (tc/auto-node "b" "agg2")
                (tc/auto-node "agg2" "agg1")
-               (tc/auto-node "agg1" "end")
+               (tc/auto-node "agg1" "c")
+               (tc/auto-node "c" "end")
                (aor/node
                 "end"
                 nil
@@ -652,9 +670,18 @@
                   "b"      2
                   "agg2"   1
                   "agg1"   1
+                  "c"      1
                   "end"    1}))
 
-          (prepare! #{})
+          (prepare! #{"agg1"})
+          (bind c (of-name trace "c"))
+          (bind finv (aor/agent-initiate-fork foo inv {c [:abc]}))
+          (is (= :abc (aor/agent-result foo finv)))
+          (is (empty? @tc/FAIL-NODES-ATOM)) ; sanity check
+          (is (= {"c" 1 "end" 1} @tc/RAN-NODES-ATOM))
+          ;; TODO: <<<<>>>>
+          ;;  - verify parts of the trace
+
 
 
           ;(clojure.pprint/pprint trace)

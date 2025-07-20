@@ -232,8 +232,7 @@
                      (aor-types/->valid-NodeFailure
                       task-id
                       invoke-id
-                      retry-num
-                      (h/current-time-millis))
+                      retry-num)
                      :append-ack)
                     (throw t)
                   ))

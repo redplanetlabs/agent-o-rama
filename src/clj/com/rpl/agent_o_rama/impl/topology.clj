@@ -618,6 +618,10 @@
     $$nodes)
    (:>)))
 
+(deframaop hook:handling-retry-node-complete>
+  [*agent-name *node *invoke-id *retry-num]
+  (:>))
+
 (deframaop intake-retry-node-complete
   [*agent-name {:keys [*invoke-id *retry-num *fork-context]}]
   (<<with-substitutions
@@ -628,6 +632,7 @@
                         *invoke-id
                         *retry-num
                         :> *agent-task-id *agent-id *node *agg-invoke-id)
+   (hook:handling-retry-node-complete> *agent-name *node *invoke-id *retry-num)
    (get-node-obj *agent-graph *node :> *node-obj)
    (local-select> (keypath *invoke-id)
                   $$nodes

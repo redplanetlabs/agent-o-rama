@@ -114,7 +114,6 @@
   [task-id :- Long
    invoke-id :- Long
    retry-num :- Long
-   finish-time-millis :- Long
   ])
 
 (drp/defrecord+ AgentFailure
