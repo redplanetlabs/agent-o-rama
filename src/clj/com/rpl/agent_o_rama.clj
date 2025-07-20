@@ -57,13 +57,6 @@
          (vswap! agents-vol assoc name ret)
          ret))
      (getStreamTopology [this] stream-topology)
-
-     ;; TODO: <<<<>>>> need methods for getting mirror agents, and will also
-     ;; need methods for invoking mirror agents
-     ;;    - should invoking a mirror agent be a node, or should it just be an
-     ;;    invoke?
-     ;;      - feels like an invoke
-
      (declareKeyValueStore [this name key-class val-class]
        (simpl/declare-store* stream-topology
                              store-info-vol

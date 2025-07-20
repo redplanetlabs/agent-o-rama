@@ -126,7 +126,7 @@
      (source> agent-streaming-depot-sym {:retry-mode :all-after} :> *data)
       (at/handle-streaming agent-name *data)
 
-      ;; TODO: <<<<<>>>> add case here for GC
+      ;; TODO: add case here for GC
       ;; - each iteration delete node and write to PState the next ones to
       ;; delete and where – can probably be same PState as one used by retry
       ;; - ordered IDs is perfect for GC

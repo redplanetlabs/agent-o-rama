@@ -34,7 +34,7 @@
         (instance? NodeAgg node) AGG-NODE-KW
         :else (throw (h/ex-info "Unexpected node type" {:class (class node)}))))
 
-;; TODO: <<<<>>>> use flexible serialization for these to ease updating the
+;; TODO: use flexible serialization for these to ease updating the
 ;; library? or just some of them?
 
 (drp/defrecord+ AgentInvoke

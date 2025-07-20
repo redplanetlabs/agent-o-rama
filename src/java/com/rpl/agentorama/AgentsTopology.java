@@ -18,13 +18,10 @@ public interface AgentsTopology {
   PState.Declaration declarePStateStore(String name, Class schema);
   PState.Declaration declarePStateStore(String name,  PState.Schema schema);
 
-  // TODO: <<<<>>>> document how to make LLMs
+  // TODO: document how to make LLMs
   void declareAgentObject(String name, Object o);
 
-  // TODO: <<<<>>>> need method for declaring mirror agents
-
   StreamTopology getStreamTopology();
-
-
+  
   void define();
 }

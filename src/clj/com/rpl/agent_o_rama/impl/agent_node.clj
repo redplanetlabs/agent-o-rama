@@ -162,7 +162,7 @@
          (throw (h/ex-info "Cannot both emit and result" {})))
        (vreset! result-vol (aor-types/->valid-AgentResult arg false)))
      (getAgentObject [this name]
-                     ;; TODO: <<<<>>>>
+                     ;; TODO
      )
      (getStore [this name]
        (let [store-params
@@ -176,7 +176,7 @@
               (.getLocalPState rama-clients name)
               (.getPStateWriteDepot rama-clients)
               nested-ops-vol)]
-         ;; TODO: <<<<>>>> not sure this is the right approach for mirrors
+         ;; TODO: not sure this is the right approach for mirrors
          (condp = (get (:store-info store-info) name)
            simpl/KV
            (simpl/mk-kv-store store-params)
