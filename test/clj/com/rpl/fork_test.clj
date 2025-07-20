@@ -534,18 +534,19 @@
 
         (bind mk-agg3
           (fn [amt]
-            {:agg-input-count amt
-             :agg-start-res   nil
-             :emits
-             [(aor-types/->AgentNodeEmit 0 nil 0 "b4" [[1 1]])]
-             :node            "agg3"
-             :agg-inputs-first-10 (vec (repeat amt
-                                               (aor-types/->AggInput 0 [1])))
-             :result          nil
-             :agg-finished?   true
-             :nested-ops      []
-             :agg-state       (vec (repeat amt 1))
-             :input           [(vec (repeat amt 1)) nil]}
+            (let [v (vec (repeat amt 1))]
+              {:agg-input-count amt
+               :agg-start-res   nil
+               :emits
+               [(aor-types/->AgentNodeEmit 0 nil 0 "b4" [v])]
+               :node            "agg3"
+               :agg-inputs-first-10 (vec (repeat amt
+                                                 (aor-types/->AggInput 0 [1])))
+               :result          nil
+               :agg-finished?   true
+               :nested-ops      []
+               :agg-state       v
+               :input           [v nil]})
           ))
 
         (bind nodes (mapv normalize-node (trace-nodes trace2 "agg3")))
