@@ -89,7 +89,6 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
     return _clientInfo.getResource().getLocalPState(pstateName);
   }
 
-  // TODO: maybe this should contain store info as well?
   public RamaClientsTaskGlobal(Collection<String> agentNames, List<List> mirrorTuples) {
     _agentNames = agentNames;
     _mirrorTuples = mirrorTuples;

@@ -756,6 +756,9 @@
                  @tc/RAN-NODES-ATOM))
 
 
-          ;; TODO: <<<<>>>>
-          ;;   - test agent-fork and agent-fork-async
+          ;; also test agent-fork and agent-fork-async in this test though
+          ;; they're not tests of retries of forks
+          (prepare! #{})
+          (is (= [[:z :z]] (aor/agent-fork foo inv {start2 [:z]})))
+          (is (= [[:z :z]] (.get (aor/agent-fork-async foo inv {start2 [:z]}))))
          ))))))
