@@ -708,6 +708,7 @@
           (is (= [1] (:input (trace-node trace2 "start2"))))
 
 
+          (println (trace-node trace "agg2"))
           ;(clojure.pprint/pprint trace)
 
           ;; TODO: <<<<>>>>>
