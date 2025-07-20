@@ -1,6 +1,8 @@
 package com.rpl.agentorama;
 
-public class AgentInvoke {
+import com.rpl.rama.RamaSerializable;
+
+public class AgentInvoke implements RamaSerializable {
   long _taskId;
   long _agentInvokeId;
 
