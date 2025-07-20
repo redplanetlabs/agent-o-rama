@@ -724,11 +724,36 @@
           (is (= [[:a]] (:input (trace-node trace2 "c"))))
           (is (= [[:a]] (:input (trace-node trace2 "end"))))
 
+          (prepare! #{"start2"})
+          (bind start2 (of-name trace "start2"))
+          (bind finv (aor/agent-initiate-fork foo inv {start2 [:x]}))
+          (is (= [[:x :x]] (aor/agent-result foo finv)))
+          (bind trace2 (get-trace finv))
+          (is (empty? @tc/FAIL-NODES-ATOM)) ; sanity check
+          (is (= {"start2" 2
+                  "b"      2
+                  "b2"     2
+                  "agg2"   1
+                  "agg1"   1
+                  "c"      1
+                  "end"    1}
+                 @tc/RAN-NODES-ATOM))
 
-          ;; TODO: <<<<>>>>>
-          ;; - test retry of agg subgraph for COMPLETED FORKED AGG
-          ;;   - so it has to go down and traverse, but shouldn't ack the agg at
-          ;;   all
+
+          (prepare! #{"agg1"})
+          (bind start2 (of-name trace "start2"))
+          (bind finv (aor/agent-initiate-fork foo inv {start2 [:y]}))
+          (is (= [[:y :y]] (aor/agent-result foo finv)))
+          (bind trace2 (get-trace finv))
+          (is (empty? @tc/FAIL-NODES-ATOM)) ; sanity check
+          (is (= {"start2" 1
+                  "b"      2
+                  "b2"     2
+                  "agg2"   1
+                  "agg1"   2
+                  "c"      1
+                  "end"    1}
+                 @tc/RAN-NODES-ATOM))
 
 
           ;; TODO: <<<<>>>>
