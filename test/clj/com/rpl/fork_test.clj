@@ -603,7 +603,8 @@
                   (tc/run-node! agent-node "start2")
                   (aor/emit! agent-node "b" v)
                   (aor/emit! agent-node "b" v)))
-               (tc/auto-node "b" "agg2")
+               (tc/auto-node "b" "b2")
+               (tc/auto-node "b2" "agg2")
                (tc/auto-node "agg2" "agg1")
                (tc/auto-node "agg1" "c")
                (tc/auto-node "c" "end")
@@ -669,6 +670,7 @@
                   "a"      1
                   "start2" 1
                   "b"      2
+                  "b2"     2
                   "agg2"   1
                   "agg1"   1
                   "c"      1
@@ -686,22 +688,33 @@
           (is (= [:abc] (:input (trace-node trace2 "c"))))
           (is (= [:abc] (:input (trace-node trace2 "end"))))
 
+          (prepare! #{"b2"})
+          (bind b (rand-nth (trace-node-ids trace "b")))
+          (bind finv (aor/agent-initiate-fork foo inv {b [9]}))
+          (bind res (aor/agent-result foo finv))
+          (is (#{[[9 1]] [[1 9]]} res))
+          (is (empty? @tc/FAIL-NODES-ATOM)) ; sanity check
+          (is (= (dissoc @tc/RAN-NODES-ATOM "b2")
+                 {"b" 1 "agg2" 1 "agg1" 1 "c" 1 "end" 1}))
+          (bind b2-runs (get @tc/RAN-NODES-ATOM "b2"))
+          ;; - 1 if the retry failed on one path first and caused other path to
+          ;; get invalidated and never run
+          ;; - usually it will be 2, since the forked path will run and fail,
+          ;; and then re-execute
+          (is (#{1 2} b2-runs))
+          (bind trace2 (get-trace finv))
+          (is (= [1] (:input (trace-node trace2 "begin"))))
+          (is (= [1] (:input (trace-node trace2 "start1"))))
+          (is (= [1] (:input (trace-node trace2 "start2"))))
 
 
           ;(clojure.pprint/pprint trace)
 
           ;; TODO: <<<<>>>>>
-          ;; - test retry of fork where agg is not complete (something inside
-          ;; was forked so it has to retry)
-          ;;   - verify subsequent aggregation goes through fine, as fork
-          ;;   context
-          ;;   will  be set where it normally isn't
           ;; - test retry of agg start node where agg node was forked but it
-          ;; never
-          ;; completed, so it has to retry with the forked args
+          ;; never completed, so it has to retry with the forked args
           ;;   - verifies node-agg-res and agg-state were overridden correctly
-          ;;   in
-          ;;   the PState
+          ;;   in the PState
           ;; - test retry of agg subgraph for COMPLETED FORKED AGG
           ;;   - so it has to go down and traverse, but shouldn't ack the agg at
           ;;   all
