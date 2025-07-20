@@ -579,7 +579,7 @@
 (deftest retry-fork-test
   (let [retries-atom (atom 0)]
     (with-redefs [at/hook:received-retry (fn [& args] (swap! retries-atom inc))
-                  ;anode/log-node-error   (fn [& args])
+                  anode/log-node-error   (fn [& args])
 
                   at/hook:handling-retry-node-complete>
                   force-retry-node-failure]
@@ -708,16 +708,29 @@
           (is (= [1] (:input (trace-node trace2 "start2"))))
 
 
-          (println (trace-node trace "agg2"))
-          ;(clojure.pprint/pprint trace)
+          (prepare! #{"agg2"})
+          (bind agg2 (of-name trace "agg2"))
+          (bind finv (aor/agent-initiate-fork foo inv {agg2 [:a :b]}))
+          (is (= [:a] (aor/agent-result foo finv)))
+          (bind trace2 (get-trace finv))
+          (is (empty? @tc/FAIL-NODES-ATOM)) ; sanity check
+          (bind agg2-node (trace-node trace2 "agg2"))
+          (is (= :a (:agg-state agg2-node)))
+          (is (= :b (:agg-start-res agg2-node)))
+          (is (= [:a :b] (:input agg2-node)))
+          (is (= [1] (:input (trace-node trace2 "begin"))))
+          (is (= [1] (:input (trace-node trace2 "start1"))))
+          (is (= [1] (:input (trace-node trace2 "start2"))))
+          (is (= [[:a]] (:input (trace-node trace2 "c"))))
+          (is (= [[:a]] (:input (trace-node trace2 "end"))))
+
 
           ;; TODO: <<<<>>>>>
-          ;; - test retry of agg start node where agg node was forked but it
-          ;; never completed, so it has to retry with the forked args
-          ;;   - verifies node-agg-res and agg-state were overridden correctly
-          ;;   in the PState
           ;; - test retry of agg subgraph for COMPLETED FORKED AGG
           ;;   - so it has to go down and traverse, but shouldn't ack the agg at
           ;;   all
 
+
+          ;; TODO: <<<<>>>>
+          ;;   - test agent-fork and agent-fork-async
          ))))))
