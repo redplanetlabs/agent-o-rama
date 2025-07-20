@@ -579,6 +579,7 @@
 (deftest retry-fork-test
   (let [retries-atom (atom 0)]
     (with-redefs [at/hook:received-retry (fn [& args] (swap! retries-atom inc))
+                  ;anode/log-node-error   (fn [& args])
 
                   at/hook:handling-retry-node-complete>
                   force-retry-node-failure]
@@ -679,15 +680,17 @@
           (is (= :abc (aor/agent-result foo finv)))
           (is (empty? @tc/FAIL-NODES-ATOM)) ; sanity check
           (is (= {"c" 1 "end" 1} @tc/RAN-NODES-ATOM))
-          ;; TODO: <<<<>>>>
-          ;;  - verify parts of the trace
+          (bind trace2 (get-trace finv))
+          (is (= [1] (:input (trace-node trace2 "start1"))))
+          (is (= [[[1 1]] nil] (:input (trace-node trace2 "agg1"))))
+          (is (= [:abc] (:input (trace-node trace2 "c"))))
+          (is (= [:abc] (:input (trace-node trace2 "end"))))
 
 
 
           ;(clojure.pprint/pprint trace)
 
           ;; TODO: <<<<>>>>>
-          ;; - test retry of fork where agg is complete
           ;; - test retry of fork where agg is not complete (something inside
           ;; was forked so it has to retry)
           ;;   - verify subsequent aggregation goes through fine, as fork
