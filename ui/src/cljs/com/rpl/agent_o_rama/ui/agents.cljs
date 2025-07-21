@@ -130,7 +130,7 @@
     (if loading?
       "...loading"
       ($ agent-graph/graph {:initial-data data
-                            :height "200px"
+                            :height "500px"
                             :selected-node nil
                             :set-selected-node (fn [_])
                             :fitView true}))))
