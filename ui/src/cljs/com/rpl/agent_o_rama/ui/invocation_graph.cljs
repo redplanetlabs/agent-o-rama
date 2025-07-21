@@ -182,37 +182,20 @@
         node-id (:node-id data)
         node-name (:node data)
         original-input (:input data)
-        
-        ;; Check if input is a sequence/vector
-        is-array-input (sequential? original-input)
-        
-        ;; Parse current input - only works with sequences
-        current-args (when is-array-input
-                       (let [stored-input (get changed-nodes node-id)]
-                         (if stored-input
-                           stored-input
-                           (vec (map str original-input)))))
-        
-        [args set-args] (uix/use-state current-args)
-        is-affected (contains? affected-nodes node-id)
-        
-        update-arg (fn [index value]
-                     (let [new-args (assoc args index value)]
-                       (set-args new-args)
-                       (set-changed-nodes #(assoc % node-id new-args))))]
+        current-input (get changed-nodes node-id (str original-input))
+        [input-text set-input-text] (uix/use-state current-input)
+        is-affected (contains? affected-nodes node-id)]
     
-    ;; Update args when selected node changes
+    ;; Update input text when selected node changes
     (uix/use-effect
      (fn []
-       (when (and selected-node is-array-input)
+       (when selected-node
          (let [data (js->clj (.-data selected-node) :keywordize-keys true)
                node-id (:node-id data)
                original-input (:input data)
-               stored-input (get changed-nodes node-id)]
-           (if stored-input
-             (set-args stored-input)
-             (set-args (vec (map str original-input)))))))
-     [selected-node changed-nodes is-array-input])
+               current-input (get changed-nodes node-id (str original-input))]
+           (set-input-text current-input))))
+     [selected-node changed-nodes])
     
     (when selected-node
       ($ :div {:className "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl"}
@@ -223,8 +206,7 @@
                ($ :div {:className "text-sm text-gray-600 mb-2"}
                   (str "Node ID: " node-id)))
             
-            (cond
-              is-affected
+            (if is-affected
               ;; Show disabled state for affected nodes
               ($ :div {:className "bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center"}
                  ($ :div {:className "text-gray-500 mb-2"}
@@ -232,39 +214,27 @@
                  ($ :div {:className "text-sm text-gray-600 mb-4"}
                     "This node's execution will be re-determined when the fork is executed.")
                  ($ :div {:className "text-xs text-gray-500"}
-                    ($ :div (str "Current input: " (if (sequential? original-input)
-                                                     (pr-str original-input)
+                    ($ :div (str "Current input: " (if (array? original-input)
+                                                     (pr-str (js->clj original-input))
                                                      (str original-input))))))
               
-                             (not is-array-input)
-               ;; Show error for non-sequence inputs
-               ($ :div {:className "bg-red-50 border-2 border-red-300 rounded-lg p-6 text-center"}
-                  ($ :div {:className "text-red-600 mb-2 text-lg"}
-                     "⚠️ Cannot edit this input")
-                  ($ :div {:className "text-sm text-red-700 mb-4"}
-                     "This node's input is not a sequence. Only sequence inputs can be edited using the argument boxes.")
-                  ($ :div {:className "text-xs text-red-600 bg-red-100 p-2 rounded font-mono"}
-                     (str "Current input: " (str original-input)))
-                  ($ :div {:className "text-xs text-red-500 mt-2"}
-                     "Input type: " (type original-input)))
-              
-              :else
-              ;; Show normal editing interface for unaffected array nodes
+              ;; Show normal editing interface for unaffected nodes
               ($ :div {:className "space-y-4"}
                  ($ :div
                     ($ :label {:className "block text-sm font-medium text-gray-700 mb-2"}
-                       (str "New Input Arguments (" (count args) " args):"))
-                    ($ :div {:className "flex gap-2"}
-                       (for [i (range (count args))]
-                         ($ :textarea {:key i
-                                       :className "flex-1 max-w-32 p-2 border border-gray-300 rounded text-sm resize-none font-mono"
-                                       :placeholder (str "arg" (inc i) " (json)")
-                                       :value (get args i "")
-                                       :onChange #(update-arg i (.. % -target -value))
-                                       :rows 2}))))
+                       "New Input:")
+                    ($ :textarea {:className "w-full h-32 p-3 border border-gray-300 rounded-md font-mono text-sm resize-y"
+                                  :value input-text
+                                  :onChange (fn [e]
+                                              (let [new-value (.-value (.-target e))]
+                                                (set-input-text new-value)
+                                                (set-changed-nodes #(assoc % node-id new-value))))
+                                  :placeholder "Enter new input value..."}))
                  
                  ($ :div {:className "text-xs text-gray-500"}
-                    ($ :div (str "Original: " (pr-str original-input)))))))))))
+                    ($ :div (str "Original: " (if (array? original-input)
+                                                (pr-str (js->clj original-input))
+                                                (str original-input))))))))))))
 
 (defui stats-panel [{:keys [graph-data]}]
   (let [total-nodes (count graph-data)
