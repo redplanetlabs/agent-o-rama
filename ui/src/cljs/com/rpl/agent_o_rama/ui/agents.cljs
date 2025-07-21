@@ -128,19 +128,19 @@
      ($ wouter/Link
         {:href (str "/agents/" module-id "/" agent-id "/stats")
          :style {:flex-grow "1"}}
-        ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer.relative
+        ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6.hover:shadow-md.transition-shadow.duration-150.cursor-pointer.relative
            ($ :div.flex.justify-between.items-start
               ($ :div
-                 ($ :div.text-sm.text-gray-600.mb-2 "Last 10,000 runs")
-                 ($ :div.flex.flex-row.gap-2
-                    ($ :div.flex.justify-between
-                       ($ :span.text-sm.text-gray-700 "Avg Tokens:")
-                       ($ :span.text-sm.font-medium.text-gray-900 "1,247.3"))
-                    ($ :div.flex.justify-between
-                       ($ :span.text-sm.text-gray-700 "Avg Latency:")
-                       ($ :span.text-sm.font-medium.text-gray-900 "342ms"))))
-              ($ :div.text-gray-400.hover:text-gray-600
-                 ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
+                 ($ :div.text-sm.font-medium.text-gray-600.mb-3 "Last 10,000 runs")
+                 ($ :div.flex.flex-row.gap-4
+                    ($ :div.flex.flex-col
+                       ($ :span.text-xs.text-gray-500.uppercase.tracking-wide "Avg Tokens")
+                       ($ :span.text-lg.font-semibold.text-gray-900 "1,247.3"))
+                    ($ :div.flex.flex-col
+                       ($ :span.text-xs.text-gray-500.uppercase.tracking-wide "Avg Latency")
+                       ($ :span.text-lg.font-semibold.text-gray-900 "342ms"))))
+              ($ :div.text-gray-400.hover:text-gray-600.transition-colors.duration-150
+                 ($ :svg.w-5.h-5 {:viewBox "0 0 20 20" :fill "currentColor"}
                     ($ :path {:fillRule "evenodd"
                               :d "M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
                               :clipRule "evenodd"}))))))))
@@ -153,19 +153,19 @@
        ($ wouter/Link
           {:href (str "/agents/" module-id "/" agent-id "/alerts")
            :style {:flex-grow "1"}}
-          ($ :div.bg-gray-100.flex-1.p-4.hover:bg-gray-200.cursor-pointer.relative
+          ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6.hover:shadow-md.transition-shadow.duration-150.cursor-pointer.relative
              ($ :div.flex.justify-between.items-start
                 ($ :div.w-full
-                   ($ :div.text-sm.text-gray-600.mb-2 "Recent Alerts")
-                   ($ :div.space-y-2
+                   ($ :div.text-sm.font-medium.text-gray-600.mb-3 "Recent Alerts")
+                   ($ :div.space-y-3
                       (for [alert dummy-alerts]
-                        ($ :div.flex.justify-between.items-center.text-xs {:key (str (:metric alert) (:time-ago alert))}
+                        ($ :div.flex.justify-between.items-center.text-sm.pb-2.border-b.border-gray-100.last:border-b-0.last:pb-0 {:key (str (:metric alert) (:time-ago alert))}
                            ($ :div.flex-1
-                              ($ :div.font-medium.text-red-600 (:metric alert))
-                              ($ :div.text-gray-500 (str (:value alert) " (threshold: " (:threshold alert) ")")))
-                           ($ :div.text-gray-400.text-right (:time-ago alert))))))
-                ($ :div.text-gray-400.hover:text-gray-600.ml-2
-                   ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
+                              ($ :div.font-semibold.text-red-600 (:metric alert))
+                              ($ :div.text-xs.text-gray-500.mt-1 (str (:value alert) " (threshold: " (:threshold alert) ")")))
+                           ($ :div.text-xs.text-gray-400.text-right.ml-3 (:time-ago alert))))))
+                ($ :div.text-gray-400.hover:text-gray-600.transition-colors.duration-150.ml-2
+                   ($ :svg.w-5.h-5 {:viewBox "0 0 20 20" :fill "currentColor"}
                       ($ :path {:fillRule "evenodd"
                                 :d "M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
                                 :clipRule "evenodd"})))))))))
@@ -176,16 +176,16 @@
                         (.preventDefault e)
                         ;; TODO: Implement actual API call
                         (println "Running agent with args:" args))]
-    ($ :div.bg-gray-100.flex-1.p-4
+    ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6
        ($ :form {:onSubmit handle-submit}
-          ($ :div.text-sm.text-gray-600.mb-3 "Manually Run Agent")
-          ($ :div.flex.gap-2.justify-between
-             ($ :textarea.flex-1.p-2.border.border-gray-300.rounded.text-sm
-                {:placeholder "Enter arguments (json)"
+          ($ :div.text-sm.font-medium.text-gray-600.mb-4 "Manually Run Agent")
+          ($ :div.flex.gap-3.justify-between
+             ($ :textarea.flex-1.p-3.border.border-gray-300.rounded-md.text-sm.focus:ring-2.focus:ring-blue-500.focus:border-blue-500.transition-colors.duration-150
+                {:placeholder "Enter arguments (JSON)"
                  :value args
                  :onChange #(set-args (.. % -target -value))
-                 :rows 2})
-             ($ :button.w-32.h-16.bg-green-600.text-white.px-4.rounded.hover:bg-green-700.text-sm.font-medium.cursor-pointer
+                 :rows 3})
+             ($ :button.w-32.h-20.bg-blue-600.text-white.px-4.rounded-md.hover:bg-blue-700.focus:ring-2.focus:ring-blue-500.focus:ring-offset-2.text-sm.font-semibold.cursor-pointer.transition-colors.duration-150
                 {:type "submit"}
                 "Submit"))))))
 
