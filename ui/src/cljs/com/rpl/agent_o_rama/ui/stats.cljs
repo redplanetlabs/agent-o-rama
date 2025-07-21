@@ -214,8 +214,7 @@
     (- element-client-width padding-left padding-right)))
 
 (defui chart [{:keys [dimension data]}]
-  (let [chart-ref (uix/use-ref)
-        container-ref (uix/use-ref)
+  (let [container-ref (uix/use-ref)
         chart-instance-ref (uix/use-ref)
         [time-data sine-data] data]
     
@@ -223,71 +222,85 @@
     (uix/use-effect
      (fn []
        (when (and @container-ref (not @chart-instance-ref))
-         (let [chart-width (element-available-content-width @container-ref)
-               
-               ;; Format data for uPlot: [[x-values], [y-values]]
-               chart-data (clj->js [(js/Array.from time-data) (js/Array.from sine-data)])
-               
-               ;; Chart options
-               opts (clj->js
-                     {:width chart-width
-                      :height 200
-                      :scales {:x {:time false}
-                               :y {}}
-                      :series [{:font "12px sans-serif"
-                                :label "Time"} ;; X-axis series
-                               {:label dimension
-                                :stroke (case dimension
-                                          "execution time" "#3b82f6" ;; blue
-                                          "tokens" "#8b5cf6" ;; purple
-                                          "latency" "#ef4444" ;; red
-                                          "model calls" "#10b981" ;; green
-                                          "nodes executed" "#f59e0b" ;; orange
-                                          "#6b7280") ;; gray default
-                                :width 2}]
-                      :axes [{:font "12px sans-serif"
-                              :stroke "#e5e7eb"
-                              :grid {:stroke "#f3f4f6"}
-                              :size 35}
-                             {:font "12px sans-serif"
-                              :stroke "#e5e7eb"
-                              :grid {:stroke "#f3f4f6"}
-                              :size 60}]})
-               
-               ;; Create chart instance
-               chart-instance (uplot. opts chart-data @chart-ref)]
-           (reset! chart-instance-ref chart-instance)))
+         ;; Use requestAnimationFrame to ensure container is rendered
+         (js/requestAnimationFrame
+          (fn []
+            (when @container-ref
+              (let [;; Get the actual rendered width
+                    container-rect (.getBoundingClientRect @container-ref)
+                    chart-width (.-width container-rect)
+                    
+                    ;; Format data for uPlot: [[x-values], [y-values]]
+                    chart-data (clj->js [(js/Array.from time-data) (js/Array.from sine-data)])
+                    
+                    ;; Chart options
+                    opts (clj->js
+                          {:width chart-width
+                           :height 200
+                           :padding [0 0 0 0]
+                           :scales {:x {:time false}
+                                    :y {}}
+                           :series [{:font "12px sans-serif"
+                                     :label "Time"} ;; X-axis series
+                                    {:label dimension
+                                     :stroke (case dimension
+                                               "execution time" "#3b82f6" ;; blue
+                                               "tokens" "#8b5cf6" ;; purple
+                                               "latency" "#ef4444" ;; red
+                                               "model calls" "#10b981" ;; green
+                                               "nodes executed" "#f59e0b" ;; orange
+                                               "#6b7280") ;; gray default
+                                     :width 2}]
+                           :axes [{:font "12px sans-serif"
+                                   :stroke "#e5e7eb"
+                                   :grid {:stroke "#f3f4f6"}
+                                   :size 35}
+                                  {:font "12px sans-serif"
+                                   :stroke "#e5e7eb"
+                                   :grid {:stroke "#f3f4f6"}
+                                   :size 60}]})
+                    
+                    ;; Create a div inside the container for uPlot
+                    chart-div (js/document.createElement "div")]
+                
+                ;; Append the div to container
+                (.appendChild @container-ref chart-div)
+                
+                ;; Create chart instance in the new div
+                (let [chart-instance (uplot. opts chart-data chart-div)]
+                  (reset! chart-instance-ref chart-instance)))))))
        ;; Cleanup function
        (fn []
          (when-let [chart-instance @chart-instance-ref]
            (.destroy chart-instance)
            (reset! chart-instance-ref nil))))
-     #js [dimension data])
+     [dimension data])
 
     ;; Automatic plot resizing effect
     (uix/use-effect
       (fn []
         (let [container-element @container-ref]
-          (when container-element
+          (when (and container-element @chart-instance-ref)
             (let [resize-sensor (ResizeSensor.
                                   container-element
                                   (fn []
                                     (when-let [chart-instance @chart-instance-ref]
-                                      (.setSize
-                                        chart-instance
-                                        (clj->js
-                                          {:width (element-available-content-width container-element)
-                                           :height 200})))))]
+                                      (let [container-rect (.getBoundingClientRect container-element)
+                                            new-width (.-width container-rect)]
+                                        (.setSize
+                                          chart-instance
+                                          (clj->js
+                                            {:width new-width
+                                             :height 200}))))))]
               ;; Return cleanup function
               (fn []
                 (.detach resize-sensor))))))
-      #js [@container-ref])
+      [@container-ref])
 
 
     ($ :div {:className "bg-white p-4 rounded-lg shadow-sm border w-full"
-             :ref container-ref}
-       ($ :div {:ref chart-ref
-                :style {:width "100%" :height "200px"}}))))
+             :ref container-ref
+             :style {:minHeight "200px"}})))
 
 (defui stats-timeseries []
   (let [points 100
