@@ -66,30 +66,43 @@
 
         [location navigate] (useLocation)]
     (cond
-      loading? ($ :div "loading...")
-      (not data) ($ :div "no data")
+      loading? ($ :div.flex.justify-center.items-center.py-8
+                 ($ :div.text-gray-500 "Loading invocations..."))
+      (not data) ($ :div.flex.justify-center.items-center.py-8
+                   ($ :div.text-gray-500 "No invocations found"))
       :else
-      ($ :table.w-full
-         ($ :thead.text-left ($ :tr ($ :th "invoke id") ($ :th "args") ($ :th "version") ($ :th "result")))
-         ($ :tbody
-            (for [invoke (:invokes data)
-                  :let [url (str "/agents/" module-id "/" agent-id "/invocations/" (:root-invoke-id invoke))]]
-              ($ :tr.bg-gray-200.hover:bg-gray-300.cursor-pointer
-                 {:key url
-                  :onClick (fn [_] (navigate url))}
-                 ($ :td (:root-invoke-id invoke))
-                 ($ :td (common/pp (:invoke-args invoke)))
-                 ($ :td (:graph-version invoke))
-                 ($ :td (common/pp (:result invoke))))))
-         ($ :tfoot 
-            ($ :tr
-               {:onClick (fn [_] (navigate (str "/agents/" module-id "/" agent-id "/invocations")))}
-               ($ :th.hover:bg-gray-200.cursor-pointer {:colSpan 4} 
-                  ($ :div.flex.justify-center.items-center
-                     ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
-                        ($ :path {:fillRule "evenodd"
-                                  :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                  :clipRule "evenodd"}))))))))))
+      ($ :div.bg-white.rounded-md.border.border-gray-200.overflow-hidden.shadow-sm
+         ($ :table.w-full.text-sm
+            ($ :thead.bg-gray-50.border-b.border-gray-200
+               ($ :tr
+                  ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Invoke ID")
+                  ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Arguments")
+                  ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
+                  ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")))
+            ($ :tbody.divide-y.divide-gray-200
+               (for [invoke (:invokes data)
+                     :let [url (str "/agents/" module-id "/" agent-id "/invocations/" (:root-invoke-id invoke))]]
+                 ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
+                    {:key url
+                     :onClick (fn [_] (navigate url))}
+                    ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium (:root-invoke-id invoke))
+                    ($ :td.px-4.py-3.max-w-xs
+                       ($ :div.truncate.text-gray-900 
+                          (common/pp (:invoke-args invoke))))
+                    ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
+                    ($ :td.px-4.py-3.max-w-xs
+                       ($ :div.truncate.text-gray-900
+                          (common/pp (:result invoke)))))))
+            ($ :tfoot.bg-gray-50.border-t.border-gray-200
+               ($ :tr.hover:bg-gray-100.transition-colors.duration-150
+                  {:onClick (fn [_] (navigate (str "/agents/" module-id "/" agent-id "/invocations")))}
+                  ($ :td.px-4.py-3.cursor-pointer {:colSpan 4}
+                     ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
+                        ($ :span.mr-2.text-sm.font-medium "View all invocations")
+                        ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
+                           ($ :path {:fillRule "evenodd"
+                                     :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                     :clipRule "evenodd"})))))))))))
 
 (defui evaluations []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))]
@@ -192,12 +205,8 @@
              {:style {:flex-grow "1"}}
              ($ manual-run {:module-id module-id :agent-id agent-id})))
        
-       ($ :div.p-4.flex.gap-1
-          ($ :div
-             {:style {:flex-grow "1"} }
-             ($ :div.bg-gray-100.flex-1.p-4
-                "invocations"
-                ($ mini-invocations)))))))
+       ($ :div.p-4
+          ($ mini-invocations)))))
 
 (defui invoke []
   (let [{:strs [module-id agent-id invoke-id]} (js->clj (wouter/useParams))
