@@ -153,11 +153,8 @@
                                 :d "M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
                                 :clipRule "evenodd"})))))))))
 
-(defui manual-run [{:keys [module-id agent-id num-args]
-                    :or {num-args 3}}]
-  (let [[args set-args] (uix/use-state (vec (repeat num-args "")))
-        update-arg (fn [index value]
-                     (set-args #(assoc % index value)))
+(defui manual-run [{:keys [module-id agent-id]}]
+  (let [[args set-args] (uix/use-state "")
         handle-submit (fn [e]
                         (.preventDefault e)
                         ;; TODO: Implement actual API call
@@ -166,14 +163,11 @@
        ($ :form {:onSubmit handle-submit}
           ($ :div.text-sm.text-gray-600.mb-3 "Manually Run Agent")
           ($ :div.flex.gap-2.justify-between
-             ($ :div.flex.gap-2
-                (for [i (range num-args)]
-                  ($ :textarea.flex-1.max-w-32.p-2.border.border-gray-300.rounded.text-sm.resize-none
-                     {:key i
-                      :placeholder (str "arg" (inc i) " (json)")
-                      :value (get args i "")
-                      :onChange #(update-arg i (.. % -target -value))
-                      :rows 2})))
+             ($ :textarea.flex-1.p-2.border.border-gray-300.rounded.text-sm
+                {:placeholder "Enter arguments (json)"
+                 :value args
+                 :onChange #(set-args (.. % -target -value))
+                 :rows 2})
              ($ :button.w-32.h-16.bg-green-600.text-white.px-4.rounded.hover:bg-green-700.text-sm.font-medium.cursor-pointer
                 {:type "submit"}
                 "Submit"))))))
