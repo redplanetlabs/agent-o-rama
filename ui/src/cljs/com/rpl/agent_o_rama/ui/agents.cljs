@@ -38,25 +38,37 @@
                            :query-url (str "/api/agents/" module-id "/" agent-id "/invocations")})
         [location navigate] (useLocation)]
     (cond
-      loading? ($ :div "loading...")
-      (not data) ($ :div "no data")
+      loading? ($ :div.flex.justify-center.items-center.py-8
+                 ($ :div.text-gray-500 "Loading invocations..."))
+      (not data) ($ :div.flex.justify-center.items-center.py-8
+                   ($ :div.text-gray-500 "No invocations found"))
       :else
       ($ :div.p-4
-         ($ :table.w-full
-            ($ :thead.text-left ($ :tr ($ :th "invoke id") ($ :th "args") ($ :th "version") ($ :th "result")))
-            ($ :tbody
-               (for [invoke (:invokes data)
-                     :let [url (str "/agents/" module-id "/" agent-id "/invocations/" (:root-invoke-id invoke))]]
-                 ($ :tr.bg-gray-200.hover:bg-gray-300.cursor-pointer
-                    {:key url
-                     :onClick (fn [e]
-                                (println e)
-                                (. e stopPropagation)
-                                (navigate url))}
-                    ($ :td (:root-invoke-id invoke))
-                    ($ :td (common/pp (:invoke-args invoke)))
-                    ($ :td (:graph-version invoke))
-                    ($ :td (common/pp (:result invoke)))))))))))
+         ($ :div.bg-white.rounded-md.border.border-gray-200.overflow-hidden.shadow-sm
+            ($ :table.w-full.text-sm
+               ($ :thead.bg-gray-50.border-b.border-gray-200
+                  ($ :tr
+                     ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Invoke ID")
+                     ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Arguments")
+                     ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
+                     ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")))
+               ($ :tbody.divide-y.divide-gray-200
+                  (for [invoke (:invokes data)
+                        :let [url (str "/agents/" module-id "/" agent-id "/invocations/" (:root-invoke-id invoke))]]
+                    ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
+                       {:key url
+                        :onClick (fn [e]
+                                   (println e)
+                                   (. e stopPropagation)
+                                   (navigate url))}
+                       ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium (:root-invoke-id invoke))
+                       ($ :td.px-4.py-3.max-w-xs
+                          ($ :div.truncate.text-gray-900
+                             (common/pp (:invoke-args invoke))))
+                       ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
+                       ($ :td.px-4.py-3.max-w-xs
+                          ($ :div.truncate.text-gray-900
+                             (common/pp (:result invoke)))))))))))))
 
 (defui mini-invocations []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
