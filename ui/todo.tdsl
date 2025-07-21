@@ -1,16 +1,11 @@
 test out rednering a loop in agent graph
 
-arrow down instead of see all invocations
-
-get rid of the boxes, replace with one big textearea.
-
 special case of agg fork ui. first box is agg result, agg start result (add label)
-
-have one of the traces be 5 args (scroll horizontally) (make them resizable)
 
 timeseries graphs on agent stats page {
   like rama cluster ui, scroll of many timeseries (granularity like rama cluster ui)
 }
+
 edn=>json (and label that says its json)
 
 remove pagination?
