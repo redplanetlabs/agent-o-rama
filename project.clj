@@ -3,7 +3,10 @@
   :java-source-paths ["src/java" "test/java"]
   :test-paths ["test/clj"]
   :jvm-opts ["-Xss6m"]
-  :dependencies [[com.rpl/rama-helpers "0.10.0"]]
+  :dependencies [[com.rpl/rama-helpers "0.10.0"]
+                 [dev.langchain4j/langchain4j "1.1.0"]
+                 ;; TODO: remove
+                 [dev.langchain4j/langchain4j-open-ai "1.1.0"]]
   :global-vars {*warn-on-reflection* true}
   :repositories
   [["releases"
