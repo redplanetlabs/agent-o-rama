@@ -21,7 +21,7 @@
                 "node3" {:node-type :node
                          :output-nodes #{"final"}}
                 "node2" {:node-type :node
-                         :output-nodes #{"final"}}
+                         :output-nodes #{"node1"}}
                 "final" {:node-type :agg-node
                          :output-nodes #{}}}
      :start-node "node1"
