@@ -17,14 +17,17 @@
    [com.rpl.agent-o-rama.store :as store]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
-   [com.rpl.rama.test :as rtest])
+   [com.rpl.rama.test :as rtest]
+   [com.rpl.test-common :as tc])
   (:import
    [com.rpl.agentorama
     AgentInvoke]
    [com.rpl.agentorama.impl
     AgentNodeExecutorTaskGlobal]
    [com.rpl.rama.helpers
-    TopologyUtils]))
+    TopologyUtils]
+   [java.util.concurrent
+    CompletableFuture]))
 
 (def SEM)
 (def SEM2)
@@ -65,7 +68,7 @@
       [retries/SUBSTITUTE-TICK-DEPOT true
        retries/checker-threshold-millis short-checker-threshold-millis
 
-       aor-types/get-config ZERO-MAX-RETRIES-OVERRIDE
+       aor-types/get-config (max-retries-override 0)
 
        retries/hook:checker-finished
        (fn [] (swap! checks-atom inc))
@@ -328,7 +331,7 @@
       [retries/SUBSTITUTE-TICK-DEPOT true
        at/init-retry-num             (fn [] @init-retry-num-atom)
 
-       aor-types/get-config          ZERO-MAX-RETRIES-OVERRIDE
+       aor-types/get-config          (max-retries-override 0)
 
        anode/log-node-error          (fn [& args])
 
@@ -496,7 +499,7 @@
        BLOCKED-NODES-ATOM (atom 0)
        EVENTS-ATOM (atom [])
 
-       aor-types/get-config ZERO-MAX-RETRIES-OVERRIDE
+       aor-types/get-config (max-retries-override 0)
 
        anode/log-node-error (fn [& args])
 
@@ -788,3 +791,375 @@
                                   agent-id
                                   #{(inv-id "a1") (inv-id "b1")})))
     )))
+
+(def CF-ATOM)
+
+(deframaop cf-running-retry>
+  [*agent-task-id *agent-id *retry-num]
+  (tc/mk-cf :> *cf)
+  (reset! (var-get (clj! var CF-ATOM)) *cf)
+  (completable-future> *cf)
+  (:>))
+
+(deftest retry-on-failure-test
+  (let [failures-atom (atom 0)]
+    (tc/with-auto-builder
+     (with-redefs [CF-ATOM (atom nil)
+                   anode/log-node-error (fn [& args])
+                   at/hook:running-retry> cf-running-retry>
+
+                   anode/hook:appended-agent-failure
+                   (fn [& args] (swap! failures-atom inc))]
+       (with-open [ipc (rtest/create-ipc)]
+         (letlocals
+          (bind module
+            (aor/agentmodule
+             [topology]
+             (->
+               topology
+               (aor/new-agent "foo")
+               ;; verify this is ignored
+               (aor/set-update-mode (rand-nth [:drop :continue :restart]))
+               (tc/auto-node "begin" ["node1" "node2"])
+               (tc/auto-node "node1" "start1")
+               (tc/auto-node "start1" ["a1" "a2"])
+               (tc/auto-node "a1" "agg")
+               (tc/auto-node "a2" "agg")
+               (tc/auto-node "agg" "node3")
+               (tc/auto-node "node3" nil)
+
+               (tc/auto-node "node2" "start2")
+               (tc/auto-node "start2" "b1")
+               (tc/auto-node "b1" "start3")
+               (tc/auto-node "start3" "b2")
+               (tc/auto-node "b2" "agg2")
+               (tc/auto-node "agg2" "b3")
+               (tc/auto-node "b3" "agg3")
+               (tc/auto-node "agg3" "b4")
+               (tc/auto-node "b4" nil)
+             )))
+          (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+          (bind module-name (get-module-name module))
+
+          (bind agent-manager (aor/agent-manager ipc module-name))
+          (bind foo (aor/agent-client agent-manager "foo"))
+          (bind active-pstate
+            (foreign-pstate ipc
+                            module-name
+                            (po/agent-active-invokes-task-global-name "foo")))
+          (bind ks (rtest/gen-hashing-index-keys 4))
+
+          (bind check-active!
+            (fn [expected]
+              (let [c (reduce
+                       (fn [c k]
+                         (+ c
+                            (foreign-select-one (view count)
+                                                active-pstate
+                                                {:pkey k})))
+                       0
+                       ks)]
+                (when-not (= c expected)
+                  (throw (ex-info "Mismatched active count"
+                                  {:expected expected :count c})))
+              )))
+
+          (bind fail-and-retry!
+            (fn [result-node num-fails nodes]
+              (letlocals
+               (reset! tc/AGG-RESULTS-ATOM {})
+               (reset! tc/FAIL-NODES-ATOM (set nodes))
+               (reset! tc/RAN-NODES-ATOM {})
+               (reset! tc/RESULT-NODE-ATOM result-node)
+               (reset! failures-atom 0)
+               (reset! CF-ATOM nil)
+               (rtest/pause-microbatch-topology!
+                ipc
+                module-name
+                aor-types/AGENTS-MB-TOPOLOGY-NAME)
+               (bind inv (aor/agent-initiate foo 1))
+               (when-not (condition-attained? (= (count nodes) @failures-atom))
+                 (throw (ex-info "Didn't reach initial failures" {})))
+               (rtest/resume-microbatch-topology!
+                ipc
+                module-name
+                aor-types/AGENTS-MB-TOPOLOGY-NAME)
+               (dotimes [i (min (dec num-fails) 3)]
+                 (check-active! 1)
+                 (reset! failures-atom 0)
+                 (when-not (condition-attained? (some? @CF-ATOM))
+                   (throw (ex-info "Did not reach CF" {})))
+                 (rtest/pause-microbatch-topology!
+                  ipc
+                  module-name
+                  aor-types/AGENTS-MB-TOPOLOGY-NAME)
+                 (tc/complete-cf! @CF-ATOM true)
+                 (when-not (condition-attained? (= (count nodes)
+                                                   @failures-atom))
+                   (throw (ex-info "Didn't reach failures" {})))
+                 (reset! CF-ATOM nil)
+                 (rtest/resume-microbatch-topology!
+                  ipc
+                  module-name
+                  aor-types/AGENTS-MB-TOPOLOGY-NAME)
+               )
+               (reset! tc/FAIL-NODES-ATOM #{})
+               (when-not (condition-attained? (some? @CF-ATOM))
+                 (throw (ex-info "Did not reach CF at end" {})))
+               (tc/complete-cf! @CF-ATOM true)
+               inv
+              )))
+
+          (bind verify!
+            (fn [m]
+              (doseq [[k v] m]
+                (let [actual (get @tc/RAN-NODES-ATOM k)]
+                  (when (not= v actual)
+                    (throw (ex-info "Matches failed!"
+                                    {:node k :expected v :actual actual})))
+                ))
+              (check-active! 0)
+              (when-not (condition-attained?
+                         (= @tc/AGG-RESULTS-ATOM
+                            {"agg" [[1 1]] "agg2" [[1]] "agg3" [[[1]]]}))
+                (throw (ex-info "Agg failed" {:result @tc/AGG-RESULTS-ATOM})))
+            ))
+
+          (bind inv (fail-and-retry! "node3" 1 ["node1"]))
+          (is (= "node3" (aor/agent-result foo inv)))
+          (verify! {"node1" 2 "begin" 1})
+
+          (bind inv (fail-and-retry! "node3" 2 ["node1"]))
+          (is (= "node3" (aor/agent-result foo inv)))
+          (verify! {"node1" 3 "begin" 1})
+
+          (bind inv (fail-and-retry! "node3" 3 ["node1"]))
+          (is (= "node3" (aor/agent-result foo inv)))
+          (verify! {"node1" 4 "begin" 1})
+
+          (bind inv (fail-and-retry! "node3" 4 ["node1"]))
+          (is (thrown? Exception (aor/agent-result foo inv)))
+
+          ;; this one can partially aggregate, so it verifies the retry resets
+          ;; properly
+          (bind inv (fail-and-retry! "node3" 1 ["a2"]))
+          (is (= "node3" (aor/agent-result foo inv)))
+          (verify! {"begin" 1 "node1" 1 "start1" 1 "a2" 2 "agg" 1 "node3" 1})
+
+          (bind inv (fail-and-retry! "b4" 2 ["b1"]))
+          (is (= "b4" (aor/agent-result foo inv)))
+          (verify! {"begin"  1
+                    "node2"  1
+                    "start2" 1
+                    "b1"     3
+                    "start3" 1
+                    "b2"     1
+                    "agg2"   1
+                    "b3"     1
+                    "agg3"   1
+                    "b4"     1})
+
+          (bind inv (fail-and-retry! "b4" 2 ["agg2"]))
+          (is (= "b4" (aor/agent-result foo inv)))
+          (verify! {"begin"  1
+                    "node2"  1
+                    "start2" 1
+                    "b1"     1
+                    "start3" 1
+                    "b2"     1
+                    "agg2"   3
+                    "b3"     1
+                    "agg3"   1
+                    "b4"     1})
+
+          (bind inv (fail-and-retry! "b4" 1 ["start3"]))
+          (is (= "b4" (aor/agent-result foo inv)))
+          (verify! {"begin"  1
+                    "node2"  1
+                    "start2" 1
+                    "b1"     1
+                    "start3" 2
+                    "b2"     1
+                    "agg2"   1
+                    "b3"     1
+                    "agg3"   1
+                    "b4"     1})
+
+          (bind inv (fail-and-retry! "b4" 1 ["start2" "agg"]))
+          (is (= "b4" (aor/agent-result foo inv)))
+          (verify! {"begin"  1
+                    "node2"  1
+                    "start2" 2
+                    "b1"     1
+                    "start3" 1
+                    "b2"     1
+                    "agg2"   1
+                    "b3"     1
+                    "agg3"   1
+                    "b4"     1
+
+                    "node1"  1
+                    "start1" 1
+                    "a1"     1
+                    "a2"     1
+                    ;; since completion is on other path, can't say for sure how
+                    ;; many times reset of this path runs
+                   })
+         ))))))
+
+(def FORCED-VERSION-ATOM)
+
+(deframaop forced-graph-version
+  [*agent-name]
+  (deref (var-get (clj! var FORCED-VERSION-ATOM)) :> *ret)
+  (:> *ret))
+
+
+(deftest update-modes-test
+  (let [failures-atom (atom 0)
+        retries-atom  (atom 0)]
+    (with-redefs [FORCED-VERSION-ATOM    (atom 0)
+                  at/fetch-graph-version forced-graph-version
+                  anode/log-node-error   (fn [& args])
+
+                  at/hook:received-retry (fn [& args] (swap! retries-atom inc))
+
+                  anode/hook:appended-agent-failure
+                  (fn [& args] (swap! failures-atom inc))]
+      (tc/with-auto-builder
+       (with-open [ipc (rtest/create-ipc)]
+         (letlocals
+          (bind module
+            (aor/agentmodule
+             [topology]
+             (->
+               topology
+               (aor/new-agent "foo")
+               (aor/set-update-mode :continue)
+               (tc/auto-node "begin" "node1")
+               (tc/auto-node "node1" "node2")
+               (tc/auto-node "node2" nil))
+             (->
+               topology
+               (aor/new-agent "bar")
+               (aor/set-update-mode :restart)
+               (tc/auto-node "begin" "node1")
+               (tc/auto-node "node1" "node2")
+               (tc/auto-node "node2" nil))
+             (->
+               topology
+               (aor/new-agent "car")
+               (aor/set-update-mode :drop)
+               (tc/auto-node "begin" "node1")
+               (tc/auto-node "node1" "node2")
+               (tc/auto-node "node2" nil))
+            ))
+          (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+          (bind module-name (get-module-name module))
+
+          (bind agent-manager (aor/agent-manager ipc module-name))
+          (bind foo (aor/agent-client agent-manager "foo"))
+          (bind bar (aor/agent-client agent-manager "bar"))
+          (bind car (aor/agent-client agent-manager "car"))
+
+          (bind actives
+            (vec
+             (for [n ["foo" "bar" "car"]]
+               (foreign-pstate ipc
+                               module-name
+                               (po/agent-active-invokes-task-global-name n)))))
+          (bind ks (rtest/gen-hashing-index-keys 4))
+
+          (bind check-active!
+            (fn [expected]
+              (let [c (reduce
+                       (fn [c k]
+                         (reduce
+                          (fn [c ap]
+                            (+ c
+                               (foreign-select-one (view count)
+                                                   ap
+                                                   {:pkey k})))
+                          c
+                          actives))
+                       0
+                       ks)]
+                (when-not (= c expected)
+                  (throw (ex-info "Mismatched active count"
+                                  {:expected expected :count c})))
+              )))
+
+
+          (reset! tc/RESULT-NODE-ATOM "node2")
+
+          (reset! tc/FAIL-NODES-ATOM #{"node1"})
+          (reset! failures-atom 0)
+          (rtest/pause-microbatch-topology!
+           ipc
+           module-name
+           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+          (bind inv (aor/agent-initiate foo))
+          (is (condition-attained? (= 1 @failures-atom)))
+          (check-active! 1)
+          (reset! tc/FAIL-NODES-ATOM #{})
+          (reset! FORCED-VERSION-ATOM 1)
+          (rtest/resume-microbatch-topology!
+           ipc
+           module-name
+           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+          (is (= "node2" (aor/agent-result foo inv)))
+          (is (= {"begin" 1 "node1" 2 "node2" 1} @tc/RAN-NODES-ATOM))
+          (check-active! 0)
+          (is (= 1 @retries-atom))
+
+
+          (reset! tc/FAIL-NODES-ATOM #{"node1"})
+          (reset! FORCED-VERSION-ATOM 0)
+          (reset! failures-atom 0)
+          (reset! tc/RAN-NODES-ATOM {})
+          (rtest/pause-microbatch-topology!
+           ipc
+           module-name
+           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+          (bind inv (aor/agent-initiate bar))
+          (is (condition-attained? (= 1 @failures-atom)))
+          (check-active! 1)
+          (reset! tc/FAIL-NODES-ATOM #{})
+          (reset! FORCED-VERSION-ATOM 1)
+          (rtest/resume-microbatch-topology!
+           ipc
+           module-name
+           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+          (is (= "node2" (aor/agent-result bar inv)))
+          (is (= {"begin" 2 "node1" 2 "node2" 1} @tc/RAN-NODES-ATOM))
+          (check-active! 0)
+          (is (= 2 @retries-atom))
+
+
+          (reset! tc/FAIL-NODES-ATOM #{"node1"})
+          (reset! FORCED-VERSION-ATOM 0)
+          (reset! failures-atom 0)
+          (reset! tc/RAN-NODES-ATOM {})
+          (rtest/pause-microbatch-topology!
+           ipc
+           module-name
+           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+          (bind inv (aor/agent-initiate car))
+          (is (condition-attained? (= 1 @failures-atom)))
+          (check-active! 1)
+          (reset! tc/FAIL-NODES-ATOM #{})
+          (reset! FORCED-VERSION-ATOM 1)
+          (rtest/resume-microbatch-topology!
+           ipc
+           module-name
+           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+          (try
+            (aor/agent-result car inv)
+            (is false)
+            (catch java.util.concurrent.ExecutionException e
+              (is (= "Retry dropped {}" (ex-message (.getCause e))))
+            ))
+          (is (= {"begin" 1 "node1" 1} @tc/RAN-NODES-ATOM))
+          (check-active! 0)
+          (is (= 3 @retries-atom))
+         ))))))

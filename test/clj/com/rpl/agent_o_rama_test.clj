@@ -780,7 +780,7 @@
          (dotimes [_ 10]
            (let [{[agent-task-id agent-id] "_agents-topology"}
                  (foreign-append! depot
-                                  (aor-types/->AgentInvoke ["hello"] 0 nil))]
+                                  (aor-types/->AgentInvoke ["hello"] 0))]
              (is (= 0
                     (foreign-select-one [(keypath agent-id) :graph-version]
                                         root-pstate
@@ -823,7 +823,7 @@
          (reset! task-counts-atom {})
          (dotimes [_ 10]
            (let [{[agent-task-id agent-id] "_agents-topology"}
-                 (foreign-append! depot (aor-types/->AgentInvoke [] 0 nil))]
+                 (foreign-append! depot (aor-types/->AgentInvoke [] 0))]
              (is (= 1
                     (foreign-select-one [(keypath agent-id) :graph-version]
                                         root-pstate
@@ -2057,6 +2057,9 @@
 
          (is (= (count @opens-atom) 6))
          (is (opens-matches-closes? @opens-atom @closes-atom))
+
+         (close! foo)
+         (close! bar)
         )))))
 
 (defn matching-ascending-seq?
@@ -2629,7 +2632,7 @@
   (with-redefs [SEM  (h/mk-semaphore 0)
                 SEM2 (h/mk-semaphore 0)
                 anode/log-node-error (fn [& args])
-                aor-types/get-config ZERO-MAX-RETRIES-OVERRIDE]
+                aor-types/get-config (max-retries-override 0)]
     (with-open [ipc (rtest/create-ipc)
                 _ (TopologyUtils/startSimTime)]
       (letlocals
@@ -2875,8 +2878,3 @@
        (h/release-semaphore SEM 1)
        (is (condition-attained? (empty? (pending-invokes))))
       ))))
-
-(deftest traced-out-of-band-test
-         ;; TODO: <<<<<>>>> do custom CF thing with custom tracing
-         ;;  - need to make API for this
-)

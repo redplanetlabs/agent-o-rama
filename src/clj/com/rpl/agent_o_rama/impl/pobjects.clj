@@ -67,18 +67,19 @@
 (def AGENT-INVOKE-PSTATE-SCHEMA
   {Long
    (fixed-keys-schema
-    {:root-invoke-id    Long
-     :invoke-args       [Object]
-     :graph-version     Long
-     :result            AgentResult
-     :ack-val           Long
-     :start-time-millis Long
+    {:root-invoke-id     Long
+     :invoke-args        [Object]
+     :graph-version      Long
+     :result             AgentResult
+     :ack-val            Long
+     :start-time-millis  Long
+     :finish-time-millis Long
      :last-progress-time-millis Long
-     :retry-num         Long
-     :fork-of           (fixed-keys-schema
-                         {:parent-agent-id Long
-                          :fork-context    ForkContext})
-     :forks             (set-schema Long {:subindex? true}) ; agent ids
+     :retry-num          Long
+     :fork-of            (fixed-keys-schema
+                          {:parent-agent-id Long
+                           :fork-context    ForkContext})
+     :forks              (set-schema Long {:subindex? true}) ; agent ids
     })})
 
 (defn agent-active-invokes-task-global-name
@@ -154,9 +155,6 @@
      :agg-ack-val         Long
      :agg-start-invoke-id Long
      :agg-finished?       Boolean
-
-     ;; TODO: <<<<>>>>
-     ;;   - what other stats does langsmith track?
     })})
 
 (defn graph-history-task-global-name

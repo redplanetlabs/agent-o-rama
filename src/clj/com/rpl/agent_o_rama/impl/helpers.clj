@@ -163,3 +163,7 @@
 (defn throw!
   [e]
   (throw e))
+
+(defn into-map
+  [arg]
+  (into {} arg))

@@ -37,15 +37,11 @@
        (is (= ~data (ex-data e#)))
      )))
 
-(defn invoke-agent-and-wait!
-  [depot invokes-pstate args]
-  (let [res   (foreign-append! depot (aor-types/->AgentInvoke args 0 nil))
-        [agent-task-id agent-id] (-> res
-                                     vals
-                                     first)
-        prom  (promise)
+(defn wait-agent-finished!
+  [root-pstate agent-task-id agent-id]
+  (let [prom  (promise)
         proxy (foreign-proxy [(keypath agent-id) :ack-val]
-                             invokes-pstate
+                             root-pstate
                              {:pkey        agent-task-id
                               :callback-fn (fn [new-val _ _]
                                              (when (= new-val 0)
@@ -54,6 +50,15 @@
     (when (= ::failed (deref prom 30000 ::failed))
       (throw (ex-info "Agent did not complete" {})))
     (close! proxy)
+  ))
+
+(defn invoke-agent-and-wait!
+  [depot root-pstate args]
+  (let [res (foreign-append! depot (aor-types/->AgentInvoke args 0))
+        [agent-task-id agent-id] (-> res
+                                     vals
+                                     first)]
+    (wait-agent-finished! root-pstate agent-task-id agent-id)
     [agent-task-id agent-id]
   ))
 
@@ -160,8 +165,9 @@
 
 
 (let [prev aor-types/get-config]
-  (defn ZERO-MAX-RETRIES-OVERRIDE
-    [m config]
-    (if (= (:name config) (:name aor-types/MAX-RETRIES-CONFIG))
-      0
-      (prev m config))))
+  (defn max-retries-override
+    [max-retries]
+    (fn [m config]
+      (if (= (:name config) (:name aor-types/MAX-RETRIES-CONFIG))
+        max-retries
+        (prev m config)))))

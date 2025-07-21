@@ -57,13 +57,6 @@
          (vswap! agents-vol assoc name ret)
          ret))
      (getStreamTopology [this] stream-topology)
-
-     ;; TODO: need methods for getting mirror agents, and will also need methods
-     ;; for invoking mirror agents
-     ;;    - should invoking a mirror agent be a node, or should it just be an
-     ;;    invoke?
-     ;;      - feels like an invoke
-
      (declareKeyValueStore [this name key-class val-class]
        (simpl/declare-store* stream-topology
                              store-info-vol
@@ -113,11 +106,6 @@
   [^AgentsTopology at]
   (.define at))
 
-
-; (declareKeyValueStore [this name key-class val-class]
-; (declareDocumentStore [this name key-class key-val-classes]
-; (^PState$Declaration declarePStateStore [this ^String name ^Class schema]
-
 (defn declare-key-value-store
   [^AgentsTopology agents-topology name key-class val-class]
   (.declareKeyValueStore agents-topology name key-class val-class))
@@ -132,8 +120,6 @@
 (defn declare-pstate-store
   [^AgentsTopology agents-topology name schema]
   (declare-pstate* (.getStreamTopology agents-topology) (symbol name) schema))
-
-;; TODO: all the declare methods
 
 (defn new-agent
   [^AgentsTopology agents-topology name]
@@ -255,7 +241,15 @@
                                                  module-name
                                                  (po/agent-depot-name
                                                   agentName))
-             invokes-pstate       (foreign-pstate
+             agent-config-depot   (foreign-depot cluster
+                                                 module-name
+                                                 (po/agent-config-depot-name
+                                                  agentName))
+             config-pstate        (foreign-pstate
+                                   cluster
+                                   module-name
+                                   (po/agent-config-task-global-name agentName))
+             root-pstate          (foreign-pstate
                                    cluster
                                    module-name
                                    (po/agent-root-task-global-name agentName))
@@ -292,12 +286,34 @@
               agent-depot
               (aor-types/->AgentInvoke
                (vec args)
-               (h/current-time-millis)
-               nil))
+               (h/current-time-millis)))
              (h/cf-function [{[agent-task-id agent-id]
                               aor-types/AGENTS-TOPOLOGY-NAME}]
                (AgentInvoke. agent-task-id agent-id)
              )))
+
+          (fork [this invoke nodeInvokeIdToNewArgs]
+            (.get (.forkAsync this invoke nodeInvokeIdToNewArgs)))
+          (forkAsync [this invoke nodeInvokeIdToNewArgs]
+            (.thenCompose
+             (.initiateForkAsync this invoke nodeInvokeIdToNewArgs)
+             (h/cf-function [agent-invoke]
+               (.agentResultAsync this agent-invoke))))
+          (initiateFork [this invoke nodeInvokeIdToNewArgs]
+            (.get (.initiateForkAsync this invoke nodeInvokeIdToNewArgs)))
+          (initiateForkAsync [this invoke invokeIdToNewArgs]
+            (.thenApply
+             (foreign-append-async!
+              agent-depot
+              (aor-types/->ForkAgentInvoke
+               (.getTaskId invoke)
+               (.getAgentInvokeId invoke)
+               invokeIdToNewArgs))
+             (h/cf-function [{[agent-task-id agent-id]
+                              aor-types/AGENTS-TOPOLOGY-NAME}]
+               (AgentInvoke. agent-task-id agent-id)
+             )))
+
           (agentResult [this agent-invoke]
             (.get (.agentResultAsync this agent-invoke)))
           (agentResultAsync [this agent-invoke]
@@ -308,7 +324,7 @@
               (.thenApply
                (foreign-proxy-async
                 [(keypath agent-id) :result]
-                invokes-pstate
+                root-pstate
                 {:pkey        agent-task-id
                  :callback-fn (fn [new-val _ _]
                                 (when (some? new-val)
@@ -376,13 +392,9 @@
                             new-chunks
                             reset-invoke-ids
                             complete?)))))
-
-          ;; TODO: <<<<>>> methods for getting graph history
-          ;;    - just max version and method to get historicalgraphinfo at a
-          ;;    particular version
-          ;;    - need historicalgraphinfo to be a java type
-
-
+          (close [this]
+            (close! agent-depot)
+            (close! agent-config-depot))
           aor-types/AgentClientInternal
           (stream-internal [this agent-invoke node callback-fn]
             (iclient/agent-stream-impl
@@ -396,6 +408,14 @@
              agent-invoke
              node
              callback-fn))
+          (underlying-objects [this]
+            {:agent-depot          agent-depot
+             :agent-config-depot   agent-config-depot
+             :config-pstate        config-pstate
+             :root-pstate          root-pstate
+             :streaming-pstate     streaming-pstate
+             :graph-history-pstate graph-history-pstate
+             :tracing-query        tracing-query})
          ))))))
 
 (defn agent-client
@@ -421,6 +441,25 @@
 (defn agent-initiate-async
   ^CompletableFuture [^AgentClient agent-client & args]
   (.initiateAsync agent-client (into-array Object args)))
+
+(defn agent-fork
+  [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
+  (.fork agent-client invoke node-invoke-id->new-args))
+
+(defn agent-fork-async
+  ^CompletableFuture
+  [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
+  (.forkAsync agent-client invoke node-invoke-id->new-args))
+
+(defn agent-initiate-fork
+  ^AgentInvoke
+  [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
+  (.initiateFork agent-client invoke node-invoke-id->new-args))
+
+(defn agent-initiate-fork-async
+  ^CompletableFuture
+  [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
+  (.initiateForkAsync agent-client invoke node-invoke-id->new-args))
 
 (defn agent-result
   [^AgentClient agent-client agent-invoke]
@@ -452,5 +491,3 @@
         (.numResetsByInvoke ^AgentStreamByInvoke stream)
 
         :else (throw (h/ex-info "Unknown type" {:class (class stream)}))))
-
-;; TODO: <<<<>>>> need to define Clojure API for any other methods

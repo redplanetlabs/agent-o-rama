@@ -238,7 +238,7 @@
   [mode]
   (condp = mode
     UpdateMode/CONTINUE :continue
-    UpdateMode/RETRY :retry
+    UpdateMode/RESTART :restart
     UpdateMode/DROP :drop
     (throw (h/ex-info "Invalid mode" {:mode mode}))))
 
@@ -246,7 +246,7 @@
   [mode]
   (condp = mode
     :continue UpdateMode/CONTINUE
-    :retry UpdateMode/RETRY
+    :restart UpdateMode/RESTART
     :drop UpdateMode/DROP
     (throw (h/ex-info "Invalid mode" {:mode mode}))))
 

@@ -94,6 +94,17 @@
                     (symbol (po/agent-failures-depot-name agent-name))
                     :random)
 
+
+    (doseq [d [(symbol (po/agent-failures-depot-name agent-name))
+               (symbol (po/agent-graph-task-global-name agent-name))
+               agent-config-depot-sym
+               agent-streaming-depot-sym
+               agent-depot-sym]]
+      (set-launch-depot-dynamic-option!* setup
+                                         d
+                                         "depot.max.entries.per.partition"
+                                         500))
+
     (declare-pstate*
      mb-topology
      (symbol (po/agent-valid-invokes-task-global-name agent-name))
@@ -115,7 +126,7 @@
      (source> agent-streaming-depot-sym {:retry-mode :all-after} :> *data)
       (at/handle-streaming agent-name *data)
 
-      ;; TODO: <<<<<>>>> add case here for GC
+      ;; TODO: add case here for GC
       ;; - each iteration delete node and write to PState the next ones to
       ;; delete and where – can probably be same PState as one used by retry
       ;; - ordered IDs is perfect for GC
@@ -167,6 +178,10 @@
 
   (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
+    (set-launch-depot-dynamic-option!* setup
+                                       pstate-write-depot-sym
+                                       "depot.max.entries.per.partition"
+                                       500)
     (<<sources stream-topology
      (source> pstate-write-depot-sym
                {:retry-mode :none}
