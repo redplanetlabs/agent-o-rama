@@ -7,7 +7,10 @@
    [com.rpl.rama.ops :as ops])
   (:import
    [clojure.lang
-    PersistentQueue]))
+    PersistentQueue]
+   [java.util
+    Comparator
+    PriorityQueue]))
 
 (defn tracing-query-name
   [agent-name]
@@ -20,6 +23,10 @@
 (defn agent-get-fork-affected-aggs-query-name
   [agent-name]
   (str "_agent-get-fork-affected-aggs-" agent-name))
+
+(defn agent-get-invokes-page-query-name
+  [agent-name]
+  (str "_agent-get-invokes-page-" agent-name))
 
 (defn fork-affected-aggs-query-task-global
   [agent-name]
@@ -139,6 +146,85 @@
       (ops/explode *agg-context :> *invoke-id)
       (|origin)
       (aggs/+set-agg *invoke-id :> *res)
+    )))
+
+(defn- invokes-pqueue
+  []
+  (PriorityQueue.
+   20
+   (reify
+    Comparator
+    (compare [_ [_ _ a-millis] [_ _ b-billis]]
+      (compare b-millis a-millis)))))
+
+(defn to-invokes-page-result
+  [pages-map page-size]
+  (let [pqueue       (invokes-pqueue)
+        end-task-ids (volatile! #{})
+
+        task-queues
+        (transform
+         [ALL (collect-one FIRST) LAST]
+         (fn [task-id id->start-time-millis]
+           (when (< (count id->start-time-millis) page-size)
+             (vswap! end-task-ids conj task-id))
+           (let [ret (invokes-pqueue)]
+             (doseq [[id start-time-millis] id->start-time-millis]
+               (.add ret [task-id id start-time-millis]))
+             ret
+           ))
+         pages-map)]
+    (doseq [[_ ^PriorityQueue q] task-queues]
+      (if-let [tuple (.poll q)]
+        (.add pqueue tuple)))
+    (let [ret
+          (loop [ret []]
+            (let [[task-id _ _ :as item] (.poll pqueue)]
+              (if-not item
+                ret
+                (let [ret       (conj ret item)
+                      ^PriorityQueue nextq (get task-queues task-id)
+                      next-item (.poll nextq)]
+                  (.add pqueue next-item)
+                  (if (.isEmpty nextq)
+                    ret
+                    (recur ret)
+                  )))))]
+      (while (not (.isEmpty pqueue))
+        (let [[task-id _ _ :as item] (.poll pqueue)
+              ^PriorityQueue q       (get task-queues task-id)]
+          (.add q item)))
+      {:agent-invokes     ret
+       :pagination-params (transform MAP-VALS
+                                     (fn [^PriorityQueue q]
+                                       (if-let [[_ id _] (.poll q)]
+                                         id))
+                                     task-queues)}
+    )))
+
+;; returns map of form:
+;; {:agent-invokes [[task-id agent-id start-time-millis] ...]
+;;  :pagination-params {task-id end-id}}
+(defn declare-get-invokes-page-topology
+  [topologies agent-name]
+  (let [root-sym (symbol (po/agent-root-task-global-name agent-name))]
+    (<<query-topology topologies
+      (agent-get-invokes-page-query-name agent-name)
+      [*page-size *pagination-params :> *res]
+      (|all)
+      (ops/current-task-id :> *task-id)
+      (get *pagination-params *task-id Long/MAX_VALUE :> *end-id)
+      (<<if (nil? *end-id)
+        (identity [] :> *task-page)
+       (else>)
+        (local-select>
+         [(sorted-map-range-to *end-id {:inclusive? true :max-amt *page-size})
+          (transformed MAP-VALS :start-time-millis)]
+         root-sym
+         :> *task-page))
+      (|origin)
+      (aggs/+map-agg *task-id *task-page :> *pages-map)
+      (to-invokes-page-result *pages-map *page-size :> *res)
     )))
 
 (defn declare-agent-get-names-query-topology
