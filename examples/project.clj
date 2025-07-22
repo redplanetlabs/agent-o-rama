@@ -1,7 +1,9 @@
-(defproject examples "0.1.0-SNAPSHOT"
-  :description "FIXME: write description"
-  :url "http://example.com/FIXME"
-  :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
-            :url "https://www.eclipse.org/legal/epl-2.0/"}
-  :dependencies [[org.clojure/clojure "1.11.1"]]
-  :repl-options {:init-ns examples.core})
+(defproject examples "1.0.0-SNAPSHOT"
+  :dependencies [[com.rpl/rama-helpers "0.10.0"]
+                 [org.clojure/clojure "1.12.0"]]
+  :repositories [["releases" {:id "maven-releases"
+                              :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
+
+  :profiles {:dev {:resource-paths ["test/resources/"]}
+             :provided {:dependencies [[com.rpl/rama "0.0.6-SNAPSHOT"]]}}
+  )
