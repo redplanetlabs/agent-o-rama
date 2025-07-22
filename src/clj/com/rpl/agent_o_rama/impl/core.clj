@@ -118,6 +118,7 @@
     (retries/declare-check-impl mb-topology agent-name)
     (queries/declare-tracing-query-topology topologies agent-name)
     (queries/declare-fork-affected-aggs-query-topology topologies agent-name)
+    (queries/declare-get-invokes-page-topology topologies agent-name)
 
     (<<sources stream-topology
      (source> agent-config-depot-sym {:retry-mode :all-after} :> *data)

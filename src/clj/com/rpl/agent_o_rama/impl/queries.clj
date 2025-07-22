@@ -149,12 +149,12 @@
     )))
 
 (defn- invokes-pqueue
-  []
+  ^PriorityQueue []
   (PriorityQueue.
    20
    (reify
     Comparator
-    (compare [_ [_ _ a-millis] [_ _ b-billis]]
+    (compare [_ [_ _ a-millis] [_ _ b-millis]]
       (compare b-millis a-millis)))))
 
 (defn to-invokes-page-result
@@ -185,11 +185,19 @@
                 (let [ret       (conj ret item)
                       ^PriorityQueue nextq (get task-queues task-id)
                       next-item (.poll nextq)]
-                  (.add pqueue next-item)
-                  (if (.isEmpty nextq)
+                  (when next-item
+                    (.add pqueue next-item))
+                  (if (and (.isEmpty nextq)
+                           (not (contains? @end-task-ids task-id)))
                     ret
                     (recur ret)
-                  )))))]
+                  )))))
+          ;; the next one is definitely OK, so include it to ensure this always
+          ;; returns at least page-size elems even if the latest items all came
+          ;; from the same task
+          ret (if-let [item (.poll pqueue)]
+                (conj ret item)
+                ret)]
       (while (not (.isEmpty pqueue))
         (let [[task-id _ _ :as item] (.poll pqueue)
               ^PriorityQueue q       (get task-queues task-id)]
