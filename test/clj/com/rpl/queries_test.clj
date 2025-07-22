@@ -127,6 +127,9 @@
                       (queries/agent-get-invokes-page-query-name "foo")))
 
 
+     ;; this would be much faster if did agent-initiate-async and then resolved
+     ;; the CompletableFuture's afterwards, but this makes it much more likely
+     ;; for pages to be intermixed
      (bind invokes
        (vec
         (for [_ (range 50)]
