@@ -1,10 +1,9 @@
 (ns repl
   (:require
    [com.rpl.agent-o-rama.ui.server :as srv]
+   [com.rpl.agent-o-rama.system :as sys]
    [shadow.cljs.devtools.api :as shadow]
-   [com.stuartsierra.component :as component]
-
-   [ring.adapter.jetty :as jetty]))
+   [com.stuartsierra.component :as component]))
 
 (defrecord ShadowComponent []
   component/Lifecycle
@@ -19,33 +18,11 @@
 (defn new-shadow-component []
   (->ShadowComponent))
 
-(defrecord WebServerComponent [port handler jetty-server]
-  component/Lifecycle
-  (start [component]
-    (if jetty-server
-      (do
-        (println "Webserver already running on port" port)
-        component)
-      (do
-        (println "Starting webserver on port" port)
-        (let [server (jetty/run-jetty handler
-                                      {:port port
-                                       :join? false})]
-          (assoc component :jetty-server server)))))
-  
-  (stop [component]
-    (when jetty-server
-      (println "Stopping webserver")
-      (.stop jetty-server))
-    (assoc component :jetty-server nil)))
-
-(defn new-webserver-component [port handler]
-  (->WebServerComponent port handler nil))
 
 (defn new-system []
   (component/system-map
    :shadow (new-shadow-component)
-   :webserver (new-webserver-component 3000 #'srv/handler)))
+   :webserver (sys/new-webserver-component 3000 #'srv/handler)))
 
 (defonce system (atom nil))
 
