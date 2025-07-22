@@ -187,7 +187,7 @@
                       next-item (.poll nextq)]
                   (when next-item
                     (.add pqueue next-item))
-                  (if (and (.isEmpty nextq)
+                  (if (and (= 1 (.size nextq))
                            (not (contains? @end-task-ids task-id)))
                     ret
                     (recur ret)
@@ -210,6 +210,10 @@
                                      task-queues)}
     )))
 
+(defn adjust-page-size
+  [i]
+  (if (= i 1) 3 (inc i)))
+
 ;; returns map of form:
 ;; {:agent-invokes [[task-id agent-id start-time-millis] ...]
 ;;  :pagination-params {task-id end-id}}
@@ -226,13 +230,17 @@
         (identity [] :> *task-page)
        (else>)
         (local-select>
-         [(sorted-map-range-to *end-id {:inclusive? true :max-amt *page-size})
+         [(sorted-map-range-to *end-id
+                               {:inclusive? true
+                                :max-amt    (adjust-page-size *page-size)})
           (transformed MAP-VALS :start-time-millis)]
          root-sym
          :> *task-page))
       (|origin)
       (aggs/+map-agg *task-id *task-page :> *pages-map)
-      (to-invokes-page-result *pages-map *page-size :> *res)
+      (to-invokes-page-result *pages-map
+                              (adjust-page-size *page-size)
+                              :> *res)
     )))
 
 (defn declare-agent-get-names-query-topology
