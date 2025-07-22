@@ -5,6 +5,7 @@
         [com.rpl.rama.path])
   (:require
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
@@ -913,3 +914,154 @@
         (and (= ?agent-id agent-id)
              (= ?agent-task-id agent-task-id)))))
     )))
+
+(def SEM)
+(def REACHED-ATOM)
+
+(deftest in-progress-tracing-test
+  (with-redefs [SEM (h/mk-semaphore 0)
+                REACHED-ATOM (atom 0)]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (-> topology
+              (aor/new-agent "foo")
+              (aor/node
+               "start"
+               ["node1" "node2"]
+               (fn [agent-node]
+                 (aor/emit! agent-node "node1")
+                 (aor/emit! agent-node "node2")))
+              (aor/node
+               "node1"
+               nil
+               (fn [agent-node]
+                 (swap! REACHED-ATOM inc)
+                 (h/acquire-semaphore SEM)))
+              (aor/agg-start-node
+               "node2"
+               "agg"
+               (fn [agent-node]
+                 (aor/emit! agent-node "agg" 1)
+                 (aor/emit! agent-node "agg" 2)))
+              (aor/agg-node
+               "agg"
+               nil
+               aggs/+vec-agg
+               (fn [agent-node agg node-start-res]
+                 (swap! REACHED-ATOM inc)
+                 (h/acquire-semaphore SEM)
+                 (aor/result! agent-node agg)))
+          )))
+       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind depot
+         (foreign-depot ipc
+                        module-name
+                        (po/agent-depot-name "foo")))
+       (bind root-pstate
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "foo")))
+       (bind traces-query
+         (foreign-query ipc
+                        module-name
+                        (queries/tracing-query-name "foo")))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind foo (aor/agent-client agent-manager "foo"))
+
+       (bind inv (aor/agent-initiate foo))
+       (bind agent-task-id (.getTaskId inv))
+       (bind agent-id (.getAgentInvokeId inv))
+       (is (condition-attained? (= @REACHED-ATOM 2)))
+       (bind root-invoke-id
+         (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                             root-pstate
+                             {:pkey agent-task-id}))
+       (bind res
+         (foreign-invoke-query traces-query
+                               agent-task-id
+                               [[agent-task-id root-invoke-id]]
+                               100))
+       (is
+        (trace-matches?
+         (:invokes-map res)
+         {!id1
+          {:agg-invoke-id     nil
+           :agent-id          ?agent-id
+           :emits
+           [{:invoke-id      !id2
+             :fork-invoke-id nil
+             :target-task-id ?agent-task-id
+             :node-name      "node1"
+             :args           []}
+            {:invoke-id      !id3
+             :fork-invoke-id nil
+             :target-task-id ?agent-task-id
+             :node-name      "node2"
+             :args           []}]
+           :agent-task-id     ?agent-task-id
+           :finish-time-millis !finish1
+           :node              "start"
+           :result            nil
+           :nested-ops        []
+           :start-time-millis !start1
+           :input             []}
+          !id2
+          {:agg-invoke-id     nil
+           :agent-id          ?agent-id
+           :agent-task-id     ?agent-task-id
+           :node              "node1"
+           :start-time-millis !start2
+           :input             []
+           :node-task-id      ?agent-task-id}
+          !id3
+          {:started-agg?      true
+           :agg-invoke-id     !agg1
+           :agent-id          0
+           :emits
+           [{:invoke-id      !id4
+             :fork-invoke-id nil
+             :target-task-id ?agent-task-id
+             :node-name      "agg"
+             :args           [1]}
+            {:invoke-id      !id5
+             :fork-invoke-id nil
+             :target-task-id ?agent-task-id
+             :node-name      "agg"
+             :args           [2]}]
+           :agent-task-id     ?agent-task-id
+           :finish-time-millis !finish3
+           :node              "node2"
+           :result            nil
+           :nested-ops        []
+           :start-time-millis !start3
+           :input             []}
+          !id4  {:invoked-agg-invoke-id !agg1}
+          !id5  {:invoked-agg-invoke-id !agg1}
+          !agg1
+          {:agg-invoke-id       nil
+           :agg-input-count     2
+           :agent-id            ?agent-id
+           :agg-start-res       nil
+           :agent-task-id       ?agent-task-id
+           :node                "agg"
+           :agg-inputs-first-10
+           [{:invoke-id !id4 :args [1]}
+            {:invoke-id !id5 :args [2]}]
+           :agg-ack-val         0
+           :agg-finished?       true
+           :start-time-millis   !start-agg1
+           :agg-state           [1 2]
+           :node-task-id        ?agent-task-id
+           :input               [[1 2] nil]
+           :agg-start-invoke-id !id3}}
+         (m/guard
+          (and (= ?agent-id agent-id)
+               (= ?agent-task-id agent-task-id)))))
+
+       (h/release-semaphore SEM 1000)
+       (is (= [1 2] (aor/agent-result foo inv)))
+      ))))

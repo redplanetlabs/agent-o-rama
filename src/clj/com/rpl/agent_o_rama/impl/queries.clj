@@ -39,16 +39,26 @@
 
 (defn- to-trace-invoke-info
   [all-invoke-info]
-  (if (contains? all-invoke-info :agg-inputs)
-    (let [ai       (:agg-inputs all-invoke-info)
-          ai-count (count ai)]
-      (-> all-invoke-info
-          (dissoc :agg-inputs)
-          (assoc :agg-input-count ai-count)
-          (assoc :agg-inputs-first-10
-                 (select-any (srange 0 (min 10 ai-count)) ai))))
-    all-invoke-info
-  ))
+  (let [all-invoke-info
+        (if (contains? all-invoke-info :agg-inputs)
+          (let [ai       (:agg-inputs all-invoke-info)
+                ai-count (count ai)]
+            (-> all-invoke-info
+                (dissoc :agg-inputs)
+                (assoc :agg-input-count ai-count)
+                (assoc :agg-inputs-first-10
+                       (select-any (srange 0 (min 10 ai-count)) ai))))
+          all-invoke-info
+        )]
+    (if (and (-> all-invoke-info
+                 (contains? :finish-time-millis)
+                 not)
+             (-> all-invoke-info
+                 (contains? :invoked-agg-invoke-id)
+                 not))
+      (assoc all-invoke-info :node-task-id (ops/current-task-id))
+      all-invoke-info
+    )))
 
 (defn- emits->pairs
   [emits]
