@@ -1,0 +1,19 @@
+manager = (open-cluster-manager-internal {"conductor.host" "localhost"})
+(list-modules manager)
+
+once per module= 
+  agent-manager (aor/agent-manager manager "Some.Module")
+    can list agents
+    agent-client  (methods for invoking (initiate/initiateFork))
+
+
+only need toa ccess AGENT-INVOKE-PSTATE-SCHEMA (which needs {:pkey task-id})
+
+underlying objects on agent-manager has all the things i need to query
+
+start with lifecycle management
+install rama from master. sh scripts/install.sh
+
+GRAPH-HISTORY-PSTATE always key=versionnumber=0 {:pkey 0}
+
+eventually config page
