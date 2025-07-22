@@ -22,7 +22,8 @@
 (defn new-system []
   (component/system-map
    :shadow (new-shadow-component)
-   :webserver (sys/new-webserver-component 3000 #'srv/handler)))
+   :webserver (sys/new-webserver-component 3000 #'srv/handler)
+   :rama-client (sys/new-rama-client)))
 
 (defonce system (atom nil))
 
