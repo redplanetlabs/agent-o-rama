@@ -3,6 +3,8 @@
             [ring.adapter.jetty :as jetty]
             [com.rpl.rama :as r]))
 
+(defonce system (atom nil))
+
 (defrecord WebServerComponent [port handler jetty-server]
   component/Lifecycle
   (start [component]
@@ -29,10 +31,13 @@
 (defrecord RamaClient []
   component/Lifecycle
   (start [component]
-    (assoc component :rama-client #_(r/open-cluster-manager) ::TODO))
+    (println "starting rama client")
+    (assoc component :rama-client (r/open-cluster-manager-internal {"conductor.host" "localhost"})))
   
   (stop [component]
-    ::TODO))
+    (println "stopping rama client")
+    (.close (:rama-client component))
+    (assoc component :rama-client nil)))
 
 (defn new-rama-client []
   (->RamaClient))

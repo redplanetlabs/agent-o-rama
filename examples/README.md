@@ -4,7 +4,7 @@ A Clojure library designed to ... well, that part is up to you.
 
 ## Usage
 
-FIXME
+to deploy, `lein uberjar`, launch a local cluster, deploy `./rama deploy --action launch --jar /Users/tommy/programming/agent-o-rama/examples/target/examples-1.0.0-SNAPSHOT-standalone.jar --module examples.core/FlowModule --workers 1 --threads 1 --tasks 1` (needs full path, yours will be different)
 
 ## License
 

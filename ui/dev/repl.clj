@@ -22,19 +22,17 @@
 (defn new-system []
   (component/system-map
    :shadow (new-shadow-component)
-   :webserver (sys/new-webserver-component 3000 #'srv/handler)
+   :webserver (sys/new-webserver-component 2999 #'srv/handler)
    :rama-client (sys/new-rama-client)))
 
-(defonce system (atom nil))
-
 (defn stop []
-  (when @system (reset! system (component/stop @system)))
+  (when @sys/system (reset! sys/system (component/stop @sys/system)))
   ::stopped)
 
 (defn start []
-  (when @system
+  (when @sys/system
     (stop))
-  (reset! system (component/start (new-system)))
+  (reset! sys/system (component/start (new-system)))
   ::started)
 
 (defn go []
@@ -42,4 +40,5 @@
   (start))
 
 (comment
+  (-> sys/system deref :rama-client)
   (go))
