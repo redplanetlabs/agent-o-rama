@@ -76,6 +76,16 @@
 (drp/defrecord+ NestedOpInfo
   [start-time-millis :- Long
    finish-time-millis :- Long
+
+   type :-
+   (s/enum :store-write
+           :store-read
+           :db-write
+           :db-read
+           :model-call
+           :agent-invoke
+           :other)
+
    ;; info for models contains token stats, input prompt, output, etc.
    info :- (s/maybe {String s/Any})])
 

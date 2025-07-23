@@ -72,8 +72,8 @@
             (aor-types/->NestedOpInfo
              start-time
              finish-time
-             {"type"   "store-write"
-              "op"     op
+             :store-write
+             {"op"     op
               "params" params}
             ))))
 
@@ -99,8 +99,8 @@
      (aor-types/->valid-NestedOpInfo
       start-time
       finish-time
-      {"type"   "store-query"
-       "op"     op
+      :store-read
+      {"op"     op
        "params" params
        "result" res}
      ))

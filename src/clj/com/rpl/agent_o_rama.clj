@@ -2,6 +2,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -193,6 +194,15 @@
 (defn stream-chunk!
   [^AgentNode agent-node chunk]
   (.streamChunk agent-node chunk))
+
+(defn record-nested-op!
+  [^AgentNode agent-node nested-op-type start-time-millis finish-time-millis
+   info-map]
+  (.recordNestedOp agent-node
+                   (anode/nested-op-type->java nested-op-type)
+                   start-time-millis
+                   finish-time-millis
+                   info-map))
 
 (defn- parse-map-options
   [[arg1 & rest-args :as args]]

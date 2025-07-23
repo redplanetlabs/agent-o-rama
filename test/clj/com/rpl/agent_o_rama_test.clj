@@ -1319,10 +1319,20 @@
                        j (store/pstate-select :b p :a)]
                    (aor/emit! agent-node "end")
                  )))
-              (aor/node "end"
-                        nil
-                        (fn [agent-node]
-                          (aor/result! agent-node "done")))
+              (aor/node
+               "end"
+               nil
+               (fn [agent-node]
+                 (let [v (volatile! 100)]
+                   (doseq [t [:store-read :store-write :db-read :db-write
+                              :model-call :agent-invoke :other]]
+                     (aor/record-nested-op! agent-node
+                                            t
+                                            (vswap! v inc)
+                                            (vswap! v inc)
+                                            {"a" (vswap! v inc)})
+                   ))
+                 (aor/result! agent-node "done")))
             )
            ))
          (rtest/launch-module! ipc module {:tasks 4 :threads 2})
@@ -1363,25 +1373,29 @@
              :nested-ops
              [{:start-time-millis 0
                :finish-time-millis 1
+               :type :store-read
                :info
-               {"type" "store-query" "op" "get" "params" [:b] "result" []}}
+               {"op" "get" "params" [:b] "result" []}}
               {:start-time-millis 1
                :finish-time-millis 3
+               :type :store-read
                :info
-               {"type" "store-query" "op" "get" "params" [:b] "result" nil}}
+               {"op" "get" "params" [:b] "result" nil}}
               {:start-time-millis 3
                :finish-time-millis 6
+               :type :store-read
                :info
-               {"type"   "store-query"
-                "op"     "contains?"
+               {"op"     "contains?"
                 "params" [:a]
                 "result" false}}
               {:start-time-millis 6
                :finish-time-millis 10
-               :info {"type" "store-write" "op" "put" "params" [:a 1]}}
+               :type :store-write
+               :info {"op" "put" "params" [:a 1]}}
               {:start-time-millis 10
                :finish-time-millis 15
-               :info {"type" "store-write" "op" "update" "params" [:d]}}]
+               :type :store-write
+               :info {"op" "update" "params" [:d]}}]
              :result            nil
              :agent-id          ?agent-id
              :input             []
@@ -1399,36 +1413,36 @@
              :nested-ops
              [{:start-time-millis 15
                :finish-time-millis 21
+               :type :store-read
                :info
-               {"type"   "store-query"
-                "op"     "get-document-field"
+               {"op"     "get-document-field"
                 "params" [:m :a {:default nil}]
                 "result" nil}}
               {:start-time-millis 21
                :finish-time-millis 28
+               :type :store-read
                :info
-               {"type"   "store-query"
-                "op"     "get-document-field"
+               {"op"     "get-document-field"
                 "params" [:m :b {:default []}]
                 "result" []}}
               {:start-time-millis 28
                :finish-time-millis 36
+               :type :store-read
                :info
-               {"type"   "store-query"
-                "op"     "contains-document-field?"
+               {"op"     "contains-document-field?"
                 "params" [:m :a]
                 "result" false}}
               {:start-time-millis 36
                :finish-time-millis 45
+               :type :store-write
                :info
-               {"type"   "store-write"
-                "op"     "put-document-field"
+               {"op"     "put-document-field"
                 "params" [:m :a 1]}}
               {:start-time-millis 45
                :finish-time-millis 55
+               :type :store-write
                :info
-               {"type"   "store-write"
-                "op"     "update-document-field"
+               {"op"     "update-document-field"
                 "params" [:m :a]}}]
              :result            nil
              :agent-id          ?agent-id
@@ -1447,38 +1461,40 @@
              :nested-ops
              [{:start-time-millis 55
                :finish-time-millis 66
+               :type :store-write
                :info
-               {"type" "store-write" "op" "pstate-transform" "params" [:a]}}
+               {"op" "pstate-transform" "params" [:a]}}
               {:start-time-millis 66
                :finish-time-millis 78
+               :type :store-write
                :info
-               {"type" "store-write" "op" "pstate-transform" "params" [:a]}}
+               {"op" "pstate-transform" "params" [:a]}}
               {:start-time-millis 78
                :finish-time-millis 91
+               :type :store-read
                :info
-               {"type"   "store-query"
-                "op"     "pstate-select-one"
+               {"op"     "pstate-select-one"
                 "params" []
                 "result" 1}}
               {:start-time-millis 91
                :finish-time-millis 105
+               :type :store-read
                :info
-               {"type"   "store-query"
-                "op"     "pstate-select"
+               {"op"     "pstate-select"
                 "params" []
                 "result" [1]}}
               {:start-time-millis 105
                :finish-time-millis 120
+               :type :store-read
                :info
-               {"type"   "store-query"
-                "op"     "pstate-select-one"
+               {"op"     "pstate-select-one"
                 "params" [{:pkey :a}]
                 "result" 2}}
               {:start-time-millis 120
                :finish-time-millis 136
+               :type :store-read
                :info
-               {"type"   "store-query"
-                "op"     "pstate-select"
+               {"op"     "pstate-select"
                 "params" [{:pkey :a}]
                 "result" [2]}}]
              :result            nil
@@ -1492,13 +1508,48 @@
             {:agg-invoke-id     nil
              :emits             []
              :node              "end"
-             :nested-ops        []
              :result            {:val "done" :failure? false}
              :agent-id          ?agent-id
              :input             []
              :agent-task-id     ?agent-task-id
              :start-time-millis 136
              :finish-time-millis 136
+             :nested-ops
+             [{:start-time-millis 101
+               :finish-time-millis 102
+               :type :store-read
+               :info
+               {"a" 103}}
+              {:start-time-millis 104
+               :finish-time-millis 105
+               :type :store-write
+               :info
+               {"a" 106}}
+              {:start-time-millis 107
+               :finish-time-millis 108
+               :type :db-read
+               :info
+               {"a" 109}}
+              {:start-time-millis 110
+               :finish-time-millis 111
+               :type :db-write
+               :info
+               {"a" 112}}
+              {:start-time-millis 113
+               :finish-time-millis 114
+               :type :model-call
+               :info
+               {"a" 115}}
+              {:start-time-millis 116
+               :finish-time-millis 117
+               :type :agent-invoke
+               :info
+               {"a" 118}}
+              {:start-time-millis 119
+               :finish-time-millis 120
+               :type :other
+               :info
+               {"a" 121}}]
             }
            }
            (m/guard

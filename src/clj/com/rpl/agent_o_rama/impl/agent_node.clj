@@ -13,6 +13,7 @@
   (:import
    [com.rpl.agentorama
     AgentNode
+    NestedOpType
     StreamingRecorder]
    [com.rpl.agentorama.impl
     AgentNodeExecutorTaskGlobal
@@ -99,6 +100,31 @@
        (doseq [cf @outstanding-queue-vol]
          (verify-successful-cf! cf)))
     )))
+
+(def NESTED-OP-TYPE-CLJ
+  {:store-read   NestedOpType/STORE_READ
+   :store-write  NestedOpType/STORE_WRITE
+   :db-read      NestedOpType/DB_READ
+   :db-write     NestedOpType/DB_WRITE
+   :model-call   NestedOpType/MODEL_CALL
+   :agent-invoke NestedOpType/AGENT_INVOKE
+   :other        NestedOpType/OTHER
+  })
+
+(def NESTED-OP-TYPE-JAVA
+  (into {} (for [[k v] NESTED-OP-TYPE-CLJ] [v k])))
+
+(defn nested-op-type->clj
+  [v]
+  (if-let [res (get NESTED-OP-TYPE-JAVA v)]
+    res
+    (throw (h/ex-info "Unknown nested op type" {:val v :type (class v)}))))
+
+(defn nested-op-type->java
+  [v]
+  (if-let [res (get NESTED-OP-TYPE-CLJ v)]
+    res
+    (throw (h/ex-info "Unknown nested op type" {:val v :type (class v)}))))
 
 (defn mk-agent-node
   [agent-name agent-graph agent-task-id agent-id curr-node invoke-id retry-num
@@ -193,6 +219,18 @@
          )))
      (streamChunk [this chunk]
        (.streamChunk streaming-recorder chunk))
+     (recordNestedOp [this type start-time-millis finish-time-millis info]
+       (when (< finish-time-millis start-time-millis)
+         (throw (h/ex-info "Finish time cannot be before start time"
+                           {:start-time-millis  start-time-millis
+                            :finish-time-millis finish-time-millis})))
+       (vswap! nested-ops-vol
+               conj
+               (aor-types/->NestedOpInfo
+                start-time-millis
+                finish-time-millis
+                (nested-op-type->clj type)
+                info)))
      AgentNodeInternal
      (get-streaming-recorder [this] streaming-recorder)
      (agent-node-state [this]
@@ -218,6 +256,10 @@
   (fn []
     (let [depot (.getAgentDepot rama-clients agent-name)
           res   (try
+                  ;; TODO: <<<<>>>> use thread local or dvar to capture
+                  ;; nested-ops / streaming context
+                  ;;  -  need to expose ability to capture own nested ops
+                  ;;    - for analytics need to not have it be user-defined...
                   (h/returning (apply node-fn agent-node args)
                     (-> agent-node
                         get-streaming-recorder

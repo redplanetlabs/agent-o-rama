@@ -4,8 +4,11 @@
   :test-paths ["test/clj"]
   :jvm-opts ["-Xss6m"]
   :dependencies [[com.rpl/rama-helpers "0.10.0"]
-                 [dev.langchain4j/langchain4j "1.1.0"]
-                 ;; TODO: remove
+                 [dev.langchain4j/langchain4j
+                  "1.1.0"
+                  :exclusions
+                  [org.slf4j/slf4j-api]]
+                 ;; TODO <<<<>>>>: remove?
                  [dev.langchain4j/langchain4j-open-ai "1.1.0"]]
   :global-vars {*warn-on-reflection* true}
   :repositories
