@@ -167,3 +167,11 @@
 (defn into-map
   [arg]
   (into {} arg))
+
+(defn thread-local-set!
+  [^ThreadLocal t v]
+  (.set t v))
+
+(defn thread-local-get
+  [^ThreadLocal t]
+  (.get t))

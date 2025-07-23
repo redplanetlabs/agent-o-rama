@@ -249,6 +249,8 @@
   [t msg data]
   (cljlogging/error t msg data))
 
+(def AGENT-NODE-CONTEXT (ThreadLocal.))
+
 (defn node-event
   [agent-name task-id invoke-id retry-num node-name node-fn
    ^AgentNode agent-node args ^RamaClientsTaskGlobal rama-clients
@@ -256,10 +258,8 @@
   (fn []
     (let [depot (.getAgentDepot rama-clients agent-name)
           res   (try
-                  ;; TODO: <<<<>>>> use thread local or dvar to capture
-                  ;; nested-ops / streaming context
-                  ;;  -  need to expose ability to capture own nested ops
-                  ;;    - for analytics need to not have it be user-defined...
+                  (h/thread-local-set! AGENT-NODE-CONTEXT
+                                       {:agent-node agent-node})
                   (h/returning (apply node-fn agent-node args)
                     (-> agent-node
                         get-streaming-recorder
