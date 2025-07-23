@@ -4,10 +4,10 @@
   (:require
    [com.rpl.agent-o-rama.ui.server :as srv]
    [com.rpl.agent-o-rama.system :as sys]
-   [shadow.cljs.devtools.api :as shadow]
-   [ring.adapter.jetty :as jetty])
+   [ring.adapter.jetty :as jetty]
+   [shadow.cljs.devtools.api :as shadow])
   (:import
-   [java.util.concurrent ScheduledThreadPoolExecutor]))
+   [java.util.concurrent ScheduledThreadPoolExecutor TimeUnit]))
 
 (defn start []
   (shadow/watch :frontend)
@@ -15,7 +15,13 @@
                                                   {:port 2999
                                                    :join? false}))
   (swap! sys/system assoc :rama-client (open-cluster-manager-internal {"conductor.host" "localhost"}))
-  (swap! sys/system assoc :background-exec (ScheduledThreadPoolExecutor. 1) ))
+  (swap! sys/system assoc :background-exec (ScheduledThreadPoolExecutor. 1) )
+  (.scheduleAtFixedRate
+   ^ScheduledThreadPoolExecutor (:background-exec @sys/system)
+   (fn [] (println "Test"))
+   0
+   5
+   TimeUnit/SECONDS))
 
 (defn stop []
   (.stop (:jetty @sys/system))
