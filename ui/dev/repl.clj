@@ -1,41 +1,26 @@
 (ns repl
+  (:use
+   [com.rpl.rama])
   (:require
    [com.rpl.agent-o-rama.ui.server :as srv]
    [com.rpl.agent-o-rama.system :as sys]
    [shadow.cljs.devtools.api :as shadow]
-   [com.stuartsierra.component :as component]))
-
-(defrecord ShadowComponent []
-  component/Lifecycle
-  (start [component]
-    (shadow/watch :frontend)
-    (assoc component :shadow-started? true))
-  
-  (stop [component]
-    (when (:shadow-started? component) (shadow/stop-worker :frontend))
-    (dissoc component :shadow-started?)))
-
-(defn new-shadow-component []
-  (->ShadowComponent))
-
-
-(defn new-system []
-  (component/system-map
-   :shadow (new-shadow-component)
-   :rama-client (sys/new-rama-client)
-   :webserver (component/using
-               (sys/new-webserver-component 2999 #'srv/handler)
-               [:rama-client])))
-
-(defn stop []
-  (when @sys/system (reset! sys/system (component/stop @sys/system)))
-  ::stopped)
+   [ring.adapter.jetty :as jetty])
+  (:import
+   [java.util.concurrent ScheduledThreadPoolExecutor]))
 
 (defn start []
-  (when @sys/system
-    (stop))
-  (reset! sys/system (component/start (new-system)))
-  ::started)
+  (shadow/watch :frontend)
+  (swap! sys/system assoc :jetty (jetty/run-jetty #'srv/handler
+                                                  {:port 2999
+                                                   :join? false}))
+  (swap! sys/system assoc :rama-client (open-cluster-manager-internal {"conductor.host" "localhost"}))
+  (swap! sys/system assoc :background-exec (ScheduledThreadPoolExecutor. 1) ))
+
+(defn stop []
+  (.stop (:jetty @sys/system))
+  (close! (:rama-client @sys/system))
+  (.shutdownNow (:background-exec @sys/system)))
 
 (defn go []
   (stop)
