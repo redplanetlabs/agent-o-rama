@@ -1,3 +1,4 @@
+move deps.edn to lein, get rid of REPL.sh
 next steps
   lein uberjar my module
   run it on a local cluster

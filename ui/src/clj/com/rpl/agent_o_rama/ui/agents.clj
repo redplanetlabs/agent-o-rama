@@ -1,7 +1,16 @@
 (ns com.rpl.agent-o-rama.ui.agents
-  (:require [com.rpl.specter :as s]))
+  (:require [com.rpl.specter :as s]
+            [com.rpl.agent-o-rama.system :as sys]
+            [com.rpl.agent-o-rama :as aor]))
+
+(def agent-manager)
+
 
 (defn index [{:keys [parameters]}]
+  ;; TODO catch exception for (aor/agent-manager ... )
+  (-> sys/system deref :rama-client :rama-client (.getDeployedModuleNames))
+  (aor/agent-manager (-> sys/system deref :rama-client :rama-client)
+                     (first (-> sys/system deref :rama-client :rama-client (.getDeployedModuleNames))))
   {:status
    200
    
