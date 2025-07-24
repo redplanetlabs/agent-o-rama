@@ -1,20 +1,16 @@
 (ns com.rpl.agent-o-rama.ui.agents
-  (:require [com.rpl.specter :as s]
-            [com.rpl.agent-o-rama.system :as sys]
+  (:use [com.rpl.specter])
+  (:require [com.rpl.agent-o-rama.system :as sys]
             [com.rpl.agent-o-rama :as aor]))
 
 (defn index [{:keys [parameters]}]
-  ;; TODO catch exception for (aor/agent-manager ... )
-  (-> sys/system deref :rama-client (.getDeployedModuleNames))
-  (aor/agent-manager (-> sys/system deref :rama-client)
-                     (first (-> sys/system deref :rama-client :rama-client (.getDeployedModuleNames))))
   {:status
    200
    
    :body
-   [{:module-id "ModuleA" :agent-id "research"}
-    {:module-id "ModuleA" :agent-id "support"}
-    {:module-id "ModuleB" :agent-id "research"}]})
+   (for [[module-name agent-name]
+         (select [ALL (collect-one FIRST) LAST :clients MAP-KEYS] (sys/get-object :aor-cache))]
+     {:module-id module-name :agent-id agent-name})})
 
 (defn get-graph [{{:keys [module-id agent-id]} :path-params}]
   {:status
