@@ -34,26 +34,19 @@
                (unreplace-slash agent-id)]
               (sys/get-object :aor-cache)))
 
+(defn objects [module-id agent-id]
+  (aort/underlying-objects (get-client module-id agent-id)))
+
 (defn get-graph [{{:keys [module-id agent-id]} :path-params}]
-  (foreign-select [LAST]
-                  (:graph-history-pstate
-                   (aort/underlying-objects (get-client module-id agent-id)))
-                  {:pkey 0})
   {:status
    200
    
    :body
    {:graph
-    {:node-map {"node1" {:node-type :agg-start-node
-                         :output-nodes #{"node2" "node3"}}
-                "node3" {:node-type :node
-                         :output-nodes #{"final"}}
-                "node2" {:node-type :node
-                         :output-nodes #{"node1"}}
-                "final" {:node-type :agg-node
-                         :output-nodes #{}}}
-     :start-node "node1"
-     :uuid "15e8c43e-0b5f-4d36-9424-1b1165b89404"}}})
+    (second (first (foreign-select [LAST]
+                                   (:graph-history-pstate
+                                    (objects module-id agent-id))
+                                   {:pkey 0})))}})
 
 (defn manually-trigger-invoke [{{:keys [module-id agent-id]} :path-params
                                 {:keys [args]} :body-params
@@ -63,9 +56,11 @@
   
   (let [inv (apply aor/agent-initiate (get-client module-id agent-id) args)]
     {:status 200 :body
-     [(.getTaskId inv) (.getAgentInvokeId inv)]}))
+     {:task-id (.getTaskId inv)
+      :invoke-id (.getAgentInvokeId inv)}}))
 
 (defn get-invokes [{{:keys [module-id agent-id]} :path-params}]
+  (objects module-id agent-id)
   {:status
    200
    
