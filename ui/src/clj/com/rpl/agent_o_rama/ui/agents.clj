@@ -10,7 +10,9 @@
    :body
    (for [[module-name agent-name]
          (select [ALL (collect-one FIRST) LAST :clients MAP-KEYS] (sys/get-object :aor-cache))]
-     {:module-id module-name :agent-id agent-name})})
+     {:module-id
+      (java.net.URLEncoder/encode module-name "UTF-8")
+      :agent-id (java.net.URLEncoder/encode agent-name "UTF-8")})})
 
 (defn get-graph [{{:keys [module-id agent-id]} :path-params}]
   {:status

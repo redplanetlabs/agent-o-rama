@@ -11,6 +11,9 @@
    
    [com.rpl.agent-o-rama.ui.common :as common]))
 
+(defn url-decode [s]
+  (js/decodeURIComponent s))
+
 (defui index []
   (let [{:keys [data loading?]}
         (common/use-query {:query-key ["agents"]
@@ -26,7 +29,7 @@
                      ($ :div.flex.items-center.group 
                       ($ :div.flex-1
                           ($ :div.text-lg.font-medium.text-indigo-600.group-hover:text-indigo-800
-                            ($ :div (:module-id agent) "/" (:agent-id agent)))
+                            ($ :div (url-decode (:module-id agent)) ":" (url-decode (:agent-id agent))))
                           ($ :div.mt-1.text-sm.text-gray-500.group-hover:text-gray-700
                             "View agent details"))))))))))
 
