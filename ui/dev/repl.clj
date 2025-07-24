@@ -26,9 +26,9 @@
                      (constantly manager)
                      sys/system)
           
-          (doseq [agent-name (.getAgentNames manager)]
-            (transform [ATOM :aor-cache mod :clients agent-name nil?]
-                       (constantly (.getAgentClient manager agent-name))
+          (doseq [agent-name (aor/agent-names manager)]
+            (transform [ATOM :aor-cache mod :clients agent-name]
+                       (constantly (aor/agent-client manager agent-name))
                        sys/system)))))
 
     ;; stale agents
