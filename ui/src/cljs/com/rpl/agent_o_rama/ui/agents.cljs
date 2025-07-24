@@ -185,10 +185,30 @@
 
 (defui manual-run [{:keys [module-id agent-id]}]
   (let [[args set-args] (uix/use-state "")
+        [result set-result] (uix/use-state nil)
+        [error-msg set-error-msg] (uix/use-state nil)
+        
+        run-agent (common/use-mutation 
+                   {:mutation-fn (fn [variables]
+                                   (let [parsed-args (try
+                                                       (js/JSON.parse variables)
+                                                       (catch js/Error e
+                                                         (throw (js/Error. "Invalid JSON format"))))]
+                                     (common/post (str "/api/agents/" module-id "/" agent-id "/run")
+                                                  {:args parsed-args})))
+                    :on-success (fn [data]
+                                  (set-result data)
+                                  (set-error-msg nil))
+                    :on-error (fn [error]
+                                (set-error-msg (str "Error: " (or (.-message error) "Unknown error")))
+                                (set-result nil))})
+        
         handle-submit (fn [e]
                         (.preventDefault e)
-                        ;; TODO: Implement actual API call
-                        (println "Running agent with args:" args))]
+                        (set-error-msg nil)
+                        (set-result nil)
+                        ((:mutate run-agent) args))]
+    
     ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6
        ($ :form {:onSubmit handle-submit}
           ($ :div.text-sm.font-medium.text-gray-600.mb-4 "Manually Run Agent")
@@ -197,10 +217,26 @@
                 {:placeholder "Enter arguments (JSON)"
                  :value args
                  :onChange #(set-args (.. % -target -value))
-                 :rows 3})
-             ($ :button.w-32.h-20.bg-blue-600.text-white.px-4.rounded-md.hover:bg-blue-700.focus:ring-2.focus:ring-blue-500.focus:ring-offset-2.text-sm.font-semibold.cursor-pointer.transition-colors.duration-150
-                {:type "submit"}
-                "Submit"))))))
+                 :rows 3
+                 :disabled (:loading? run-agent)})
+             ($ :button.w-32.h-20.text-white.px-4.rounded-md.focus:ring-2.focus:ring-blue-500.focus:ring-offset-2.text-sm.font-semibold.cursor-pointer.transition-colors.duration-150
+                {:type "submit"
+                 :disabled (:loading? run-agent)
+                 :className (if (:loading? run-agent)
+                              "bg-gray-400 cursor-not-allowed"
+                              "bg-blue-600 hover:bg-blue-700")}
+                (if (:loading? run-agent) "Running..." "Submit"))))
+       
+       ;; Show results/errors
+       (when (or result error-msg)
+         ($ :div.mt-4.p-3.rounded-md
+            {:className (if error-msg "bg-red-50 border border-red-200" "bg-green-50 border border-green-200")}
+            (if error-msg
+              ($ :div.text-red-700.text-sm error-msg)
+              ($ :div
+                 ($ :div.text-green-700.text-sm.font-medium.mb-2 "Success!")
+                 ($ :pre.text-xs.text-gray-700.bg-white.p-2.rounded.border.overflow-auto
+                    (common/pp result))))))))) 
 
 (defui agent []
   (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
