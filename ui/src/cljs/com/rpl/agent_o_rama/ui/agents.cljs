@@ -93,19 +93,16 @@
                   ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
                   ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")))
             ($ :tbody.divide-y.divide-gray-200
-               (for [invoke (:invokes data)
-                     :let [url (str "/agents/" module-id "/" agent-id "/invocations/" (:root-invoke-id invoke))]]
+               (for [[task-id invoke-id start-time-millis] (:agent-invokes data)
+                     :let [url (str "/agents/" module-id "/" agent-id "/invocations/" task-id "-" invoke-id)]]
                  ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
                     {:key url
                      :onClick (fn [_] (navigate url))}
-                    ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium (:root-invoke-id invoke))
+                    ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium (str task-id "-" invoke-id))
                     ($ :td.px-4.py-3.max-w-xs
                        ($ :div.truncate.text-gray-900 
-                          (common/pp (:invoke-args invoke))))
-                    ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
-                    ($ :td.px-4.py-3.max-w-xs
-                       ($ :div.truncate.text-gray-900
-                          (common/pp (:result invoke)))))))
+                          (common/pp start-time-millis)))
+                    ($ :td.px-4.py-3.font-mono.text-gray-600 ""))))
             ($ :tfoot.bg-gray-50.border-t.border-gray-200
                ($ :tr.hover:bg-gray-100.transition-colors.duration-150
                   {:onClick (fn [_] (navigate (str "/agents/" module-id "/" agent-id "/invocations")))}

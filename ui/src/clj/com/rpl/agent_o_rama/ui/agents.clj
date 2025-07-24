@@ -55,36 +55,19 @@
     (throw (ex-info "must be a json list of args" {:bad-args args})))
   
   (let [inv (apply aor/agent-initiate (get-client module-id agent-id) args)]
-    {:status 200 :body
+    {:status 200
+     :body
      {:task-id (.getTaskId inv)
       :invoke-id (.getAgentInvokeId inv)}}))
 
 (defn get-invokes [{{:keys [module-id agent-id]} :path-params}]
-  (objects module-id agent-id)
   {:status
    200
    
    :body
-   {:invokes ;;agent-invoke-pstate-<agent-id> 
-    [
-     ;; probably want to join/lookup more data about each root invoke from the
-     ;; $$_agent_node-<agent-id>[root-invoke-id] pstate
-     {:root-invoke-id 121
-      :invoke-args ["CUSTOMER-123"]
-      :graph-version 0
-      :result {:success true} }
-     {:root-invoke-id 122
-      :invoke-args ["CUSTOMER-66"]
-      :graph-version 0
-      :result {:success true} }
-     {:root-invoke-id 123
-      :invoke-args ["CUSTOMER-456"]
-      :graph-version 0
-      :result {:success true} }
-     {:root-invoke-id 124
-      :invoke-args ["CUSTOMER-222"]
-      :graph-version 0
-      :result {:success true} }]}})
+   (foreign-invoke-query
+    (:invokes-page-query (objects module-id agent-id))
+    10 nil)})
 
 (def all-data
   {-1183571186781372609 {:invoked-agg-invoke-id 6016686666795829822},

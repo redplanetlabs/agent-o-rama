@@ -1,4 +1,8 @@
 move deps.edn to lein, get rid of REPL.sh
+  set warn on reflect 
+
+path-parameter: agent-id -> agent-name
+
 next steps
   lein uberjar my module
   run it on a local cluster

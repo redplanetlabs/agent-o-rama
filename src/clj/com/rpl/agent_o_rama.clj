@@ -267,7 +267,12 @@
                                    cluster
                                    module-name
                                    (queries/tracing-query-name
-                                    agentName))]
+                                    agentName))
+             invokes-page-query (foreign-query
+                                 cluster
+                                 module-name
+                                 (queries/agent-get-invokes-page-query-name
+                                  agentName))]
 
          (reify
           AgentClient
@@ -415,8 +420,8 @@
              :root-pstate          root-pstate
              :streaming-pstate     streaming-pstate
              :graph-history-pstate graph-history-pstate
-             :tracing-query        tracing-query})
-         ))))))
+             :tracing-query        tracing-query
+             :invokes-page-query   invokes-page-query})))))))
 
 (defn agent-client
   ^AgentClient [^AgentManager agent-manager agent-name]

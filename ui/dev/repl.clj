@@ -1,7 +1,7 @@
 (ns repl
   (:use
    [com.rpl.rama]
-   [com.rpl.specter])
+   [com.rpl.rama.path])
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.ui.server :as srv]
@@ -22,34 +22,37 @@
                       (aor/agent-manager rama-client mod)
                       (catch Exception e ::no-aor))]
         (when-not (= ::no-aor manager)
-          (setval [ATOM :aor-cache mod :manager]
+          (setval [ATOM :aor-cache (keypath mod) :manager]
                   manager
                   sys/system)
           (let [agent-names (aor/agent-names manager)]
             (doseq [agent-name agent-names]
               ;; nil? so that it doesn't waste resources on uneeded clients
               ;; doesn't use constantly because that evals its body
-              (transform [ATOM :aor-cache mod :clients agent-name nil?]
+              (transform [ATOM :aor-cache (keypath mod) :clients (keypath agent-name) nil?]
                          (fn [_] (aor/agent-client manager agent-name))
                          sys/system))
 
             ;; stale agents
             (let [stale-agents (clojure.set/difference
                                 (set
-                                 (select [ATOM :aor-cache mod :clients MAP-KEYS] sys/system))
+                                 (select [ATOM :aor-cache (keypath mod) :clients MAP-KEYS]
+                                         sys/system))
                                 agent-names)]
               (doseq [stale-agent stale-agents]
-                (close! (select-one [ATOM :aor-cache mod :clients stale-agent] sys/system))
-                (setval [ATOM :aor-cache mod :clients stale-agent] NONE sys/system)))))))
+                (transform [ATOM :aor-cache (keypath mod) :clients (keypath stale-agent)]
+                           (fn [client]
+                             (close! client)
+                             NONE)
+                           sys/system)))))))
 
     ;; stale modules
     (let [stale-modules (clojure.set/difference
                          (set (select [ATOM :aor-cache MAP-KEYS] sys/system))
                          modules)]
       (doseq [mod stale-modules]
-        (transform [ATOM :aor-cache mod :client MAP-VALS] close! sys/system)
-        #_(close! (select-one [ATOM :aor-cache mod :manager] sys/system))
-        (setval [ATOM :aor-cache mod] NONE sys/system)))))
+        (transform [ATOM :aor-cache (keypath mod) :client MAP-VALS] close! sys/system)
+        (setval [ATOM :aor-cache (keypath mod)] NONE sys/system)))))
 
 (comment (-> @sys/system :aor-cache
              ))
