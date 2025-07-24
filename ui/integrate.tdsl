@@ -3,6 +3,8 @@ move deps.edn to lein, get rid of REPL.sh
 
 path-parameter: agent-id -> agent-name
 
+add pagination controls/hookup for full invocations
+
 next steps
   lein uberjar my module
   run it on a local cluster
