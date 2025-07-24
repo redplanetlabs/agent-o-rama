@@ -25,13 +25,12 @@
           (setval [ATOM :aor-cache mod :manager]
                   manager
                   sys/system)
-          
           (let [agent-names (aor/agent-names manager)]
             (doseq [agent-name agent-names]
               ;; nil? so that it doesn't waste resources on uneeded clients
               ;; doesn't use constantly because that evals its body
               (transform [ATOM :aor-cache mod :clients agent-name nil?]
-                         (fn [] (aor/agent-client manager agent-name))
+                         (fn [_] (aor/agent-client manager agent-name))
                          sys/system))
 
             ;; stale agents
