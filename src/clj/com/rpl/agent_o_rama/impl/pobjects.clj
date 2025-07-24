@@ -2,6 +2,7 @@
   (:use [com.rpl.rama])
   (:import
    [com.rpl.agentorama.impl
+    AgentDeclaredObjectsTaskGlobal
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     AgentNodeEmit
@@ -23,6 +24,10 @@
 (defn agent-node-executor-name
   []
   "*_agent-node-executor")
+
+(defn agent-declared-objects-name
+  []
+  "*_agent-declared-objects")
 
 (defn agent-pstate-write-depot-name
   []
@@ -189,6 +194,10 @@
 (defn agent-store-info-task-global
   []
   (declared-object-task-global (agents-store-info-name)))
+
+(defn agent-declared-objects-task-global
+  ^AgentDeclaredObjectsTaskGlobal []
+  (declared-object-task-global (agent-declared-objects-name)))
 
 (defn agent-depot-task-global
   [name]

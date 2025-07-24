@@ -44,11 +44,13 @@
   (let [^StreamTopology stream-topology (stream-topology
                                          topologies
                                          aor-types/AGENTS-TOPOLOGY-NAME)
-        mb-topology    (microbatch-topology topologies
-                                            aor-types/AGENTS-MB-TOPOLOGY-NAME)
-        defined?-vol   (volatile! false)
-        agents-vol     (volatile! {})
-        store-info-vol (volatile! {})]
+        mb-topology          (microbatch-topology
+                              topologies
+                              aor-types/AGENTS-MB-TOPOLOGY-NAME)
+        defined?-vol         (volatile! false)
+        agents-vol           (volatile! {})
+        store-info-vol       (volatile! {})
+        declared-objects-vol (volatile! {})]
     (reify
      AgentsTopology
      (newAgent [this name]
@@ -85,7 +87,13 @@
                                               ^PState$Schema schema]
        (.pstate stream-topology name schema))
      (declareAgentObject [this name o]
-       (declare-object* setup (symbol name) o))
+       (aor-types/declare-agent-object-builder-internal this
+                                                        name
+                                                        (constantly o)))
+     (declareAgentObjectBuilder [this name jfn]
+       (aor-types/declare-agent-object-builder-internal this
+                                                        name
+                                                        (h/convert-jfn jfn)))
      (define [this]
        (when @defined?-vol
          (throw (h/ex-info "Agents topology already defined" {})))
@@ -96,8 +104,17 @@
         stream-topology
         mb-topology
         @agents-vol
-        @store-info-vol)
-     ))))
+        @store-info-vol
+        @declared-objects-vol))
+     aor-types/AgentsTopologyInternal
+     (declare-agent-object-builder-internal [this name afn]
+       (when-not (ifn? afn)
+         (throw (h/ex-info "Object builder must be a function"
+                           {:actual-type (class afn)})))
+       (when (contains? @declared-objects-vol name)
+         (throw (h/ex-info "Object already declared" {:name name})))
+       (vswap! declared-objects-vol assoc name afn))
+    )))
 
 (defn underlying-stream-topology
   [^AgentsTopology at]

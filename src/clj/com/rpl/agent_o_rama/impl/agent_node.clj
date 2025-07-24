@@ -152,6 +152,9 @@
                                                    invoke-id
                                                    retry-num
                                                    streaming-depot)
+
+        agent-objects       (.getAgentObjects
+                             (po/agent-declared-objects-task-global))
        ]
     (reify
      AgentNode
@@ -188,8 +191,9 @@
          (throw (h/ex-info "Cannot both emit and result" {})))
        (vreset! result-vol (aor-types/->valid-AgentResult arg false)))
      (getAgentObject [this name]
-                     ;; TODO
-     )
+       (if (contains? agent-objects name)
+         (get agent-objects name)
+         (throw (h/ex-info "Could not find agent object" {:name name}))))
      (getStore [this name]
        (let [store-params
              (simpl/->valid-StoreParams
@@ -250,6 +254,12 @@
   (cljlogging/error t msg data))
 
 (def AGENT-NODE-CONTEXT (ThreadLocal.))
+
+(defn wrap-agent-object
+  [obj]
+  obj
+  ;; TODO: <<<<>>>>> wrap ChatModel and possibly db impls
+)
 
 (defn node-event
   [agent-name task-id invoke-id retry-num node-name node-fn

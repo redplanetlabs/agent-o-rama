@@ -15,6 +15,7 @@
   (:import
    [com.rpl.agentorama.impl
     RamaClientsTaskGlobal
+    AgentDeclaredObjectsTaskGlobal
     AgentNodeExecutorTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     AggAckOp
@@ -162,7 +163,8 @@
     )))
 
 (defn define-agents!
-  [setup topologies stream-topology mb-topology agent-graphs store-info]
+  [setup topologies stream-topology mb-topology agent-graphs store-info
+   declared-objects]
   (declare-object* setup
                    (symbol (po/agents-store-info-name))
                    (aor-types/->valid-StoreInfo store-info {}))
@@ -176,6 +178,10 @@
   (declare-object* setup
                    (symbol (po/agent-node-executor-name))
                    (AgentNodeExecutorTaskGlobal.))
+
+  (declare-object* setup
+                   (symbol (po/agent-declared-objects-name))
+                   (AgentDeclaredObjectsTaskGlobal. declared-objects))
 
   (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
