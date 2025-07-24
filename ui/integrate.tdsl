@@ -1,32 +1,6 @@
 move deps.edn to lein, get rid of REPL.sh
   set warn on reflect 
 
-path-parameter: agent-id -> agent-name
-
 add pagination controls/hookup for full invocations
-
-next steps
-  lein uberjar my module
-  run it on a local cluster
-  go back to ui/, make it connect to that local cluster, from a stuart component
-
-
-manager = (open-cluster-manager-internal {"conductor.host" "localhost"})
-(list-modules manager)
-
-once per module= 
-  agent-manager (aor/agent-manager manager "Some.Module")
-    can list agents
-    agent-client  (methods for invoking (initiate/initiateFork))
-
-
-only need toa ccess AGENT-INVOKE-PSTATE-SCHEMA (which needs {:pkey task-id})
-
-underlying objects on agent-manager has all the things i need to query
-
-start with lifecycle management
-install rama from master. sh scripts/install.sh
-
-GRAPH-HISTORY-PSTATE always key=versionnumber=0 {:pkey 0}
 
 eventually config page

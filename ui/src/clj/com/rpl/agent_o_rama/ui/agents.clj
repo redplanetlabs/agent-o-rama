@@ -100,13 +100,15 @@
   [{{:keys [module-id agent-name invoke-id]} :path-params
     {:strs [start-node-id depth] :or {depth "3"}} :query-params
     :as req}]
-  (def module-id module-id)
-  (def agent-name agent-name)
-  (def invoke-id invoke-id)
-  (let [[task-id invoke-id-parsed] (parse-url-agent-id invoke-id)]
-    (foreign-invoke-query (:tracing-query (objects module-id agent-name))
-                          task-id
-                          [task-id invoke-id-parsed]
-                          10)))
+  ;; TODO figure out why data is smaller
+  ;; https://github.com/redplanetlabs/agent-o-rama/commit/d0d0cf0e8fcab3d8d445ae947518c205ce3a1a50#diff-cae22e578469a40db2bab77d83e834f1d5a3e857168c9d263480de365d392460
+  {:status 200
+   :body
+   (let [[task-id invoke-id-parsed] (parse-url-agent-id invoke-id)]
+     (foreign-invoke-query (:tracing-query (objects module-id agent-name))
+                           task-id
+                           [ [task-id invoke-id-parsed]]
+                           10))
+   {:next-task-invoke-pairs [], :invokes-map {8 {:node-task-id 0}}}})
 
 
