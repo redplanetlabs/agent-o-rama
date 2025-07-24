@@ -55,8 +55,15 @@
      :start-node "node1"
      :uuid "15e8c43e-0b5f-4d36-9424-1b1165b89404"}}})
 
-(defn manually-trigger-invoke [{{:keys [module-id agent-id]} :path-params}]
-  {:status 200 :body {:wow true}})
+(defn manually-trigger-invoke [{{:keys [module-id agent-id]} :path-params
+                                {:keys [args]} :body-params
+                                :as req}]
+  (when-not (vector? args)
+    (throw (ex-info "must be a json list of args" {:bad-args args})))
+  
+  (let [inv (apply aor/agent-initiate (get-client module-id agent-id) args)]
+    {:status 200 :body
+     [(.getTaskId inv) (.getAgentInvokeId inv)]}))
 
 (defn get-invokes [{{:keys [module-id agent-id]} :path-params}]
   {:status

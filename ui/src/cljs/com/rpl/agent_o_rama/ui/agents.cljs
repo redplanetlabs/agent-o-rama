@@ -214,7 +214,7 @@
           ($ :div.text-sm.font-medium.text-gray-600.mb-4 "Manually Run Agent")
           ($ :div.flex.gap-3.justify-between
              ($ :textarea.flex-1.p-3.border.border-gray-300.rounded-md.text-sm.focus:ring-2.focus:ring-blue-500.focus:border-blue-500.transition-colors.duration-150
-                {:placeholder "Enter arguments (JSON)"
+                {:placeholder "[arg1, arg2, arg3, ...] (json)"
                  :value args
                  :onChange #(set-args (.. % -target -value))
                  :rows 3
