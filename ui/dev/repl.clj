@@ -22,29 +22,39 @@
                       (aor/agent-manager rama-client mod)
                       (catch Exception e ::no-aor))]
         (when-not (= ::no-aor manager)
-          (transform [ATOM :aor-cache mod :manager]
-                     (constantly manager)
-                     sys/system)
+          (setval [ATOM :aor-cache mod :manager]
+                  manager
+                  sys/system)
           
-          (doseq [agent-name (aor/agent-names manager)]
-            (transform [ATOM :aor-cache mod :clients agent-name]
-                       (constantly (aor/agent-client manager agent-name))
-                       sys/system)))))
+          (let [agent-names (aor/agent-names manager)]
+            (doseq [agent-name agent-names]
+              ;; nil? so that it doesn't waste resources on uneeded clients
+              ;; doesn't use constantly because that evals its body
+              (transform [ATOM :aor-cache mod :clients agent-name nil?]
+                         (fn [] (aor/agent-client manager agent-name))
+                         sys/system))
 
-    ;; stale agents
-    :TODO
-    
+            ;; stale agents
+            (let [stale-agents (clojure.set/difference
+                                (set
+                                 (select [ATOM :aor-cache mod :clients MAP-KEYS] sys/system))
+                                agent-names)]
+              (doseq [stale-agent stale-agents]
+                (close! (select-one [ATOM :aor-cache mod :clients stale-agent] sys/system))
+                (setval [ATOM :aor-cache mod :clients stale-agent] NONE sys/system)))))))
+
     ;; stale modules
     (let [stale-modules (clojure.set/difference
-                         (set (select [:aor-agent-managers MAP-KEYS] @sys/system))
+                         (set (select [ATOM :aor-cache MAP-KEYS] sys/system))
                          modules)]
       (doseq [mod stale-modules]
-        :TODO))
-    ))
+        (transform [ATOM :aor-cache mod :client MAP-VALS] close! sys/system)
+        #_(close! (select-one [ATOM :aor-cache mod :manager] sys/system))
+        (setval [ATOM :aor-cache mod] NONE sys/system)))))
 
-(-> @sys/system :aor-agent-managers (get "examples.core/FlowModule")
-    (.getAgentClient "foo")
-    )
+(comment (-> @sys/system :aor-cache
+             ))
+
 
 (defn start []
   (shadow/watch :frontend)
@@ -56,7 +66,7 @@
   (.scheduleAtFixedRate
    ^ScheduledThreadPoolExecutor (:background-exec @sys/system)
    (fn [] (try
-            #_(refresh-agent-modules!)
+            (refresh-agent-modules!)
             (catch Throwable t
               (cljlogging/error t "Error in refreshing agent modules" {}))))
    0
@@ -68,9 +78,6 @@
   (close! (:rama-client @sys/system))
   (.shutdownNow (:background-exec @sys/system)))
 
-(defn go []
-  (stop)
-  (start))
-
 (comment
-  (go))
+  (start)
+  (stop))

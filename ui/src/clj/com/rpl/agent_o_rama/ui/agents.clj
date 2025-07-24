@@ -3,9 +3,6 @@
             [com.rpl.agent-o-rama.system :as sys]
             [com.rpl.agent-o-rama :as aor]))
 
-(def agent-manager)
-
-
 (defn index [{:keys [parameters]}]
   ;; TODO catch exception for (aor/agent-manager ... )
   (-> sys/system deref :rama-client (.getDeployedModuleNames))
