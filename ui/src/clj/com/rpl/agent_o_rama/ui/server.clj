@@ -38,7 +38,8 @@
      ["/agents"
       {:get {:handler #'agents/index}}]
      ["/agents/:module-id/:agent-id/invocations"
-      {:get {:handler #'agents/get-invokes}}]
+      {:get {:handler #'agents/get-invokes}
+       :post {:handler #'agents/manually-trigger-invoke}}]
      ["/agents/:module-id/:agent-id/graph"
       {:get {:handler #'agents/get-graph}}]
      ["/agents/:module-id/:agent-id/invocations/:invoke-id"

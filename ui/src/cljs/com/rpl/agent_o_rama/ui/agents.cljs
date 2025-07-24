@@ -194,7 +194,7 @@
                                                        (js/JSON.parse variables)
                                                        (catch js/Error e
                                                          (throw (js/Error. "Invalid JSON format"))))]
-                                     (common/post (str "/api/agents/" module-id "/" agent-id "/run")
+                                     (common/post (str "/api/agents/" module-id "/" agent-id "/invocations")
                                                   {:args parsed-args})))
                     :on-success (fn [data]
                                   (set-result data)

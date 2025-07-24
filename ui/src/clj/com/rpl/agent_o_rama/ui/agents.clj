@@ -55,6 +55,9 @@
      :start-node "node1"
      :uuid "15e8c43e-0b5f-4d36-9424-1b1165b89404"}}})
 
+(defn manually-trigger-invoke [{{:keys [module-id agent-id]} :path-params}]
+  {:status 200 :body {:wow true}})
+
 (defn get-invokes [{{:keys [module-id agent-id]} :path-params}]
   {:status
    200
