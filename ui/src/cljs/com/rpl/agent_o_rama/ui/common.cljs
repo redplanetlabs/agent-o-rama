@@ -1,7 +1,10 @@
 (ns com.rpl.agent-o-rama.ui.common
   (:require ["@tanstack/react-query" :as rq]
             ["axios" :as axios]
-            [cognitect.transit :as t]))
+            [cognitect.transit :as t]
+            [clojure.string :as str]))
+
+(defn url-decode [s] (str/replace s #"::" "/"))
 
 (def reader (t/reader :json))
 

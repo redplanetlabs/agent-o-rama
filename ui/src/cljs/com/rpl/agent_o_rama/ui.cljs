@@ -10,6 +10,7 @@
    ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon Bars3Icon XMarkIcon]]
    
    [com.rpl.agent-o-rama.ui.datasets :as datasets]
+   [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.stats :as stats]))
 
 (def query-client (QueryClient.))
@@ -101,7 +102,7 @@
                                       ;; Build the item
                                       item (if is-agent-pair?
                                              ;; Merge module/agent into one breadcrumb
-                                             {:label (str segment "/" next-segment)
+                                             {:label (str segment ":" next-segment)
                                               :path (str path "/" segment "/" next-segment)
                                               :segments-consumed 2}
                                              ;; Regular breadcrumb
@@ -132,12 +133,12 @@
                   (if is-last?
                     ;; Current page - not clickable
                     ($ :span {:key (str "crumb-" idx) :className "text-gray-500"} 
-                       (:label item))
+                       (common/url-decode (:label item)))
                     ;; Clickable link
                     ($ Link {:key (str "crumb-" idx)
                             :href (:path item)
                             :className "text-blue-600 hover:text-blue-800"}
-                       (:label item))))))
+                       (common/url-decode (:label item)))))))
              breadcrumb-items))))))
 
 ;; Main content area wrapper

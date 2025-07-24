@@ -3,6 +3,13 @@
   (:require [com.rpl.agent-o-rama.system :as sys]
             [com.rpl.agent-o-rama :as aor]))
 
+(defn replace-slash [s]
+  "because urlencoding causes jetty to 400 with Ambiguous URI path separator"
+  (clojure.string/replace s #"/" "::"))
+
+(comment
+  (replace-slash "example.core/FlowModule"))
+
 (defn index [{:keys [parameters]}]
   {:status
    200
@@ -11,8 +18,8 @@
    (for [[module-name agent-name]
          (select [ALL (collect-one FIRST) LAST :clients MAP-KEYS] (sys/get-object :aor-cache))]
      {:module-id
-      (java.net.URLEncoder/encode module-name "UTF-8")
-      :agent-id (java.net.URLEncoder/encode agent-name "UTF-8")})})
+      (replace-slash module-name)
+      :agent-id (replace-slash agent-name)})})
 
 (defn get-graph [{{:keys [module-id agent-id]} :path-params}]
   {:status
