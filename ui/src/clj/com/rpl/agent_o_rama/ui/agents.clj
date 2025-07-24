@@ -27,19 +27,18 @@
    (for [[module-name agent-name]
          (select [ALL (collect-one FIRST) LAST :clients MAP-KEYS] (sys/get-object :aor-cache))]
      {:module-id (replace-slash module-name)
-      :agent-id (replace-slash agent-name)})})
+      :agent-name (replace-slash agent-name)})})
 
-(defn get-client [module-id agent-id]
+(defn get-client [module-id agent-name]
   (select-one [(unreplace-slash module-id)
                :clients
-               (unreplace-slash agent-id)]
+               (unreplace-slash agent-name)]
               (sys/get-object :aor-cache)))
 
-(defn objects [module-id agent-id]
-  (aort/underlying-objects (get-client module-id agent-id)))
+(defn objects [module-id agent-name]
+  (aort/underlying-objects (get-client module-id agent-name)))
 
-(defn get-graph [{{:keys [module-id agent-id]} :path-params}]
-  (println "graph")
+(defn get-graph [{{:keys [module-id agent-name]} :path-params}]
   {:status
    200
    
@@ -47,28 +46,28 @@
    {:graph
     (second (first (foreign-select [LAST]
                                    (:graph-history-pstate
-                                    (objects module-id agent-id))
+                                    (objects module-id agent-name))
                                    {:pkey 0})))}})
 
-(defn manually-trigger-invoke [{{:keys [module-id agent-id]} :path-params
+(defn manually-trigger-invoke [{{:keys [module-id agent-name]} :path-params
                                 {:keys [args]} :body-params
                                 :as req}]
   (when-not (vector? args)
     (throw (ex-info "must be a json list of args" {:bad-args args})))
   
-  (let [inv (apply aor/agent-initiate (get-client module-id agent-id) args)]
+  (let [inv (apply aor/agent-initiate (get-client module-id agent-name) args)]
     {:status 200
      :body
      {:task-id (.getTaskId inv)
       :invoke-id (.getAgentInvokeId inv)}}))
 
-(defn get-invokes [{{:keys [module-id agent-id]} :path-params}]
+(defn get-invokes [{{:keys [module-id agent-name]} :path-params}]
   {:status
    200
    
    :body
    (foreign-invoke-query
-    (:invokes-page-query (objects module-id agent-id))
+    (:invokes-page-query (objects module-id agent-name))
     10 nil)})
 
 (defn remove-implicit-nodes
@@ -98,15 +97,15 @@
     [(parse-long task-id) (parse-long agent-id)]))
 
 (defn invoke-paginated 
-  [{{:keys [module-id agent-id invoke-id]} :path-params
+  [{{:keys [module-id agent-name invoke-id]} :path-params
     {:strs [start-node-id depth] :or {depth "3"}} :query-params
     :as req}]
   (def module-id module-id)
-  (def agent-id agent-id)
+  (def agent-name agent-name)
   (def invoke-id invoke-id)
   (let [[task-id agent-id] (parse-url-agent-id invoke-id)]
-    3)
-  (objects module-id agent-id)
+    task-id agent-id)
+  (objects module-id agent-name)
   {:status 200 :body []})
 
 

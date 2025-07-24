@@ -37,22 +37,22 @@
     ["/api"
      ["/agents"
       {:get {:handler #'agents/index}}]
-     ["/agents/:module-id/:agent-id/invocations"
+     ["/agents/:module-id/:agent-name/invocations"
       {:get {:handler #'agents/get-invokes}
        :post {:handler #'agents/manually-trigger-invoke}}]
-     ["/agents/:module-id/:agent-id/graph"
+     ["/agents/:module-id/:agent-name/graph"
       {:get {:handler #'agents/get-graph}}]
-     ["/agents/:module-id/:agent-id/invocations/:invoke-id"
+     ["/agents/:module-id/:agent-name/invocations/:invoke-id"
       {:get {:handler #'agents/invoke}}]
-     ["/agents/:module-id/:agent-id/invocations/:invoke-id/paginated"
+     ["/agents/:module-id/:agent-name/invocations/:invoke-id/paginated"
       {:get {:parameters {:query [:map
                                   [:depth int?]
                                   [:start-node-id {:optional true} string?]]}
              :handler #'agents/invoke-paginated}}]
      
-     ["/agents/:module-id/:agent-id/datasets"
+     ["/agents/:module-id/:agent-name/datasets"
       {:get {:handler #'datasets/index}}]
-     ["/agents/:module-id/:agent-id/evaluate"
+     ["/agents/:module-id/:agent-name/evaluate"
       {:post {:handler #'datasets/start-evaluation}}]
 
      ;; Dataset management routes
