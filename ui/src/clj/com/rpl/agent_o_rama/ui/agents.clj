@@ -8,8 +8,8 @@
 
 (defn index [{:keys [parameters]}]
   ;; TODO catch exception for (aor/agent-manager ... )
-  (-> sys/system deref :rama-client :rama-client (.getDeployedModuleNames))
-  (aor/agent-manager (-> sys/system deref :rama-client :rama-client)
+  (-> sys/system deref :rama-client (.getDeployedModuleNames))
+  (aor/agent-manager (-> sys/system deref :rama-client)
                      (first (-> sys/system deref :rama-client :rama-client (.getDeployedModuleNames))))
   {:status
    200
