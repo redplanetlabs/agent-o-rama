@@ -1,8 +1,10 @@
 (ns com.rpl.agent-o-rama.ui.agents
-  (:use [com.rpl.specter]
-        [com.rpl.rama])
-  (:require [com.rpl.agent-o-rama.system :as sys]
-            [com.rpl.agent-o-rama :as aor]))
+  (:use [com.rpl.rama]
+        [com.rpl.rama.path])
+  (:require
+   [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.types :as aort]
+   [com.rpl.agent-o-rama.system :as sys]))
 
 (defn replace-slash [s]
   "because urlencoding causes jetty to 400 with Ambiguous URI path separator"
@@ -33,9 +35,10 @@
               (sys/get-object :aor-cache)))
 
 (defn get-graph [{{:keys [module-id agent-id]} :path-params}]
-  (foreign-select [ALL]
+  (foreign-select [LAST]
                   (:graph-history-pstate
-                   (.underlying-objects (get-client module-id agent-id))))
+                   (aort/underlying-objects (get-client module-id agent-id)))
+                  {:pkey 0})
   {:status
    200
    
@@ -338,19 +341,19 @@
   [invokes-map]
   (let [implicit->real
         (into {}
-              (s/select [s/ALL
-                         (s/selected? s/LAST (s/must :invoked-agg-invoke-id))
-                         (s/view (fn [[id node]]
+              (select [ALL
+                         (selected? LAST (must :invoked-agg-invoke-id))
+                         (view (fn [[id node]]
                                    [id (:invoked-agg-invoke-id node)]))]
                         invokes-map))]
     (->> invokes-map
-         (s/setval [s/ALL 
-                    (s/selected? s/LAST (s/must :invoked-agg-invoke-id))]
-                   s/NONE)
-         (s/transform [s/ALL 
-                       s/LAST 
-                       (s/must :emits) 
-                       s/ALL 
+         (setval [ALL 
+                    (selected? LAST (must :invoked-agg-invoke-id))]
+                   NONE)
+         (transform [ALL 
+                       LAST 
+                       (must :emits) 
+                       ALL 
                        :invoke-id]
                       #(get implicit->real % %)))))
 
