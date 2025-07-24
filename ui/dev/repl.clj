@@ -18,11 +18,33 @@
   (let [rama-client (sys/get-object :rama-client)
         modules (deployed-module-names rama-client)]
     (doseq [mod modules]
-      (reset! sys/system (transform [:aor-agent-managers mod]
-                                    (constantly (aor/agent-manager rama-client mod))
-                                    @sys/system)))))
+      (let [manager (try
+                      (aor/agent-manager rama-client mod)
+                      (catch Exception e ::no-aor))]
+        (when-not (= ::no-aor manager)
+          (transform [ATOM :aor-cache mod :manager]
+                     (constantly manager)
+                     sys/system)
+          
+          (doseq [agent-name (.getAgentNames manager)]
+            (transform [ATOM :aor-cache mod :clients agent-name nil?]
+                       (constantly (.getAgentClient manager agent-name))
+                       sys/system)))))
 
-#_(-> @sys/system :aor-agent-managers (get "examples.core/FlowModule"))
+    ;; stale agents
+    :TODO
+    
+    ;; stale modules
+    (let [stale-modules (clojure.set/difference
+                         (set (select [:aor-agent-managers MAP-KEYS] @sys/system))
+                         modules)]
+      (doseq [mod stale-modules]
+        :TODO))
+    ))
+
+(-> @sys/system :aor-agent-managers (get "examples.core/FlowModule")
+    (.getAgentClient "foo")
+    )
 
 (defn start []
   (shadow/watch :frontend)
@@ -34,7 +56,7 @@
   (.scheduleAtFixedRate
    ^ScheduledThreadPoolExecutor (:background-exec @sys/system)
    (fn [] (try
-            (refresh-agent-modules!)
+            #_(refresh-agent-modules!)
             (catch Throwable t
               (cljlogging/error t "Error in refreshing agent modules" {}))))
    0
