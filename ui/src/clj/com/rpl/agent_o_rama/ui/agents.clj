@@ -103,9 +103,10 @@
   (def module-id module-id)
   (def agent-name agent-name)
   (def invoke-id invoke-id)
-  (let [[task-id agent-id] (parse-url-agent-id invoke-id)]
-    task-id agent-id)
-  (objects module-id agent-name)
-  {:status 200 :body []})
+  (let [[task-id invoke-id-parsed] (parse-url-agent-id invoke-id)]
+    (foreign-invoke-query (:tracing-query (objects module-id agent-name))
+                          task-id
+                          [task-id invoke-id-parsed]
+                          10)))
 
 
