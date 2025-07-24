@@ -1,5 +1,6 @@
 (ns com.rpl.agent-o-rama.ui.agents
-  (:use [com.rpl.specter])
+  (:use [com.rpl.specter]
+        [com.rpl.rama])
   (:require [com.rpl.agent-o-rama.system :as sys]
             [com.rpl.agent-o-rama :as aor]))
 
@@ -7,8 +8,13 @@
   "because urlencoding causes jetty to 400 with Ambiguous URI path separator"
   (clojure.string/replace s #"/" "::"))
 
+(defn unreplace-slash [s]
+  "reverse of above function"
+  (clojure.string/replace s #"::" "/"))
+
 (comment
-  (replace-slash "example.core/FlowModule"))
+  (replace-slash "example.core/FlowModule")
+  (unreplace-slash "example.core::FlowModule"))
 
 (defn index [{:keys [parameters]}]
   {:status
@@ -17,11 +23,19 @@
    :body
    (for [[module-name agent-name]
          (select [ALL (collect-one FIRST) LAST :clients MAP-KEYS] (sys/get-object :aor-cache))]
-     {:module-id
-      (replace-slash module-name)
+     {:module-id (replace-slash module-name)
       :agent-id (replace-slash agent-name)})})
 
+(defn get-client [module-id agent-id]
+  (select-one [(unreplace-slash module-id)
+               :clients
+               (unreplace-slash agent-id)]
+              (sys/get-object :aor-cache)))
+
 (defn get-graph [{{:keys [module-id agent-id]} :path-params}]
+  (foreign-select [ALL]
+                  (:graph-history-pstate
+                   (.underlying-objects (get-client module-id agent-id))))
   {:status
    200
    
