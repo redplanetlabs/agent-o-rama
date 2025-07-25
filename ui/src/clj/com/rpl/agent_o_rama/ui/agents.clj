@@ -67,7 +67,7 @@
   (let [parsed-pagination-information
         (transform [(multi-path MAP-KEYS
                                 MAP-VALS)]
-                   Integer/parseInt
+                   parse-long
                    (-> req :query-params))
         pagination
         (if (= {} parsed-pagination-information)
@@ -103,7 +103,7 @@
                      :invoke-id]
                     #(get implicit->real % %)))))
 
-(defn parse-url-agent-id [s]
+(defn parse-url-trace-id [s]
   (let [[task-id agent-id] (clojure.string/split s #"-")]
     [(parse-long task-id) (parse-long agent-id)]))
 
@@ -111,11 +111,22 @@
   [{{:keys [module-id agent-name invoke-id]} :path-params
     {:strs [start-node-id depth] :or {depth "3"}} :query-params
     :as req}]
+  (def module-id module-id)
+  (def agent-name agent-name)
+  (def invoke-id invoke-id)
+  (def start-node-id start-node-id)
+  (def depth depth)
   ;; TODO figure out why data is smaller
   ;; https://github.com/redplanetlabs/agent-o-rama/commit/d0d0cf0e8fcab3d8d445ae947518c205ce3a1a50#diff-cae22e578469a40db2bab77d83e834f1d5a3e857168c9d263480de365d392460
+  (comment
+    (foreign-select [5 ALL]
+                    (:root-pstate (objects module-id agent-name))
+                    {:pkey 0}))
   {:status 200
    :body
-   (let [[task-id invoke-id-parsed] (parse-url-agent-id invoke-id)]
+   (let [[task-id invoke-id-parsed] (parse-url-trace-id invoke-id)]
+     (def task-id task-id)
+     (def invoke-id-parsed invoke-id-parsed)
      (foreign-invoke-query (:tracing-query (objects module-id agent-name))
                            task-id
                            [ [task-id invoke-id-parsed]]
