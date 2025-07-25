@@ -34,15 +34,56 @@
 
 (defui invocations []
   (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
+        [requested-pagination-params set-requested-pagination-params] (uix/use-state {})
+        [all-invokes set-all-invokes] (uix/use-state [])
+        [has-more? set-has-more?] (uix/use-state true)
+        [next-pagination-params set-next-pagination-params] (uix/use-state {})
+        
+        ;; Build query URL with pagination params
+        query-url (let [base-url (str "/api/agents/" module-id "/" agent-name "/invocations")]
+                    (if (empty? requested-pagination-params)
+                      base-url
+                      (let [params-str (->> requested-pagination-params
+                                           (map (fn [[task-id item-id]] (str task-id "=" item-id)))
+                                           (clojure.string/join "&"))]
+                        (str base-url "?" params-str))))
+        
         {:keys [data loading?]}
-        (common/use-query {:query-key ["agent" module-id agent-name]
-                           :query-url (str "/api/agents/" module-id "/" agent-name "/invocations")})
-        [location navigate] (useLocation)]
+        (common/use-query {:query-key ["agent" module-id agent-name requested-pagination-params]
+                           :query-url query-url})
+        
+        [location navigate] (useLocation)
+        
+        ;; Update accumulated data when new data arrives
+        _ (uix/use-effect
+           (fn []
+             (when data
+               (let [new-invokes (:agent-invokes data)
+                     new-pagination (:pagination-params data)]
+                 (if (empty? requested-pagination-params)
+                   ;; First load - replace all data
+                   (set-all-invokes new-invokes)
+                   ;; Subsequent loads - append new data
+                   (set-all-invokes (fn [current] (concat current new-invokes))))
+                 
+                 ;; Store next pagination params for the "Load More" button
+                 (if (and new-pagination (not (empty? new-pagination)))
+                   (do
+                     (set-next-pagination-params new-pagination)
+                     (set-has-more? true))
+                   (set-has-more? false)))))
+           [data])
+        
+        load-more (fn []
+                    (when (and has-more? (not loading?))
+                      ;; Trigger next page by updating requested pagination params
+                      (set-requested-pagination-params next-pagination-params)))]
+    
     (cond
-      loading? ($ :div.flex.justify-center.items-center.py-8
-                 ($ :div.text-gray-500 "Loading invocations..."))
-      (not data) ($ :div.flex.justify-center.items-center.py-8
-                   ($ :div.text-gray-500 "No invocations found"))
+      (and loading? (empty? all-invokes)) ($ :div.flex.justify-center.items-center.py-8
+                                            ($ :div.text-gray-500 "Loading invocations..."))
+      (and (not data) (empty? all-invokes)) ($ :div.flex.justify-center.items-center.py-8
+                                              ($ :div.text-gray-500 "No invocations found"))
       :else
       ($ :div.p-4
          ($ :div.bg-white.rounded-md.border.border-gray-200.overflow-hidden.shadow-sm
@@ -54,7 +95,7 @@
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")))
                ($ :tbody.divide-y.divide-gray-200
-                  (for [[task-id invoke-id start-time-millis] (:agent-invokes data)
+                  (for [[task-id invoke-id start-time-millis] all-invokes
                         :let [url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" invoke-id)]]
                     ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
                        {:key url
@@ -66,7 +107,15 @@
                        ($ :td.px-4.py-3.max-w-xs
                           ($ :div.truncate.text-gray-900
                              (common/pp start-time-millis)))
-                        ($ :td.px-4.py-3.font-mono.text-gray-600 ""))))))))))
+                        ($ :td.px-4.py-3.font-mono.text-gray-600 ""))))
+            
+            ;; Load More button
+            (when has-more?
+              ($ :div.bg-gray-50.border-t.border-gray-200.p-4.text-center
+                 ($ :button.bg-blue-600.hover:bg-blue-700.text-white.px-6.py-2.rounded-md.text-sm.font-semibold.transition-colors.duration-150.disabled:bg-gray-400.disabled:cursor-not-allowed
+                    {:onClick load-more
+                     :disabled loading?}
+                    (if loading? "Loading..." "Load More"))))))))))
 
 (defui mini-invocations []
   (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
