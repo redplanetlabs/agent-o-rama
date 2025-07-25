@@ -117,11 +117,17 @@
             
             ;; Load More button
             (when has-more?
-              ($ :div.bg-gray-50.border-t.border-gray-200.p-4.text-center
-                 ($ :button.bg-blue-600.hover:bg-blue-700.text-white.px-6.py-2.rounded-md.text-sm.font-semibold.transition-colors.duration-150.disabled:bg-gray-400.disabled:cursor-not-allowed.cursor-pointer
-                    {:onClick load-more
-                     :disabled loading?}
-                    (if loading? "Loading..." "Load More"))))))))))
+              ($ :tfoot.bg-gray-50.border-t.border-gray-200
+                 ($ :tr.hover:bg-gray-100.transition-colors.duration-150
+                    {:onClick (when (not loading?) load-more)}
+                    ($ :td.px-4.py-3.cursor-pointer {:colSpan 4}
+                       ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
+                          ($ :span.mr-2.text-sm.font-medium (if loading? "Loading..." "Load More"))
+                          (when (not loading?)
+                            ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
+                               ($ :path {:fillRule "evenodd"
+                                         :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                         :clipRule "evenodd"}))))))))))))))
 
 (defui mini-invocations []
   (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
