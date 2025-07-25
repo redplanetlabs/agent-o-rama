@@ -5,6 +5,7 @@
    [reitit.ring :as ring]
    [reitit.ring.middleware.muuntaja :as muuntaja]
    [reitit.ring.middleware.parameters :as parameters]
+   [reitit.ring.middleware.exception :as exception]
    [muuntaja.core :as m]
    [ring.util.response :as resp]
    [ring.middleware.resource :as resource]
@@ -31,6 +32,19 @@
                          ;; Return index.html for any non-API routes for History API routing
                          ["/*" {:get {:handler spa-index-handler}}]]
                         {:conflicts nil}))))
+
+(defn exception-handler [^Exception e request]
+  (let [sw (java.io.StringWriter.)
+        pw (java.io.PrintWriter. sw)]
+    (.printStackTrace e pw)
+    {:status 500
+     :headers {"Content-Type" "text/plain"}
+     :body (.toString sw)}))
+
+(def exception-middleware
+  (exception/create-exception-middleware
+   {::exception/default exception-handler}))
+
 (defn app-routes []
   (ring/ring-handler
    (ring/router
@@ -43,7 +57,7 @@
      ["/agents/:module-id/:agent-name/graph"
       {:get {:handler #'agents/get-graph}}]
      #_["/agents/:module-id/:agent-name/invocations/:invoke-id"
-      {:get {:handler #'agents/invoke}}]
+        {:get {:handler #'agents/invoke}}]
      ["/agents/:module-id/:agent-name/invocations/:invoke-id/paginated"
       {:get {:parameters {:query [:map
                                   [:depth int?]
@@ -81,6 +95,7 @@
     {:data {:muuntaja m/instance
             :middleware [parameters/parameters-middleware
                          muuntaja/format-middleware
+                         exception-middleware
                          rrc/coerce-exceptions-middleware
                          rrc/coerce-request-middleware
                          rrc/coerce-response-middleware]
