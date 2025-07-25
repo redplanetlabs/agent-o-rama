@@ -330,17 +330,23 @@
 
 (defn- instrument-streaming-chat!
   [name ^ChatRequest request initiate-fn]
-  (let [^AgentNode agent-node (h/thread-local-get AGENT-NODE-CONTEXT)]
-    ;; TODO: <<<<>>>>
-    ;;  - make CompletableFuture
-    ;;  - call initiate-fn with StreamingChatResponseHandler method
-    ;;  - deliver on onComplete and onError
-    ;;  - forward to agent node
-
-    ;; StreamingChatResponseHandler methods:
-    ; void onCompleteResponse(ChatResponse completeResponse)
-    ; void onError(Throwable error)
-    ; void onPartialResponse(String partialResponse)
+  (let [^AgentNode agent-node (h/thread-local-get AGENT-NODE-CONTEXT)
+        cf (CompletableFuture.)
+        start-time-millis (h/current-time-millis)
+        _ (initiate-fn
+           (reify
+            StreamingChatResponseHandler
+            (onPartialResponse [this partial]
+              (.streamChunk agent-node partial))
+            (onCompleteResponse [this response]
+              (.complete cf response))
+            (onError [this t]
+              (.completeExceptionally
+               cf
+               (h/ex-info "Streaming failed" {:name name} t)))))
+        response (.get cf)]
+    (record-model-call! name agent-node request response start-time-millis)
+    response
   ))
 
 (defn wrap-agent-object
