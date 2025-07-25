@@ -6,6 +6,7 @@
   (:require
    [clojure.set :as set]
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.queries :as queries]
@@ -42,7 +43,7 @@
                     nil
                     (fn [agent-node prompt]
                       (let [openai (aor/get-agent-object agent-node "openai")]
-                        (aor/result! agent-node (.chat openai prompt))))))
+                        (aor/result! agent-node (lc4j/chat openai prompt))))))
        ))
      (rtest/launch-module! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
