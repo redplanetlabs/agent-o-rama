@@ -8,7 +8,8 @@
    [com.rpl.agent-o-rama.system :as sys]
    [clojure.tools.logging :as cljlogging]
    [ring.adapter.jetty :as jetty]
-   [shadow.cljs.devtools.api :as shadow])
+   [shadow.cljs.devtools.api :as shadow]
+   [shadow.cljs.devtools.server])
   (:import
    [java.util.concurrent ScheduledThreadPoolExecutor TimeUnit]))
 
@@ -59,6 +60,7 @@
 
 
 (defn start []
+  (shadow.cljs.devtools.server/start!)
   (shadow/watch :frontend)
   (swap! sys/system assoc :jetty (jetty/run-jetty #'srv/handler
                                                   {:port 1974 ;; TODO make configurable

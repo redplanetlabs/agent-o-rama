@@ -4,7 +4,9 @@
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.types :as aort]
-   [com.rpl.agent-o-rama.system :as sys]))
+   [com.rpl.agent-o-rama.system :as sys])
+  (:import
+   [com.rpl.agentorama AgentInvoke]))
 
 (defn replace-slash [s]
   "because urlencoding causes jetty to 400 with Ambiguous URI path separator"
@@ -55,7 +57,7 @@
   (when-not (vector? args)
     (throw (ex-info "must be a json list of args" {:bad-args args})))
   
-  (let [inv (apply aor/agent-initiate (get-client module-id agent-name) args)]
+  (let [^AgentInvoke inv (apply aor/agent-initiate (get-client module-id agent-name) args)]
     {:status 200
      :body
      {:task-id (.getTaskId inv)
@@ -93,7 +95,7 @@
                     #(get implicit->real % %)))))
 
 (defn parse-url-agent-id [s]
-  (let [[task-id agent-id] (clojure.string/split invoke-id #"-")]
+  (let [[task-id agent-id] (clojure.string/split s #"-")]
     [(parse-long task-id) (parse-long agent-id)]))
 
 (defn invoke-paginated 
@@ -108,7 +110,6 @@
      (foreign-invoke-query (:tracing-query (objects module-id agent-name))
                            task-id
                            [ [task-id invoke-id-parsed]]
-                           10))
-   {:next-task-invoke-pairs [], :invokes-map {8 {:node-task-id 0}}}})
+                           10))})
 
 

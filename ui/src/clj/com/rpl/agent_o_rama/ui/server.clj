@@ -42,7 +42,7 @@
        :post {:handler #'agents/manually-trigger-invoke}}]
      ["/agents/:module-id/:agent-name/graph"
       {:get {:handler #'agents/get-graph}}]
-     ["/agents/:module-id/:agent-name/invocations/:invoke-id"
+     #_["/agents/:module-id/:agent-name/invocations/:invoke-id"
       {:get {:handler #'agents/invoke}}]
      ["/agents/:module-id/:agent-name/invocations/:invoke-id/paginated"
       {:get {:parameters {:query [:map

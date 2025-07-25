@@ -1,4 +1,4 @@
-{:deps true
+{:lein true
  :builds
  {:frontend
   {:target :browser
