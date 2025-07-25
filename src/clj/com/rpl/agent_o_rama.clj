@@ -2,6 +2,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [clojure.set :as set]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.core :as i]
@@ -89,11 +90,19 @@
      (declareAgentObject [this name o]
        (aor-types/declare-agent-object-builder-internal this
                                                         name
-                                                        (constantly o)))
+                                                        (constantly o)
+                                                        nil))
      (declareAgentObjectBuilder [this name jfn]
        (aor-types/declare-agent-object-builder-internal this
                                                         name
-                                                        (h/convert-jfn jfn)))
+                                                        (h/convert-jfn jfn)
+                                                        nil))
+     (declareAgentObjectBuilder [this name jfn options]
+       (aor-types/declare-agent-object-builder-internal
+        this
+        name
+        (h/convert-jfn jfn)
+        (i/convert-agent-object-options options)))
      (define [this]
        (when @defined?-vol
          (throw (h/ex-info "Agents topology already defined" {})))
@@ -107,13 +116,41 @@
         @store-info-vol
         @declared-objects-vol))
      aor-types/AgentsTopologyInternal
-     (declare-agent-object-builder-internal [this name afn]
+     (declare-agent-object-builder-internal [this name afn options]
        (when-not (ifn? afn)
          (throw (h/ex-info "Object builder must be a function"
                            {:actual-type (class afn)})))
        (when (contains? @declared-objects-vol name)
          (throw (h/ex-info "Object already declared" {:name name})))
-       (vswap! declared-objects-vol assoc name afn))
+       (let [invalid-opts (set/difference (-> options
+                                              keys
+                                              set)
+                                          #{:thread-safe?
+                                            :auto-tracing?
+                                            :worker-object-limit})
+             full-options (merge {:thread-safe?        false
+                                  :auto-tracing?       true
+                                  :worker-object-limit 1000}
+                                 options)]
+         (when-not (empty? invalid-opts)
+           (throw (h/ex-info "Invalid agent object options"
+                             {:name name :invalid-keys invalid-opts})))
+         (h/validate-option! name full-options :thread-safe? boolean?)
+         (h/validate-option! name full-options :auto-tracing? boolean?)
+         (h/validate-option! name
+                             full-options
+                             :worker-object-limit
+                             integer?
+                             pos?)
+         (vswap! declared-objects-vol
+                 assoc
+                 name
+                 {"limit"       (:worker-object-limit full-options)
+                  "threadSafe"  (:thread-safe? full-options)
+                  "autoTracing" (:auto-tracing? full-options)
+                  "builderFn"   afn
+                 })
+       ))
     )))
 
 (defn underlying-stream-topology

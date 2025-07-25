@@ -18,9 +18,9 @@ public interface AgentObjectOptions {
   }
 
   class Impl implements AgentObjectOptions {
-    public boolean threadSafe = false;
-    public boolean autoTracing = true;
-    public int workerObjectLimit = 1000;
+    public Boolean threadSafe;
+    public Boolean autoTracing;
+    public Long workerObjectLimit;
 
     public Impl threadSafe() {
       this.threadSafe = true;
@@ -33,7 +33,7 @@ public interface AgentObjectOptions {
     }
 
     public Impl workerObjectLimit(int amt) {
-      this.workerObjectLimit = amt;
+      this.workerObjectLimit = (long) amt;
       return this;
     }
   }

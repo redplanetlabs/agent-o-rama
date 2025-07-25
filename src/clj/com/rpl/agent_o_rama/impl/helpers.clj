@@ -175,3 +175,12 @@
 (defn thread-local-get
   [^ThreadLocal t]
   (.get t))
+
+(defn validate-option!
+  [context m key & preds]
+  (let [v (get m key)]
+    (when-not (every? #(% v) preds)
+      (throw (ex-info "Invalid option"
+                      {:context context
+                       :option  key
+                       :val     v})))))

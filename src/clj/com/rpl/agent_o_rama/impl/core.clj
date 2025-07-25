@@ -13,6 +13,8 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.ops :as ops])
   (:import
+   [com.rpl.agentorama
+    AgentObjectOptions$Impl]
    [com.rpl.agentorama.impl
     RamaClientsTaskGlobal
     AgentDeclaredObjectsTaskGlobal
@@ -217,3 +219,12 @@
                    stream-topology
                    mb-topology
                    agent-graph)))
+
+(defn convert-agent-object-options
+  [^AgentObjectOptions$Impl options]
+  (when options
+    (setval [MAP-VALS nil?]
+            NONE
+            {:thread-safe?        (.threadSafe options)
+             :auto-tracing?       (.autoTracing options)
+             :worker-object-limit (.workerObjectLimit options)})))

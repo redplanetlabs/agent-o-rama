@@ -190,7 +190,7 @@
    key :- s/Any])
 
 (defprotocol AgentsTopologyInternal
-  (declare-agent-object-builder-internal [this name afn]))
+  (declare-agent-object-builder-internal [this name afn options]))
 
 (defprotocol AgentClientInternal
   (stream-internal [this agent-invoke node callback-fn])
