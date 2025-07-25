@@ -250,13 +250,13 @@
   (.streamChunk agent-node chunk))
 
 (defn record-nested-op!
-  [^AgentNode agent-node nested-op-type start-time-millis finish-time-millis
+  [agent-node nested-op-type start-time-millis finish-time-millis
    info-map]
-  (.recordNestedOp agent-node
-                   (anode/nested-op-type->java nested-op-type)
-                   start-time-millis
-                   finish-time-millis
-                   info-map))
+  (anode/record-nested-op!-impl agent-node
+                                nested-op-type
+                                start-time-millis
+                                finish-time-millis
+                                info-map))
 
 (defn- parse-map-options
   [[arg1 & rest-args :as args]]

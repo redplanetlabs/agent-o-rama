@@ -184,3 +184,19 @@
                       {:context context
                        :option  key
                        :val     v})))))
+
+(defmacro safe->
+  [x & forms]
+  (let [g (gensym "val")]
+    (reduce
+     (fn [acc form]
+       `(let [~g ~acc]
+          (if (nil? ~g)
+            nil
+            ~(if (seq? form)
+               (with-meta
+                 `(~(first form) ~g ~@(rest form))
+                 (meta form))
+               `(~form ~g)))))
+     x
+     forms)))

@@ -5,6 +5,7 @@
    [clojure.tools.logging :as cljlogging]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.impl.partitioner :as apart]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
@@ -13,6 +14,7 @@
   (:import
    [com.rpl.agentorama
     AgentNode
+    IUnderlying
     NestedOpType
     StreamingRecorder]
    [com.rpl.agentorama.impl
@@ -21,6 +23,20 @@
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     Node]
+   [dev.langchain4j.model.chat
+    ChatModel
+    StreamingChatModel]
+   [dev.langchain4j.data.message
+    ChatMessage]
+   [dev.langchain4j.model.chat.request
+    ChatRequest]
+   [dev.langchain4j.model.chat.response
+    ChatResponse
+    StreamingChatResponseHandler]
+   [dev.langchain4j.store.embedding
+    EmbeddingStore]
+   [java.io
+    Closeable]
    [java.util.concurrent
     CompletableFuture]))
 
@@ -262,35 +278,146 @@
 
 (def AGENT-NODE-CONTEXT (ThreadLocal.))
 
+(defn record-nested-op!-impl
+  [^AgentNode agent-node nested-op-type start-time-millis finish-time-millis
+   info-map]
+  (.recordNestedOp agent-node
+                   (nested-op-type->java nested-op-type)
+                   start-time-millis
+                   finish-time-millis
+                   info-map))
+
+(defn try-close!
+  [obj]
+  (when (instance? Closeable obj)
+    (close! obj)))
+
+(defn- instrument-chat!
+  [^ChatRequest request response-fn]
+  (let [^AgentNode agent-node  (h/thread-local-get AGENT-NODE-CONTEXT)
+        start-time-millis      (h/current-time-millis)
+        ^ChatResponse response (response-fn)]
+    (record-nested-op!-impl
+     agent-node
+     :model-call
+     start-time-millis
+     (h/current-time-millis)
+     {"modelName"        (.modelName request)
+      "frequencyPenalty" (.frequencyPenalty request)
+      "presencePenalty"  (.presencePenalty request)
+      "stopSequences"    (.stopSequences request)
+      "temperature"      (.temperature request)
+      "topK"             (.topK request)
+      "topP"             (.topP request)
+      "input"            (lc4j/messages->trace (.messages request))
+      "response"         (h/safe-> response .aiMessage .text)
+      "finishReason"     (lc4j/finish-reason->trace (.finishReason response))
+      "inputTokenCount"  (h/safe-> response
+                                   .tokenUsage
+                                   .inputTokenCount)
+      "outputTokenCount" (h/safe-> response
+                                   .tokenUsage
+                                   .outputTokenCount)
+     })
+    response
+  ))
+
+(defn- instrument-streaming-chat!
+  [^ChatRequest request initiate-fn]
+  (let [^AgentNode agent-node (h/thread-local-get AGENT-NODE-CONTEXT)]
+    ;; TODO: <<<<>>>>
+    ;;  - make CompletableFuture
+    ;;  - call initiate-fn with StreamingChatResponseHandler method
+    ;;  - deliver on onComplete and onError
+    ;;  - forward to agent node
+
+    ;; StreamingChatResponseHandler methods:
+    ; void onCompleteResponse(ChatResponse completeResponse)
+    ; void onError(Throwable error)
+    ; void onPartialResponse(String partialResponse)
+  ))
+
 (defn wrap-agent-object
   [obj]
-  obj
-  ;; TODO: <<<<>>>>> wrap ChatModel and possibly db impls
-  ;;    - wrapper should look at AGENT-NODE-CONTEXT to get AgentNode
-  ;;    - (h/thread-local-get AGENT-NODE-CONTEXT)
-  ;;    - types:
-  ;;      - ChatModel
-  ;;      - StreamingChatModel
-  ;;        - should be converted to ChatModel
-  ;;      - EmbeddingStore
-  ;;      - VectorStore?
-  ;;      - EmbeddingModel
-  ;;    - what if wrapping is explicit?
-  ;;      - user calls "new TrackedChatModel(...)", "new
-  ;;      TrackedEmbeddingStore(...)"
-  ;;      - makes demo not as good, so this is no good
-  ;;      - so it's a question of if wrap anything besides models
-  ;;        - would be nice to use vector store in demo...
-  ;;        - models, built-in storage, and vector stores being wrapped is
-  ;;        pretty good...
-  ;;           - for all of them should expose underlying via
-  ;;           underlying-agent-object method
-  ;;            - IUnderlyingAgentObject interface with
-  ;;            getUnderlyingAgentObject() method
+  (cond
+    (instance? ChatModel obj)
+    (let [^ChatModel obj obj]
+      (reify
+       ChatModel
+       ;; - each provider overrides one of the following two methods and uses
+       ;; default impls for the rest of the "chat" methods
+       (^ChatResponse chat [this ^ChatRequest chatRequest]
+         (instrument-chat! chatRequest #(.chat obj chatRequest)))
+       (^ChatResponse doChat [this ^ChatRequest chatRequest]
+         (instrument-chat! chatRequest #(.doChat obj chatRequest)))
+       (defaultRequestParameters [this] (.defaultRequestParameters obj))
+       (listeners [this] (.listeners obj))
+       (provider [this] (.provider obj))
+       (supportedCapabilities [this] (.supportedCapabilities obj))
+
+       IUnderlying
+       (getUnderlying [this] obj)
+
+       Closeable
+       (close [this] (try-close! obj))))
 
 
-  ;; TODO: <<<<>>>>> wrapped model needs to implement closeable and forward it
-)
+    (instance? StreamingChatModel obj)
+    (let [^StreamingChatModel obj obj]
+      (reify
+       ChatModel
+       ;; - same as with ChatModel impls, some StreamingChatModel impls
+       ;; implement
+       ;; chat(ChatRequest, StreamingChatResponseHandler) and others implement
+       ;; doChat(ChatRequest, StreamingChatResponseHandler)
+       ;; - so here only need to implement these entry points and forward to
+       ;; corresponding method on StreamingChatModel
+       (^ChatResponse chat [this ^ChatRequest chatRequest]
+         (instrument-streaming-chat!
+          chatRequest
+          #(.chat obj chatRequest ^StreamingChatResponseHandler %)))
+       (^ChatResponse doChat [this ^ChatRequest chatRequest]
+         (instrument-streaming-chat!
+          chatRequest
+          #(.doChat obj chatRequest ^StreamingChatResponseHandler %)))
+       (defaultRequestParameters [this] (.defaultRequestParameters obj))
+       (listeners [this] (.listeners obj))
+       (provider [this] (.provider obj))
+       (supportedCapabilities [this] (.supportedCapabilities obj))
+
+       IUnderlying
+       (getUnderlying [this] obj)
+
+       Closeable
+       (close [this] (try-close! obj))))
+
+    (instance? EmbeddingStore obj)
+    (reify
+     EmbeddingStore
+
+     ;; TODO: <<<<>>>>
+     ; String add(Embedding embedding)
+     ; String add(Embedding embedding, Embedded embedded)
+     ; void add(String id, Embedding embedding)
+     ; List<String> addAll(List<Embedding> embeddings)
+     ; List<String> addAll(List<Embedding> embeddings, List<Embedded> embedded)
+     ; void addAll(List<String> ids, List<Embedding> embeddings, List<Embedded>
+     ; embedded)
+     ; List<String> generateIds(int n)
+     ; void remove(String id)
+     ; void removeAll()
+     ; void removeAll(Filter filter)
+     ; void removeAll(Collection<String> ids)
+     ; EmbeddingSearchResult<Embedded> search(EmbeddingSearchRequest request)
+
+     IUnderlying
+     (getUnderlying [this] obj)
+
+     Closeable
+     (close [this] (try-close! obj)))
+
+    :else
+    obj))
 
 (defn node-event
   [agent-name task-id invoke-id retry-num node-name node-fn
