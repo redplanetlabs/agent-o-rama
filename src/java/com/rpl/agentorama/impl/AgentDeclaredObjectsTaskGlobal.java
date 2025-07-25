@@ -45,6 +45,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
 
   @Override
   public void prepareForTask(int taskId, TaskGlobalContext context) {
+    _objects = new HashMap();
     for(String name: _builders.keySet()) {
       Map info = _builders.get(name);
       int limit = (int) info.get("limit");
