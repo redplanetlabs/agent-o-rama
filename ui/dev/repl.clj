@@ -55,10 +55,6 @@
         (transform [ATOM :aor-cache (keypath mod) :client MAP-VALS] close! sys/system)
         (setval [ATOM :aor-cache (keypath mod)] NONE sys/system)))))
 
-(comment (-> @sys/system :aor-cache
-             ))
-
-
 (defn start []
   (shadow.cljs.devtools.server/start!)
   (shadow/watch :frontend)
