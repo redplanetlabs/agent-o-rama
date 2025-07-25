@@ -292,33 +292,37 @@
   (when (instance? Closeable obj)
     (close! obj)))
 
+(defn- record-model-call!
+  [agent-node ^ChatRequest request ^ChatResponse response start-time-millis]
+  (record-nested-op!-impl
+   agent-node
+   :model-call
+   start-time-millis
+   (h/current-time-millis)
+   {"modelName"        (.modelName request)
+    "frequencyPenalty" (.frequencyPenalty request)
+    "presencePenalty"  (.presencePenalty request)
+    "stopSequences"    (.stopSequences request)
+    "temperature"      (.temperature request)
+    "topK"             (.topK request)
+    "topP"             (.topP request)
+    "input"            (lc4j/messages->trace (.messages request))
+    "response"         (h/safe-> response .aiMessage .text)
+    "finishReason"     (lc4j/finish-reason->trace (.finishReason response))
+    "inputTokenCount"  (h/safe-> response
+                                 .tokenUsage
+                                 .inputTokenCount)
+    "outputTokenCount" (h/safe-> response
+                                 .tokenUsage
+                                 .outputTokenCount)
+   }))
+
 (defn- instrument-chat!
-  [^ChatRequest request response-fn]
-  (let [^AgentNode agent-node  (h/thread-local-get AGENT-NODE-CONTEXT)
-        start-time-millis      (h/current-time-millis)
-        ^ChatResponse response (response-fn)]
-    (record-nested-op!-impl
-     agent-node
-     :model-call
-     start-time-millis
-     (h/current-time-millis)
-     {"modelName"        (.modelName request)
-      "frequencyPenalty" (.frequencyPenalty request)
-      "presencePenalty"  (.presencePenalty request)
-      "stopSequences"    (.stopSequences request)
-      "temperature"      (.temperature request)
-      "topK"             (.topK request)
-      "topP"             (.topP request)
-      "input"            (lc4j/messages->trace (.messages request))
-      "response"         (h/safe-> response .aiMessage .text)
-      "finishReason"     (lc4j/finish-reason->trace (.finishReason response))
-      "inputTokenCount"  (h/safe-> response
-                                   .tokenUsage
-                                   .inputTokenCount)
-      "outputTokenCount" (h/safe-> response
-                                   .tokenUsage
-                                   .outputTokenCount)
-     })
+  [request response-fn]
+  (let [^AgentNode agent-node (h/thread-local-get AGENT-NODE-CONTEXT)
+        start-time-millis (h/current-time-millis)
+        response (response-fn)]
+    (record-model-call! agent-node request response start-time-millis)
     response
   ))
 
