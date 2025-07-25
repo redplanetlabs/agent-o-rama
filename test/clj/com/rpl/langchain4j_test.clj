@@ -59,7 +59,15 @@
                       (queries/tracing-query-name "foo")))
 
 
-     (bind inv (aor/agent-initiate foo "What is 11 * 13?"))
+     (bind inv
+       (aor/agent-initiate foo
+                           "Who are you? Who am I? Answer like a philosopher."))
+     (aor/agent-stream foo
+                       inv
+                       "start"
+                       (fn [all new reset? complete?]
+                         (println "STREAM" new reset? complete?)))
+
      (bind agent-task-id (.getTaskId inv))
      (bind agent-id (.getAgentInvokeId inv))
      (bind root-invoke-id

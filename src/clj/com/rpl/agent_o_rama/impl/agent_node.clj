@@ -5,7 +5,7 @@
    [clojure.tools.logging :as cljlogging]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.helpers :as h]
-   [com.rpl.agent-o-rama.impl.langchain4j :as lc4j]
+   [com.rpl.agent-o-rama.impl.langchain4j-trace :as lc4j-trace]
    [com.rpl.agent-o-rama.impl.partitioner :as apart]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
@@ -300,24 +300,26 @@
    :model-call
    start-time-millis
    (h/current-time-millis)
-   {"objectName"       name
-    "modelName"        (.modelName request)
-    "frequencyPenalty" (.frequencyPenalty request)
-    "presencePenalty"  (.presencePenalty request)
-    "stopSequences"    (into [] (.stopSequences request))
-    "temperature"      (.temperature request)
-    "topK"             (.topK request)
-    "topP"             (.topP request)
-    "input"            (lc4j/messages->trace (.messages request))
-    "response"         (h/safe-> response .aiMessage .text)
-    "finishReason"     (lc4j/finish-reason->trace (.finishReason response))
-    "inputTokenCount"  (h/safe-> response
-                                 .tokenUsage
-                                 .inputTokenCount)
-    "outputTokenCount" (h/safe-> response
-                                 .tokenUsage
-                                 .outputTokenCount)
-   }))
+   (h/remove-empty-vals
+    {"objectName"       name
+     "modelName"        (.modelName response)
+     "frequencyPenalty" (.frequencyPenalty request)
+     "presencePenalty"  (.presencePenalty request)
+     "stopSequences"    (into [] (.stopSequences request))
+     "temperature"      (.temperature request)
+     "topK"             (.topK request)
+     "topP"             (.topP request)
+     "input"            (lc4j-trace/messages->trace (.messages request))
+     "response"         (h/safe-> response .aiMessage .text)
+     "finishReason"     (lc4j-trace/finish-reason->trace
+                         (.finishReason response))
+     "inputTokenCount"  (h/safe-> response
+                                  .tokenUsage
+                                  .inputTokenCount)
+     "outputTokenCount" (h/safe-> response
+                                  .tokenUsage
+                                  .outputTokenCount)
+    })))
 
 (defn- instrument-chat!
   [name request response-fn]

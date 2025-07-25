@@ -199,3 +199,9 @@
                `(~form ~g)))))
      x
      forms)))
+
+(defn remove-empty-vals
+  [m]
+  (setval [MAP-VALS #(or (nil? %) (and (coll? %) (empty? %)))]
+          NONE
+          m))
