@@ -43,10 +43,13 @@
         query-url (let [base-url (str "/api/agents/" module-id "/" agent-name "/invocations")]
                     (if (empty? requested-pagination-params)
                       base-url
-                      (let [params-str (->> requested-pagination-params
+                      (let [valid-params (filter (fn [[task-id item-id]] (not (nil? item-id))) requested-pagination-params)
+                            params-str (->> valid-params
                                            (map (fn [[task-id item-id]] (str task-id "=" item-id)))
                                            (clojure.string/join "&"))]
-                        (str base-url "?" params-str))))
+                        (if (empty? params-str)
+                          base-url
+                          (str base-url "?" params-str)))))
         
         {:keys [data loading?]}
         (common/use-query {:query-key ["agent" module-id agent-name requested-pagination-params]
@@ -67,11 +70,14 @@
                    (set-all-invokes (fn [current] (concat current new-invokes))))
                  
                  ;; Store next pagination params for the "Load More" button
-                 (if (and new-pagination (not (empty? new-pagination)))
-                   (do
-                     (set-next-pagination-params new-pagination)
-                     (set-has-more? true))
-                   (set-has-more? false)))))
+                 (let [has-valid-pagination? (and new-pagination 
+                                                  (not (empty? new-pagination))
+                                                  (some (fn [[_ item-id]] (not (nil? item-id))) new-pagination))]
+                   (if has-valid-pagination?
+                     (do
+                       (set-next-pagination-params new-pagination)
+                       (set-has-more? true))
+                     (set-has-more? false))))))
            [data])
         
         load-more (fn []
@@ -112,7 +118,7 @@
             ;; Load More button
             (when has-more?
               ($ :div.bg-gray-50.border-t.border-gray-200.p-4.text-center
-                 ($ :button.bg-blue-600.hover:bg-blue-700.text-white.px-6.py-2.rounded-md.text-sm.font-semibold.transition-colors.duration-150.disabled:bg-gray-400.disabled:cursor-not-allowed
+                 ($ :button.bg-blue-600.hover:bg-blue-700.text-white.px-6.py-2.rounded-md.text-sm.font-semibold.transition-colors.duration-150.disabled:bg-gray-400.disabled:cursor-not-allowed.cursor-pointer
                     {:onClick load-more
                      :disabled loading?}
                     (if loading? "Loading..." "Load More"))))))))))

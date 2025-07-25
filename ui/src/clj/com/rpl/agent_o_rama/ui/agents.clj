@@ -63,14 +63,23 @@
      {:task-id (.getTaskId inv)
       :invoke-id (.getAgentInvokeId inv)}}))
 
-(defn get-invokes [{{:keys [module-id agent-name]} :path-params}]
-  {:status
-   200
-   
-   :body
-   (foreign-invoke-query
-    (:invokes-page-query (objects module-id agent-name))
-    10 nil)})
+(defn get-invokes [{{:keys [module-id agent-name]} :path-params :as req}]
+  (let [parsed-pagination-information
+        (transform [(multi-path MAP-KEYS
+                                MAP-VALS)]
+                   Integer/parseInt
+                   (-> req :query-params))
+        pagination
+        (if (= {} parsed-pagination-information)
+          nil
+          parsed-pagination-information)]
+    {:status
+     200
+     
+     :body
+     (foreign-invoke-query
+      (:invokes-page-query (objects module-id agent-name))
+      10 pagination)}))
 
 (defn remove-implicit-nodes
   "Preprocesses the invokes-map to remove implicit nodes and rewire edges to real nodes.
