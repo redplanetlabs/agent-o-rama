@@ -22,11 +22,14 @@
     AgentInvoke
     AgentManager
     AgentNode
+    AgentObjectSetup
     AgentsTopology
     AgentStream
     AgentStreamByInvoke
     MultiAgg$Impl
     UpdateMode]
+   [com.rpl.agentorama.impl
+    IFetchAgentObject]
    [com.rpl.rama
     PState$Declaration
     PState$Schema]
@@ -176,6 +179,23 @@
   [^AgentsTopology agents-topology name schema]
   (declare-pstate* (.getStreamTopology agents-topology) (symbol name) schema))
 
+(defn declare-agent-object
+  [^AgentsTopology agents-topology name val]
+  (.declareAgentObject agents-topology name val))
+
+(defn declare-agent-object-builder
+  ([agents-topology name afn]
+   (declare-agent-object-builder agents-topology name afn nil))
+  ([agents-topology name afn options]
+   (aor-types/declare-agent-object-builder-internal agents-topology
+                                                    name
+                                                    afn
+                                                    options)))
+
+(defn setup-object-name
+  [^AgentObjectSetup setup]
+  (.getObjectName setup))
+
 (defn new-agent
   [^AgentsTopology agents-topology name]
   (.newAgent agents-topology name))
@@ -244,6 +264,10 @@
 (defn get-store
   [^AgentNode agent-node name]
   (.getStore agent-node name))
+
+(defn get-agent-object
+  [^IFetchAgentObject fetch name]
+  (.getAgentObject fetch name))
 
 (defn stream-chunk!
   [^AgentNode agent-node chunk]

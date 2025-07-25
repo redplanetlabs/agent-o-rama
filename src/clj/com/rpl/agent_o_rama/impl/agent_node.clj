@@ -209,7 +209,7 @@
          (throw (h/ex-info "Cannot both emit and result" {})))
        (vreset! result-vol (aor-types/->valid-AgentResult arg false)))
      (getAgentObject [this name]
-       (let [ret (.getAgentObject declared-objects-tg name)]
+       (let [ret (.getAgentObjectFromResource declared-objects-tg name)]
          (swap! acquired-objects-atom conj [name ret])
          ret
        ))
@@ -304,7 +304,7 @@
     "modelName"        (.modelName request)
     "frequencyPenalty" (.frequencyPenalty request)
     "presencePenalty"  (.presencePenalty request)
-    "stopSequences"    (.stopSequences request)
+    "stopSequences"    (into [] (.stopSequences request))
     "temperature"      (.temperature request)
     "topK"             (.topK request)
     "topP"             (.topP request)

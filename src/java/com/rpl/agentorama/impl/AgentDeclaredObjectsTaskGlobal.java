@@ -19,7 +19,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     _builders = builders;
   }
 
-  public Object getAgentObject(String name) {
+  public Object getAgentObjectFromResource(String name) {
     if(!_objects.containsKey(name)) {
       throw new RuntimeException("Agent object does not exist: " + name);
     }
@@ -48,14 +48,14 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     _objects = new HashMap();
     for(String name: _builders.keySet()) {
       Map info = _builders.get(name);
-      int limit = (int) info.get("limit");
+      int limit = ((Number) info.get("limit")).intValue();
       boolean threadSafe = (boolean) info.get("threadSafe");
       boolean autoTracing = (boolean) info.get("autoTracing");
       IFn afn = (IFn) info.get("builderFn");
       AgentObjectSetup setup = new AgentObjectSetup() {
         @Override
         public <T> T getAgentObject(String otherName) {
-          return getAgentObject(name);
+          return (T) getAgentObjectFromResource(otherName);
         }
 
         @Override
