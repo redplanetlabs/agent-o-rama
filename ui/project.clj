@@ -7,7 +7,7 @@
    [org.apache.logging.log4j/log4j-slf4j18-impl "2.16.0"]
    
    [thheller/shadow-cljs "3.1.7"]
-   [net.java.dev.jna/jna "5.17.0"]
+   [net.java.dev.jna/jna "5.17.0"] ;; to fix dynlink error on arm macs
    
    [ring/ring-core "1.14.1"]
    [ring/ring-jetty-adapter "1.14.1"]
@@ -19,8 +19,7 @@
     :exclusions
     [org.eclipse.jetty/jetty-http
      org.eclipse.jetty/jetty-io
-     org.eclipse.jetty/jetty-util
-     hawk]]
+     org.eclipse.jetty/jetty-util]]
    [com.rpl/agent-o-rama "1.0.0-SNAPSHOT"]]
 
   :global-vars {*warn-on-reflection* true}
