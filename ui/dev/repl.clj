@@ -66,7 +66,7 @@
                                                   {:port 1974 ;; TODO make configurable
                                                    :join? false}))
   (swap! sys/system assoc :rama-client (open-cluster-manager-internal {"conductor.host" "localhost"}))
-  (swap! sys/system assoc :background-exec (ScheduledThreadPoolExecutor. 1) )
+  (swap! sys/system assoc :background-exec (ScheduledThreadPoolExecutor. 1))
   (.scheduleAtFixedRate
    ^ScheduledThreadPoolExecutor (:background-exec @sys/system)
    (fn [] (try
@@ -78,9 +78,9 @@
    TimeUnit/SECONDS))
 
 (defn stop []
-  (.stop (:jetty @sys/system))
+  (.stop ^org.eclipse.jetty.server.Server (:jetty @sys/system))
   (close! (:rama-client @sys/system))
-  (.shutdownNow (:background-exec @sys/system)))
+  (.shutdownNow ^ScheduledThreadPoolExecutor (:background-exec @sys/system)))
 
 (comment
   (start)
