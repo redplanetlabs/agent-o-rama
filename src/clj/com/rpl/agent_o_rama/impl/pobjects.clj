@@ -16,7 +16,6 @@
     NodeAggStart
     StreamingChunk]))
 
-
 (defn agents-store-info-name
   []
   "*_agents-store-info")
@@ -125,7 +124,6 @@
                 {:subindex? true})})
     {:subindex? true})})
 
-
 (defn agent-node-task-global-name
   [agent-name]
   (str "$$_agent-node-" agent-name))
@@ -183,7 +181,6 @@
 
 (def AGENT-CONFIG-PSTATE-SCHEMA
   java.util.Map)
-
 
 ;; Task global fetch helpers
 

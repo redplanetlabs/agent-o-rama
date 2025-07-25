@@ -6,8 +6,6 @@
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.types :as aor-types]))
 
-
-
 (defn hook:filtered-event [agent-task-id agent-id retry-num])
 
 (deframafn valid-retry-num?
@@ -30,7 +28,6 @@
   [:<* [[agent-name agent-task-id agent-id retry-num] & partitioner+args]]
   [(vec partitioner+args)
    [filter-valid-retry-num> agent-name agent-task-id agent-id retry-num]])
-
 
 (defdepotpartitioner agent-streaming-depot-partitioner
   [{:keys [agent-task-id]} num-partitions]

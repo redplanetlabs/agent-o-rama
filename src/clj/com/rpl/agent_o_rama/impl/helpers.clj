@@ -107,7 +107,6 @@
   ([afn a b c d e f g h i j k l m n o] (afn a b c d e f g h i j k l m n o))
   ([afn a b c d e f g h i j k l m n o p] (afn a b c d e f g h i j k l m n o p)))
 
-
 (defmacro cf-function
   [& body]
   `(let [afn# (fn ~@body)]

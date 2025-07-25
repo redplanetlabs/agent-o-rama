@@ -46,7 +46,6 @@
   [val :- s/Any
    failure? :- Boolean])
 
-
 (drp/defrecord+ AgentNode
   [node :- (s/cond-pre Node NodeAggStart NodeAgg)
    output-nodes :- #{String}
@@ -76,7 +75,6 @@
 (drp/defrecord+ NestedOpInfo
   [start-time-millis :- Long
    finish-time-millis :- Long
-
    type :-
    (s/enum :store-write
            :store-read
@@ -85,7 +83,6 @@
            :model-call
            :agent-invoke
            :other)
-
    ;; info for models contains token stats, input prompt, output, etc.
    info :- (s/maybe {String s/Any})])
 
@@ -148,8 +145,7 @@
   ])
 
 (drp/defrecord+ HistoricalAgentGraphInfo
-  [node-map :- {String HistoricalAgentNodeInfo} ; :node, :agg-node,
-                                                ; :agg-start-node
+  [node-map :- {String HistoricalAgentNodeInfo}
    start-node :- String
    uuid :- String
   ])
@@ -244,7 +240,6 @@
 (defn positive-long?
   [v]
   (and (instance? Long v) (> v 0)))
-
 
 (defconfig MAX-RETRIES
            natural-long?

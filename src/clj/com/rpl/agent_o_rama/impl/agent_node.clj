@@ -379,9 +379,8 @@
       (reify
        ChatModel
        ;; - same as with ChatModel impls, some StreamingChatModel impls
-       ;; implement
-       ;; chat(ChatRequest, StreamingChatResponseHandler) and others implement
-       ;; doChat(ChatRequest, StreamingChatResponseHandler)
+       ;; implement chat(ChatRequest, StreamingChatResponseHandler) and others
+       ;; implement doChat(ChatRequest, StreamingChatResponseHandler)
        ;; - so here only need to implement these entry points and forward to
        ;; corresponding method on StreamingChatModel
        (^ChatResponse chat [this ^ChatRequest chatRequest]
@@ -406,30 +405,30 @@
        (close [this] (try-close! obj))))
 
     (instance? EmbeddingStore obj)
-    (reify
-     EmbeddingStore
+    (let [^EmbeddingStore obj obj]
+      (reify
+       EmbeddingStore
 
-     ;; TODO: <<<<>>>>
-     ; - capture name of the object
-     ; String add(Embedding embedding)
-     ; String add(Embedding embedding, Embedded embedded)
-     ; void add(String id, Embedding embedding)
-     ; List<String> addAll(List<Embedding> embeddings)
-     ; List<String> addAll(List<Embedding> embeddings, List<Embedded> embedded)
-     ; void addAll(List<String> ids, List<Embedding> embeddings, List<Embedded>
-     ; embedded)
-     ; List<String> generateIds(int n)
-     ; void remove(String id)
-     ; void removeAll()
-     ; void removeAll(Filter filter)
-     ; void removeAll(Collection<String> ids)
-     ; EmbeddingSearchResult<Embedded> search(EmbeddingSearchRequest request)
+       ;; TODO: <<<<>>>>
+       ; - capture name of the object
+       ; String add(Embedding embedding)
+       ; String add(Embedding embedding, Embedded embedded)
+       ; void add(String id, Embedding embedding)
+       ; List<String> addAll(List<Embedding> embeddings)
+       ; List<String> addAll(List<Embedding> embeddings, List<Embedded> e)
+       ; void addAll(List<String> ids, List<Embedding> eg, List<Embedded> e)
+       ; List<String> generateIds(int n)
+       ; void remove(String id)
+       ; void removeAll()
+       ; void removeAll(Filter filter)
+       ; void removeAll(Collection<String> ids)
+       ; EmbeddingSearchResult<Embedded> search(EmbeddingSearchRequest request)
 
-     IUnderlying
-     (getUnderlying [this] obj)
+       IUnderlying
+       (getUnderlying [this] obj)
 
-     Closeable
-     (close [this] (try-close! obj)))
+       Closeable
+       (close [this] (try-close! obj))))
 
     :else
     obj))
