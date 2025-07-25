@@ -293,13 +293,15 @@
     (close! obj)))
 
 (defn- record-model-call!
-  [agent-node ^ChatRequest request ^ChatResponse response start-time-millis]
+  [name agent-node ^ChatRequest request ^ChatResponse response
+   start-time-millis]
   (record-nested-op!-impl
    agent-node
    :model-call
    start-time-millis
    (h/current-time-millis)
-   {"modelName"        (.modelName request)
+   {"objectName"       name
+    "modelName"        (.modelName request)
     "frequencyPenalty" (.frequencyPenalty request)
     "presencePenalty"  (.presencePenalty request)
     "stopSequences"    (.stopSequences request)
@@ -318,16 +320,16 @@
    }))
 
 (defn- instrument-chat!
-  [request response-fn]
+  [name request response-fn]
   (let [^AgentNode agent-node (h/thread-local-get AGENT-NODE-CONTEXT)
         start-time-millis (h/current-time-millis)
         response (response-fn)]
-    (record-model-call! agent-node request response start-time-millis)
+    (record-model-call! name agent-node request response start-time-millis)
     response
   ))
 
 (defn- instrument-streaming-chat!
-  [^ChatRequest request initiate-fn]
+  [name ^ChatRequest request initiate-fn]
   (let [^AgentNode agent-node (h/thread-local-get AGENT-NODE-CONTEXT)]
     ;; TODO: <<<<>>>>
     ;;  - make CompletableFuture
@@ -342,7 +344,7 @@
   ))
 
 (defn wrap-agent-object
-  [obj]
+  [name obj]
   (cond
     (instance? ChatModel obj)
     (let [^ChatModel obj obj]
@@ -351,9 +353,9 @@
        ;; - each provider overrides one of the following two methods and uses
        ;; default impls for the rest of the "chat" methods
        (^ChatResponse chat [this ^ChatRequest chatRequest]
-         (instrument-chat! chatRequest #(.chat obj chatRequest)))
+         (instrument-chat! name chatRequest #(.chat obj chatRequest)))
        (^ChatResponse doChat [this ^ChatRequest chatRequest]
-         (instrument-chat! chatRequest #(.doChat obj chatRequest)))
+         (instrument-chat! name chatRequest #(.doChat obj chatRequest)))
        (defaultRequestParameters [this] (.defaultRequestParameters obj))
        (listeners [this] (.listeners obj))
        (provider [this] (.provider obj))
@@ -378,10 +380,12 @@
        ;; corresponding method on StreamingChatModel
        (^ChatResponse chat [this ^ChatRequest chatRequest]
          (instrument-streaming-chat!
+          name
           chatRequest
           #(.chat obj chatRequest ^StreamingChatResponseHandler %)))
        (^ChatResponse doChat [this ^ChatRequest chatRequest]
          (instrument-streaming-chat!
+          name
           chatRequest
           #(.doChat obj chatRequest ^StreamingChatResponseHandler %)))
        (defaultRequestParameters [this] (.defaultRequestParameters obj))
@@ -400,6 +404,7 @@
      EmbeddingStore
 
      ;; TODO: <<<<>>>>
+     ; - capture name of the object
      ; String add(Embedding embedding)
      ; String add(Embedding embedding, Embedded embedded)
      ; void add(String id, Embedding embedding)

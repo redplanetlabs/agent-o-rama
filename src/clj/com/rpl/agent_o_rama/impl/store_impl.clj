@@ -73,7 +73,8 @@
              start-time
              finish-time
              :store-write
-             {"op"     op
+             {"name"   (:pstate-name store-params)
+              "op"     op
               "params" params}
             ))))
 
@@ -100,7 +101,8 @@
       start-time
       finish-time
       :store-read
-      {"op"     op
+      {"name"   (:pstate-name store-params)
+       "op"     op
        "params" params
        "result" res}
      ))

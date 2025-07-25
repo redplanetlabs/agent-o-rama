@@ -38,9 +38,9 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
       }
   }
 
-  private static Object makeObject(IFn afn, AgentObjectSetup setup, boolean autoTracing) {
+  private static Object makeObject(String name, IFn afn, AgentObjectSetup setup, boolean autoTracing) {
     Object o = afn.invoke(setup);
-    return autoTracing? AORHelpers.WRAP_AGENT_OBJECT.invoke() : o;
+    return autoTracing? AORHelpers.WRAP_AGENT_OBJECT.invoke(name, o) : o;
   }
 
   @Override
@@ -64,8 +64,8 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
         }
       };
       _objects.put(name, new WorkerManagedResource(name, context, () -> {
-        if(threadSafe) return makeObject(afn, setup, autoTracing);
-        else return new LazyObjectPool(limit, () -> makeObject(afn, setup, autoTracing));
+        if(threadSafe) return makeObject(name, afn, setup, autoTracing);
+        else return new LazyObjectPool(limit, () -> makeObject(name, afn, setup, autoTracing));
       }));
     }
   }
