@@ -95,7 +95,7 @@
                                 result
                                 (let [segment (first remaining)
                                       next-segment (second remaining)
-                                      ;; Check if this is an agent module/agent-id pair
+                                      ;; Check if this is an agent module/agent-name pair
                                       is-agent-pair? (and (= (get segments 0) "agents")
                                                           (= (count result) 1)
                                                           next-segment)
@@ -148,11 +148,11 @@
      ($ :div.flex-1.overflow-auto
         ($ Router
            ;; Agent routes
-           ($ Route {:path "/agents/:module-id/:agent-id/invocations" :component agents/invocations})
-           ($ Route {:path "/agents/:module-id/:agent-id/invocations/:invoke-id" :component agents/invoke})
-           ($ Route {:path "/agents/:module-id/:agent-id/evaluations" :component agents/evaluations})
-           ($ Route {:path "/agents/:module-id/:agent-id/stats" :component stats/stats})
-           ($ Route {:path "/agents/:module-id/:agent-id" :component agents/agent})
+           ($ Route {:path "/agents/:module-id/:agent-name/invocations" :component agents/invocations})
+           ($ Route {:path "/agents/:module-id/:agent-name/invocations/:invoke-id" :component agents/invoke})
+           ($ Route {:path "/agents/:module-id/:agent-name/evaluations" :component agents/evaluations})
+           ($ Route {:path "/agents/:module-id/:agent-name/stats" :component stats/stats})
+           ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
            ($ Route {:path "/agents" :component agents/index})
            
            ;; Dataset routes

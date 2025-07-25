@@ -480,7 +480,7 @@
             #{}
             modified-node-ids)))
 
-(defui graph [{:keys [initial-data api-url module-id agent-id invoke-id forking-mode? set-forking-mode?]}]
+(defui graph [{:keys [initial-data api-url module-id agent-name invoke-id forking-mode? set-forking-mode?]}]
   (let [[selected-node set-selected-node] (uix/use-state nil)
         [loading-nodes set-loading-nodes] (uix/use-state #{})
         [graph-data set-graph-data] (uix/use-state initial-data)

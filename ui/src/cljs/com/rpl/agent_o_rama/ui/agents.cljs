@@ -21,22 +21,22 @@
       (not data) ($ :div "no data")
       :else ($ :div.p-4
               (for [agent data
-                    :let [url (str "/agents/" (:module-id agent) "/" (:agent-id agent))]]
+                    :let [url (str "/agents/" (:module-id agent) "/" (:agent-name agent))]]
                 ($ :div.p-4.transition-colors.duration-150.hover:bg-gray-200.bg-gray-100.m-4  {:key url}
                   ($ wouter/Link {:href url}
                      ($ :div.flex.items-center.group 
                       ($ :div.flex-1
                           ($ :div.text-lg.font-medium.text-indigo-600.group-hover:text-indigo-800
-                            ($ :div (common/url-decode (:module-id agent)) ":" (common/url-decode (:agent-id agent))))
+                            ($ :div (common/url-decode (:module-id agent)) ":" (common/url-decode (:agent-name agent))))
                           ($ :div.mt-1.text-sm.text-gray-500.group-hover:text-gray-700
                             "View agent details"))))))))))
 
 
 (defui invocations []
-  (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
+  (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
         {:keys [data loading?]}
-        (common/use-query {:query-key ["agent" module-id agent-id]
-                           :query-url (str "/api/agents/" module-id "/" agent-id "/invocations")})
+        (common/use-query {:query-key ["agent" module-id agent-name]
+                           :query-url (str "/api/agents/" module-id "/" agent-name "/invocations")})
         [location navigate] (useLocation)]
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
@@ -55,7 +55,7 @@
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")))
                ($ :tbody.divide-y.divide-gray-200
                   (for [invoke (:invokes data)
-                        :let [url (str "/agents/" module-id "/" agent-id "/invocations/" (:root-invoke-id invoke))]]
+                        :let [url (str "/agents/" module-id "/" agent-name "/invocations/" (:root-invoke-id invoke))]]
                     ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
                        {:key url
                         :onClick (fn [e]
@@ -72,10 +72,10 @@
                              (common/pp (:result invoke)))))))))))))
 
 (defui mini-invocations []
-  (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
+  (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
         {:keys [data loading?]}
-        (common/use-query {:query-key ["agent" module-id agent-id]
-                           :query-url (str "/api/agents/" module-id "/" agent-id "/invocations")})
+        (common/use-query {:query-key ["agent" module-id agent-name]
+                           :query-url (str "/api/agents/" module-id "/" agent-name "/invocations")})
 
         [location navigate] (useLocation)]
     (cond
@@ -94,7 +94,7 @@
                   ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")))
             ($ :tbody.divide-y.divide-gray-200
                (for [[task-id invoke-id start-time-millis] (:agent-invokes data)
-                     :let [url (str "/agents/" module-id "/" agent-id "/invocations/" task-id "-" invoke-id)]]
+                     :let [url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" invoke-id)]]
                  ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
                     {:key url
                      :onClick (fn [_] (navigate url))}
@@ -105,7 +105,7 @@
                     ($ :td.px-4.py-3.font-mono.text-gray-600 ""))))
             ($ :tfoot.bg-gray-50.border-t.border-gray-200
                ($ :tr.hover:bg-gray-100.transition-colors.duration-150
-                  {:onClick (fn [_] (navigate (str "/agents/" module-id "/" agent-id "/invocations")))}
+                  {:onClick (fn [_] (navigate (str "/agents/" module-id "/" agent-name "/invocations")))}
                   ($ :td.px-4.py-3.cursor-pointer {:colSpan 4}
                      ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
                         ($ :span.mr-2.text-sm.font-medium "View all invocations")
@@ -115,16 +115,16 @@
                                      :clipRule "evenodd"})))))))))))
 
 (defui evaluations []
-  (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))]
+  (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))]
     ($ :div
        ($ :h2.text-xl.font-semibold.mb-4 "Evaluations")
        ($ :div.text-gray-500 "Evaluations functionality coming soon..."))))
 
 (defui agent-graph []
-  (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
+  (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
         {:keys [data loading?]}
-        (common/use-query {:query-key ["agent" module-id agent-id "graph"]
-                           :query-url (str "/api/agents/" module-id "/" agent-id "/graph")})]
+        (common/use-query {:query-key ["agent" module-id agent-name "graph"]
+                           :query-url (str "/api/agents/" module-id "/" agent-name "/graph")})]
     (if loading?
       "...loading"
       ($ agent-graph/graph {:initial-data data
@@ -133,10 +133,10 @@
                             :set-selected-node (fn [_])
                             :fitView true}))))
 
-(defui stats-summary [{:keys [module-id agent-id]}]
+(defui stats-summary [{:keys [module-id agent-name]}]
   ($ :div.p-4.flex.gap-1
      ($ wouter/Link
-        {:href (str "/agents/" module-id "/" agent-id "/stats")
+        {:href (str "/agents/" module-id "/" agent-name "/stats")
          :style {:flex-grow "1"}}
         ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6.hover:shadow-md.transition-shadow.duration-150.cursor-pointer.relative
            ($ :div.flex.justify-between.items-start
@@ -155,13 +155,13 @@
                               :d "M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
                               :clipRule "evenodd"}))))))))
 
-(defui alerts [{:keys [module-id agent-id]}]
+(defui alerts [{:keys [module-id agent-name]}]
   (let [dummy-alerts [{:metric "Error Rate" :value "2.3%" :threshold "< 5%" :time-ago "2h ago"}
                       {:metric "Latency" :value "847ms" :threshold "< 500ms" :time-ago "4h ago"}
                       {:metric "Error Rate" :value "8.1%" :threshold "< 5%" :time-ago "1d ago"}]]
     ($ :div.p-4.flex.gap-1
        ($ wouter/Link
-          {:href (str "/agents/" module-id "/" agent-id "/alerts")
+          {:href (str "/agents/" module-id "/" agent-name "/alerts")
            :style {:flex-grow "1"}}
           ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6.hover:shadow-md.transition-shadow.duration-150.cursor-pointer.relative
              ($ :div.flex.justify-between.items-start
@@ -180,7 +180,7 @@
                                 :d "M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
                                 :clipRule "evenodd"})))))))))
 
-(defui manual-run [{:keys [module-id agent-id]}]
+(defui manual-run [{:keys [module-id agent-name]}]
   (let [[args set-args] (uix/use-state "")
         [result set-result] (uix/use-state nil)
         [error-msg set-error-msg] (uix/use-state nil)
@@ -191,7 +191,7 @@
                                                        (js/JSON.parse variables)
                                                        (catch js/Error e
                                                          (throw (js/Error. "Invalid JSON format"))))]
-                                     (common/post (str "/api/agents/" module-id "/" agent-id "/invocations")
+                                     (common/post (str "/api/agents/" module-id "/" agent-name "/invocations")
                                                   {:args parsed-args})))
                     :on-success (fn [data]
                                   (set-result data)
@@ -236,7 +236,7 @@
                     (common/pp result))))))))) 
 
 (defui agent []
-  (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
+  (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
         [location navigate] (useLocation)]
 
     ($ :div.p-4
@@ -244,26 +244,26 @@
        ($ :div.flex
           ($ :div {:className "w-1/2"} ($ agent-graph))
           ($ :div {:className "w-1/2"}
-             ($ stats-summary {:module-id module-id :agent-id agent-id})
-             ($ alerts {:module-id module-id :agent-id agent-id})))
+             ($ stats-summary {:module-id module-id :agent-name agent-name})
+             ($ alerts {:module-id module-id :agent-name agent-name})))
        ($ :div.p-4.flex.gap-1
           ($ :div
              {:style {:flex-grow "1"}}
-             ($ manual-run {:module-id module-id :agent-id agent-id})))
+             ($ manual-run {:module-id module-id :agent-name agent-name})))
        
        ($ :div.p-4
           ($ mini-invocations)))))
 
 (defui invoke []
-  (let [{:strs [module-id agent-id invoke-id]} (js->clj (wouter/useParams))
+  (let [{:strs [module-id agent-name invoke-id]} (js->clj (wouter/useParams))
         [use-pagination? set-use-pagination] (uix/use-state true)
         [forking-mode? set-forking-mode?] (uix/use-state false)
         ;; Only fetch initial data - no need to refetch on pagination state changes
         {:keys [data loading?]}
-        (common/use-query {:query-key ["invoke-initial" module-id agent-id invoke-id use-pagination?]
+        (common/use-query {:query-key ["invoke-initial" module-id agent-name invoke-id use-pagination?]
                            :query-url (if use-pagination?
-                                        (str "/api/agents/" module-id "/" agent-id "/invocations/" invoke-id "/paginated?depth=1")
-                                        (str "/api/agents/" module-id "/" agent-id "/invocations/" invoke-id))})]
+                                        (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id "/paginated?depth=1")
+                                        (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id))})]
     (cond
       loading? ($ :div "loading...")
       (not data) ($ :div "no data")
@@ -284,9 +284,9 @@
          ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
             ($ invocation-graph/graph {:initial-data (:invokes-map data)
                                       :api-url (when use-pagination? 
-                                                 (str "/api/agents/" module-id "/" agent-id "/invocations/" invoke-id "/paginated"))
+                                                 (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id "/paginated"))
                                       :module-id module-id
-                                      :agent-id agent-id
+                                      :agent-name agent-name
                                       :invoke-id invoke-id
                                       :forking-mode? forking-mode?
                                       :set-forking-mode? set-forking-mode?}))))))

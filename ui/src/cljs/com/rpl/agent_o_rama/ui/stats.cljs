@@ -173,10 +173,10 @@
                   (str "W: " (get-in stats [:total-store-operations :writes])))))))))
 
 (defui agent-graph [{:keys [selected-version]}]
-  (let [{:strs [module-id agent-id]} (js->clj (wouter/useParams))
+  (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
         {:keys [data loading?]}
-        (common/use-query {:query-key ["agent" module-id agent-id "graph"]
-                           :query-url (str "/api/agents/" module-id "/" agent-id "/graph")})
+        (common/use-query {:query-key ["agent" module-id agent-name "graph"]
+                           :query-url (str "/api/agents/" module-id "/" agent-name "/graph")})
         [selected-node set-selected-node] (uix/use-state nil)]
     (if loading?
       "...loading"
