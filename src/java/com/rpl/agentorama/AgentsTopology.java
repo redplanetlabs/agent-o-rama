@@ -21,6 +21,7 @@ public interface AgentsTopology {
 
   void declareAgentObject(String name, Object o);
   void declareAgentObjectBuilder(String name, RamaFunction1<AgentObjectSetup, Object> builder);
+  void declareAgentObjectBuilder(String name, RamaFunction1<AgentObjectSetup, Object> builder, AgentObjectOptions options);
 
   StreamTopology getStreamTopology();
 

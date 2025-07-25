@@ -21,13 +21,6 @@
    [com.rpl.agentorama.impl
     AgentNodeExecutorTaskGlobal]))
 
-(deframafn read-config
-  [*agent-name *config]
-  (<<with-substitutions
-   [$$config (po/agent-config-task-global *agent-name)]
-   (local-select> STAY $$config :> *config-map)
-   (:> (aor-types/get-config *config-map *config))))
-
 (defn get-node-obj
   [agent-graph node]
   (select-any [:node-map (keypath node) :node]
@@ -300,7 +293,9 @@
       (else>)
        (identity *root-invoke-id :> *root-invoke-id))
 
-     (read-config *agent-name aor-types/MAX-RETRIES-CONFIG :> *max-retries)
+     (anode/read-config *agent-name
+                        aor-types/MAX-RETRIES-CONFIG
+                        :> *max-retries)
      (<<if (> *retry-num *max-retries)
        (complete-with-failure! *agent-name *agent-id "Max retry limit exceeded")
       (else>)

@@ -253,3 +253,7 @@
 (defconfig STALL-CHECKER-THRESHOLD-MILLIS
            positive-long?
            10000)
+
+(defconfig ACQUIRE-OBJECT-TIMEOUT-MILLIS
+           positive-long?
+           30000)

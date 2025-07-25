@@ -16,6 +16,7 @@
     NestedOpType
     StreamingRecorder]
    [com.rpl.agentorama.impl
+    AgentDeclaredObjectsTaskGlobal
     AgentNodeExecutorTaskGlobal
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
@@ -36,6 +37,7 @@
 
 (defprotocol AgentNodeInternal
   (agent-node-state [this])
+  (release-acquired-objects! [this])
   (get-streaming-recorder [this]))
 
 (defprotocol StreamingRecorderInternal
@@ -129,32 +131,32 @@
 (defn mk-agent-node
   [agent-name agent-graph agent-task-id agent-id curr-node invoke-id retry-num
    store-info ^RamaClientsTaskGlobal rama-clients]
-  (let [task-id             (ops/current-task-id)
-        result-vol          (volatile! nil)
-        emits-vol           (volatile! [])
-        nested-ops-vol      (volatile! [])
-        task-thread-ids-vol (volatile! nil)
-        emit-count-vol      (volatile! 0)
-        valid-output-nodes  (-> agent-graph
-                                :node-map
-                                (get curr-node)
-                                :output-nodes)
+  (let [task-id               (ops/current-task-id)
+        result-vol            (volatile! nil)
+        emits-vol             (volatile! [])
+        nested-ops-vol        (volatile! [])
+        task-thread-ids-vol   (volatile! nil)
+        emit-count-vol        (volatile! 0)
+        valid-output-nodes    (-> agent-graph
+                                  :node-map
+                                  (get curr-node)
+                                  :output-nodes)
 
         ^com.rpl.rama.ModuleInstanceInfo module-instance-info
         (ops/module-instance-info)
 
-        this-module-name    (.getModuleName module-instance-info)
-        random-source       (ops/current-random-source)
-        streaming-depot     (.getAgentStreamingDepot rama-clients agent-name)
-        streaming-recorder  (mk-streaming-recorder agent-task-id
-                                                   agent-id
-                                                   curr-node
-                                                   invoke-id
-                                                   retry-num
-                                                   streaming-depot)
+        this-module-name      (.getModuleName module-instance-info)
+        random-source         (ops/current-random-source)
+        streaming-depot       (.getAgentStreamingDepot rama-clients agent-name)
+        streaming-recorder    (mk-streaming-recorder agent-task-id
+                                                     agent-id
+                                                     curr-node
+                                                     invoke-id
+                                                     retry-num
+                                                     streaming-depot)
 
-        agent-objects       (.getAgentObjects
-                             (po/agent-declared-objects-task-global))
+        declared-objects-tg   (po/agent-declared-objects-task-global)
+        acquired-objects-atom (atom [])
        ]
     (reify
      AgentNode
@@ -191,9 +193,10 @@
          (throw (h/ex-info "Cannot both emit and result" {})))
        (vreset! result-vol (aor-types/->valid-AgentResult arg false)))
      (getAgentObject [this name]
-       (if (contains? agent-objects name)
-         (get agent-objects name)
-         (throw (h/ex-info "Could not find agent object" {:name name}))))
+       (let [ret (.getAgentObject declared-objects-tg name)]
+         (swap! acquired-objects-atom conj [name ret])
+         ret
+       ))
      (getStore [this name]
        (let [store-params
              (simpl/->valid-StoreParams
@@ -237,10 +240,14 @@
                 info)))
      AgentNodeInternal
      (get-streaming-recorder [this] streaming-recorder)
+     (release-acquired-objects! [this]
+       (doseq [[name o] @acquired-objects-atom]
+         (.releaseAgentObject declared-objects-tg name o)))
      (agent-node-state [this]
        {:emits      @emits-vol
         :result     @result-vol
-        :nested-ops @nested-ops-vol}))))
+        :nested-ops @nested-ops-vol
+       }))))
 
 
 (defn submit-virtual-task!
@@ -259,17 +266,43 @@
   [obj]
   obj
   ;; TODO: <<<<>>>>> wrap ChatModel and possibly db impls
+  ;;    - wrapper should look at AGENT-NODE-CONTEXT to get AgentNode
+  ;;    - (h/thread-local-get AGENT-NODE-CONTEXT)
+  ;;    - types:
+  ;;      - ChatModel
+  ;;      - StreamingChatModel
+  ;;        - should be converted to ChatModel
+  ;;      - EmbeddingStore
+  ;;      - VectorStore?
+  ;;      - EmbeddingModel
+  ;;    - what if wrapping is explicit?
+  ;;      - user calls "new TrackedChatModel(...)", "new
+  ;;      TrackedEmbeddingStore(...)"
+  ;;      - makes demo not as good, so this is no good
+  ;;      - so it's a question of if wrap anything besides models
+  ;;        - would be nice to use vector store in demo...
+  ;;        - models, built-in storage, and vector stores being wrapped is
+  ;;        pretty good...
+  ;;           - for all of them should expose underlying via
+  ;;           underlying-agent-object method
+  ;;            - IUnderlyingAgentObject interface with
+  ;;            getUnderlyingAgentObject() method
+
+
+  ;; TODO: <<<<>>>>> wrapped model needs to implement closeable and forward it
 )
 
 (defn node-event
   [agent-name task-id invoke-id retry-num node-name node-fn
    ^AgentNode agent-node args ^RamaClientsTaskGlobal rama-clients
-   fork-context]
+   fork-context acquire-timeout-millis]
   (fn []
     (let [depot (.getAgentDepot rama-clients agent-name)
           res   (try
-                  (h/thread-local-set! AGENT-NODE-CONTEXT
-                                       {:agent-node agent-node})
+                  (h/thread-local-set! AGENT-NODE-CONTEXT agent-node)
+                  (h/thread-local-set!
+                   AgentDeclaredObjectsTaskGlobal/ACQUIRE_TIMEOUT_MILLIS
+                   acquire-timeout-millis)
                   (h/returning (apply node-fn agent-node args)
                     (-> agent-node
                         get-streaming-recorder
@@ -286,8 +319,9 @@
                       invoke-id
                       retry-num)
                      :append-ack)
-                    (throw t)
-                  ))
+                    (throw t))
+                  (finally
+                    (release-acquired-objects! agent-node)))
           {:keys [emits result nested-ops]} (agent-node-state agent-node)]
       (foreign-append!
        depot
@@ -303,6 +337,13 @@
         fork-context)
        :append-ack)
     )))
+
+(deframafn read-config
+  [*agent-name *config]
+  (<<with-substitutions
+   [$$config (po/agent-config-task-global *agent-name)]
+   (local-select> STAY $$config :> *config-map)
+   (:> (aor-types/get-config *config-map *config))))
 
 (deframaop handle-node-invoke
   [*agent-name *agent-task-id *agent-id *node-fn *invoke-id *retry-num
@@ -345,6 +386,9 @@
    (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
                |direct
                *task-id)
+   (read-config *agent-name
+                aor-types/ACQUIRE-OBJECT-TIMEOUT-MILLIS-CONFIG
+                :> *acquire-timeout-millis)
    (submit-virtual-task!
     *invoke-id
     (node-event *agent-name
@@ -356,7 +400,8 @@
                 *agent-node
                 *args
                 *rama-clients
-                *fork-context))
+                *fork-context
+                *acquire-timeout-millis))
    (:>)))
 
 (defn- invoke-or-error

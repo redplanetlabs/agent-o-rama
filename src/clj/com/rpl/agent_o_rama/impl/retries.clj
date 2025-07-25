@@ -2,6 +2,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -17,8 +18,8 @@
 
 (deframafn checker-threshold-millis
   [*agent-name]
-  (:> (at/read-config *agent-name
-                      aor-types/STALL-CHECKER-THRESHOLD-MILLIS-CONFIG)))
+  (:> (anode/read-config *agent-name
+                         aor-types/STALL-CHECKER-THRESHOLD-MILLIS-CONFIG)))
 
 (defn invalid-time-delta?
   [agent-name time-millis]

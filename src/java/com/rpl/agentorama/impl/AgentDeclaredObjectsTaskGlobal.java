@@ -1,90 +1,76 @@
 package com.rpl.agentorama.impl;
 
-import java.io.Closeable;
 import java.io.IOException;
 
 import com.rpl.agentorama.AgentObjectSetup;
 import com.rpl.rama.integration.*;
-import com.rpl.rama.ops.RamaFunction0;
 
 import clojure.lang.IFn;
 import java.util.*;
 
 public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
-  Map<String, IFn> _builders;
-  Map<String, Object> _objects;
-  Map<String, Object> _wrapped;
-  Map<String, WorkerManagedResource> _shared;
-  Set<String> _inProgress;
-  // - this leaks memory in test environment / REPL that's creating/tearing down multiple clusters,
-  // but not in production since task globals are only set up once in a real worker
-  // - the leaking shouldn't matter is it should take a very long time to cause any issues
-  static final IdentityHashMap _sharedUnderlying = new IdentityHashMap();
+  public static ThreadLocal<Long> ACQUIRE_TIMEOUT_MILLIS = new ThreadLocal<>();
 
-  public AgentDeclaredObjectsTaskGlobal(Map<String, IFn> builders) {
+  Map<String, Map<String, Object>> _builders;
+  Map<String, WorkerManagedResource> _objects;
+
+
+  public AgentDeclaredObjectsTaskGlobal(Map<String, Map<String, Object>> builders) {
     _builders = builders;
-    _objects = new HashMap();
-    _shared = new HashMap();
-    _inProgress = new HashSet();
   }
 
-  public Map<String, Object> getAgentObjects() {
-    return _wrapped;
+  public Object getAgentObject(String name) {
+    if(!_objects.containsKey(name)) {
+      throw new RuntimeException("Agent object does not exist: " + name);
+    }
+    Object resource = _objects.get(name).getResource();
+    if(resource instanceof LazyObjectPool) {
+      return ((LazyObjectPool) resource).acquire(ACQUIRE_TIMEOUT_MILLIS.get());
+    } else {
+      return resource;
+    }
   }
 
-  private void buildObject(String name, TaskGlobalContext context) {
-    _inProgress.add(name);
-    Object obj = _builders.get(name).invoke(new AgentObjectSetup() {
-      @Override
-      public Object getAgentObject(String otherName) {
-        if(!_wrapped.containsKey(otherName)) {
-          if(_inProgress.contains(otherName))
-            throw new RuntimeException("Detected cycle when building agent object " + name + " -> " + otherName);
-          buildObject(otherName, context);
-        }
-       return _wrapped.get(otherName);
+  public void releaseAgentObject(String name, Object o) {
+      Object res = _objects.get(name).getResource();
+      if(res instanceof LazyObjectPool) {
+        ((LazyObjectPool) res).release(o);
       }
+  }
 
-      @Override
-      public Object getSharedScopedInstance(String key, RamaFunction0 builder) {
-        String resourceId = "" + name.length() + ":" + name + key.length() + ":" + key;
-        WorkerManagedResource resource = new WorkerManagedResource(
-                                            resourceId,
-                                            context,
-                                            () -> {
-                                              Object shared = builder.invoke();
-                                              synchronized(_sharedUnderlying) {
-                                                _sharedUnderlying.put(shared, null);
-                                              }
-                                              return shared;
-                                            });
-        _shared.put(resourceId, resource);
-        return resource.getResource();
-      }
-
-      @Override
-      public String getObjectName() {
-        return name;
-      }
-    });
-    _objects.put(name, obj);
-    _wrapped.put(name, AORHelpers.WRAP_AGENT_OBJECT.invoke(obj));
+  private static Object makeObject(IFn afn, AgentObjectSetup setup) {
+    return AORHelpers.WRAP_AGENT_OBJECT.invoke(afn.invoke(setup));
   }
 
   @Override
   public void prepareForTask(int taskId, TaskGlobalContext context) {
     for(String name: _builders.keySet()) {
-      if(!_objects.containsKey(name)) buildObject(name, context);
+      Map info = _builders.get(name);
+      int limit = (int) info.get("limit");
+      boolean threadSafe = (boolean) info.get("threadSafe");
+      IFn afn = (IFn) info.get("builderFn");
+      AgentObjectSetup setup = new AgentObjectSetup() {
+        @Override
+        public <T> T getAgentObject(String otherName) {
+          return getAgentObject(name);
+        }
+
+        @Override
+        public String getObjectName() {
+          return name;
+        }
+      };
+      _objects.put(name, new WorkerManagedResource(name, context, () -> {
+        if(threadSafe) return makeObject(afn, setup);
+        else return new LazyObjectPool(limit, () -> makeObject(afn, setup));
+      }));
     }
   }
 
   @Override
   public void close() throws IOException {
-    for(WorkerManagedResource resource: _shared.values()) resource.close();
-    for(Object o: _objects.values()) {
-      if(!_sharedUnderlying.containsKey(o) && o instanceof Closeable) {
-        ((Closeable) o).close();
-      }
+    for(WorkerManagedResource resource: _objects.values()) {
+      resource.close();
     }
   }
 }
