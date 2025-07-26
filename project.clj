@@ -7,16 +7,16 @@
                  [dev.langchain4j/langchain4j
                   "1.1.0"
                   :exclusions
-                  [org.slf4j/slf4j-api]]
-                 ;; TODO <<<<>>>>: remove?
-                 [dev.langchain4j/langchain4j-open-ai "1.1.0"]]
+                  [org.slf4j/slf4j-api]]]
   :global-vars {*warn-on-reflection* true}
   :repositories
   [["releases"
     {:id  "maven-releases"
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
   :profiles {:dev      {:resource-paths ["test/resources/"]
-                        :dependencies   [[meander/epsilon "0.0.650"]]}
+                        :dependencies
+                        [[meander/epsilon "0.0.650"]
+                         [dev.langchain4j/langchain4j-open-ai "1.1.0"]]}
              :provided {:dependencies
                         [[com.rpl/rama "1.1.0"]
                          [org.apache.logging.log4j/log4j-slf4j18-impl
