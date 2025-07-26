@@ -16,37 +16,35 @@
    [com.rpl.rama.test :as rtest])
   (:import
    [dev.langchain4j.model.openai
+    OpenAiChatModel
     OpenAiStreamingChatModel]))
+
+(aor/defagentmodule OpenAIModule
+  [topology]
+  (aor/declare-agent-object topology "api-key" (System/getenv "OPENAI_API_KEY"))
+  (aor/declare-agent-object-builder
+   topology
+   "openai"
+   (fn [setup]
+     (-> (OpenAiStreamingChatModel/builder)
+         (.apiKey (aor/get-agent-object setup "api-key"))
+         (.modelName "gpt-4o-mini")
+         .build)))
+  (->
+    topology
+    (aor/new-agent "foo")
+    (aor/node
+     "start"
+     nil
+     (fn [agent-node prompt]
+       (let [openai (aor/get-agent-object agent-node "openai")]
+         (aor/result! agent-node (lc4j/chat openai prompt)))))))
 
 (deftest openai-agent-test
   (with-open [ipc (rtest/create-ipc)]
     (letlocals
-     (bind module
-       (aor/agentmodule
-        [topology]
-        (aor/declare-agent-object topology
-                                  "openai-key"
-                                  (System/getenv "OPENAI_API_KEY"))
-        (aor/declare-agent-object-builder
-         topology
-         "openai"
-         (fn [setup]
-           (-> (OpenAiStreamingChatModel/builder)
-               (.apiKey (aor/get-agent-object setup "openai-key"))
-               (.modelName "gpt-4o-mini")
-               .build
-           )))
-        (->
-          topology
-          (aor/new-agent "foo")
-          (aor/node "start"
-                    nil
-                    (fn [agent-node prompt]
-                      (let [openai (aor/get-agent-object agent-node "openai")]
-                        (aor/result! agent-node (lc4j/chat openai prompt))))))
-       ))
-     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
-     (bind module-name (get-module-name module))
+     (rtest/launch-module! ipc OpenAIModule {:tasks 4 :threads 2})
+     (bind module-name (get-module-name OpenAIModule))
 
      (bind agent-manager (aor/agent-manager ipc module-name))
      (bind foo (aor/agent-client agent-manager "foo"))
@@ -61,13 +59,14 @@
 
 
      (bind inv
-       (aor/agent-initiate foo
-                           "Who are you? Who am I? Answer like a philosopher."))
+       (aor/agent-initiate
+        foo
+        "What is 11 * 17?"))
      (aor/agent-stream foo
                        inv
                        "start"
                        (fn [all new reset? complete?]
-                         (println "STREAM" new reset? complete?)))
+                         (println "STREAM" (pr-str new) reset? complete?)))
 
      (bind agent-task-id (.getTaskId inv))
      (bind agent-id (.getAgentInvokeId inv))

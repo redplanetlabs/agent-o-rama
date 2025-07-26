@@ -25,6 +25,7 @@
 
 ;; for agent-o-rama namespace
 (defn hook:agent-result-proxy [proxy])
+(defn hook:building-plain-agent-object [name o])
 
 (defn- define-agent!
   [agent-name setup topologies stream-topology mb-topology agent-graph]

@@ -91,10 +91,13 @@
                                               ^PState$Schema schema]
        (.pstate stream-topology name schema))
      (declareAgentObject [this name o]
-       (aor-types/declare-agent-object-builder-internal this
-                                                        name
-                                                        (constantly o)
-                                                        nil))
+       (aor-types/declare-agent-object-builder-internal
+        this
+        name
+        (fn [setup]
+          (i/hook:building-plain-agent-object name o)
+          o)
+        {:thread-safe? true}))
      (declareAgentObjectBuilder [this name jfn]
        (aor-types/declare-agent-object-builder-internal this
                                                         name
