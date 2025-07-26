@@ -13,7 +13,10 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.test-common :as tc]))
+   [com.rpl.test-common :as tc])
+  (:import
+   [java.util
+    IdentityHashMap]))
 
 (def SEMS)
 (def BUILDS-ATOM)
@@ -27,6 +30,13 @@
 (defn every-identical?
   [objs]
   (every? #(identical? (first %) (second %)) (partition 2 1 objs)))
+
+(defn unique-objects-count
+  [objs]
+  (let [m (IdentityHashMap.)]
+    (doseq [o objs]
+      (.put m o nil))
+    (count m)))
 
 (deftest object-lifecycle-test
   (let [plain-atom (atom {})]
@@ -95,6 +105,7 @@
          (is (every-identical? (get @ACQUIRED-ATOM "reg1")))
          (is (= 1 (select-any ["reg1" FIRST] @ACQUIRED-ATOM)))
          (is (= {"reg1" 1} @plain-atom))
+         (is (= {} @BUILDS-ATOM))
 
          (dotimes [_ 9]
            (aor/agent-initiate foo "reg2"))
@@ -102,6 +113,23 @@
          (is (every-identical? (get @ACQUIRED-ATOM "reg2")))
          (is (= "abcde" (select-any ["reg2" FIRST] @ACQUIRED-ATOM)))
          (is (= {"reg1" 1 "reg2" 1} @plain-atom))
+         (is (= {} @BUILDS-ATOM))
+
+         (dotimes [_ 8]
+           (aor/agent-initiate foo "obj3"))
+         (is (condition-attained? (= 8 (count (get @ACQUIRED-ATOM "obj3")))))
+         (is (every-identical? (get @ACQUIRED-ATOM "obj3")))
+         (is (= "obj3" (select-any ["obj3" FIRST] @ACQUIRED-ATOM)))
+         (is (= {"reg1" 1 "reg2" 1} @plain-atom))
+         (is (= {"obj3" 1} @BUILDS-ATOM))
+
+         (dotimes [_ 5]
+           (aor/agent-initiate foo "obj4"))
+         (is (condition-attained? (= 5 (count (get @ACQUIRED-ATOM "obj4")))))
+         (is (every-identical? (get @ACQUIRED-ATOM "obj4")))
+         (is (= "obj4" (select-any ["obj4" FIRST] @ACQUIRED-ATOM)))
+         (is (= {"reg1" 1 "reg2" 1} @plain-atom))
+         (is (= {"obj3" 1 "obj4" 1} @BUILDS-ATOM))
 
          ;; TODO: <<<<>>>>
          ;;  - use semaphores to block to verify what happens
