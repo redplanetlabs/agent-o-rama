@@ -26,6 +26,8 @@
    [dev.langchain4j.model.chat
     ChatModel
     StreamingChatModel]
+   [dev.langchain4j.data.embedding
+    Embedding]
    [dev.langchain4j.data.message
     ChatMessage]
    [dev.langchain4j.model.chat.request
@@ -35,6 +37,8 @@
     StreamingChatResponseHandler]
    [dev.langchain4j.store.embedding
     EmbeddingStore]
+   [dev.langchain4j.store.embedding.filter
+    Filter]
    [java.io
     Closeable]
    [java.util.concurrent
@@ -351,6 +355,22 @@
     response
   ))
 
+(defmacro with-traced
+  [expr object-name nested-op-type [res-sym] & body]
+  `(let [agent-node#        (h/thread-local-get AGENT-NODE-CONTEXT)
+         start-time-millis# (h/current-time-millis)
+         ~res-sym           ~expr
+         info-map#          (do ~@body)
+        ]
+     (record-nested-op!-impl
+      agent-node#
+      ~nested-op-type
+      start-time-millis#
+      (h/current-time-millis)
+      (assoc info-map# "objectName" ~object-name))
+     ~res-sym
+   ))
+
 (defn wrap-agent-object
   [name obj]
   (cond
@@ -410,21 +430,115 @@
     (let [^EmbeddingStore obj obj]
       (reify
        EmbeddingStore
-
-       ;; TODO: <<<<>>>>
-       ; - capture name of the object
-       ; String add(Embedding embedding)
-       ; String add(Embedding embedding, Embedded embedded)
-       ; void add(String id, Embedding embedding)
-       ; List<String> addAll(List<Embedding> embeddings)
-       ; List<String> addAll(List<Embedding> embeddings, List<Embedded> e)
-       ; void addAll(List<String> ids, List<Embedding> eg, List<Embedded> e)
-       ; List<String> generateIds(int n)
-       ; void remove(String id)
-       ; void removeAll()
-       ; void removeAll(Filter filter)
-       ; void removeAll(Collection<String> ids)
-       ; EmbeddingSearchResult<Embedded> search(EmbeddingSearchRequest request)
+       (add [this embedding]
+         (with-traced
+          (.add obj embedding)
+          name
+          :db-write
+          [res]
+          {"op"        "add"
+           "embedding" (vec (.vector embedding))
+           "id"        res
+          }))
+       (^String add [this ^Embedding embedding ^Object embedded]
+         (with-traced
+          (.add obj embedding embedded)
+          name
+          :db-write
+          [res]
+          {"op"        "add"
+           "embedding" (vec (.vector embedding))
+           "embedded"  (str embedded)
+           "id"        res
+          }))
+       (^void add [this ^String id ^Embedding embedding]
+         (with-traced
+          (.add obj id embedding)
+          name
+          :db-write
+          [res]
+          {"op"        "add"
+           "embedding" (vec (.vector embedding))
+           "id"        id
+          }))
+       (addAll [this embeddings]
+         (with-traced
+          (.addAll obj embeddings)
+          name
+          :db-write
+          [res]
+          {"op"         "addAll"
+           "embeddings" (mapv #(vec (.vector ^Embedding %)) embeddings)
+           "ids"        res
+          }))
+       (addAll [this embeddings embeddeds]
+         (with-traced
+          (.addAll obj embeddings embeddeds)
+          name
+          :db-write
+          [res]
+          {"op"         "addAll"
+           "embeddings" (mapv #(vec (.vector ^Embedding %)) embeddings)
+           "embeddeds"  (mapv str embeddeds)
+           "ids"        res
+          }))
+       (addAll [this ids embeddings embeddeds]
+         (with-traced
+          (.addAll obj ids embeddings embeddeds)
+          name
+          :db-write
+          [res]
+          {"op"         "addAll"
+           "embeddings" (mapv #(vec (.vector ^Embedding %)) embeddings)
+           "embeddeds"  (mapv str embeddeds)
+           "ids"        ids
+          }))
+       (generateIds [this n]
+         (.generateIds obj n))
+       (remove [this id]
+         (with-traced
+          (.remove obj id)
+          name
+          :db-write
+          [res]
+          {"op" "remove"
+           "id" id
+          }))
+       (removeAll [this]
+         (with-traced
+          (.removeAll obj)
+          name
+          :db-write
+          [res]
+          {"op" "removeAll"
+          }))
+       (^void removeAll [this ^Filter filter]
+         (with-traced
+          (.removeAll obj filter)
+          name
+          :db-write
+          [res]
+          {"op"     "removeAll"
+           "filter" (str filter)
+          }))
+       (^void removeAll [this ^java.util.Collection ids]
+         (with-traced
+          (.removeAll obj ids)
+          name
+          :db-write
+          [res]
+          {"op"  "removeAll"
+           "ids" ids
+          }))
+       (search [this request]
+         (with-traced
+          (.search obj request)
+          name
+          :db-read
+          [res]
+          {"op" "search"
+           ;; TODO: <<<<>>>>
+          }))
 
        IUnderlying
        (getUnderlying [this] obj)
