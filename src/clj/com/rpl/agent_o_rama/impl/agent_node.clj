@@ -36,6 +36,7 @@
     ChatResponse
     StreamingChatResponseHandler]
    [dev.langchain4j.store.embedding
+    EmbeddingMatch
     EmbeddingStore]
    [dev.langchain4j.store.embedding.filter
     Filter]
@@ -437,7 +438,7 @@
           :db-write
           [res]
           {"op"        "add"
-           "embedding" (vec (.vector embedding))
+           "embedding" (.vector embedding)
            "id"        res
           }))
        (^String add [this ^Embedding embedding ^Object embedded]
@@ -447,7 +448,7 @@
           :db-write
           [res]
           {"op"        "add"
-           "embedding" (vec (.vector embedding))
+           "embedding" (.vector embedding)
            "embedded"  (str embedded)
            "id"        res
           }))
@@ -458,7 +459,7 @@
           :db-write
           [res]
           {"op"        "add"
-           "embedding" (vec (.vector embedding))
+           "embedding" (.vector embedding)
            "id"        id
           }))
        (addAll [this embeddings]
@@ -468,7 +469,7 @@
           :db-write
           [res]
           {"op"         "addAll"
-           "embeddings" (mapv #(vec (.vector ^Embedding %)) embeddings)
+           "embeddings" (mapv #(.vector ^Embedding %) embeddings)
            "ids"        res
           }))
        (addAll [this embeddings embeddeds]
@@ -478,7 +479,7 @@
           :db-write
           [res]
           {"op"         "addAll"
-           "embeddings" (mapv #(vec (.vector ^Embedding %)) embeddings)
+           "embeddings" (mapv #(.vector ^Embedding %) embeddings)
            "embeddeds"  (mapv str embeddeds)
            "ids"        res
           }))
@@ -489,7 +490,7 @@
           :db-write
           [res]
           {"op"         "addAll"
-           "embeddings" (mapv #(vec (.vector ^Embedding %)) embeddings)
+           "embeddings" (mapv #(.vector ^Embedding %) embeddings)
            "embeddeds"  (mapv str embeddeds)
            "ids"        ids
           }))
@@ -536,8 +537,18 @@
           name
           :db-read
           [res]
-          {"op" "search"
-           ;; TODO: <<<<>>>>
+          {"op"      "search"
+           "request" {"filter"         (str (.filter request))
+                      "maxResults"     (.maxResults request)
+                      "minScore"       (.minScore request)
+                      "queryEmbedding" (.vector (.queryEmbedding request))}
+           "matches" (mapv
+                      (fn [^EmbeddingMatch match]
+                        {"embedded"  (str (.embedded match))
+                         "embedding" (.vector (.embedding match))
+                         "id"        (.embeddingId match)
+                         "score"     (.score match)})
+                      (.matches res))
           }))
 
        IUnderlying
