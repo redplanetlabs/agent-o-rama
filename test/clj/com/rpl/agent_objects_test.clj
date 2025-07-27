@@ -23,9 +23,9 @@
 (def ACQUIRED-ATOM)
 
 (defn inc-build!
-  [k]
+  [^String k]
   (transform [ATOM (keypath k) (nil->val 0)] inc BUILDS-ATOM)
-  k)
+  (String. k))
 
 (defn every-identical?
   [objs]
@@ -92,6 +92,7 @@
                            o
                            ACQUIRED-ATOM)
                    (h/acquire-semaphore (get SEMS n) 1)
+                   (aor/result! agent-node "done")
                  ))))))
          (rtest/launch-module! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
@@ -123,21 +124,54 @@
          (is (= {"reg1" 1 "reg2" 1} @plain-atom))
          (is (= {"obj3" 1} @BUILDS-ATOM))
 
+         (reset! BUILDS-ATOM {})
          (dotimes [_ 5]
            (aor/agent-initiate foo "obj4"))
          (is (condition-attained? (= 5 (count (get @ACQUIRED-ATOM "obj4")))))
          (is (every-identical? (get @ACQUIRED-ATOM "obj4")))
          (is (= "obj4" (select-any ["obj4" FIRST] @ACQUIRED-ATOM)))
          (is (= {"reg1" 1 "reg2" 1} @plain-atom))
-         (is (= {"obj3" 1 "obj4" 1} @BUILDS-ATOM))
+         (is (= {"obj4" 1} @BUILDS-ATOM))
+
+         (reset! BUILDS-ATOM {})
+         (dotimes [_ 5]
+           (aor/agent-initiate foo "obj1"))
+         (is (condition-stable? (= 3 (count (get @ACQUIRED-ATOM "obj1")))))
+         (is (= 3 (unique-objects-count (get @ACQUIRED-ATOM "obj1"))))
+         (is (= {"obj1" 3} @BUILDS-ATOM))
+
+         (h/release-semaphore (get SEMS "obj1"))
+         (is (condition-stable? (= 4 (count (get @ACQUIRED-ATOM "obj1")))))
+         (is (= 3 (unique-objects-count (get @ACQUIRED-ATOM "obj1"))))
+         (is (= {"obj1" 3} @BUILDS-ATOM))
+
+         (h/release-semaphore (get SEMS "obj1"))
+         (is (condition-stable? (= 5 (count (get @ACQUIRED-ATOM "obj1")))))
+         (is (= 3 (unique-objects-count (get @ACQUIRED-ATOM "obj1"))))
+         (is (= {"obj1" 3} @BUILDS-ATOM))
+
+
+         (reset! BUILDS-ATOM {})
+         (dotimes [_ 6]
+           (aor/agent-initiate foo "obj2"))
+         (is (condition-stable? (= 4 (count (get @ACQUIRED-ATOM "obj2")))))
+         (is (= 4 (unique-objects-count (get @ACQUIRED-ATOM "obj2"))))
+         (is (= {"obj2" 4} @BUILDS-ATOM))
+
+         (h/release-semaphore (get SEMS "obj2"))
+         (is (condition-stable? (= 5 (count (get @ACQUIRED-ATOM "obj2")))))
+         (is (= 4 (unique-objects-count (get @ACQUIRED-ATOM "obj2"))))
+         (is (= {"obj2" 4} @BUILDS-ATOM))
+
+         (h/release-semaphore (get SEMS "obj2"))
+         (is (condition-stable? (= 6 (count (get @ACQUIRED-ATOM "obj2")))))
+         (is (= 4 (unique-objects-count (get @ACQUIRED-ATOM "obj2"))))
+         (is (= {"obj2" 4} @BUILDS-ATOM))
 
          ;; TODO: <<<<>>>>
-         ;;  - use semaphores to block to verify what happens
          ;;  - verify timeout on acquire causes exception on the acquire
          ;;  callsite
          ;;    - configure config to lower timeout
-         ;;  - track number of times builder fn called and verify it never goes
-         ;;  above limit
         )))))
 
 ;; TODO: <<<<>>>>
