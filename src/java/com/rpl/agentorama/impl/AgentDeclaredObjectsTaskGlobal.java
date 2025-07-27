@@ -40,7 +40,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
 
   private static Object makeObject(String name, IFn afn, AgentObjectSetup setup, boolean autoTracing) {
     Object o = afn.invoke(setup);
-    return autoTracing? AORHelpers.WRAP_AGENT_OBJECT.invoke(name, o) : o;
+    return autoTracing ? AORHelpers.WRAP_AGENT_OBJECT.invoke(name, o) : o;
   }
 
   @Override

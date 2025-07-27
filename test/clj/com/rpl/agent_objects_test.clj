@@ -6,6 +6,7 @@
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
@@ -14,8 +15,27 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.test-common :as tc])
+   [com.rpl.test-common :as tc]
+   [meander.epsilon :as m])
   (:import
+   [dev.langchain4j.data.message
+    AiMessage
+    UserMessage]
+   [dev.langchain4j.model.chat.response
+    ChatResponse$Builder]
+   [dev.langchain4j.model.chat
+    ChatModel
+    StreamingChatModel]
+   [dev.langchain4j.model.chat.request
+    ChatRequest]
+   [dev.langchain4j.model.chat.response
+    ChatResponse
+    StreamingChatResponseHandler]
+   [dev.langchain4j.model.output
+    FinishReason
+    TokenUsage]
+   [dev.langchain4j.store.embedding
+    EmbeddingStore]
    [java.util
     IdentityHashMap]))
 
@@ -186,9 +206,231 @@
                                "Could not acquire object."))
         )))))
 
-;; TODO: <<<<>>>>
-;; - test auto-wrap
-;;   - can make custom impl of ChatModel that makes a fixed ChatResponse for
-;;   doChat
-;; - test StreamingChatModel streaming
-;;  - custom impl that calls the callbacks directly and synchronously
+(defrecord MockChatModel1 []
+  ChatModel
+  (doChat [this request]
+    (let [^UserMessage m (-> request
+                             .messages
+                             last)]
+      (-> (ChatResponse$Builder.)
+          (.aiMessage (AiMessage. (str (.singleText m) "!!!")))
+          (.finishReason FinishReason/STOP)
+          (.modelName "aor-model")
+          (.tokenUsage (TokenUsage. (int 10) (int 20)))
+          .build))))
+
+(defrecord MockChatModel2 []
+  ChatModel
+  (^ChatResponse chat [this ^ChatRequest request]
+    (let [^UserMessage m (-> request
+                             .messages
+                             last)]
+      (-> (ChatResponse$Builder.)
+          (.aiMessage (AiMessage. (str (.singleText m) "!?")))
+          (.finishReason FinishReason/OTHER)
+          (.modelName "aor-model2")
+          (.tokenUsage (TokenUsage. (int 15) (int 40)))
+          .build))))
+
+
+(defrecord MockStreamingChatModel1 []
+  StreamingChatModel
+  (doChat [this request handler]
+    (let [^UserMessage m (-> request
+                             .messages
+                             last)
+          s        (.singleText m)
+          response (-> (ChatResponse$Builder.)
+                       (.aiMessage (AiMessage. (str "You said " s)))
+                       (.finishReason FinishReason/STOP)
+                       (.modelName "aor-model")
+                       (.tokenUsage (TokenUsage. (int 10) (int 20)))
+                       .build)]
+      (.onPartialResponse handler "You ")
+      (.onPartialResponse handler "said ")
+      (.onPartialResponse handler s)
+      (.onCompleteResponse handler response)
+    )))
+
+(defrecord MockStreamingChatModel2 []
+  StreamingChatModel
+  (^void chat [this ^ChatRequest request ^StreamingChatResponseHandler handler]
+    (let [^UserMessage m (-> request
+                             .messages
+                             last)
+          s        (.singleText m)
+          response (-> (ChatResponse$Builder.)
+                       (.aiMessage (AiMessage. (str "You said " s)))
+                       (.finishReason FinishReason/STOP)
+                       (.modelName "aor-model")
+                       (.tokenUsage (TokenUsage. (int 10) (int 20)))
+                       .build)]
+      (.onPartialResponse handler "You ")
+      (.onPartialResponse handler "said ")
+      (.onPartialResponse handler s)
+      (.onCompleteResponse handler response)
+    )))
+
+(deftest object-wrapping-test
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (aor/declare-agent-object-builder
+         topology
+         "chat1"
+         (fn [setup] (->MockChatModel1)))
+        (aor/declare-agent-object-builder
+         topology
+         "chat2"
+         (fn [setup] (->MockChatModel1))
+         {:auto-tracing? false})
+        (aor/declare-agent-object-builder
+         topology
+         "chat3"
+         (fn [setup] (->MockChatModel2)))
+        (aor/declare-agent-object-builder
+         topology
+         "schat1"
+         (fn [setup] (->MockStreamingChatModel1)))
+        (aor/declare-agent-object-builder
+         topology
+         "schat2"
+         (fn [setup] (->MockStreamingChatModel2)))
+        (->
+          topology
+          (aor/new-agent "foo")
+          (aor/node
+           "start"
+           nil
+           (fn [agent-node model prompt]
+             (let [model (aor/get-agent-object agent-node model)]
+               (aor/result! agent-node (lc4j/chat model prompt)))
+           )))))
+     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (bind module-name (get-module-name module))
+
+     (bind agent-manager (aor/agent-manager ipc module-name))
+     (bind foo (aor/agent-client agent-manager "foo"))
+     (bind root-pstate
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-root-task-global-name "foo")))
+     (bind traces-query
+       (foreign-query ipc
+                      module-name
+                      (queries/tracing-query-name "foo")))
+
+     (bind inv (aor/agent-initiate foo "chat1" "Hello"))
+     (bind [agent-task-id agent-id] (tc/extract-invoke inv))
+     (is (= "Hello!!!" (aor/agent-result foo inv)))
+     (bind root
+       (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                           root-pstate
+                           {:pkey agent-task-id}))
+     (bind trace
+       (foreign-invoke-query traces-query
+                             agent-task-id
+                             [[agent-task-id root]]
+                             10000))
+     (is
+      (trace-matches?
+       (:invokes-map trace)
+       {!id1
+        {:agent-id      ?agent-id
+         :emits         []
+         :agent-task-id ?agent-task-id
+         :node          "start"
+         :result        {:val "Hello!!!" :failure? false}
+         :nested-ops    [{:type :model-call
+                          :info
+                          {"modelName"        "aor-model"
+                           "inputTokenCount"  10
+                           "finishReason"     "stop"
+                           "objectName"       "chat1"
+                           "input"
+                           [{"type"     "user"
+                             "contents" [{"type" "text" "text" "Hello"}]}]
+                           "response"         "Hello!!!"
+                           "outputTokenCount" 20}}]
+         :input         ["chat1" "Hello"]}}
+       (m/guard
+        (and (= ?agent-id agent-id)
+             (= ?agent-task-id agent-task-id)))
+      ))
+
+
+     (bind inv (aor/agent-initiate foo "chat2" "Hello"))
+     (bind [agent-task-id agent-id] (tc/extract-invoke inv))
+     (is (= "Hello!!!" (aor/agent-result foo inv)))
+     (bind root
+       (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                           root-pstate
+                           {:pkey agent-task-id}))
+     (bind trace
+       (foreign-invoke-query traces-query
+                             agent-task-id
+                             [[agent-task-id root]]
+                             10000))
+     (is
+      (trace-matches?
+       (:invokes-map trace)
+       {!id1
+        {:agent-id      ?agent-id
+         :emits         []
+         :agent-task-id ?agent-task-id
+         :node          "start"
+         :result        {:val "Hello!!!" :failure? false}
+         :nested-ops    []
+         :input         ["chat2" "Hello"]}}
+       (m/guard
+        (and (= ?agent-id agent-id)
+             (= ?agent-task-id agent-task-id)))
+      ))
+
+     (bind inv (aor/agent-initiate foo "chat3" "Hello"))
+     (bind [agent-task-id agent-id] (tc/extract-invoke inv))
+     (is (= "Hello!?" (aor/agent-result foo inv)))
+     (bind root
+       (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                           root-pstate
+                           {:pkey agent-task-id}))
+     (bind trace
+       (foreign-invoke-query traces-query
+                             agent-task-id
+                             [[agent-task-id root]]
+                             10000))
+     (is
+      (trace-matches?
+       (:invokes-map trace)
+       {!id1
+        {:agent-id      ?agent-id
+         :emits         []
+         :agent-task-id ?agent-task-id
+         :node          "start"
+         :result        {:val "Hello!?" :failure? false}
+         :nested-ops    [{:type :model-call
+                          :info
+                          {"modelName"        "aor-model2"
+                           "inputTokenCount"  15
+                           "finishReason"     "other"
+                           "objectName"       "chat3"
+                           "input"
+                           [{"type"     "user"
+                             "contents" [{"type" "text" "text" "Hello"}]}]
+                           "response"         "Hello!?"
+                           "outputTokenCount" 40}}]
+         :input         ["chat3" "Hello"]}}
+       (m/guard
+        (and (= ?agent-id agent-id)
+             (= ?agent-task-id agent-task-id)))
+      ))
+
+
+     ;; TODO: <<<<>>>>
+     ;; - test StreamingChatModel streaming
+
+     ;; TODO: <<<<>>>>>
+     ;;  - test EmbeddingStore wrapping
+    )))

@@ -13,6 +13,8 @@
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest])
   (:import
+   [com.rpl.agentorama
+    AgentInvoke]
    [com.rpl.rama.helpers
     TopologyUtils]
    [java.util.concurrent
@@ -83,3 +85,7 @@
 
 (defn mk-cf [] (CompletableFuture.))
 (defn complete-cf! [^CompletableFuture cf v] (.complete cf v))
+
+(defn extract-invoke
+  [^AgentInvoke inv]
+  [(.getTaskId inv) (.getAgentInvokeId inv)])

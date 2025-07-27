@@ -1882,70 +1882,68 @@
                                  [[agent-task-id root]]
                                  10000))
          ;; because of early return, subsequent recordings of
-         ;; :invoked-agg-invoke-id
-         ;; are async
+         ;; :invoked-agg-invoke-id are async
          (is
-          (condition-attained?
-           (trace-matches?
-            (:invokes-map res)
-            {!id1
-             {:started-agg?  true
-              :agg-invoke-id !id2
-              :agent-id      ?agent-id
-              :emits
-              [{:invoke-id      !id3
-                :target-task-id ?agent-task-id
-                :node-name      "agg"
-                :args           [1]}
-               {:invoke-id      !id4
-                :target-task-id ?agent-task-id
-                :node-name      "agg"
-                :args           [3]}
-               {:invoke-id      !id5
-                :target-task-id ?agent-task-id
-                :node-name      "agg"
-                :args           [7]}
-               {:invoke-id      !id6
-                :target-task-id ?agent-task-id
-                :node-name      "agg"
-                :args           [2]}
-               {:invoke-id      !id7
-                :target-task-id ?agent-task-id
-                :node-name      "agg"
-                :args           [100]}]
-              :agent-task-id ?agent-task-id
-              :node          "start"
-              :result        nil
-              :nested-ops    []
-              :input         []}
-             !id3 {:invoked-agg-invoke-id !id2}
-             !id4 {:invoked-agg-invoke-id !id2}
-             !id5 {:invoked-agg-invoke-id !id2}
-             !id6 {:invoked-agg-invoke-id !id2}
-             !id7 {:invoked-agg-invoke-id !id2}
-             !id2
-             {:agg-invoke-id   nil
-              :agg-input-count 3
-              :agent-id        0
-              :agg-start-res   nil
-              :emits           []
-              :agent-task-id   ?agent-task-id
-              :node            "agg"
-              :agg-inputs-first-10
-              [{:invoke-id !id3 :args [1]}
-               {:invoke-id !id4 :args [3]}
-               {:invoke-id !id5 :args [7]}]
-              :agg-ack-val     !ack-val
-              :result          {:val 11 :failure? false}
-              :agg-finished?   true
-              :nested-ops      []
-              :agg-state       11
-              :input           [11 nil]
-              :agg-start-invoke-id !id1}}
-            (m/guard
-             (and (= ?agent-id agent-id)
-                  (= ?agent-task-id agent-task-id)))
-           )))
+          (trace-matches?
+           (:invokes-map res)
+           {!id1
+            {:started-agg?  true
+             :agg-invoke-id !id2
+             :agent-id      ?agent-id
+             :emits
+             [{:invoke-id      !id3
+               :target-task-id ?agent-task-id
+               :node-name      "agg"
+               :args           [1]}
+              {:invoke-id      !id4
+               :target-task-id ?agent-task-id
+               :node-name      "agg"
+               :args           [3]}
+              {:invoke-id      !id5
+               :target-task-id ?agent-task-id
+               :node-name      "agg"
+               :args           [7]}
+              {:invoke-id      !id6
+               :target-task-id ?agent-task-id
+               :node-name      "agg"
+               :args           [2]}
+              {:invoke-id      !id7
+               :target-task-id ?agent-task-id
+               :node-name      "agg"
+               :args           [100]}]
+             :agent-task-id ?agent-task-id
+             :node          "start"
+             :result        nil
+             :nested-ops    []
+             :input         []}
+            !id3 {:invoked-agg-invoke-id !id2}
+            !id4 {:invoked-agg-invoke-id !id2}
+            !id5 {:invoked-agg-invoke-id !id2}
+            !id6 {:invoked-agg-invoke-id !id2}
+            !id7 {:invoked-agg-invoke-id !id2}
+            !id2
+            {:agg-invoke-id   nil
+             :agg-input-count 3
+             :agent-id        0
+             :agg-start-res   nil
+             :emits           []
+             :agent-task-id   ?agent-task-id
+             :node            "agg"
+             :agg-inputs-first-10
+             [{:invoke-id !id3 :args [1]}
+              {:invoke-id !id4 :args [3]}
+              {:invoke-id !id5 :args [7]}]
+             :agg-ack-val     !ack-val
+             :result          {:val 11 :failure? false}
+             :agg-finished?   true
+             :nested-ops      []
+             :agg-state       11
+             :input           [11 nil]
+             :agg-start-invoke-id !id1}}
+           (m/guard
+            (and (= ?agent-id agent-id)
+                 (= ?agent-task-id agent-task-id)))
+          ))
 
          (reset! completions-atom 0)
          (bind agent-manager (aor/agent-manager ipc module-name))
