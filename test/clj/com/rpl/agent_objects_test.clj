@@ -4,6 +4,7 @@
         [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -21,6 +22,7 @@
 (def SEMS)
 (def BUILDS-ATOM)
 (def ACQUIRED-ATOM)
+(def FAILS-ATOM)
 
 (defn inc-build!
   [^String k]
@@ -48,6 +50,7 @@
                                  "obj4" (h/mk-semaphore 0)}
                   BUILDS-ATOM   (atom {})
                   ACQUIRED-ATOM (atom {})
+                  FAILS-ATOM    (atom [])
                   i/hook:building-plain-agent-object
                   (fn [name o]
                     (transform [ATOM (keypath name) (nil->val 0)]
@@ -87,15 +90,21 @@
                "start"
                nil
                (fn [agent-node n]
-                 (let [o (aor/get-agent-object agent-node n)]
-                   (setval [ATOM (keypath n) (nil->val []) AFTER-ELEM]
-                           o
-                           ACQUIRED-ATOM)
-                   (h/acquire-semaphore (get SEMS n) 1)
-                   (aor/result! agent-node "done")
-                 ))))))
+                 (try
+                   (let [o (aor/get-agent-object agent-node n)]
+                     (setval [ATOM (keypath n) (nil->val []) AFTER-ELEM]
+                             o
+                             ACQUIRED-ATOM)
+                     (h/acquire-semaphore (get SEMS n) 1))
+                   (catch Exception e
+                     (swap! FAILS-ATOM conj e)))
+                 (aor/result! agent-node "done")
+
+               )))))
          (rtest/launch-module! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
+         (bind config-depot
+           (foreign-depot ipc module-name (po/agent-config-depot-name "foo")))
 
          (bind agent-manager (aor/agent-manager ipc module-name))
          (bind foo (aor/agent-client agent-manager "foo"))
@@ -168,10 +177,13 @@
          (is (= 4 (unique-objects-count (get @ACQUIRED-ATOM "obj2"))))
          (is (= {"obj2" 4} @BUILDS-ATOM))
 
-         ;; TODO: <<<<>>>>
-         ;;  - verify timeout on acquire causes exception on the acquire
-         ;;  callsite
-         ;;    - configure config to lower timeout
+         (foreign-append! config-depot
+                          (aor-types/change-acquire-object-timeout-millis 10))
+
+         (aor/agent-initiate foo "obj2")
+         (is (condition-stable? (= 1 (count @FAILS-ATOM))))
+         (is (str/starts-with? (.getMessage ^Exception (first @FAILS-ATOM))
+                               "Could not acquire object."))
         )))))
 
 ;; TODO: <<<<>>>>
