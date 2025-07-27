@@ -242,8 +242,8 @@
           s        (.singleText m)
           response (-> (ChatResponse$Builder.)
                        (.aiMessage (AiMessage. (str "You said " s)))
-                       (.finishReason FinishReason/STOP)
-                       (.modelName "aor-model")
+                       (.finishReason FinishReason/LENGTH)
+                       (.modelName "s-aor-model")
                        (.tokenUsage (TokenUsage. (int 10) (int 20)))
                        .build)]
       (.onPartialResponse handler "You ")
@@ -261,12 +261,13 @@
           s        (.singleText m)
           response (-> (ChatResponse$Builder.)
                        (.aiMessage (AiMessage. (str "You said " s)))
-                       (.finishReason FinishReason/STOP)
-                       (.modelName "aor-model")
+                       (.finishReason FinishReason/CONTENT_FILTER)
+                       (.modelName "s-aor-model2")
                        (.tokenUsage (TokenUsage. (int 10) (int 20)))
                        .build)]
       (.onPartialResponse handler "You ")
-      (.onPartialResponse handler "said ")
+      (.onPartialResponse handler "sa")
+      (.onPartialResponse handler "id ")
       (.onPartialResponse handler s)
       (.onCompleteResponse handler response)
     )))
@@ -428,9 +429,86 @@
       ))
 
 
-     ;; TODO: <<<<>>>>
-     ;; - test StreamingChatModel streaming
+     (bind inv (aor/agent-initiate foo "schat1" "Hi"))
+     (bind [agent-task-id agent-id] (tc/extract-invoke inv))
+     (is (= "You said Hi" (aor/agent-result foo inv)))
+     (is (= ["You " "said " "Hi"] @(aor/agent-stream foo inv "start")))
 
+     (bind root
+       (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                           root-pstate
+                           {:pkey agent-task-id}))
+     (bind trace
+       (foreign-invoke-query traces-query
+                             agent-task-id
+                             [[agent-task-id root]]
+                             10000))
+     (is
+      (trace-matches?
+       (:invokes-map trace)
+       {!id1
+        {:agent-id      ?agent-id
+         :emits         []
+         :agent-task-id ?agent-task-id
+         :node          "start"
+         :result        {:val "You said Hi" :failure? false}
+         :nested-ops    [{:type :model-call
+                          :info
+                          {"modelName"        "s-aor-model"
+                           "inputTokenCount"  10
+                           "finishReason"     "length"
+                           "objectName"       "schat1"
+                           "input"
+                           [{"type"     "user"
+                             "contents" [{"type" "text" "text" "Hi"}]}]
+                           "response"         "You said Hi"
+                           "outputTokenCount" 20}}]
+         :input         ["schat1" "Hi"]}}
+       (m/guard
+        (and (= ?agent-id agent-id)
+             (= ?agent-task-id agent-task-id)))
+      ))
+
+
+     (bind inv (aor/agent-initiate foo "schat2" "Hi"))
+     (bind [agent-task-id agent-id] (tc/extract-invoke inv))
+     (is (= "You said Hi" (aor/agent-result foo inv)))
+     (is (= ["You " "sa" "id " "Hi"] @(aor/agent-stream foo inv "start")))
+
+     (bind root
+       (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                           root-pstate
+                           {:pkey agent-task-id}))
+     (bind trace
+       (foreign-invoke-query traces-query
+                             agent-task-id
+                             [[agent-task-id root]]
+                             10000))
+     (is
+      (trace-matches?
+       (:invokes-map trace)
+       {!id1
+        {:agent-id      ?agent-id
+         :emits         []
+         :agent-task-id ?agent-task-id
+         :node          "start"
+         :result        {:val "You said Hi" :failure? false}
+         :nested-ops    [{:type :model-call
+                          :info
+                          {"modelName"        "s-aor-model2"
+                           "inputTokenCount"  10
+                           "finishReason"     "content_filter"
+                           "objectName"       "schat2"
+                           "input"
+                           [{"type"     "user"
+                             "contents" [{"type" "text" "text" "Hi"}]}]
+                           "response"         "You said Hi"
+                           "outputTokenCount" 20}}]
+         :input         ["schat2" "Hi"]}}
+       (m/guard
+        (and (= ?agent-id agent-id)
+             (= ?agent-task-id agent-task-id)))
+      ))
      ;; TODO: <<<<>>>>>
      ;;  - test EmbeddingStore wrapping
     )))
