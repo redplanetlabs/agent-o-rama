@@ -407,10 +407,9 @@
         has-paginated-children? (fn [node-id]
                                   (when-let [node-data (get data node-id)]
                                     (let [emitted-ids (set (map :invoke-id (:emits node-data)))
-                                          paginated-children (:has-paginated-children node-data)]
-                                      (some #(and (contains? emitted-ids %)
-                                                  (not (contains? data %)))
-                                            paginated-children))))
+                                          node-ids (set (keys data))]
+                                      (some #(not (contains? node-ids %))
+                                            emitted-ids))))
         
         ;; Create phantom nodes for pagination
         phantom-nodes (for [node nodes
@@ -421,6 +420,7 @@
                          :data {:label "Click to paginate"
                                 :parent-node-id node-id
                                 :is-phantom true}})
+        _ (println "phantom-nodes" phantom-nodes)
         
         ;; Create edges from parent nodes to their phantom children
         phantom-edges (for [phantom phantom-nodes

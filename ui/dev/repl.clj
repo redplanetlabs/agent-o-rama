@@ -13,8 +13,6 @@
   (:import
    [java.util.concurrent ScheduledThreadPoolExecutor TimeUnit]))
 
-;; check for closed modules, check for new agents on existing modules,
-;; check for removed agents, and for new modules
 (defn refresh-agent-modules! []
   (let [rama-client (sys/get-object :rama-client)
         modules (deployed-module-names rama-client)]

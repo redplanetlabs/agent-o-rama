@@ -119,11 +119,12 @@
          (foreign-select-one [(keypath agent-id) :root-invoke-id]
                              (:root-pstate (objects module-id agent-name))
                              {:pkey agent-task-id})]
-     (transform [:invokes-map]
-                remove-implicit-nodes
-                (foreign-invoke-query (:tracing-query (objects module-id agent-name))
-                                      agent-task-id
-                                      [[agent-task-id root-invoke-id]]
-                                      10)))})
+     (def t (transform [:invokes-map]
+                       remove-implicit-nodes
+                       (foreign-invoke-query (:tracing-query (objects module-id agent-name))
+                                             agent-task-id
+                                             [[agent-task-id root-invoke-id]]
+                                             10)))
+     t)})
 
 

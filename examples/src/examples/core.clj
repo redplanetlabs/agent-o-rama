@@ -32,26 +32,26 @@
                       (aor/result! agent-node [agg node-start-res])))))
 
 (aor/defagentmodule AggModule 
- {}
- [topology]
- (-> topology
-     (aor/new-agent "agg-2")
-     (aor/node "start"
-               "abc"
-               (fn [agent-node arg]
-                 (aor/emit! agent-node "abc" (str arg "!"))
-                 ))
-     (aor/agg-start-node "abc"
-                         "agg"
-                         (fn [agent-node arg]
-                           (dotimes [_ 3]
-                             (aor/emit! agent-node "agg" 1))
-                           (str arg "?")))
-     (aor/agg-node "agg"
-                   nil
-                   aggs/+sum
-                   (fn [agent-node agg node-start-res]
-                     (aor/result! agent-node [agg node-start-res]))))
+  {}
+  [topology]
+  (-> topology
+      (aor/new-agent "agg-2")
+      (aor/node "start"
+                "abc"
+                (fn [agent-node arg]
+                  (aor/emit! agent-node "abc" (str arg "!"))
+                  ))
+      (aor/agg-start-node "abc"
+                          "agg"
+                          (fn [agent-node arg]
+                            (dotimes [_ 3]
+                              (aor/emit! agent-node "agg" 1))
+                            (str arg "?")))
+      (aor/agg-node "agg"
+                    nil
+                    aggs/+sum
+                    (fn [agent-node agg node-start-res]
+                      (aor/result! agent-node [agg node-start-res]))))
   
   (-> topology
       (aor/new-agent "loop")
@@ -71,4 +71,5 @@
                   (if (>= 0 arg)
                     (aor/result! agent-node "done! node 2")
                     (aor/emit! agent-node "node1" (dec arg)))))))
+
 
