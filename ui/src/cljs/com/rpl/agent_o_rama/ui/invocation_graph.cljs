@@ -420,7 +420,6 @@
                          :data {:label "Click to paginate"
                                 :parent-node-id node-id
                                 :is-phantom true}})
-        _ (println "phantom-nodes" phantom-nodes)
         
         ;; Create edges from parent nodes to their phantom children
         phantom-edges (for [phantom phantom-nodes
