@@ -161,8 +161,9 @@
                                                   
                                                   (set-selected-node (clj->js target-node)))
                                                 ;; Load the unloaded node
+
                                                 (when handle-paginate-node
-                                                  (handle-paginate-node emit-id (:id data))))))}
+                                                  (handle-paginate-node emit-id)))))}
                            ($ :div {:className "text-xs text-purple-600"}
                               ($ :div (str "→ " (:node-name emit)))
                               (when (:args emit)
@@ -403,23 +404,28 @@
                  :source (str from)
                  :target (str to)})
         
-        ;; Check if a node's children are paginated (not all loaded)
-        has-paginated-children? (fn [node-id]
-                                  (when-let [node-data (get data node-id)]
-                                    (let [emitted-ids (set (map :invoke-id (:emits node-data)))
-                                          node-ids (set (keys data))]
-                                      (some #(not (contains? node-ids %))
-                                            emitted-ids))))
+        ;; Get missing child node IDs for a given parent node
+        get-missing-children (fn [node-id]
+                               (when-let [node-data (get data node-id)]
+                                 (let [emitted-ids (set (map :invoke-id (:emits node-data)))
+                                       node-ids (set (keys data))]
+                                   (filter #(not (contains? node-ids %)) emitted-ids))))
         
         ;; Create phantom nodes for pagination
         phantom-nodes (for [node nodes
-                            :let [node-id (-> node :data :node-id)]
-                            :when (has-paginated-children? node-id)]
-                        {:id (str "phantom-" node-id)
-                         :type "phantom"
-                         :data {:label "Click to paginate"
-                                :parent-node-id node-id
-                                :is-phantom true}})
+                            :let [node-id (-> node :data :node-id)
+                                  missing-children (get-missing-children node-id)]
+                            :when (seq missing-children)]
+                        (for [missing-child-id missing-children]
+                          {:id (str "phantom-" node-id "-" missing-child-id)
+                           :type "phantom"
+                           :data {:label "Click to paginate"
+                                  :parent-node-id node-id
+                                  :missing-node-id missing-child-id
+                                  :is-phantom true}}))
+        
+        ;; Flatten the nested phantom nodes
+        phantom-nodes (apply concat phantom-nodes)
         
         ;; Create edges from parent nodes to their phantom children
         phantom-edges (for [phantom phantom-nodes
@@ -499,19 +505,18 @@
         [flow-edges set-edges on-edges-change] (useEdgesState (clj->js edges))
         
         handle-paginate-node (uix/use-callback
-                              (fn [node-id]
-                                 ;; need :next-task-invoke-pairs to be sent to the server
-
-                                (println "nodee id" node-id "phantom node id" phantom-node-id)
+                              (fn [missing-node-id]
+                                (println "Loading missing node id:" missing-node-id)
                                 
-                                #_(println "next-task-invoke-pairs" next-task-invoke-pairs)
-                                (let [[task-id _] (first (filter (fn [[a b]] (= b node-id)) next-task-invoke-pairs))]
-                                  (println "task-id!" task-id))
+                                ;; Find the task-id for this missing node from next-task-invoke-pairs
+                                ;; Convert to string for comparison since JS numbers truncate longs
+                                (let [[task-id _] (first (filter (fn [[a b]] (= (str b) (str missing-node-id))) next-task-invoke-pairs))]
+                                  (println "Found task-id for missing node:" task-id))
                                 
-                                (when-not (contains? loading-nodes node-id)
-                                  (set-loading-nodes #(conj % node-id))
+                                (when-not (contains? loading-nodes missing-node-id)
+                                  (set-loading-nodes #(conj % missing-node-id))
                                   (-> (common/fetch (str api-url 
-                                                         "?depth=1&start-node-id=" node-id))
+                                                         "?depth=1&start-node-id=" missing-node-id))
                                       (.then (fn [response]
                                                (let [new-data (:invokes-map response)
                                                      
@@ -527,10 +532,10 @@
                                                  ;; Replace all nodes and edges with the re-laid out versions, keepign the selection
                                                  (set-nodes (clj->js nodes))
                                                  (set-edges (clj->js edges))
-                                                 (set-loading-nodes #(disj % node-id)))))
+                                                 (set-loading-nodes #(disj % missing-node-id)))))
                                       (.catch (fn [error]
                                                 (js/console.error "Failed to load paginated data:" error)
-                                                (set-loading-nodes #(disj % node-id)))))))
+                                                (set-loading-nodes #(disj % missing-node-id)))))))
                               [graph-data api-url loading-nodes set-nodes set-edges])
         
         handle-execute-fork (uix/use-callback
@@ -609,12 +614,12 @@
                                                 (uix.core/as-react
                                                  (fn [{:keys [data]}]
                                                    (let [data (js->clj data :keywordize-keys true)
-                                                         parent-node-id (:parent-node-id data)]
+                                                         missing-node-id (:missing-node-id data)]
                                                      ($ :div {:className "relative cursor-pointer"
                                                               :onClick (fn [e]
                                                                          (.stopPropagation e)
-                                                                         (println "data" data)
-                                                                         (handle-paginate-node (:id data)))}
+                                                                         (println "phantom data" data)
+                                                                         (handle-paginate-node missing-node-id))}
                                                         ($ :div {:className "bg-gray-100 text-gray-600 p-3 rounded-md shadow-lg border-2 border-dashed border-gray-400 hover:bg-gray-200 transition-colors"
                                                                  :style {:width "170px" :height "40px"}}
                                                            (:label data))
