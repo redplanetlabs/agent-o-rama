@@ -109,20 +109,30 @@
 
 (defn invoke-paginated 
   [{{:keys [module-id agent-name invoke-id]} :path-params
-    {:strs [start-node-id depth] :or {depth "3"}} :query-params
+    {:strs [paginate-task-id missing-node-id]} :query-params
     :as req}]
-  
+
+  (def paginate-task-id paginate-task-id)
+  (def missing-node-id missing-node-id)
+
   {:status 200
    :body
    (let [[agent-task-id agent-id] (parse-url-trace-id invoke-id)
-         root-invoke-id
-         (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                             (:root-pstate (objects module-id agent-name))
-                             {:pkey agent-task-id})]
+
+         pair
+         (cond
+           (and (string? paginate-task-id)
+                (string? missing-node-id))
+           [(parse-long paginate-task-id) (parse-long missing-node-id)]
+           (and (nil? paginate-task-id)
+                (nil? missing-node-id))
+           [agent-task-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                                              (:root-pstate (objects module-id agent-name))
+                                              {:pkey agent-task-id})])]
      (def t (transform [:invokes-map]
                        remove-implicit-nodes
                        (foreign-invoke-query (:tracing-query (objects module-id agent-name))
                                              agent-task-id
-                                             [[agent-task-id root-invoke-id]]
+                                             [pair]
                                              10)))
      t)})

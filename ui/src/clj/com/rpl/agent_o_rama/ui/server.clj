@@ -60,8 +60,8 @@
         {:get {:handler #'agents/invoke}}]
      ["/agents/:module-id/:agent-name/invocations/:invoke-id/paginated"
       {:get {:parameters {:query [:map
-                                  [:depth int?]
-                                  [:start-node-id {:optional true} string?]]}
+                                  [:paginate-task-id {:optional true} int?]
+                                  [:missing-node-id {:optional true} string?]]}
              :handler #'agents/invoke-paginated}}]
      
      ["/agents/:module-id/:agent-name/datasets"

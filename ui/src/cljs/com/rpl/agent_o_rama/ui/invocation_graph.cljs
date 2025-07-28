@@ -506,36 +506,35 @@
         
         handle-paginate-node (uix/use-callback
                               (fn [missing-node-id]
-                                (println "Loading missing node id:" missing-node-id)
                                 
                                 ;; Find the task-id for this missing node from next-task-invoke-pairs
                                 ;; Convert to string for comparison since JS numbers truncate longs
                                 (let [[task-id _] (first (filter (fn [[a b]] (= (str b) (str missing-node-id))) next-task-invoke-pairs))]
-                                  (println "Found task-id for missing node:" task-id))
-                                
-                                (when-not (contains? loading-nodes missing-node-id)
-                                  (set-loading-nodes #(conj % missing-node-id))
-                                  (-> (common/fetch (str api-url 
-                                                         "?depth=1&start-node-id=" missing-node-id))
-                                      (.then (fn [response]
-                                               (let [new-data (:invokes-map response)
-                                                     
-                                                     ;; Merge new data with existing graph data
-                                                     combined-data (merge graph-data new-data)
-                                                     
-                                                     ;; Re-process the entire combined graph with dagre layout
-                                                     {:keys [nodes edges]} (process-graph-data combined-data)]
-                                                 
-                                                 ;; Update the graph data state
-                                                 (set-graph-data combined-data)
-                                                 
-                                                 ;; Replace all nodes and edges with the re-laid out versions, keepign the selection
-                                                 (set-nodes (clj->js nodes))
-                                                 (set-edges (clj->js edges))
-                                                 (set-loading-nodes #(disj % missing-node-id)))))
-                                      (.catch (fn [error]
-                                                (js/console.error "Failed to load paginated data:" error)
-                                                (set-loading-nodes #(disj % missing-node-id)))))))
+                                  
+                                  
+                                  (when-not (contains? loading-nodes missing-node-id)
+                                    (set-loading-nodes #(conj % missing-node-id))
+                                    (-> (common/fetch (str api-url 
+                                                           "?paginate-task-id=" task-id "&missing-node-id=" missing-node-id))
+                                        (.then (fn [response]
+                                                 (let [new-data (:invokes-map response)
+                                                       
+                                                       ;; Merge new data with existing graph data
+                                                       combined-data (merge graph-data new-data)
+                                                       
+                                                       ;; Re-process the entire combined graph with dagre layout
+                                                       {:keys [nodes edges]} (process-graph-data combined-data)]
+                                                   
+                                                   ;; Update the graph data state
+                                                   (set-graph-data combined-data)
+                                                   
+                                                   ;; Replace all nodes and edges with the re-laid out versions, keepign the selection
+                                                   (set-nodes (clj->js nodes))
+                                                   (set-edges (clj->js edges))
+                                                   (set-loading-nodes #(disj % missing-node-id)))))
+                                        (.catch (fn [error]
+                                                  (js/console.error "Failed to load paginated data:" error)
+                                                  (set-loading-nodes #(disj % missing-node-id))))))))
                               [graph-data api-url loading-nodes set-nodes set-edges])
         
         handle-execute-fork (uix/use-callback
