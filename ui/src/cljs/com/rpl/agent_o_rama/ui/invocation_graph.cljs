@@ -485,7 +485,7 @@
             #{}
             modified-node-ids)))
 
-(defui graph [{:keys [initial-data api-url module-id agent-name invoke-id forking-mode? set-forking-mode? next-task-invoke-pairs]}]
+(defui graph [{:keys [initial-data api-url module-id agent-name invoke-id forking-mode? set-forking-mode? next-task-invoke-pairs set-next-task-invoke-pairs]}]
   (let [[selected-node set-selected-node] (uix/use-state nil)
         [loading-nodes set-loading-nodes] (uix/use-state #{})
         [graph-data set-graph-data] (uix/use-state initial-data)
@@ -518,6 +518,7 @@
                                                            "?paginate-task-id=" task-id "&missing-node-id=" missing-node-id))
                                         (.then (fn [response]
                                                  (let [new-data (:invokes-map response)
+                                                       new-task-pairs (:next-task-invoke-pairs response)
                                                        
                                                        ;; Merge new data with existing graph data
                                                        combined-data (merge graph-data new-data)
@@ -528,6 +529,11 @@
                                                    ;; Update the graph data state
                                                    (set-graph-data combined-data)
                                                    
+                                                   ;; Update next-task-invoke-pairs if new ones came back
+                                                   (when (and new-task-pairs set-next-task-invoke-pairs)
+                                                     (set-next-task-invoke-pairs 
+                                                       (concat next-task-invoke-pairs new-task-pairs)))
+                                                   
                                                    ;; Replace all nodes and edges with the re-laid out versions, keepign the selection
                                                    (set-nodes (clj->js nodes))
                                                    (set-edges (clj->js edges))
@@ -535,7 +541,7 @@
                                         (.catch (fn [error]
                                                   (js/console.error "Failed to load paginated data:" error)
                                                   (set-loading-nodes #(disj % missing-node-id))))))))
-                              [graph-data api-url loading-nodes set-nodes set-edges])
+                              [graph-data api-url loading-nodes set-nodes set-edges next-task-invoke-pairs set-next-task-invoke-pairs])
         
         handle-execute-fork (uix/use-callback
                              (fn []

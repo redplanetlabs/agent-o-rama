@@ -316,12 +316,20 @@
   (let [{:strs [module-id agent-name invoke-id]} (js->clj (wouter/useParams))
         [use-pagination? set-use-pagination] (uix/use-state true)
         [forking-mode? set-forking-mode?] (uix/use-state false)
+        [next-task-invoke-pairs set-next-task-invoke-pairs] (uix/use-state [])
         ;; Only fetch initial data - no need to refetch on pagination state changes
         {:keys [data loading?]}
         (common/use-query {:query-key ["invoke-initial" module-id agent-name invoke-id use-pagination?]
                            :query-url (if use-pagination?
                                         (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id "/paginated?depth=1")
-                                        (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id))})]
+                                        (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id))})
+        
+        ;; Initialize next-task-invoke-pairs when data loads
+        _ (uix/use-effect
+           (fn []
+             (when data
+               (set-next-task-invoke-pairs (:next-task-invoke-pairs data))))
+           [data])]
     (cond
       loading? ($ :div "loading...")
       (not data) ($ :div "no data")
@@ -341,7 +349,8 @@
          ;; Graph content
          ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
             ($ invocation-graph/graph {:initial-data (:invokes-map data)
-                                       :next-task-invoke-pairs (:next-task-invoke-pairs data)
+                                       :next-task-invoke-pairs next-task-invoke-pairs
+                                       :set-next-task-invoke-pairs set-next-task-invoke-pairs
                                        :api-url (when use-pagination? 
                                                   (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id "/paginated"))
                                        :module-id module-id
