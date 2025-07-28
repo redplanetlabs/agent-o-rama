@@ -5,6 +5,7 @@
         [com.rpl.rama.path])
   (:require
    [clojure.string :as str]
+   [clojure.walk :as walk]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.impl.core :as i]
@@ -357,24 +358,24 @@
                    (.add obj (embedding 1.0 2.0))
                    (.add obj (embedding 1.1 2.1) "a1")
                    (.add obj "abcd" (embedding 1.2 2.2))
-                   (.addAll obj [(embedding 1.3 2.3) (embedding 1.4 2.4)])
-                   (.addAll obj
-                            [(embedding 1.5 2.5) (embedding 1.6 2.6)]
-                            ["x" "y"])
-                   (.addAll obj
-                            ["7" "8"]
-                            [(embedding 1.7 2.7) (embedding 1.8 2.8)]
-                            ["x1" "y1"])
-                   (.remove obj "id1")
-                   (.removeAll obj)
-                   (.removeAll obj (IsEqualTo. "a" 1))
-                   (.removeAll obj ["id1" "id2"])
-                   (.search
-                    obj
-                    (EmbeddingSearchRequest. (embedding 0.1 0.3)
-                                             (int 5)
-                                             0.75
-                                             (IsEqualTo. "b" 2)))
+                   ; (.addAll obj [(embedding 1.3 2.3) (embedding 1.4 2.4)])
+                   ; (.addAll obj
+                   ;          [(embedding 1.5 2.5) (embedding 1.6 2.6)]
+                   ;          ["x" "y"])
+                   ; (.addAll obj
+                   ;          ["7" "8"]
+                   ;          [(embedding 1.7 2.7) (embedding 1.8 2.8)]
+                   ;          ["x1" "y1"])
+                   ; (.remove obj "id1")
+                   ; (.removeAll obj)
+                   ; (.removeAll obj (IsEqualTo. "a" 1))
+                   ; (.removeAll obj ["id1" "id2"])
+                   ; (.search
+                   ;  obj
+                   ;  (EmbeddingSearchRequest. (embedding 0.1 0.3)
+                   ;                           (int 5)
+                   ;                           0.75
+                   ;                           (IsEqualTo. "b" 2)))
                    (aor/result! agent-node "eee")
                  ))))))))
      (rtest/launch-module! ipc module {:tasks 4 :threads 2})
@@ -592,44 +593,52 @@
                              [[agent-task-id root]]
                              10000))
 
-     (clojure.pprint/pprint (:invokes-map trace))
-     ;; TODO: <<<<>>>>>
-     ;;  - need to convert trace to change all arrays to vecs
+     (is
+      (trace-matches?
+       (walk/postwalk
+        (fn [x]
+          (if (= (class (float-array 0)) (class x))
+            ;; meander seems unable to match floats, so do this as a workaround
+            ["*" (mapv str x)]
+            x))
+        (:invokes-map trace))
+       {!id1
+        {:agent-id      ?agent-id
+         :emits         []
+         :agent-task-id ?agent-task-id
+         :node          "start"
+         :result        {:val "eee" :failure? false}
+         :nested-ops    [{:type :db-write
+                          :info
+                          {"op"         "add"
+                           "embedding"  ["*" ["1.0" "2.0"]]
+                           "id"         "999"
+                           "objectName" "emb"
+                          }}
+                         {:type :db-write
+                          :info
+                          {"op"         "add"
+                           "embedding"  ["*" ["1.1" "2.1"]]
+                           "embedded"   "a1"
+                           "id"         "1001"
+                           "objectName" "emb"
+                          }}
+                         {:type :db-write
+                          :info
+                          {"op"         "add"
+                           "embedding"  ["*" ["1.2" "2.2"]]
+                           "id"         "abcd"
+                           "objectName" "emb"
+                          }}
+                        ]
+         :input         ["emb" ""]}}
+       (m/guard
+        (and (= ?agent-id agent-id)
+             (= ?agent-task-id agent-task-id)))
+      ))
 
-     ; {8435352031189511526
-     ;  {:agg-invoke-id nil,
-     ;   :agent-id 1,
-     ;   :emits [],
-     ;   :agent-task-id 2,
-     ;   :finish-time-millis 1753672400117,
-     ;   :node "start",
-     ;   :result {:val "eee", :failure? false},
-     ;   :nested-ops
-     ;   [{:start-time-millis 1753672400117,
-     ;     :finish-time-millis 1753672400117,
-     ;     :type :db-write,
-     ;     :info
-     ;     {"op" "add",
-     ;      "embedding" [1.0, 2.0],
-     ;      "id" "999",
-     ;      "objectName" "emb"}}
-     ;    {:start-time-millis 1753672400117,
-     ;     :finish-time-millis 1753672400117,
-     ;     :type :db-write,
-     ;     :info
-     ;     {"op" "add",
-     ;      "embedding" [1.1, 2.1],
-     ;      "embedded" "a1",
-     ;      "id" "1001",
-     ;      "objectName" "emb"}}
-     ;    {:start-time-millis 1753672400117,
-     ;     :finish-time-millis 1753672400117,
-     ;     :type :db-write,
-     ;     :info
-     ;     {"op" "add",
-     ;      "embedding" [1.2, 2.2],
-     ;      "id" "abcd",
-     ;      "objectName" "emb"}}
+
+
      ;    {:start-time-millis 1753672400117,
      ;     :finish-time-millis 1753672400117,
      ;     :type :db-write,
@@ -697,4 +706,12 @@
      ;      "objectName" "emb"}}],
      ;   :start-time-millis 1753672400094,
      ;   :input ["emb" ""]}}
+     ; (clojure.pprint/pprint
+     ;  (walk/postwalk
+     ;   (fn [x]
+     ;     (if (= (class (float-array 0)) (class x))
+     ;       (vec x)
+     ;       x))
+     ;   (:invokes-map trace))
+     ; )
     )))
