@@ -341,12 +341,13 @@
          ;; Graph content
          ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
             ($ invocation-graph/graph {:initial-data (:invokes-map data)
-                                      :api-url (when use-pagination? 
-                                                 (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id "/paginated"))
-                                      :module-id module-id
-                                      :agent-name agent-name
-                                      :invoke-id invoke-id
-                                      :forking-mode? forking-mode?
-                                      :set-forking-mode? set-forking-mode?}))))))
+                                       :next-task-invoke-pairs (:next-task-invoke-pairs data)
+                                       :api-url (when use-pagination? 
+                                                  (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id "/paginated"))
+                                       :module-id module-id
+                                       :agent-name agent-name
+                                       :invoke-id invoke-id
+                                       :forking-mode? forking-mode?
+                                       :set-forking-mode? set-forking-mode?}))))))
 
 

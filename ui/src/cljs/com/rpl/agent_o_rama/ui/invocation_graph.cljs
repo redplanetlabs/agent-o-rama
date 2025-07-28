@@ -162,7 +162,7 @@
                                                   (set-selected-node (clj->js target-node)))
                                                 ;; Load the unloaded node
                                                 (when handle-paginate-node
-                                                  (handle-paginate-node emit-id)))))}
+                                                  (handle-paginate-node emit-id (:id data))))))}
                            ($ :div {:className "text-xs text-purple-600"}
                               ($ :div (str "→ " (:node-name emit)))
                               (when (:args emit)
@@ -479,7 +479,7 @@
             #{}
             modified-node-ids)))
 
-(defui graph [{:keys [initial-data api-url module-id agent-name invoke-id forking-mode? set-forking-mode?]}]
+(defui graph [{:keys [initial-data api-url module-id agent-name invoke-id forking-mode? set-forking-mode? next-task-invoke-pairs]}]
   (let [[selected-node set-selected-node] (uix/use-state nil)
         [loading-nodes set-loading-nodes] (uix/use-state #{})
         [graph-data set-graph-data] (uix/use-state initial-data)
@@ -500,6 +500,14 @@
         
         handle-paginate-node (uix/use-callback
                               (fn [node-id]
+                                 ;; need :next-task-invoke-pairs to be sent to the server
+
+                                (println "nodee id" node-id "phantom node id" phantom-node-id)
+                                
+                                #_(println "next-task-invoke-pairs" next-task-invoke-pairs)
+                                (let [[task-id _] (first (filter (fn [[a b]] (= b node-id)) next-task-invoke-pairs))]
+                                  (println "task-id!" task-id))
+                                
                                 (when-not (contains? loading-nodes node-id)
                                   (set-loading-nodes #(conj % node-id))
                                   (-> (common/fetch (str api-url 
@@ -605,7 +613,8 @@
                                                      ($ :div {:className "relative cursor-pointer"
                                                               :onClick (fn [e]
                                                                          (.stopPropagation e)
-                                                                         (handle-paginate-node parent-node-id))}
+                                                                         (println "data" data)
+                                                                         (handle-paginate-node (:id data)))}
                                                         ($ :div {:className "bg-gray-100 text-gray-600 p-3 rounded-md shadow-lg border-2 border-dashed border-gray-400 hover:bg-gray-200 transition-colors"
                                                                  :style {:width "170px" :height "40px"}}
                                                            (:label data))
