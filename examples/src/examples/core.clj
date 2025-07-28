@@ -51,5 +51,24 @@
                    nil
                    aggs/+sum
                    (fn [agent-node agg node-start-res]
-                     (aor/result! agent-node [agg node-start-res])))))
+                     (aor/result! agent-node [agg node-start-res]))))
+  
+  (-> topology
+      (aor/new-agent "loop")
+      (aor/node "start"
+                "node1"
+                (fn [agent-node arg]
+                  (aor/emit! agent-node "abc" 1000)))
+      (aor/agg-start-node "node1"
+                          "node2"
+                          (fn [agent-node arg]
+                            (if (>= 0 arg)
+                              (aor/result! agent-node "done!")
+                              (aor/emit! agent-node "node2" (dec arg)))))
+      (aor/agg-start-node "node2"
+                          "node1"
+                          (fn [agent-node arg]
+                            (if (>= 0 arg)
+                              (aor/result! agent-node "done!")
+                              (aor/emit! agent-node "node1" (dec arg)))))))
 

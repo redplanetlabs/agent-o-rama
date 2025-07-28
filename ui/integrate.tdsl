@@ -1,3 +1,6 @@
+fork ui
+module-id -> module-name
+
 move deps.edn to lein, get rid of REPL.sh
   set warn on reflect 
 
