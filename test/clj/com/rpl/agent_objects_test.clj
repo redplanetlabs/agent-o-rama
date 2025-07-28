@@ -18,6 +18,8 @@
    [com.rpl.test-common :as tc]
    [meander.epsilon :as m])
   (:import
+   [dev.langchain4j.data.embedding
+    Embedding]
    [dev.langchain4j.data.message
     AiMessage
     UserMessage]
@@ -35,7 +37,14 @@
     FinishReason
     TokenUsage]
    [dev.langchain4j.store.embedding
+    EmbeddingMatch
+    EmbeddingSearchRequest
+    EmbeddingSearchResult
     EmbeddingStore]
+   [dev.langchain4j.store.embedding.filter
+    Filter]
+   [dev.langchain4j.store.embedding.filter.comparison
+    IsEqualTo]
    [java.util
     IdentityHashMap]))
 
@@ -272,6 +281,37 @@
       (.onCompleteResponse handler response)
     )))
 
+(defn embedding
+  ^Embedding [& nums]
+  (let [nums (vec nums)
+        arr  (float-array (count nums))]
+    (dotimes [i (count nums)]
+      (aset-float arr i (float (nth nums i))))
+    (Embedding. arr)))
+
+(deftype MockEmbeddingStore []
+  EmbeddingStore
+  (add [this embedding] "999")
+  (^String add [this ^Embedding embedding ^Object embedded]
+    "1001")
+  (^void add [this ^String id ^Embedding embedding])
+  (addAll [this embeddings]
+    (.generateIds this (count embeddings)))
+  (addAll [this embeddings embeddeds]
+    (.generateIds this (count embeddings)))
+  (addAll [this ids embeddings embeddeds])
+  (generateIds [this n]
+    (vec (for [i (range n)] (str i))))
+  (remove [this id])
+  (removeAll [this])
+  (^void removeAll [this ^Filter filter])
+  (^void removeAll [this ^java.util.Collection ids])
+  (search [this request]
+    (EmbeddingSearchResult.
+     [(EmbeddingMatch. 0.5 "11" (embedding 0.1 0.2) "foo")
+      (EmbeddingMatch. 0.75 "12" (embedding 1.5 0.3) "bar")]
+    )))
+
 (deftest object-wrapping-test
   (with-open [ipc (rtest/create-ipc)]
     (letlocals
@@ -299,16 +339,44 @@
          topology
          "schat2"
          (fn [setup] (->MockStreamingChatModel2)))
+        (aor/declare-agent-object-builder
+         topology
+         "emb"
+         (fn [setup] (MockEmbeddingStore.)))
         (->
           topology
           (aor/new-agent "foo")
           (aor/node
            "start"
            nil
-           (fn [agent-node model prompt]
-             (let [model (aor/get-agent-object agent-node model)]
-               (aor/result! agent-node (lc4j/chat model prompt)))
-           )))))
+           (fn [agent-node oname prompt]
+             (let [obj (aor/get-agent-object agent-node oname)]
+               (if-not (= oname "emb")
+                 (aor/result! agent-node (lc4j/chat obj prompt))
+                 (let [^EmbeddingStore obj obj]
+                   (.add obj (embedding 1.0 2.0))
+                   (.add obj (embedding 1.1 2.1) "a1")
+                   (.add obj "abcd" (embedding 1.2 2.2))
+                   (.addAll obj [(embedding 1.3 2.3) (embedding 1.4 2.4)])
+                   (.addAll obj
+                            [(embedding 1.5 2.5) (embedding 1.6 2.6)]
+                            ["x" "y"])
+                   (.addAll obj
+                            ["7" "8"]
+                            [(embedding 1.7 2.7) (embedding 1.8 2.8)]
+                            ["x1" "y1"])
+                   (.remove obj "id1")
+                   (.removeAll obj)
+                   (.removeAll obj (IsEqualTo. "a" 1))
+                   (.removeAll obj ["id1" "id2"])
+                   (.search
+                    obj
+                    (EmbeddingSearchRequest. (embedding 0.1 0.3)
+                                             (int 5)
+                                             0.75
+                                             (IsEqualTo. "b" 2)))
+                   (aor/result! agent-node "eee")
+                 ))))))))
      (rtest/launch-module! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
 
@@ -509,6 +577,124 @@
         (and (= ?agent-id agent-id)
              (= ?agent-task-id agent-task-id)))
       ))
+
+
+     (bind inv (aor/agent-initiate foo "emb" ""))
+     (bind [agent-task-id agent-id] (tc/extract-invoke inv))
+     (is (= "eee" (aor/agent-result foo inv)))
+     (bind root
+       (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                           root-pstate
+                           {:pkey agent-task-id}))
+     (bind trace
+       (foreign-invoke-query traces-query
+                             agent-task-id
+                             [[agent-task-id root]]
+                             10000))
+
+     (clojure.pprint/pprint (:invokes-map trace))
      ;; TODO: <<<<>>>>>
-     ;;  - test EmbeddingStore wrapping
+     ;;  - need to convert trace to change all arrays to vecs
+
+     ; {8435352031189511526
+     ;  {:agg-invoke-id nil,
+     ;   :agent-id 1,
+     ;   :emits [],
+     ;   :agent-task-id 2,
+     ;   :finish-time-millis 1753672400117,
+     ;   :node "start",
+     ;   :result {:val "eee", :failure? false},
+     ;   :nested-ops
+     ;   [{:start-time-millis 1753672400117,
+     ;     :finish-time-millis 1753672400117,
+     ;     :type :db-write,
+     ;     :info
+     ;     {"op" "add",
+     ;      "embedding" [1.0, 2.0],
+     ;      "id" "999",
+     ;      "objectName" "emb"}}
+     ;    {:start-time-millis 1753672400117,
+     ;     :finish-time-millis 1753672400117,
+     ;     :type :db-write,
+     ;     :info
+     ;     {"op" "add",
+     ;      "embedding" [1.1, 2.1],
+     ;      "embedded" "a1",
+     ;      "id" "1001",
+     ;      "objectName" "emb"}}
+     ;    {:start-time-millis 1753672400117,
+     ;     :finish-time-millis 1753672400117,
+     ;     :type :db-write,
+     ;     :info
+     ;     {"op" "add",
+     ;      "embedding" [1.2, 2.2],
+     ;      "id" "abcd",
+     ;      "objectName" "emb"}}
+     ;    {:start-time-millis 1753672400117,
+     ;     :finish-time-millis 1753672400117,
+     ;     :type :db-write,
+     ;     :info
+     ;     {"op" "addAll",
+     ;      "embeddings" [[1.3, 2.3] [1.4, 2.4]],
+     ;      "ids" ["0" "1"],
+     ;      "objectName" "emb"}}
+     ;    {:start-time-millis 1753672400117,
+     ;     :finish-time-millis 1753672400117,
+     ;     :type :db-write,
+     ;     :info
+     ;     {"op" "addAll",
+     ;      "embeddings" [[1.5, 2.5] [1.6, 2.6]],
+     ;      "embeddeds" ["x" "y"],
+     ;      "ids" ["0" "1"],
+     ;      "objectName" "emb"}}
+     ;    {:start-time-millis 1753672400117,
+     ;     :finish-time-millis 1753672400117,
+     ;     :type :db-write,
+     ;     :info
+     ;     {"op" "addAll",
+     ;      "embeddings" [[1.7, 2.7] [1.8, 2.8]],
+     ;      "embeddeds" ["x1" "y1"],
+     ;      "ids" ["7" "8"],
+     ;      "objectName" "emb"}}
+     ;    {:start-time-millis 1753672400117,
+     ;     :finish-time-millis 1753672400117,
+     ;     :type :db-write,
+     ;     :info {"op" "remove", "id" "id1", "objectName" "emb"}}
+     ;    {:start-time-millis 1753672400117,
+     ;     :finish-time-millis 1753672400117,
+     ;     :type :db-write,
+     ;     :info {"op" "removeAll", "objectName" "emb"}}
+     ;    {:start-time-millis 1753672400117,
+     ;     :finish-time-millis 1753672400117,
+     ;     :type :db-write,
+     ;     :info
+     ;     {"op" "removeAll",
+     ;      "filter" "IsEqualTo(key=a, comparisonValue=1)",
+     ;      "objectName" "emb"}}
+     ;    {:start-time-millis 1753672400117,
+     ;     :finish-time-millis 1753672400117,
+     ;     :type :db-write,
+     ;     :info {"op" "removeAll", "ids" ["id1" "id2"], "objectName" "emb"}}
+     ;    {:start-time-millis 1753672400117,
+     ;     :finish-time-millis 1753672400117,
+     ;     :type :db-read,
+     ;     :info
+     ;     {"op" "search",
+     ;      "request"
+     ;      {"filter" "IsEqualTo(key=b, comparisonValue=2)",
+     ;       "maxResults" 5,
+     ;       "minScore" 0.75,
+     ;       "queryEmbedding" [0.1, 0.3]},
+     ;      "matches"
+     ;      [{"embedded" "foo",
+     ;        "embedding" [0.1, 0.2],
+     ;        "id" "11",
+     ;        "score" 0.5}
+     ;       {"embedded" "bar",
+     ;        "embedding" [1.5, 0.3],
+     ;        "id" "12",
+     ;        "score" 0.75}],
+     ;      "objectName" "emb"}}],
+     ;   :start-time-millis 1753672400094,
+     ;   :input ["emb" ""]}}
     )))
