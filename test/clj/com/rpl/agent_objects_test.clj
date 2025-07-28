@@ -358,24 +358,24 @@
                    (.add obj (embedding 1.0 2.0))
                    (.add obj (embedding 1.1 2.1) "a1")
                    (.add obj "abcd" (embedding 1.2 2.2))
-                   ; (.addAll obj [(embedding 1.3 2.3) (embedding 1.4 2.4)])
-                   ; (.addAll obj
-                   ;          [(embedding 1.5 2.5) (embedding 1.6 2.6)]
-                   ;          ["x" "y"])
-                   ; (.addAll obj
-                   ;          ["7" "8"]
-                   ;          [(embedding 1.7 2.7) (embedding 1.8 2.8)]
-                   ;          ["x1" "y1"])
-                   ; (.remove obj "id1")
-                   ; (.removeAll obj)
-                   ; (.removeAll obj (IsEqualTo. "a" 1))
-                   ; (.removeAll obj ["id1" "id2"])
-                   ; (.search
-                   ;  obj
-                   ;  (EmbeddingSearchRequest. (embedding 0.1 0.3)
-                   ;                           (int 5)
-                   ;                           0.75
-                   ;                           (IsEqualTo. "b" 2)))
+                   (.addAll obj [(embedding 1.3 2.3) (embedding 1.4 2.4)])
+                   (.addAll obj
+                            [(embedding 1.5 2.5) (embedding 1.6 2.6)]
+                            ["x" "y"])
+                   (.addAll obj
+                            ["7" "8"]
+                            [(embedding 1.7 2.7) (embedding 1.8 2.8)]
+                            ["x1" "y1"])
+                   (.remove obj "id1")
+                   (.removeAll obj)
+                   (.removeAll obj (IsEqualTo. "a" 1))
+                   (.removeAll obj ["id1" "id2"])
+                   (.search
+                    obj
+                    (EmbeddingSearchRequest. (embedding 0.1 0.3)
+                                             (int 5)
+                                             0.75
+                                             (IsEqualTo. "b" 2)))
                    (aor/result! agent-node "eee")
                  ))))))))
      (rtest/launch-module! ipc module {:tasks 4 :threads 2})
@@ -597,9 +597,19 @@
       (trace-matches?
        (walk/postwalk
         (fn [x]
-          (if (= (class (float-array 0)) (class x))
-            ;; meander seems unable to match floats, so do this as a workaround
+          ;; meander seems unable to match floats/doubles/ints, so do this as a
+          ;; workaround
+          (cond
+            (= (class (float-array 0)) (class x))
             ["*" (mapv str x)]
+
+            (= Integer (class x))
+            ["i" (str x)]
+
+            (= Double (class x))
+            ["d" (str x)]
+
+            :else
             x))
         (:invokes-map trace))
        {!id1
@@ -630,88 +640,78 @@
                            "id"         "abcd"
                            "objectName" "emb"
                           }}
-                        ]
+                         {:type :db-write
+                          :info
+                          {"op"         "addAll"
+                           "embeddings" [["*" ["1.3" "2.3"]]
+                                         ["*" ["1.4" "2.4"]]]
+                           "ids"        ["0" "1"]
+                           "objectName" "emb"
+                          }}
+                         {:type :db-write
+                          :info
+                          {"op"         "addAll"
+                           "embeddings" [["*" ["1.5" "2.5"]]
+                                         ["*" ["1.6" "2.6"]]]
+                           "embeddeds"  ["x" "y"]
+                           "ids"        ["0" "1"]
+                           "objectName" "emb"
+                          }}
+                         {:type :db-write
+                          :info
+                          {"op"         "addAll"
+                           "embeddings" [["*" ["1.7" "2.7"]]
+                                         ["*" ["1.8" "2.8"]]]
+                           "embeddeds"  ["x1" "y1"]
+                           "ids"        ["7" "8"]
+                           "objectName" "emb"
+                          }}
+                         {:type :db-write
+                          :info
+                          {"op"         "remove"
+                           "id"         "id1"
+                           "objectName" "emb"
+                          }}
+                         {:type :db-write
+                          :info
+                          {"op"         "removeAll"
+                           "objectName" "emb"
+                          }}
+                         {:type :db-write
+                          :info
+                          {"op"         "removeAll"
+                           "filter"     "IsEqualTo(key=a, comparisonValue=1)"
+                           "objectName" "emb"
+                          }}
+                         {:type :db-write
+                          :info
+                          {"op"         "removeAll"
+                           "ids"        ["id1" "id2"]
+                           "objectName" "emb"
+                          }}
+                         {:type :db-read
+                          :info
+                          {"op"         "search"
+                           "objectName" "emb"
+                           "request"
+                           {"filter" "IsEqualTo(key=b, comparisonValue=2)"
+                            "maxResults" ["i" "5"]
+                            "minScore" ["d" "0.75"]
+                            "queryEmbedding" ["*" ["0.1" "0.3"]]}
+                           "matches"
+                           [{"embedded"  "foo"
+                             "embedding" ["*" ["0.1" "0.2"]]
+                             "id"        "11"
+                             "score"     ["d" "0.5"]}
+                            {"embedded"  "bar"
+                             "embedding" ["*" ["1.5" "0.3"]]
+                             "id"        "12"
+                             "score"     ["d" "0.75"]}
+                           ]
+                          }}]
          :input         ["emb" ""]}}
        (m/guard
         (and (= ?agent-id agent-id)
              (= ?agent-task-id agent-task-id)))
       ))
-
-
-
-     ;    {:start-time-millis 1753672400117,
-     ;     :finish-time-millis 1753672400117,
-     ;     :type :db-write,
-     ;     :info
-     ;     {"op" "addAll",
-     ;      "embeddings" [[1.3, 2.3] [1.4, 2.4]],
-     ;      "ids" ["0" "1"],
-     ;      "objectName" "emb"}}
-     ;    {:start-time-millis 1753672400117,
-     ;     :finish-time-millis 1753672400117,
-     ;     :type :db-write,
-     ;     :info
-     ;     {"op" "addAll",
-     ;      "embeddings" [[1.5, 2.5] [1.6, 2.6]],
-     ;      "embeddeds" ["x" "y"],
-     ;      "ids" ["0" "1"],
-     ;      "objectName" "emb"}}
-     ;    {:start-time-millis 1753672400117,
-     ;     :finish-time-millis 1753672400117,
-     ;     :type :db-write,
-     ;     :info
-     ;     {"op" "addAll",
-     ;      "embeddings" [[1.7, 2.7] [1.8, 2.8]],
-     ;      "embeddeds" ["x1" "y1"],
-     ;      "ids" ["7" "8"],
-     ;      "objectName" "emb"}}
-     ;    {:start-time-millis 1753672400117,
-     ;     :finish-time-millis 1753672400117,
-     ;     :type :db-write,
-     ;     :info {"op" "remove", "id" "id1", "objectName" "emb"}}
-     ;    {:start-time-millis 1753672400117,
-     ;     :finish-time-millis 1753672400117,
-     ;     :type :db-write,
-     ;     :info {"op" "removeAll", "objectName" "emb"}}
-     ;    {:start-time-millis 1753672400117,
-     ;     :finish-time-millis 1753672400117,
-     ;     :type :db-write,
-     ;     :info
-     ;     {"op" "removeAll",
-     ;      "filter" "IsEqualTo(key=a, comparisonValue=1)",
-     ;      "objectName" "emb"}}
-     ;    {:start-time-millis 1753672400117,
-     ;     :finish-time-millis 1753672400117,
-     ;     :type :db-write,
-     ;     :info {"op" "removeAll", "ids" ["id1" "id2"], "objectName" "emb"}}
-     ;    {:start-time-millis 1753672400117,
-     ;     :finish-time-millis 1753672400117,
-     ;     :type :db-read,
-     ;     :info
-     ;     {"op" "search",
-     ;      "request"
-     ;      {"filter" "IsEqualTo(key=b, comparisonValue=2)",
-     ;       "maxResults" 5,
-     ;       "minScore" 0.75,
-     ;       "queryEmbedding" [0.1, 0.3]},
-     ;      "matches"
-     ;      [{"embedded" "foo",
-     ;        "embedding" [0.1, 0.2],
-     ;        "id" "11",
-     ;        "score" 0.5}
-     ;       {"embedded" "bar",
-     ;        "embedding" [1.5, 0.3],
-     ;        "id" "12",
-     ;        "score" 0.75}],
-     ;      "objectName" "emb"}}],
-     ;   :start-time-millis 1753672400094,
-     ;   :input ["emb" ""]}}
-     ; (clojure.pprint/pprint
-     ;  (walk/postwalk
-     ;   (fn [x]
-     ;     (if (= (class (float-array 0)) (class x))
-     ;       (vec x)
-     ;       x))
-     ;   (:invokes-map trace))
-     ; )
     )))
