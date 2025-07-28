@@ -58,17 +58,17 @@
       (aor/node "start"
                 "node1"
                 (fn [agent-node arg]
-                  (aor/emit! agent-node "abc" 1000)))
-      (aor/agg-start-node "node1"
-                          "node2"
-                          (fn [agent-node arg]
-                            (if (>= 0 arg)
-                              (aor/result! agent-node "done!")
-                              (aor/emit! agent-node "node2" (dec arg)))))
-      (aor/agg-start-node "node2"
-                          "node1"
-                          (fn [agent-node arg]
-                            (if (>= 0 arg)
-                              (aor/result! agent-node "done!")
-                              (aor/emit! agent-node "node1" (dec arg)))))))
+                  (aor/emit! agent-node "node1" 1000)))
+      (aor/node "node1"
+                "node2"
+                (fn [agent-node arg]
+                  (if (>= 0 arg)
+                    (aor/result! agent-node "done! node 1")
+                    (aor/emit! agent-node "node2" (dec arg)))))
+      (aor/node "node2"
+                "node1"
+                (fn [agent-node arg]
+                  (if (>= 0 arg)
+                    (aor/result! agent-node "done! node 2")
+                    (aor/emit! agent-node "node1" (dec arg)))))))
 
