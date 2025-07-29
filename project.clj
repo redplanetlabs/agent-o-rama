@@ -16,7 +16,10 @@
   :profiles {:dev      {:resource-paths ["test/resources/"]
                         :dependencies
                         [[meander/epsilon "0.0.650"]
-                         [dev.langchain4j/langchain4j-open-ai "1.1.0"]]}
+                         [dev.langchain4j/langchain4j-open-ai "1.1.0"]
+                         [dev.langchain4j/langchain4j-web-search-engine-tavily
+                          "1.1.0-beta7"]
+                         [http-kit "2.8.0"]]}
              :provided {:dependencies
                         ;; TODO: fix Rama version
                         [[com.rpl/rama "0.0.6-SNAPSHOT"]
