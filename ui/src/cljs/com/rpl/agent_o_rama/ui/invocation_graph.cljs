@@ -11,7 +11,8 @@
 
    ["react" :refer [useState useCallback useEffect]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle]]
-   ["@dagrejs/dagre" :as Dagre]))
+   ["@dagrejs/dagre" :as Dagre]
+   ["wouter" :refer [useLocation]]))
 
 (defn format-ms [ms]
   (let [date (js/Date. ms)
@@ -500,7 +501,8 @@
             modified-node-ids)))
 
 (defui graph [{:keys [module-id agent-name invoke-id]}]
-  (let [[selected-node set-selected-node] (uix/use-state nil)
+  (let [[location set-location] (useLocation)
+        [selected-node set-selected-node] (uix/use-state nil)
         [loading-nodes set-loading-nodes] (uix/use-state #{})
         [graph-data set-graph-data] (uix/use-state {})
         [next-task-invoke-pairs set-next-task-invoke-pairs] (uix/use-state [])
@@ -598,7 +600,18 @@
                                       (js/console.log "Fork executed successfully:" response)
                                       ;; Clear changes after successful execution
                                       (set-changed-nodes {})
-                                      (set-selected-node nil))
+                                      (set-selected-node nil)
+                                      ;; Redirect to the new invocation page
+                                      (let [new-path (str "/agents/"
+                                                          module-id
+                                                          "/"
+                                                          agent-name
+                                                          "/invocations/"
+                                                          (:task-id response)
+                                                          "-"
+                                                          (:agent-invoke-id response))]
+                                        (js/console.log "Redirecting to:" new-path)
+                                        (set-location new-path)))
                         :on-error (fn [error variables]
                                     (js/console.error "Failed to execute fork:" error)
                                     ;; TODO: Show user-friendly error message
