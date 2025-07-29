@@ -592,10 +592,8 @@
         ;; Fork execution mutation
         fork-mutation (common/use-mutation
                        {:mutation-fn (fn [variables]
-                                       (let [{:keys [changed-nodes invoke-id]} (js->clj variables :keywordize-keys true)
-                                             fork-url (str "/api/agents/" module-id "/" agent-name "/fork")]
-                                         (common/post fork-url {:changed-nodes changed-nodes
-                                                                :invoke-id invoke-id})))
+                                       (let [fork-url (str "/api/agents/" module-id "/" agent-name "/fork")]
+                                         (common/post fork-url variables)))
                         :on-success (fn [response variables]
                                       (js/console.log "Fork executed successfully:" response)
                                       ;; Clear changes after successful execution
@@ -609,8 +607,9 @@
         handle-execute-fork (uix/use-callback
                              (fn []
                                (when (not (empty? changed-nodes))
-                                 ((:mutate fork-mutation) (clj->js {:changed-nodes changed-nodes
-                                                                    :invoke-id invoke-id}))))
+                                 ;; Pass data directly as Clojure map to preserve long precision
+                                 ((:mutate fork-mutation) {:changed-nodes changed-nodes
+                                                           :invoke-id invoke-id})))
                              [changed-nodes invoke-id fork-mutation])
         
         handle-cancel-fork (uix/use-callback

@@ -139,4 +139,8 @@
 
 (defn fork [req]
   (def req req)
+  (-> req :body-params :changed-nodes)
+  (-> req :body-params :changed-nodes)
+  (-> req :body-params)
+  
   {:status 200 :body ["wow" "cool"]})
