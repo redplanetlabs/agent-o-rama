@@ -26,6 +26,12 @@
     ChatRequest]
    [dev.langchain4j.model.chat.response
     ChatResponse]
+   [dev.langchain4j.model.output
+    TokenUsage]
+   [dev.langchain4j.service
+    Result]
+   [dev.langchain4j.service.tool
+    ToolExecution]
    [dev.langchain4j.store.embedding
     EmbeddingMatch
     EmbeddingSearchResult]
@@ -137,5 +143,8 @@
 )
 
 ;; TODO: <<<<>>>>
+; Result
+; TokenUsage
+; ToolExecution
 ; ChatRequest
 ; ChatResponse
