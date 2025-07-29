@@ -324,6 +324,9 @@
      "outputTokenCount" (h/safe-> response
                                   .tokenUsage
                                   .outputTokenCount)
+     "totalTokenCount"  (h/safe-> response
+                                  .tokenUsage
+                                  .totalTokenCount)
     })))
 
 (defn- instrument-chat!

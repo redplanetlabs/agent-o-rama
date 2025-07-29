@@ -415,7 +415,8 @@
                            [{"type"     "user"
                              "contents" [{"type" "text" "text" "Hello"}]}]
                            "response"         "Hello!!!"
-                           "outputTokenCount" 20}}]
+                           "outputTokenCount" 20
+                           "totalTokenCount"  30}}]
          :input         ["chat1" "Hello"]}}
        (m/guard
         (and (= ?agent-id agent-id)
@@ -482,7 +483,8 @@
                            [{"type"     "user"
                              "contents" [{"type" "text" "text" "Hello"}]}]
                            "response"         "Hello!?"
-                           "outputTokenCount" 40}}]
+                           "outputTokenCount" 40
+                           "totalTokenCount"  55}}]
          :input         ["chat3" "Hello"]}}
        (m/guard
         (and (= ?agent-id agent-id)
@@ -523,7 +525,8 @@
                            [{"type"     "user"
                              "contents" [{"type" "text" "text" "Hi"}]}]
                            "response"         "You said Hi"
-                           "outputTokenCount" 20}}]
+                           "outputTokenCount" 20
+                           "totalTokenCount"  30}}]
          :input         ["schat1" "Hi"]}}
        (m/guard
         (and (= ?agent-id agent-id)
@@ -564,7 +567,8 @@
                            [{"type"     "user"
                              "contents" [{"type" "text" "text" "Hi"}]}]
                            "response"         "You said Hi"
-                           "outputTokenCount" 20}}]
+                           "outputTokenCount" 20
+                           "totalTokenCount"  30}}]
          :input         ["schat2" "Hi"]}}
        (m/guard
         (and (= ?agent-id agent-id)

@@ -360,8 +360,8 @@
 ;  )
 
 ;; TODO: <<<<>>>>
-; Result
 ; TokenUsage
 ; ToolExecution
+; Result
 ; ChatRequest
 ; ChatResponse
