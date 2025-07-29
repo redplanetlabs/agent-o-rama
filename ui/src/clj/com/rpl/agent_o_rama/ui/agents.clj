@@ -136,3 +136,7 @@
                                              [pair]
                                              10)))
      t)})
+
+(defn fork [req]
+  (def req req)
+  {:status 200 :body ["wow" "cool"]})

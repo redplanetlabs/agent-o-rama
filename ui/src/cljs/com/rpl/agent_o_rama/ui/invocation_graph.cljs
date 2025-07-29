@@ -287,7 +287,7 @@
                 ($ :div {:className "text-right"}
                    ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens))))))))))
 
-(defui right-panel [{:keys [graph-data changed-nodes set-changed-nodes affected-nodes flow-nodes set-selected-node on-execute-fork on-clear-fork forking-mode? set-forking-mode?]}]
+(defui right-panel [{:keys [graph-data changed-nodes set-changed-nodes affected-nodes flow-nodes set-selected-node on-execute-fork on-clear-fork forking-mode? set-forking-mode? fork-loading? fork-error]}]
   (let [[active-tab set-active-tab] (uix/use-state :stats)]
     
     ;; Update forking mode when tab changes
@@ -366,10 +366,24 @@
                        
                        ;; Action buttons
                        ($ :div {:className "pt-4 border-t border-gray-200 space-y-2"}
-                          ($ :button {:className "w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+                          ;; Error message
+                          (when fork-error
+                            ($ :div {:className "bg-red-50 border border-red-200 rounded-md p-3"}
+                               ($ :div {:className "text-sm font-medium text-red-800"} "Fork execution failed")
+                               ($ :div {:className "text-xs text-red-600 mt-1"} 
+                                  (or (:message fork-error) "An error occurred while executing the fork"))))
+                          
+                          ($ :button {:className (str "w-full font-medium py-2 px-4 rounded-md transition-colors "
+                                                      (if fork-loading?
+                                                        "bg-gray-400 text-gray-700 cursor-not-allowed"
+                                                        "bg-blue-600 hover:bg-blue-700 text-white"))
+                                      :disabled fork-loading?
                                       :onClick on-execute-fork}
-                             (str "Execute Fork (" (count changed-nodes) " changes)"))
+                             (if fork-loading?
+                               "Executing Fork..."
+                               (str "Execute Fork (" (count changed-nodes) " changes)")))
                           ($ :button {:className "w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors"
+                                      :disabled fork-loading?
                                       :onClick on-clear-fork}
                              "Clear All Changes")))))))))
 
@@ -575,14 +589,29 @@
                ((:mutate pagination-mutation) (clj->js {:task-id task-id :missing-node-id missing-node-id})))))
          [graph-data loading-nodes next-task-invoke-pairs initial-data-url pagination-mutation])
         
+        ;; Fork execution mutation
+        fork-mutation (common/use-mutation
+                       {:mutation-fn (fn [variables]
+                                       (let [{:keys [changed-nodes invoke-id]} (js->clj variables :keywordize-keys true)
+                                             fork-url (str "/api/agents/" module-id "/" agent-name "/fork")]
+                                         (common/post fork-url {:changed-nodes changed-nodes
+                                                                :invoke-id invoke-id})))
+                        :on-success (fn [response variables]
+                                      (js/console.log "Fork executed successfully:" response)
+                                      ;; Clear changes after successful execution
+                                      (set-changed-nodes {})
+                                      (set-selected-node nil))
+                        :on-error (fn [error variables]
+                                    (js/console.error "Failed to execute fork:" error)
+                                    ;; TODO: Show user-friendly error message
+                                    )})
+
         handle-execute-fork (uix/use-callback
                              (fn []
-                               ;; TODO: Implement fork execution API call
-                               (js/console.log "Execute fork with changes:" (clj->js changed-nodes))
-                               ;; Clear changes after execution
-                               (set-changed-nodes {})
-                               (set-selected-node nil))
-                             [changed-nodes])
+                               (when (not (empty? changed-nodes))
+                                 ((:mutate fork-mutation) (clj->js {:changed-nodes changed-nodes
+                                                                    :invoke-id invoke-id}))))
+                             [changed-nodes invoke-id fork-mutation])
         
         handle-cancel-fork (uix/use-callback
                             (fn []
@@ -695,5 +724,7 @@
                          :on-execute-fork handle-execute-fork
                          :on-clear-fork handle-clear-fork
                          :forking-mode? forking-mode?
-                         :set-forking-mode? set-forking-mode?})))))
+                         :set-forking-mode? set-forking-mode?
+                         :fork-loading? (:loading? fork-mutation)
+                         :fork-error (:error fork-mutation)})))))
 
