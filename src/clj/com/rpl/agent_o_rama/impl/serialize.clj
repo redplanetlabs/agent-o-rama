@@ -95,9 +95,28 @@
  [in]
  (Metadata. (nippy/thaw-from-in! in)))
 
+(ser/extend-8-byte-freeze
+ Embedding
+ [^Embedding obj out]
+ (nippy/freeze-to-out! out (.vector obj)))
+
+(ser/extend-8-byte-thaw
+ Embedding
+ [in]
+ (Embedding. (nippy/thaw-from-in! in)))
+
+
+; (ser/extend-8-byte-freeze
+;  Embedding
+;  [^Embedding obj out]
+;  )
+;
+; (ser/extend-8-byte-thaw
+;  Embedding
+;  [in]
+;  )
 
 ;; TODO: <<<<>>>>
-; Embedding
 ; AiMessage
 ; CustomMessage
 ; SystemMessage

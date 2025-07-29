@@ -282,14 +282,6 @@
       (.onCompleteResponse handler response)
     )))
 
-(defn embedding
-  ^Embedding [& nums]
-  (let [nums (vec nums)
-        arr  (float-array (count nums))]
-    (dotimes [i (count nums)]
-      (aset-float arr i (float (nth nums i))))
-    (Embedding. arr)))
-
 (deftype MockEmbeddingStore []
   EmbeddingStore
   (add [this embedding] "999")
@@ -309,8 +301,8 @@
   (^void removeAll [this ^java.util.Collection ids])
   (search [this request]
     (EmbeddingSearchResult.
-     [(EmbeddingMatch. 0.5 "11" (embedding 0.1 0.2) "foo")
-      (EmbeddingMatch. 0.75 "12" (embedding 1.5 0.3) "bar")]
+     [(EmbeddingMatch. 0.5 "11" (tc/embedding 0.1 0.2) "foo")
+      (EmbeddingMatch. 0.75 "12" (tc/embedding 1.5 0.3) "bar")]
     )))
 
 (deftest object-wrapping-test
@@ -355,16 +347,16 @@
                (if-not (= oname "emb")
                  (aor/result! agent-node (lc4j/chat obj prompt))
                  (let [^EmbeddingStore obj obj]
-                   (.add obj (embedding 1.0 2.0))
-                   (.add obj (embedding 1.1 2.1) "a1")
-                   (.add obj "abcd" (embedding 1.2 2.2))
-                   (.addAll obj [(embedding 1.3 2.3) (embedding 1.4 2.4)])
+                   (.add obj (tc/embedding 1.0 2.0))
+                   (.add obj (tc/embedding 1.1 2.1) "a1")
+                   (.add obj "abcd" (tc/embedding 1.2 2.2))
+                   (.addAll obj [(tc/embedding 1.3 2.3) (tc/embedding 1.4 2.4)])
                    (.addAll obj
-                            [(embedding 1.5 2.5) (embedding 1.6 2.6)]
+                            [(tc/embedding 1.5 2.5) (tc/embedding 1.6 2.6)]
                             ["x" "y"])
                    (.addAll obj
                             ["7" "8"]
-                            [(embedding 1.7 2.7) (embedding 1.8 2.8)]
+                            [(tc/embedding 1.7 2.7) (tc/embedding 1.8 2.8)]
                             ["x1" "y1"])
                    (.remove obj "id1")
                    (.removeAll obj)
@@ -372,7 +364,7 @@
                    (.removeAll obj ["id1" "id2"])
                    (.search
                     obj
-                    (EmbeddingSearchRequest. (embedding 0.1 0.3)
+                    (EmbeddingSearchRequest. (tc/embedding 0.1 0.3)
                                              (int 5)
                                              0.75
                                              (IsEqualTo. "b" 2)))

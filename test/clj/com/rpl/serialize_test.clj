@@ -3,6 +3,7 @@
         [com.rpl.test-helpers])
   (:require
    [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.test-common :as tc]
    [taoensso.nippy :as nippy])
   (:import
    [dev.langchain4j.agent.tool
@@ -69,10 +70,11 @@
   (is (ser= (ToolExecutionResultMessage. "a" nil "ccc")))
   (is (ser= (ToolExecutionResultMessage. nil nil "1")))
   (is (ser= (Document/document "abcde" (Metadata. {"a" 1 "b" 2}))))
+  (is (ser= (tc/embedding 0.1 0.2 0.3 0.4)))
+  (is (ser= (tc/embedding)))
 )
 
 ;; TODO: <<<<>>>>
-; Embedding
 ; AiMessage
 ; CustomMessage
 ; SystemMessage
