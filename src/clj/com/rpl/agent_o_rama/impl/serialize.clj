@@ -289,6 +289,27 @@
  [in]
  (IsNotEqualTo. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
 
+(ser/extend-8-byte-freeze
+ IsIn
+ [^IsIn obj out]
+ (nippy/freeze-to-out! out (.key obj))
+ (nippy/freeze-to-out! out (.comparisonValues obj)))
+
+(ser/extend-8-byte-thaw
+ IsIn
+ [in]
+ (IsIn. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ IsNotIn
+ [^IsNotIn obj out]
+ (nippy/freeze-to-out! out (.key obj))
+ (nippy/freeze-to-out! out (.comparisonValues obj)))
+
+(ser/extend-8-byte-thaw
+ IsNotIn
+ [in]
+ (IsNotIn. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
 
 ; (ser/extend-8-byte-freeze
 ;  Embedding
@@ -301,8 +322,6 @@
 ;  )
 
 ;; TODO: <<<<>>>>
-; IsIn
-; IsNotIn
 ; And
 ; Not
 ; Or

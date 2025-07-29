@@ -125,13 +125,15 @@
   (is (ser= (IsNotEqualTo. "k" "v")))
   (is (ser= (IsNotEqualTo. "k2" "")))
   (is (ser= (IsNotEqualTo. "k2" 10)))
+  (is (ser= (IsIn. "k2" ["a" "b"])))
+  (is (ser= (IsIn. "k2" #{"a"})))
+  (is (ser= (IsNotIn. "k2" ["a" "b"])))
+  (is (ser= (IsNotIn. "k2" #{"a"})))
 
 
 )
 
 ;; TODO: <<<<>>>>
-; IsIn
-; IsNotIn
 ; And
 ; Not
 ; Or
