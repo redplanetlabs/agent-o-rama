@@ -311,6 +311,38 @@
  [in]
  (IsNotIn. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
 
+(ser/extend-8-byte-freeze
+ And
+ [^And obj out]
+ (nippy/freeze-to-out! out (.left obj))
+ (nippy/freeze-to-out! out (.right obj)))
+
+(ser/extend-8-byte-thaw
+ And
+ [in]
+ (And. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ Or
+ [^Or obj out]
+ (nippy/freeze-to-out! out (.left obj))
+ (nippy/freeze-to-out! out (.right obj)))
+
+(ser/extend-8-byte-thaw
+ Or
+ [in]
+ (Or. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ Not
+ [^Not obj out]
+ (nippy/freeze-to-out! out (.expression obj)))
+
+(ser/extend-8-byte-thaw
+ Not
+ [in]
+ (Not. (nippy/thaw-from-in! in)))
+
 ; (ser/extend-8-byte-freeze
 ;  Embedding
 ;  [^Embedding obj out]
@@ -322,8 +354,5 @@
 ;  )
 
 ;; TODO: <<<<>>>>
-; And
-; Not
-; Or
 ; ChatRequest
 ; ChatResponse

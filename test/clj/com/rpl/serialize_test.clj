@@ -129,13 +129,13 @@
   (is (ser= (IsIn. "k2" #{"a"})))
   (is (ser= (IsNotIn. "k2" ["a" "b"])))
   (is (ser= (IsNotIn. "k2" #{"a"})))
+  (is (ser= (And. (IsEqualTo. "k" "a") (IsEqualTo. "k2" "b"))))
+  (is (ser= (Or. (IsEqualTo. "k" "a") (IsEqualTo. "k2" "b"))))
+  (is (ser= (Not. (IsNotIn. "k2" ["a" "b"]))))
 
 
 )
 
 ;; TODO: <<<<>>>>
-; And
-; Not
-; Or
 ; ChatRequest
 ; ChatResponse
