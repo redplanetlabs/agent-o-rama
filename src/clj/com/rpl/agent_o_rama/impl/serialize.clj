@@ -45,6 +45,22 @@
    [java.util
     List]))
 
+;; - have to do this to avoid serializing type returned by List.of, which
+;; doesn't exist in Java 8 – so the serializer can't be included by default in
+;; Rama
+;; - this is used for various other collections to avoid this problem
+(defn empty-coll
+  [coll]
+  (if-not (empty? coll)
+    coll))
+
+;; because some constructors allow empty map but not nil
+(defn empty-map
+  [coll]
+  (if (empty? coll)
+    {}
+    coll))
+
 (ser/extend-8-byte-freeze
  ToolExecutionRequest
  [^ToolExecutionRequest obj out]
@@ -90,7 +106,7 @@
 (ser/extend-8-byte-freeze
  Metadata
  [^Metadata obj out]
- (nippy/freeze-to-out! out (.toMap obj)))
+ (nippy/freeze-to-out! out (empty-map (.toMap obj))))
 
 (ser/extend-8-byte-thaw
  Metadata
@@ -106,14 +122,6 @@
  Embedding
  [in]
  (Embedding. (nippy/thaw-from-in! in)))
-
-
-;; have to do this to avoid serializing type returned by List.of, which doesn't
-;; exist in Java 8 – so the serializer can't be included by default in Rama
-(defn empty-coll
-  [coll]
-  (if-not (empty? coll)
-    coll))
 
 (ser/extend-8-byte-freeze
  AiMessage
@@ -167,6 +175,43 @@
  [in]
  (UserMessage. ^String (nippy/thaw-from-in! in) ^List (nippy/thaw-from-in! in)))
 
+(ser/extend-8-byte-freeze
+ TextSegment
+ [^TextSegment obj out]
+ (nippy/freeze-to-out! out (.text obj))
+ (nippy/freeze-to-out! out (.metadata obj)))
+
+(ser/extend-8-byte-thaw
+ TextSegment
+ [in]
+ (TextSegment. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ EmbeddingMatch
+ [^EmbeddingMatch obj out]
+ (nippy/freeze-to-out! out (.score obj))
+ (nippy/freeze-to-out! out (.embeddingId obj))
+ (nippy/freeze-to-out! out (.embedding obj))
+ (nippy/freeze-to-out! out (.embedded obj)))
+
+(ser/extend-8-byte-thaw
+ EmbeddingMatch
+ [in]
+ (EmbeddingMatch. (nippy/thaw-from-in! in)
+                  (nippy/thaw-from-in! in)
+                  (nippy/thaw-from-in! in)
+                  (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ EmbeddingSearchResult
+ [^EmbeddingSearchResult obj out]
+ (nippy/freeze-to-out! out (.matches obj)))
+
+(ser/extend-8-byte-thaw
+ EmbeddingSearchResult
+ [in]
+ (EmbeddingSearchResult. (nippy/thaw-from-in! in)))
+
 ; (ser/extend-8-byte-freeze
 ;  Embedding
 ;  [^Embedding obj out]
@@ -178,11 +223,6 @@
 ;  )
 
 ;; TODO: <<<<>>>>
-; TextSegment
-; ChatRequest
-; ChatResponse
-; EmbeddingMatch
-; EmbeddingSearchResult
 ; ContainsString
 ; IsEqualTo
 ; IsGreaterThan
@@ -195,3 +235,5 @@
 ; And
 ; Not
 ; Or
+; ChatRequest
+; ChatResponse

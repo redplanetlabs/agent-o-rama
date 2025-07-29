@@ -70,6 +70,7 @@
   (is (ser= (ToolExecutionResultMessage. "a" nil "ccc")))
   (is (ser= (ToolExecutionResultMessage. nil nil "1")))
   (is (ser= (Document/document "abcde" (Metadata. {"a" 1 "b" 2}))))
+  (is (ser= (Document/document "abcde" (Metadata. {}))))
   (is (ser= (tc/embedding 0.1 0.2 0.3 0.4)))
   (is (ser= (tc/embedding)))
   (is (ser= (AiMessage/aiMessage "abc"
@@ -91,15 +92,25 @@
     (is (ser= (UserMessage. "aa" l)))
     (is (ser= (UserMessage. l)))
     (is (ser= (UserMessage. "abcdz"))))
+  (is (ser= (TextSegment. "abcz" (Metadata. {}))))
+  (is (ser= (TextSegment. "abcz" (Metadata. {"a" 1}))))
+  (is (ser= (EmbeddingMatch. 2.0 "aaa" (tc/embedding 1.1 1.2) "hello")))
+  (is (ser= (EmbeddingMatch. 2.0 "a" (tc/embedding 1.1 1.2) nil)))
+  ;; EmbeddingSearchResult doesn't implement equals correctly
+  (let [r (EmbeddingSearchResult.
+           [(EmbeddingMatch. 2.0 "a" (tc/embedding 1.1 1.2) nil)
+            (EmbeddingMatch. 2.1 "bb" (tc/embedding 1.1 1.3) "foo")])
+        ^EmbeddingSearchResult r* (roundtrip r)
+
+        r2 (EmbeddingSearchResult. [])
+        ^EmbeddingSearchResult r2* (roundtrip r2)]
+    (is (= (.matches r) (.matches r*)))
+    (is (= (.matches r2) (.matches r2*))))
+
 
 )
 
 ;; TODO: <<<<>>>>
-; TextSegment
-; ChatRequest
-; ChatResponse
-; EmbeddingMatch
-; EmbeddingSearchResult
 ; ContainsString
 ; IsEqualTo
 ; IsGreaterThan
@@ -112,3 +123,5 @@
 ; And
 ; Not
 ; Or
+; ChatRequest
+; ChatResponse
