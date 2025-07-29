@@ -64,17 +64,18 @@
 
 (defn object
   ([name->schema]
-   (object name->schema nil))
-  ([name->schema
-    {:keys [description required definitions additional-properties?]
-     :as   options}]
-   (-> (JsonObjectSchema/builder)
-       (.addProperties name->schema)
-       (.additionalProperties (clojure.core/boolean additional-properties?))
-       (.definitions definitions)
-       (.description description)
-       (.required ^List required)
-       .build)))
+   (object nil name->schema))
+  ([options name->schema]
+   (let [{:keys [description required definitions additional-properties?]
+          :as   options}
+         (if (string? options) {:description options} options)]
+     (-> (JsonObjectSchema/builder)
+         (.addProperties name->schema)
+         (.additionalProperties (clojure.core/boolean additional-properties?))
+         (.definitions definitions)
+         (.description description)
+         (.required ^List required)
+         .build))))
 
 (defn reference
   [ref]

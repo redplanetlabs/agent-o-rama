@@ -5,6 +5,8 @@
   (:import
    [dev.langchain4j.agent.tool
     ToolSpecification]
+   [dev.langchain4j.data.message
+    UserMessage]
    [dev.langchain4j.model.chat
     ChatModel]
    [dev.langchain4j.model.chat.request
@@ -12,6 +14,8 @@
     ResponseFormat
     ResponseFormatType
     ToolChoice]
+   [dev.langchain4j.model.chat.request.json
+    JsonSchema]
    [java.util
     List]))
 
@@ -37,10 +41,14 @@
    :required ToolChoice/REQUIRED})
 
 (defn json-response-format
-  [schema]
+  [name schema]
   (-> (ResponseFormat/builder)
       (.type ResponseFormatType/JSON)
-      (.jsonSchema schema)
+      (.jsonSchema
+       (-> (JsonSchema/builder)
+           (.name name)
+           (.rootElement schema)
+           .build))
       .build))
 
 (defn tool-specification
@@ -61,7 +69,7 @@
             tool-specifications top-k top-p]}]
    (let [messages (mapv #(if (string? %) (UserMessage. ^String %) %) messages)]
      (-> (ChatRequest/builder)
-         (.messages messages)
+         (.messages ^List messages)
          (.frequencyPenalty frequency-penalty)
          (.maxOutputTokens (if max-output-tokens (int max-output-tokens)))
          (.modelName model-name)
