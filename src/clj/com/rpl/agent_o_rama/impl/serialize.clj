@@ -426,16 +426,3 @@
      (.modelName (nippy/thaw-from-in! in))
      (.tokenUsage (nippy/thaw-from-in! in))
      .build))
-
-; (ser/extend-8-byte-freeze
-;  Embedding
-;  [^Embedding obj out]
-;  )
-;
-; (ser/extend-8-byte-thaw
-;  Embedding
-;  [in]
-;  )
-
-;; TODO: <<<<>>>>
-; ChatRequest

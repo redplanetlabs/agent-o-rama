@@ -182,9 +182,4 @@
   (is (ser= (-> (ChatResponse/builder)
                 (.aiMessage (AiMessage/aiMessage "bar"))
                 .build)))
-
-
 )
-
-;; TODO: <<<<>>>>
-; ChatRequest
