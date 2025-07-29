@@ -234,6 +234,62 @@
  [in]
  (IsEqualTo. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
 
+(ser/extend-8-byte-freeze
+ IsGreaterThan
+ [^IsGreaterThan obj out]
+ (nippy/freeze-to-out! out (.key obj))
+ (nippy/freeze-to-out! out (.comparisonValue obj)))
+
+(ser/extend-8-byte-thaw
+ IsGreaterThan
+ [in]
+ (IsGreaterThan. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ IsGreaterThanOrEqualTo
+ [^IsGreaterThan obj out]
+ (nippy/freeze-to-out! out (.key obj))
+ (nippy/freeze-to-out! out (.comparisonValue obj)))
+
+(ser/extend-8-byte-thaw
+ IsGreaterThanOrEqualTo
+ [in]
+ (IsGreaterThanOrEqualTo. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ IsLessThan
+ [^IsLessThan obj out]
+ (nippy/freeze-to-out! out (.key obj))
+ (nippy/freeze-to-out! out (.comparisonValue obj)))
+
+(ser/extend-8-byte-thaw
+ IsLessThan
+ [in]
+ (IsLessThan. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ IsLessThanOrEqualTo
+ [^IsLessThanOrEqualTo obj out]
+ (nippy/freeze-to-out! out (.key obj))
+ (nippy/freeze-to-out! out (.comparisonValue obj)))
+
+(ser/extend-8-byte-thaw
+ IsLessThanOrEqualTo
+ [in]
+ (IsLessThanOrEqualTo. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ IsNotEqualTo
+ [^IsNotEqualTo obj out]
+ (nippy/freeze-to-out! out (.key obj))
+ (nippy/freeze-to-out! out (.comparisonValue obj)))
+
+(ser/extend-8-byte-thaw
+ IsNotEqualTo
+ [in]
+ (IsNotEqualTo. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
+
+
 ; (ser/extend-8-byte-freeze
 ;  Embedding
 ;  [^Embedding obj out]
@@ -245,12 +301,7 @@
 ;  )
 
 ;; TODO: <<<<>>>>
-; IsGreaterThan
-; IsGreaterThanOrEqualTo
 ; IsIn
-; IsLessThan
-; IsLessThanOrEqualTo
-; IsNotEqualTo
 ; IsNotIn
 ; And
 ; Not

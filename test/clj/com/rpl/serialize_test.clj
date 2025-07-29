@@ -96,7 +96,7 @@
   (is (ser= (TextSegment. "abcz" (Metadata. {"a" 1}))))
   (is (ser= (EmbeddingMatch. 2.0 "aaa" (tc/embedding 1.1 1.2) "hello")))
   (is (ser= (EmbeddingMatch. 2.0 "a" (tc/embedding 1.1 1.2) nil)))
-  ;; EmbeddingSearchResult doesn't implement equals correctly
+  ;; EmbeddingSearchResult doesn't implement equals
   (let [r (EmbeddingSearchResult.
            [(EmbeddingMatch. 2.0 "a" (tc/embedding 1.1 1.2) nil)
             (EmbeddingMatch. 2.1 "bb" (tc/embedding 1.1 1.3) "foo")])
@@ -110,17 +110,27 @@
   (is (ser= (ContainsString. "k2" "")))
   (is (ser= (IsEqualTo. "k" "v")))
   (is (ser= (IsEqualTo. "k2" "")))
+  (is (ser= (IsGreaterThan. "k" "v")))
+  (is (ser= (IsGreaterThan. "k2" "")))
+  (is (ser= (IsGreaterThan. "k2" 10)))
+  (is (ser= (IsGreaterThanOrEqualTo. "k" "v")))
+  (is (ser= (IsGreaterThanOrEqualTo. "k2" "")))
+  (is (ser= (IsGreaterThanOrEqualTo. "k2" 10)))
+  (is (ser= (IsLessThan. "k" "v")))
+  (is (ser= (IsLessThan. "k2" "")))
+  (is (ser= (IsLessThan. "k2" 10)))
+  (is (ser= (IsLessThanOrEqualTo. "k" "v")))
+  (is (ser= (IsLessThanOrEqualTo. "k2" "")))
+  (is (ser= (IsLessThanOrEqualTo. "k2" 10)))
+  (is (ser= (IsNotEqualTo. "k" "v")))
+  (is (ser= (IsNotEqualTo. "k2" "")))
+  (is (ser= (IsNotEqualTo. "k2" 10)))
 
 
 )
 
 ;; TODO: <<<<>>>>
-; IsGreaterThan
-; IsGreaterThanOrEqualTo
 ; IsIn
-; IsLessThan
-; IsLessThanOrEqualTo
-; IsNotEqualTo
 ; IsNotIn
 ; And
 ; Not
