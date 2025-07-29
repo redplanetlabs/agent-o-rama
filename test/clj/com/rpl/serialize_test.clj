@@ -106,13 +106,15 @@
         ^EmbeddingSearchResult r2* (roundtrip r2)]
     (is (= (.matches r) (.matches r*)))
     (is (= (.matches r2) (.matches r2*))))
+  (is (ser= (ContainsString. "k" "v")))
+  (is (ser= (ContainsString. "k2" "")))
+  (is (ser= (IsEqualTo. "k" "v")))
+  (is (ser= (IsEqualTo. "k2" "")))
 
 
 )
 
 ;; TODO: <<<<>>>>
-; ContainsString
-; IsEqualTo
 ; IsGreaterThan
 ; IsGreaterThanOrEqualTo
 ; IsIn

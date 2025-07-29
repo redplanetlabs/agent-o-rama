@@ -212,6 +212,28 @@
  [in]
  (EmbeddingSearchResult. (nippy/thaw-from-in! in)))
 
+(ser/extend-8-byte-freeze
+ ContainsString
+ [^ContainsString obj out]
+ (nippy/freeze-to-out! out (.key obj))
+ (nippy/freeze-to-out! out (.comparisonValue obj)))
+
+(ser/extend-8-byte-thaw
+ ContainsString
+ [in]
+ (ContainsString. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ IsEqualTo
+ [^IsEqualTo obj out]
+ (nippy/freeze-to-out! out (.key obj))
+ (nippy/freeze-to-out! out (.comparisonValue obj)))
+
+(ser/extend-8-byte-thaw
+ IsEqualTo
+ [in]
+ (IsEqualTo. (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
+
 ; (ser/extend-8-byte-freeze
 ;  Embedding
 ;  [^Embedding obj out]
@@ -223,8 +245,6 @@
 ;  )
 
 ;; TODO: <<<<>>>>
-; ContainsString
-; IsEqualTo
 ; IsGreaterThan
 ; IsGreaterThanOrEqualTo
 ; IsIn
