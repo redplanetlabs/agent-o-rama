@@ -103,7 +103,7 @@
                      :invoke-id]
                     #(get implicit->real % %)))))
 
-(defn parse-url-trace-id [s]
+(defn parse-url-pair [s]
   (let [[task-id agent-id] (clojure.string/split s #"-")]
     [(parse-long task-id) (parse-long agent-id)]))
 
@@ -112,12 +112,9 @@
     {:strs [paginate-task-id missing-node-id]} :query-params
     :as req}]
 
-  (def paginate-task-id paginate-task-id)
-  (def missing-node-id missing-node-id)
-
   {:status 200
    :body
-   (let [[agent-task-id agent-id] (parse-url-trace-id invoke-id)
+   (let [[agent-task-id agent-id] (parse-url-pair invoke-id)
 
          pair
          (cond
@@ -129,18 +126,18 @@
            [agent-task-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
                                               (:root-pstate (objects module-id agent-name))
                                               {:pkey agent-task-id})])]
-     (def t (transform [:invokes-map]
-                       remove-implicit-nodes
-                       (foreign-invoke-query (:tracing-query (objects module-id agent-name))
-                                             agent-task-id
-                                             [pair]
-                                             10)))
-     t)})
+     (transform [:invokes-map]
+                remove-implicit-nodes
+                (foreign-invoke-query (:tracing-query (objects module-id agent-name))
+                                      agent-task-id
+                                      [pair]
+                                      10)))})
 
-(defn fork [req]
-  (def req req)
-  (-> req :body-params :changed-nodes)
-  (-> req :body-params :changed-nodes)
-  (-> req :body-params)
-  
-  {:status 200 :body ["wow" "cool"]})
+(defn fork [{{:keys [module-id agent-name]} :path-params
+             {:keys [changed-nodes invoke-id]} :body-params}]
+  {:status 200 :body (let [[task-id agent-invoke-id]
+                           (parse-url-trace-id invoke-id)]
+                       (aor/agent-initiate-fork
+                        (get-client module-id agent-name)
+                        (AgentInvoke. task-id agent-invoke-id )
+                        (transform [MAP-VALS] read-string changed-nodes)))})
