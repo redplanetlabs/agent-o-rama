@@ -407,6 +407,26 @@
  [in]
  (FinishReason/valueOf (nippy/thaw-from-in! in)))
 
+(ser/extend-8-byte-freeze
+ ChatResponse
+ [^ChatResponse obj out]
+ (nippy/freeze-to-out! out (.aiMessage obj))
+ (nippy/freeze-to-out! out (.finishReason obj))
+ (nippy/freeze-to-out! out (.id obj))
+ (nippy/freeze-to-out! out (.modelName obj))
+ (nippy/freeze-to-out! out (.tokenUsage obj)))
+
+(ser/extend-8-byte-thaw
+ ChatResponse
+ [in]
+ (-> (ChatResponse/builder)
+     (.aiMessage (nippy/thaw-from-in! in))
+     (.finishReason (nippy/thaw-from-in! in))
+     (.id (nippy/thaw-from-in! in))
+     (.modelName (nippy/thaw-from-in! in))
+     (.tokenUsage (nippy/thaw-from-in! in))
+     .build))
+
 ; (ser/extend-8-byte-freeze
 ;  Embedding
 ;  [^Embedding obj out]
@@ -419,4 +439,3 @@
 
 ;; TODO: <<<<>>>>
 ; ChatRequest
-; ChatResponse

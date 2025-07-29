@@ -172,10 +172,19 @@
     (is (= (.sources r) (.sources r*)))
     (is (= (.finishReason r) (.finishReason r*)))
     (is (= (.toolExecutions r) (.toolExecutions r*))))
+  (is (ser= (-> (ChatResponse/builder)
+                (.aiMessage (AiMessage/aiMessage "foo"))
+                (.finishReason FinishReason/STOP)
+                (.id "aaa")
+                (.modelName "aor-model")
+                (.tokenUsage (TokenUsage. (int 1)))
+                .build)))
+  (is (ser= (-> (ChatResponse/builder)
+                (.aiMessage (AiMessage/aiMessage "bar"))
+                .build)))
 
 
 )
 
 ;; TODO: <<<<>>>>
 ; ChatRequest
-; ChatResponse
