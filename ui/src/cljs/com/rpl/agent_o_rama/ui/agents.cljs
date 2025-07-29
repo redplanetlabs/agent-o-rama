@@ -315,48 +315,28 @@
 (defui invoke []
   (let [{:strs [module-id agent-name invoke-id]} (js->clj (wouter/useParams))
         [use-pagination? set-use-pagination] (uix/use-state true)
-        [forking-mode? set-forking-mode?] (uix/use-state false)
-        [next-task-invoke-pairs set-next-task-invoke-pairs] (uix/use-state [])
-        ;; Only fetch initial data - no need to refetch on pagination state changes
-        {:keys [data loading?]}
-        (common/use-query {:query-key ["invoke-initial" module-id agent-name invoke-id use-pagination?]
-                           :query-url (if use-pagination?
-                                        (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id "/paginated?depth=1")
-                                        (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id))})
-        
-        ;; Initialize next-task-invoke-pairs when data loads
-        _ (uix/use-effect
-           (fn []
-             (when data
-               (set-next-task-invoke-pairs (:next-task-invoke-pairs data))))
-           [data])]
-    (cond
-      loading? ($ :div "loading...")
-      (not data) ($ :div "no data")
-      :else 
-      ($ :div
-         ;; Sticky header with all controls
-         ($ :div.sticky.top-0.z-50.bg-white.border-b.border-gray-200.shadow-sm.p-6
-            ($ :div.flex.justify-between.items-center
-               ($ :h2.text-2xl.font-semibold.text-gray-700 "Agent Invocation Graph")
-               ($ :div.flex.items-center.gap-4
-                  ($ :div.flex.items-center.gap-2
-                     ($ :label.text-sm.text-gray-600 "Pagination")
-                     ($ :input.mr-2 {:type "checkbox"
-                                     :checked use-pagination?
-                                     :onChange #(set-use-pagination (not use-pagination?))})))))
-         
-         ;; Graph content
-         ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
-            ($ invocation-graph/graph {:initial-data (:invokes-map data)
-                                       :next-task-invoke-pairs next-task-invoke-pairs
-                                       :set-next-task-invoke-pairs set-next-task-invoke-pairs
-                                       :api-url (when use-pagination? 
-                                                  (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id "/paginated"))
-                                       :module-id module-id
-                                       :agent-name agent-name
-                                       :invoke-id invoke-id
-                                       :forking-mode? forking-mode?
-                                       :set-forking-mode? set-forking-mode?}))))))
+        [forking-mode? set-forking-mode?] (uix/use-state false)]
+    
+    ($ :div
+       ;; Sticky header with all controls
+       ($ :div.sticky.top-0.z-50.bg-white.border-b.border-gray-200.shadow-sm.p-6
+          ($ :div.flex.justify-between.items-center
+             ($ :h2.text-2xl.font-semibold.text-gray-700 "Agent Invocation Graph")
+             ($ :div.flex.items-center.gap-4
+                ($ :div.flex.items-center.gap-2
+                   ($ :label.text-sm.text-gray-600 "Pagination")
+                   ($ :input.mr-2 {:type "checkbox"
+                                   :checked use-pagination?
+                                   :onChange #(set-use-pagination (not use-pagination?))})))))
+       
+       ;; Graph content
+       ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
+          ($ invocation-graph/graph {:api-url (when use-pagination? 
+                                                (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id "/paginated"))
+                                     :module-id module-id
+                                     :agent-name agent-name
+                                     :invoke-id invoke-id
+                                     :forking-mode? forking-mode?
+                                     :set-forking-mode? set-forking-mode?})))))
 
 

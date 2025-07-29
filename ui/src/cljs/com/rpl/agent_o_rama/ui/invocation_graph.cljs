@@ -485,10 +485,33 @@
             #{}
             modified-node-ids)))
 
-(defui graph [{:keys [initial-data api-url module-id agent-name invoke-id forking-mode? set-forking-mode? next-task-invoke-pairs set-next-task-invoke-pairs]}]
+(defui graph [{:keys [api-url module-id agent-name invoke-id forking-mode? set-forking-mode?]}]
   (let [[selected-node set-selected-node] (uix/use-state nil)
         [loading-nodes set-loading-nodes] (uix/use-state #{})
-        [graph-data set-graph-data] (uix/use-state initial-data)
+        [graph-data set-graph-data] (uix/use-state {})
+        [next-task-invoke-pairs set-next-task-invoke-pairs] (uix/use-state [])
+        
+        ;; Fetch initial data
+        initial-data-url (if api-url
+                          ;; If api-url is provided, use it for paginated initial load
+                          (str api-url "?depth=1")
+                          ;; Otherwise build the standard URL
+                          (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id))
+        
+        {:keys [data loading?]} (common/use-query {:query-key ["invocation-graph" module-id agent-name invoke-id]
+                                                   :query-url initial-data-url})
+        
+        ;; Initialize graph-data when initial data loads
+        _ (uix/use-effect
+           (fn []
+             (when data
+               (let [initial-invokes-map (:invokes-map data)
+                     initial-pagination (:next-task-invoke-pairs data)]
+                 (set-graph-data initial-invokes-map)
+                 ;; Update next-task-invoke-pairs if provided
+                 (when initial-pagination
+                   (set-next-task-invoke-pairs initial-pagination)))))
+           [data])
         
         ;; Forking mode state - now controlled by parent
         [changed-nodes set-changed-nodes] (uix/use-state {})
@@ -530,7 +553,7 @@
                                                    (set-graph-data combined-data)
                                                    
                                                    ;; Update next-task-invoke-pairs if new ones came back
-                                                   (when (and new-task-pairs set-next-task-invoke-pairs)
+                                                   (when new-task-pairs
                                                      (set-next-task-invoke-pairs 
                                                        (concat next-task-invoke-pairs new-task-pairs)))
                                                    
@@ -541,7 +564,7 @@
                                         (.catch (fn [error]
                                                   (js/console.error "Failed to load paginated data:" error)
                                                   (set-loading-nodes #(disj % missing-node-id))))))))
-                              [graph-data api-url loading-nodes set-nodes set-edges next-task-invoke-pairs set-next-task-invoke-pairs])
+                              [graph-data api-url loading-nodes set-nodes set-edges next-task-invoke-pairs])
         
         handle-execute-fork (uix/use-callback
                              (fn []
@@ -564,100 +587,104 @@
                              (set-selected-node nil))
                            [])]
     
+    (cond
+      loading? ($ :div.flex.justify-center.items-center.py-8
+                 ($ :div.text-gray-500 "Loading invocation graph..."))
+      (not data) ($ :div.flex.justify-center.items-center.py-8
+                   ($ :div.text-gray-500 "No invocation data found"))
+      :else
+      ($ :<>
+         ;; Main content area with right margin for the stats panel
+         ($ :div {:className "mr-80"}
+            ($ :div {:style {:width "100%" :height "500px"}}
+               ($ ReactFlow {:nodes flow-nodes 
+                             :edges flow-edges
+                             :onNodesChange on-nodes-change
+                             :onEdgesChange on-edges-change
+                             :proOptions (clj->js {:hideAttribution true})
+                             :nodeTypes (clj->js {"custom"
+                                                  (uix.core/as-react
+                                                   (fn [{:keys [data id]}]
+                                                     (let [data (js->clj data :keywordize-keys true)
+                                                           label (:label data)
+                                                           node-id (:node-id data)
+                                                           selected (= (when selected-node (.-id selected-node)) id)
+                                                           has-changes (contains? changed-nodes node-id)
+                                                           is-affected (and forking-mode? (contains? affected-nodes node-id))
+                                                           base-classes (cond
+                                                                          is-affected
+                                                                          ["bg-gray-300" "text-gray-500" "border-2" "border-gray-400"]
+                                                                          
+                                                                          has-changes
+                                                                          ["bg-orange-500" "text-white" "border-2" "border-orange-600"]
+                                                                          
+                                                                          (agg-node? data)
+                                                                          ["bg-yellow-500" "text-white" "border-2" "border-yellow-600"]
 
-    
-    ($ :<>
-       ;; Main content area with right margin for the stats panel
-       ($ :div {:className "mr-80"}
-          ($ :div {:style {:width "100%" :height "500px"}}
-             ($ ReactFlow {:nodes flow-nodes 
-                           :edges flow-edges
-                           :onNodesChange on-nodes-change
-                           :onEdgesChange on-edges-change
-                           :proOptions (clj->js {:hideAttribution true})
-                           :nodeTypes (clj->js {"custom"
-                                                (uix.core/as-react
-                                                 (fn [{:keys [data id]}]
-                                                   (let [data (js->clj data :keywordize-keys true)
-                                                         label (:label data)
-                                                         node-id (:node-id data)
-                                                         selected (= (when selected-node (.-id selected-node)) id)
-                                                         has-changes (contains? changed-nodes node-id)
-                                                         is-affected (and forking-mode? (contains? affected-nodes node-id))
-                                                         base-classes (cond
-                                                                        is-affected
-                                                                        ["bg-gray-300" "text-gray-500" "border-2" "border-gray-400"]
-                                                                        
-                                                                        has-changes
-                                                                        ["bg-orange-500" "text-white" "border-2" "border-orange-600"]
-                                                                        
-                                                                        (agg-node? data)
-                                                                        ["bg-yellow-500" "text-white" "border-2" "border-yellow-600"]
+                                                                          (starter-node? data)
+                                                                          ["bg-green-500" "text-white" "border-2" "border-green-600"]
 
-                                                                        (starter-node? data)
-                                                                        ["bg-green-500" "text-white" "border-2" "border-green-600"]
-
-                                                                        :else
-                                                                        ["bg-white" "text-gray-800" "border-2" "border-gray-300"])
-                                                         selection-classes (if selected
-                                                                             ["ring-4" "ring-blue-400" "ring-opacity-75" "shadow-2xl" "transform" "scale-105"]
-                                                                             ["shadow-lg"])
-                                                         common-classes ["p-3" "rounded-md" "transition-all" "duration-200"]
-                                                         node-className (str/join " " (concat base-classes selection-classes common-classes))]
-                                                     ($ :div {:className "relative"}
-                                                        ($ :div {:className node-className
-                                                                 :style {:width "170px" :height "40px" :opacity (if is-affected "0.6" "1.0")}}
-                                                           label)
-                                                        (when (and (:result data) (not is-affected))
-                                                          ($ :div {:className "absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"}))
-                                                        (when has-changes
-                                                          ($ :div {:className "absolute -top-1 -left-1 w-3 h-3 bg-orange-400 rounded-full border-2 border-white shadow-sm"}))
-                                                        ($ Handle {:type "target" :position "top"})
-                                                        ($ Handle {:type "source" :position "bottom"})))))
-                                                
-                                                "phantom"
-                                                (uix.core/as-react
-                                                 (fn [{:keys [data]}]
-                                                   (let [data (js->clj data :keywordize-keys true)
-                                                         missing-node-id (:missing-node-id data)]
-                                                     ($ :div {:className "relative cursor-pointer"
-                                                              :onClick (fn [e]
-                                                                         (.stopPropagation e)
-                                                                         (println "phantom data" data)
-                                                                         (handle-paginate-node missing-node-id))}
-                                                        ($ :div {:className "bg-gray-100 text-gray-600 p-3 rounded-md shadow-lg border-2 border-dashed border-gray-400 hover:bg-gray-200 transition-colors"
-                                                                 :style {:width "170px" :height "40px"}}
-                                                           (:label data))
-                                                        ($ Handle {:type "target" :position "top"})))))})
-                           :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
-                           :onNodeClick (fn [_ node] (set-selected-node node))}
-                ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
-                ($ Controls {:className "fill-gray-500 stroke-gray-500"})))
-          
-          ;; Show selected node details or forking input component
-          (when selected-node
-            (if forking-mode?
-              ($ forking-input-component {:selected-node selected-node
-                                          :changed-nodes changed-nodes
-                                          :set-changed-nodes set-changed-nodes
-                                          :affected-nodes affected-nodes})
-              ($ selected-node-component {:selected-node selected-node
-                                          :graph-data graph-data
-                                          :handle-paginate-node handle-paginate-node
-                                          :loading-nodes loading-nodes
-                                          :flow-nodes flow-nodes
-                                          :set-nodes set-nodes
-                                          :set-selected-node set-selected-node}))))
-       
-       ;; Always-visible right panel with tabs
-       ($ right-panel {:graph-data graph-data
-                       :changed-nodes changed-nodes
-                       :set-changed-nodes set-changed-nodes
-                       :affected-nodes affected-nodes
-                       :flow-nodes flow-nodes
-                       :set-selected-node set-selected-node
-                       :on-execute-fork handle-execute-fork
-                       :on-clear-fork handle-clear-fork
-                       :forking-mode? forking-mode?
-                       :set-forking-mode? set-forking-mode?}))))
+                                                                          :else
+                                                                          ["bg-white" "text-gray-800" "border-2" "border-gray-300"])
+                                                           selection-classes (if selected
+                                                                               ["ring-4" "ring-blue-400" "ring-opacity-75" "shadow-2xl" "transform" "scale-105"]
+                                                                               ["shadow-lg"])
+                                                           common-classes ["p-3" "rounded-md" "transition-all" "duration-200"]
+                                                           node-className (str/join " " (concat base-classes selection-classes common-classes))]
+                                                       ($ :div {:className "relative"}
+                                                          ($ :div {:className node-className
+                                                                   :style {:width "170px" :height "40px" :opacity (if is-affected "0.6" "1.0")}}
+                                                             label)
+                                                          (when (and (:result data) (not is-affected))
+                                                            ($ :div {:className "absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"}))
+                                                          (when has-changes
+                                                            ($ :div {:className "absolute -top-1 -left-1 w-3 h-3 bg-orange-400 rounded-full border-2 border-white shadow-sm"}))
+                                                          ($ Handle {:type "target" :position "top"})
+                                                          ($ Handle {:type "source" :position "bottom"})))))
+                                                  
+                                                  "phantom"
+                                                  (uix.core/as-react
+                                                   (fn [{:keys [data]}]
+                                                     (let [data (js->clj data :keywordize-keys true)
+                                                           missing-node-id (:missing-node-id data)]
+                                                       ($ :div {:className "relative cursor-pointer"
+                                                                :onClick (fn [e]
+                                                                           (.stopPropagation e)
+                                                                           (println "phantom data" data)
+                                                                           (handle-paginate-node missing-node-id))}
+                                                          ($ :div {:className "bg-gray-100 text-gray-600 p-3 rounded-md shadow-lg border-2 border-dashed border-gray-400 hover:bg-gray-200 transition-colors"
+                                                                   :style {:width "170px" :height "40px"}}
+                                                             (:label data))
+                                                          ($ Handle {:type "target" :position "top"})))))})
+                             :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
+                             :onNodeClick (fn [_ node] (set-selected-node node))}
+                  ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
+                  ($ Controls {:className "fill-gray-500 stroke-gray-500"})))
+            
+            ;; Show selected node details or forking input component
+            (when selected-node
+              (if forking-mode?
+                ($ forking-input-component {:selected-node selected-node
+                                            :changed-nodes changed-nodes
+                                            :set-changed-nodes set-changed-nodes
+                                            :affected-nodes affected-nodes})
+                ($ selected-node-component {:selected-node selected-node
+                                            :graph-data graph-data
+                                            :handle-paginate-node handle-paginate-node
+                                            :loading-nodes loading-nodes
+                                            :flow-nodes flow-nodes
+                                            :set-nodes set-nodes
+                                            :set-selected-node set-selected-node}))))
+         
+         ;; Always-visible right panel with tabs
+         ($ right-panel {:graph-data graph-data
+                         :changed-nodes changed-nodes
+                         :set-changed-nodes set-changed-nodes
+                         :affected-nodes affected-nodes
+                         :flow-nodes flow-nodes
+                         :set-selected-node set-selected-node
+                         :on-execute-fork handle-execute-fork
+                         :on-clear-fork handle-clear-fork
+                         :forking-mode? forking-mode?
+                         :set-forking-mode? set-forking-mode?})))))
 
