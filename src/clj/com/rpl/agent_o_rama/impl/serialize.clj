@@ -24,6 +24,7 @@
    [dev.langchain4j.model.chat.response
     ChatResponse]
    [dev.langchain4j.model.output
+    FinishReason
     TokenUsage]
    [dev.langchain4j.service
     Result]
@@ -349,6 +350,63 @@
  [in]
  (Not. (nippy/thaw-from-in! in)))
 
+(ser/extend-8-byte-freeze
+ TokenUsage
+ [^TokenUsage obj out]
+ (nippy/freeze-to-out! out (.inputTokenCount obj))
+ (nippy/freeze-to-out! out (.outputTokenCount obj))
+ (nippy/freeze-to-out! out (.totalTokenCount obj)))
+
+(ser/extend-8-byte-thaw
+ TokenUsage
+ [in]
+ (TokenUsage. (nippy/thaw-from-in! in)
+              (nippy/thaw-from-in! in)
+              (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ ToolExecution
+ [^ToolExecution obj out]
+ (nippy/freeze-to-out! out (.request obj))
+ (nippy/freeze-to-out! out (.result obj)))
+
+(ser/extend-8-byte-thaw
+ ToolExecution
+ [in]
+ (-> (ToolExecution/builder)
+     (.request (nippy/thaw-from-in! in))
+     (.result (nippy/thaw-from-in! in))
+     .build))
+
+(ser/extend-8-byte-freeze
+ Result
+ [^Result obj out]
+ (nippy/freeze-to-out! out (.content obj))
+ (nippy/freeze-to-out! out (.tokenUsage obj))
+ (nippy/freeze-to-out! out (.sources obj))
+ (nippy/freeze-to-out! out (.finishReason obj))
+ (nippy/freeze-to-out! out (.toolExecutions obj)))
+
+(ser/extend-8-byte-thaw
+ Result
+ [in]
+ (Result. (nippy/thaw-from-in! in)
+          (nippy/thaw-from-in! in)
+          (nippy/thaw-from-in! in)
+          (nippy/thaw-from-in! in)
+          (nippy/thaw-from-in! in)))
+
+
+(ser/extend-8-byte-freeze
+ FinishReason
+ [^FinishReason obj out]
+ (nippy/freeze-to-out! out (.name obj)))
+
+(ser/extend-8-byte-thaw
+ FinishReason
+ [in]
+ (FinishReason/valueOf (nippy/thaw-from-in! in)))
+
 ; (ser/extend-8-byte-freeze
 ;  Embedding
 ;  [^Embedding obj out]
@@ -360,8 +418,5 @@
 ;  )
 
 ;; TODO: <<<<>>>>
-; TokenUsage
-; ToolExecution
-; Result
 ; ChatRequest
 ; ChatResponse

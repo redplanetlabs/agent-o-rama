@@ -27,6 +27,7 @@
    [dev.langchain4j.model.chat.response
     ChatResponse]
    [dev.langchain4j.model.output
+    FinishReason
     TokenUsage]
    [dev.langchain4j.service
     Result]
@@ -138,13 +139,43 @@
   (is (ser= (And. (IsEqualTo. "k" "a") (IsEqualTo. "k2" "b"))))
   (is (ser= (Or. (IsEqualTo. "k" "a") (IsEqualTo. "k2" "b"))))
   (is (ser= (Not. (IsNotIn. "k2" ["a" "b"]))))
+  (is (ser= (TokenUsage. (int 1) (int 2) (int 3))))
+  (is (ser= (TokenUsage. (int 1) (int 2))))
+  (is (ser= (TokenUsage. (int 11))))
+  (is (ser= (TokenUsage.)))
+  (is (ser= (-> (ToolExecution/builder)
+                (.request (-> (ToolExecutionRequest/builder)
+                              (.id "id1")
+                              (.name "foo")
+                              (.arguments "abcde")
+                              .build))
+                (.result "abcd")
+                .build)))
+  (is (ser= FinishReason/STOP))
+  (is (ser= FinishReason/LENGTH))
+  (is (ser= FinishReason/OTHER))
+  (let [r (Result. "abc"
+                   (TokenUsage. (int 1))
+                   [(TextContent. "foo")]
+                   FinishReason/STOP
+                   [(-> (ToolExecution/builder)
+                        (.request (-> (ToolExecutionRequest/builder)
+                                      (.id "id1")
+                                      (.name "foo")
+                                      (.arguments "abcde")
+                                      .build))
+                        (.result "abcd")
+                        .build)])
+        ^Result r* (roundtrip r)]
+    (is (= (.content r) (.content r*)))
+    (is (= (.tokenUsage r) (.tokenUsage r*)))
+    (is (= (.sources r) (.sources r*)))
+    (is (= (.finishReason r) (.finishReason r*)))
+    (is (= (.toolExecutions r) (.toolExecutions r*))))
 
 
 )
 
 ;; TODO: <<<<>>>>
-; TokenUsage
-; ToolExecution
-; Result
 ; ChatRequest
 ; ChatResponse
