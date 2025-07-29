@@ -3,6 +3,7 @@
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.serialize]
    [com.rpl.ramaspecter.defrecord-plus :as drp]
    [rpl.schema.core :as s])
   (:import
