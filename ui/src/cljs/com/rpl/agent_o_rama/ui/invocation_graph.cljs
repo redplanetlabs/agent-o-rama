@@ -535,39 +535,45 @@
                  (set-edges (clj->js edges)))))
            [graph-data])
         
+        ;; Pagination mutation
+        pagination-mutation (common/use-mutation
+                             {:mutation-fn (fn [variables]
+                                             (let [{:keys [task-id missing-node-id]} (js->clj variables :keywordize-keys true)]
+                                               (common/fetch (str initial-data-url 
+                                                                  "?paginate-task-id=" task-id "&missing-node-id=" missing-node-id))))
+                              :on-success (fn [response variables]
+                                            (let [response-data (js->clj response :keywordize-keys true)
+                                                  {:keys [missing-node-id]} (js->clj variables :keywordize-keys true)
+                                                  new-data (:invokes-map response-data)
+                                                  new-task-pairs (:next-task-invoke-pairs response-data)
+                                                  
+                                                  ;; Merge new data with existing graph data
+                                                  combined-data (merge graph-data new-data)]
+                                              
+                                              ;; Update the graph data state (this will trigger useEffect to update nodes/edges)
+                                              (set-graph-data combined-data)
+                                              
+                                              ;; Update next-task-invoke-pairs if new ones came back
+                                              (when new-task-pairs
+                                                (set-next-task-invoke-pairs 
+                                                 (concat next-task-invoke-pairs new-task-pairs)))
+                                              
+                                              (set-loading-nodes #(disj % missing-node-id))))
+                              :on-error (fn [error variables]
+                                          (let [{:keys [missing-node-id]} (js->clj variables :keywordize-keys true)]
+                                            (js/console.error "Failed to load paginated data:" error)
+                                            (set-loading-nodes #(disj % missing-node-id))))})
+
         handle-paginate-node
         (uix/use-callback
          (fn [missing-node-id]
-           
            ;; Find the task-id for this missing node from next-task-invoke-pairs
            ;; Convert to string for comparison since JS numbers truncate longs
            (let [[task-id _] (first (filter (fn [[a b]] (= (str b) (str missing-node-id))) next-task-invoke-pairs))]
-             
-             
              (when-not (contains? loading-nodes missing-node-id)
                (set-loading-nodes #(conj % missing-node-id))
-               (-> (common/fetch (str initial-data-url 
-                                      "?paginate-task-id=" task-id "&missing-node-id=" missing-node-id))
-                   (.then (fn [response]
-                            (let [new-data (:invokes-map response)
-                                  new-task-pairs (:next-task-invoke-pairs response)
-                                  
-                                  ;; Merge new data with existing graph data
-                                  combined-data (merge graph-data new-data)]
-                              
-                              ;; Update the graph data state (this will trigger useEffect to update nodes/edges)
-                              (set-graph-data combined-data)
-                              
-                              ;; Update next-task-invoke-pairs if new ones came back
-                              (when new-task-pairs
-                                (set-next-task-invoke-pairs 
-                                 (concat next-task-invoke-pairs new-task-pairs)))
-                              
-                              (set-loading-nodes #(disj % missing-node-id)))))
-                   (.catch (fn [error]
-                             (js/console.error "Failed to load paginated data:" error)
-                             (set-loading-nodes #(disj % missing-node-id))))))))
-         [graph-data loading-nodes next-task-invoke-pairs initial-data-url])
+               ((:mutate pagination-mutation) (clj->js {:task-id task-id :missing-node-id missing-node-id})))))
+         [graph-data loading-nodes next-task-invoke-pairs initial-data-url pagination-mutation])
         
         handle-execute-fork (uix/use-callback
                              (fn []
