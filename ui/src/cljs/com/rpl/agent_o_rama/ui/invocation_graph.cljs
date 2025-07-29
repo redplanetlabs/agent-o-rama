@@ -504,33 +504,36 @@
         {:keys [data loading?]} (common/use-query {:query-key ["invocation-graph" module-id agent-name invoke-id]
                                                    :query-url initial-data-url})
         
-        ;; Initialize graph-data when initial data loads
-        _ (uix/use-effect
-           (fn []
-             (when data
-               (let [initial-invokes-map (:invokes-map data)
-                     initial-pagination (:next-task-invoke-pairs data)]
-                 (set-graph-data initial-invokes-map)
-                 ;; Update next-task-invoke-pairs if provided
-                 (when initial-pagination
-                   (set-next-task-invoke-pairs initial-pagination)))))
-           [data])
-        
-        ;; Forking mode state - now controlled by parent
         [changed-nodes set-changed-nodes] (uix/use-state {})
         
-        ;; Calculate affected downstream nodes in forking mode
         affected-nodes (when forking-mode?
                          (find-downstream-nodes graph-data (set (keys changed-nodes))))
         
-        ;; Process current graph data
-        {:keys [nodes edges]} (process-graph-data graph-data)
         ;; Use React Flow's state management hooks
-        _ (println "nodes!!!" nodes)
-        [flow-nodes set-nodes on-nodes-change] (useNodesState (clj->js nodes))
-        [flow-edges set-edges on-edges-change] (useEdgesState (clj->js edges))
-
-        _ (println "flow nodes1" flow-nodes )
+        [flow-nodes set-nodes on-nodes-change] (useNodesState (clj->js []))
+        [flow-edges set-edges on-edges-change] (useEdgesState (clj->js []))
+        
+        ;; Two-stage data processing pattern:
+        ;; We need separate useEffects because pagination updates graph-data directly,
+        ;; which wouldn't trigger a merged useEffect that only depends on [data].
+        _ (uix/use-effect
+           (fn []
+             (when data
+               (set-graph-data (:invokes-map data))
+               (set-next-task-invoke-pairs (:next-task-invoke-pairs data))))
+           [data])
+        
+        ;; Update React Flow nodes/edges when graph data changes (initial load or pagination)
+        ;; NOTE: We can't initialize useNodesState/useEdgesState with processed data directly
+        ;; because those hooks only use their initial value on first render when data is empty.
+        _ (uix/use-effect
+           (fn []
+             (when (not (empty? graph-data))
+               (let [{:keys [nodes edges]} (process-graph-data graph-data)]
+                 (println "Updating flow with nodes:" (count nodes))
+                 (set-nodes (clj->js nodes))
+                 (set-edges (clj->js edges)))))
+           [graph-data])
         
         handle-paginate-node
         (uix/use-callback
@@ -550,12 +553,9 @@
                                   new-task-pairs (:next-task-invoke-pairs response)
                                   
                                   ;; Merge new data with existing graph data
-                                  combined-data (merge graph-data new-data)
-                                  
-                                  ;; Re-process the entire combined graph with dagre layout
-                                  {:keys [nodes edges]} (process-graph-data combined-data)]
+                                  combined-data (merge graph-data new-data)]
                               
-                              ;; Update the graph data state
+                              ;; Update the graph data state (this will trigger useEffect to update nodes/edges)
                               (set-graph-data combined-data)
                               
                               ;; Update next-task-invoke-pairs if new ones came back
@@ -563,14 +563,11 @@
                                 (set-next-task-invoke-pairs 
                                  (concat next-task-invoke-pairs new-task-pairs)))
                               
-                              ;; Replace all nodes and edges with the re-laid out versions, keepign the selection
-                              (set-nodes (clj->js nodes))
-                              (set-edges (clj->js edges))
                               (set-loading-nodes #(disj % missing-node-id)))))
                    (.catch (fn [error]
                              (js/console.error "Failed to load paginated data:" error)
                              (set-loading-nodes #(disj % missing-node-id))))))))
-         [graph-data loading-nodes set-nodes set-edges next-task-invoke-pairs initial-data-url])
+         [graph-data loading-nodes next-task-invoke-pairs initial-data-url])
         
         handle-execute-fork (uix/use-callback
                              (fn []
@@ -601,10 +598,9 @@
       :else
       ($ :<>
          ;; Main content area with right margin for the stats panel
-         ($ :div {:className "mr-80"}
-            ($ :div {:style {:width "100%" :height "500px"}}
-               (println "nodes" flow-nodes)
-               ($ ReactFlow {:nodes flow-nodes 
+                    ($ :div {:className "mr-80"}
+              ($ :div {:style {:width "100%" :height "500px"}}
+                 ($ ReactFlow {:nodes flow-nodes 
                              :edges flow-edges
                              :onNodesChange on-nodes-change
                              :onEdgesChange on-edges-change
