@@ -78,7 +78,7 @@
                        (set-next-pagination-params new-pagination)
                        (set-has-more? true))
                      (set-has-more? false))))))
-           [data])
+           [data requested-pagination-params])
         
         load-more (fn []
                     (when (and has-more? (not loading?))
@@ -313,30 +313,18 @@
           ($ mini-invocations)))))
 
 (defui invoke []
-  (let [{:strs [module-id agent-name invoke-id]} (js->clj (wouter/useParams))
-        [use-pagination? set-use-pagination] (uix/use-state true)
-        [forking-mode? set-forking-mode?] (uix/use-state false)]
+  (let [{:strs [module-id agent-name invoke-id]} (js->clj (wouter/useParams))]
     
     ($ :div
        ;; Sticky header with all controls
        ($ :div.sticky.top-0.z-50.bg-white.border-b.border-gray-200.shadow-sm.p-6
           ($ :div.flex.justify-between.items-center
-             ($ :h2.text-2xl.font-semibold.text-gray-700 "Agent Invocation Graph")
-             ($ :div.flex.items-center.gap-4
-                ($ :div.flex.items-center.gap-2
-                   ($ :label.text-sm.text-gray-600 "Pagination")
-                   ($ :input.mr-2 {:type "checkbox"
-                                   :checked use-pagination?
-                                   :onChange #(set-use-pagination (not use-pagination?))})))))
+             ($ :h2.text-2xl.font-semibold.text-gray-700 "Agent Invocation Graph")))
        
        ;; Graph content
        ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
-          ($ invocation-graph/graph {:api-url (when use-pagination? 
-                                                (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id "/paginated"))
-                                     :module-id module-id
+          ($ invocation-graph/graph {:module-id module-id
                                      :agent-name agent-name
-                                     :invoke-id invoke-id
-                                     :forking-mode? forking-mode?
-                                     :set-forking-mode? set-forking-mode?})))))
+                                     :invoke-id invoke-id})))))
 
 

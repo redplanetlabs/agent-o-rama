@@ -485,18 +485,21 @@
             #{}
             modified-node-ids)))
 
-(defui graph [{:keys [api-url module-id agent-name invoke-id forking-mode? set-forking-mode?]}]
+(defui graph [{:keys [module-id agent-name invoke-id]}]
   (let [[selected-node set-selected-node] (uix/use-state nil)
         [loading-nodes set-loading-nodes] (uix/use-state #{})
         [graph-data set-graph-data] (uix/use-state {})
         [next-task-invoke-pairs set-next-task-invoke-pairs] (uix/use-state [])
+        [forking-mode? set-forking-mode?] (uix/use-state false)
         
         ;; Fetch initial data
-        initial-data-url (if api-url
-                          ;; If api-url is provided, use it for paginated initial load
-                          (str api-url "?depth=1")
-                          ;; Otherwise build the standard URL
-                          (str "/api/agents/" module-id "/" agent-name "/invocations/" invoke-id))
+        initial-data-url (str "/api/agents/"
+                              module-id
+                              "/"
+                              agent-name
+                              "/invocations/"
+                              invoke-id
+                              "/paginated")
         
         {:keys [data loading?]} (common/use-query {:query-key ["invocation-graph" module-id agent-name invoke-id]
                                                    :query-url initial-data-url})
@@ -522,49 +525,52 @@
         
         ;; Process current graph data
         {:keys [nodes edges]} (process-graph-data graph-data)
-        
         ;; Use React Flow's state management hooks
+        _ (println "nodes!!!" nodes)
         [flow-nodes set-nodes on-nodes-change] (useNodesState (clj->js nodes))
         [flow-edges set-edges on-edges-change] (useEdgesState (clj->js edges))
+
+        _ (println "flow nodes1" flow-nodes )
         
-        handle-paginate-node (uix/use-callback
-                              (fn [missing-node-id]
-                                
-                                ;; Find the task-id for this missing node from next-task-invoke-pairs
-                                ;; Convert to string for comparison since JS numbers truncate longs
-                                (let [[task-id _] (first (filter (fn [[a b]] (= (str b) (str missing-node-id))) next-task-invoke-pairs))]
+        handle-paginate-node
+        (uix/use-callback
+         (fn [missing-node-id]
+           
+           ;; Find the task-id for this missing node from next-task-invoke-pairs
+           ;; Convert to string for comparison since JS numbers truncate longs
+           (let [[task-id _] (first (filter (fn [[a b]] (= (str b) (str missing-node-id))) next-task-invoke-pairs))]
+             
+             
+             (when-not (contains? loading-nodes missing-node-id)
+               (set-loading-nodes #(conj % missing-node-id))
+               (-> (common/fetch (str initial-data-url 
+                                      "?paginate-task-id=" task-id "&missing-node-id=" missing-node-id))
+                   (.then (fn [response]
+                            (let [new-data (:invokes-map response)
+                                  new-task-pairs (:next-task-invoke-pairs response)
                                   
+                                  ;; Merge new data with existing graph data
+                                  combined-data (merge graph-data new-data)
                                   
-                                  (when-not (contains? loading-nodes missing-node-id)
-                                    (set-loading-nodes #(conj % missing-node-id))
-                                    (-> (common/fetch (str api-url 
-                                                           "?paginate-task-id=" task-id "&missing-node-id=" missing-node-id))
-                                        (.then (fn [response]
-                                                 (let [new-data (:invokes-map response)
-                                                       new-task-pairs (:next-task-invoke-pairs response)
-                                                       
-                                                       ;; Merge new data with existing graph data
-                                                       combined-data (merge graph-data new-data)
-                                                       
-                                                       ;; Re-process the entire combined graph with dagre layout
-                                                       {:keys [nodes edges]} (process-graph-data combined-data)]
-                                                   
-                                                   ;; Update the graph data state
-                                                   (set-graph-data combined-data)
-                                                   
-                                                   ;; Update next-task-invoke-pairs if new ones came back
-                                                   (when new-task-pairs
-                                                     (set-next-task-invoke-pairs 
-                                                       (concat next-task-invoke-pairs new-task-pairs)))
-                                                   
-                                                   ;; Replace all nodes and edges with the re-laid out versions, keepign the selection
-                                                   (set-nodes (clj->js nodes))
-                                                   (set-edges (clj->js edges))
-                                                   (set-loading-nodes #(disj % missing-node-id)))))
-                                        (.catch (fn [error]
-                                                  (js/console.error "Failed to load paginated data:" error)
-                                                  (set-loading-nodes #(disj % missing-node-id))))))))
-                              [graph-data api-url loading-nodes set-nodes set-edges next-task-invoke-pairs])
+                                  ;; Re-process the entire combined graph with dagre layout
+                                  {:keys [nodes edges]} (process-graph-data combined-data)]
+                              
+                              ;; Update the graph data state
+                              (set-graph-data combined-data)
+                              
+                              ;; Update next-task-invoke-pairs if new ones came back
+                              (when new-task-pairs
+                                (set-next-task-invoke-pairs 
+                                 (concat next-task-invoke-pairs new-task-pairs)))
+                              
+                              ;; Replace all nodes and edges with the re-laid out versions, keepign the selection
+                              (set-nodes (clj->js nodes))
+                              (set-edges (clj->js edges))
+                              (set-loading-nodes #(disj % missing-node-id)))))
+                   (.catch (fn [error]
+                             (js/console.error "Failed to load paginated data:" error)
+                             (set-loading-nodes #(disj % missing-node-id))))))))
+         [graph-data loading-nodes set-nodes set-edges next-task-invoke-pairs initial-data-url])
         
         handle-execute-fork (uix/use-callback
                              (fn []
@@ -576,10 +582,10 @@
                              [changed-nodes])
         
         handle-cancel-fork (uix/use-callback
-                           (fn []
-                             (set-changed-nodes {})
-                             (set-selected-node nil))
-                           [])
+                            (fn []
+                              (set-changed-nodes {})
+                              (set-selected-node nil))
+                            [])
         
         handle-clear-fork (uix/use-callback
                            (fn []
@@ -597,6 +603,7 @@
          ;; Main content area with right margin for the stats panel
          ($ :div {:className "mr-80"}
             ($ :div {:style {:width "100%" :height "500px"}}
+               (println "nodes" flow-nodes)
                ($ ReactFlow {:nodes flow-nodes 
                              :edges flow-edges
                              :onNodesChange on-nodes-change
