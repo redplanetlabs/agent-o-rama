@@ -1,6 +1,17 @@
+
+show fork-of (in root-pstate) (under stats)
+show forks  (in root-pstate)
+
+teleport to invoke page on manual invoke
+
+polling
+
+render timestamps as text
+
+make ui runnable from ipc
+
 see why node1/node2 not rendering loop correcty
 
-fork ui
 module-id -> module-name
 
 move deps.edn to lein, get rid of REPL.sh

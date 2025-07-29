@@ -10,7 +10,7 @@
    [com.rpl.specter :as s]
 
    ["react" :refer [useState useCallback useEffect]]
-   ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle]]
+   ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
    ["@dagrejs/dagre" :as Dagre]
    ["wouter" :refer [useLocation]]))
 
@@ -708,6 +708,7 @@
                                                           ($ Handle {:type "target" :position "top"})))))})
                              :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
                              :onNodeClick (fn [_ node] (set-selected-node node))}
+                  ($ MiniMap {:position "bottom-right" :pannable true :zoomable true})
                   ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
                   ($ Controls {:className "fill-gray-500 stroke-gray-500"})))
             
