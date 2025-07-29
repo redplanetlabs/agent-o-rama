@@ -72,14 +72,29 @@
   (is (ser= (Document/document "abcde" (Metadata. {"a" 1 "b" 2}))))
   (is (ser= (tc/embedding 0.1 0.2 0.3 0.4)))
   (is (ser= (tc/embedding)))
+  (is (ser= (AiMessage/aiMessage "abc"
+                                 [(-> (ToolExecutionRequest/builder)
+                                      (.name "foo")
+                                      (.arguments "abcde")
+                                      .build)
+                                  (-> (ToolExecutionRequest/builder)
+                                      (.name "foo2")
+                                      (.arguments "abc")
+                                      .build)])))
+  (is (ser= (AiMessage/aiMessage "abc")))
+  (is (ser= (CustomMessage. {"a" 1 "b" 10})))
+  (is (ser= (CustomMessage. {})))
+  (is (ser= (CustomMessage. nil)))
+  (is (ser= (SystemMessage. "abc")))
+  (is (ser= (TextContent. "abcz")))
+  (let [^java.util.List l [(TextContent. "abc") (TextContent. "def")]]
+    (is (ser= (UserMessage. "aa" l)))
+    (is (ser= (UserMessage. l)))
+    (is (ser= (UserMessage. "abcdz"))))
+
 )
 
 ;; TODO: <<<<>>>>
-; AiMessage
-; CustomMessage
-; SystemMessage
-; TextContent
-; UserMessage
 ; TextSegment
 ; ChatRequest
 ; ChatResponse

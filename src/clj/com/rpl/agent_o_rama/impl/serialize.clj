@@ -41,7 +41,9 @@
     Not
     Or]
    [java.io
-    DataOutput]))
+    DataOutput]
+   [java.util
+    List]))
 
 (ser/extend-8-byte-freeze
  ToolExecutionRequest
@@ -106,6 +108,65 @@
  (Embedding. (nippy/thaw-from-in! in)))
 
 
+;; have to do this to avoid serializing type returned by List.of, which doesn't
+;; exist in Java 8 – so the serializer can't be included by default in Rama
+(defn empty-coll
+  [coll]
+  (if-not (empty? coll)
+    coll))
+
+(ser/extend-8-byte-freeze
+ AiMessage
+ [^AiMessage obj out]
+ (nippy/freeze-to-out! out (.text obj))
+ (nippy/freeze-to-out! out (empty-coll (.toolExecutionRequests obj))))
+
+(ser/extend-8-byte-thaw
+ AiMessage
+ [in]
+ (AiMessage/aiMessage (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ CustomMessage
+ [^CustomMessage obj out]
+ (nippy/freeze-to-out! out (empty-coll (.attributes obj))))
+
+(ser/extend-8-byte-thaw
+ CustomMessage
+ [in]
+ (CustomMessage. (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ SystemMessage
+ [^SystemMessage obj out]
+ (nippy/freeze-to-out! out (.text obj)))
+
+(ser/extend-8-byte-thaw
+ SystemMessage
+ [in]
+ (SystemMessage. (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ TextContent
+ [^TextContent obj out]
+ (nippy/freeze-to-out! out (.text obj)))
+
+(ser/extend-8-byte-thaw
+ TextContent
+ [in]
+ (TextContent. (nippy/thaw-from-in! in)))
+
+(ser/extend-8-byte-freeze
+ UserMessage
+ [^UserMessage obj out]
+ (nippy/freeze-to-out! out (.name obj))
+ (nippy/freeze-to-out! out (.contents obj)))
+
+(ser/extend-8-byte-thaw
+ UserMessage
+ [in]
+ (UserMessage. ^String (nippy/thaw-from-in! in) ^List (nippy/thaw-from-in! in)))
+
 ; (ser/extend-8-byte-freeze
 ;  Embedding
 ;  [^Embedding obj out]
@@ -117,11 +178,6 @@
 ;  )
 
 ;; TODO: <<<<>>>>
-; AiMessage
-; CustomMessage
-; SystemMessage
-; TextContent
-; UserMessage
 ; TextSegment
 ; ChatRequest
 ; ChatResponse
