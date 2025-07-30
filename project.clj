@@ -20,9 +20,7 @@
                         :dependencies [[comb "0.1.1"]
                                        [org.clojure/clojure "1.12.0"]]}
              :ui       {:dependencies
-                        [
-                         
-                         [thheller/shadow-cljs "3.1.7"]
+                        [[thheller/shadow-cljs "3.1.7"]
                          [ring/ring-core "1.14.1"]
                          [ring/ring-jetty-adapter "1.14.1"]
                          [com.rpl/specter "1.1.4"] ;; only cljs

@@ -1,4 +1,4 @@
-{:lein true
+{:lein {:profile "+ui"}
  :builds
  {:frontend
   {:target :browser
