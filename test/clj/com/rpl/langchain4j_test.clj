@@ -100,6 +100,18 @@ Remember to stay in character throughout your response, reflecting the persona a
   [analyst]
   (format GENERATE-QUESTION-INSTRUCTIONS (analyst-persona analyst)))
 
+(def SEARCH_INSTRUCTIONS
+  "You will be given a conversation between an analyst and an expert.
+
+Your goal is to generate a well-structured query for use in retrieval and / or web-search related to the conversation.
+
+First, analyze the full conversation.
+
+Pay particular attention to the final question posed by the analyst.
+
+Convert this final question into a well-structured web search query")
+
+
 (def MAPPER (j/object-mapper {:decode-key-fn keyword}))
 
 (defn wiki-search
@@ -190,32 +202,42 @@ Remember to stay in character throughout your response, reflecting the persona a
      "generate-question"
      ["search-web" "search-wikipedia"]
      (fn [agent-node analyst messages]
-       (let [openai   (aor/get-agent-object agent-node "openai")
-             instr    (generate-question-instructions analyst)
-             question (-> (lc4j/chat openai
-                                     (concat [(SystemMessage. instr)] messages))
-                          .aiMessage
-                          .text)]
-         (aor/emit! agent-node "search-web" question messages)
-         (aor/emit! agent-node "search-wikipedia" question messages)
+       (let [openai       (aor/get-agent-object agent-node "openai")
+             instr        (generate-question-instructions analyst)
+             question     (-> (lc4j/chat openai
+                                         (concat [(SystemMessage. instr)]
+                                                 messages))
+                              .aiMessage)
+             new-messages (conj messages question)
+             search-query (-> (lc4j/chat openai
+                                         (concat [(SystemMessage.
+                                                   SEARCH_INSTRUCTIONS)]
+                                                 new-messages))
+                              .aiMessage
+                              .text)]
+         ;(atomic-println "QUESTION" (.text question))
+         (aor/emit! agent-node "search-web" search-query new-messages)
+         (aor/emit! agent-node "search-wikipedia" search-query new-messages)
+         messages
        )))
     (aor/node
      "search-web"
      "agg-research"
-     (fn [agent-node question messages]
+     (fn [agent-node search-query messages]
+         ;(atomic-println "SEARCH QUERY:" search-query)
          ;; TODO: <<<<>>>>
      ))
     (aor/node
      "search-wikipedia"
      "agg-research"
-     (fn [agent-node question messages]
+     (fn [agent-node search-query messages]
          ;; TODO: <<<<>>>>
      ))
     (aor/agg-node
      "agg-research"
      ["generate-question" "agg-analysts"]
      aggs/+vec-agg
-     (fn [agent-node agg-state node-start-res]
+     (fn [agent-node searches messages]
          ;; TODO: <<<<>>>>
      ))
     (aor/agg-node
