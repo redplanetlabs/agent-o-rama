@@ -22,6 +22,7 @@
                             :body (t/write writer data)})
          (fn [response] (.then (.text response) (fn [text] (t/read reader text))))))
 
+
 (defn use-query
   "Wrap useQuery
 

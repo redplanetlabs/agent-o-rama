@@ -25,3 +25,4 @@ scripts/code-format
 # frontend 
 .shadow-cljs/
 node_modules/
+public/
