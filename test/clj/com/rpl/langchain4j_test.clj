@@ -35,17 +35,17 @@
 (def ANALYST-INSTRUCTIONS
   "You are tasked with creating a set of AI analyst personas. Follow these instructions carefully:
 
-  1. First, review the research topic: %s
+1. First, review the research topic: %s
 
-  2. Examine any editorial feedback that has been optionally provided to guide creation of the analysts:
+2. Examine any editorial feedback that has been optionally provided to guide creation of the analysts:
 
-  %s
+%s
 
-  3. Determine the most interesting themes based upon documents and / or feedback above.
+3. Determine the most interesting themes based upon documents and / or feedback above.
 
-  4. Pick the top %s themes.
+4. Pick the top %s themes.
 
-  5. Assign one analyst to each theme.")
+5. Assign one analyst to each theme.")
 
 (defn analyst-instructions
   [topic human-feedback max-analysts]
@@ -100,7 +100,7 @@ Remember to stay in character throughout your response, reflecting the persona a
   [analyst]
   (format GENERATE-QUESTION-INSTRUCTIONS (analyst-persona analyst)))
 
-(def SEARCH_INSTRUCTIONS
+(def SEARCH-INSTRUCTIONS
   "You will be given a conversation between an analyst and an expert.
 
 Your goal is to generate a well-structured query for use in retrieval and / or web-search related to the conversation.
@@ -109,8 +109,12 @@ First, analyze the full conversation.
 
 Pay particular attention to the final question posed by the analyst.
 
-Convert this final question into a well-structured web search query")
+Convert this final question into a well-structured web search query no more than 400 characters.")
 
+(def DOCUMENT-TEMPLATE
+  "<Document href=\"%s\">
+%s
+</Document>")
 
 (def MAPPER (j/object-mapper {:decode-key-fn keyword}))
 
@@ -154,22 +158,31 @@ Convert this final question into a well-structured web search query")
 
 (defn tavily-search
   [^TavilyWebSearchEngine tavily terms max-results]
-  (mapv #(.text ^Document %)
-        (.toDocuments
-         (.search tavily
-                  (WebSearchRequest/from terms (int max-results))))))
+  (.toDocuments
+   (.search tavily
+            (WebSearchRequest/from terms (int max-results)))))
 
 (aor/defagentmodule OpenAIModule
   [topology]
-  (aor/declare-agent-object topology "api-key" (System/getenv "OPENAI_API_KEY"))
+  (aor/declare-agent-object topology
+                            "openai-api-key"
+                            (System/getenv "OPENAI_API_KEY"))
+  (aor/declare-agent-object topology
+                            "tavily-api-key"
+                            (System/getenv "TAVILY_API_KEY"))
   (aor/declare-agent-object-builder
    topology
    "openai"
    (fn [setup]
      (-> (OpenAiChatModel/builder)
-         (.apiKey (aor/get-agent-object setup "api-key"))
+         (.apiKey (aor/get-agent-object setup "openai-api-key"))
          (.modelName "gpt-4o-mini")
          .build)))
+  (aor/declare-agent-object-builder
+   topology
+   "tavily"
+   (fn [setup]
+     (tavily-web-search-engine (aor/get-agent-object setup "tavily-api-key"))))
   (->
     topology
     (aor/new-agent "foo")
@@ -211,26 +224,33 @@ Convert this final question into a well-structured web search query")
              new-messages (conj messages question)
              search-query (-> (lc4j/chat openai
                                          (concat [(SystemMessage.
-                                                   SEARCH_INSTRUCTIONS)]
+                                                   SEARCH-INSTRUCTIONS)]
                                                  new-messages))
                               .aiMessage
                               .text)]
-         ;(atomic-println "QUESTION" (.text question))
-         (aor/emit! agent-node "search-web" search-query new-messages)
-         (aor/emit! agent-node "search-wikipedia" search-query new-messages)
-         messages
+         (aor/emit! agent-node "search-web" search-query)
+         (aor/emit! agent-node "search-wikipedia" search-query)
+         new-messages
        )))
     (aor/node
      "search-web"
      "agg-research"
-     (fn [agent-node search-query messages]
-         ;(atomic-println "SEARCH QUERY:" search-query)
-         ;; TODO: <<<<>>>>
-     ))
+     (fn [agent-node search-query]
+       (let [tavily    (aor/get-agent-object agent-node "tavily")
+             docs      (tavily-search tavily search-query 3)
+             formatted (str/join "\n\n---\n\n"
+                                 (for [^Document doc docs]
+                                   (format DOCUMENT-TEMPLATE
+                                           (-> doc
+                                               .metadata
+                                               (.getString "url"))
+                                           (.text doc))))]
+         (aor/emit! agent-node "agg-research" formatted)
+       )))
     (aor/node
      "search-wikipedia"
      "agg-research"
-     (fn [agent-node search-query messages]
+     (fn [agent-node search-query]
          ;; TODO: <<<<>>>>
      ))
     (aor/agg-node
