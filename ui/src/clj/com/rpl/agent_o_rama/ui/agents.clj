@@ -135,10 +135,6 @@
 
 (defn fork [{{:keys [module-id agent-name]} :path-params
              {:keys [changed-nodes invoke-id]} :body-params}]
-  (def module-id module-id)
-  (def agent-name agent-name)
-  (def changed-nodes changed-nodes)
-  (def invoke-id invoke-id)
   (let [^AgentInvoke result (let [[task-id agent-invoke-id]
                                   (parse-url-trace-id invoke-id)]
                               (aor/agent-initiate-fork
