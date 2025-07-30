@@ -111,8 +111,13 @@ Pay particular attention to the final question posed by the analyst.
 
 Convert this final question into a well-structured web search query no more than 400 characters.")
 
-(def DOCUMENT-TEMPLATE
+(def WEB-DOCUMENT-TEMPLATE
   "<Document href=\"%s\">
+%s
+</Document>")
+
+(def WIKIPEDIA-DOCUMENT-TEMPLATE
+  "<Document source=\"%s\" page=\"%s\">
 %s
 </Document>")
 
@@ -142,7 +147,10 @@ Convert this final question into a well-structured web search query no more than
             extract (-> pages
                         first
                         :extract)]
-        (if extract extract ""))
+        {:content (or extract "")
+         :source  (str "https://en.wikipedia.org/wiki/"
+                       (.replace title " " "_"))
+         :page    title})
       (throw (ex-info "Wikipedia extract failed" {:status status})))))
 
 (defn wikipedia-loader
@@ -236,29 +244,39 @@ Convert this final question into a well-structured web search query no more than
      "search-web"
      "agg-research"
      (fn [agent-node search-query]
-       (let [tavily    (aor/get-agent-object agent-node "tavily")
-             docs      (tavily-search tavily search-query 3)
-             formatted (str/join "\n\n---\n\n"
-                                 (for [^Document doc docs]
-                                   (format DOCUMENT-TEMPLATE
-                                           (-> doc
-                                               .metadata
-                                               (.getString "url"))
-                                           (.text doc))))]
-         (aor/emit! agent-node "agg-research" formatted)
+       (let [tavily (aor/get-agent-object agent-node "tavily")
+             docs   (tavily-search tavily search-query 3)]
+         (doseq [^Document doc docs]
+           (aor/emit! agent-node
+                      "agg-research"
+                      (format WEB-DOCUMENT-TEMPLATE
+                              (-> doc
+                                  .metadata
+                                  (.getString "url"))
+                              (.text doc))))
        )))
     (aor/node
      "search-wikipedia"
      "agg-research"
      (fn [agent-node search-query]
-         ;; TODO: <<<<>>>>
-     ))
+       (let [docs (wikipedia-loader (str/replace search-query "\"" "") 2)]
+         (doseq [doc docs]
+           (aor/emit! agent-node
+                      "agg-research"
+                      (format WIKIPEDIA-DOCUMENT-TEMPLATE
+                              (:source doc)
+                              (:page doc)
+                              (:content doc))))
+       )))
     (aor/agg-node
      "agg-research"
      ["generate-question" "agg-analysts"]
      aggs/+vec-agg
      (fn [agent-node searches messages]
-         ;; TODO: <<<<>>>>
+       (atomic-println "SEARCH RESULTS")
+       (doseq [s searches]
+         (atomic-println s))
+       ;; TODO: <<<<>>>>
      ))
     (aor/agg-node
      "agg-analysts"
