@@ -22,6 +22,7 @@
              :ui       {:source-paths ["resource" "src/cljs"]
                         :dependencies
                         [[thheller/shadow-cljs "3.1.7"]
+                         [net.java.dev.jna/jna "5.17.0"] ;; to fix dynlink error on arm macs
                          [ring/ring-core "1.9.5"]
                          [ring/ring-jetty-adapter "1.8.2"]
                          [ring/ring-codec "1.2.0"]
