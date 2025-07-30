@@ -345,7 +345,7 @@
            (fn [agent-node oname prompt]
              (let [obj (aor/get-agent-object agent-node oname)]
                (if-not (= oname "emb")
-                 (aor/result! agent-node (lc4j/chat obj prompt))
+                 (aor/result! agent-node (lc4j/basic-chat obj prompt))
                  (let [^EmbeddingStore obj obj]
                    (.add obj (tc/embedding 1.0 2.0))
                    (.add obj (tc/embedding 1.1 2.1) "a1")

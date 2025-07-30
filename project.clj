@@ -1,4 +1,4 @@
-(defproject com.rpl/agent-o-rama "1.0.0-SNAPSHOT"
+(defproject com.rpl/agent-o-rama "0.9.0-SNAPSHOT"
   :source-paths ["src/clj"]
   :java-source-paths ["src/java" "test/java"]
   :test-paths ["test/clj"]
@@ -16,10 +16,7 @@
   :profiles {:dev      {:resource-paths ["test/resources/"]
                         :dependencies
                         [[meander/epsilon "0.0.650"]
-                         [dev.langchain4j/langchain4j-open-ai "1.2.0"]
-                         [dev.langchain4j/langchain4j-web-search-engine-tavily
-                          "1.2.0-beta8"]
-                         [http-kit "2.8.0"]]}
+                         [dev.langchain4j/langchain4j-open-ai "1.2.0"]]}
              :provided {:dependencies
                         ;; TODO: fix Rama version
                         [[com.rpl/rama "0.0.6-SNAPSHOT"]
