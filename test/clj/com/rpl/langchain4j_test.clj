@@ -162,6 +162,7 @@ Convert this final question into a well-structured web search query no more than
   [api-key]
   (-> (TavilyWebSearchEngine/builder)
       (.apiKey api-key)
+      (.excludeDomains ["en.wikipedia.org"])
       .build))
 
 (defn tavily-search
@@ -170,7 +171,7 @@ Convert this final question into a well-structured web search query no more than
    (.search tavily
             (WebSearchRequest/from terms (int max-results)))))
 
-(aor/defagentmodule OpenAIModule
+(aor/defagentmodule ResearchAgentModule
   [topology]
   (aor/declare-agent-object topology
                             "openai-api-key"
@@ -297,12 +298,12 @@ Convert this final question into a well-structured web search query no more than
 
   ))
 
-(deftest openai-agent-test
+(deftest research-agent-test
   (when (some? (System/getenv "OPENAI_API_KEY"))
     (with-open [ipc (rtest/create-ipc)]
       (letlocals
-       (rtest/launch-module! ipc OpenAIModule {:tasks 4 :threads 2})
-       (bind module-name (get-module-name OpenAIModule))
+       (rtest/launch-module! ipc ResearchAgentModule {:tasks 4 :threads 2})
+       (bind module-name (get-module-name ResearchAgentModule))
 
        (bind agent-manager (aor/agent-manager ipc module-name))
        (bind foo (aor/agent-client agent-manager "foo"))
