@@ -208,6 +208,76 @@ There should be no redundant sources. It should simply be:
 - Include no preamble before the title of the report
 - Check that all guidelines have been followed")
 
+(defn section-writer-instructions
+  [persona]
+  (format SECTION-WRITER-INSTRUCTIONS persona))
+
+(def REPORT-WRITER-INSTRUCTIONS
+  "You are a technical writer creating a report on this overall topic:
+
+%s
+
+You have a team of analysts. Each analyst has done two things:
+
+1. They conducted an interview with an expert on a specific sub-topic.
+2. They write up their finding into a memo.
+
+Your task:
+
+1. You will be given a collection of memos from your analysts.
+2. Think carefully about the insights from each memo.
+3. Consolidate these into a crisp overall summary that ties together the central ideas from all of the memos.
+4. Summarize the central points in each memo into a cohesive single narrative.
+
+To format your report:
+
+1. Use markdown formatting.
+2. Include no pre-amble for the report.
+3. Use no sub-heading.
+4. Start your report with a single title header: ## Insights
+5. Do not mention any analyst names in your report.
+6. Preserve any citations in the memos, which will be annotated in brackets, for example [1] or [2].
+7. Create a final, consolidated list of sources and add to a Sources section with the `## Sources` header.
+8. List your sources in order and do not repeat.
+
+[1] Source 1
+[2] Source 2
+
+Here are the memos from your analysts to build your report from:
+
+%s")
+
+(defn report-writer-instructions
+  [topic sections]
+  (format REPORT-WRITER-INSTRUCTIONS topic sections))
+
+(def INTRO-CONCLUSION-INSTRUCTIONS
+  "You are a technical writer finishing a report on %s
+
+You will be given all of the sections of the report.
+
+You job is to write a crisp and compelling introduction or conclusion section.
+
+The user will instruct you whether to write the introduction or conclusion.
+
+Include no pre-amble for either section.
+
+Target around 100 words, crisply previewing (for introduction) or recapping (for conclusion) all of the sections of the report.
+
+Use markdown formatting.
+
+For your introduction, create a compelling title and use the # header for the title.
+
+For your introduction, use ## Introduction as the section header.
+
+For your conclusion, use ## Conclusion as the section header.
+
+Here are the sections to reflect on for writing: %s")
+
+(defn intro-conclusion-instructions
+  [topic sections]
+  (format INTRO-CONCLUSION-INSTRUCTIONS topic sections))
+
 (def MAPPER (j/object-mapper {:decode-key-fn keyword}))
 
 (defn wiki-search
@@ -312,6 +382,12 @@ There should be no redundant sources. It should simply be:
    ""
    messages))
 
+(defn chat-and-get-text
+  ^String [model request]
+  (-> (lc4j/chat model request)
+      .aiMessage
+      .text))
+
 (aor/defagentmodule ResearchAgentModule
   [topology]
   (aor/declare-agent-object topology
@@ -344,7 +420,7 @@ There should be no redundant sources. It should simply be:
              (merge {:max-analysts 4 :max-turns 2} options)
              openai (aor/get-agent-object agent-node "openai")
              res    (-> openai
-                        (lc4j/chat
+                        (chat-and-get-text
                          (lc4j/chat-request
                           [(analyst-instructions topic
                                                  human-feedback
@@ -352,21 +428,23 @@ There should be no redundant sources. It should simply be:
                           {:response-format (lc4j/json-response-format
                                              "analysts"
                                              ANALYST-RESPONSE-SCHEMA)}))
-                        .aiMessage
-                        .text
                         (j/read-value MAPPER))]
-         (aor/emit! agent-node "questions" (:analysts res) max-turns)
+         (aor/emit! agent-node
+                    "questions"
+                    (:analysts res)
+                    {:topic topic :max-turns max-turns})
        )))
     (aor/agg-start-node
      "questions"
      "generate-question"
-     (fn [agent-node analysts max-turns]
+     (fn [agent-node analysts {:keys [topic max-turns :as config]}]
        (doseq [analyst analysts]
          (aor/emit! agent-node
                     "generate-question"
                     (analyst-persona analyst)
                     []
-                    max-turns))))
+                    max-turns))
+       config))
     (aor/agg-start-node
      "generate-question"
      ["search-web" "search-wikipedia"]
@@ -417,13 +495,12 @@ There should be no redundant sources. It should simply be:
      aggs/+vec-agg
      (fn [agent-node searches {:keys [persona messages max-turns]}]
        (let [openai       (aor/get-agent-object agent-node "openai")
-             instr        (answer-instructions persona
-                                               (str/join "\n---\n" searches))
-             answer       (-> (lc4j/chat openai
-                                         (concat [(SystemMessage. instr)]
-                                                 messages))
-                              .aiMessage
-                              .text)
+             context      (str/join "\n---\n" searches)
+             instr        (answer-instructions persona context)
+             answer       (chat-and-get-text openai
+                                             (concat [(SystemMessage. instr)]
+                                                     messages))
+
              new-messages (conj messages (UserMessage. "expert" answer))
              num-turns    (count
                            (filter
@@ -436,7 +513,7 @@ There should be no redundant sources. It should simply be:
                       "write-section"
                       persona
                       new-messages
-                      searches)
+                      context)
            (aor/emit! agent-node
                       "generate-question"
                       persona
@@ -446,28 +523,94 @@ There should be no redundant sources. It should simply be:
     (aor/node
      "write-section"
      "agg-sections"
-     (fn [agent-node persona messages searches]
+     (fn [agent-node persona messages context]
        (let [openai    (aor/get-agent-object agent-node "openai")
-             interview (extract-interview messages)]
-         (atomic-println "INTERVIEW:\n" interview)
-         ;; TODO: <<<<>>>>
-
+             interview (extract-interview messages)
+             instr     (section-writer-instructions persona)
+             section   (chat-and-get-text
+                        openai
+                        (concat
+                         [(SystemMessage. instr)]
+                         [(UserMessage. (str "Here is the interview:\n"
+                                             interview))
+                          (UserMessage. (str "Here are the sources:\n"
+                                             context))]))]
+         (aor/emit! agent-node "agg-sections" section)
        )))
     (aor/agg-node
      "agg-sections"
-     nil
+     "begin-report"
      aggs/+vec-agg
-     (fn [agent-node sections _]
-       ;; TODO: <<<<>>>>
-       ;; - input is:
-       ;;   - interview, which is messages converted to a string
-       ;;   - context, which is all the web searches for the analyst (across all
-       ;;   rounds?)
-       ;;   - analyst persona
-       (aor/result! agent-node nil)
-     ))
+     (fn [agent-node sections {:keys [topic]}]
+       (aor/emit! agent-node "begin-report" sections topic)))
+    (aor/agg-start-node
+     "begin-report"
+     ["write-report" "write-intro" "write-conclusion"]
+     (fn [agent-node sections topic]
+       (let [sections (str/join "\n\n" sections)]
+         (doseq [n ["write-report" "write-intro" "write-conclusion"]]
+           (aor/emit! agent-node n sections topic)))))
+    (aor/node
+     "write-report"
+     "finish-report"
+     (fn [agent-node sections topic]
+       (let [openai (aor/get-agent-object agent-node "openai")
+             instr  (report-writer-instructions topic sections)
+             text   (chat-and-get-text
+                     openai
+                     (concat
+                      [(SystemMessage. instr)]
+                      [(UserMessage.
+                        "Write a report based upon these memos.")]))]
+         (aor/emit! agent-node "finish-report" :report text)
+       )))
+    (aor/node
+     "write-intro"
+     "finish-report"
+     (fn [agent-node sections topic]
+       (let [openai (aor/get-agent-object agent-node "openai")
+             instr  (intro-conclusion-instructions topic sections)
+             text   (chat-and-get-text
+                     openai
+                     (concat
+                      [(SystemMessage. instr)]
+                      [(UserMessage.
+                        "Write the report introduction")]))]
+         (aor/emit! agent-node "finish-report" :intro text)
+       )))
+    (aor/node
+     "write-conclusion"
+     "finish-report"
+     (fn [agent-node sections topic]
+       (let [openai (aor/get-agent-object agent-node "openai")
+             instr  (intro-conclusion-instructions topic sections)
+             text   (chat-and-get-text
+                     openai
+                     (concat
+                      [(SystemMessage. instr)]
+                      [(UserMessage.
+                        "Write the report conclusion")]))]
+         (aor/emit! agent-node "finish-report" :conclusion text)
+       )))
+    (aor/agg-node
+     "finish-report"
+     nil
+     aggs/+map-agg
+     (fn [agent-node {:keys [report intro conclusion]} _]
+       (let [report           (str/replace report #"## Insights" "")
+             [report sources] (str/split report #"## Sources")
+             combined         (str intro
+                                   "\n\n---\n\n" report
+                                   "\n\n---\n\n" conclusion)
+             final            (if sources
+                                (str combined "\n\n## Sources\n" sources)
+                                combined)]
+         (aor/result! agent-node final)
+       )))
   ))
 
+;; TODO: <<<<>>>>> this should move to an example, not a test
+;;  - this should just be a simple openai integration test
 (deftest research-agent-test
   (when (some? (System/getenv "OPENAI_API_KEY"))
     (with-open [ipc (rtest/create-ipc)]
@@ -486,7 +629,6 @@ There should be no redundant sources. It should simply be:
                         module-name
                         (queries/tracing-query-name "foo")))
 
-
        (bind inv
          (aor/agent-initiate
           foo
@@ -501,7 +643,7 @@ There should be no redundant sources. It should simply be:
                              root-pstate
                              {:pkey agent-task-id}))
        (println "RESULT:")
-       (clojure.pprint/pprint (aor/agent-result foo inv))
+       (println (aor/agent-result foo inv))
 
        (println "\nTRACE:")
        (bind res
