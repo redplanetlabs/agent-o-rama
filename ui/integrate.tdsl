@@ -1,14 +1,17 @@
+install/update rama
+make ui runnable from ipc
+polling
+
+streaming panel ui/ (under inputs above emits)
 
 show fork-of (in root-pstate) (under stats)
 show forks  (in root-pstate)
 
 teleport to invoke page on manual invoke
 
-polling
 
 render timestamps as text
 
-make ui runnable from ipc
 
 see why node1/node2 not rendering loop correcty
 
@@ -20,3 +23,4 @@ move deps.edn to lein, get rid of REPL.sh
 add pagination controls/hookup for full invocations
 
 eventually config page
+make ui runnable from ipc
