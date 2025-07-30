@@ -57,8 +57,8 @@
   (shadow.cljs.devtools.server/start!)
   (shadow/watch :frontend)
   (swap! ui/system assoc :jetty (jetty/run-jetty #'srv/handler
-                                              {:port 1974 ;; TODO make configurable
-                                               :join? false}))
+                                                 {:port 1974 ;; TODO make configurable
+                                                  :join? false}))
   (swap! ui/system assoc :rama-client (open-cluster-manager-internal {"conductor.host" "localhost"}))
   (swap! ui/system assoc :background-exec (ScheduledThreadPoolExecutor. 1))
   (.scheduleAtFixedRate
@@ -75,6 +75,14 @@
   (.stop ^org.eclipse.jetty.server.Server (:jetty @ui/system))
   (close! (:rama-client @ui/system))
   (.shutdownNow ^ScheduledThreadPoolExecutor (:background-exec @ui/system)))
+
+(defn start-ui ^java.io.Closeable [ipc]
+  (def ipc ipc)
+  (start)
+  (reify java.io.Closeable
+    (close [this]
+      (stop)
+      :closed)))
 
 (comment
   (start)

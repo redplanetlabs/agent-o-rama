@@ -16,6 +16,7 @@
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.ui.core :as uic]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
@@ -851,13 +852,17 @@
          (is (= hgraph2 graph-history2))
         )))))
 
+(comment
+  (def ui (ui/start-ui)))
+
 (deftest finish-test
   (let [results-atom (atom [])]
     (with-redefs [at/hook:writing-result
                   (fn [agent-task-id agent-id result]
                     (swap! results-atom conj result)
                   )]
-      (with-open [ipc (rtest/create-ipc)]
+      (with-open [ipc (rtest/create-ipc)
+                  ui (uic/start-ui ipc)]
         (letlocals
          (bind module
            (aor/agentmodule
