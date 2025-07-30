@@ -5,7 +5,7 @@
   :jvm-opts ["-Xss6m"]
   :dependencies [[com.rpl/rama-helpers "0.10.0"]
                  [dev.langchain4j/langchain4j
-                  "1.1.0"
+                  "1.2.0"
                   :exclusions
                   [org.slf4j/slf4j-api]]]
   :global-vars {*warn-on-reflection* true}
@@ -16,9 +16,9 @@
   :profiles {:dev      {:resource-paths ["test/resources/"]
                         :dependencies
                         [[meander/epsilon "0.0.650"]
-                         [dev.langchain4j/langchain4j-open-ai "1.1.0"]
+                         [dev.langchain4j/langchain4j-open-ai "1.2.0"]
                          [dev.langchain4j/langchain4j-web-search-engine-tavily
-                          "1.1.0-beta7"]
+                          "1.2.0-beta8"]
                          [http-kit "2.8.0"]]}
              :provided {:dependencies
                         ;; TODO: fix Rama version

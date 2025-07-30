@@ -134,12 +134,19 @@
  AiMessage
  [^AiMessage obj out]
  (nippy/freeze-to-out! out (.text obj))
- (nippy/freeze-to-out! out (empty-coll (.toolExecutionRequests obj))))
+ (nippy/freeze-to-out! out (empty-coll (.toolExecutionRequests obj)))
+ (nippy/freeze-to-out! out (.thinking obj))
+ (nippy/freeze-to-out! out (empty-map (.attributes obj))))
 
 (ser/extend-8-byte-thaw
  AiMessage
  [in]
- (AiMessage/aiMessage (nippy/thaw-from-in! in) (nippy/thaw-from-in! in)))
+ (-> (AiMessage/builder)
+     (.text (nippy/thaw-from-in! in))
+     (.toolExecutionRequests (nippy/thaw-from-in! in))
+     (.thinking (nippy/thaw-from-in! in))
+     (.attributes (nippy/thaw-from-in! in))
+     .build))
 
 (ser/extend-8-byte-freeze
  CustomMessage
