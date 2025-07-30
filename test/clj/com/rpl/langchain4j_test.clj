@@ -23,6 +23,7 @@
    [dev.langchain4j.data.document
     Document]
    [dev.langchain4j.data.message
+    AiMessage
     SystemMessage
     UserMessage]
    [dev.langchain4j.model.openai
@@ -285,6 +286,32 @@ There should be no redundant sources. It should simply be:
          (inc iters))
       ))))
 
+(defn user-message-name
+  [^UserMessage m]
+  (.name m))
+
+(defn extract-interview
+  [messages]
+  (reduce
+   (fn [curr m]
+     (str curr
+          (cond
+            (instance? UserMessage m)
+            (str (if (= (user-message-name m) "expert")
+                   "Expert: "
+                   "Human: ")
+                 (.singleText ^UserMessage m)
+                 "\n\n")
+
+            (instance? AiMessage m)
+            (str "AI: " (.text ^AiMessage m) "\n\n")
+
+            :else
+            (throw (ex-info "Unexpected message" {:message m}))
+          )))
+   ""
+   messages))
+
 (aor/defagentmodule ResearchAgentModule
   [topology]
   (aor/declare-agent-object topology
@@ -404,8 +431,6 @@ There should be no redundant sources. It should simply be:
                               (and (instance? UserMessage m)
                                    (= "expert" (.name ^UserMessage m))))
                             new-messages))]
-         (atomic-println "PERSONA:" persona)
-         (atomic-println "MESSAGES:" new-messages)
          (if (>= num-turns max-turns)
            (aor/emit! agent-node
                       "write-section"
@@ -422,8 +447,12 @@ There should be no redundant sources. It should simply be:
      "write-section"
      "agg-sections"
      (fn [agent-node persona messages searches]
+       (let [openai    (aor/get-agent-object agent-node "openai")
+             interview (extract-interview messages)]
+         (atomic-println "INTERVIEW:\n" interview)
+         ;; TODO: <<<<>>>>
 
-     ))
+       )))
     (aor/agg-node
      "agg-sections"
      nil
