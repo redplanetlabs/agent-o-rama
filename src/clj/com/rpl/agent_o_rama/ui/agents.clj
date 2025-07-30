@@ -4,7 +4,7 @@
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.types :as aort]
-   [com.rpl.agent-o-rama.system :as sys])
+   [com.rpl.agent-o-rama.ui :as ui])
   (:import
    [com.rpl.agentorama AgentInvoke]))
 
@@ -27,7 +27,7 @@
    
    :body
    (for [[module-name agent-name]
-         (select [ALL (collect-one FIRST) LAST :clients MAP-KEYS] (sys/get-object :aor-cache))]
+         (select [ALL (collect-one FIRST) LAST :clients MAP-KEYS] (ui/get-object :aor-cache))]
      {:module-id (replace-slash module-name)
       :agent-name (replace-slash agent-name)})})
 
@@ -35,7 +35,7 @@
   (select-one [(unreplace-slash module-id)
                :clients
                (unreplace-slash agent-name)]
-              (sys/get-object :aor-cache)))
+              (ui/get-object :aor-cache)))
 
 (defn objects [module-id agent-name]
   (aort/underlying-objects (get-client module-id agent-name)))
@@ -136,7 +136,7 @@
 (defn fork [{{:keys [module-id agent-name]} :path-params
              {:keys [changed-nodes invoke-id]} :body-params}]
   (let [^AgentInvoke result (let [[task-id agent-invoke-id]
-                                  (parse-url-trace-id invoke-id)]
+                                  (parse-url-pair invoke-id)]
                               (aor/agent-initiate-fork
                                (get-client module-id agent-name)
                                (AgentInvoke. task-id agent-invoke-id )
@@ -145,3 +145,4 @@
      :body
      {:agent-invoke-id (:agentInvokeId (bean result))
       :task-id (:taskId (bean result))}}))
+

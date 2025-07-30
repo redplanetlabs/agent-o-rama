@@ -1,4 +1,4 @@
-(ns com.rpl.agent-o-rama.system)
+(ns com.rpl.agent-o-rama.ui)
 
 (defonce system (atom {}))
 
