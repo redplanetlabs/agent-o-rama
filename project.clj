@@ -19,13 +19,15 @@
                         :source-paths ["scripts"]
                         :dependencies [[comb "0.1.1"]
                                        [org.clojure/clojure "1.12.0"]]}
-             :ui       {:dependencies
+             :ui       {:source-paths ["resource" "src/cljs"]
+                        :dependencies
                         [[thheller/shadow-cljs "3.1.7"]
-                         [ring/ring-core "1.14.1"]
-                         [ring/ring-jetty-adapter "1.14.1"]
+                         [ring/ring-core "1.9.5"]
+                         [ring/ring-jetty-adapter "1.8.2"]
+                         [ring/ring-codec "1.2.0"]
                          [com.rpl/specter "1.1.4"] ;; only cljs
                          [com.pitch/uix.core "1.4.3"]
                          [com.pitch/uix.dom "1.4.3"]
-                         [metosin/reitit "0.8.0"]]}}
+                         [metosin/reitit "0.7.2"]]}}
   :plugins [[lein-exec "0.3.7"]]
 )

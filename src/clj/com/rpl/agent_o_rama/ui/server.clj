@@ -15,5 +15,61 @@
    [reitit.ring.coercion :as rrc]
    [malli.core :as mc]
 
-   [com.rpl.agent-o-rama.ui.agents :as agents]
-   [com.rpl.agent-o-rama.ui.datasets :as datasets]))
+   [com.rpl.agent-o-rama.ui.agents :as agents]))
+
+(defn spa-index-handler [_request]
+  (-> (resp/resource-response "index.html")
+      (resp/content-type "text/html")))
+
+(def default-handler (ring/routes
+                      (ring/create-file-handler {:path ""
+                                                 :root "public"})
+                      (ring/ring-handler
+                       (ring/router
+                        [""
+                         ["/api/*" {:handler (fn [_req] (resp/not-found ""))}]
+                         ;; Return index.html for any non-API routes for History API routing
+                         ["/*" {:get {:handler spa-index-handler}}]]
+                        {:conflicts nil}))))
+
+(defn exception-handler [^Exception e request]
+  (let [sw (java.io.StringWriter.)
+        pw (java.io.PrintWriter. sw)]
+    (.printStackTrace e pw)
+    {:status 500
+     :headers {"Content-Type" "text/plain"}
+     :body (.toString sw)}))
+
+(def exception-middleware
+  (exception/create-exception-middleware
+   {::exception/default exception-handler}))
+
+(defn app-routes []
+  (ring/ring-handler
+   (ring/router
+    ["/api"
+     ["/agents"
+      {:get {:handler #'agents/index}}]
+     ["/agents/:module-id/:agent-name/invocations"
+      {:get {:handler #'agents/get-invokes}
+       :post {:handler #'agents/manually-trigger-invoke}}]
+     ["/agents/:module-id/:agent-name/graph"
+      {:get {:handler #'agents/get-graph}}]
+     ["/agents/:module-id/:agent-name/fork"
+      {:post {:handler #'agents/fork}}]
+     ["/agents/:module-id/:agent-name/invocations/:invoke-id/paginated"
+      {:get {:parameters {:query [:map
+                                  [:paginate-task-id {:optional true} int?]
+                                  [:missing-node-id {:optional true} string?]]}
+             :handler #'agents/invoke-paginated}}]]
+    {:data {:muuntaja m/instance
+            :middleware [parameters/parameters-middleware
+                         muuntaja/format-middleware
+                         exception-middleware
+                         rrc/coerce-exceptions-middleware
+                         rrc/coerce-request-middleware
+                         rrc/coerce-response-middleware]
+            :coercion rcm/coercion}})
+   default-handler))
+
+(def handler (#'app-routes))
