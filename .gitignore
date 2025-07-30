@@ -21,3 +21,4 @@ pom.xml.asc
 scripts/code-format
 .on-save.json
 .zprintrc
+.shadow-cljs/
