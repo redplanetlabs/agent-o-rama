@@ -21,4 +21,7 @@ pom.xml.asc
 scripts/code-format
 .on-save.json
 .zprintrc
+
+# frontend 
 .shadow-cljs/
+node_modules/
