@@ -2,7 +2,8 @@
   (:use [clojure.test]
         [com.rpl.test-helpers]
         [com.rpl.rama]
-        [com.rpl.rama.path])
+        [com.rpl.rama.path]
+        [rpl.rama.util.helpers :refer [atomic-println]])
   (:require
    [clojure.set :as set]
    [clojure.string :as str]
@@ -21,6 +22,8 @@
   (:import
    [dev.langchain4j.data.document
     Document]
+   [dev.langchain4j.data.message
+    SystemMessage]
    [dev.langchain4j.model.openai
     OpenAiChatModel
     OpenAiStreamingChatModel]
@@ -63,6 +66,39 @@
        (lj/string "Description of the analyst focus, concerns, and motives.")
       })
     )}))
+
+(defn analyst-persona
+  [{:keys [name role affiliation description]}]
+  (format
+   "Name: %s\nRole: %s\nAffiliation: %s\nDescription: %s"
+   name
+   role
+   affiliation
+   description
+  ))
+
+(def GENERATE-QUESTION-INSTRUCTIONS
+  "You are an analyst tasked with interviewing an expert to learn about a specific topic.
+
+Your goal is boil down to interesting and specific insights related to your topic.
+
+1. Interesting: Insights that people will find surprising or non-obvious.
+
+2. Specific: Insights that avoid generalities and include specific examples from the expert.
+
+Here is your topic of focus and set of goals: %s
+
+Begin by introducing yourself using a name that fits your persona, and then ask your question.
+
+Continue to ask questions to drill down and refine your understanding of the topic.
+
+When you are satisfied with your understanding, complete the interview with: \"Thank you so much for your help!\"
+
+Remember to stay in character throughout your response, reflecting the persona and goals provided to you.")
+
+(defn generate-question-instructions
+  [analyst]
+  (format GENERATE-QUESTION-INSTRUCTIONS (analyst-persona analyst)))
 
 (def MAPPER (j/object-mapper {:decode-key-fn keyword}))
 
@@ -127,19 +163,79 @@
     (aor/new-agent "foo")
     (aor/node
      "create-analysts"
-     nil
+     "questions"
      (fn [agent-node topic human-feedback max-analysts]
-       (let [openai (aor/get-agent-object agent-node "openai")]
-         (println "RES"
-                  (lc4j/chat
-                   openai
-                   (lc4j/chat-request
-                    [(analyst-instructions topic human-feedback max-analysts)]
-                    {:response-format (lc4j/json-response-format
-                                       "analysts"
-                                       ANALYST-RESPONSE-SCHEMA)})))
-         (aor/result! agent-node 123)
-       )))))
+       (let [openai (aor/get-agent-object agent-node "openai")
+             res    (-> openai
+                        (lc4j/chat
+                         (lc4j/chat-request
+                          [(analyst-instructions topic
+                                                 human-feedback
+                                                 max-analysts)]
+                          {:response-format (lc4j/json-response-format
+                                             "analysts"
+                                             ANALYST-RESPONSE-SCHEMA)}))
+                        .aiMessage
+                        .text
+                        (j/read-value MAPPER))]
+         (aor/emit! agent-node "questions" (:analysts res))
+       )))
+    (aor/agg-start-node
+     "questions"
+     "generate-question"
+     (fn [agent-node analysts]
+       (doseq [analyst analysts]
+         (aor/emit! agent-node "generate-question" analyst []))))
+    (aor/agg-start-node
+     "generate-question"
+     ["search-web" "search-wikipedia"]
+     (fn [agent-node analyst messages]
+       (let [openai   (aor/get-agent-object agent-node "openai")
+             instr    (generate-question-instructions analyst)
+             question (-> (lc4j/chat openai
+                                     (concat [(SystemMessage. instr)] messages))
+                          .aiMessage
+                          .text)]
+         (aor/emit! agent-node "search-web" question messages)
+         (aor/emit! agent-node "search-wikipedia" question messages)
+       )))
+    (aor/node
+     "search-web"
+     "agg-research"
+     (fn [agent-node question messages]
+         ;; TODO: <<<<>>>>
+     ))
+    (aor/node
+     "search-wikipedia"
+     "agg-research"
+     (fn [agent-node question messages]
+         ;; TODO: <<<<>>>>
+     ))
+    (aor/agg-node
+     "agg-research"
+     ["generate-question" "agg-analysts"]
+     aggs/+vec-agg
+     (fn [agent-node agg-state node-start-res]
+         ;; TODO: <<<<>>>>
+     ))
+    (aor/agg-node
+     "agg-analysts"
+     "write-section"
+     aggs/+vec-agg
+     (fn [agent-node agg-state node-start-res]
+       ;; TODO: <<<<>>>>
+       (aor/emit! agent-node "write-section" nil)
+     ))
+    (aor/node
+     "write-section"
+     nil
+     (fn [agent-node data]
+       ;; TODO: <<<<>>>>
+       (aor/result! agent-node "done")
+     ))
+
+
+  ))
 
 (deftest openai-agent-test
   (when (some? (System/getenv "OPENAI_API_KEY"))
@@ -173,7 +269,10 @@
          (foreign-select-one [(keypath agent-id) :root-invoke-id]
                              root-pstate
                              {:pkey agent-task-id}))
-       (println "RESULT:" (aor/agent-result foo inv))
+       (println "RESULT:")
+       (clojure.pprint/pprint (aor/agent-result foo inv))
+
+       (println "\nTRACE:")
        (bind res
          (foreign-invoke-query traces-query
                                agent-task-id

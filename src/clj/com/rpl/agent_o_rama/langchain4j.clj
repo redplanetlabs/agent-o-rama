@@ -14,18 +14,21 @@
     ResponseFormat
     ResponseFormatType
     ToolChoice]
+   [dev.langchain4j.model.chat.response
+    ChatResponse]
    [dev.langchain4j.model.chat.request.json
     JsonSchema]
    [java.util
     List]))
 
-(defn chat
-  [^ChatModel model request]
-  (cond
-    (string? request)
-    (.chat model ^String request)
+(defn basic-chat
+  [^ChatModel model ^String prompt]
+  (.chat model prompt))
 
-    (list? request)
+(defn chat
+  ^ChatResponse [^ChatModel model request]
+  (cond
+    (sequential? request)
     (.chat model ^java.util.List request)
 
     (instance? ChatRequest request)
