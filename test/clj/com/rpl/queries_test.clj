@@ -17,6 +17,7 @@
    [java.util.concurrent
     CompletableFuture]))
 
+;; TODO: <<<<>>>>
 (deftest to-invokes-page-result-test
   (is
    (=
@@ -157,7 +158,7 @@
         (is (> (count res) 2))
         (is (every? #(>= (count %) i) (butlast res)))
         (bind all (apply concat res))
-        (is (apply >= (mapv #(nth % 2) all)))
-        (bind all-invokes (mapv #(vec (butlast %)) all))
+        (is (apply >= (mapv :start-time-millis all)))
+        (bind all-invokes (mapv (fn [m] [(:task-id m) (:agent-id m)]) all))
         (is (= (set all-invokes) (set invokes)))))
     )))
