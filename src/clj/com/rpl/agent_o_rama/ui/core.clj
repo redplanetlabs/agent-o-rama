@@ -53,13 +53,13 @@
         (transform [ATOM :aor-cache (keypath mod) :client MAP-VALS] close! ui/system)
         (setval [ATOM :aor-cache (keypath mod)] NONE ui/system)))))
 
-(defn start []
+(defn start [ipc]
   (shadow.cljs.devtools.server/start!)
   (shadow/watch :frontend)
   (swap! ui/system assoc :jetty (jetty/run-jetty #'srv/handler
                                                  {:port 1974 ;; TODO make configurable
                                                   :join? false}))
-  (swap! ui/system assoc :rama-client (open-cluster-manager-internal {"conductor.host" "localhost"}))
+  (swap! ui/system assoc :rama-client ipc)
   (swap! ui/system assoc :background-exec (ScheduledThreadPoolExecutor. 1))
   (.scheduleAtFixedRate
    ^ScheduledThreadPoolExecutor (:background-exec @ui/system)
@@ -77,14 +77,15 @@
   (.shutdownNow ^ScheduledThreadPoolExecutor (:background-exec @ui/system)))
 
 (defn start-ui ^java.io.Closeable [ipc]
-  (def ipc ipc)
-  (start)
+  (start ipc)
   (reify java.io.Closeable
     (close [this]
+      (println "press enter to close the ui")
+      (read-line)
       (stop)
       :closed)))
 
 (comment
-  (start)
+  (start (open-cluster-manager-internal {"conductor.host" "localhost"}))
   (stop))
 
