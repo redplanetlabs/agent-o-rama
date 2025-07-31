@@ -1,5 +1,7 @@
 (ns com.rpl.agent-o-rama.impl.pobjects
   (:use [com.rpl.rama])
+  (:require
+   [com.rpl.agent-o-rama.impl.types])
   (:import
    [com.rpl.agentorama.impl
     AgentDeclaredObjectsTaskGlobal

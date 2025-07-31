@@ -1,7 +1,5 @@
 (ns com.rpl.agent.research-agent
-  (:use [clojure.test]
-        [com.rpl.test-helpers]
-        [com.rpl.rama]
+  (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
    [clojure.set :as set]
@@ -608,23 +606,17 @@ Here are the sections to reflect on for writing: %s")
        )))
   ))
 
-(deftest research-agent-test
-  (when (some? (System/getenv "OPENAI_API_KEY"))
-    (with-open [ipc (rtest/create-ipc)]
-      (letlocals
-       (rtest/launch-module! ipc ResearchAgentModule {:tasks 4 :threads 2})
-       (bind module-name (get-module-name ResearchAgentModule))
-
-       (bind agent-manager (aor/agent-manager ipc module-name))
-       (bind researcher (aor/agent-client agent-manager "researcher"))
-
-       (println "Enter a topic:")
-       (bind topic (read-line))
-
-       (println "Elaborate on research direction:")
-       (bind elaboration (read-line))
-
-       (bind inv
-         (aor/agent-initiate researcher topic elaboration {}))
-       (println (aor/agent-result researcher inv))
-      ))))
+(defn run-research-agent
+  []
+  (with-open [ipc (rtest/create-ipc)]
+    (rtest/launch-module! ipc ResearchAgentModule {:tasks 4 :threads 2})
+    (let [module-name   (get-module-name ResearchAgentModule)
+          agent-manager (aor/agent-manager ipc module-name)
+          researcher    (aor/agent-client agent-manager "researcher")
+          _ (println "Enter a topic:")
+          topic         (read-line)
+          _ (println "Elaborate on research direction:")
+          elaboration   (read-line)
+          inv           (aor/agent-initiate researcher topic elaboration {})]
+      (println (aor/agent-result researcher inv))
+    )))
