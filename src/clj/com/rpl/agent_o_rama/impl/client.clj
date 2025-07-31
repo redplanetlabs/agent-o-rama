@@ -199,3 +199,38 @@
      clojure.lang.IDeref
      (deref [this] (.get this)))
   ))
+
+(defn agent-stream-specific-impl
+  [streaming-pstate agent-invoke node node-invoke-id callback-fn]
+  (let [done-vol (volatile! false)
+        delegate
+        (agent-stream-all-impl*
+         streaming-pstate
+         agent-invoke
+         node
+         (fn [invoke-id->chunks invoke-id->new-chunks reset-invoke-ids
+              finished-invoke-ids _]
+           (when-not @done-vol
+             (let [finished? (contains? finished-invoke-ids node-invoke-id)]
+               (when finished?
+                 (vreset! done-vol true))
+               (when (and callback-fn
+                          (or finished?
+                              (contains? invoke-id->new-chunks node-invoke-id)))
+                 (callback-fn
+                  (get invoke-id->chunks node-invoke-id)
+                  (get invoke-id->new-chunks node-invoke-id)
+                  (contains? reset-invoke-ids node-invoke-id)
+                  finished?))
+             ))))]
+    (reify
+     AgentStream
+     (get [this]
+       (get @delegate node-invoke-id []))
+     (numResets [this]
+       (get (.numResetsByInvoke delegate) node-invoke-id 0))
+     (close [this]
+       (.close delegate))
+     clojure.lang.IDeref
+     (deref [this] (.get this)))
+  ))

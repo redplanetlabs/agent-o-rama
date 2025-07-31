@@ -2636,6 +2636,7 @@
             (swap! res-atom conj
               [all-chunks new-chunks reset? complete?])
           )))
+       ;; TODO: <<<<>>>> add stream of a single node invoke here
        (is (condition-attained? (= @res-atom [[[1] [1] false false]])))
        (h/release-semaphore SEM 1)
        (h/release-semaphore SEM2 10000)
