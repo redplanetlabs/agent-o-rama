@@ -100,7 +100,6 @@
 
 
     (doseq [d [(symbol (po/agent-failures-depot-name agent-name))
-               (symbol (po/agent-graph-task-global-name agent-name))
                agent-config-depot-sym
                agent-streaming-depot-sym
                agent-depot-sym]]
@@ -123,6 +122,7 @@
     (queries/declare-tracing-query-topology topologies agent-name)
     (queries/declare-fork-affected-aggs-query-topology topologies agent-name)
     (queries/declare-get-invokes-page-topology topologies agent-name)
+    (queries/declare-get-current-graph topologies agent-name)
 
     (<<sources stream-topology
      (source> agent-config-depot-sym {:retry-mode :all-after} :> *data)

@@ -2,6 +2,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops])
@@ -32,6 +33,10 @@
   [agent-name]
   (this-module-query-topology-task-global
    (agent-get-fork-affected-aggs-query-name agent-name)))
+
+(defn agent-get-current-graph-name
+  [agent-name]
+  (str "_agent-get-current-graph-" agent-name))
 
 (defn- to-pqueue
   [coll]
@@ -273,3 +278,13 @@
     [:> *res]
     (|origin)
     (identity agent-names :> *res)))
+
+(defn declare-get-current-graph
+  [topologies agent-name]
+  (let [agent-graph-sym (symbol (po/agent-graph-task-global-name agent-name))]
+    (<<query-topology topologies
+      (agent-get-current-graph-name agent-name)
+      [:> *res]
+      (|origin)
+      (graph/graph->historical-graph-info agent-graph-sym :> *res)
+    )))

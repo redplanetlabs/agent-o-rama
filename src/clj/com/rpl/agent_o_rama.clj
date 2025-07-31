@@ -358,8 +358,12 @@
                                    cluster
                                    module-name
                                    (queries/tracing-query-name
+                                    agentName))
+             current-graph-query  (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/agent-get-current-graph-name
                                     agentName))]
-
          (reify
           AgentClient
           (invoke [this args]
@@ -506,7 +510,9 @@
              :root-pstate          root-pstate
              :streaming-pstate     streaming-pstate
              :graph-history-pstate graph-history-pstate
-             :tracing-query        tracing-query})
+             :tracing-query        tracing-query
+             :current-graph-query  current-graph-query
+            })
          ))))))
 
 (defn agent-client
