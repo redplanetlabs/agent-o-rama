@@ -2636,7 +2636,6 @@
             (swap! res-atom conj
               [all-chunks new-chunks reset? complete?])
           )))
-       ;; TODO: <<<<>>>> add stream of a single node invoke here
        (is (condition-attained? (= @res-atom [[[1] [1] false false]])))
        (h/release-semaphore SEM 1)
        (h/release-semaphore SEM2 10000)
@@ -2650,6 +2649,16 @@
        (bind as (aor/agent-stream foo inv "node1"))
        (is (= @as [1 2 3]))
       ))))
+
+(deftest aegnt-stream-specific-test
+         ;; TODO: <<<<>>>>
+         ;;  - have a node invoke multiple times, freeze on different sems each
+         ;;  time
+         ;;  - get node invoke ID from trace and specific input
+         ;;  - unblock both sems, verify result
+         ;;  - exercise agent-stream-reset-info here and in other tests
+
+)
 
 (deftest stream-close-test
   (with-redefs [SEM (h/mk-semaphore 0)]

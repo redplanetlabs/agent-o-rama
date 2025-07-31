@@ -391,6 +391,14 @@ Here are the sections to reflect on for writing: %s")
    topology
    "openai"
    (fn [setup]
+     (-> (OpenAiStreamingChatModel/builder)
+         (.apiKey (aor/get-agent-object setup "openai-api-key"))
+         (.modelName "gpt-4o-mini")
+         .build)))
+  (aor/declare-agent-object-builder
+   topology
+   "openai-non-streaming"
+   (fn [setup]
      (-> (OpenAiChatModel/builder)
          (.apiKey (aor/get-agent-object setup "openai-api-key"))
          (.modelName "gpt-4o-mini")
@@ -409,7 +417,9 @@ Here are the sections to reflect on for writing: %s")
      (fn [agent-node topic human-feedback options]
        (let [{:keys [max-analysts max-turns]}
              (merge {:max-analysts 4 :max-turns 2} options)
-             openai (aor/get-agent-object agent-node "openai")
+             ;; - JSON schemas not supported by streaming model, so have to use
+             ;; non-streaming here
+             openai (aor/get-agent-object agent-node "openai-non-streaming")
              res    (-> openai
                         (chat-and-get-text
                          (lc4j/chat-request
