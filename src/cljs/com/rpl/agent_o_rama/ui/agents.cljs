@@ -101,19 +101,26 @@
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")))
                ($ :tbody.divide-y.divide-gray-200
-                  (for [[task-id invoke-id start-time-millis] all-invokes
-                        :let [url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" invoke-id)]]
+                  (for [invoke all-invokes
+                        :let [task-id (:task-id invoke)
+                              agent-id (:agent-id invoke)
+                              url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" agent-id)]]
                     ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
                        {:key url
                         :onClick (fn [e]
                                    (println e)
                                    (. e stopPropagation)
                                    (navigate url))}
-                       ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium (str task-id "-" invoke-id))
+                       ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium (str task-id "-" agent-id))
                        ($ :td.px-4.py-3.max-w-xs
                           ($ :div.truncate.text-gray-900
-                             (common/pp start-time-millis)))
-                        ($ :td.px-4.py-3.font-mono.text-gray-600 ""))))
+                             (common/pp (:invoke-args invoke))))
+                       ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
+                       ($ :td.px-4.py-3.text-sm
+                          (let [result (:result invoke)]
+                            (if (:failure? result)
+                              ($ :span.px-2.py-1.bg-red-100.text-red-800.rounded-full.text-xs.font-medium "Failed")
+                              ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs.font-medium "Success")))))))
             
             ;; Load More button
             (when has-more?
@@ -151,16 +158,23 @@
                   ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
                   ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")))
             ($ :tbody.divide-y.divide-gray-200
-               (for [[task-id invoke-id start-time-millis] (:agent-invokes data)
-                     :let [url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" invoke-id)]]
+               (for [invoke (:agent-invokes data)
+                     :let [task-id (:task-id invoke)
+                           agent-id (:agent-id invoke)
+                           url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" agent-id)]]
                  ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
                     {:key url
                      :onClick (fn [_] (navigate url))}
-                    ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium (str task-id "-" invoke-id))
+                    ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium (str task-id "-" agent-id))
                     ($ :td.px-4.py-3.max-w-xs
                        ($ :div.truncate.text-gray-900 
-                          (common/pp start-time-millis)))
-                    ($ :td.px-4.py-3.font-mono.text-gray-600 ""))))
+                          (common/pp (:invoke-args invoke))))
+                    ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
+                    ($ :td.px-4.py-3.text-sm
+                       (let [result (:result invoke)]
+                         (if (:failure? result)
+                           ($ :span.px-2.py-1.bg-red-100.text-red-800.rounded-full.text-xs.font-medium "Failed")
+                           ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs.font-medium "Success")))))))
             ($ :tfoot.bg-gray-50.border-t.border-gray-200
                ($ :tr.hover:bg-gray-100.transition-colors.duration-150
                   {:onClick (fn [_] (navigate (str "/agents/" module-id "/" agent-name "/invocations")))}

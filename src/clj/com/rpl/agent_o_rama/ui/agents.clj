@@ -46,7 +46,9 @@
    
    :body
    {:graph
-    (foreign-invoke-query (:current-graph-query (objects module-id agent-name)))}})
+    (foreign-invoke-query
+     (:current-graph-query
+      (objects module-id agent-name)))}})
 
 (defn manually-trigger-invoke [{{:keys [module-id agent-name]} :path-params
                                 {:keys [args]} :body-params
