@@ -776,6 +776,10 @@
            (foreign-pstate ipc
                            module-name
                            (po/graph-history-task-global-name "foo")))
+         (bind current-graph-query
+           (foreign-query ipc
+                          module-name
+                          (queries/agent-get-current-graph-name "foo")))
 
          (dotimes [_ 10]
            (let [{[agent-task-id agent-id] "_agents-topology"}
@@ -806,6 +810,7 @@
             "start"
             (:uuid hgraph)))
          (is (= hgraph graph-history1))
+         (is (= graph-history1 (foreign-invoke-query current-graph-query)))
 
          (bind module2
            (aor/agentmodule {:module-name "foo-module"}
@@ -819,6 +824,15 @@
                             )))
 
          (rtest/update-module! ipc module2)
+
+
+         (bind graph-history2*
+           (aor-types/->HistoricalAgentGraphInfo
+            {"start" (aor-types/->HistoricalAgentNodeInfo :node #{} nil)}
+            "start"
+            nil))
+         (is (= graph-history2*
+                (assoc (foreign-invoke-query current-graph-query) :uuid nil)))
 
          (reset! task-counts-atom {})
          (dotimes [_ 10]
@@ -847,6 +861,7 @@
             {"start" (aor-types/->HistoricalAgentNodeInfo :node #{} nil)}
             "start"
             (:uuid hgraph2)))
+         (is (= graph-history2 (foreign-invoke-query current-graph-query)))
          (is (= hgraph1 graph-history1))
          (is (= hgraph2 graph-history2))
         )))))
