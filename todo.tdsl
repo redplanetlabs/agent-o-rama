@@ -1,5 +1,7 @@
+new query topology for historicalagentgraphinfo
+new response for invoke list
 
-polling
+polling/sente refactor
 
 we also need to handle the args potentially being java objects that can't be transferred to the browser
 
