@@ -4,6 +4,7 @@ import com.rpl.agentorama.impl.AORHelpers;
 import com.rpl.rama.PState;
 import com.rpl.rama.RamaModule.*;
 import com.rpl.rama.module.*;
+import com.rpl.rama.ops.*;
 
 public interface AgentsTopology {
 
@@ -18,10 +19,11 @@ public interface AgentsTopology {
   PState.Declaration declarePStateStore(String name, Class schema);
   PState.Declaration declarePStateStore(String name,  PState.Schema schema);
 
-  // TODO: document how to make LLMs
   void declareAgentObject(String name, Object o);
+  void declareAgentObjectBuilder(String name, RamaFunction1<AgentObjectSetup, Object> builder);
+  void declareAgentObjectBuilder(String name, RamaFunction1<AgentObjectSetup, Object> builder, AgentObjectOptions options);
 
   StreamTopology getStreamTopology();
-  
+
   void define();
 }

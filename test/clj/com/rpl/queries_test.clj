@@ -4,6 +4,7 @@
         [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [clojure.set :as set]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
@@ -20,41 +21,58 @@
 (deftest to-invokes-page-result-test
   (is
    (=
-    {:agent-invokes     [[1 2 19] [2 3 18] [2 2 14] [2 1 12]]
+    {:agent-invokes     [{:task-id 1 :agent-id 2 :start-time-millis 19}
+                         {:task-id 2 :agent-id 3 :start-time-millis 18}
+                         {:task-id  2
+                          :agent-id 2
+                          :start-time-millis 14
+                          :foo      1
+                          :bar      2}
+                         {:task-id 2 :agent-id 1 :start-time-millis 12}]
      :pagination-params {0 nil 1 1 2 0}}
     (queries/to-invokes-page-result
      {0 {}
-      1 {0 10
-         1 11
-         2 19}
-      2 {0 9
-         1 12
-         2 14
-         3 18}}
+      1 {0 {:start-time-millis 10}
+         1 {:start-time-millis 11}
+         2 {:start-time-millis 19}}
+      2 {0 {:start-time-millis 9}
+         1 {:start-time-millis 12}
+         2 {:start-time-millis 14 :foo 1 :bar 2}
+         3 {:start-time-millis 18}}}
      4)))
   (is
    (=
-    {:agent-invokes     [[1 2 19] [2 3 18] [2 2 14] [2 1 12] [1 1 11] [1 0 10]
-                         [2 0 9]]
+    {:agent-invokes     [{:task-id 1 :agent-id 2 :start-time-millis 19}
+                         {:task-id 2 :agent-id 3 :start-time-millis 18}
+                         {:task-id  2
+                          :agent-id 2
+                          :start-time-millis 14
+                          :foo      1
+                          :bar      2}
+                         {:task-id 2 :agent-id 1 :start-time-millis 12}
+                         {:task-id 1 :agent-id 1 :start-time-millis 11}
+                         {:task-id 1 :agent-id 0 :start-time-millis 10}
+                         {:task-id 2 :agent-id 0 :start-time-millis 9}]
      :pagination-params {0 nil 1 nil 2 nil}}
     (queries/to-invokes-page-result
      {0 {}
-      1 {0 10
-         1 11
-         2 19}
-      2 {0 9
-         1 12
-         2 14
-         3 18}}
+      1 {0 {:start-time-millis 10}
+         1 {:start-time-millis 11}
+         2 {:start-time-millis 19}}
+      2 {0 {:start-time-millis 9}
+         1 {:start-time-millis 12}
+         2 {:start-time-millis 14 :foo 1 :bar 2}
+         3 {:start-time-millis 18}}}
      5)))
   (is
    (=
-    {:agent-invokes     [[1 0 10] [2 0 9]]
+    {:agent-invokes     [{:task-id 1 :agent-id 0 :start-time-millis 10}
+                         {:task-id 2 :agent-id 0 :start-time-millis 9}]
      :pagination-params {0 nil 1 nil 2 nil}}
     (queries/to-invokes-page-result
      {0 {}
-      1 {0 10}
-      2 {0 9}}
+      1 {0 {:start-time-millis 10}}
+      2 {0 {:start-time-millis 9}}}
      1)))
   (is
    (=
@@ -68,40 +86,47 @@
      10)))
   (is
    (=
-    {:agent-invokes     [[2 12 11] [2 11 10] [2 10 9]]
+    {:agent-invokes     [{:task-id 2 :agent-id 12 :start-time-millis 11}
+                         {:task-id 2 :agent-id 11 :start-time-millis 10}
+                         {:task-id 2 :agent-id 10 :start-time-millis 9}]
      :pagination-params {0 300 1 3 2 0}}
     (queries/to-invokes-page-result
-     {0 {0   0
-         100 1
-         200 2
-         300 3}
-      1 {0 4
-         1 5
-         2 6
-         3 7}
-      2 {0  8
-         10 9
-         11 10
-         12 11}}
+     {0 {0   {:start-time-millis 0}
+         100 {:start-time-millis 1}
+         200 {:start-time-millis 2}
+         300 {:start-time-millis 3}}
+      1 {0 {:start-time-millis 4}
+         1 {:start-time-millis 5}
+         2 {:start-time-millis 6}
+         3 {:start-time-millis 7}}
+      2 {0  {:start-time-millis 8}
+         10 {:start-time-millis 9}
+         11 {:start-time-millis 10}
+         12 {:start-time-millis 11}}}
      4)))
   (is
    (=
-    {:agent-invokes     [[1 4 40] [0 0 37] [2 3 35] [3 3 32] [3 2 31] [1 2 30]]
+    {:agent-invokes     [{:task-id 1 :agent-id 4 :start-time-millis 40}
+                         {:task-id 0 :agent-id 0 :start-time-millis 37}
+                         {:task-id 2 :agent-id 3 :start-time-millis 35}
+                         {:task-id 3 :agent-id 3 :start-time-millis 32}
+                         {:task-id 3 :agent-id 2 :start-time-millis 31}
+                         {:task-id 1 :agent-id 2 :start-time-millis 30}]
      :pagination-params {0 nil 1 1 2 2 3 1}}
     (queries/to-invokes-page-result
-     {0 {0 37}
-      1 {0 10
-         1 20
-         2 30
-         4 40}
-      2 {0 5
-         1 8
-         2 25
-         3 35}
-      3 {0 1
-         1 22
-         2 31
-         3 32}}
+     {0 {0 {:start-time-millis 37}}
+      1 {0 {:start-time-millis 10}
+         1 {:start-time-millis 20}
+         2 {:start-time-millis 30}
+         4 {:start-time-millis 40}}
+      2 {0 {:start-time-millis 5}
+         1 {:start-time-millis 8}
+         2 {:start-time-millis 25}
+         3 {:start-time-millis 35}}
+      3 {0 {:start-time-millis 1}
+         1 {:start-time-millis 22}
+         2 {:start-time-millis 31}
+         3 {:start-time-millis 32}}}
      4)))
 )
 
@@ -157,7 +182,18 @@
         (is (> (count res) 2))
         (is (every? #(>= (count %) i) (butlast res)))
         (bind all (apply concat res))
-        (is (apply >= (mapv #(nth % 2) all)))
-        (bind all-invokes (mapv #(vec (butlast %)) all))
-        (is (= (set all-invokes) (set invokes)))))
+        (is (apply >= (mapv :start-time-millis all)))
+        (bind all-invokes (mapv (fn [m] [(:task-id m) (:agent-id m)]) all))
+        (is (= (set all-invokes) (set invokes)))
+        (doseq [page res]
+          (doseq [m page]
+            (let [expected-keys #{:start-time-millis :finish-time-millis
+                                  :invoke-args :result :task-id :agent-id
+                                  :graph-version}]
+              (is (= expected-keys
+                     (set/intersection expected-keys
+                                       (-> m
+                                           keys
+                                           set))))
+            )))))
     )))

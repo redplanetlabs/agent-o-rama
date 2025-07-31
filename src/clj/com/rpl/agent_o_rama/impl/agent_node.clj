@@ -5,6 +5,7 @@
    [clojure.tools.logging :as cljlogging]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.langchain4j-trace :as lc4j-trace]
    [com.rpl.agent-o-rama.impl.partitioner :as apart]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
@@ -13,12 +14,34 @@
   (:import
    [com.rpl.agentorama
     AgentNode
+    IUnderlying
+    NestedOpType
     StreamingRecorder]
    [com.rpl.agentorama.impl
+    AgentDeclaredObjectsTaskGlobal
     AgentNodeExecutorTaskGlobal
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     Node]
+   [dev.langchain4j.model.chat
+    ChatModel
+    StreamingChatModel]
+   [dev.langchain4j.data.embedding
+    Embedding]
+   [dev.langchain4j.data.message
+    ChatMessage]
+   [dev.langchain4j.model.chat.request
+    ChatRequest]
+   [dev.langchain4j.model.chat.response
+    ChatResponse
+    StreamingChatResponseHandler]
+   [dev.langchain4j.store.embedding
+    EmbeddingMatch
+    EmbeddingStore]
+   [dev.langchain4j.store.embedding.filter
+    Filter]
+   [java.io
+    Closeable]
    [java.util.concurrent
     CompletableFuture]))
 
@@ -35,6 +58,7 @@
 
 (defprotocol AgentNodeInternal
   (agent-node-state [this])
+  (release-acquired-objects! [this])
   (get-streaming-recorder [this]))
 
 (defprotocol StreamingRecorderInternal
@@ -100,32 +124,60 @@
          (verify-successful-cf! cf)))
     )))
 
+(def NESTED-OP-TYPE-CLJ
+  {:store-read   NestedOpType/STORE_READ
+   :store-write  NestedOpType/STORE_WRITE
+   :db-read      NestedOpType/DB_READ
+   :db-write     NestedOpType/DB_WRITE
+   :model-call   NestedOpType/MODEL_CALL
+   :agent-invoke NestedOpType/AGENT_INVOKE
+   :other        NestedOpType/OTHER
+  })
+
+(def NESTED-OP-TYPE-JAVA
+  (into {} (for [[k v] NESTED-OP-TYPE-CLJ] [v k])))
+
+(defn nested-op-type->clj
+  [v]
+  (if-let [res (get NESTED-OP-TYPE-JAVA v)]
+    res
+    (throw (h/ex-info "Unknown nested op type" {:val v :type (class v)}))))
+
+(defn nested-op-type->java
+  [v]
+  (if-let [res (get NESTED-OP-TYPE-CLJ v)]
+    res
+    (throw (h/ex-info "Unknown nested op type" {:val v :type (class v)}))))
+
 (defn mk-agent-node
   [agent-name agent-graph agent-task-id agent-id curr-node invoke-id retry-num
    store-info ^RamaClientsTaskGlobal rama-clients]
-  (let [task-id             (ops/current-task-id)
-        result-vol          (volatile! nil)
-        emits-vol           (volatile! [])
-        nested-ops-vol      (volatile! [])
-        task-thread-ids-vol (volatile! nil)
-        emit-count-vol      (volatile! 0)
-        valid-output-nodes  (-> agent-graph
-                                :node-map
-                                (get curr-node)
-                                :output-nodes)
+  (let [task-id               (ops/current-task-id)
+        result-vol            (volatile! nil)
+        emits-vol             (volatile! [])
+        nested-ops-vol        (volatile! [])
+        task-thread-ids-vol   (volatile! nil)
+        emit-count-vol        (volatile! 0)
+        valid-output-nodes    (-> agent-graph
+                                  :node-map
+                                  (get curr-node)
+                                  :output-nodes)
 
         ^com.rpl.rama.ModuleInstanceInfo module-instance-info
         (ops/module-instance-info)
 
-        this-module-name    (.getModuleName module-instance-info)
-        random-source       (ops/current-random-source)
-        streaming-depot     (.getAgentStreamingDepot rama-clients agent-name)
-        streaming-recorder  (mk-streaming-recorder agent-task-id
-                                                   agent-id
-                                                   curr-node
-                                                   invoke-id
-                                                   retry-num
-                                                   streaming-depot)
+        this-module-name      (.getModuleName module-instance-info)
+        random-source         (ops/current-random-source)
+        streaming-depot       (.getAgentStreamingDepot rama-clients agent-name)
+        streaming-recorder    (mk-streaming-recorder agent-task-id
+                                                     agent-id
+                                                     curr-node
+                                                     invoke-id
+                                                     retry-num
+                                                     streaming-depot)
+
+        declared-objects-tg   (po/agent-declared-objects-task-global)
+        acquired-objects-atom (atom [])
        ]
     (reify
      AgentNode
@@ -162,8 +214,10 @@
          (throw (h/ex-info "Cannot both emit and result" {})))
        (vreset! result-vol (aor-types/->valid-AgentResult arg false)))
      (getAgentObject [this name]
-                     ;; TODO
-     )
+       (let [ret (.getAgentObjectFromResource declared-objects-tg name)]
+         (swap! acquired-objects-atom conj [name ret])
+         ret
+       ))
      (getStore [this name]
        (let [store-params
              (simpl/->valid-StoreParams
@@ -193,12 +247,28 @@
          )))
      (streamChunk [this chunk]
        (.streamChunk streaming-recorder chunk))
+     (recordNestedOp [this type start-time-millis finish-time-millis info]
+       (when (< finish-time-millis start-time-millis)
+         (throw (h/ex-info "Finish time cannot be before start time"
+                           {:start-time-millis  start-time-millis
+                            :finish-time-millis finish-time-millis})))
+       (vswap! nested-ops-vol
+               conj
+               (aor-types/->NestedOpInfo
+                start-time-millis
+                finish-time-millis
+                (nested-op-type->clj type)
+                info)))
      AgentNodeInternal
      (get-streaming-recorder [this] streaming-recorder)
+     (release-acquired-objects! [this]
+       (doseq [[name o] @acquired-objects-atom]
+         (.releaseAgentObject declared-objects-tg name o)))
      (agent-node-state [this]
        {:emits      @emits-vol
         :result     @result-vol
-        :nested-ops @nested-ops-vol}))))
+        :nested-ops @nested-ops-vol
+       }))))
 
 
 (defn submit-virtual-task!
@@ -211,13 +281,299 @@
   [t msg data]
   (cljlogging/error t msg data))
 
+(def AGENT-NODE-CONTEXT (ThreadLocal.))
+
+(defn record-nested-op!-impl
+  [^AgentNode agent-node nested-op-type start-time-millis finish-time-millis
+   info-map]
+  (.recordNestedOp agent-node
+                   (nested-op-type->java nested-op-type)
+                   start-time-millis
+                   finish-time-millis
+                   info-map))
+
+(defn try-close!
+  [obj]
+  (when (instance? Closeable obj)
+    (close! obj)))
+
+(defn- record-model-call!
+  [name agent-node ^ChatRequest request ^ChatResponse response
+   start-time-millis]
+  (record-nested-op!-impl
+   agent-node
+   :model-call
+   start-time-millis
+   (h/current-time-millis)
+   (h/remove-empty-vals
+    {"objectName"       name
+     "modelName"        (.modelName response)
+     "frequencyPenalty" (.frequencyPenalty request)
+     "presencePenalty"  (.presencePenalty request)
+     "stopSequences"    (into [] (.stopSequences request))
+     "temperature"      (.temperature request)
+     "topK"             (.topK request)
+     "topP"             (.topP request)
+     "input"            (lc4j-trace/messages->trace (.messages request))
+     "response"         (h/safe-> response .aiMessage .text)
+     "finishReason"     (lc4j-trace/finish-reason->trace
+                         (.finishReason response))
+     "inputTokenCount"  (h/safe-> response
+                                  .tokenUsage
+                                  .inputTokenCount)
+     "outputTokenCount" (h/safe-> response
+                                  .tokenUsage
+                                  .outputTokenCount)
+     "totalTokenCount"  (h/safe-> response
+                                  .tokenUsage
+                                  .totalTokenCount)
+    })))
+
+(defn- instrument-chat!
+  [name request response-fn]
+  (let [^AgentNode agent-node (h/thread-local-get AGENT-NODE-CONTEXT)
+        start-time-millis (h/current-time-millis)
+        response (response-fn)]
+    (record-model-call! name agent-node request response start-time-millis)
+    response
+  ))
+
+(defn- instrument-streaming-chat!
+  [name ^ChatRequest request initiate-fn]
+  (let [^AgentNode agent-node (h/thread-local-get AGENT-NODE-CONTEXT)
+        cf (CompletableFuture.)
+        start-time-millis (h/current-time-millis)
+        _ (initiate-fn
+           (reify
+            StreamingChatResponseHandler
+            (onPartialResponse [this partial]
+              (.streamChunk agent-node partial))
+            (onCompleteResponse [this response]
+              (.complete cf response))
+            (onError [this t]
+              (.completeExceptionally
+               cf
+               (h/ex-info "Streaming failed" {:name name} t)))))
+        response (.get cf)]
+    (record-model-call! name agent-node request response start-time-millis)
+    response
+  ))
+
+(defmacro with-traced
+  [expr object-name nested-op-type [res-sym] & body]
+  `(let [agent-node#        (h/thread-local-get AGENT-NODE-CONTEXT)
+         start-time-millis# (h/current-time-millis)
+         ~res-sym           ~expr
+         info-map#          (do ~@body)
+        ]
+     (record-nested-op!-impl
+      agent-node#
+      ~nested-op-type
+      start-time-millis#
+      (h/current-time-millis)
+      (assoc info-map# "objectName" ~object-name))
+     ~res-sym
+   ))
+
+(defn wrap-agent-object
+  [name obj]
+  (cond
+    (instance? ChatModel obj)
+    (let [^ChatModel obj obj]
+      (reify
+       ChatModel
+       ;; - each provider overrides one of the following two methods and uses
+       ;; default impls for the rest of the "chat" methods
+       (^ChatResponse chat [this ^ChatRequest chatRequest]
+         (instrument-chat! name chatRequest #(.chat obj chatRequest)))
+       (^ChatResponse doChat [this ^ChatRequest chatRequest]
+         (instrument-chat! name chatRequest #(.doChat obj chatRequest)))
+       (defaultRequestParameters [this] (.defaultRequestParameters obj))
+       (listeners [this] (.listeners obj))
+       (provider [this] (.provider obj))
+       (supportedCapabilities [this] (.supportedCapabilities obj))
+
+       IUnderlying
+       (getUnderlying [this] obj)
+
+       Closeable
+       (close [this] (try-close! obj))))
+
+
+    (instance? StreamingChatModel obj)
+    (let [^StreamingChatModel obj obj]
+      (reify
+       ChatModel
+       ;; - same as with ChatModel impls, some StreamingChatModel impls
+       ;; implement chat(ChatRequest, StreamingChatResponseHandler) and others
+       ;; implement doChat(ChatRequest, StreamingChatResponseHandler)
+       ;; - so here only need to implement these entry points and forward to
+       ;; corresponding method on StreamingChatModel
+       (^ChatResponse chat [this ^ChatRequest chatRequest]
+         (instrument-streaming-chat!
+          name
+          chatRequest
+          #(.chat obj chatRequest ^StreamingChatResponseHandler %)))
+       (^ChatResponse doChat [this ^ChatRequest chatRequest]
+         (instrument-streaming-chat!
+          name
+          chatRequest
+          #(.doChat obj chatRequest ^StreamingChatResponseHandler %)))
+       (defaultRequestParameters [this] (.defaultRequestParameters obj))
+       (listeners [this] (.listeners obj))
+       (provider [this] (.provider obj))
+       (supportedCapabilities [this] (.supportedCapabilities obj))
+
+       IUnderlying
+       (getUnderlying [this] obj)
+
+       Closeable
+       (close [this] (try-close! obj))))
+
+    (instance? EmbeddingStore obj)
+    (let [^EmbeddingStore obj obj]
+      (reify
+       EmbeddingStore
+       (add [this embedding]
+         (with-traced
+          (.add obj embedding)
+          name
+          :db-write
+          [res]
+          {"op"        "add"
+           "embedding" (.vector embedding)
+           "id"        res
+          }))
+       (^String add [this ^Embedding embedding ^Object embedded]
+         (with-traced
+          (.add obj embedding embedded)
+          name
+          :db-write
+          [res]
+          {"op"        "add"
+           "embedding" (.vector embedding)
+           "embedded"  (str embedded)
+           "id"        res
+          }))
+       (^void add [this ^String id ^Embedding embedding]
+         (with-traced
+          (.add obj id embedding)
+          name
+          :db-write
+          [res]
+          {"op"        "add"
+           "embedding" (.vector embedding)
+           "id"        id
+          }))
+       (addAll [this embeddings]
+         (with-traced
+          (.addAll obj embeddings)
+          name
+          :db-write
+          [res]
+          {"op"         "addAll"
+           "embeddings" (mapv #(.vector ^Embedding %) embeddings)
+           "ids"        res
+          }))
+       (addAll [this embeddings embeddeds]
+         (with-traced
+          (.addAll obj embeddings embeddeds)
+          name
+          :db-write
+          [res]
+          {"op"         "addAll"
+           "embeddings" (mapv #(.vector ^Embedding %) embeddings)
+           "embeddeds"  (mapv str embeddeds)
+           "ids"        res
+          }))
+       (addAll [this ids embeddings embeddeds]
+         (with-traced
+          (.addAll obj ids embeddings embeddeds)
+          name
+          :db-write
+          [res]
+          {"op"         "addAll"
+           "embeddings" (mapv #(.vector ^Embedding %) embeddings)
+           "embeddeds"  (mapv str embeddeds)
+           "ids"        ids
+          }))
+       (generateIds [this n]
+         (.generateIds obj n))
+       (remove [this id]
+         (with-traced
+          (.remove obj id)
+          name
+          :db-write
+          [res]
+          {"op" "remove"
+           "id" id
+          }))
+       (removeAll [this]
+         (with-traced
+          (.removeAll obj)
+          name
+          :db-write
+          [res]
+          {"op" "removeAll"
+          }))
+       (^void removeAll [this ^Filter filter]
+         (with-traced
+          (.removeAll obj filter)
+          name
+          :db-write
+          [res]
+          {"op"     "removeAll"
+           "filter" (str filter)
+          }))
+       (^void removeAll [this ^java.util.Collection ids]
+         (with-traced
+          (.removeAll obj ids)
+          name
+          :db-write
+          [res]
+          {"op"  "removeAll"
+           "ids" ids
+          }))
+       (search [this request]
+         (with-traced
+          (.search obj request)
+          name
+          :db-read
+          [res]
+          {"op"      "search"
+           "request" {"filter"         (str (.filter request))
+                      "maxResults"     (.maxResults request)
+                      "minScore"       (.minScore request)
+                      "queryEmbedding" (.vector (.queryEmbedding request))}
+           "matches" (mapv
+                      (fn [^EmbeddingMatch match]
+                        {"embedded"  (str (.embedded match))
+                         "embedding" (.vector (.embedding match))
+                         "id"        (.embeddingId match)
+                         "score"     (.score match)})
+                      (.matches res))
+          }))
+
+       IUnderlying
+       (getUnderlying [this] obj)
+
+       Closeable
+       (close [this] (try-close! obj))))
+
+    :else
+    obj))
+
 (defn node-event
   [agent-name task-id invoke-id retry-num node-name node-fn
    ^AgentNode agent-node args ^RamaClientsTaskGlobal rama-clients
-   fork-context]
+   fork-context acquire-timeout-millis]
   (fn []
     (let [depot (.getAgentDepot rama-clients agent-name)
           res   (try
+                  (h/thread-local-set! AGENT-NODE-CONTEXT agent-node)
+                  (h/thread-local-set!
+                   AgentDeclaredObjectsTaskGlobal/ACQUIRE_TIMEOUT_MILLIS
+                   acquire-timeout-millis)
                   (h/returning (apply node-fn agent-node args)
                     (-> agent-node
                         get-streaming-recorder
@@ -234,8 +590,9 @@
                       invoke-id
                       retry-num)
                      :append-ack)
-                    (throw t)
-                  ))
+                    (throw t))
+                  (finally
+                    (release-acquired-objects! agent-node)))
           {:keys [emits result nested-ops]} (agent-node-state agent-node)]
       (foreign-append!
        depot
@@ -251,6 +608,13 @@
         fork-context)
        :append-ack)
     )))
+
+(deframafn read-config
+  [*agent-name *config]
+  (<<with-substitutions
+   [$$config (po/agent-config-task-global *agent-name)]
+   (local-select> STAY $$config :> *config-map)
+   (:> (aor-types/get-config *config-map *config))))
 
 (deframaop handle-node-invoke
   [*agent-name *agent-task-id *agent-id *node-fn *invoke-id *retry-num
@@ -293,6 +657,9 @@
    (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
                |direct
                *task-id)
+   (read-config *agent-name
+                aor-types/ACQUIRE-OBJECT-TIMEOUT-MILLIS-CONFIG
+                :> *acquire-timeout-millis)
    (submit-virtual-task!
     *invoke-id
     (node-event *agent-name
@@ -304,7 +671,8 @@
                 *agent-node
                 *args
                 *rama-clients
-                *fork-context))
+                *fork-context
+                *acquire-timeout-millis))
    (:>)))
 
 (defn- invoke-or-error

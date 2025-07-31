@@ -4,6 +4,7 @@
         [com.rpl.rama.path])
   (:require
    [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.ramaspecter :refer [walker]]))
 
 (defmacro letlocals
@@ -163,6 +164,42 @@
   [& body]
   `(condition-attained?* (fn [] ~@body)))
 
+(defn condition-stable?*
+  [exec-fn]
+  (let [start-time-millis (h/current-time-millis)
+        attempts (atom 0)
+        matches  (atom 0)
+        res
+        (loop []
+          (swap! attempts inc)
+          (let [cond-exec-result (exec-fn)]
+            (cond
+              cond-exec-result
+              (do
+                (swap! matches inc)
+                (if (= @matches 10)
+                  :success
+                  (do
+                    ;; give a chance for condition to break
+                    (Thread/sleep 2)
+                    (recur)
+                  )))
+
+              (> (- (h/current-time-millis) start-time-millis)
+                 30000)
+              :timeout
+
+              :else
+              (if (> @matches 0)
+                :not-stable
+                (do
+                  (Thread/sleep 1)
+                  (recur))))))]
+    (= res :success)))
+
+(defmacro condition-stable?
+  [& body]
+  `(condition-stable?* (fn [] ~@body)))
 
 (let [prev aor-types/get-config]
   (defn max-retries-override

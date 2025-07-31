@@ -3,6 +3,7 @@
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.serialize]
    [com.rpl.ramaspecter.defrecord-plus :as drp]
    [rpl.schema.core :as s])
   (:import
@@ -46,7 +47,6 @@
   [val :- s/Any
    failure? :- Boolean])
 
-
 (drp/defrecord+ AgentNode
   [node :- (s/cond-pre Node NodeAggStart NodeAgg)
    output-nodes :- #{String}
@@ -76,6 +76,14 @@
 (drp/defrecord+ NestedOpInfo
   [start-time-millis :- Long
    finish-time-millis :- Long
+   type :-
+   (s/enum :store-write
+           :store-read
+           :db-write
+           :db-read
+           :model-call
+           :agent-invoke
+           :other)
    ;; info for models contains token stats, input prompt, output, etc.
    info :- (s/maybe {String s/Any})])
 
@@ -138,8 +146,7 @@
   ])
 
 (drp/defrecord+ HistoricalAgentGraphInfo
-  [node-map :- {String HistoricalAgentNodeInfo} ; :node, :agg-node,
-                                                ; :agg-start-node
+  [node-map :- {String HistoricalAgentNodeInfo}
    start-node :- String
    uuid :- String
   ])
@@ -179,8 +186,12 @@
    path :- s/Any
    key :- s/Any])
 
+(defprotocol AgentsTopologyInternal
+  (declare-agent-object-builder-internal [this name afn options]))
+
 (defprotocol AgentClientInternal
   (stream-internal [this agent-invoke node callback-fn])
+  (stream-specific-internal [this agent-invoke node node-invoke-id callback-fn])
   (stream-all-internal [this agent-invoke node callback-fn])
   (underlying-objects [this]))
 
@@ -232,7 +243,6 @@
   [v]
   (and (instance? Long v) (> v 0)))
 
-
 (defconfig MAX-RETRIES
            natural-long?
            3)
@@ -240,3 +250,7 @@
 (defconfig STALL-CHECKER-THRESHOLD-MILLIS
            positive-long?
            10000)
+
+(defconfig ACQUIRE-OBJECT-TIMEOUT-MILLIS
+           positive-long?
+           30000)

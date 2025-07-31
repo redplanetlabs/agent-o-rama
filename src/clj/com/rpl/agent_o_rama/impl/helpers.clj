@@ -107,7 +107,6 @@
   ([afn a b c d e f g h i j k l m n o] (afn a b c d e f g h i j k l m n o))
   ([afn a b c d e f g h i j k l m n o p] (afn a b c d e f g h i j k l m n o p)))
 
-
 (defmacro cf-function
   [& body]
   `(let [afn# (fn ~@body)]
@@ -167,3 +166,42 @@
 (defn into-map
   [arg]
   (into {} arg))
+
+(defn thread-local-set!
+  [^ThreadLocal t v]
+  (.set t v))
+
+(defn thread-local-get
+  [^ThreadLocal t]
+  (.get t))
+
+(defn validate-option!
+  [context m key & preds]
+  (let [v (get m key)]
+    (when-not (every? #(% v) preds)
+      (throw (ex-info "Invalid option"
+                      {:context context
+                       :option  key
+                       :val     v})))))
+
+(defmacro safe->
+  [x & forms]
+  (let [g (gensym "val")]
+    (reduce
+     (fn [acc form]
+       `(let [~g ~acc]
+          (if (nil? ~g)
+            nil
+            ~(if (seq? form)
+               (with-meta
+                 `(~(first form) ~g ~@(rest form))
+                 (meta form))
+               `(~form ~g)))))
+     x
+     forms)))
+
+(defn remove-empty-vals
+  [m]
+  (setval [MAP-VALS #(or (nil? %) (and (coll? %) (empty? %)))]
+          NONE
+          m))

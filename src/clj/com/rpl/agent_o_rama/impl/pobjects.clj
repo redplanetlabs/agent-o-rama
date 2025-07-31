@@ -1,7 +1,10 @@
 (ns com.rpl.agent-o-rama.impl.pobjects
   (:use [com.rpl.rama])
+  (:require
+   [com.rpl.agent-o-rama.impl.types])
   (:import
    [com.rpl.agentorama.impl
+    AgentDeclaredObjectsTaskGlobal
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     AgentNodeEmit
@@ -15,7 +18,6 @@
     NodeAggStart
     StreamingChunk]))
 
-
 (defn agents-store-info-name
   []
   "*_agents-store-info")
@@ -23,6 +25,10 @@
 (defn agent-node-executor-name
   []
   "*_agent-node-executor")
+
+(defn agent-declared-objects-name
+  []
+  "*_agent-declared-objects")
 
 (defn agent-pstate-write-depot-name
   []
@@ -120,7 +126,6 @@
                 {:subindex? true})})
     {:subindex? true})})
 
-
 (defn agent-node-task-global-name
   [agent-name]
   (str "$$_agent-node-" agent-name))
@@ -179,7 +184,6 @@
 (def AGENT-CONFIG-PSTATE-SCHEMA
   java.util.Map)
 
-
 ;; Task global fetch helpers
 
 (defn agent-node-executor-task-global
@@ -189,6 +193,10 @@
 (defn agent-store-info-task-global
   []
   (declared-object-task-global (agents-store-info-name)))
+
+(defn agent-declared-objects-task-global
+  ^AgentDeclaredObjectsTaskGlobal []
+  (declared-object-task-global (agent-declared-objects-name)))
 
 (defn agent-depot-task-global
   [name]

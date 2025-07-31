@@ -2,6 +2,8 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [clojure.set :as set]
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -20,11 +22,14 @@
     AgentInvoke
     AgentManager
     AgentNode
+    AgentObjectSetup
     AgentsTopology
     AgentStream
     AgentStreamByInvoke
     MultiAgg$Impl
     UpdateMode]
+   [com.rpl.agentorama.impl
+    IFetchAgentObject]
    [com.rpl.rama
     PState$Declaration
     PState$Schema]
@@ -43,11 +48,13 @@
   (let [^StreamTopology stream-topology (stream-topology
                                          topologies
                                          aor-types/AGENTS-TOPOLOGY-NAME)
-        mb-topology    (microbatch-topology topologies
-                                            aor-types/AGENTS-MB-TOPOLOGY-NAME)
-        defined?-vol   (volatile! false)
-        agents-vol     (volatile! {})
-        store-info-vol (volatile! {})]
+        mb-topology          (microbatch-topology
+                              topologies
+                              aor-types/AGENTS-MB-TOPOLOGY-NAME)
+        defined?-vol         (volatile! false)
+        agents-vol           (volatile! {})
+        store-info-vol       (volatile! {})
+        declared-objects-vol (volatile! {})]
     (reify
      AgentsTopology
      (newAgent [this name]
@@ -84,7 +91,24 @@
                                               ^PState$Schema schema]
        (.pstate stream-topology name schema))
      (declareAgentObject [this name o]
-       (declare-object* setup (symbol name) o))
+       (aor-types/declare-agent-object-builder-internal
+        this
+        name
+        (fn [setup]
+          (i/hook:building-plain-agent-object name o)
+          o)
+        {:thread-safe? true}))
+     (declareAgentObjectBuilder [this name jfn]
+       (aor-types/declare-agent-object-builder-internal this
+                                                        name
+                                                        (h/convert-jfn jfn)
+                                                        nil))
+     (declareAgentObjectBuilder [this name jfn options]
+       (aor-types/declare-agent-object-builder-internal
+        this
+        name
+        (h/convert-jfn jfn)
+        (i/convert-agent-object-options options)))
      (define [this]
        (when @defined?-vol
          (throw (h/ex-info "Agents topology already defined" {})))
@@ -95,8 +119,45 @@
         stream-topology
         mb-topology
         @agents-vol
-        @store-info-vol)
-     ))))
+        @store-info-vol
+        @declared-objects-vol))
+     aor-types/AgentsTopologyInternal
+     (declare-agent-object-builder-internal [this name afn options]
+       (when-not (ifn? afn)
+         (throw (h/ex-info "Object builder must be a function"
+                           {:actual-type (class afn)})))
+       (when (contains? @declared-objects-vol name)
+         (throw (h/ex-info "Object already declared" {:name name})))
+       (let [invalid-opts (set/difference (-> options
+                                              keys
+                                              set)
+                                          #{:thread-safe?
+                                            :auto-tracing?
+                                            :worker-object-limit})
+             full-options (merge {:thread-safe?        false
+                                  :auto-tracing?       true
+                                  :worker-object-limit 1000}
+                                 options)]
+         (when-not (empty? invalid-opts)
+           (throw (h/ex-info "Invalid agent object options"
+                             {:name name :invalid-keys invalid-opts})))
+         (h/validate-option! name full-options :thread-safe? boolean?)
+         (h/validate-option! name full-options :auto-tracing? boolean?)
+         (h/validate-option! name
+                             full-options
+                             :worker-object-limit
+                             integer?
+                             pos?)
+         (vswap! declared-objects-vol
+                 assoc
+                 name
+                 {"limit"       (:worker-object-limit full-options)
+                  "threadSafe"  (:thread-safe? full-options)
+                  "autoTracing" (:auto-tracing? full-options)
+                  "builderFn"   afn
+                 })
+       ))
+    )))
 
 (defn underlying-stream-topology
   [^AgentsTopology at]
@@ -120,6 +181,23 @@
 (defn declare-pstate-store
   [^AgentsTopology agents-topology name schema]
   (declare-pstate* (.getStreamTopology agents-topology) (symbol name) schema))
+
+(defn declare-agent-object
+  [^AgentsTopology agents-topology name val]
+  (.declareAgentObject agents-topology name val))
+
+(defn declare-agent-object-builder
+  ([agents-topology name afn]
+   (declare-agent-object-builder agents-topology name afn nil))
+  ([agents-topology name afn options]
+   (aor-types/declare-agent-object-builder-internal agents-topology
+                                                    name
+                                                    afn
+                                                    options)))
+
+(defn setup-object-name
+  [^AgentObjectSetup setup]
+  (.getObjectName setup))
 
 (defn new-agent
   [^AgentsTopology agents-topology name]
@@ -190,9 +268,22 @@
   [^AgentNode agent-node name]
   (.getStore agent-node name))
 
+(defn get-agent-object
+  [^IFetchAgentObject fetch name]
+  (.getAgentObject fetch name))
+
 (defn stream-chunk!
   [^AgentNode agent-node chunk]
   (.streamChunk agent-node chunk))
+
+(defn record-nested-op!
+  [agent-node nested-op-type start-time-millis finish-time-millis
+   info-map]
+  (anode/record-nested-op!-impl agent-node
+                                nested-op-type
+                                start-time-millis
+                                finish-time-millis
+                                info-map))
 
 (defn- parse-map-options
   [[arg1 & rest-args :as args]]
@@ -272,8 +363,13 @@
                                  cluster
                                  module-name
                                  (queries/agent-get-invokes-page-query-name
-                                  agentName))]
+                                  agentName))
 
+             current-graph-query  (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/agent-get-current-graph-name
+                                    agentName))]
          (reify
           AgentClient
           (invoke [this args]
@@ -380,6 +476,23 @@
                             new-chunks
                             reset?
                             complete?)))))
+          (streamSpecific [this agent-invoke node node-invoke-id]
+            (.streamSpecific this agent-invoke node node-invoke-id nil))
+          (streamSpecific [this agent-invoke node node-invoke-id
+                           stream-callback]
+            (aor-types/stream-specific-internal
+             this
+             agent-invoke
+             node
+             node-invoke-id
+             (when stream-callback
+               (fn [all-chunks new-chunks reset? complete?]
+                 (.onUpdate ^AgentClient$StreamCallback
+                            stream-callback
+                            all-chunks
+                            new-chunks
+                            reset?
+                            complete?)))))
 
 
           (streamAll [this agent-invoke node]
@@ -407,6 +520,14 @@
              agent-invoke
              node
              callback-fn))
+          (stream-specific-internal [this agent-invoke node node-invoke-id
+                                     callback-fn]
+            (iclient/agent-stream-specific-impl
+             streaming-pstate
+             agent-invoke
+             node
+             node-invoke-id
+             callback-fn))
           (stream-all-internal [this agent-invoke node callback-fn]
             (iclient/agent-stream-all-impl
              streaming-pstate
@@ -421,7 +542,10 @@
              :streaming-pstate     streaming-pstate
              :graph-history-pstate graph-history-pstate
              :tracing-query        tracing-query
-             :invokes-page-query   invokes-page-query})))))))
+             :invokes-page-query   invokes-page-query
+             :current-graph-query  current-graph-query
+            })
+         ))))))
 
 (defn agent-client
   ^AgentClient [^AgentManager agent-manager agent-name]
@@ -479,6 +603,18 @@
    (.stream agent-client agent-invoke node))
   (^AgentStream [^AgentClient agent-client agent-invoke node callback-fn]
    (aor-types/stream-internal agent-client agent-invoke node callback-fn)))
+
+(defn agent-stream-specific
+  (^AgentStream
+   [^AgentClient agent-client agent-invoke node node-invoke-id]
+   (.streamSpecific agent-client agent-invoke node node-invoke-id))
+  (^AgentStream
+   [^AgentClient agent-client agent-invoke node node-invoke-id callback-fn]
+   (aor-types/stream-specific-internal agent-client
+                                       agent-invoke
+                                       node
+                                       node-invoke-id
+                                       callback-fn)))
 
 (defn agent-stream-all
   (^AgentStreamByInvoke [^AgentClient agent-client agent-invoke node]

@@ -13,6 +13,10 @@
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest])
   (:import
+   [dev.langchain4j.data.embedding
+    Embedding]
+   [com.rpl.agentorama
+    AgentInvoke]
    [com.rpl.rama.helpers
     TopologyUtils]
    [java.util.concurrent
@@ -83,3 +87,15 @@
 
 (defn mk-cf [] (CompletableFuture.))
 (defn complete-cf! [^CompletableFuture cf v] (.complete cf v))
+
+(defn extract-invoke
+  [^AgentInvoke inv]
+  [(.getTaskId inv) (.getAgentInvokeId inv)])
+
+(defn embedding
+  ^Embedding [& nums]
+  (let [nums (vec nums)
+        arr  (float-array (count nums))]
+    (dotimes [i (count nums)]
+      (aset-float arr i (float (nth nums i))))
+    (Embedding. arr)))

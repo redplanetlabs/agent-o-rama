@@ -2,6 +2,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops])
@@ -32,6 +33,10 @@
   [agent-name]
   (this-module-query-topology-task-global
    (agent-get-fork-affected-aggs-query-name agent-name)))
+
+(defn agent-get-current-graph-name
+  [agent-name]
+  (str "_agent-get-current-graph-" agent-name))
 
 (defn- to-pqueue
   [coll]
@@ -164,7 +169,7 @@
    20
    (reify
     Comparator
-    (compare [_ [_ _ a-millis] [_ _ b-millis]]
+    (compare [_ {a-millis :start-time-millis} {b-millis :start-time-millis}]
       (compare b-millis a-millis)))))
 
 (defn to-invokes-page-result
@@ -175,21 +180,24 @@
         task-queues
         (transform
          [ALL (collect-one FIRST) LAST]
-         (fn [task-id id->start-time-millis]
-           (when (< (count id->start-time-millis) page-size)
+         (fn [task-id id->info]
+           (when (< (count id->info) page-size)
              (vswap! end-task-ids conj task-id))
            (let [ret (invokes-pqueue)]
-             (doseq [[id start-time-millis] id->start-time-millis]
-               (.add ret [task-id id start-time-millis]))
+             (doseq [[id info] id->info]
+               (.add ret
+                     (assoc info
+                      :task-id task-id
+                      :agent-id id)))
              ret
            ))
          pages-map)]
     (doseq [[_ ^PriorityQueue q] task-queues]
-      (if-let [tuple (.poll q)]
-        (.add pqueue tuple)))
+      (if-let [m (.poll q)]
+        (.add pqueue m)))
     (let [ret
           (loop [ret []]
-            (let [[task-id _ _ :as item] (.poll pqueue)]
+            (let [{:keys [task-id] :as item} (.poll pqueue)]
               (if-not item
                 ret
                 (let [ret       (conj ret item)
@@ -209,14 +217,14 @@
                 (conj ret item)
                 ret)]
       (while (not (.isEmpty pqueue))
-        (let [[task-id _ _ :as item] (.poll pqueue)
-              ^PriorityQueue q       (get task-queues task-id)]
+        (let [{:keys [task-id] :as item} (.poll pqueue)
+              ^PriorityQueue q (get task-queues task-id)]
           (.add q item)))
       {:agent-invokes     ret
        :pagination-params (transform MAP-VALS
                                      (fn [^PriorityQueue q]
-                                       (if-let [[_ id _] (.poll q)]
-                                         id))
+                                       (if-let [{:keys [agent-id]} (.poll q)]
+                                         agent-id))
                                      task-queues)}
     )))
 
@@ -224,8 +232,18 @@
   [i]
   (if (= i 1) 3 (inc i)))
 
+(defn relevant-invoke-submap
+  [m]
+  (select-keys m
+               [:start-time-millis :finish-time-millis :invoke-args
+                :result :graph-version]))
+
 ;; returns map of form:
-;; {:agent-invokes [[task-id agent-id start-time-millis] ...]
+;; {:agent-invokes
+;;   [{:task-id ... :agent-id ... :start-time-millis ...
+;;     :finish-time-millis ... :invoke-args ... :result ...
+;;     :graph-version ...}
+;;    ...]
 ;;  :pagination-params {task-id end-id}}
 (defn declare-get-invokes-page-topology
   [topologies agent-name]
@@ -243,7 +261,7 @@
          [(sorted-map-range-to *end-id
                                {:inclusive? true
                                 :max-amt    (adjust-page-size *page-size)})
-          (transformed MAP-VALS :start-time-millis)]
+          (transformed MAP-VALS relevant-invoke-submap)]
          root-sym
          :> *task-page))
       (|origin)
@@ -260,3 +278,13 @@
     [:> *res]
     (|origin)
     (identity agent-names :> *res)))
+
+(defn declare-get-current-graph
+  [topologies agent-name]
+  (let [agent-graph-sym (symbol (po/agent-graph-task-global-name agent-name))]
+    (<<query-topology topologies
+      (agent-get-current-graph-name agent-name)
+      [:> *res]
+      (|origin)
+      (graph/graph->historical-graph-info agent-graph-sym :> *res)
+    )))

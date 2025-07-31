@@ -72,7 +72,8 @@
             (aor-types/->NestedOpInfo
              start-time
              finish-time
-             {"type"   "store-write"
+             :store-write
+             {"name"   (:pstate-name store-params)
               "op"     op
               "params" params}
             ))))
@@ -99,7 +100,8 @@
      (aor-types/->valid-NestedOpInfo
       start-time
       finish-time
-      {"type"   "store-query"
+      :store-read
+      {"name"   (:pstate-name store-params)
        "op"     op
        "params" params
        "result" res}
