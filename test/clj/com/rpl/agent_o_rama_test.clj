@@ -19,6 +19,7 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
+   [com.rpl.test-common :as tc]
    [loom.attr :as lattr]
    [loom.graph :as lgraph]
    [meander.epsilon :as m])
@@ -2570,6 +2571,7 @@
               (swap! res-atom conj
                 [all-chunks new-chunks reset-invoke-ids complete?])
             )))
+         (is (every? #(= 0 %) (vals (aor/agent-stream-reset-info as))))
          (is (= 14 @closes-atom))
          (is (= 1 (count @res-atom)))
          (bind res (first @res-atom))
@@ -2648,17 +2650,118 @@
        (is (every? #(= % [false false]) (butlast metas)))
        (bind as (aor/agent-stream foo inv "node1"))
        (is (= @as [1 2 3]))
+       (is (= 0 (aor/agent-stream-reset-info as)))
       ))))
 
-(deftest aegnt-stream-specific-test
-         ;; TODO: <<<<>>>>
-         ;;  - have a node invoke multiple times, freeze on different sems each
-         ;;  time
-         ;;  - get node invoke ID from trace and specific input
-         ;;  - unblock both sems, verify result
-         ;;  - exercise agent-stream-reset-info here and in other tests
+(def NODE1)
 
-)
+(deftest agent-stream-specific-test
+  (with-redefs [SEM   (h/mk-semaphore 0)
+                SEM2  (h/mk-semaphore 0)
+                NODE1 (atom 0)]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (->
+            topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             "node1"
+             (fn [agent-node]
+               (aor/emit! agent-node "node1" 1)
+               (aor/emit! agent-node "node1" 2)
+             ))
+            (aor/node
+             "node1"
+             nil
+             (fn [agent-node i]
+               (swap! NODE1 inc)
+               (if (= i 1)
+                 (do
+                   (h/acquire-semaphore SEM 1)
+                   (aor/stream-chunk! agent-node 1)
+                   (aor/stream-chunk! agent-node 2)
+                   (aor/stream-chunk! agent-node 3)
+                   (aor/result! agent-node "done"))
+                 (do
+                   (h/acquire-semaphore SEM2 1)
+                   (aor/stream-chunk! agent-node 10)
+                   (aor/stream-chunk! agent-node 11)
+                   (aor/stream-chunk! agent-node 12))
+               ))))
+         ))
+       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (bind module-name (get-module-name module))
+
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind foo (aor/agent-client agent-manager "foo"))
+       (bind root-pstate
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "foo")))
+       (bind traces-query
+         (foreign-query ipc
+                        module-name
+                        (queries/tracing-query-name "foo")))
+
+       (bind inv (aor/agent-initiate foo))
+       (bind [agent-task-id agent-id] (tc/extract-invoke inv))
+       (is (condition-attained? (= 2 @NODE1)))
+       (bind root
+         (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                             root-pstate
+                             {:pkey agent-task-id}))
+
+       (bind trace
+         (foreign-invoke-query traces-query
+                               agent-task-id
+                               [[agent-task-id root]]
+                               10000))
+       (bind find-invoke-id
+         (fn [input]
+           (select-any [:invokes-map
+                        ALL
+                        (selected? LAST :input (pred= input))
+                        FIRST]
+                       trace)))
+
+       (bind node-inv1 (find-invoke-id [1]))
+       (bind node-inv2 (find-invoke-id [2]))
+
+       (h/release-semaphore SEM)
+       (h/release-semaphore SEM2)
+
+
+       (bind res-atom (atom []))
+       (bind as
+         (aor/agent-stream-specific
+          foo
+          inv
+          "node1"
+          node-inv2
+          (fn [all-chunks new-chunks reset? complete?]
+            (swap! res-atom conj
+              [all-chunks new-chunks reset? complete?])
+          )))
+       (is (condition-attained? (-> @res-atom
+                                    last
+                                    last)))
+       (is (= @as [10 11 12]))
+       (is (= 0 (aor/agent-stream-reset-info as)))
+
+       (bind as
+         (aor/agent-stream-specific
+          foo
+          inv
+          "node1"
+          node-inv1))
+       (is (condition-attained? (= @as [1 2 3])))
+
+       (is (= 0 (aor/agent-stream-reset-info as)))
+      ))))
 
 (deftest stream-close-test
   (with-redefs [SEM (h/mk-semaphore 0)]
