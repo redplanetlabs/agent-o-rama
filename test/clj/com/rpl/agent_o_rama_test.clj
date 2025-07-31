@@ -2758,10 +2758,8 @@
        (doseq [[_ _ reset? complete?] (butlast @res-atom)]
          (is (not reset?))
          (is (not complete?)))
-       (is (= [false true]
-              (-> @res-atom
-                  last
-                  (srange 2 4))))
+       (bind [_ _ reset? complete?] (last @res-atom))
+       (is (= [false true] [reset? complete?]))
        (is (= 0 (aor/agent-stream-reset-info as)))
 
        (bind as
