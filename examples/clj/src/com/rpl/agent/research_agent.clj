@@ -4,6 +4,7 @@
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.ui.core :as uic]
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.langchain4j.json :as lj]
    [com.rpl.rama.aggs :as aggs]

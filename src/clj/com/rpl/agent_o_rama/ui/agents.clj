@@ -55,7 +55,6 @@
                                 :as req}]
   (when-not (vector? args)
     (throw (ex-info "must be a json list of args" {:bad-args args})))
-  
   (let [^AgentInvoke inv (apply aor/agent-initiate (get-client module-id agent-name) args)]
     {:status 200
      :body
