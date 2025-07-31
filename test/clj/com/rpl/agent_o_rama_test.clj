@@ -2690,7 +2690,10 @@
                    (h/acquire-semaphore SEM2 1)
                    (aor/stream-chunk! agent-node 10)
                    (aor/stream-chunk! agent-node 11)
-                   (aor/stream-chunk! agent-node 12))
+                   (aor/stream-chunk! agent-node 12)
+                   (aor/stream-chunk! agent-node 13)
+                   (aor/stream-chunk! agent-node 14)
+                   (aor/stream-chunk! agent-node 15))
                ))))
          ))
        (rtest/launch-module! ipc module {:tasks 4 :threads 2})
@@ -2749,7 +2752,16 @@
        (is (condition-attained? (-> @res-atom
                                     last
                                     last)))
-       (is (= @as [10 11 12]))
+       (is (= @as [10 11 12 13 14 15]))
+       (is
+        (matching-ascending-seq? (mapv first @res-atom) [10 11 12 13 14 15] <=))
+       (doseq [[_ _ reset? complete?] (butlast @res-atom)]
+         (is (not reset?))
+         (is (not complete?)))
+       (is (= [false true]
+              (-> @res-atom
+                  last
+                  (srange 2 4))))
        (is (= 0 (aor/agent-stream-reset-info as)))
 
        (bind as
