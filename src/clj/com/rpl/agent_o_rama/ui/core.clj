@@ -50,7 +50,7 @@
                          (set (select [ATOM :aor-cache MAP-KEYS] ui/system))
                          modules)]
       (doseq [mod stale-modules]
-        (transform [ATOM :aor-cache (keypath mod) :client MAP-VALS] close! ui/system)
+        (transform [ATOM :aor-cache (keypath mod) :clients MAP-VALS] close! ui/system)
         (setval [ATOM :aor-cache (keypath mod)] NONE ui/system)))))
 
 (defn start [ipc]
@@ -72,6 +72,8 @@
    TimeUnit/SECONDS))
 
 (defn stop []
+  (transform [ATOM :aor-cache MAP-VALS :clients MAP-VALS] close! ui/system)
+  (setval [ATOM :aor-cache MAP-VALS :clients MAP-VALS] NONE ui/system)
   (.stop ^org.eclipse.jetty.server.Server (:jetty @ui/system))
   (close! (:rama-client @ui/system))
   (.shutdownNow ^ScheduledThreadPoolExecutor (:background-exec @ui/system)))
@@ -80,7 +82,7 @@
   (start ipc)
   (reify java.io.Closeable
     (close [this]
-      (println "press enter to close the ui")
+      (println "press enter to close the ui, default port is 1974")
       (read-line)
       (stop)
       :closed)))
