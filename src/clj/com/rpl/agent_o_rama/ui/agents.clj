@@ -46,10 +46,7 @@
    
    :body
    {:graph
-    (second (first (foreign-select [LAST]
-                                   (:graph-history-pstate
-                                    (objects module-id agent-name))
-                                   {:pkey 0})))}})
+    (foreign-invoke-query (:current-graph-query (objects module-id agent-name)))}})
 
 (defn manually-trigger-invoke [{{:keys [module-id agent-name]} :path-params
                                 {:keys [args]} :body-params
