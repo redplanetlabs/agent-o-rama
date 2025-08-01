@@ -17,8 +17,15 @@
         (common/use-query {:query-key ["agents"]
                            :query-url "/api/agents"})]
     (cond
-      loading? ($ :div "loading...")
-      (not data) ($ :div "no data")
+      ;; Still loading initial data
+      loading? ($ :div.flex.justify-center.items-center.py-8
+                     ($ :div.text-gray-500 "Loading agents..."))
+      ;; Request errored or returned nil
+      (not data) ($ :div.flex.justify-center.items-center.py-8
+                    ($ :div.text-gray-500 "Unable to retrieve agents"))
+      ;; No agents returned from the API
+      (empty? data) ($ :div.flex.justify-center.items-center.py-8
+                      ($ :div.text-gray-500 "No agents found"))
       :else ($ :div.p-4
               (for [agent data
                     :let [url (str "/agents/" (:module-id agent) "/" (:agent-name agent))]]
