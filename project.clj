@@ -1,5 +1,5 @@
 (defproject com.rpl/agent-o-rama "0.9.0-SNAPSHOT"
-  :source-paths ["src/clj" "src/cljs"]
+  :source-paths ["src/clj" "src/cljs" "resource"]
   :java-source-paths ["src/java" "test/java"]
   :test-paths ["test/clj"]
   :jvm-opts ["-Xss6m"]

@@ -2,4 +2,5 @@
  :builds
  {:frontend
   {:target :browser
-   :modules {:main {:init-fn com.rpl.agent-o-rama.ui/init}}}}}
+   :modules {:main {:init-fn com.rpl.agent-o-rama.ui/init}}
+   :output-dir "resource/"}}}
