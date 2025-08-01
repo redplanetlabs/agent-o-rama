@@ -109,6 +109,11 @@
   [{{:keys [module-id agent-name invoke-id]} :path-params
     {:strs [paginate-task-id missing-node-id]} :query-params
     :as req}]
+  (def module-id module-id)
+  (def agent-name agent-name)
+  (def invoke-id invoke-id)
+  (def paginate-task-id paginate-task-id)
+  (def missing-node-id missing-node-id)
 
   {:status 200
    :body

@@ -43,6 +43,7 @@
                         {:conflicts nil}))))
 
 (defn exception-handler [^Exception e request]
+  (def e e)
   (let [sw (java.io.StringWriter.)
         pw (java.io.PrintWriter. sw)]
     (.printStackTrace e pw)
@@ -73,9 +74,9 @@
                                   [:missing-node-id {:optional true} string?]]}
              :handler #'agents/invoke-paginated}}]]
     {:data {:muuntaja m/instance
-            :middleware [parameters/parameters-middleware
+            :middleware [exception-middleware
+                         parameters/parameters-middleware
                          muuntaja/format-middleware
-                         exception-middleware
                          rrc/coerce-exceptions-middleware
                          rrc/coerce-request-middleware
                          rrc/coerce-response-middleware]
