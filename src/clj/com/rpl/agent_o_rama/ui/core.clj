@@ -7,9 +7,7 @@
    [com.rpl.agent-o-rama.ui.server :as srv]
    [com.rpl.agent-o-rama.ui :as ui]
    [clojure.tools.logging :as cljlogging]
-   [ring.adapter.jetty :as jetty]
-   [shadow.cljs.devtools.api :as shadow]
-   [shadow.cljs.devtools.server])
+   [ring.adapter.jetty :as jetty])
   (:import
    [java.util.concurrent ScheduledThreadPoolExecutor TimeUnit]))
 
@@ -54,8 +52,6 @@
         (setval [ATOM :aor-cache (keypath mod)] NONE ui/system)))))
 
 (defn start [ipc]
-  (shadow.cljs.devtools.server/start!)
-  (shadow/watch :frontend)
   (swap! ui/system assoc :jetty (jetty/run-jetty #'srv/handler
                                                  {:port 1974 ;; TODO make configurable
                                                   :join? false}))
@@ -87,7 +83,14 @@
       (stop)
       :closed)))
 
+(defn start-repl [ipc]
+  #_(shadow.cljs.devtools.server/start!)
+  #_(shadow/watch :frontend)
+  (start ipc))
+
 (comment
-  (start (open-cluster-manager-internal {"conductor.host" "localhost"}))
+  
+  ;; TODO move to new lein profile, move to dev.clj or user.clj file
+  (start-repl (open-cluster-manager-internal {"conductor.host" "localhost"}))
   (stop))
 

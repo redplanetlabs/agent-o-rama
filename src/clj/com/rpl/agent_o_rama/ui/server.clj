@@ -22,8 +22,18 @@
       (resp/content-type "text/html")))
 
 (def default-handler (ring/routes
-                      (ring/create-file-handler {:path ""
-                                                 :root "public"})
+                      (->
+                       
+                       ;; for serving shadow/watch dev files
+                       (ring/create-file-handler
+                        {:path ""
+                         :root "public"}) ; /public
+                       
+                       ;; TODO make it so we only have one of these
+                       
+                       ;; for serving files out of the jar when used as library
+                       (resource/wrap-resource "public") ; /resources/public
+                       )
                       (ring/ring-handler
                        (ring/router
                         [""
