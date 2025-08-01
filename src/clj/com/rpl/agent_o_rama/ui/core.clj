@@ -14,6 +14,7 @@
 (defn refresh-agent-modules! []
   (let [rama-client (ui/get-object :rama-client)
         modules (deployed-module-names rama-client)]
+    (when (empty? modules) (setval [ATOM :aor-cache] {} ui/system))
     (doseq [mod modules]
       (let [manager (try
                       (aor/agent-manager rama-client mod)
@@ -82,15 +83,4 @@
       (read-line)
       (stop)
       :closed)))
-
-(defn start-repl [ipc]
-  #_(shadow.cljs.devtools.server/start!)
-  #_(shadow/watch :frontend)
-  (start ipc))
-
-(comment
-  
-  ;; TODO move to new lein profile, move to dev.clj or user.clj file
-  (start-repl (open-cluster-manager-internal {"conductor.host" "localhost"}))
-  (stop))
 

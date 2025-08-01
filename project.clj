@@ -10,14 +10,9 @@
                   [org.slf4j/slf4j-api]]
                  
                  ;; ui dependencies
-                 [thheller/shadow-cljs "3.1.7"]
-                 [net.java.dev.jna/jna "5.17.0"] ;; to fix dynlink error on arm macs
                  [ring/ring-core "1.9.5"]
                  [ring/ring-jetty-adapter "1.8.2"]
                  [ring/ring-codec "1.2.0"]
-                 [com.rpl/specter "1.1.4"] ;; only cljs
-                 [com.pitch/uix.core "1.4.3"]
-                 [com.pitch/uix.dom "1.4.3"]
                  [metosin/reitit "0.7.2"]]
   :global-vars {*warn-on-reflection* true}
   :repositories
@@ -36,5 +31,13 @@
              :gen {:prep-tasks   []
                    :source-paths ["scripts"]
                    :dependencies [[comb "0.1.1"]
-                                  [org.clojure/clojure "1.12.0"]]}}
+                                  [org.clojure/clojure "1.12.0"]]}
+             :ui {:dependencies [
+                                 [com.rpl/specter "1.1.4"] ;; only cljs
+                                 [com.pitch/uix.core "1.4.3"]
+                                 [com.pitch/uix.dom "1.4.3"]
+                                 [thheller/shadow-cljs "3.1.7"]
+                                 [net.java.dev.jna/jna "5.17.0"] ;; to fix dynlink error on arm macs
+                                 [org.clojure/clojure "1.12.0"] 
+                                 ]}}
   :plugins [[lein-exec "0.3.7"]])

@@ -1,2 +1,2 @@
-npx shadow-cljs release frontend
+npx shadow-cljs compile frontend
 lein install

@@ -5,5 +5,4 @@
 (defn get-object [k]
   (if-let [v (get @system k)]
     v
-    (throw (ex-info "not found" {:key k :availible-keys (keys @system)}))))
-
+    (throw (ex-info "not found or nil" {:key k :availible-keys (keys @system)}))))
