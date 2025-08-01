@@ -4,7 +4,9 @@
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.types :as aort]
-   [com.rpl.agent-o-rama.ui :as ui])
+   [com.rpl.agent-o-rama.ui :as ui]
+   [clojure.walk :as walk]
+   [muuntaja.core :as m])
   (:import
    [com.rpl.agentorama AgentInvoke]))
 
@@ -105,6 +107,20 @@
   (let [[task-id agent-id] (clojure.string/split s #"-")]
     [(parse-long task-id) (parse-long agent-id)]))
 
+(def m (m/create))
+(def encoder (m/encoder m "application/transit+json"))
+
+(defn filter-encodable
+  [data]
+  (walk/postwalk
+   (fn [x]
+     (try
+       (encoder x)
+       x
+       (catch Exception e
+         :not-encodable)))
+   data))
+
 (defn invoke-paginated 
   [{{:keys [module-id agent-name invoke-id]} :path-params
     {:strs [paginate-task-id missing-node-id]} :query-params
@@ -129,12 +145,13 @@
            [agent-task-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
                                               (:root-pstate (objects module-id agent-name))
                                               {:pkey agent-task-id})])]
-     (transform [:invokes-map]
-                remove-implicit-nodes
-                (foreign-invoke-query (:tracing-query (objects module-id agent-name))
-                                      agent-task-id
-                                      [pair]
-                                      10)))})
+     (->> (foreign-invoke-query (:tracing-query (objects module-id agent-name))
+                                agent-task-id
+                                [pair]
+                                100)
+          (transform [:invokes-map] remove-implicit-nodes)
+          filter-encodable))})
+
 
 (defn fork [{{:keys [module-id agent-name]} :path-params
              {:keys [changed-nodes invoke-id]} :body-params}]
