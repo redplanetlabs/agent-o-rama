@@ -29,7 +29,7 @@
   [(vec partitioner+args)
    [filter-valid-retry-num> agent-name agent-task-id agent-id retry-num]])
 
-(defdepotpartitioner agent-streaming-depot-partitioner
+(defdepotpartitioner agent-task-id-depot-partitioner
   [{:keys [agent-task-id]} num-partitions]
   agent-task-id)
 

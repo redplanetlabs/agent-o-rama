@@ -755,6 +755,12 @@
     $$streaming)
   ))
 
+(deframaop handle-streaming
+  [*agent-name *data]
+  ;; TODO: <<<<>>>>
+  ;;  - two cases: new request, and answer to a request
+)
+
 (deframaop handle-config
   [*agent-name {:keys [*key *val]}]
   (<<with-substitutions

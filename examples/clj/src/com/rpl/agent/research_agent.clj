@@ -419,7 +419,8 @@ Here are the sections to reflect on for writing: %s")
              (merge {:max-analysts 4 :max-turns 2} options)
              ;; - JSON schemas not supported by streaming model, so have to use
              ;; non-streaming here
-             openai (aor/get-agent-object agent-node "openai-non-streaming")
+             openai (aor/get-agent-object agent-node
+                                          "openai-non-streaming")
              res    (-> openai
                         (chat-and-get-text
                          (lc4j/chat-request

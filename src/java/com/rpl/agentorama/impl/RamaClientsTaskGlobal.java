@@ -17,6 +17,10 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
     return "*_agent-streaming-depot-" + agentName;
   }
 
+  public static String agentHumanDepotName(String agentName) {
+    return "*_agent-human-depot-" + agentName;
+  }
+
   public static String AGENT_PSTATE_WRITE_DEPOT = "*_agent-pstate-write";
 
   private static class ClientInfo implements Closeable {
@@ -24,15 +28,17 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
     public Map<List, PState> mirrorClients;
     public Map<String, Depot> agentDepots;
     public Map<String, Depot> streamingDepots;
+    public Map<String, Depot> humanDepots;
     public ConcurrentHashMap<String, PState> localPStates;
     public Depot pstateWritesDepot;
     ClusterManagerBase manager;
 
-    public ClientInfo(String moduleName, Map mirrorClients, Map agentDepots, Map streamingDepots, Depot pstateWritesDepot, ClusterManagerBase manager) {
+    public ClientInfo(String moduleName, Map mirrorClients, Map agentDepots, Map streamingDepots, Map humanDepots, Depot pstateWritesDepot, ClusterManagerBase manager) {
       this.moduleName = moduleName;
       this.mirrorClients = mirrorClients;
       this.agentDepots = agentDepots;
       this.streamingDepots = streamingDepots;
+      this.humanDepots = humanDepots;
       this.pstateWritesDepot = pstateWritesDepot;
       this.localPStates = new ConcurrentHashMap();
       this.manager = manager;
@@ -85,6 +91,10 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
     return _clientInfo.getResource().streamingDepots.get(agentName);
   }
 
+  public Depot getAgentHumanDepot(String agentName) {
+    return _clientInfo.getResource().humanDepots.get(agentName);
+  }
+
   public PState getLocalPState(String pstateName) {
     return _clientInfo.getResource().getLocalPState(pstateName);
   }
@@ -108,6 +118,10 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
                       for(String name: _agentNames) {
                         streamingDepots.put(name, manager.clusterDepot(moduleName, agentStreamingDepotName(name)));
                       }
+                      Map humanDepots = new HashMap();
+                      for(String name: _agentNames) {
+                        humanDepots.put(name, manager.clusterDepot(moduleName, agentHumanDepotName(name)));
+                      }
                       Map clients = new HashMap();
                       for(List<String> tuple: _mirrorTuples) {
                         String mm = tuple.get(0);
@@ -119,6 +133,7 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
                                clients,
                                agentDepots,
                                streamingDepots,
+                               humanDepots,
                                manager.clusterDepot(moduleName, AGENT_PSTATE_WRITE_DEPOT),
                                manager);
                     });

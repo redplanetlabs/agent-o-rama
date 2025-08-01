@@ -32,12 +32,17 @@
   (let [agent-depot-sym           (symbol (po/agent-depot-name agent-name))
         agent-streaming-depot-sym (symbol (po/agent-streaming-depot-name
                                            agent-name))
+        agent-human-depot-sym     (symbol (po/agent-human-depot-name
+                                           agent-name))
         agent-config-depot-sym    (symbol (po/agent-config-depot-name
                                            agent-name))]
     (declare-depot* setup agent-depot-sym apart/agent-depot-partitioner)
     (declare-depot* setup
                     agent-streaming-depot-sym
-                    apart/agent-streaming-depot-partitioner)
+                    apart/agent-task-id-depot-partitioner)
+    (declare-depot* setup
+                    agent-human-depot-sym
+                    apart/agent-task-id-depot-partitioner)
     (declare-depot* setup
                     agent-config-depot-sym
                     :random
@@ -102,6 +107,7 @@
     (doseq [d [(symbol (po/agent-failures-depot-name agent-name))
                agent-config-depot-sym
                agent-streaming-depot-sym
+               agent-human-depot-sym
                agent-depot-sym]]
       (set-launch-depot-dynamic-option!* setup
                                          d
@@ -130,6 +136,9 @@
 
      (source> agent-streaming-depot-sym {:retry-mode :all-after} :> *data)
       (at/handle-streaming agent-name *data)
+
+     (source> agent-human-depot-sym :> *data)
+      (at/handle-human agent-name *data)
 
       ;; TODO: add case here for GC
       ;; - each iteration delete node and write to PState the next ones to

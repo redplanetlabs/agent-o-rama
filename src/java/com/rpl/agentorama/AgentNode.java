@@ -10,4 +10,5 @@ public interface AgentNode extends IFetchAgentObject {
   <T extends Store> T getStore(String name);
   void streamChunk(Object chunk);
   void recordNestedOp(NestedOpType nestedOpType, long startTimeMillis, long finishTimeMillis, Map<String, Object> info);
+  String getHumanInput(String prompt);
 }

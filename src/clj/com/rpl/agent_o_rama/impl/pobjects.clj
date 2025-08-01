@@ -42,6 +42,10 @@
   [name]
   (RamaClientsTaskGlobal/agentStreamingDepotName name))
 
+(defn agent-human-depot-name
+  [name]
+  (RamaClientsTaskGlobal/agentHumanDepotName name))
+
 (defn agent-config-depot-name
   [name]
   (str "*_agent-config-depot-" name))

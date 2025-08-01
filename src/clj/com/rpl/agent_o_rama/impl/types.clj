@@ -165,6 +165,21 @@
    index :- Long
    chunk :- Object])
 
+(drp/defrecord+ HumanInputRequest
+  [agent-task-id :- Long
+   agent-id :- Long
+   node :- String
+   invoke-id :- Long
+   prompt :- String
+   uuid :- String])
+
+(drp/defrecord+ HumanInput
+  [agent-task-id :- Long
+   agent-id :- Long
+   invoke-id :- Long
+   uuid :- Long
+   response :- String])
+
 (drp/defrecord+ NodeOp
   [invoke-id :- Long
    fork-invoke-id :- (s/maybe Long)
