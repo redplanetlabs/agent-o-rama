@@ -1157,7 +1157,10 @@
             (aor/agent-result car inv)
             (is false)
             (catch java.util.concurrent.ExecutionException e
-              (is (= "Retry dropped {}" (ex-message (.getCause e))))
+              (is
+               (=
+                "Retry dropped (last failure: clojure.lang.ExceptionInfo: Intentional {})"
+                (ex-message (.getCause e))))
             ))
           (is (= {"begin" 1 "node1" 1} @tc/RAN-NODES-ATOM))
           (check-active! 0)
