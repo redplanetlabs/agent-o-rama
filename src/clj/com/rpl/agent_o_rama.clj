@@ -418,9 +418,9 @@
              )))
 
 
-          (nextStep [this invoke]
-            (.get (.nextStepAsync this invoke)))
-          (nextStepAsync [this invoke]
+          (nextStep [this agent-invoke]
+            (.get (.nextStepAsync this agent-invoke)))
+          (nextStepAsync [this agent-invoke]
             (i/client-wait-for-result
              root-pstate
              agent-invoke
@@ -430,7 +430,7 @@
                  (fn [^CompletableFuture cf]
                    (if (:failure? result)
                      (.completeExceptionally
-                      ret
+                      cf
                       (i/mk-failure-exception result exceptions))
                      (.complete
                       cf
@@ -451,7 +451,7 @@
                  (fn [^CompletableFuture cf]
                    (if (:failure? result)
                      (.completeExceptionally
-                      ret
+                      cf
                       (i/mk-failure-exception result exceptions))
                      (.complete cf (:val result))))
                ))))
