@@ -609,7 +609,8 @@
                      (aor-types/->valid-NodeFailure
                       task-id
                       invoke-id
-                      retry-num)
+                      retry-num
+                      (h/throwable->str t))
                      :append-ack)
                     (throw t))
                   (finally
@@ -702,16 +703,25 @@
     (afn)
     (catch Throwable t
       (log-node-error t "Error invoking function" {:info info})
-      ::error)))
+      {::error t})))
 
 (defn hook:appended-agent-failure [agent-task-id agent-id retry-num])
 
 (deframaop invoke-on-task-thread
   [*agent-name *agent-task-id *agent-id *retry-num *afn *info]
   (<<with-substitutions
-   [*failure-depot (po/agent-failures-depot-task-global *agent-name)]
+   [$$root (po/agent-root-task-global *agent-name)
+    *failure-depot (po/agent-failures-depot-task-global *agent-name)]
    (invoke-or-error *afn *info :> *res)
-   (<<if (= *res ::error)
+   (<<if (and> (map? *res) (contains? *res ::error))
+     (h/throwable->str (get *res ::error) :> *s)
+     (|direct *agent-task-id)
+     (local-transform>
+      [(must *agent-id)
+       :exceptions
+       AFTER-ELEM
+       (termval *s)]
+      $$root)
      (depot-partition-append!
       *failure-depot
       (aor-types/->valid-AgentFailure *agent-task-id *agent-id *retry-num)

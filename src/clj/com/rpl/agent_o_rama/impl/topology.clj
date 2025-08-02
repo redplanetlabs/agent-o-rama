@@ -377,7 +377,7 @@
    (:> *agent-task-id *fork-agent-id *retry-num *op)))
 
 (deframaop intake-node-failure
-  [*agent-name {:keys [*invoke-id *retry-num]}]
+  [*agent-name {:keys [*invoke-id *retry-num *throwable-str]}]
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)
     *failure-depot (po/agent-failures-depot-task-global *agent-name)]
@@ -389,6 +389,13 @@
                                   *agent-task-id
                                   *agent-id
                                   *retry-num)
+   (|direct *agent-task-id)
+   (local-transform>
+    [(must *agent-id)
+     :exceptions
+     AFTER-ELEM
+     (termval *throwable-str)]
+    $$root)
    (depot-partition-append!
     *failure-depot
     (aor-types/->valid-AgentFailure *agent-task-id

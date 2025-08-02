@@ -14,6 +14,7 @@
    [com.rpl.rama.ops :as ops])
   (:import
    [com.rpl.agentorama
+    AgentFailedException
     AgentObjectOptions$Impl]
    [com.rpl.agentorama.impl
     RamaClientsTaskGlobal
@@ -238,3 +239,18 @@
             {:thread-safe?        (.threadSafe options)
              :auto-tracing?       (.autoTracing options)
              :worker-object-limit (.workerObjectLimit options)})))
+
+(defn mk-failure-exception
+  [result exceptions]
+  (let [s (-> result
+              :val
+              str)
+        s (if (empty? exceptions)
+            s
+            (str s
+                 " (last failure: "
+                 (-> exceptions
+                     last
+                     h/first-line)
+                 ")"))]
+    (AgentFailedException. s)))

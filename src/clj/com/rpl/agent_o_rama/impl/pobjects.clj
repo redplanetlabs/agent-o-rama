@@ -82,6 +82,7 @@
      :invoke-args        [Object]
      :graph-version      Long
      :result             AgentResult
+     :exceptions         []
      :ack-val            Long
      :start-time-millis  Long
      :finish-time-millis Long

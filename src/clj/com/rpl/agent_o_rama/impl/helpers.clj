@@ -2,12 +2,16 @@
   (:refer-clojure :exclude [ex-info])
   (:use [com.rpl.rama.path])
   (:require
+   [clojure.string :as str]
    [com.rpl.rama.ops :as ops])
   (:import
    [com.rpl.agentorama.impl
     AORExceptionInfo]
    [com.rpl.rama.helpers
     TopologyUtils]
+   [java.io
+    PrintWriter
+    StringWriter]
    [java.util.concurrent
     Semaphore]
    [java.util.function
@@ -209,3 +213,13 @@
 (defn uuid-str
   []
   (str (java.util.UUID/randomUUID)))
+
+(defn throwable->str
+  [^Throwable t]
+  (let [sw (StringWriter.)]
+    (.printStackTrace t (PrintWriter. sw))
+    (.toString sw)))
+
+(defn first-line
+  [s]
+  (first (str/split s #"\n" 2)))

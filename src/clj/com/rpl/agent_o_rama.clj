@@ -426,30 +426,32 @@
                   proxy-atom    (atom nil)]
               (.thenApply
                (foreign-proxy-async
-                [(keypath agent-id) :result]
+                [(keypath agent-id) (submap [:result :exceptions])]
                 root-pstate
                 {:pkey        agent-task-id
-                 :callback-fn (fn [new-val _ _]
-                                (when (some? new-val)
-                                  (when-not (.isDone ret)
-                                    (if (:failure? new-val)
-                                      (.completeExceptionally
-                                       ret
-                                       (h/ex-info (:val new-val) {}))
-                                      (.complete ret (:val new-val))))
-                                  (locking proxy-atom
-                                    (cond
-                                      (nil? @proxy-atom)
-                                      (reset! proxy-atom ::close)
+                 :callback-fn
+                 (fn [m _ _]
+                   (let [new-val (:result m)]
+                     (when (some? new-val)
+                       (when-not (.isDone ret)
+                         (if (:failure? new-val)
+                           (.completeExceptionally
+                            ret
+                            (i/mk-failure-exception new-val (:exceptions m)))
+                           (.complete ret (:val new-val))))
+                       (locking proxy-atom
+                         (cond
+                           (nil? @proxy-atom)
+                           (reset! proxy-atom ::close)
 
-                                      (keyword? @proxy-atom) nil
+                           (keyword? @proxy-atom) nil
 
-                                      :else
-                                      (do
-                                        (close! @proxy-atom)
-                                        (reset! proxy-atom ::done)
-                                      )))
-                                ))
+                           :else
+                           (do
+                             (close! @proxy-atom)
+                             (reset! proxy-atom ::done)
+                           )))
+                     )))
                 })
                (h/cf-function [proxy-state]
                  (i/hook:agent-result-proxy proxy-state)
@@ -614,7 +616,13 @@
 
 
 ;; TODO: <<<<>>>>> need something else here, either in addition or replacement
-;;  - need something like agent-next-event
+;;  - need something like agent-next-step
+;;    AgentStep nextStep(AgentInvoke invoke)
+;;    - AgentStep can be HumanInputResult or AgentComplete
+;;    - remove AgentResult and replace with AgentSuccess (implementing AgentComplete) or AgentFailure
+;;      - AgentFailure results in exception with latest exception as cause or the stringified version in info
+;;        - this is confusing – maybe leave this for the UI
+;;          - or always just include the latest ex-message, without stack trace
 (defn agent-result
   [^AgentClient agent-client agent-invoke]
   (.result agent-client agent-invoke))

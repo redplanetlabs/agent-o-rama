@@ -124,6 +124,7 @@
   [task-id :- Long
    invoke-id :- Long
    retry-num :- Long
+   throwable-str :- String
   ])
 
 (drp/defrecord+ AgentFailure
