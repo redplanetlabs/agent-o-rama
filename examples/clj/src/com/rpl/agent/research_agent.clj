@@ -419,8 +419,7 @@ Here are the sections to reflect on for writing: %s")
              (merge {:max-analysts 4 :max-turns 2} options)
              ;; - JSON schemas not supported by streaming model, so have to use
              ;; non-streaming here
-             openai (aor/get-agent-object agent-node
-                                          "openai-non-streaming")
+             openai (aor/get-agent-object agent-node "openai-non-streaming")
              res    (-> openai
                         (chat-and-get-text
                          (lc4j/chat-request
@@ -613,7 +612,8 @@ Here are the sections to reflect on for writing: %s")
 
 (defn run-research-agent
   []
-  (with-open [ipc (rtest/create-ipc)]
+  (with-open [ipc (rtest/create-ipc)
+              ui  (aor/start-ui ipc)]
     (rtest/launch-module! ipc ResearchAgentModule {:tasks 4 :threads 2})
     (let [module-name   (get-module-name ResearchAgentModule)
           agent-manager (aor/agent-manager ipc module-name)
