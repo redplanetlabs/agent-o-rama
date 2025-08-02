@@ -11,7 +11,7 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
   ConcurrentHashMap<Long, List> _runningInvokeIds;
 
   public void submitTask(long invokeId, clojure.lang.AFn f) {
-    _runningInvokeIds.put(invokeId, null);
+    _runningInvokeIds.put(invokeId, Arrays.asList());
     Runnable wrappedTask = () -> {
       try {
         f.run();
@@ -43,7 +43,7 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
 
   public CompletableFuture getHumanFuture(long invokeId, String uuid) {
     List tuple = _runningInvokeIds.get(invokeId);
-    if(tuple!=null && tuple.get(0).equals(uuid)) {
+    if(tuple!=null && !tuple.isEmpty() && tuple.get(0).equals(uuid)) {
       return (CompletableFuture) tuple.get(1);
     } else return null;
   }
