@@ -379,7 +379,8 @@
 (deframaop intake-node-failure
   [*agent-name {:keys [*invoke-id *retry-num *throwable-str]}]
   (<<with-substitutions
-   [$$nodes (po/agent-node-task-global *agent-name)
+   [$$root (po/agent-root-task-global *agent-name)
+    $$nodes (po/agent-node-task-global *agent-name)
     *failure-depot (po/agent-failures-depot-task-global *agent-name)]
    (local-select> (keypath *invoke-id)
                   $$nodes
