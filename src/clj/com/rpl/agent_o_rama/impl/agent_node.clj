@@ -178,6 +178,10 @@
                                                      streaming-depot)
 
         declared-objects-tg   (po/agent-declared-objects-task-global)
+
+        ^AgentNodeExecutorTaskGlobal node-exec
+        (po/agent-node-executor-task-global)
+
         acquired-objects-atom (atom [])
        ]
     (reify
@@ -262,31 +266,21 @@
                 info)))
      (getHumanInput
        [this prompt]
-       ;; TODO: <<<<>>>>> use human-depot
-
-       ;; TODO: <<<<>>>>
-       ;;   - generate UUID
-       ;;   - make UUID -> CF in in-memory map on the task global
-       ;;   - that entry should be cleared if node has exception or
-       ;;   leader switch
-       ;;   - depot append to record in root PState
-       ;;      - record node-invoke-id, node name, prompt
-       ;;      - subindexed
-       ;;   - have another depot for human input that:
-       ;;      - delivers that CF, then removes it from the root
-       ;;  - this could be used forgetting user input at scale within an agent
-       ;;     - need to know also for the particular agent invoke that it's
-       ;;     waiting for human input
-       ;;     - would be nice to have agent-progress that waits for next event,
-       ;;     being human input or completion
-       ;;  - update agent invoke pagination topology to rturn boolean as to
-       ;;  whether it's waiting for human input
-       ;;    - tracing topology should include if a node is waiting for human
-       ;;    input
-       ;; TODO: <<<<>>>>
-       ;;  - need AgentClient methods to get pending human in the loop for an
-       ;;  invoke, and to provide human in the loop for an invoke ID
-     )
+       (let [uuid (h/uuid-str)
+             cf   (CompletableFuture.)]
+         (.putHumanFuture node-exec invoke-id uuid cf)
+         (foreign-append!
+          human-depot
+          (aor-types/->valid-NodeHumanInputRequest
+           agent-task-id
+           agent-id
+           curr-node
+           task-id
+           invoke-id
+           prompt
+           uuid)
+          :append-ack)
+         (.get cf)))
      AgentNodeInternal
      (get-streaming-recorder [this] streaming-recorder)
      (release-acquired-objects! [this]
@@ -297,7 +291,6 @@
         :result     @result-vol
         :nested-ops @nested-ops-vol
        }))))
-
 
 (defn submit-virtual-task!
   [invoke-id afn]

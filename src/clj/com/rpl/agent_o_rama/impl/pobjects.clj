@@ -13,6 +13,7 @@
     ForkContext
     NestedOpInfo
     HistoricalAgentGraphInfo
+    HumanInputRequest
     Node
     NodeAgg
     NodeAggStart
@@ -86,6 +87,7 @@
      :finish-time-millis Long
      :last-progress-time-millis Long
      :retry-num          Long
+     :human-requests     (set-schema NodeHumanInputRequest {:subindex? true})
      :fork-of            (fixed-keys-schema
                           {:parent-agent-id Long
                            :fork-context    ForkContext})

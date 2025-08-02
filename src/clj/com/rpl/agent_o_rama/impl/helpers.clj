@@ -205,3 +205,7 @@
   (setval [MAP-VALS #(or (nil? %) (and (coll? %) (empty? %)))]
           NONE
           m))
+
+(defn uuid-str
+  []
+  (str (java.util.UUID/randomUUID)))

@@ -755,11 +755,36 @@
     $$streaming)
   ))
 
-(deframaop handle-streaming
+(defn- complete-human-future!
+  [^AgentNodeExecutorTaskGlobal node-exec invoke-id uuid response]
+  (if-let [cf (.getHumanFuture node-exec invoke-id uuid)]
+    (.complete cf response)))
+
+(deframaop handle-human
   [*agent-name *data]
-  ;; TODO: <<<<>>>>
-  ;;  - two cases: new request, and answer to a request
-)
+  (<<with-substitutions
+   [$$root (po/agent-root-task-global *agent-name)
+    *node-exec (po/agent-node-executor-task-global)]
+   (<<subsource *data
+    (case> NodeHumanInputRequest :> {:keys [*agent-id]})
+     (local-transform> [(must *agent-id)
+                        :human-requests
+                        NONE-ELEM
+                        (termval *data)]
+                       $$root)
+
+    (case> HumanInput
+           :> {:keys [*request *response]})
+     (identity *request :> {:keys [*agent-id *node-task-id *invoke-id *uuid]})
+     (complete-human-future! *node-exec *invoke-id *uuid *response)
+     (get *request :agent-task-id :> *agent-task-id)
+     (|hash *agent-task-id)
+     (local-transform> [(must *agent-id)
+                        :human-requests
+                        (set-elem *request)
+                        NONE>]
+                       $$root)
+   )))
 
 (deframaop handle-config
   [*agent-name {:keys [*key *val]}]

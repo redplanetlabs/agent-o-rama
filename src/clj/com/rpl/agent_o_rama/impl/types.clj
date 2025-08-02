@@ -7,6 +7,8 @@
    [com.rpl.ramaspecter.defrecord-plus :as drp]
    [rpl.schema.core :as s])
   (:import
+   [com.rpl.agentorama
+    HumanInputRequest]
    [com.rpl.agentorama.impl
     NippyMap]
    [com.rpl.rama.integration
@@ -165,19 +167,21 @@
    index :- Long
    chunk :- Object])
 
-(drp/defrecord+ HumanInputRequest
+(drp/defrecord+ NodeHumanInputRequest
   [agent-task-id :- Long
    agent-id :- Long
    node :- String
+   node-task-id :- Long
    invoke-id :- Long
    prompt :- String
-   uuid :- String])
+   uuid :- String]
+  HumanInputRequest
+  (getNode [this] node)
+  (getNodeInvokeId [this] invoke-id)
+  (getPrompt [this] prompt))
 
 (drp/defrecord+ HumanInput
-  [agent-task-id :- Long
-   agent-id :- Long
-   invoke-id :- Long
-   uuid :- Long
+  [request :- NodeHumanInputRequest
    response :- String])
 
 (drp/defrecord+ NodeOp

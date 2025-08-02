@@ -42,7 +42,7 @@
                     apart/agent-task-id-depot-partitioner)
     (declare-depot* setup
                     agent-human-depot-sym
-                    apart/agent-task-id-depot-partitioner)
+                    apart/human-depot-partitioner)
     (declare-depot* setup
                     agent-config-depot-sym
                     :random

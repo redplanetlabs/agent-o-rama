@@ -8,10 +8,10 @@ import com.rpl.rama.integration.*;
 
 public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
   WorkerManagedResource<ExecutorService> _execServResource;
-  ConcurrentHashMap<Long, Object> _runningInvokeIds;
+  ConcurrentHashMap<Long, List> _runningInvokeIds;
 
   public void submitTask(long invokeId, clojure.lang.AFn f) {
-    _runningInvokeIds.put(invokeId, true);
+    _runningInvokeIds.put(invokeId, null);
     Runnable wrappedTask = () -> {
       try {
         f.run();
@@ -35,6 +35,17 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
 
   public void removeTrackedInvokeId(long invokeId) {
     _runningInvokeIds.remove(invokeId);
+  }
+
+  public void putHumanFuture(long invokeId, String uuid, CompletableFuture cf) {
+    _runningInvokeIds.put(invokeId, Arrays.asList(uuid, cf));
+  }
+
+  public CompletableFuture getHumanFuture(long invokeId, String uuid) {
+    List tuple = _runningInvokeIds.get(invokeId);
+    if(tuple!=null && tuple.get(0).equals(uuid)) {
+      return (CompletableFuture) tuple.get(1);
+    } else return null;
   }
 
   @Override
