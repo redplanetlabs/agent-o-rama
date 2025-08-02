@@ -1,5 +1,5 @@
 package com.rpl.agentorama;
 
-public interface AgentComplete<T> {
+public interface AgentComplete<T> extends AgentStep {
   T getResult();
 }

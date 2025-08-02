@@ -15,6 +15,7 @@
   (:import
    [com.rpl.agentorama
     AgentFailedException
+    AgentInvoke
     AgentObjectOptions$Impl]
    [com.rpl.agentorama.impl
     RamaClientsTaskGlobal
@@ -22,10 +23,11 @@
     AgentNodeExecutorTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     AggAckOp
-    NodeOp]))
+    NodeOp]
+   [java.util.concurrent
+    CompletableFuture]))
 
 ;; for agent-o-rama namespace
-(defn hook:agent-result-proxy [proxy])
 (defn hook:building-plain-agent-object [name o])
 
 (defn- define-agent!
@@ -254,3 +256,51 @@
                      h/first-line)
                  ")"))]
     (AgentFailedException. s)))
+
+(defn hook:agent-result-proxy [proxy])
+
+(defn client-wait-for-result
+  [root-pstate ^AgentInvoke agent-invoke handle-fn]
+  (let [agent-task-id (.getTaskId agent-invoke)
+        agent-id      (.getAgentInvokeId agent-invoke)
+        ret           (CompletableFuture.)
+        proxy-atom    (atom nil)]
+    (.thenApply
+     (foreign-proxy-async
+      [(keypath agent-id)
+       (submap [:result :exceptions :human-requests])
+       (transformed :human-requests first)
+       (multi-transformed [(map-key :human-requests) (termval :human-request)])]
+      root-pstate
+      {:pkey        agent-task-id
+       :callback-fn
+       (fn [m _ _]
+         (let [done-fn (handle-fn m)]
+           (when (some? done-fn)
+             (when-not (.isDone ret)
+               (done-fn ret))
+             (locking proxy-atom
+               (cond
+                 (nil? @proxy-atom)
+                 (reset! proxy-atom ::close)
+
+                 (keyword? @proxy-atom) nil
+
+                 :else
+                 (do
+                   (close! @proxy-atom)
+                   (reset! proxy-atom ::done)
+                 )))
+           )))
+      })
+     (h/cf-function [proxy-state]
+       (hook:agent-result-proxy proxy-state)
+       (locking proxy-atom
+         (if (= ::close @proxy-atom)
+           (do
+             (close! proxy-state)
+             (reset! proxy-atom ::done))
+           (reset! proxy-atom proxy-state))
+       )))
+    ret
+  ))

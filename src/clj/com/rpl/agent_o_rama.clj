@@ -417,54 +417,44 @@
                (AgentInvoke. agent-task-id agent-id)
              )))
 
+
+          (nextStep [this invoke]
+            (.get (.nextStepAsync this invoke)))
+          (nextStepAsync [this invoke]
+            (i/client-wait-for-result
+             root-pstate
+             agent-invoke
+             (fn [{:keys [result human-request exceptions]}]
+               (cond
+                 result
+                 (fn [^CompletableFuture cf]
+                   (if (:failure? result)
+                     (.completeExceptionally
+                      ret
+                      (i/mk-failure-exception result exceptions))
+                     (.complete
+                      cf
+                      (aor-types/->AgentCompleteImpl (:val result)))))
+
+                 human-request
+                 (fn [^CompletableFuture cf]
+                   (.complete cf human-request))
+               ))))
           (result [this agent-invoke]
             (.get (.resultAsync this agent-invoke)))
           (resultAsync [this agent-invoke]
-            (let [agent-task-id (.getTaskId ^AgentInvoke agent-invoke)
-                  agent-id      (.getAgentInvokeId ^AgentInvoke agent-invoke)
-                  ret           (CompletableFuture.)
-                  proxy-atom    (atom nil)]
-              (.thenApply
-               (foreign-proxy-async
-                [(keypath agent-id) (submap [:result :exceptions])]
-                root-pstate
-                {:pkey        agent-task-id
-                 :callback-fn
-                 (fn [m _ _]
-                   (let [new-val (:result m)]
-                     (when (some? new-val)
-                       (when-not (.isDone ret)
-                         (if (:failure? new-val)
-                           (.completeExceptionally
-                            ret
-                            (i/mk-failure-exception new-val (:exceptions m)))
-                           (.complete ret (:val new-val))))
-                       (locking proxy-atom
-                         (cond
-                           (nil? @proxy-atom)
-                           (reset! proxy-atom ::close)
-
-                           (keyword? @proxy-atom) nil
-
-                           :else
-                           (do
-                             (close! @proxy-atom)
-                             (reset! proxy-atom ::done)
-                           )))
-                     )))
-                })
-               (h/cf-function [proxy-state]
-                 (i/hook:agent-result-proxy proxy-state)
-                 (locking proxy-atom
-                   (if (= ::close @proxy-atom)
-                     (do
-                       (close! proxy-state)
-                       (reset! proxy-atom ::done))
-                     (reset! proxy-atom proxy-state))
-                 ))
-              )
-              ret
-            ))
+            (i/client-wait-for-result
+             root-pstate
+             agent-invoke
+             (fn [{:keys [result exceptions]}]
+               (when result
+                 (fn [^CompletableFuture cf]
+                   (if (:failure? result)
+                     (.completeExceptionally
+                      ret
+                      (i/mk-failure-exception result exceptions))
+                     (.complete cf (:val result))))
+               ))))
           (stream [this agent-invoke node]
             (.stream this agent-invoke node nil))
           (stream [this agent-invoke node stream-callback]
@@ -614,15 +604,14 @@
   [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
   (.initiateForkAsync agent-client invoke node-invoke-id->new-args))
 
+(defn agent-next-step
+  [^AgentClient client agent-invoke]
+  (.nextStep client agent-invoke))
 
-;; TODO: <<<<>>>>> need something else here, either in addition or replacement
-;;  - need something like agent-next-step
-;;    AgentStep nextStep(AgentInvoke invoke)
-;;    - AgentStep can be HumanInputResult or AgentComplete
-;;    - remove AgentResult and replace with AgentSuccess (implementing AgentComplete) or AgentFailure
-;;      - AgentFailure results in exception with latest exception as cause or the stringified version in info
-;;        - this is confusing – maybe leave this for the UI
-;;          - or always just include the latest ex-message, without stack trace
+(defn agent-next-step-async
+  [^AgentClient client agent-invoke]
+  (.nextStepAsync client agent-invoke))
+
 (defn agent-result
   [^AgentClient agent-client agent-invoke]
   (.result agent-client agent-invoke))

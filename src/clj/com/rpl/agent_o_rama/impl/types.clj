@@ -8,6 +8,7 @@
    [rpl.schema.core :as s])
   (:import
    [com.rpl.agentorama
+    AgentComplete
     HumanInputRequest]
    [com.rpl.agentorama.impl
     NippyMap]
@@ -48,6 +49,11 @@
 (drp/defrecord+ AgentResult
   [val :- s/Any
    failure? :- Boolean])
+
+(drp/defrecord+ AgentCompleteImpl
+  [result :- s/Any]
+  AgentComplete
+  (getResult [this] val))
 
 (drp/defrecord+ AgentNode
   [node :- (s/cond-pre Node NodeAggStart NodeAgg)
