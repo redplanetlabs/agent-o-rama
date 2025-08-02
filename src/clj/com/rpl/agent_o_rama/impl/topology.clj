@@ -15,9 +15,11 @@
    [com.rpl.agentorama
     FinishedAgg]
    [com.rpl.agent_o_rama.impl.types
+    HumanInput
     Node
     NodeAgg
-    NodeAggStart]
+    NodeAggStart
+    NodeHumanInputRequest]
    [com.rpl.agentorama.impl
     AgentNodeExecutorTaskGlobal]))
 

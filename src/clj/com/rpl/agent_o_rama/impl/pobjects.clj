@@ -12,8 +12,8 @@
     AggInput
     ForkContext
     NestedOpInfo
+    NodeHumanInputRequest
     HistoricalAgentGraphInfo
-    HumanInputRequest
     Node
     NodeAgg
     NodeAggStart

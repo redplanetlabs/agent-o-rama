@@ -36,5 +36,5 @@ public interface AgentClient extends Closeable {
   List<HumanInputRequest> pendingHumanInputs(AgentInvoke invoke);
   CompletableFuture<List<HumanInputRequest>> pendingHumanInputsAsync(AgentInvoke invoke);
   void provideHumanInput(HumanInputRequest request, String response);
-  void provideHumanInputAsync(HumanInputRequest request, String response);
+  CompletableFuture<Void> provideHumanInputAsync(HumanInputRequest request, String response);
 }
