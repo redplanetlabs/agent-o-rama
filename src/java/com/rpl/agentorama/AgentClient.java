@@ -33,10 +33,8 @@ public interface AgentClient extends Closeable {
   <T> AgentStreamByInvoke streamAll(AgentInvoke invoke,
                                     String node,
                                     StreamAllCallback<T> callback);
-
-
-  // TODO: <<<<>>>> return object with prompt, UUID, node name, and node invoke ID
-  //  - could return up to 1000
   List<HumanInputRequest> pendingHumanInputs(AgentInvoke invoke);
-  void provideHumanInput(HumanInputRequest request, String input);
+  CompletableFuture<List<HumanInputRequest>> pendingHumanInputsAsync(AgentInvoke invoke);
+  void provideHumanInput(HumanInputRequest request, String response);
+  void provideHumanInputAsync(HumanInputRequest request, String response);
 }

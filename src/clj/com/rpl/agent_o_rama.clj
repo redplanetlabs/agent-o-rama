@@ -336,6 +336,10 @@
                                                  module-name
                                                  (po/agent-depot-name
                                                   agentName))
+             human-depot          (foreign-depot cluster
+                                                 module-name
+                                                 (po/agent-human-depot-name
+                                                  agentName))
              agent-config-depot   (foreign-depot cluster
                                                  module-name
                                                  (po/agent-config-depot-name
@@ -508,6 +512,27 @@
                             new-chunks
                             reset-invoke-ids
                             complete?)))))
+
+          (pendingHumanInputs [this invoke]
+            (.get (.pendingHumanInputsAsync this invoke)))
+          (pendingHumanInputsAsync [this invoke]
+            (let [agent-task-id (.getTaskId invoke)
+                  agent-id      (.getAgentInvokeId invoke)]
+              (foreign-select-async
+               [(keypath agent-id)
+                :human-requests
+                (sorted-set-range-from-start 1000)
+                ALL]
+               root-pstate
+               {:pkey agent-task-id}
+              )))
+          (provideHumanInput [this request response]
+            (.get (.provideHumanInputAsync this request response)))
+          (provideHumanInputAsync [this request response]
+            (foreign-append-async!
+             human-depot
+             (aor-types/->valid-HumanInput request response)
+             :append-ack))
           (close [this]
             (close! agent-depot)
             (close! agent-config-depot))
@@ -629,3 +654,19 @@
         (.numResetsByInvoke ^AgentStreamByInvoke stream)
 
         :else (throw (h/ex-info "Unknown type" {:class (class stream)}))))
+
+(defn pending-human-inputs
+  [^AgentClient client agent-invoke]
+  (.pendingHumanInputs client agent-invoke))
+
+(defn pending-human-inputs-async
+  [^AgentClient client agent-invoke]
+  (.pendingHumanInputsAsync client agent-invoke))
+
+(defn provide-human-input
+  [^AgentClient client request response]
+  (.provideHumanInput client request response))
+
+(defn provide-human-input-async
+  [^AgentClient client request response]
+  (.provideHumanInputAsync client request response))
