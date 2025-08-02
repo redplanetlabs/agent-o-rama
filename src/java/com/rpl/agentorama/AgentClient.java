@@ -23,8 +23,8 @@ public interface AgentClient extends Closeable {
   AgentInvoke initiateFork(AgentInvoke invoke, Map<Long, List> nodeInvokeIdToNewArgs);
   CompletableFuture<AgentInvoke> initiateForkAsync(AgentInvoke invoke, Map<Long, List> nodeInvokeIdToNewArgs);
 
-  <T> T agentResult(AgentInvoke invoke);
-  <T> CompletableFuture<T> agentResultAsync(AgentInvoke invoke);
+  <T> T result(AgentInvoke invoke);
+  <T> CompletableFuture<T> resultAsync(AgentInvoke invoke);
   AgentStream stream(AgentInvoke invoke, String node);
   <T> AgentStream stream(AgentInvoke invoke, String node, StreamCallback<T> callback);
   AgentStream streamSpecific(AgentInvoke invoke, String node, long nodeInvokeId);

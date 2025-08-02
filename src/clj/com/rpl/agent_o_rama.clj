@@ -380,7 +380,7 @@
             (.thenCompose
              (.initiateAsync this args)
              (h/cf-function [agent-invoke]
-               (.agentResultAsync this agent-invoke))))
+               (.resultAsync this agent-invoke))))
           (initiate [this args]
             (.get (.initiateAsync this args)))
           (initiateAsync [this args]
@@ -401,7 +401,7 @@
             (.thenCompose
              (.initiateForkAsync this invoke nodeInvokeIdToNewArgs)
              (h/cf-function [agent-invoke]
-               (.agentResultAsync this agent-invoke))))
+               (.resultAsync this agent-invoke))))
           (initiateFork [this invoke nodeInvokeIdToNewArgs]
             (.get (.initiateForkAsync this invoke nodeInvokeIdToNewArgs)))
           (initiateForkAsync [this invoke invokeIdToNewArgs]
@@ -417,9 +417,9 @@
                (AgentInvoke. agent-task-id agent-id)
              )))
 
-          (agentResult [this agent-invoke]
-            (.get (.agentResultAsync this agent-invoke)))
-          (agentResultAsync [this agent-invoke]
+          (result [this agent-invoke]
+            (.get (.resultAsync this agent-invoke)))
+          (resultAsync [this agent-invoke]
             (let [agent-task-id (.getTaskId ^AgentInvoke agent-invoke)
                   agent-id      (.getAgentInvokeId ^AgentInvoke agent-invoke)
                   ret           (CompletableFuture.)
@@ -612,13 +612,16 @@
   [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
   (.initiateForkAsync agent-client invoke node-invoke-id->new-args))
 
+
+;; TODO: <<<<>>>>> need something else here, either in addition or replacement
+;;  - need something like agent-next-event
 (defn agent-result
   [^AgentClient agent-client agent-invoke]
-  (.agentResult agent-client agent-invoke))
+  (.result agent-client agent-invoke))
 
 (defn agent-result-async
   ^CompletableFuture [^AgentClient agent-client agent-invoke]
-  (.agentResultAsync agent-client agent-invoke))
+  (.resultAsync agent-client agent-invoke))
 
 (defn agent-stream
   (^AgentStream [^AgentClient agent-client agent-invoke node]
