@@ -788,12 +788,13 @@
      (identity *request :> {:keys [*agent-id *node-task-id *invoke-id *uuid]})
      (complete-human-future! *node-exec *invoke-id *uuid *response)
      (get *request :agent-task-id :> *agent-task-id)
-     (|hash *agent-task-id)
+     (|direct *agent-task-id)
      (local-transform> [(must *agent-id)
                         :human-requests
                         (set-elem *request)
                         NONE>]
                        $$root)
+     (local-select> (keypath *agent-id) $$root :> *tmp)
    )))
 
 (deframaop handle-config

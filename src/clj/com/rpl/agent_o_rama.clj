@@ -523,8 +523,7 @@
           (provideHumanInputAsync [this request response]
             (foreign-append-async!
              human-depot
-             (aor-types/->valid-HumanInput request response)
-             :append-ack))
+             (aor-types/->valid-HumanInput request response)))
           (close [this]
             (close! agent-depot)
             (close! agent-config-depot))
@@ -609,6 +608,7 @@
   (.nextStep client agent-invoke))
 
 (defn agent-next-step-async
+  ^CompletableFuture
   [^AgentClient client agent-invoke]
   (.nextStepAsync client agent-invoke))
 
@@ -660,6 +660,7 @@
   (.pendingHumanInputs client agent-invoke))
 
 (defn pending-human-inputs-async
+  ^CompletableFuture
   [^AgentClient client agent-invoke]
   (.pendingHumanInputsAsync client agent-invoke))
 
@@ -668,5 +669,6 @@
   (.provideHumanInput client request response))
 
 (defn provide-human-input-async
+  ^CompletableFuture
   [^AgentClient client request response]
   (.provideHumanInputAsync client request response))

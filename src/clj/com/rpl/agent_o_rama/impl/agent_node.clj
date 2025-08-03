@@ -45,15 +45,16 @@
    [java.util.concurrent
     CompletableFuture]))
 
-(defn next-task-thread-id
-  [task-thread-id-vol ^com.rpl.rama.ModuleInstanceInfo module-instance-info]
-  (when (empty? @task-thread-id-vol)
-    (vreset! task-thread-id-vol
-             (-> (.getTaskThreadIds module-instance-info)
+(defn next-task-id
+  [task-id-vol ^com.rpl.rama.ModuleInstanceInfo module-instance-info]
+  (when (empty? @task-id-vol)
+    (vreset! task-id-vol
+             (-> (.getNumTasks module-instance-info)
+                 range
                  shuffle
                  seq)))
-  (let [ret (long (first @task-thread-id-vol))]
-    (vswap! task-thread-id-vol next)
+  (let [ret (long (first @task-id-vol))]
+    (vswap! task-id-vol next)
     ret))
 
 (defprotocol AgentNodeInternal
@@ -157,7 +158,7 @@
         result-vol            (volatile! nil)
         emits-vol             (volatile! [])
         nested-ops-vol        (volatile! [])
-        task-thread-ids-vol   (volatile! nil)
+        task-ids-vol          (volatile! nil)
         emit-count-vol        (volatile! 0)
         valid-output-nodes    (-> agent-graph
                                   :node-map
@@ -207,7 +208,7 @@
                               agent-graph)
              (if (= emit-count 1)
                task-id
-               (next-task-thread-id task-thread-ids-vol module-instance-info))
+               (next-task-id task-ids-vol module-instance-info))
              agent-task-id)
            node
            (vec args)
