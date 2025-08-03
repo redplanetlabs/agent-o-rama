@@ -33,21 +33,18 @@
                (aor/emit! agent-node "b" (+ v 3))
              ))
             (aor/node
-             agent-node
              "a"
              "agg"
              (fn [agent-node v]
                (let [h (aor/get-human-input agent-node (str "ABC " v))]
                  (aor/emit! agent-node "agg" [v h]))))
             (aor/node
-             agent-node
              "b"
              "agg"
              (fn [agent-node v]
                (let [h (aor/get-human-input agent-node (str "DEF " v))]
                  (aor/emit! agent-node "agg" [v h]))))
             (aor/agg-node
-             agent-node
              "agg"
              nil
              aggs/+vec-agg
@@ -60,8 +57,8 @@
      (bind module-name (get-module-name module))
      (bind agent-manager (aor/agent-manager ipc module-name))
      (bind foo (aor/agent-client agent-manager "foo"))
-     (bund inv1 (aor/agent-initiate foo 0))
-     (bund inv2 (aor/agent-initiate foo 10))
+     (bind inv1 (aor/agent-initiate foo 0))
+     (bind inv2 (aor/agent-initiate foo 10))
      ;; TODO: <<<<>>>>
      ;; - test pending-human-inputs / pending-human-inputs-async
      ;; - test provide-human-input / provide-human-input-async
