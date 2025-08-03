@@ -1341,7 +1341,7 @@
                (fn [agent-node]
                  (let [v (volatile! 100)]
                    (doseq [t [:store-read :store-write :db-read :db-write
-                              :model-call :agent-invoke :other]]
+                              :model-call :agent-invoke :other :human-input]]
                      (aor/record-nested-op! agent-node
                                             t
                                             (vswap! v inc)
@@ -1575,7 +1575,12 @@
                :finish-time-millis 120
                :type :other
                :info
-               {"a" 121}}]
+               {"a" 121}}
+              {:start-time-millis 122
+               :finish-time-millis 123
+               :type :human-input
+               :info
+               {"a" 124}}]
             }
            }
            (m/guard

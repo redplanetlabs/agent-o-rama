@@ -131,6 +131,7 @@
    :db-write     NestedOpType/DB_WRITE
    :model-call   NestedOpType/MODEL_CALL
    :agent-invoke NestedOpType/AGENT_INVOKE
+   :human-input  NestedOpType/HUMAN_INPUT
    :other        NestedOpType/OTHER
   })
 
@@ -266,21 +267,29 @@
                 info)))
      (getHumanInput
        [this prompt]
-       (let [uuid (h/uuid-str)
-             cf   (CompletableFuture.)]
-         (.putHumanFuture node-exec invoke-id uuid cf)
-         (foreign-append!
-          human-depot
-          (aor-types/->valid-NodeHumanInputRequest
-           agent-task-id
-           agent-id
-           curr-node
-           task-id
-           invoke-id
-           prompt
-           uuid)
-          :append-ack)
-         (.get cf)))
+       (let [start-time-millis (h/current-time-millis)
+             request (aor-types/->valid-NodeHumanInputRequest
+                      agent-task-id
+                      agent-id
+                      curr-node
+                      task-id
+                      invoke-id
+                      prompt
+                      (h/uuid-str))
+             cf      (CompletableFuture.)
+             _ (.putHumanFuture node-exec invoke-id request cf)
+             _ (foreign-append! human-depot request :append-ack)
+             ret     (.get cf)]
+         (vswap! nested-ops-vol
+                 conj
+                 (aor-types/->NestedOpInfo
+                  start-time-millis
+                  (h/current-time-millis)
+                  :human-input
+                  {"prompt" prompt
+                   "result" ret}))
+         ret
+       ))
      AgentNodeInternal
      (get-streaming-recorder [this] streaming-recorder)
      (release-acquired-objects! [this]

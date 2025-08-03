@@ -91,6 +91,7 @@
            :db-read
            :model-call
            :agent-invoke
+           :human-input
            :other)
    ;; info for models contains token stats, input prompt, output, etc.
    info :- (s/maybe {String s/Any})])

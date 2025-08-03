@@ -69,6 +69,9 @@
   [emits]
   (mapv (fn [emit] [(:target-task-id emit) (:invoke-id emit)]) emits))
 
+;; TODO: <<<<>>>> update to include HumanInputRequest
+;;  - should keep those in the in-memory info instead of just the UUID
+;;  - makes it easier to call provideInput
 (defn declare-tracing-query-topology
   [topologies agent-name]
   (let [topo-name    (tracing-query-name agent-name)
@@ -245,6 +248,8 @@
 ;;     :graph-version ...}
 ;;    ...]
 ;;  :pagination-params {task-id end-id}}
+;; TODO: <<<<>>>> need to include boolean as to whether there's any pending
+;; human input requests
 (defn declare-get-invokes-page-topology
   [topologies agent-name]
   (let [root-sym (symbol (po/agent-root-task-global-name agent-name))]
