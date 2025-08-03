@@ -12,6 +12,9 @@
    [com.rpl.rama.test :as rtest]
    [com.rpl.test-common :as tc])
   (:import
+   [com.rpl.agentorama
+    AgentComplete
+    HumanInputRequest]
    [java.util.concurrent
     CompletableFuture]))
 
@@ -43,7 +46,7 @@
              "agg"
              (fn [agent-node v]
                (let [h1 (aor/get-human-input agent-node (str "DEF " v))
-                     h2 (aor/get-human-input agent-node (str "GHI " v))]
+                     h2 (aor/get-human-input agent-node (str "GHI " h1))]
                  (aor/emit! agent-node "agg" [v (str h1 "-" h2)]))))
             (aor/agg-node
              "agg"
@@ -63,7 +66,7 @@
 
 
      (bind h (aor/agent-next-step foo inv1))
-     (is (aor-types/NodeHumanInputRequest? h))
+     (is (instance? HumanInputRequest h))
      (is (condition-attained? (= 3
                                  (-> foo
                                      (aor/pending-human-inputs inv1)
@@ -78,18 +81,23 @@
      (aor/provide-human-input foo r1 "aa")
      (aor/provide-human-input foo r2 "bb")
      (bind h (aor/agent-next-step foo inv1))
-     (is (= "GHI 3" (:prompt h)))
+     (is (= "GHI bb" (:prompt h)))
      (aor/provide-human-input foo h "blah")
 
      (bind h (aor/agent-next-step foo inv1))
      (is (= "XYZ" (:prompt h)))
      (.get (aor/provide-human-input-async foo h "car"))
 
-     (is (= [[[1 "hello there"] [2 "aa"] [3 "bb-blah"]] "car"]
-            (aor/agent-result foo inv1)))
+
+     (bind r (aor/agent-next-step foo inv1))
+     (bind expected [[[1 "hello there"] [2 "aa"] [3 "bb-blah"]] "car"])
+     (is (instance? AgentComplete r))
+     (is (= expected (:result r)))
+     (is (= expected (aor/agent-result foo inv1)))
 
 
      ;; TODO: <<<<>>>>
+     ;; - similar for inv2
      ;; - test next-step / next-step-async
      ;; - also test pagination and tracing topology here
     )))
