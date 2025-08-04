@@ -68,7 +68,7 @@
    5
    TimeUnit/SECONDS))
 
-(defn stop []
+(defn stop-ui []
   (transform [ATOM :aor-cache MAP-VALS :clients MAP-VALS] close! ui/system)
   (setval [ATOM :aor-cache MAP-VALS :clients MAP-VALS] NONE ui/system)
   (.stop ^org.eclipse.jetty.server.Server (:jetty @ui/system))
@@ -81,6 +81,6 @@
     (close [this]
       (println "press enter to close the ui, default port is 1974")
       (read-line)
-      (stop)
+      (stop-ui)
       :closed)))
 

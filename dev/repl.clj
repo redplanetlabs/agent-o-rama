@@ -9,8 +9,8 @@
 (defn start-repl [ipc]
   (shadow.cljs.devtools.server/start!)
   (shadow/watch :frontend)
-  (uic/start ipc))
+  (aor/start-ui ipc))
 
 (comment
   (start-repl (open-cluster-manager-internal {"conductor.host" "localhost"}))
-  (uic/stop))
+  (aor/stop-ui))

@@ -12,7 +12,8 @@
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
-   [com.rpl.agent-o-rama.impl.types :as aor-types])
+   [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.impl.ui.core :as uic])
   (:import
    [com.rpl.agentorama
     AgentClient
@@ -632,3 +633,6 @@
         (.numResetsByInvoke ^AgentStreamByInvoke stream)
 
         :else (throw (h/ex-info "Unknown type" {:class (class stream)}))))
+
+(defn start-ui [ipc] (uic/start-ui ipc))
+(defn stop-ui [] (uic/stop-ui))
