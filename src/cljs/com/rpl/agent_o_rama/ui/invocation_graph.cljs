@@ -407,17 +407,15 @@
                                                  :is-phantom false)}))]
                         data)
         
-        edges (for [[from to]
+        edges (for [[from [idx to]]
                     (s/select [s/ALL
                                (s/collect-one s/FIRST)
                                s/LAST
                                (s/must :emits)
-                               s/ALL
-                               :invoke-id] data)]
-                
-                {:id (str from to)
+                               s/INDEXED-VALS] data)]
+                {:id (str from (:invoke-id to) idx)
                  :source (str from)
-                 :target (str to)})
+                 :target (str (:invoke-id to))})
         
         ;; Get missing child node IDs for a given parent node
         get-missing-children (fn [node-id]
