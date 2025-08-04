@@ -1,4 +1,4 @@
-(ns com.rpl.agent-o-rama.ui.server
+(ns com.rpl.agent-o-rama.impl.ui.server
   (:require
    [ring.middleware.file :as ring-file]
    [ring.middleware.file-info :as ring-file-info]

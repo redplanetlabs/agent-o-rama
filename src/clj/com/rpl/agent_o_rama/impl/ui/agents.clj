@@ -1,4 +1,4 @@
-(ns com.rpl.agent-o-rama.ui.agents
+(ns com.rpl.agent-o-rama.impl.ui.agents
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require

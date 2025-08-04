@@ -1,4 +1,4 @@
-(ns com.rpl.agent-o-rama.ui.core
+(ns com.rpl.agent-o-rama.impl.ui.core
   (:use
    [com.rpl.rama]
    [com.rpl.rama.path])
