@@ -13,9 +13,9 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
   private static final Keyword UUID_KW = Keyword.intern(null, "uuid");
 
   WorkerManagedResource<ExecutorService> _execServResource;
-  ConcurrentHashMap<Long, List> _runningInvokeIds;
+  ConcurrentHashMap<UUID, List> _runningInvokeIds;
 
-  public void submitTask(long invokeId, clojure.lang.AFn f) {
+  public void submitTask(UUID invokeId, clojure.lang.AFn f) {
     _runningInvokeIds.put(invokeId, Arrays.asList());
     Runnable wrappedTask = () -> {
       try {
@@ -28,7 +28,7 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
     _execServResource.getResource().submit(wrappedTask);
   }
 
-  public Set<Long> getRunningInvokeIds() {
+  public Set<UUID> getRunningInvokeIds() {
     return new HashSet(_runningInvokeIds.keySet());
   }
 
@@ -38,15 +38,15 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
     _runningInvokeIds = new ConcurrentHashMap();
   }
 
-  public void removeTrackedInvokeId(long invokeId) {
+  public void removeTrackedInvokeId(UUID invokeId) {
     _runningInvokeIds.remove(invokeId);
   }
 
-  public void putHumanFuture(long invokeId, Object request, CompletableFuture cf) {
+  public void putHumanFuture(UUID invokeId, Object request, CompletableFuture cf) {
     _runningInvokeIds.put(invokeId, Arrays.asList(request, cf));
   }
 
-  public CompletableFuture getHumanFuture(long invokeId, String uuid) {
+  public CompletableFuture getHumanFuture(UUID invokeId, String uuid) {
     List tuple = _runningInvokeIds.get(invokeId);
     if(tuple!=null && !tuple.isEmpty()) {
       ILookup m = (ILookup) tuple.get(0);
@@ -57,7 +57,7 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
     return null;
   }
 
-  public Object getHumanRequest(long invokeId) {
+  public Object getHumanRequest(UUID invokeId) {
     List tuple = _runningInvokeIds.get(invokeId);
     if(tuple!=null && !tuple.isEmpty()) return tuple.get(0);
     return null;

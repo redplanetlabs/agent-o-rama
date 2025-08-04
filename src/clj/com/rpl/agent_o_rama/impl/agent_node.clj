@@ -42,6 +42,8 @@
     Filter]
    [java.io
     Closeable]
+   [java.util
+    UUID]
    [java.util.concurrent
     CompletableFuture]))
 
@@ -169,7 +171,6 @@
         (ops/module-instance-info)
 
         this-module-name      (.getModuleName module-instance-info)
-        random-source         (ops/current-random-source)
         streaming-depot       (.getAgentStreamingDepot rama-clients agent-name)
         human-depot           (.getAgentHumanDepot rama-clients agent-name)
         streaming-recorder    (mk-streaming-recorder agent-task-id
@@ -201,7 +202,7 @@
           emits-vol
           conj
           (aor-types/->valid-AgentNodeEmit
-           (h/random-long random-source)
+           (random-uuid)
            nil
            (if (selected-any? [:node-map (keypath node) :node
                                #(instance? Node %)]
@@ -276,7 +277,7 @@
                       task-id
                       invoke-id
                       prompt
-                      (h/uuid-str))
+                      (h/random-uuid-str))
              cf      (CompletableFuture.)
              _ (.putHumanFuture node-exec invoke-id request cf)
              _ (foreign-append! human-depot request :append-ack)

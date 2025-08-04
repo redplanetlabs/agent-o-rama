@@ -12,6 +12,8 @@
    [java.io
     PrintWriter
     StringWriter]
+   [java.util
+    UUID]
    [java.util.concurrent
     Semaphore]
    [java.util.function
@@ -86,11 +88,6 @@
        (fn ~@arities))))
 
 (mk-jfn-converter)
-
-(defn random-long
-  ([] (random-long (ops/current-random-source)))
-  ([random-source]
-   (.nextLong ^java.util.Random random-source)))
 
 (defn invoke
   ([afn] (afn))
@@ -210,9 +207,13 @@
           NONE
           m))
 
-(defn uuid-str
+(defn random-uuid-str
   []
-  (str (java.util.UUID/randomUUID)))
+  (str (random-uuid)))
+
+(defn half-uuid
+  [^UUID uuid]
+  (.getLeastSignificantBits uuid))
 
 (defn throwable->str
   [^Throwable t]

@@ -15,6 +15,8 @@
     NippyMap]
    [com.rpl.rama.integration
     TaskGlobalObject]
+   [java.util
+    UUID]
    [java.util.concurrent
     CompletableFuture]))
 
@@ -87,7 +89,7 @@
   (close [this]))
 
 (drp/defrecord+ AggInput
-  [invoke-id :- Long
+  [invoke-id :- UUID
    args :- [s/Any]])
 
 (drp/defrecord+ NestedOpInfo
@@ -106,21 +108,21 @@
    info :- (s/maybe {String s/Any})])
 
 (drp/defrecord+ AgentNodeEmit
-  [invoke-id :- Long
-   fork-invoke-id :- (s/maybe Long)
+  [invoke-id :- UUID
+   fork-invoke-id :- (s/maybe UUID)
    target-task-id :- Long
    node-name :- String
    args :- [s/Any]
   ])
 
 (drp/defrecord+ ForkContext
-  [invoke-id->new-args :- {Long [s/Any]}
-   affected-aggs :- (s/maybe #{Long}) ; agg-start-node invoke-ids
+  [invoke-id->new-args :- {UUID [s/Any]}
+   affected-aggs :- (s/maybe #{UUID}) ; agg-start-node invoke-ids
   ])
 
 (drp/defrecord+ NodeComplete
   [task-id :- Long
-   invoke-id :- Long
+   invoke-id :- UUID
    retry-num :- Long
    node-fn-res :- s/Any
    emits :- [AgentNodeEmit]
@@ -131,14 +133,14 @@
   ])
 
 (drp/defrecord+ RetryNodeComplete
-  [invoke-id :- Long
+  [invoke-id :- UUID
    retry-num :- Long
    fork-context :- (s/maybe ForkContext)
   ])
 
 (drp/defrecord+ NodeFailure
   [task-id :- Long
-   invoke-id :- Long
+   invoke-id :- UUID
    retry-num :- Long
    throwable-str :- String
   ])
@@ -156,7 +158,7 @@
 (drp/defrecord+ ForkAgentInvoke
   [agent-task-id :- Long
    agent-id :- Long
-   invoke-id->new-args :- {Long [s/Any]}])
+   invoke-id->new-args :- {UUID [s/Any]}])
 
 (drp/defrecord+ HistoricalAgentNodeInfo
   [node-type :- clojure.lang.Keyword ; :node, :agg-node, :agg-start-node
@@ -174,13 +176,13 @@
   [agent-task-id :- Long
    agent-id :- Long
    node :- String
-   invoke-id :- Long
+   invoke-id :- UUID
    retry-num :- Long
    streaming-index :- Long
    value :- Object])
 
 (drp/defrecord+ StreamingChunk
-  [invoke-id :- Long
+  [invoke-id :- UUID
    index :- Long
    chunk :- Object])
 
@@ -189,7 +191,7 @@
    agent-id :- Long
    node :- String
    node-task-id :- Long
-   invoke-id :- Long
+   invoke-id :- UUID
    prompt :- String
    uuid :- String]
   HumanInputRequest
@@ -202,15 +204,15 @@
    response :- String])
 
 (drp/defrecord+ NodeOp
-  [invoke-id :- Long
-   fork-invoke-id :- (s/maybe Long)
+  [invoke-id :- UUID
+   fork-invoke-id :- (s/maybe UUID)
    fork-context :- (s/maybe ForkContext)
    next-node :- String
    args :- [s/Any]
-   agg-invoke-id :- (s/maybe Long)])
+   agg-invoke-id :- (s/maybe UUID)])
 
 (drp/defrecord+ AggAckOp
-  [agg-invoke-id :- Long
+  [agg-invoke-id :- UUID
    ack-val :- Long])
 
 (drp/defrecord+ PStateWrite

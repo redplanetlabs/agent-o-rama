@@ -4,6 +4,6 @@ import java.io.Closeable;
 import java.util.*;
 
 public interface AgentStreamByInvoke extends Closeable {
-  <T> Map<Long, List<T>> get();
-  Map<Long, Long> numResetsByInvoke();
+  <T> Map<UUID, List<T>> get();
+  Map<UUID, Long> numResetsByInvoke();
 }

@@ -96,8 +96,8 @@
    (anchor> <regular-emit>)
 
    (hook> <root>)
-   (mapv :invoke-id *emits :> *next-invoke-ids)
-   (reduce bit-xor *invoke-id *next-invoke-ids :> *ack-val)
+   (mapv (comp h/half-uuid :invoke-id) *emits :> *next-ack-vals)
+   (reduce bit-xor (h/half-uuid *invoke-id) *next-ack-vals :> *ack-val)
    (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
                |direct
                *agent-task-id)
@@ -176,14 +176,14 @@
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)]
    (fetch-graph-version *agent-name :> *version)
-   (h/random-long :> *invoke-id)
+   (random-uuid :> *invoke-id)
    (h/current-time-millis :> *current-time-millis)
    (local-transform>
     [(keypath *agent-id)
      (termval {:root-invoke-id    *invoke-id
                :invoke-args       *args
                :graph-version     *version
-               :ack-val           *invoke-id
+               :ack-val           (h/half-uuid *invoke-id)
                :last-progress-time-millis *current-time-millis
                :retry-num         *retry-num
                :start-time-millis *current-time-millis})]
@@ -302,10 +302,11 @@
        (complete-with-failure! *agent-name *agent-id "Max retry limit exceeded")
       (else>)
        (local-transform> [(keypath *agent-id)
-                          (multi-path [:retry-num (termval *retry-num)]
-                                      [:graph-version
-                                       (termval *curr-graph-version)]
-                                      [:ack-val (termval *root-invoke-id)])]
+                          (multi-path
+                           [:retry-num (termval *retry-num)]
+                           [:graph-version
+                            (termval *curr-graph-version)]
+                           [:ack-val (termval (h/half-uuid *root-invoke-id))])]
                          $$root)
 
        (aor-types/->valid-NodeOp *root-invoke-id
@@ -617,7 +618,7 @@
                :agg-inputs          []
                :agg-start-res       *agg-start-res
                :agg-state           *init-agg-state
-               :agg-ack-val         *invoke-id
+               :agg-ack-val         (h/half-uuid *invoke-id)
                :agg-start-invoke-id *invoke-id
               })]
     $$nodes)
@@ -855,7 +856,7 @@
       *fork-context)
 
     (case> NodeAggStart :> {:keys [*node-fn *agg-node-name]})
-     (h/random-long :> *new-agg-invoke-id)
+     (random-uuid :> *new-agg-invoke-id)
      (local-transform>
       [(keypath *invoke-id) :started-agg? (termval true)]
       $$nodes)
@@ -923,7 +924,10 @@
      (<<if *finished?
        (complete-agg! *agent-name *agg-invoke-id *retry-num)
       (else>)
-       (ack-agg! *agent-name *agg-invoke-id *retry-num *invoke-id))
+       (ack-agg! *agent-name
+                 *agg-invoke-id
+                 *retry-num
+                 (h/half-uuid *invoke-id)))
    )))
 
 (deframaop handle-node-already-complete
@@ -939,13 +943,12 @@
 
 (deframafn update-forked-emits
   [*emits]
-  (ops/current-random-source :> *random-source)
   (<<ramafn %update-emit
     [{*emit-invoke-id :invoke-id :as *emit}]
     (:>
      (assoc *emit
       :fork-invoke-id *emit-invoke-id
-      :invoke-id (h/random-long *random-source))))
+      :invoke-id (random-uuid))))
   (:> (mapv %update-emit *emits)))
 
 (deframafn copy-unforked-agg-state
@@ -1022,7 +1025,7 @@
                                   :agg-invoke-id *agg-invoke-id))]
                        $$nodes)
      (<<if (aor-types/NodeAggStart? *node-obj)
-       (h/random-long (ops/current-random-source) :> *new-agg-invoke-id)
+       (random-uuid :> *new-agg-invoke-id)
        (local-select> (keypath *fork-agg-invoke-id)
                       $$nodes
                       :> {*agg-node      :node

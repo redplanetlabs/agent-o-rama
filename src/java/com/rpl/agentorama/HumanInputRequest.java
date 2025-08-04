@@ -1,7 +1,9 @@
 package com.rpl.agentorama;
 
+import java.util.UUID;
+
 public interface HumanInputRequest extends AgentStep {
   String getNode();
-  long getNodeInvokeId();
+  UUID getNodeInvokeId();
   String getPrompt();
 }

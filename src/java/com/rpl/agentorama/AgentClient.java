@@ -10,7 +10,7 @@ public interface AgentClient extends Closeable {
   }
 
   interface StreamAllCallback<T> {
-    void onUpdate(Map<Long, List<T>> allChunks, Map<Long, List<T>> newChunks, Set<Long> resetInvokeIds, boolean isComplete);
+    void onUpdate(Map<UUID, List<T>> allChunks, Map<UUID, List<T>> newChunks, Set<UUID> resetInvokeIds, boolean isComplete);
   }
 
   <T> T invoke(Object... args);
@@ -18,10 +18,10 @@ public interface AgentClient extends Closeable {
   AgentInvoke initiate(Object... args);
   CompletableFuture<AgentInvoke> initiateAsync(Object... args);
 
-  <T> T fork(AgentInvoke invoke, Map<Long, List> nodeInvokeIdToNewArgs);
-  <T> CompletableFuture<T> forkAsync(AgentInvoke invoke, Map<Long, List> nodeInvokeIdToNewArgs);
-  AgentInvoke initiateFork(AgentInvoke invoke, Map<Long, List> nodeInvokeIdToNewArgs);
-  CompletableFuture<AgentInvoke> initiateForkAsync(AgentInvoke invoke, Map<Long, List> nodeInvokeIdToNewArgs);
+  <T> T fork(AgentInvoke invoke, Map<UUID, List> nodeInvokeIdToNewArgs);
+  <T> CompletableFuture<T> forkAsync(AgentInvoke invoke, Map<UUID, List> nodeInvokeIdToNewArgs);
+  AgentInvoke initiateFork(AgentInvoke invoke, Map<UUID, List> nodeInvokeIdToNewArgs);
+  CompletableFuture<AgentInvoke> initiateForkAsync(AgentInvoke invoke, Map<UUID, List> nodeInvokeIdToNewArgs);
 
 
   AgentStep nextStep(AgentInvoke invoke);
@@ -32,8 +32,8 @@ public interface AgentClient extends Closeable {
 
   AgentStream stream(AgentInvoke invoke, String node);
   <T> AgentStream stream(AgentInvoke invoke, String node, StreamCallback<T> callback);
-  AgentStream streamSpecific(AgentInvoke invoke, String node, long nodeInvokeId);
-  <T> AgentStream streamSpecific(AgentInvoke invoke, String node, long nodeInvokeId, StreamCallback<T> callback);
+  AgentStream streamSpecific(AgentInvoke invoke, String node, UUID nodeInvokeId);
+  <T> AgentStream streamSpecific(AgentInvoke invoke, String node, UUID nodeInvokeId, StreamCallback<T> callback);
   AgentStreamByInvoke streamAll(AgentInvoke invoke, String node);
   <T> AgentStreamByInvoke streamAll(AgentInvoke invoke,
                                     String node,
