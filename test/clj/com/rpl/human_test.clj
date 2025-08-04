@@ -12,7 +12,8 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.test-common :as tc])
+   [com.rpl.test-common :as tc]
+   [meander.epsilon :as m])
   (:import
    [com.rpl.agentorama
     AgentComplete
@@ -79,6 +80,12 @@
      (bind inv1 (aor/agent-initiate foo 0))
      (bind inv2 (aor/agent-initiate foo 10))
 
+     (bind [agent-task-id1 agent-id1] (tc/extract-invoke inv1))
+     (bind root1
+       (foreign-select-one [(keypath agent-id1) :root-invoke-id]
+                           root-pstate
+                           {:pkey agent-task-id1}))
+
 
      (bind h (aor/agent-next-step foo inv1))
      (aor/agent-next-step foo inv2)
@@ -93,6 +100,60 @@
      (is (= 2 (count page)))
      (is (every? :human-request? page))
 
+
+     (bind trace
+       (foreign-invoke-query traces-query
+                             agent-task-id1
+                             [[agent-task-id1 root1]]
+                             10000))
+     (is
+      (trace-matches?
+       (:invokes-map trace)
+       {!id1
+        {:agent-id      ?agent-id
+         :agent-task-id ?agent-task-id
+         :node          "a"
+         :input         [1]
+         :nested-ops    nil
+         :human-request {:agent-task-id ?agent-task-id
+                         :agent-id      ?agent-id
+                         :node          "a"
+                         :node-task-id  ?agent-task-id
+                         :invoke-id     !id1
+                         :prompt        "ABC 1"
+                         :uuid          !uuid1}}
+        !id2
+        {:agent-id      ?agent-id
+         :agent-task-id ?agent-task-id
+         :node          "a"
+         :input         [2]
+         :nested-ops    nil
+         :human-request {:agent-task-id ?agent-task-id
+                         :agent-id      ?agent-id
+                         :node          "a"
+                         :node-task-id  !task-id1
+                         :invoke-id     !id2
+                         :prompt        "ABC 2"
+                         :uuid          !uuid2}}
+        !id3
+        {:agent-id      ?agent-id
+         :agent-task-id ?agent-task-id
+         :node          "b"
+         :input         [3]
+         :nested-ops    nil
+         :human-request {:agent-task-id ?agent-task-id
+                         :agent-id      ?agent-id
+                         :node          "b"
+                         :node-task-id  !task-id2
+                         :invoke-id     !id3
+                         :prompt        "DEF 3"
+                         :uuid          !uuid3}}
+       }
+       (m/guard
+        (and (= ?agent-id agent-id1)
+             (= ?agent-task-id agent-task-id1)))
+      ))
+
      (bind [r0 r1 r2 :as items]
        (sort-by :prompt (aor/pending-human-inputs foo inv1)))
 
@@ -100,6 +161,55 @@
             (.get (aor/pending-human-inputs-async foo inv1))))
      (is (= ["ABC 1" "ABC 2" "DEF 3"] (mapv :prompt items)))
      (aor/provide-human-input foo r0 "hello there")
+
+     (bind trace
+       (foreign-invoke-query traces-query
+                             agent-task-id1
+                             [[agent-task-id1 root1]]
+                             10000))
+     (is
+      (trace-matches?
+       (:invokes-map trace)
+       {!id1
+        {:agent-id      ?agent-id
+         :agent-task-id ?agent-task-id
+         :node          "a"
+         :input         [1]
+         :nested-ops    [{:type :human-input
+                          :info
+                          {"prompt" "ABC 1"
+                           "result" "hello there"}}]
+         :human-request nil}
+        !id2
+        {:agent-id      ?agent-id
+         :agent-task-id ?agent-task-id
+         :node          "a"
+         :input         [2]
+         :human-request {:agent-task-id ?agent-task-id
+                         :agent-id      ?agent-id
+                         :node          "a"
+                         :node-task-id  !task-id1
+                         :invoke-id     !id2
+                         :prompt        "ABC 2"
+                         :uuid          !uuid2}}
+        !id3
+        {:agent-id      ?agent-id
+         :agent-task-id ?agent-task-id
+         :node          "b"
+         :input         [3]
+         :human-request {:agent-task-id ?agent-task-id
+                         :agent-id      ?agent-id
+                         :node          "b"
+                         :node-task-id  !task-id2
+                         :invoke-id     !id3
+                         :prompt        "DEF 3"
+                         :uuid          !uuid3}}
+       }
+       (m/guard
+        (and (= ?agent-id agent-id1)
+             (= ?agent-task-id agent-task-id1)))
+      ))
+
      (aor/provide-human-input foo r1 "aa")
      (aor/provide-human-input foo r2 "bb")
      (bind h (aor/agent-next-step foo inv1))
@@ -154,8 +264,4 @@
      (is (instance? AgentComplete r))
      (is (= expected (:result r)))
      (is (= expected (aor/agent-result foo inv2)))
-
-
-     ;; TODO: <<<<>>>>
-     ;; - also test pagination and tracing topology here
     )))
