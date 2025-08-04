@@ -118,19 +118,14 @@
        (encoder x)
        x
        (catch Exception e
-         :not-encodable)))
+         (str x))))
    data))
 
 (defn invoke-paginated 
   [{{:keys [module-id agent-name invoke-id]} :path-params
     {:strs [paginate-task-id missing-node-id]} :query-params
     :as req}]
-  (def module-id module-id)
-  (def agent-name agent-name)
-  (def invoke-id invoke-id)
-  (def paginate-task-id paginate-task-id)
-  (def missing-node-id missing-node-id)
-
+  
   {:status 200
    :body
    (let [[agent-task-id agent-id] (parse-url-pair invoke-id)
