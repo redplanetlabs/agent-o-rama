@@ -453,7 +453,7 @@ Here are the sections to reflect on for writing: %s")
          (human-yes?
           agent-node
           (str
-           "Do you have any changes you would like to make to this set of analysts? Answer 'yes' or 'no'.\n\n"
+           "Do you have any feedback on this set of analysts? Answer 'yes' or 'no'.\n\n"
            (str/join "\n" (mapv str analysts))))
          (let [feedback (aor/get-human-input agent-node
                                              "What is your feedback?")]
@@ -641,14 +641,19 @@ Here are the sections to reflect on for writing: %s")
     (let [module-name   (get-module-name ResearchAgentModule)
           agent-manager (aor/agent-manager ipc module-name)
           researcher    (aor/agent-client agent-manager "researcher")
-          _ (println "Enter a topic:")
+          _ (print "Enter a topic: ")
+          _ (flush)
           topic         (read-line)
           inv           (aor/agent-initiate researcher "" {:topic topic})]
+      (println)
       (loop [step (aor/agent-next-step researcher inv)]
         (if (instance? HumanInputRequest step)
           (do
             (println (:prompt step))
+            (print ">> ")
+            (flush)
             (aor/provide-human-input researcher step (read-line))
+            (println)
             (recur (aor/agent-next-step researcher inv)))
           (println (:result step))))
     )))
