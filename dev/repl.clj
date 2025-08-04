@@ -3,7 +3,6 @@
    [com.rpl.rama])
   (:require
    [com.rpl.agent-o-rama :as aor]
-   [com.rpl.agent-o-rama.ui.core :as uic]
    [shadow.cljs.devtools.server]
    [shadow.cljs.devtools.api :as shadow]))
 

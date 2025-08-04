@@ -4,7 +4,7 @@
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.types :as aort]
-   [com.rpl.agent-o-rama.ui :as ui]
+   [com.rpl.agent-o-rama.impl.ui :as ui]
    [clojure.walk :as walk]
    [muuntaja.core :as m])
   (:import

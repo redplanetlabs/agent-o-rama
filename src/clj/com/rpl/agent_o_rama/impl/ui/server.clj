@@ -15,7 +15,7 @@
    [reitit.ring.coercion :as rrc]
    [malli.core :as mc]
 
-   [com.rpl.agent-o-rama.ui.agents :as agents]))
+   [com.rpl.agent-o-rama.impl.ui.agents :as agents]))
 
 (defn spa-index-handler [_request]
   (-> (resp/resource-response "index.html")

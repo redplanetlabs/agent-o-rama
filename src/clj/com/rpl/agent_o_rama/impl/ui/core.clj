@@ -4,8 +4,8 @@
    [com.rpl.rama.path])
   (:require
    [com.rpl.agent-o-rama :as aor]
-   [com.rpl.agent-o-rama.ui.server :as srv]
-   [com.rpl.agent-o-rama.ui :as ui]
+   [com.rpl.agent-o-rama.impl.ui.server :as srv]
+   [com.rpl.agent-o-rama.impl.ui :as ui]
    [clojure.tools.logging :as cljlogging]
    [ring.adapter.jetty :as jetty])
   (:import
