@@ -84,7 +84,7 @@
      (is (= "GHI bb" (:prompt h)))
      (aor/provide-human-input foo h "blah")
 
-     (bind h (aor/agent-next-step foo inv1))
+     (bind h (.get (aor/agent-next-step-async foo inv1)))
      (is (= "XYZ" (:prompt h)))
      (.get (aor/provide-human-input-async foo h "car"))
 
@@ -96,8 +96,39 @@
      (is (= expected (aor/agent-result foo inv1)))
 
 
+     (bind h (aor/agent-next-step foo inv2))
+     (is (instance? HumanInputRequest h))
+     (is (condition-attained? (= 3
+                                 (-> foo
+                                     (aor/pending-human-inputs inv2)
+                                     count))))
+
+     (bind [r0 r1 r2 :as items]
+       (sort-by :prompt (aor/pending-human-inputs foo inv2)))
+
+     (is (= (aor/pending-human-inputs foo inv2)
+            (.get (aor/pending-human-inputs-async foo inv2))))
+     (is (= ["ABC 11" "ABC 12" "DEF 13"] (mapv :prompt items)))
+     (aor/provide-human-input foo r0 "a b c")
+     (aor/provide-human-input foo r1 "xy")
+     (aor/provide-human-input foo r2 "apple banana")
+     (bind h (aor/agent-next-step foo inv2))
+     (is (= "GHI apple banana" (:prompt h)))
+     (aor/provide-human-input foo h "blah2")
+
+     (bind h (.get (aor/agent-next-step-async foo inv2)))
+     (is (= "XYZ" (:prompt h)))
+     (.get (aor/provide-human-input-async foo h "alice"))
+
+
+     (bind r (aor/agent-next-step foo inv2))
+     (bind expected
+       [[[11 "a b c"] [12 "xy"] [13 "apple banana-blah2"]] "alice"])
+     (is (instance? AgentComplete r))
+     (is (= expected (:result r)))
+     (is (= expected (aor/agent-result foo inv2)))
+
+
      ;; TODO: <<<<>>>>
-     ;; - similar for inv2
-     ;; - test next-step / next-step-async
      ;; - also test pagination and tracing topology here
     )))
