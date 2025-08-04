@@ -198,7 +198,7 @@
   (local-transform> (term inc) $$id)
   (:> *ret))
 
-(deframaop intake-agent-invoke
+(deframaop intake-agent-initiate
   [*agent-name *data]
   (<<with-substitutions
    [$$id-gen (po/agent-id-gen-task-global *agent-name)
@@ -690,10 +690,10 @@
 (deframaop intake-agent-depot
   [*agent-name *data]
   (<<cond
-   (case> (aor-types/AgentInvoke? *data))
-    (intake-agent-invoke *agent-name
-                         *data
-                         :> *agent-task-id *agent-id *retry-num *op)
+   (case> (aor-types/AgentInitiate? *data))
+    (intake-agent-initiate *agent-name
+                           *data
+                           :> *agent-task-id *agent-id *retry-num *op)
     (ack-return> [*agent-task-id *agent-id])
 
    (case> (aor-types/RetryAgentInvoke? *data))

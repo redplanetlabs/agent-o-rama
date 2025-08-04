@@ -387,12 +387,12 @@
             (.thenApply
              (foreign-append-async!
               agent-depot
-              (aor-types/->AgentInvoke
+              (aor-types/->AgentInitiate
                (vec args)
                (h/current-time-millis)))
              (h/cf-function [{[agent-task-id agent-id]
                               aor-types/AGENTS-TOPOLOGY-NAME}]
-               (AgentInvoke. agent-task-id agent-id)
+               (aor-types/->AgentInvokeImpl agent-task-id agent-id)
              )))
 
           (fork [this invoke nodeInvokeIdToNewArgs]
@@ -414,7 +414,7 @@
                invokeIdToNewArgs))
              (h/cf-function [{[agent-task-id agent-id]
                               aor-types/AGENTS-TOPOLOGY-NAME}]
-               (AgentInvoke. agent-task-id agent-id)
+               (aor-types/->AgentInvokeImpl agent-task-id agent-id)
              )))
 
 

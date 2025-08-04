@@ -158,11 +158,14 @@
      (bind invokes
        (vec
         (for [_ (range 50)]
-          (let [^AgentInvoke inv (aor/agent-initiate foo)]
-            [(.getTaskId inv) (.getAgentInvokeId inv)]
+          (let [{:keys [task-id agent-invoke-id]} (aor/agent-initiate foo)]
+            [task-id agent-invoke-id]
           ))))
      (doseq [[task-id agent-id] invokes]
-       (is (= "abc" (aor/agent-result foo (AgentInvoke. task-id agent-id)))))
+       (is
+        (= "abc"
+           (aor/agent-result foo
+                             (aor-types/->AgentInvokeImpl task-id agent-id)))))
 
 
      (doseq [i [1 6 9 10]]

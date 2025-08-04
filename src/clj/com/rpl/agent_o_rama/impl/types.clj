@@ -9,6 +9,7 @@
   (:import
    [com.rpl.agentorama
     AgentComplete
+    AgentInvoke
     HumanInputRequest]
    [com.rpl.agentorama.impl
     NippyMap]
@@ -41,7 +42,7 @@
 ;; TODO: use flexible serialization for these to ease updating the
 ;; library? or just some of them?
 
-(drp/defrecord+ AgentInvoke
+(drp/defrecord+ AgentInitiate
   [args :- [s/Any]
    time-millis :- Long
   ])
@@ -54,6 +55,14 @@
   [result :- s/Any]
   AgentComplete
   (getResult [this] val))
+
+(drp/defrecord+ AgentInvokeImpl
+  [task-id :- Long
+   agent-invoke-id :- Long]
+  AgentInvoke
+  (getTaskId [this] task-id)
+  (getAgentInvokeId [this] agent-invoke-id))
+
 
 (drp/defrecord+ AgentNode
   [node :- (s/cond-pre Node NodeAggStart NodeAgg)
