@@ -6,6 +6,8 @@
   (:require
    [clojure.set :as set]
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
@@ -61,16 +63,36 @@
      (bind module-name (get-module-name module))
      (bind agent-manager (aor/agent-manager ipc module-name))
      (bind foo (aor/agent-client agent-manager "foo"))
+     (bind root-pstate
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-root-task-global-name "foo")))
+     (bind invokes-page-query
+       (foreign-query ipc
+                      module-name
+                      (queries/agent-get-invokes-page-query-name "foo")))
+     (bind traces-query
+       (foreign-query ipc
+                      module-name
+                      (queries/tracing-query-name "foo")))
+
      (bind inv1 (aor/agent-initiate foo 0))
      (bind inv2 (aor/agent-initiate foo 10))
 
 
      (bind h (aor/agent-next-step foo inv1))
+     (aor/agent-next-step foo inv2)
      (is (instance? HumanInputRequest h))
      (is (condition-attained? (= 3
                                  (-> foo
                                      (aor/pending-human-inputs inv1)
                                      count))))
+
+     (bind page
+       (:agent-invokes (foreign-invoke-query invokes-page-query 10 nil)))
+     (is (= 2 (count page)))
+     (is (every? :human-request? page))
+
      (bind [r0 r1 r2 :as items]
        (sort-by :prompt (aor/pending-human-inputs foo inv1)))
 
@@ -95,6 +117,11 @@
      (is (= expected (:result r)))
      (is (= expected (aor/agent-result foo inv1)))
 
+
+     (bind page
+       (:agent-invokes (foreign-invoke-query invokes-page-query 10 nil)))
+     (is (= 2 (count page)))
+     (is (= 1 (count (filter :human-request? page))))
 
      (bind h (aor/agent-next-step foo inv2))
      (is (instance? HumanInputRequest h))
