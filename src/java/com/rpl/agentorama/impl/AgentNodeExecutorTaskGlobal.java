@@ -57,6 +57,12 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
     return null;
   }
 
+  public Object getHumanRequest(long invokeId) {
+    List tuple = _runningInvokeIds.get(invokeId);
+    if(tuple!=null && !tuple.isEmpty()) return tuple.get(0);
+    return null;
+  }
+
   @Override
   public void gainedLeadership() {
     _runningInvokeIds = new ConcurrentHashMap();
