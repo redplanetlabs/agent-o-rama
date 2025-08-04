@@ -4,6 +4,7 @@
         [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.core :as i]
@@ -21,6 +22,7 @@
    [com.rpl.test-common :as tc])
   (:import
    [com.rpl.agentorama
+    AgentFailedException
     AgentInvoke]
    [com.rpl.agentorama.impl
     AgentNodeExecutorTaskGlobal]
@@ -1166,3 +1168,95 @@
           (check-active! 0)
           (is (= 3 @retries-atom))
          ))))))
+
+
+(def VAL-ATOM)
+
+(deftest exceptions-test
+  (with-redefs [SEM      (h/mk-semaphore 0)
+                VAL-ATOM (atom 0)
+                anode/log-node-error (fn [& args])]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (->
+            topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node]
+               (h/acquire-semaphore SEM)
+               (let [v (swap! VAL-ATOM dec)]
+                 (if (= 0 v)
+                   (aor/result! agent-node "done")
+                   (throw (ex-info "intentional" {:v v}))))
+             )))
+         ))
+       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (bind module-name (get-module-name module))
+
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind root-pstate
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "foo")))
+       (bind foo (aor/agent-client agent-manager "foo"))
+       (bind get-exceptions
+         (fn [{:keys [task-id agent-invoke-id]}]
+           (foreign-select-one [(keypath agent-invoke-id) :exceptions]
+                               root-pstate
+                               {:pkey task-id})
+         ))
+
+       (reset! VAL-ATOM 5)
+       (bind inv (aor/agent-initiate foo))
+
+       (h/release-semaphore SEM 1)
+       (is (condition-attained? (= 1
+                                   (-> inv
+                                       get-exceptions
+                                       count))))
+       (is (= "clojure.lang.ExceptionInfo: intentional {:v 4}"
+              (-> inv
+                  get-exceptions
+                  first
+                  h/first-line)))
+
+       (h/release-semaphore SEM 1000)
+       (is (condition-attained? (= 4
+                                   (-> inv
+                                       get-exceptions
+                                       count))))
+       (is (= ["clojure.lang.ExceptionInfo: intentional {:v 4}"
+               "clojure.lang.ExceptionInfo: intentional {:v 3}"
+               "clojure.lang.ExceptionInfo: intentional {:v 2}"
+               "clojure.lang.ExceptionInfo: intentional {:v 1}"]
+              (->> inv
+                   get-exceptions
+                   (mapv h/first-line))))
+
+       (try
+         (aor/agent-result foo inv)
+         (is false)
+         (catch Exception e
+           (let [e (ex-cause e)]
+             (is (instance? AgentFailedException e))
+             (is (str/includes?
+                  (ex-message e)
+                  "clojure.lang.ExceptionInfo: intentional {:v 1}"))
+           )))
+
+       (try
+         (aor/agent-next-step foo inv)
+         (is false)
+         (catch Exception e
+           (let [e (ex-cause e)]
+             (is (instance? AgentFailedException e))
+             (is (str/includes?
+                  (ex-message e)
+                  "clojure.lang.ExceptionInfo: intentional {:v 1}"))
+           )))
+      ))))
