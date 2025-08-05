@@ -59,16 +59,39 @@
            ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
               content)))))
 
+
+(defui expandable-item-component [{:keys [item color title truncate-length]
+                                   :or {truncate-length 50}}]
+  (let [[show-modal set-show-modal] (uix/use-state false)
+        item-str (if (string? item) item (pr-str item))
+        is-long? (> (count item-str) truncate-length)
+        truncated-str (if is-long?
+                        (str (subs item-str 0 (- truncate-length 3)) "...")
+                        item-str)]
+    ($ :<>
+       ($ :div {:className (str "text-" color "-500 mt-1")}
+          ($ :span {:className (str "break-words cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded")
+                    :onClick (fn [e]
+                               (.stopPropagation e)
+                               (set-show-modal true))
+                    :title "Click to expand"}
+             truncated-str))
+       
+       ;; Popup modal
+       (when show-modal
+         ($ expandable-popup-modal {:content item-str
+                                    :title title
+                                    :on-close #(set-show-modal false)})))))
+
 (defui expandable-list-component [{:keys [items color title-singular truncate-length]
                                    :or {truncate-length 50}}]
-  (let [[selected-item set-selected-item] (uix/use-state nil)
-        items-vec (if (array? items) (js->clj items) items)]
+  (let [[selected-item set-selected-item] (uix/use-state nil)]
     ($ :<>
-       (if (> (count items-vec) 1)
-         ;; Multiple items - show as numbered list
          ($ :div {:className (str "text-" color "-500 mt-1 space-y-1")}
-            (for [[idx item] (map-indexed vector items-vec)]
-              (let [item-str (pr-str item)
+            (for [[idx item] (map-indexed vector items)]
+              (let [item-str (if (string? item) 
+                                   item 
+                                   (pr-str item))
                     is-long? (> (count item-str) truncate-length)
                     truncated-str (if is-long?
                                     (str (subs item-str 0 (- truncate-length 3)) "...")
@@ -77,41 +100,15 @@
                          :className "flex items-center gap-2"}
                    ($ :span {:className (str "text-" color "-400 text-xs")}
                       (str (inc idx) "."))
-                   ($ :span {:className (str "break-words " 
-                                             (if is-long? 
-                                               (str "cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded")
-                                               ""))
-                             :onClick (when is-long?
-                                        (fn [e]
-                                          (.stopPropagation e)
-                                          (set-selected-item {:content item-str 
-                                                              :index idx 
-                                                              :title (str title-singular " " (inc idx))})))
-                             :title (when is-long? "Click to expand")}
+                                    ($ :span {:className (str "break-words cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded")
+                           :onClick (fn [e]
+                                      (.stopPropagation e)
+                                      (set-selected-item {:content (if (string? item) item (pr-str item))
+                                                          :index idx 
+                                                          :title (str title-singular " " (inc idx))}))
+                           :title "Click to expand"}
                       truncated-str)))))
          
-         ;; Single item - show without numbering
-         (when (= (count items-vec) 1)
-           (let [item (first items-vec)
-                 item-str (pr-str item)
-                 is-long? (> (count item-str) truncate-length)
-                 truncated-str (if is-long?
-                                 (str (subs item-str 0 (- truncate-length 3)) "...")
-                                 item-str)]
-             ($ :div {:className (str "text-" color "-500 mt-1")}
-                ($ :span {:className (str "break-words " 
-                                          (if is-long? 
-                                            (str "cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded")
-                                            ""))
-                          :onClick (when is-long?
-                                     (fn [e]
-                                       (.stopPropagation e)
-                                       (set-selected-item {:content item-str 
-                                                           :index 0 
-                                                           :title title-singular})))
-                          :title (when is-long? "Click to expand")}
-                   truncated-str)))))
-       
        ;; Popup modal
        (when selected-item
          ($ expandable-popup-modal {:content (:content selected-item)
@@ -148,19 +145,22 @@
                
                ;; Input Section
                (when input
+                 (println "input" input)
                  ($ :div {:className "bg-green-50 p-3 rounded-md"}
                     ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
-                    ($ :div {:className "text-sm text-green-600 font-mono break-words"}
-                       (if (array? input)
-                         (pr-str (js->clj input))
-                         (str input)))))
+                    ($ expandable-list-component {:items input
+                                                  :color "green"
+                                                  :title-singular "Input"
+                                                  :truncate-length 100})))
                
                ;; Result Section - only show if result is not nil
                (when result
                  ($ :div {:className "bg-blue-50 p-3 rounded-md"}
                     ($ :div {:className "text-sm font-medium text-blue-700 mb-1"} "Result")
-                    ($ :div {:className "text-sm text-blue-600 font-mono break-words"}
-                       (pr-str (js->clj result)))))
+                    ($ expandable-item-component {:item result
+                                                  :color "blue"
+                                                  :title "Result"
+                                                  :truncate-length 100})))
                
                ;; Timing Section
                (when (and start-time finish-time)
@@ -207,11 +207,19 @@
                                       ($ :span {:className "text-sm font-mono text-sky-700"} 
                                          op-name))
                                    (when op-params
-                                     ($ :div {:className "text-xs text-sky-600 mt-1 font-mono break-words"}
-                                        (str "params: " (pr-str (js->clj op-params)))))
+                                     ($ :div {:className "text-xs text-sky-600 mt-1"}
+                                        ($ :span {:className "font-medium"} "params: ")
+                                        ($ expandable-list-component {:items op-params
+                                                                      :color "sky"
+                                                                      :title-singular "Parameter"
+                                                                      :truncate-length 60})))
                                    (when op-result
-                                     ($ :div {:className "text-xs text-sky-600 mt-1 font-mono break-words"}
-                                        (str "result: " (pr-str (js->clj op-result))))))
+                                     ($ :div {:className "text-xs text-sky-600 mt-1"}
+                                        ($ :span {:className "font-medium"} "result: ")
+                                        ($ expandable-item-component {:item op-result
+                                                                      :color "sky"
+                                                                      :title "Operation Result"
+                                                                      :truncate-length 60}))))
                                 (when duration
                                   ($ :div {:className "text-xs text-sky-500 font-mono"
                                            :title (str (format-ms start-time)
@@ -301,9 +309,11 @@
                  ($ :div {:className "text-sm text-gray-600 mb-4"}
                     "This node's execution will be re-determined when the fork is executed.")
                  ($ :div {:className "text-xs text-gray-500"}
-                    ($ :div (str "Current input: " (if (array? original-input)
-                                                     (pr-str (js->clj original-input))
-                                                     (str original-input))))))
+                    ($ :span {:className "font-medium"} "Current input: ")
+                    ($ expandable-list-component {:items (if (array? original-input) original-input [original-input])
+                                                  :color "gray"
+                                                  :title-singular "Input"
+                                                  :truncate-length 80}))))
               
               ;; Show normal editing interface for unaffected nodes
               ($ :div {:className "space-y-4"}
@@ -319,9 +329,11 @@
                                   :placeholder "Enter new input value..."}))
                  
                  ($ :div {:className "text-xs text-gray-500"}
-                    ($ :div (str "Original: " (if (array? original-input)
-                                                (pr-str (js->clj original-input))
-                                                (str original-input))))))))))))
+                    ($ :span {:className "font-medium"} "Original: ")
+                    ($ expandable-list-component {:items (if (array? original-input) original-input [original-input])
+                                                  :color "gray"
+                                                  :title-singular "Original Input"
+                                                  :truncate-length 80}))))))))
 
 (defui stats-panel [{:keys [graph-data]}]
   (let [total-nodes (count graph-data)
