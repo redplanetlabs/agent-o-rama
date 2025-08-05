@@ -48,6 +48,10 @@
     (throw (h/ex-info "Unexpected type" {:type (class data)}))
   ))
 
+(defn next-agent-task
+  [num-partitions]
+  (rand-int num-partitions))
+
 (defdepotpartitioner agent-depot-partitioner
   [data num-partitions]
   (cond (or (aor-types/NodeComplete? data)
@@ -58,7 +62,7 @@
         (:agent-task-id data)
 
         :else
-        (rand-int num-partitions)))
+        (next-agent-task num-partitions)))
 
 (defn task-id-key-partitioner
   [num-partitions task-id]

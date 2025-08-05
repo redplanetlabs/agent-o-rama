@@ -125,9 +125,12 @@
     (declare-depot* setup
                     (symbol (po/agent-failures-depot-name agent-name))
                     :random)
-
+    (declare-depot* setup
+                    (symbol (po/agent-gc-valid-invokes-depot-name agent-name))
+                    :random)
 
     (doseq [d [(symbol (po/agent-failures-depot-name agent-name))
+               (symbol (po/agent-gc-valid-invokes-depot-name agent-name))
                agent-config-depot-sym
                agent-streaming-depot-sym
                agent-human-depot-sym

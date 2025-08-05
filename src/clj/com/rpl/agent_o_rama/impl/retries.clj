@@ -117,6 +117,8 @@
                                        agent-name))
         agent-depot-sym       (symbol (po/agent-depot-name agent-name))
         failure-depot-sym     (symbol (po/agent-failures-depot-name agent-name))
+        gc-depot-sym          (symbol (po/agent-gc-valid-invokes-depot-name
+                                       agent-name))
         agent-root-pstate-sym (symbol (po/agent-root-task-global-name
                                        agent-name))
 
@@ -188,4 +190,9 @@
            failure-depot-sym
            ::trigger
            :append-ack)))
+
+     (source> gc-depot-sym :> %microbatch)
+      (%microbatch :> *tuple)
+      (|all)
+      (local-transform> [(keypath *tuple) NONE>] agent-valid-invokes-pstate-sym)
     )))

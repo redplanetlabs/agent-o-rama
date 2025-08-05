@@ -65,6 +65,10 @@
   [name]
   (str "*_agent-failures-depot-" name))
 
+(defn agent-gc-valid-invokes-depot-name
+  [name]
+  (str "*_agent-gc-valid-invokes-depot-" name))
+
 (defn agents-clients-name
   []
   "*_agents-clients")
@@ -222,6 +226,10 @@
 (defn agent-failures-depot-task-global
   [name]
   (this-module-pobject-task-global (agent-failures-depot-name name)))
+
+(defn agent-gc-valid-invokes-depot-task-global
+  [name]
+  (this-module-pobject-task-global (agent-gc-valid-invokes-depot-name name)))
 
 (defn agents-clients-task-global
   []

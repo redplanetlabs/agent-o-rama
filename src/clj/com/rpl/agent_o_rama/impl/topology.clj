@@ -1087,7 +1087,8 @@
    [$$root (po/agent-root-task-global *agent-name)
     $$root-count (po/agent-root-count-task-global *agent-name)
     $$nodes (po/agent-node-task-global *agent-name)
-    $$gc (po/agent-gc-invokes-task-global *agent-name)]
+    $$gc (po/agent-gc-invokes-task-global *agent-name)
+    *gc-valid-depot (po/agent-gc-valid-invokes-depot-task-global *agent-name)]
    (anode/read-config *agent-name
                       aor-types/MAX-TRACES-PER-TASK-CONFIG
                       :> *max-traces)
@@ -1100,20 +1101,26 @@
                       $$root
                       {:allow-yield? true}
                       :> *to-delete)
+       (ops/current-task-id :> *agent-task-id)
        (select>
          ALL
          *to-delete
          {:allow-yield? true}
-         :> [*agent-id {:keys [*root-invoke-id]}])
+         :> [*agent-id {:keys [*root-invoke-id *retry-num *result]}])
+       (filter> (some? *result))
        (local-transform> [(keypath *agent-id)
                           (multi-path [:forks NONE>]
                                       [:human-requests NONE>])]
                          $$root)
-       (|direct (ops/current-task-id))
+       (|direct *agent-task-id)
        ;; rare possibility it ticks again while partitioning and tries to delete
        ;; same elements concurrently
        (local-select> [(keypath *agent-id) (view some?)] $$root :> *exists?)
        (<<if *exists?
+         (<<if (> *retry-num 0)
+           (depot-partition-append! *gc-valid-depot
+                                    [*agent-task-id *agent-id]
+                                    :append-ack))
          (local-transform> [(keypath *root-invoke-id) (termval nil)] $$gc)
          (local-transform> [(keypath *agent-id) NONE>] $$root)
          (local-transform> (term dec) $$root-count))))
