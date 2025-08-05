@@ -35,7 +35,7 @@
 (defn agg-node? [node]
   (not (nil? (:agg-state node))))
 
-(defui arg-popup-modal [{:keys [arg arg-index on-close]}]
+(defui expandable-popup-modal [{:keys [content content-index title on-close]}]
   ($ :div {:className "fixed inset-0 flex items-center justify-center z-50"
            :style {:backgroundColor "rgba(0, 0, 0, 0.5)"}
            :onClick (fn [e]
@@ -48,7 +48,7 @@
                          (.stopPropagation e))}
         ($ :div {:className "p-4 border-b border-gray-200 flex justify-between items-center"}
            ($ :h3 {:className "text-lg font-medium text-gray-800"}
-              (str "Argument " (inc arg-index)))
+              title)
            ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer"
                        :onClick (fn [e]
                                   (.preventDefault e)
@@ -57,39 +57,67 @@
               "×"))
         ($ :div {:className "p-4 overflow-auto max-h-96"}
            ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
-              arg)))))
+              content)))))
 
-(defui emit-args-component [{:keys [args]}]
-  (let [[selected-arg set-selected-arg] (uix/use-state nil)
-        args-vec (js->clj args)]
+(defui expandable-list-component [{:keys [items color title-singular truncate-length]
+                                   :or {truncate-length 50}}]
+  (let [[selected-item set-selected-item] (uix/use-state nil)
+        items-vec (if (array? items) (js->clj items) items)]
     ($ :<>
-       ($ :div {:className "text-purple-500 mt-1 space-y-1"}
-          (for [[idx arg] (map-indexed vector args-vec)]
-            (let [arg-str (pr-str arg)
-                  is-long? (> (count arg-str) 50)
-                  truncated-str (if is-long?
-                                  (str (subs arg-str 0 47) "...")
-                                  arg-str)]
-              ($ :div {:key idx
-                       :className "flex items-center gap-2"}
-                 ($ :span {:className "text-purple-400 text-xs"}
-                    (str (inc idx) "."))
-                 ($ :span {:className (str "break-words " 
-                                           (if is-long? 
-                                             "cursor-pointer hover:bg-purple-100 px-1 py-0.5 rounded"
-                                             ""))
-                           :onClick (when is-long?
-                                      (fn [e]
-                                        (.stopPropagation e)
-                                        (set-selected-arg {:arg arg :index idx})))
-                           :title (when is-long? "Click to expand")}
-                    truncated-str)))))
+       (if (> (count items-vec) 1)
+         ;; Multiple items - show as numbered list
+         ($ :div {:className (str "text-" color "-500 mt-1 space-y-1")}
+            (for [[idx item] (map-indexed vector items-vec)]
+              (let [item-str (pr-str item)
+                    is-long? (> (count item-str) truncate-length)
+                    truncated-str (if is-long?
+                                    (str (subs item-str 0 (- truncate-length 3)) "...")
+                                    item-str)]
+                ($ :div {:key idx
+                         :className "flex items-center gap-2"}
+                   ($ :span {:className (str "text-" color "-400 text-xs")}
+                      (str (inc idx) "."))
+                   ($ :span {:className (str "break-words " 
+                                             (if is-long? 
+                                               (str "cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded")
+                                               ""))
+                             :onClick (when is-long?
+                                        (fn [e]
+                                          (.stopPropagation e)
+                                          (set-selected-item {:content item-str 
+                                                              :index idx 
+                                                              :title (str title-singular " " (inc idx))})))
+                             :title (when is-long? "Click to expand")}
+                      truncated-str)))))
+         
+         ;; Single item - show without numbering
+         (when (= (count items-vec) 1)
+           (let [item (first items-vec)
+                 item-str (pr-str item)
+                 is-long? (> (count item-str) truncate-length)
+                 truncated-str (if is-long?
+                                 (str (subs item-str 0 (- truncate-length 3)) "...")
+                                 item-str)]
+             ($ :div {:className (str "text-" color "-500 mt-1")}
+                ($ :span {:className (str "break-words " 
+                                          (if is-long? 
+                                            (str "cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded")
+                                            ""))
+                          :onClick (when is-long?
+                                     (fn [e]
+                                       (.stopPropagation e)
+                                       (set-selected-item {:content item-str 
+                                                           :index 0 
+                                                           :title title-singular})))
+                          :title (when is-long? "Click to expand")}
+                   truncated-str)))))
        
        ;; Popup modal
-       (when selected-arg
-         ($ arg-popup-modal {:arg (:arg selected-arg)
-                             :arg-index (:index selected-arg)
-                             :on-close #(set-selected-arg nil)})))))
+       (when selected-item
+         ($ expandable-popup-modal {:content (:content selected-item)
+                                    :content-index (:index selected-item)
+                                    :title (:title selected-item)
+                                    :on-close #(set-selected-item nil)})))))
 
 (defui selected-node-component [{:keys [selected-node graph-data handle-paginate-node loading-nodes flow-nodes set-selected-node set-nodes]}]
   (let [data (when selected-node 
@@ -224,7 +252,9 @@
                            ($ :div {:className "text-xs text-purple-600"}
                               ($ :div (str "→ " (:node-name emit)))
                               (when (:args emit)
-                                ($ emit-args-component {:args (:args emit)}))
+                                ($ expandable-list-component {:items (:args emit)
+                                                              :color "purple"
+                                                              :title-singular "Argument"}))
                               ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
                                  (str "ID: " emit-id))
                               (when is-loading
