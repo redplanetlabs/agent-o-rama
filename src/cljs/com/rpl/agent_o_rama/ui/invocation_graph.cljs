@@ -407,15 +407,31 @@
                                                  :is-phantom false)}))]
                         data)
         
-        edges (for [[from [idx to]]
-                    (s/select [s/ALL
-                               (s/collect-one s/FIRST)
-                               s/LAST
-                               (s/must :emits)
-                               s/INDEXED-VALS] data)]
-                {:id (str from (:invoke-id to) idx)
-                 :source (str from)
-                 :target (str (:invoke-id to))})
+        ;; 1. Existing Direct Edges from :emits
+        direct-edges (for [[from [idx to]]
+                           (s/select [s/ALL
+                                      (s/collect-one s/FIRST)
+                                      s/LAST
+                                      (s/must :emits)
+                                      s/INDEXED-VALS] data)]
+                       {:id (str from (:invoke-id to) idx)
+                        :source (str from)
+                        :target (str (:invoke-id to))
+                        :type "default"})
+        
+        ;; 2. NEW: Find and create Implicit Aggregation Edges
+        implicit-edges (for [[agg-node-id agg-node-data] data
+                             :let [start-node-id (:agg-start-invoke-id agg-node-data)]
+                             :when start-node-id] ; Filter for only aggNode completions
+                         {:id (str start-node-id "->" agg-node-id "-implicit")
+                          :source (str start-node-id)
+                          :target (str agg-node-id)
+                          :animated false
+                          :style {:strokeDasharray "5 5"
+                                  :strokeWidth 1
+                                  :stroke "#888888"}})
+        
+        edges (concat direct-edges implicit-edges)
         
         ;; Get missing child node IDs for a given parent node
         get-missing-children (fn [node-id]
