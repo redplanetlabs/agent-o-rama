@@ -58,8 +58,13 @@
     (declare-pstate*
      stream-topology
      (symbol (po/agent-root-task-global-name agent-name))
-     po/AGENT-INVOKE-PSTATE-SCHEMA
+     po/AGENT-ROOT-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
+    (declare-pstate*
+     stream-topology
+     (symbol (po/agent-root-count-task-global-name agent-name))
+     Long
+     {:initial-value 0})
     (declare-pstate*
      stream-topology
      (symbol (po/agent-active-invokes-task-global-name agent-name))

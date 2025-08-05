@@ -174,10 +174,14 @@
 (deframaop init-root
   [*agent-name *agent-id *retry-num *args]
   (<<with-substitutions
-   [$$root (po/agent-root-task-global *agent-name)]
+   [$$root (po/agent-root-task-global *agent-name)
+    $$root-count (po/agent-root-count-task-global *agent-name)]
    (fetch-graph-version *agent-name :> *version)
    (random-uuid :> *invoke-id)
    (h/current-time-millis :> *current-time-millis)
+   (local-select> [(keypath *agent-id) (view some?)] $$root :> *exists?)
+   (<<if (not *exists?)
+     (local-transform> (term inc) $$root-count))
    (local-transform>
     [(keypath *agent-id)
      (termval {:root-invoke-id    *invoke-id

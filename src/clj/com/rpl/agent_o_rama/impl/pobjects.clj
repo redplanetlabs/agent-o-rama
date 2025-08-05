@@ -77,7 +77,7 @@
   [agent-name]
   (str "$$_agent-root-" agent-name))
 
-(def AGENT-INVOKE-PSTATE-SCHEMA
+(def AGENT-ROOT-PSTATE-SCHEMA
   {Long
    (fixed-keys-schema
     {:root-invoke-id     UUID
@@ -96,6 +96,10 @@
                            :fork-context    ForkContext})
      :forks              (set-schema Long {:subindex? true}) ; agent ids
     })})
+
+(defn agent-root-count-task-global-name
+  [agent-name]
+  (str "$$_agent-root-count-" agent-name))
 
 (defn agent-active-invokes-task-global-name
   [agent-name]
@@ -230,6 +234,10 @@
 (defn agent-root-task-global
   [name]
   (this-module-pobject-task-global (agent-root-task-global-name name)))
+
+(defn agent-root-count-task-global
+  [name]
+  (this-module-pobject-task-global (agent-root-count-task-global-name name)))
 
 (defn agent-active-invokes-task-global
   [name]
