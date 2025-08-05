@@ -1125,14 +1125,23 @@
          (local-transform> [(keypath *agent-id) NONE>] $$root)
          (local-transform> (term dec) $$root-count))))
    (local-select> MAP-KEYS $$gc {:allow-yield? true} :> *invoke-id)
-   (local-select> [(keypath *invoke-id) :emits] $$nodes :> *emits)
+   (local-select> [(keypath *invoke-id)]
+                  $$nodes
+                  :> {:keys [*emits *started-agg? *agg-invoke-id]})
    (ops/current-task-id :> *start-task-id)
-   (loop<- [*emits (seq *emits)]
-     (<<if (empty? *emits)
+   (<<ramafn %to-tuple
+     [{:keys [*target-task-id *invoke-id]}]
+     (:> [*target-task-id *invoke-id]))
+   (mapv %to-tuple *emits :> *tuples)
+   (<<if *started-agg?
+     (conj *tuples [*start-task-id *agg-invoke-id] :> *tuples)
+    (else>)
+     (identity *tuples :> *tuples))
+   (loop<- [*tuples (seq *tuples)]
+     (<<if (empty? *tuples)
        (:>)
       (else>)
-       (first *emits
-              :> {*emit-invoke-id :invoke-id *emit-task-id :target-task-id})
+       (first *emits :> [*emit-task-id *emit-invoke-id])
        (|direct *emit-task-id)
        (local-transform> [(keypath *emit-invoke-id) (termval nil)] $$gc)
        (continue> (next *emits))))
