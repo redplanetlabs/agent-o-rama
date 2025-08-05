@@ -35,6 +35,53 @@
 (defn agg-node? [node]
   (not (nil? (:agg-state node))))
 
+(defui arg-popup-modal [{:keys [arg arg-index on-close]}]
+  ($ :div {:className "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+           :onClick on-close}
+     ($ :div {:className "bg-white rounded-lg shadow-xl max-w-4xl max-h-[80vh] overflow-hidden"
+              :onClick (fn [e] (.stopPropagation e))}
+        ($ :div {:className "p-4 border-b border-gray-200 flex justify-between items-center"}
+           ($ :h3 {:className "text-lg font-medium text-gray-800"}
+              (str "Argument " (inc arg-index)))
+           ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold"
+                       :onClick on-close}
+              "×"))
+        ($ :div {:className "p-4 overflow-auto max-h-96"}
+           ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
+              (pr-str (js->clj arg)))))))
+
+(defui emit-args-component [{:keys [args]}]
+  (let [[selected-arg set-selected-arg] (uix/use-state nil)
+        args-vec (js->clj args)]
+    ($ :<>
+       ($ :div {:className "text-purple-500 mt-1 space-y-1"}
+          (for [[idx arg] (map-indexed vector args-vec)]
+            (let [arg-str (pr-str arg)
+                  is-long? (> (count arg-str) 50)
+                  truncated-str (if is-long?
+                                  (str (subs arg-str 0 47) "...")
+                                  arg-str)]
+              ($ :div {:key idx
+                       :className "flex items-center gap-2"}
+                 ($ :span {:className "text-purple-400 text-xs"}
+                    (str (inc idx) "."))
+                 ($ :span {:className (str "break-words " 
+                                           (if is-long? 
+                                             "cursor-pointer hover:bg-purple-100 px-1 py-0.5 rounded"
+                                             ""))
+                           :onClick (when is-long?
+                                      (fn [e]
+                                        (.stopPropagation e)
+                                        (set-selected-arg {:arg arg :index idx})))
+                           :title (when is-long? "Click to expand")}
+                    truncated-str)))))
+       
+       ;; Popup modal
+       (when selected-arg
+         ($ arg-popup-modal {:arg (:arg selected-arg)
+                             :arg-index (:index selected-arg)
+                             :on-close #(set-selected-arg nil)})))))
+
 (defui selected-node-component [{:keys [selected-node graph-data handle-paginate-node loading-nodes flow-nodes set-selected-node set-nodes]}]
   (let [data (when selected-node 
                (js->clj (.-data selected-node) :keywordize-keys true))
@@ -140,7 +187,7 @@
               ($ :div {:className "mt-4 bg-purple-50 p-3 rounded-md"}
                  ($ :div {:className "text-sm font-medium text-purple-700 mb-2"} 
                     (str "Emits (" (count emits) ")"))
-                 ($ :div {:className "grid grid-cols-1 md:grid-cols-2 gap-2"}
+                 ($ :div {:className "space-y-2"}
                     (for [emit (js->clj emits :keywordize-keys true)]
                       (let [emit-id (str (:invoke-id emit))
                             is-loaded (contains? graph-data (:invoke-id emit))
@@ -168,8 +215,7 @@
                            ($ :div {:className "text-xs text-purple-600"}
                               ($ :div (str "→ " (:node-name emit)))
                               (when (:args emit)
-                                ($ :div {:className "text-purple-500 mt-1 break-words"}
-                                   (pr-str (js->clj (:args emit)))))
+                                ($ emit-args-component {:args (:args emit)}))
                               ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
                                  (str "ID: " emit-id))
                               (when is-loading
