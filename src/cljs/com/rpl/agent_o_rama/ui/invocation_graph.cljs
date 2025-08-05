@@ -184,47 +184,57 @@
                     (str "Operations (" (count (:nested-ops data)) ")"))
                  ($ :div {:className "space-y-2"}
                     (for [op (:nested-ops data)]
-                      (do
-                        (println "op" op)
-
-                        (let [info (:info op)
-                              op-type (get info :type)
-                              op-name (get info :op) 
-                              op-params (get info :params)
-                              op-result (get info :result)
-                              start-time (:start-time-millis op)
-                              finish-time (:finish-time-millis op)
-                              duration (when (and start-time finish-time)
-                                         (- finish-time start-time))]
-                          ($ :div {:key (str start-time "-" finish-time)
-                                   :className "bg-white p-3 rounded border border-sky-200"}
-                             ($ :div {:className "flex justify-between items-start mb-2"}
-                                ($ :div {:className "flex-1"}
-                                   ($ :div {:className "flex items-center gap-2"}
-                                      ($ :span {:className "text-sm font-medium text-sky-800 bg-sky-100 px-2 py-1 rounded"} 
-                                         op-type)
+                      (let [info (:info op)
+                            op-type (:type op)  ; type is at op level, not in info
+                            op-input (:input info)  ; input is nested inside info
+                            op-response (:response op)
+                            start-time (:start-time-millis op)
+                            finish-time (:finish-time-millis op)
+                            duration (when (and start-time finish-time)
+                                       (- finish-time start-time))]
+                        ($ :div {:key (str start-time "-" finish-time)
+                                 :className "bg-white p-3 rounded border border-sky-200"}
+                           ($ :div {:className "flex justify-between items-start mb-2"}
+                              ($ :div {:className "flex-1"}
+                                 ($ :div {:className "flex items-center gap-2"}
+                                    ($ :span {:className "text-sm font-medium text-sky-800 bg-sky-100 px-2 py-1 rounded"} 
+                                       op-type)
+                                    (when (:objectName info)
                                       ($ :span {:className "text-sm font-mono text-sky-700"} 
-                                         op-name))
-                                   (when op-params
-                                     ($ :div {:className "text-xs text-sky-600 mt-1"}
-                                        ($ :span {:className "font-medium"} "params: ")
-                                        ($ expandable-list-component {:items op-params
-                                                                      :color "sky"
-                                                                      :title-singular "Parameter"
-                                                                      :truncate-length 60})))
-                                   (when op-result
-                                     ($ :div {:className "text-xs text-sky-600 mt-1"}
-                                        ($ :span {:className "font-medium"} "result: ")
-                                        ($ expandable-item-component {:item op-result
-                                                                      :color "sky"
-                                                                      :title "Operation Result"
-                                                                      :truncate-length 60}))))
-                                (when duration
-                                  ($ :div {:className "text-xs text-sky-500 font-mono"
-                                           :title (str (format-ms start-time)
-                                                       " to "
-                                                       (format-ms finish-time))}
-                                     (str duration "ms")))))))))))
+                                         (:objectName info))))
+                                 
+                                 ;; Model Info (if available)
+                                 (when (and info (or (:modelName info) (:totalTokenCount info)))
+                                   ($ :div {:className "text-xs text-sky-600 mt-1"}
+                                      ($ :span {:className "font-medium"} "model: ")
+                                      ($ :span {:className "text-sky-500"}
+                                         (str (or (:modelName info) "unknown")
+                                              (when (:totalTokenCount info)
+                                                (str " (" (:totalTokenCount info) " tokens)"))))))
+                                 
+                                 ;; Input (for model calls)
+                                 (when op-input
+                                   ($ :div {:className "text-xs text-sky-600 mt-1"}
+                                      ($ :span {:className "font-medium"} "input: ")
+                                      ($ expandable-list-component {:items op-input
+                                                                    :color "sky"
+                                                                    :title-singular "Input Message"
+                                                                    :truncate-length 60})))
+                                 
+                                 ;; Response (for model calls)
+                                 (when op-response
+                                   ($ :div {:className "text-xs text-sky-600 mt-1"}
+                                      ($ :span {:className "font-medium"} "response: ")
+                                      ($ expandable-item-component {:item op-response
+                                                                    :color "sky"
+                                                                    :title "Model Response"
+                                                                    :truncate-length 60}))))
+                              (when duration
+                                ($ :div {:className "text-xs text-sky-500 font-mono"
+                                         :title (str (format-ms start-time)
+                                                     " to "
+                                                     (format-ms finish-time))}
+                                   (str duration "ms"))))))))))
             
                ;; Emits Section (full width)
             (when (and emits (> (count emits) 0))
