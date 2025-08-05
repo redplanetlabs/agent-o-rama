@@ -263,6 +263,7 @@
   (let [[args set-args] (uix/use-state "")
         [result set-result] (uix/use-state nil)
         [error-msg set-error-msg] (uix/use-state nil)
+        [location navigate] (useLocation)
         
         run-agent (common/use-mutation 
                    {:mutation-fn (fn [variables]
@@ -273,8 +274,11 @@
                                      (common/post (str "/api/agents/" module-id "/" agent-name "/invocations")
                                                   {:args parsed-args})))
                     :on-success (fn [data]
-                                  (set-result data)
-                                  (set-error-msg nil))
+                                  (set-error-msg nil)
+                                  ;; Navigate to the trace instead of showing result
+                                  (let [trace-url (str "/agents/" module-id "/" agent-name "/invocations/" 
+                                                       (:task-id data) "-" (:invoke-id data))]
+                                    (navigate trace-url)))
                     :on-error (fn [error]
                                 (set-error-msg (str "Error: " (or (.-message error) "Unknown error")))
                                 (set-result nil))})
@@ -303,16 +307,10 @@
                               "bg-blue-600 hover:bg-blue-700")}
                 (if (:loading? run-agent) "Running..." "Submit"))))
        
-       ;; Show results/errors
-       (when (or result error-msg)
-         ($ :div.mt-4.p-3.rounded-md
-            {:className (if error-msg "bg-red-50 border border-red-200" "bg-green-50 border border-green-200")}
-            (if error-msg
-              ($ :div.text-red-700.text-sm error-msg)
-              ($ :div
-                 ($ :div.text-green-700.text-sm.font-medium.mb-2 "Success!")
-                 ($ :pre.text-xs.text-gray-700.bg-white.p-2.rounded.border.overflow-auto
-                    (common/pp result))))))))) 
+       ;; Show errors only (success navigates to trace)
+       (when error-msg
+         ($ :div.mt-4.p-3.rounded-md.bg-red-50.border.border-red-200
+            ($ :div.text-red-700.text-sm error-msg))))))
 
 (defui agent []
   (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
