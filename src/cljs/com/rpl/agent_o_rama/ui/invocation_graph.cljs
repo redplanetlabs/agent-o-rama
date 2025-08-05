@@ -143,15 +143,6 @@
                      ($ :span {:className "text-sm font-medium text-indigo-700"} "ID")
                      ($ :span {:className "text-xs text-indigo-500 font-mono"} node-id)))
                
-               ;; Input Section
-               (when input
-                 (println "input" input)
-                 ($ :div {:className "bg-green-50 p-3 rounded-md"}
-                    ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
-                    ($ expandable-list-component {:items input
-                                                  :color "green"
-                                                  :title-singular "Input"
-                                                  :truncate-length 100})))
                
                ;; Result Section - only show if result is not nil
                (when result
@@ -178,6 +169,14 @@
                           ($ :span {:className "text-xs text-yellow-600"} "Finished")
                           ($ :span {:className "text-xs text-yellow-600 font-mono"} 
                              (.toLocaleTimeString (js/Date. finish-time))))))))
+            
+            (when input
+              ($ :div {:className "bg-green-50 p-3 rounded-md mt-4"}
+                 ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
+                 ($ expandable-list-component {:items input
+                                               :color "green"
+                                               :title-singular "Input"
+                                               :truncate-length 100})))
             
             (when (not (empty? (:nested-ops data)))
               ($ :div {:className "bg-sky-50 p-3 rounded-md mt-4"}
@@ -227,7 +226,7 @@
                                                        (format-ms finish-time))}
                                      (str duration "ms")))))))))))
             
-            ;; Emits Section (full width)
+               ;; Emits Section (full width)
             (when (and emits (> (count emits) 0))
               ($ :div {:className "mt-4 bg-purple-50 p-3 rounded-md"}
                  ($ :div {:className "text-sm font-medium text-purple-700 mb-2"} 
