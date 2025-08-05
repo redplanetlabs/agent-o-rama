@@ -36,7 +36,8 @@
   (not (nil? (:agg-state node))))
 
 (defui arg-popup-modal [{:keys [arg arg-index on-close]}]
-  ($ :div {:className "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+  ($ :div {:className "fixed inset-0 flex items-center justify-center z-50"
+           :style {:backgroundColor "rgba(0, 0, 0, 0.5)"}
            :onClick on-close}
      ($ :div {:className "bg-white rounded-lg shadow-xl max-w-4xl max-h-[80vh] overflow-hidden"
               :onClick (fn [e] (.stopPropagation e))}
@@ -48,7 +49,7 @@
               "×"))
         ($ :div {:className "p-4 overflow-auto max-h-96"}
            ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
-              (pr-str (js->clj arg)))))))
+              arg)))))
 
 (defui emit-args-component [{:keys [args]}]
   (let [[selected-arg set-selected-arg] (uix/use-state nil)
