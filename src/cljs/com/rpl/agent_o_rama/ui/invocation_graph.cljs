@@ -38,14 +38,22 @@
 (defui arg-popup-modal [{:keys [arg arg-index on-close]}]
   ($ :div {:className "fixed inset-0 flex items-center justify-center z-50"
            :style {:backgroundColor "rgba(0, 0, 0, 0.5)"}
-           :onClick on-close}
+           :onClick (fn [e]
+                      (.preventDefault e)
+                      (.stopPropagation e)
+                      (on-close))}
      ($ :div {:className "bg-white rounded-lg shadow-xl max-w-4xl max-h-[80vh] overflow-hidden"
-              :onClick (fn [e] (.stopPropagation e))}
+              :onClick (fn [e] 
+                         (.preventDefault e)
+                         (.stopPropagation e))}
         ($ :div {:className "p-4 border-b border-gray-200 flex justify-between items-center"}
            ($ :h3 {:className "text-lg font-medium text-gray-800"}
               (str "Argument " (inc arg-index)))
-           ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold"
-                       :onClick on-close}
+           ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer"
+                       :onClick (fn [e]
+                                  (.preventDefault e)
+                                  (.stopPropagation e)
+                                  (on-close))}
               "×"))
         ($ :div {:className "p-4 overflow-auto max-h-96"}
            ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
@@ -189,14 +197,14 @@
                  ($ :div {:className "text-sm font-medium text-purple-700 mb-2"} 
                     (str "Emits (" (count emits) ")"))
                  ($ :div {:className "space-y-2"}
-                    (for [emit (js->clj emits :keywordize-keys true)]
+                    (for [[idx emit] (map-indexed vector (js->clj emits :keywordize-keys true))]
                       (let [emit-id (str (:invoke-id emit))
                             is-loaded (contains? graph-data (:invoke-id emit))
                             is-loading (contains? loading-nodes emit-id)
                             border-class (if is-loaded "border-purple-200" "border-dashed border-purple-300")
                             cursor-class (if is-loading "cursor-wait" "cursor-pointer")
                             bg-class (if is-loaded "bg-gray-50" "bg-white hover:bg-purple-50")]
-                        ($ :div {:key emit-id
+                        ($ :div {:key (str "emit-" idx)
                                  :className (str bg-class " p-2 rounded border " border-class " " cursor-class " transition-colors")
                                  :onClick (fn [e]
                                             (.stopPropagation e)
