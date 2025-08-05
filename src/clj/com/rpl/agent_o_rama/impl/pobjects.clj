@@ -53,6 +53,10 @@
   [name]
   (str "*_agent-config-depot-" name))
 
+(defn agent-gc-tick-depot-name
+  [name]
+  (str "*_agent-gc-tick-depot-" name))
+
 (defn agent-check-tick-depot-name
   [name]
   (str "*_agent-check-tick-depot-" name))

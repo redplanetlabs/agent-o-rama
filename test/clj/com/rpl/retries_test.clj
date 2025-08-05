@@ -67,7 +67,7 @@
         stalls-atom           (atom 0)
         init-retry-num-atom   (atom 0)]
     (with-redefs
-      [retries/SUBSTITUTE-TICK-DEPOT true
+      [i/SUBSTITUTE-TICK-DEPOTS true
        retries/checker-threshold-millis short-checker-threshold-millis
 
        aor-types/get-config (max-retries-override 0)
@@ -330,12 +330,12 @@
         failure-appends-atom (atom 0)
         init-retry-num-atom  (atom 0)]
     (with-redefs
-      [retries/SUBSTITUTE-TICK-DEPOT true
-       at/init-retry-num             (fn [] @init-retry-num-atom)
+      [i/SUBSTITUTE-TICK-DEPOTS true
+       at/init-retry-num        (fn [] @init-retry-num-atom)
 
-       aor-types/get-config          (max-retries-override 0)
+       aor-types/get-config     (max-retries-override 0)
 
-       anode/log-node-error          (fn [& args])
+       anode/log-node-error     (fn [& args])
 
        anode/hook:appended-agent-failure (fn [& args]
                                            (swap! failure-appends-atom inc))
@@ -505,7 +505,7 @@
 
        anode/log-node-error (fn [& args])
 
-       retries/SUBSTITUTE-TICK-DEPOT true
+       i/SUBSTITUTE-TICK-DEPOTS true
 
        apart/hook:filtered-event (fn [& args] (swap! EVENTS-ATOM conj :filter))
 

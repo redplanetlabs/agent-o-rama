@@ -14,7 +14,6 @@
     AgentNodeExecutorTaskGlobal]))
 
 (def DEFAULT-CHECKER-TICK-MILLIS 10000)
-(def SUBSTITUTE-TICK-DEPOT false)
 
 (deframafn checker-threshold-millis
   [*agent-name]

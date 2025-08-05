@@ -249,7 +249,7 @@
   [*agent-name {:keys [*agent-task-id *agent-id *expected-retry-num]}]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
-    $$gc-invokes (po/agent-gc-invokes-task-global *agent-name)
+    $$gc (po/agent-gc-invokes-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
    (hook:received-retry *agent-task-id *agent-id *expected-retry-num)
    (local-select> (keypath *agent-id)
@@ -294,7 +294,7 @@
     (else>)
      (<<if (= :restart *handle-mode)
        (local-transform> [(keypath *root-invoke-id) (termval nil)]
-                         $$gc-invokes)
+                         $$gc)
        (init-root *agent-name *agent-id *retry-num *args :> *root-invoke-id)
       (else>)
        (identity *root-invoke-id :> *root-invoke-id))
@@ -1080,3 +1080,58 @@
                       *agent-id
                       *retry-num
                       *node-op))))
+
+(deframaop handle-gc
+  [*agent-name]
+  (<<with-substitutions
+   [$$root (po/agent-root-task-global *agent-name)
+    $$root-count (po/agent-root-count-task-global *agent-name)
+    $$nodes (po/agent-node-task-global *agent-name)
+    $$gc (po/agent-gc-invokes-task-global *agent-name)]
+   (anode/read-config *agent-name
+                      aor-types/MAX-TRACES-PER-TASK-CONFIG
+                      :> *max-traces)
+   (|all)
+   (local-select> STAY $$root-count :> *curr-count)
+   (- *curr-count *max-traces :> *delete-count)
+   (<<if (pos? *delete-count)
+     (<<atomic
+       (local-select> (sorted-map-range-from-start *delete-count)
+                      $$root
+                      {:allow-yield? true}
+                      :> *to-delete)
+       (select>
+         ALL
+         *to-delete
+         {:allow-yield? true}
+         :> [*agent-id {:keys [*root-invoke-id]}])
+       (local-transform> [(keypath *agent-id)
+                          (multi-path [:forks NONE>]
+                                      [:human-requests NONE>])]
+                         $$root)
+       (|direct (ops/current-task-id))
+       ;; rare possibility it ticks again while partitioning and tries to delete
+       ;; same elements concurrently
+       (local-select> [(keypath *agent-id) (view some?)] $$root :> *exists?)
+       (<<if *exists?
+         (local-transform> [(keypath *root-invoke-id) (termval nil)] $$gc)
+         (local-transform> [(keypath *agent-id) NONE>] $$root)
+         (local-transform> (term dec) $$root-count))))
+   (local-select> MAP-KEYS $$gc {:allow-yield? true} :> *invoke-id)
+   (local-select> [(keypath *invoke-id) :emits] $$nodes :> *emits)
+   (ops/current-task-id :> *start-task-id)
+   (loop<- [*emits (seq *emits)]
+     (<<if (empty? *emits)
+       (:>)
+      (else>)
+       (first *emits
+              :> {*emit-invoke-id :invoke-id *emit-task-id :target-task-id})
+       (|direct *emit-task-id)
+       (local-transform> [(keypath *emit-invoke-id) (termval nil)] $$gc)
+       (continue> (next *emits))))
+   (|direct *start-task-id)
+   (local-transform> [(keypath *invoke-id) :agg-inputs NONE>] $$nodes)
+   (|direct *start-task-id)
+   (local-transform> [(keypath *invoke-id) NONE>] $$nodes)
+   (local-transform> [(keypath *invoke-id) NONE>] $$gc)
+  ))

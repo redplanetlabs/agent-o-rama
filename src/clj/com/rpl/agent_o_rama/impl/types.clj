@@ -240,7 +240,7 @@
 (def ALL-CONFIGS {})
 
 (defmacro defconfig
-  [name schema-fn config-default]
+  [name schema-fn doc config-default]
   (let [cname      (-> name
                        str
                        str/lower-case
@@ -255,6 +255,7 @@
        (def ~csym
          {:name      ~cname
           :schema-fn ~schema-fn
+          :doc       ~doc
           :default   ~config-default})
        (alter-var-root (var ALL-CONFIGS) assoc ~cname ~csym)
        (defn ~change-sym
@@ -281,14 +282,26 @@
   [v]
   (and (instance? Long v) (> v 0)))
 
-(defconfig MAX-RETRIES
-           natural-long?
-           3)
+(defconfig
+  MAX-RETRIES
+  natural-long?
+  "Maximum number of times an agent should retry after failing"
+  3)
 
-(defconfig STALL-CHECKER-THRESHOLD-MILLIS
-           positive-long?
-           10000)
+(defconfig
+  STALL-CHECKER-THRESHOLD-MILLIS
+  positive-long?
+  "Max delay after not seeing expected action to consider agent stalled and retry it"
+  10000)
 
-(defconfig ACQUIRE-OBJECT-TIMEOUT-MILLIS
-           positive-long?
-           30000)
+(defconfig
+  ACQUIRE-OBJECT-TIMEOUT-MILLIS
+  positive-long?
+  "Timeout to acquire an agent object within a node"
+  30000)
+
+(defconfig
+  MAX-TRACES-PER-TASK
+  positive-long?
+  "Maximum number of agent traces to keep per task"
+  5000)
