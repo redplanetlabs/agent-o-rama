@@ -12,7 +12,8 @@
   [["releases"
     {:id  "maven-releases"
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
-  :profiles {:dev      {:resource-paths ["test/resources/"]}
+  :profiles {:dev      {:resource-paths ["test/resources/"]
+                        :jvm-opts       ["-Xss6m"]}
              :provided {:dependencies
                         ;; TODO: fix Rama version
                         [[com.rpl/rama "0.0.6-SNAPSHOT"]
