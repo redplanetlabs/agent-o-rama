@@ -103,6 +103,42 @@
                      :invoke-id]
                     #(get implicit->real % %)))))
 
+;; Add this new function to agents.clj
+
+(defn generate-implicit-edges
+  "Compares the static historical graph with the dynamic invocation trace to find
+   paths to aggregation nodes that could have been taken but were not."
+  [invokes-map historical-graph]
+  (let [;; A map from {agg-node-invoke-id -> #{emitter-invoke-ids}}
+        actual-emits-to-aggs (into {}
+                                   (for [[id data] invokes-map
+                                         :when (:agg-state data)] ; Check if it's an agg-node trace
+                                     [id (set (map :invoke-id (:agg-inputs-first-10 data)))]))]
+    (->> invokes-map
+         (mapcat (fn [[invoke-id invoke-data]]
+                   (let [node-name     (:node invoke-data)
+                         static-info   (get-in historical-graph [:node-map node-name])
+                         agg-context   (:agg-context static-info)
+                         potential-outputs (:output-nodes static-info)]
+                     
+                     ;; Only consider nodes that are inside an aggregation context
+                     (when agg-context
+                       (for [out-name potential-outputs
+                             ;; We only care about potential outputs that ARE aggregation nodes
+                             :when (= :agg-node (get-in historical-graph [:node-map out-name :node-type]))]
+                         (let [;; This is the invoke-id of the aggregation this node belongs to.
+                               agg-node-invoke-id (:agg-invoke-id invoke-data)
+                               actual-emitters    (get actual-emits-to-aggs agg-node-invoke-id)
+                               did-emit?          (contains? actual-emitters invoke-id)]
+                           
+                           (when (and (not did-emit?) agg-node-invoke-id)
+                             {:source      (str invoke-id)
+                              :target      (str agg-node-invoke-id)
+                              :id          (str "implicit-" invoke-id "-" agg-node-invoke-id)
+                              :implicit?   true})))))))
+         (filter some?)
+         (vec))))
+
 (defn parse-url-pair [s]
   (let [[task-id agent-id] (clojure.string/split s #"-")]
     [(parse-long task-id) (parse-long agent-id)]))
@@ -121,31 +157,58 @@
          (str x))))
    data))
 
-(defn invoke-paginated 
+;; In agents.clj, replace the existing invoke-paginated function
+
+(defn invoke-paginated
   [{{:keys [module-id agent-name invoke-id]} :path-params
     {:strs [paginate-task-id missing-node-id]} :query-params
     :as req}]
-  
-  {:status 200
-   :body
-   (let [[agent-task-id agent-id] (parse-url-pair invoke-id)
 
-         pair
-         (cond
-           (and (string? paginate-task-id)
-                (string? missing-node-id))
-           [(parse-long paginate-task-id) (parse-long missing-node-id)]
-           (and (nil? paginate-task-id)
-                (nil? missing-node-id))
-           [agent-task-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                                              (:root-pstate (objects module-id agent-name))
-                                              {:pkey agent-task-id})])]
-     (->> (foreign-invoke-query (:tracing-query (objects module-id agent-name))
-                                agent-task-id
-                                [pair]
-                                100)
-          (transform [:invokes-map] remove-implicit-nodes)
-          filter-encodable))})
+  (let [;; Existing objects
+        client-objects (objects module-id agent-name)
+        root-pstate (:root-pstate client-objects)
+        history-pstate (:graph-history-pstate client-objects)
+        tracing-query (:tracing-query client-objects)
+        
+        [agent-task-id agent-id] (parse-url-pair invoke-id)
+        
+        ;; 1. Fetch the graph version for this specific invocation
+        graph-version (foreign-select-one [(keypath agent-id) :graph-version]
+                                          root-pstate
+                                          {:pkey agent-task-id})
+        
+        ;; 2. Fetch the corresponding historical graph
+        historical-graph (foreign-select-one [(keypath graph-version)]
+                                             history-pstate
+                                             {:pkey agent-task-id})
+        
+        ;; 3. Fetch the dynamic trace (existing logic)
+        root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                                           root-pstate
+                                           {:pkey agent-task-id})
+
+        pair (cond
+               (and (string? paginate-task-id) (string? missing-node-id))
+               [(parse-long paginate-task-id) (parse-long missing-node-id)]
+               
+               (and (nil? paginate-task-id) (nil? missing-node-id))
+               [agent-task-id root-invoke-id])]
+
+    (when-let [dynamic-trace (when (and pair historical-graph)
+                               (foreign-invoke-query tracing-query agent-task-id [pair] 100))]
+      (let [invokes-map-cleaned (-> (:invokes-map dynamic-trace)
+                                    (remove-implicit-nodes)
+                                    (filter-encodable))
+            
+            ;; 4. Generate implicit edges
+            implicit-edges (generate-implicit-edges invokes-map-cleaned historical-graph)]
+        {:status 200
+         :body {:invokes-map          invokes-map-cleaned
+                :next-task-invoke-pairs (:next-task-invoke-pairs dynamic-trace)
+                :implicit-edges       implicit-edges}}))))
+
+(-> t
+    (select [:invokes-map]))
 
 
 (defn fork [{{:keys [module-id agent-name]} :path-params

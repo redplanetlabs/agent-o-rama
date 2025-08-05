@@ -389,42 +389,40 @@
                              "Clear All Changes")))))))))
 
 
-(defn process-graph-data 
+(defn process-graph-data
   "Process raw graph data into nodes and edges for React Flow"
-  [data]
+  [invokes-map implicit-edges]
   (let [g (new (.. Dagre -graphlib -Graph))
-        
+
         nodes (s/select [s/ALL
                          (s/selected? s/LAST (s/must :emits))
-                         
                          (s/view (fn [[id data]]
                                    {:id (str id)
                                     :type "custom"
                                     :draggable false
-                                    :data (assoc data 
+                                    :data (assoc data
                                                  :label (str (:node data))
                                                  :node-id id
                                                  :is-phantom false)}))]
-                        data)
-        
-        edges (for [[from [idx to]]
-                    (s/select [s/ALL
-                               (s/collect-one s/FIRST)
-                               s/LAST
-                               (s/must :emits)
-                               s/INDEXED-VALS] data)]
-                {:id (str from (:invoke-id to) idx)
-                 :source (str from)
-                 :target (str (:invoke-id to))})
-        
-        ;; Get missing child node IDs for a given parent node
+                        invokes-map)
+
+        real-edges (for [[from [idx to]]
+                         (s/select [s/ALL
+                                    (s/collect-one s/FIRST)
+                                    s/LAST
+                                    (s/must :emits)
+                                    s/INDEXED-VALS] invokes-map)]
+                     {:id (str from (:invoke-id to) idx)
+                      :source (str from)
+                      :target (str (:invoke-id to))
+                      :implicit? false})
+
+        ;; All other nodes (phantoms etc.) from your original implementation...
         get-missing-children (fn [node-id]
-                               (when-let [node-data (get data node-id)]
+                              (when-let [node-data (get invokes-map node-id)]
                                  (let [emitted-ids (set (map :invoke-id (:emits node-data)))
-                                       node-ids (set (keys data))]
+                                       node-ids (set (keys invokes-map))]
                                    (filter #(not (contains? node-ids %)) emitted-ids))))
-        
-        ;; Create phantom nodes for pagination
         phantom-nodes (for [node nodes
                             :let [node-id (-> node :data :node-id)
                                   missing-children (get-missing-children node-id)]
@@ -436,19 +434,18 @@
                                   :parent-node-id node-id
                                   :missing-node-id missing-child-id
                                   :is-phantom true}}))
-        
-        ;; Flatten the nested phantom nodes
         phantom-nodes (apply concat phantom-nodes)
-        
-        ;; Create edges from parent nodes to their phantom children
         phantom-edges (for [phantom phantom-nodes
                             :let [parent-id (-> phantom :data :parent-node-id)]]
                         {:id (str parent-id "->" (:id phantom))
                          :source (str parent-id)
-                         :target (:id phantom)})
-        
+                         :target (:id phantom)
+                         :implicit? true ; Let's consider phantom edges as implicit too
+                         })
+
         all-nodes (concat nodes phantom-nodes)
-        all-edges (concat edges phantom-edges)]
+        ;; Combine real, implicit, and phantom edges
+        all-edges (concat real-edges implicit-edges phantom-edges)]
 
     (.setDefaultEdgeLabel g (fn [] #js {}))
     (.setGraph g #js {})
@@ -457,12 +454,12 @@
     (doall (for [node all-nodes]
              (.setNode g (:id node) (clj->js
                                      (merge node {:width 170 :height 40})))))
-    
+
     (Dagre/layout g)
-    
+
     (let [nodes-with-layout (for [node all-nodes
                                   :let [position (.node g (:id node))]]
-                              (assoc node 
+                              (assoc node
                                      :position position))]
       {:nodes nodes-with-layout
        :edges all-edges})))
@@ -505,6 +502,7 @@
         [graph-data set-graph-data] (uix/use-state {})
         [next-task-invoke-pairs set-next-task-invoke-pairs] (uix/use-state [])
         [forking-mode? set-forking-mode?] (uix/use-state false)
+        [implicit-edges set-implicit-edges] (uix/use-state []) ; State for implicit edges
         
         ;; Fetch initial data
         initial-data-url (str "/api/agents/"
@@ -534,6 +532,8 @@
            (fn []
              (when data
                (set-graph-data (:invokes-map data))
+               ;; NEW: Store implicit edges from the API response
+               (set-implicit-edges (get data :implicit-edges []))
                (set-next-task-invoke-pairs (:next-task-invoke-pairs data))))
            [data])
         
@@ -543,11 +543,17 @@
         _ (uix/use-effect
            (fn []
              (when (not (empty? graph-data))
-               (let [{:keys [nodes edges]} (process-graph-data graph-data)]
-                 (println "Updating flow with nodes:" (count nodes))
+               ;; NEW: Pass both data sets to process-graph-data
+               (let [{:keys [nodes edges]} (process-graph-data graph-data implicit-edges)]
+                 (println "Updating flow with nodes:" (count nodes) "and edges:" (count edges))
                  (set-nodes (clj->js nodes))
-                 (set-edges (clj->js edges)))))
-           [graph-data])
+                 ;; NEW: Apply styling based on :implicit? flag
+                 (set-edges (clj->js (for [edge edges]
+                                       (if (:implicit? edge)
+                                         (assoc edge :style #js {:strokeDasharray "5 5"
+                                                                 :stroke "#aaa"})
+                                         edge)))))))
+           [graph-data implicit-edges])
         
         ;; Pagination mutation
         pagination-mutation (common/use-mutation
