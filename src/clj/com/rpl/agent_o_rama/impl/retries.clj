@@ -2,6 +2,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [clojure.tools.logging :as cljlogging]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
@@ -111,6 +112,10 @@
   [agent-task-id agent-id retry-num]
   (hook:stall-detected agent-task-id agent-id retry-num))
 
+(defn log-warn
+  [msg data]
+  (cljlogging/warn msg data))
+
 (defn declare-check-impl
   [mb-topology agent-name]
   (let [check-tick-sym        (symbol (po/agent-check-tick-depot-name
@@ -135,6 +140,11 @@
       (<<batch
         (stalled-agent-ids agent-name
                            :> *agent-task-id *agent-id *retry-num)
+        (log-warn "Detected stall"
+                  {:agent-name    agent-name
+                   :agent-task-id *agent-task-id
+                   :agent-id      *agent-id
+                   :retry-num     *retry-num})
         (+group-by [*agent-task-id *agent-id]
           (aggs/+max *retry-num :> *retry-num))
         (hook:stall-detected* *agent-task-id *agent-id *retry-num)
@@ -192,7 +202,11 @@
            :append-ack)))
 
      (source> gc-depot-sym :> %microbatch)
-      (%microbatch :> *tuple)
-      (|all)
-      (local-transform> [(keypath *tuple) NONE>] agent-valid-invokes-pstate-sym)
+      ;; TODO: <<<<<>>>> this is working around assertion error in microbatch
+      ;; flusher
+      (<<batch
+        (%microbatch :> *tuple)
+        (|all)
+        (local-transform> [(keypath *tuple) NONE>]
+                          agent-valid-invokes-pstate-sym))
     )))

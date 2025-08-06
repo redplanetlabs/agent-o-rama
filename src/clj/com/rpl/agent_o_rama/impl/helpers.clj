@@ -121,12 +121,6 @@
   [s start-index]
   (count s))
 
-(defmacro returning
-  [expr & body]
-  `(let [rv# ~expr]
-     ~@body
-     rv#))
-
 (defn mk-semaphore
   (^Semaphore [permits] (mk-semaphore permits false))
   (^Semaphore [permits fair?] (Semaphore. permits fair?)))

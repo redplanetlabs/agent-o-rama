@@ -260,6 +260,8 @@
          (throw (h/ex-info "Finish time cannot be before start time"
                            {:start-time-millis  start-time-millis
                             :finish-time-millis finish-time-millis})))
+       (when-not (every? string? (keys info))
+         (throw (h/ex-info "Info map must contain string keys" {:info info})))
        (vswap! nested-ops-vol
                conj
                (aor-types/->NestedOpInfo
@@ -600,46 +602,46 @@
    ^AgentNode agent-node args ^RamaClientsTaskGlobal rama-clients
    fork-context acquire-timeout-millis]
   (fn []
-    (let [depot (.getAgentDepot rama-clients agent-name)
-          res   (try
-                  (h/thread-local-set! AGENT-NODE-CONTEXT agent-node)
-                  (h/thread-local-set!
-                   AgentDeclaredObjectsTaskGlobal/ACQUIRE_TIMEOUT_MILLIS
-                   acquire-timeout-millis)
-                  (h/returning (apply node-fn agent-node args)
-                    (-> agent-node
-                        get-streaming-recorder
-                        waitFinish))
-                  (catch Throwable t
-                    (log-node-error t
-                                    "Error during agent node execution"
-                                    {:node      node-name
-                                     :invoke-id invoke-id})
-                    (foreign-append!
-                     depot
-                     (aor-types/->valid-NodeFailure
-                      task-id
-                      invoke-id
-                      retry-num
-                      (h/throwable->str t))
-                     :append-ack)
-                    (throw t))
-                  (finally
-                    (release-acquired-objects! agent-node)))
-          {:keys [emits result nested-ops]} (agent-node-state agent-node)]
-      (foreign-append!
-       depot
-       (aor-types/->valid-NodeComplete
-        task-id
-        invoke-id
-        retry-num
-        res
-        emits
-        result
-        nested-ops
-        (h/current-time-millis)
-        fork-context)
-       :append-ack)
+    (let [depot (.getAgentDepot rama-clients agent-name)]
+      (try
+        (h/thread-local-set! AGENT-NODE-CONTEXT agent-node)
+        (h/thread-local-set!
+         AgentDeclaredObjectsTaskGlobal/ACQUIRE_TIMEOUT_MILLIS
+         acquire-timeout-millis)
+        (let [res (apply node-fn agent-node args)
+              {:keys [emits result nested-ops]} (agent-node-state agent-node)]
+          (-> agent-node
+              get-streaming-recorder
+              waitFinish)
+          (foreign-append!
+           depot
+           (aor-types/->valid-NodeComplete
+            task-id
+            invoke-id
+            retry-num
+            res
+            emits
+            result
+            nested-ops
+            (h/current-time-millis)
+            fork-context)
+           :append-ack))
+        (catch Throwable t
+          (log-node-error t
+                          "Error during agent node execution"
+                          {:node      node-name
+                           :invoke-id invoke-id})
+          (foreign-append!
+           depot
+           (aor-types/->valid-NodeFailure
+            task-id
+            invoke-id
+            retry-num
+            (h/throwable->str t))
+           :append-ack)
+          (throw t))
+        (finally
+          (release-acquired-objects! agent-node)))
     )))
 
 (deframafn read-config
