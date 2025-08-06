@@ -635,7 +635,7 @@
 
 (defn start-ui [ipc]
   (let [start-fn (requiring-resolve 'com.rpl.agent-o-rama.impl.ui.core/start-ui)]
-    (start-fn ipc)))
+    ^java.io.Closeable (start-fn ipc)))
 
 (defn stop-ui []
   (let [stop-fn (requiring-resolve 'com.rpl.agent-o-rama.impl.ui.core/stop-ui)]

@@ -207,10 +207,6 @@
                 :next-task-invoke-pairs (:next-task-invoke-pairs dynamic-trace)
                 :implicit-edges       implicit-edges}}))))
 
-(-> t
-    (select [:invokes-map]))
-
-
 (defn fork [{{:keys [module-id agent-name]} :path-params
              {:keys [changed-nodes invoke-id]} :body-params}]
   (let [^AgentInvoke result (let [[task-id agent-invoke-id]
