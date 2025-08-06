@@ -128,6 +128,9 @@
                  :invokes-map
                  keys
                  set))))
+         (bind root-count
+           (fn [task-id]
+             (foreign-select-one STAY root-count-pstate {:pkey task-id})))
 
          (foreign-append! config-depot
                           (aor-types/change-max-traces-per-task 3))
@@ -136,37 +139,27 @@
          (doseq [inv invs]
            (is (= [3 3] (aor/agent-result foo inv))))
 
-         (is (= 3
-                (foreign-select-one STAY root-count-pstate {:pkey 0})))
+         (is (= 3 (root-count 0)))
          (doseq [i (range 1 4)]
-           (is (=
-                0
-                (foreign-select-one STAY root-count-pstate {:pkey i}))))
-
+           (is (= 0 (root-count i))))
 
 
          (bind invs2 (vec (repeatedly 2 #(aor/agent-initiate foo))))
          (doseq [inv invs2]
            (is (= [3 3] (aor/agent-result foo inv))))
 
-         (is (= 5
-                (foreign-select-one STAY root-count-pstate {:pkey 0})))
+         (is (= 5 (root-count 0)))
          (doseq [i (range 1 4)]
-           (is (=
-                0
-                (foreign-select-one STAY root-count-pstate {:pkey i}))))
+           (is (= 0 (root-count i))))
 
          (dotimes [i 7]
            (println "ROUND" i)
            (foreign-append! gc-depot nil)
            (println "NUM NODES" (count (all-node-ids))))
 
-         (is (= 3
-                (foreign-select-one STAY root-count-pstate {:pkey 0})))
+         (is (= 3 (root-count 0)))
          (doseq [i (range 1 4)]
-           (is (=
-                0
-                (foreign-select-one STAY root-count-pstate {:pkey i}))))
+           (is (= 0 (root-count i))))
 
          (bind all-invs (all-agent-invs))
          (is (= all-invs (conj (set invs2) (last invs))))
@@ -181,21 +174,11 @@
 
 
          ;; TODO: <<<<>>>
-         ;; - capture traces for each
          ;; - gc does nothing at first
          ;;     - check that each trace fully exists after a few rounds
-         ;; - this should be 6 rounds worth (put printlns to check)
+         ;; - this should be 6 rounds worth
 
          ;; TODO: <<<<>>>>>
-         ;;  - verify full trace is GC'd after enough iterations
-         ;;     - how to actually verify this?
-         ;;     - can get trace, then GC it, then check that all nodes are gone
-         ;;       - don't have task IDs for all invoke IDs... would have to
-         ;;       reconstruct from emits
-         ;;         - could add node task ID to trace to make it easier
-         ;;         - or just check all tasks
-         ;;           - just do query for MAP-KEYS on each partition of $$nodes,
-         ;;           and verify all trace IDs are gone
          ;;  - verify GC of restarted traces (special case)
          ;;  - verify removal from $$gc
          ;;  - verify $$root-count maintained correctly

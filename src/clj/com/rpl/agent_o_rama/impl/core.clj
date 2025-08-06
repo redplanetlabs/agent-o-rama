@@ -28,7 +28,7 @@
     CompletableFuture]))
 
 (def SUBSTITUTE-TICK-DEPOTS false)
-(def DEFAULT-GC-TICK-MILLIS 15000)
+(def DEFAULT-GC-TICK-MILLIS 10000)
 
 ;; for agent-o-rama namespace
 (defn hook:building-plain-agent-object [name o])
