@@ -94,7 +94,15 @@
            (foreign-query ipc
                           module-name
                           (queries/tracing-query-name "foo")))
-
+         (bind assert-gc-state-empty!
+           (fn []
+             (let [elems (reduce concat
+                          []
+                          (for [i (range 4)]
+                            (foreign-select MAP-KEYS gc-pstate {:pkey i})))]
+               (when-not (empty? elems)
+                 (throw (ex-info "GC PState not empty" {:count (count elems)})))
+             )))
 
          (bind all-agent-invs
            (fn []
@@ -146,6 +154,7 @@
          ;; do many rounds of GC and verify agent IDs and node IDs don't change
          (dotimes [i 3]
            (foreign-append! gc-depot nil))
+         (assert-gc-state-empty!)
 
          (is (= (all-agent-invs) (set invs)))
 
@@ -161,9 +170,8 @@
            (is (= 0 (root-count i))))
 
          (dotimes [i 7]
-           (println "ROUND" i)
-           (foreign-append! gc-depot nil)
-           (println "NUM NODES" (count (all-node-ids))))
+           (foreign-append! gc-depot nil))
+         (assert-gc-state-empty!)
 
          (is (= 3 (root-count 0)))
          (doseq [i (range 1 4)]
@@ -178,8 +186,15 @@
 
 
 
+
          ;; TODO: <<<<>>>>>
+         ;;  - start a new invoke mid GC, and verify it GCs another invoke while
+         ;;  the other one is running
          ;;  - verify GC of restarted traces (special case)
+         ;;  - verify no GC of pending invokes
+         ;;  - verify valid-invokes removal
+         ;;   - just fail one once, then verify after GC that it gets removed
+         ;;     - will need wait-for-mb-processed-count on that mb topology
          ;;  - verify removal from $$gc
          ;;  - verify $$root-count maintained correctly
          ;;    - check with forks, retries, restarts

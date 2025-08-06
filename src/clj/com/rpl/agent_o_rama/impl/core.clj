@@ -78,7 +78,8 @@
     (declare-pstate*
      stream-topology
      (symbol (po/agent-gc-invokes-task-global-name agent-name))
-     po/AGENT-GC-ROOT-INVOKES-PSTATE-SCHEMA)
+     po/AGENT-GC-ROOT-INVOKES-PSTATE-SCHEMA
+     {:key-partitioner apart/task-id-key-partitioner})
     (declare-pstate*
      stream-topology
      (symbol (po/agent-streaming-results-task-global-name agent-name))
