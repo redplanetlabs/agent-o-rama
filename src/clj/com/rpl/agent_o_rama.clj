@@ -12,8 +12,7 @@
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
-   [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.agent-o-rama.impl.ui.core :as uic])
+   [com.rpl.agent-o-rama.impl.types :as aor-types])
   (:import
    [com.rpl.agentorama
     AgentClient
@@ -634,5 +633,10 @@
 
         :else (throw (h/ex-info "Unknown type" {:class (class stream)}))))
 
-(defn start-ui [ipc] (uic/start-ui ipc))
-(defn stop-ui [] (uic/stop-ui))
+(defn start-ui [ipc]
+  (let [start-fn (requiring-resolve 'com.rpl.agent-o-rama.impl.ui.core/start-ui)]
+    (start-fn ipc)))
+
+(defn stop-ui []
+  (let [stop-fn (requiring-resolve 'com.rpl.agent-o-rama.impl.ui.core/stop-ui)]
+    (stop-fn)))
