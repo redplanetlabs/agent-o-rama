@@ -143,6 +143,14 @@
          (doseq [i (range 1 4)]
            (is (= 0 (root-count i))))
 
+         ;; do many rounds of GC and verify agent IDs and node IDs don't change
+         (dotimes [i 3]
+           (foreign-append! gc-depot nil))
+
+         (is (= (all-agent-invs) (set invs)))
+
+         (is (= (all-node-ids)
+                (apply set/union (mapv trace-node-ids invs))))
 
          (bind invs2 (vec (repeatedly 2 #(aor/agent-initiate foo))))
          (doseq [inv invs2]
@@ -161,22 +169,14 @@
          (doseq [i (range 1 4)]
            (is (= 0 (root-count i))))
 
-         (bind all-invs (all-agent-invs))
-         (is (= all-invs (conj (set invs2) (last invs))))
+         (is (= (all-agent-invs) (conj (set invs2) (last invs))))
 
-         (bind all-node-ids (all-node-ids))
-         (is (= all-node-ids
+         (is (= (all-node-ids)
                 (set/union (trace-node-ids (first invs2))
                            (trace-node-ids (second invs2))
                            (trace-node-ids (last invs)))))
 
 
-
-
-         ;; TODO: <<<<>>>
-         ;; - gc does nothing at first
-         ;;     - check that each trace fully exists after a few rounds
-         ;; - this should be 6 rounds worth
 
          ;; TODO: <<<<>>>>>
          ;;  - verify GC of restarted traces (special case)
