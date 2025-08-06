@@ -633,9 +633,9 @@
 
         :else (throw (h/ex-info "Unknown type" {:class (class stream)}))))
 
-(defn start-ui [ipc]
+(defn start-ui ^java.io.Closeable [ipc]
   (let [start-fn (requiring-resolve 'com.rpl.agent-o-rama.impl.ui.core/start-ui)]
-    ^java.io.Closeable (start-fn ipc)))
+    (start-fn ipc)))
 
 (defn stop-ui []
   (let [stop-fn (requiring-resolve 'com.rpl.agent-o-rama.impl.ui.core/stop-ui)]

@@ -103,7 +103,6 @@
                      :invoke-id]
                     #(get implicit->real % %)))))
 
-;; Add this new function to agents.clj
 
 (defn generate-implicit-edges
   "Compares the static historical graph with the dynamic invocation trace to find
@@ -157,14 +156,12 @@
          (str x))))
    data))
 
-;; In agents.clj, replace the existing invoke-paginated function
-
 (defn invoke-paginated
   [{{:keys [module-id agent-name invoke-id]} :path-params
     {:strs [paginate-task-id missing-node-id]} :query-params
     :as req}]
 
-  (let [;; Existing objects
+  (let [
         client-objects (objects module-id agent-name)
         root-pstate (:root-pstate client-objects)
         history-pstate (:graph-history-pstate client-objects)

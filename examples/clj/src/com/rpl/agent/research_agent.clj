@@ -4,7 +4,6 @@
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
-   [com.rpl.agent-o-rama.ui.core :as uic]
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.langchain4j.json :as lj]
    [com.rpl.rama.aggs :as aggs]
@@ -614,7 +613,7 @@ Here are the sections to reflect on for writing: %s")
 (defn run-research-agent
   []
   (with-open [ipc (rtest/create-ipc)
-              ui (uic/start-ui ipc)]
+              ui (aor/start-ui ipc)]
     (rtest/launch-module! ipc ResearchAgentModule {:tasks 4 :threads 2})
     (let [module-name   (get-module-name ResearchAgentModule)
           agent-manager (aor/agent-manager ipc module-name)
