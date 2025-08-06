@@ -143,18 +143,18 @@
            (fn [task-id]
              (foreign-select-one STAY root-count-pstate {:pkey task-id})))
          (bind new-invs
-           (fn [task-id amt]
+           (fn [old-invs task-id amt]
              (reset! forced-task-atom task-id)
              (let [invs (vec (repeatedly amt #(aor/agent-initiate foo)))]
                (doseq [inv invs]
                  (is (= [3 3] (aor/agent-result foo inv))))
-               invs
+               (vec (concat old-invs invs))
              )))
 
          (foreign-append! config-depot
                           (aor-types/change-max-traces-per-task 3))
 
-         (bind invs (new-invs 0 3))
+         (bind invs-0 (new-invs [] 0 3))
 
          (is (= 3 (root-count 0)))
          (doseq [i (range 1 4)]
@@ -165,12 +165,12 @@
            (foreign-append! gc-depot nil))
          (assert-gc-state-empty!)
 
-         (is (= (all-agent-invs) (set invs)))
+         (is (= (all-agent-invs) (set invs-0)))
 
          (is (= (all-node-ids)
-                (apply set/union (mapv trace-node-ids invs))))
+                (all-trace-node-ids invs-0)))
 
-         (bind invs2 (new-invs 0 2))
+         (bind invs-0 (new-invs invs-0 0 2))
 
          (is (= 5 (root-count 0)))
          (doseq [i (range 1 4)]
@@ -184,16 +184,14 @@
          (doseq [i (range 1 4)]
            (is (= 0 (root-count i))))
 
-         (is (= (all-agent-invs) (conj (set invs2) (last invs))))
+         (is (= (all-agent-invs) (set (subvec invs-0 2))))
 
          (is (= (all-node-ids)
-                (set/union (trace-node-ids (first invs2))
-                           (trace-node-ids (second invs2))
-                           (trace-node-ids (last invs)))))
+                (all-trace-node-ids (subvec invs-0 2))))
 
-         (bind invs-1 (new-invs 1 3))
-         (bind invs-2 (new-invs 2 3))
-         (bind invs-3 (new-invs 3 3))
+         (bind invs-1 (new-invs [] 1 3))
+         (bind invs-2 (new-invs [] 2 3))
+         (bind invs-3 (new-invs [] 3 3))
 
 
          (dotimes [i 3]
@@ -201,23 +199,16 @@
          (assert-gc-state-empty!)
          (is (= (all-agent-invs)
                 (set/union
-                 (set invs2)
+                 (set (subvec invs-0 2))
                  (set invs-1)
                  (set invs-2)
-                 (set invs-3)
-                 #{(last invs)})))
+                 (set invs-3))))
          (is (= (all-node-ids)
-                (set/union (trace-node-ids (first invs2))
-                           (trace-node-ids (second invs2))
-                           (trace-node-ids (last invs))
+                (set/union (all-trace-node-ids (subvec invs-0 2))
                            (all-trace-node-ids invs-1)
                            (all-trace-node-ids invs-2)
                            (all-trace-node-ids invs-3)
                 )))
-
-
-
-
 
 
          ;; TODO: <<<<>>>>>
