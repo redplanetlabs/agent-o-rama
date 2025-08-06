@@ -136,16 +136,25 @@
                  :invokes-map
                  keys
                  set))))
+         (bind all-trace-node-ids
+           (fn [invs]
+             (set (apply set/union (mapv trace-node-ids invs)))))
          (bind root-count
            (fn [task-id]
              (foreign-select-one STAY root-count-pstate {:pkey task-id})))
+         (bind new-invs
+           (fn [task-id amt]
+             (reset! forced-task-atom task-id)
+             (let [invs (vec (repeatedly amt #(aor/agent-initiate foo)))]
+               (doseq [inv invs]
+                 (is (= [3 3] (aor/agent-result foo inv))))
+               invs
+             )))
 
          (foreign-append! config-depot
                           (aor-types/change-max-traces-per-task 3))
 
-         (bind invs (vec (repeatedly 3 #(aor/agent-initiate foo))))
-         (doseq [inv invs]
-           (is (= [3 3] (aor/agent-result foo inv))))
+         (bind invs (new-invs 0 3))
 
          (is (= 3 (root-count 0)))
          (doseq [i (range 1 4)]
@@ -161,9 +170,7 @@
          (is (= (all-node-ids)
                 (apply set/union (mapv trace-node-ids invs))))
 
-         (bind invs2 (vec (repeatedly 2 #(aor/agent-initiate foo))))
-         (doseq [inv invs2]
-           (is (= [3 3] (aor/agent-result foo inv))))
+         (bind invs2 (new-invs 0 2))
 
          (is (= 5 (root-count 0)))
          (doseq [i (range 1 4)]
@@ -183,6 +190,32 @@
                 (set/union (trace-node-ids (first invs2))
                            (trace-node-ids (second invs2))
                            (trace-node-ids (last invs)))))
+
+         (bind invs-1 (new-invs 1 3))
+         (bind invs-2 (new-invs 2 3))
+         (bind invs-3 (new-invs 3 3))
+
+
+         (dotimes [i 3]
+           (foreign-append! gc-depot nil))
+         (assert-gc-state-empty!)
+         (is (= (all-agent-invs)
+                (set/union
+                 (set invs2)
+                 (set invs-1)
+                 (set invs-2)
+                 (set invs-3)
+                 #{(last invs)})))
+         (is (= (all-node-ids)
+                (set/union (trace-node-ids (first invs2))
+                           (trace-node-ids (second invs2))
+                           (trace-node-ids (last invs))
+                           (all-trace-node-ids invs-1)
+                           (all-trace-node-ids invs-2)
+                           (all-trace-node-ids invs-3)
+                )))
+
+
 
 
 
