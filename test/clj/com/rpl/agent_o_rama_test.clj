@@ -16,7 +16,6 @@
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.agent-o-rama.ui.core :as uic]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
@@ -873,68 +872,67 @@
     (with-redefs [at/hook:writing-result
                   (fn [agent-task-id agent-id result]
                     (swap! results-atom conj result)
-                    )]
-      (with-open [ipc (rtest/create-ipc)
-                  ui (uic/start-ui ipc)]
+                  )]
+      (with-open [ipc (rtest/create-ipc)]
         (letlocals
          (bind module
-               (aor/agentmodule
-                [topology]
-                (->
-                 topology
-                 (aor/new-agent "foo")
-                 (aor/node "start"
-                           ["node1" "node2" "node3"]
-                           (fn [agent-node arg]
-                             (cond (= arg :regular)
-                                   (aor/emit! agent-node "node1")
+           (aor/agentmodule
+            [topology]
+            (->
+              topology
+              (aor/new-agent "foo")
+              (aor/node "start"
+                        ["node1" "node2" "node3"]
+                        (fn [agent-node arg]
+                          (cond (= arg :regular)
+                                (aor/emit! agent-node "node1")
 
-                                   (= arg :halt)
-                                   (aor/emit! agent-node "node2")
+                                (= arg :halt)
+                                (aor/emit! agent-node "node2")
 
-                                   :else
-                                   (aor/emit! agent-node "node3")
-                                   )
-                             ))
-                 (aor/node "node1"
-                           nil
-                           (fn [agent-node]
-                             (aor/result! agent-node "result1")
-                             ))
-                 (aor/node "node2"
-                           nil
-                           (fn [agent-node]
-                             ))
-                 (aor/node "node3"
-                           ["node2" "node4" "node5"]
-                           (fn [agent-node]
-                             ;; this makes the node4 and node5 emits happen on
-                             ;; different tasks
-                             (aor/emit! agent-node "node2")
-                             (aor/emit! agent-node "node4")
-                             (aor/emit! agent-node "node5")
-                             ))
-                 (aor/node "node4"
-                           nil
-                           (fn [agent-node]
-                             (aor/result! agent-node "result2")
-                             ))
-                 (aor/node "node5"
-                           nil
-                           (fn [agent-node]
-                             (aor/result! agent-node "result3")
-                             ))
-                 )))
+                                :else
+                                (aor/emit! agent-node "node3")
+                          )
+                        ))
+              (aor/node "node1"
+                        nil
+                        (fn [agent-node]
+                          (aor/result! agent-node "result1")
+                        ))
+              (aor/node "node2"
+                        nil
+                        (fn [agent-node]
+                        ))
+              (aor/node "node3"
+                        ["node2" "node4" "node5"]
+                        (fn [agent-node]
+                          ;; this makes the node4 and node5 emits happen on
+                          ;; different tasks
+                          (aor/emit! agent-node "node2")
+                          (aor/emit! agent-node "node4")
+                          (aor/emit! agent-node "node5")
+                        ))
+              (aor/node "node4"
+                        nil
+                        (fn [agent-node]
+                          (aor/result! agent-node "result2")
+                        ))
+              (aor/node "node5"
+                        nil
+                        (fn [agent-node]
+                          (aor/result! agent-node "result3")
+                        ))
+            )))
          (rtest/launch-module! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
          (bind depot
-               (foreign-depot ipc
-                              module-name
-                              (po/agent-depot-name "foo")))
+           (foreign-depot ipc
+                          module-name
+                          (po/agent-depot-name "foo")))
          (bind root-pstate
-               (foreign-pstate ipc
-                               module-name
-                               (po/agent-root-task-global-name "foo")))
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name "foo")))
 
          (is (= (aor-types/->AgentResult "result1" false)
                 (invoke-agent-and-return! depot root-pstate [:regular])))
@@ -946,7 +944,7 @@
          (is (or (= (aor-types/->AgentResult "result2" false) res)
                  (= (aor-types/->AgentResult "result3" false) res)))
          (is (= (first @results-atom) res))
-         )))))
+        )))))
 
 (deftest multiple-agents-test
   (with-open [ipc (rtest/create-ipc)]
