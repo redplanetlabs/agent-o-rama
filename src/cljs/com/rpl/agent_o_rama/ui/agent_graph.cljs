@@ -9,14 +9,28 @@
    
    [com.rpl.specter :as s]
 
-   ["react" :refer [useState useCallback useEffect]]
-   ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle]]
-   ["@dagrejs/dagre" :as Dagre]))
+   ["react" :refer [useState useCallback useEffect useLayoutEffect]]
+   ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle useReactFlow ReactFlowProvider]]
+   ["elkjs/lib/elk.bundled.js" :default ELK]))
 
-(defn process-graph-data [{:keys [graph]}]
-  (let [g (new (.. Dagre -graphlib -Graph))
+;; ELK instance
+(def elk (ELK.))
 
-        nodes (s/select [:node-map
+;; ELK layout options
+(def elk-options
+  #js {"elk.algorithm" "layered"
+       "elk.layered.spacing.nodeNodeBetweenLayers" "100"
+       "elk.spacing.nodeNode" "80"
+       "elk.direction" "DOWN"
+       "feedbackEdges" "true"
+       "edgeRouting" "POLYLINE"
+       "spacing.edgeEdgeBetweenLayers" "100"
+       "crossingMinimization.strategy" "LAYER_SWEEP"
+       "nodePlacement.strategy" "BRANDES_KOEPF"})
+
+(defn extract-graph-elements [{:keys [graph]}]
+  "Extract nodes and edges from graph data without layout"
+  (let [nodes (s/select [:node-map
                          s/MAP-KEYS
                          (s/view
                           (fn [k]
@@ -36,35 +50,74 @@
                 :output-nodes
                 s/ALL]
                graph)]
-    (.setDefaultEdgeLabel g (fn [] #js {}))
-    #_(.setGraph g {})
-    (.setGraph g #js {:rankdir "LR"})
+    {:nodes nodes
+     :edges (for [[frm to] edges] {:id (str frm "-" to) :source frm :target to
+     :markerEnd {:type "arrowclosed" :width 20 :height 20}
+     })}))
 
-    (doall (for [[frm to] edges] (.setEdge g frm to)))
-    (doall (for [node nodes] (.setNode g (:id node) (clj->js node))))
-    
-    (Dagre/layout g)
-    
-    (let [nodes-with-layout (for [node nodes] (assoc node :position (.node g (:id node))))
-          edges (for [[frm to] edges] {:id (str frm to) :source frm :target to})]
-      {:nodes nodes-with-layout :edges edges})))
+(defn get-layouted-elements [nodes edges options]
+  "Layout nodes and edges using ELK.js"
+  (let [is-horizontal false
+        graph #js {:id "root"
+                   :layoutOptions options
+                   :children (clj->js 
+                             (map (fn [node]
+                                    (-> node
+                                        (assoc :targetPosition (if is-horizontal "left" "top"))
+                                        (assoc :sourcePosition (if is-horizontal "right" "bottom"))
+                                        (assoc :width 170)
+                                        (assoc :height 40)))
+                                  nodes))
+                   :edges (clj->js edges)}]
+    (-> (.layout elk graph)
+        (.then (fn [layouted-graph]
+                 #js {:nodes (-> (.-children layouted-graph)
+                                (js->clj :keywordize-keys true)
+                                (->> (map (fn [node]
+                                           (-> node
+                                               (assoc :position {:x (:x node) :y (:y node)})
+                                               (dissoc :x :y))))))
+                      :edges (-> (.-edges layouted-graph)
+                                (js->clj :keywordize-keys true))}))
+        (.catch js/console.error))))
 
-(defui graph [{:keys [initial-data height selected-node set-selected-node fitView]}]
-  (let [;; Process current graph data
-        {:keys [nodes edges]} (process-graph-data initial-data)
+(defui graph-flow [{:keys [initial-data height selected-node set-selected-node]}]
+  (let [;; Extract initial nodes and edges
+        {:keys [nodes edges]} (extract-graph-elements initial-data)
         
         ;; Use React Flow's state management hooks
-        [flow-nodes set-nodes on-nodes-change] (useNodesState (clj->js nodes))
-        [flow-edges set-edges on-edges-change] (useEdgesState (clj->js edges))]
+        [flow-nodes set-nodes on-nodes-change] (useNodesState #js [])
+        [flow-edges set-edges on-edges-change] (useEdgesState #js [])
+        
+        ;; Get React Flow instance with fitView function
+        react-flow-instance (useReactFlow)
+        fit-view (when react-flow-instance (.-fitView react-flow-instance))
+        
+        ;; Track if initial layout has been done
+        [initial-layout-done? set-initial-layout-done] (useState false)]
     
-
+    ;; Calculate initial layout on mount - only when data changes
+    (useLayoutEffect
+     (fn []
+       (when (and nodes edges (not initial-layout-done?))
+         (let [opts elk-options]
+           (-> (get-layouted-elements nodes edges opts)
+               (.then (fn [result]
+                        (let [layouted-nodes (clj->js (.-nodes result))
+                              layouted-edges (clj->js (.-edges result))]
+                          (set-nodes layouted-nodes)
+                          (set-edges layouted-edges)
+                          (set-initial-layout-done true)
+                          (when (fn? fit-view) 
+                            (fit-view))))))))
+       js/undefined)
+     #js [nodes edges initial-layout-done? fit-view])
     
     ($ :div {:style {:width "100%" :height height}}
        ($ ReactFlow {:nodes flow-nodes 
                      :edges flow-edges
                      :onNodesChange on-nodes-change
                      :onEdgesChange on-edges-change
-                     :fitView fitView
                      :proOptions (clj->js {:hideAttribution true})
                      :nodeTypes
                      (clj->js {"custom"
@@ -86,12 +139,17 @@
                                        ($ :div {:className node-className
                                                 :style {:width "170px" :height "40px"}}
                                           label)
-                                       ($ Handle {:type "target" :position "left"})
-                                       ($ Handle {:type "source" :position "right"})))))})
-                     :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
+                                       ($ Handle {:type "target" :position "top"})
+                                       ($ Handle {:type "source" :position "bottom"})))))})
+                     :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}
+                                          :markerEnd {:type "arrowclosed" :width 20 :height 20}}
                      :onNodeClick (fn [_ node]
                                     (if (and selected-node (= (.-id node) (.-id selected-node)))
                                       (set-selected-node nil)
                                       (set-selected-node node)))}
           ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
           ($ Controls {:className "fill-gray-500 stroke-gray-500"})))))
+
+(defui graph [props]
+  ($ ReactFlowProvider
+     ($ graph-flow props)))

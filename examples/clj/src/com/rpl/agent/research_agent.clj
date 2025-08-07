@@ -450,11 +450,12 @@ Here are the sections to reflect on for writing: %s")
      ["create-analysts" "questions"]
      (fn [agent-node analysts options]
        (if
-         (human-yes?
+         #_(human-yes?
           agent-node
           (str
            "Do you have any feedback on this set of analysts? Answer 'yes' or 'no'.\n\n"
            (str/join "\n" (mapv str analysts))))
+         false
          (let [feedback (aor/get-human-input agent-node
                                              "What is your feedback?")]
            (aor/emit! agent-node "create-analysts" feedback options))
