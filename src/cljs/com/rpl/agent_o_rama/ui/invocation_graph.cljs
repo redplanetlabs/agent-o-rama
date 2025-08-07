@@ -404,18 +404,36 @@
                                                   :title-singular "Original Input"
                                                   :truncate-length 80}))))))))
 
-(defui stats-panel [{:keys [graph-data]}]
-  (let [total-nodes (count graph-data)
-        ;; Dummy values for now
-        total-execution-time 2347
-        total-tokens 45892
-        store-reads 127
-        store-writes 23
-        model-calls 156]
+(defui info-panel [{:keys [graph-data summary-data]}]
+  (let [result (:result summary-data)
+        failure? (:failure? result)
+        result-val (:val result)]
     
     ($ :div {:className "space-y-4"}
+       
+       ;; NEW: Final Result Panel
+       (when result
+         ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
+            ($ :div {:className "flex justify-between items-center mb-2"}
+               ($ :div {:className "text-sm font-medium text-gray-700"} "Final Result")
+               (if failure?
+                 ($ :span {:className "px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium"} "Failed")
+                 ($ :span {:className "px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium"} "Success")))
+            ($ expandable-item-component {:item result-val
+                                          :color (if failure? "red" "green")
+                                          :title "Final Result Details"})))
+
+       ($ :div {:className "text-sm font-medium text-gray-700 pt-2 border-t border-gray-200"} "Overall Stats")
+
        ;; Metrics grid
-       ($ :div {:className "grid grid-cols-1 gap-3"}
+       (let [total-nodes (count graph-data)
+             ;; Dummy values for now
+             total-execution-time 2347
+             total-tokens 45892
+             store-reads 127
+             store-writes 23
+             model-calls 156]
+         ($ :div {:className "grid grid-cols-1 gap-3"}
           ;; Execution time
           ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
              ($ :div {:className "flex justify-between items-center"}
@@ -452,10 +470,10 @@
                 ($ :div
                    ($ :div {:className "text-sm font-medium text-gray-700"} "Tokens"))
                 ($ :div {:className "text-right"}
-                   ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens))))))))))
+                   ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens)))))))))))
 
-(defui right-panel [{:keys [graph-data changed-nodes set-changed-nodes affected-nodes flow-nodes set-selected-node on-execute-fork on-clear-fork forking-mode? set-forking-mode? fork-loading? fork-error]}]
-  (let [[active-tab set-active-tab] (uix/use-state :stats)]
+(defui right-panel [{:keys [graph-data summary-data changed-nodes set-changed-nodes affected-nodes flow-nodes set-selected-node on-execute-fork on-clear-fork forking-mode? set-forking-mode? fork-loading? fork-error]}]
+  (let [[active-tab set-active-tab] (uix/use-state :info)]
     
     ;; Update forking mode when tab changes
     (uix/use-effect
@@ -468,11 +486,11 @@
        ($ :div {:className "border-b border-gray-200 p-4"}
           ($ :div {:className "flex space-x-1 bg-gray-100 rounded-lg p-1"}
              ($ :button {:className (str "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors "
-                                         (if (= active-tab :stats)
+                                         (if (= active-tab :info)
                                            "bg-white text-gray-900 shadow-sm"
                                            "text-gray-600 hover:text-gray-900"))
-                         :onClick #(set-active-tab :stats)}
-                "Stats")
+                         :onClick #(set-active-tab :info)}
+                "Info")
              ($ :button {:className (str "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors "
                                          (if (= active-tab :fork)
                                            "bg-white text-gray-900 shadow-sm"
@@ -483,7 +501,7 @@
        ;; Tab content
        ($ :div {:className "p-4 h-full overflow-y-auto"}
           (case active-tab
-            :stats ($ stats-panel {:graph-data graph-data})
+            :info ($ info-panel {:graph-data graph-data :summary-data summary-data})
             
             :fork (if (empty? changed-nodes)
                     ($ :div {:className "text-gray-500 text-center py-8"}
@@ -666,6 +684,7 @@
         [selected-node set-selected-node] (uix/use-state nil)
         [loading-nodes set-loading-nodes] (uix/use-state #{})
         [graph-data set-graph-data] (uix/use-state {})
+        [summary-data set-summary-data] (uix/use-state nil)
         [next-task-invoke-pairs set-next-task-invoke-pairs] (uix/use-state [])
         [forking-mode? set-forking-mode?] (uix/use-state false)
         [implicit-edges set-implicit-edges] (uix/use-state []) ; State for implicit edges
@@ -698,6 +717,7 @@
            (fn []
              (when data
                (set-graph-data (:invokes-map data))
+               (set-summary-data (:summary data))
                ;; NEW: Store implicit edges from the API response
                (set-implicit-edges (get data :implicit-edges []))
                (set-next-task-invoke-pairs (:next-task-invoke-pairs data))))
@@ -899,6 +919,7 @@
          
          ;; Always-visible right panel with tabs
          ($ right-panel {:graph-data graph-data
+                         :summary-data summary-data
                          :changed-nodes changed-nodes
                          :set-changed-nodes set-changed-nodes
                          :affected-nodes affected-nodes

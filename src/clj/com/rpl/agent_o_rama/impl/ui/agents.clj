@@ -156,6 +156,7 @@
          (str x))))
    data))
 
+
 (defn invoke-paginated
   [{{:keys [module-id agent-name invoke-id]} :path-params
     {:strs [paginate-task-id missing-node-id]} :query-params
@@ -169,17 +170,23 @@
         
         [agent-task-id agent-id] (parse-url-pair invoke-id)
         
-        ;; 1. Fetch the graph version for this specific invocation
-        graph-version (foreign-select-one [(keypath agent-id) :graph-version]
-                                          root-pstate
-                                          {:pkey agent-task-id})
+        ;; 1. Fetch the summary info for this invocation
+        ;;    (This is the main new piece of logic)
+        summary-info (foreign-select-one [
+                                          (keypath agent-id)
+                                          (submap [:invoke-args :result :start-time-millis :finish-time-millis :graph-version])]
+                                         root-pstate
+                                         {:pkey agent-task-id})
         
-        ;; 2. Fetch the corresponding historical graph
+        ;; 2. Use graph-version from summary to get historical graph
+        graph-version (:graph-version summary-info)
+        
+        ;; 3. Fetch the corresponding historical graph
         historical-graph (foreign-select-one [(keypath graph-version)]
                                              history-pstate
                                              {:pkey agent-task-id})
         
-        ;; 3. Fetch the dynamic trace (existing logic)
+        ;; 4. Fetch the dynamic trace (existing logic)
         root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
                                            root-pstate
                                            {:pkey agent-task-id})
@@ -197,12 +204,14 @@
                                     (remove-implicit-nodes)
                                     (filter-encodable))
             
-            ;; 4. Generate implicit edges
+            ;; 5. Generate implicit edges (existing logic)
             implicit-edges (generate-implicit-edges invokes-map-cleaned historical-graph)]
         {:status 200
          :body {:invokes-map          invokes-map-cleaned
                 :next-task-invoke-pairs (:next-task-invoke-pairs dynamic-trace)
-                :implicit-edges       implicit-edges}}))))
+                :implicit-edges       implicit-edges
+                ;; 6. Add the summary-info to the response payload
+                :summary              (filter-encodable summary-info)}}))))
 
 (defn fork [{{:keys [module-id agent-name]} :path-params
              {:keys [changed-nodes invoke-id]} :body-params}]
