@@ -298,8 +298,8 @@
                                        ($ :div {:className node-className
                                                 :style {:width "170px" :height "40px"}}
                                           label)
-                                       ($ Handle {:type "target" :position "top"})
-                                       ($ Handle {:type "source" :position "bottom"})))))})
+                                       ($ Handle {:type "target" :position "top" :style {:display "none"}})
+                                       ($ Handle {:type "source" :position "bottom" :style {:display "none"}})))))})
                      :edgeTypes
                      (clj->js {"elk-edge" (uix.core/as-react elk-edge-component)})
                      :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}
