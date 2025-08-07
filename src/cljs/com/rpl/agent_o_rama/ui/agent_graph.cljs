@@ -37,7 +37,8 @@
                 s/ALL]
                graph)]
     (.setDefaultEdgeLabel g (fn [] #js {}))
-    (.setGraph g #js {})
+    (.setGraph g {})
+    #_(.setGraph g #js {:rankdir "LR"})
 
     (doall (for [[frm to] edges] (.setEdge g frm to)))
     (doall (for [node nodes] (.setNode g (:id node) (clj->js node))))
