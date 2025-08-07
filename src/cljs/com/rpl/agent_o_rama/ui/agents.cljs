@@ -299,12 +299,12 @@
                  :onChange #(set-args (.. % -target -value))
                  :rows 3
                  :disabled (:loading? run-agent)})
-             ($ :button.w-32.h-20.text-white.px-4.rounded-md.focus:ring-2.focus:ring-blue-500.focus:ring-offset-2.text-sm.font-semibold.cursor-pointer.transition-colors.duration-150
+             ($ :button
                 {:type "submit"
                  :disabled (:loading? run-agent)
                  :className (if (:loading? run-agent)
-                              "bg-gray-400 cursor-not-allowed"
-                              "bg-blue-600 hover:bg-blue-700")}
+                              "w-32 h-20 text-white px-4 rounded-md focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm font-semibold cursor-not-allowed transition-colors duration-150 bg-gray-400"
+                              "w-32 h-20 text-white px-4 rounded-md focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm font-semibold cursor-pointer transition-colors duration-150 bg-blue-600 hover:bg-blue-700")}
                 (if (:loading? run-agent) "Running..." "Submit"))))
        
        ;; Show errors only (success navigates to trace)
