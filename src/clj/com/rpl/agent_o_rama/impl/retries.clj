@@ -202,8 +202,6 @@
            :append-ack)))
 
      (source> gc-depot-sym :> %microbatch)
-      ;; TODO: <<<<<>>>> this is working around assertion error in microbatch
-      ;; flusher
       (<<batch
         (%microbatch :> *tuple)
         (|all)

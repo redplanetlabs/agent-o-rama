@@ -418,10 +418,30 @@
 
 
 
+         (bind r
+           (foreign-select-one [(keypath (:agent-invoke-id inv3))
+                                :root-invoke-id]
+                               root-pstate
+                               {:pkey (:task-id inv3)}))
 
-         ;; TODO: <<<<>>>>>
-         ;;  - verify root-count remains the same
-         ;;    - do forks as well to check this
+         (bind f1 (aor/agent-initiate-fork foo inv3 {r []}))
+         (bind f2 (aor/agent-initiate-fork foo inv3 {r []}))
+         (bind f3 (aor/agent-initiate-fork foo inv3 {r []}))
+         (bind f4 (aor/agent-initiate-fork foo inv3 {r []}))
+         (is (= "done" (aor/agent-result foo f1)))
+         (is (= "done" (aor/agent-result foo f2)))
+         (is (= "done" (aor/agent-result foo f3)))
+         (is (= "done" (aor/agent-result foo f4)))
+         (is (= 6 (root-count 0)))
+
+         (dotimes [i 5]
+           (foreign-append! gc-depot nil))
+         (is (= 2 (root-count 0)))
+         (doseq [i (range 1 4)]
+           (is (= 0 (root-count i))))
+         (is (= (all-agent-invs) #{f3 f4}))
+         (is (= (all-node-ids)
+                (set/union (trace-node-ids f3) (trace-node-ids f4))))
         )))))
 
 (deftest gc-skips-pending-test
