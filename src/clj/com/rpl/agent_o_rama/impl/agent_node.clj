@@ -335,13 +335,15 @@
           (nextStepAsync [this agent-invoke]
             (no-async!))
           (result [this agent-invoke]
-            (timed-agent-call
-             (.result client agent-invoke)
-             agent-node
-             [res]
-             {"op"           "result"
-              "agent-invoke" agent-invoke
-              "result"       res}))
+            (loop [step (.nextStep this agent-invoke)]
+              (if (instance? HumanInputRequest step)
+                (do
+                  (.provideHumanInput
+                   this
+                   step
+                   (.getHumanInput agent-node (:prompt step)))
+                  (recur (.nextStep this agent-invoke)))
+                (:result step))))
           (resultAsync [this agent-invoke]
             (no-async!))
           (stream [this agent-invoke node]
@@ -377,16 +379,6 @@
               "response" "response"}))
           (provideHumanInputAsync [this request response]
             (no-async!))
-          (resultWithHumanForwarding [this agent-invoke]
-            (loop [step (.nextStep this agent-invoke)]
-              (if (instance? HumanInputRequest step)
-                (do
-                  (.provideHumanInput
-                   this
-                   step
-                   (.getHumanInput agent-node (:prompt step)))
-                  (recur (.nextStep this agent-invoke)))
-                (:result step))))
           (close [this]
             (close! client))
          )))
