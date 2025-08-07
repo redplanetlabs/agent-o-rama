@@ -22,16 +22,6 @@
         elk-points (:elkPoints data)
         edge-color (or (:stroke style) "#a5b4fc")
         
-        ;; Debug logging
-        _ (when elk-points
-            (js/console.log "Edge:" id)
-            (js/console.log "  Source:" sourceX sourceY "Target:" targetX targetY)
-            (js/console.log "  ELK points count:" (count elk-points))
-            (js/console.log "  Points:" (clj->js elk-points))
-            (when (seq elk-points)
-              (js/console.log "  First point:" (clj->js (first elk-points)))
-              (js/console.log "  Last point:" (clj->js (last elk-points)))))
-        
         ;; Build SVG path from ELK points
         edge-path (if (and elk-points (seq elk-points))
                     ;; Create polyline path from ELK points
@@ -67,13 +57,8 @@
         
         arrow-angle (when (and second-last-distinct last-point)
                       (let [dx (- (:x last-point) (:x second-last-distinct))
-                            dy (- (:y last-point) (:y second-last-distinct))
-                            angle (* (/ 180 js/Math.PI) (js/Math.atan2 dy dx))]
-                        (js/console.log "  Arrow angle calculation:")
-                        (js/console.log "    Second-last distinct:" (clj->js second-last-distinct))
-                        (js/console.log "    Last:" (clj->js last-point))
-                        (js/console.log "    dx:" dx "dy:" dy "angle:" angle)
-                        angle))
+                            dy (- (:y last-point) (:y second-last-distinct))]
+                        (* (/ 180 js/Math.PI) (js/Math.atan2 dy dx))))
         
         ;; Calculate arrow position - slightly back from the end
         arrow-offset 5 ; pixels to offset arrow from end
