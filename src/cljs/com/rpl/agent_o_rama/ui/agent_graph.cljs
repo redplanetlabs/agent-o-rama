@@ -22,20 +22,78 @@
         elk-points (:elkPoints data)
         edge-color (or (:stroke style) "#a5b4fc")
         
+        ;; Helper function to create smooth B-spline curve through points
+        create-smooth-path (fn [points]
+                              (let [pts (vec points)
+                                    n (count pts)]
+                                (cond
+                                  ;; No points or single point
+                                  (<= n 1) ""
+                                  
+                                  ;; Two points - straight line
+                                  (= n 2)
+                                  (str "M " (:x (first pts)) " " (:y (first pts))
+                                       " L " (:x (second pts)) " " (:y (second pts)))
+                                  
+                                  ;; Three or more points - create B-spline
+                                  :else
+                                  (let [;; B-spline basis function (cubic)
+                                        b-spline-basis (fn [t]
+                                                         (let [t2 (* t t)
+                                                               t3 (* t2 t)]
+                                                           [(/ (+ 1 (* -3 t) (* 3 t2) (* -1 t3)) 6)
+                                                            (/ (+ 4 (* 0 t) (* -6 t2) (* 3 t3)) 6)
+                                                            (/ (+ 1 (* 3 t) (* 3 t2) (* -3 t3)) 6)
+                                                            (/ (+ 0 (* 0 t) (* 0 t2) (* 1 t3)) 6)]))
+                                        
+                                        ;; Calculate a point on the B-spline curve
+                                        calc-spline-point (fn [p0 p1 p2 p3 t]
+                                                            (let [[b0 b1 b2 b3] (b-spline-basis t)]
+                                                              {:x (+ (* b0 (:x p0))
+                                                                     (* b1 (:x p1))
+                                                                     (* b2 (:x p2))
+                                                                     (* b3 (:x p3)))
+                                                               :y (+ (* b0 (:y p0))
+                                                                     (* b1 (:y p1))
+                                                                     (* b2 (:y p2))
+                                                                     (* b3 (:y p3)))}))
+                                        
+                                        ;; Extend points for proper B-spline (duplicate first and last)
+                                        extended-pts (vec (concat [(first pts)] pts [(last pts)]))
+                                        
+                                        ;; Number of segments between each control point pair
+                                        segments-per-curve 10
+                                        
+                                        ;; Generate interpolated points along the B-spline
+                                        curve-points (atom [])]
+                                    
+                                    ;; Generate B-spline curve points
+                                    (doseq [i (range (- (count extended-pts) 3))]
+                                      (let [p0 (nth extended-pts i)
+                                            p1 (nth extended-pts (+ i 1))
+                                            p2 (nth extended-pts (+ i 2))
+                                            p3 (nth extended-pts (+ i 3))]
+                                        (doseq [j (range segments-per-curve)]
+                                          (let [t (/ j segments-per-curve)
+                                                pt (calc-spline-point p0 p1 p2 p3 t)]
+                                            (swap! curve-points conj pt)))))
+                                    
+                                    ;; Add the last point
+                                    (swap! curve-points conj (last pts))
+                                    
+                                    ;; Build SVG path from the interpolated points
+                                    (let [path-points @curve-points]
+                                      (if (empty? path-points)
+                                        ""
+                                        (str "M " (:x (first path-points)) " " (:y (first path-points))
+                                             (apply str
+                                                    (map (fn [pt]
+                                                           (str " L " (:x pt) " " (:y pt)))
+                                                         (rest path-points))))))))))
+        
         ;; Build SVG path from ELK points
         edge-path (if (and elk-points (seq elk-points))
-                    ;; Create polyline path from ELK points
-                    (let [points-vec (vec elk-points)
-                          path-data (reduce-kv 
-                                     (fn [path idx point]
-                                       (let [x (:x point)
-                                             y (:y point)]
-                                         (if (= idx 0)
-                                           (str "M " x " " y)
-                                           (str path " L " x " " y))))
-                                     ""
-                                     points-vec)]
-                      path-data)
+                    (create-smooth-path elk-points)
                     ;; Fallback to straight line if no ELK points
                     (str "M " sourceX " " sourceY " L " targetX " " targetY))
         
@@ -79,7 +137,7 @@
        (when markerEnd
          ($ :g {:transform (str "translate(" arrow-x "," arrow-y ") "
                                (when arrow-angle (str "rotate(" arrow-angle ")")))}
-            ($ :path {:d "M 0 0 L -10 -4 L -10 4 z"
+            ($ :path {:d "M 0 0 L -12 -5 L -12 5 z"
                       :fill edge-color}))))))
 
 ;; ELK layout options
