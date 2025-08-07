@@ -136,9 +136,13 @@
                  :invokes-map
                  keys
                  set))))
-         (bind all-trace-node-ids
+         (bind non-gc-vec
+           (fn [v]
+             (subvec v (- (count v) 3))))
+         (bind non-gc-trace-node-ids
            (fn [invs]
-             (set (apply set/union (mapv trace-node-ids invs)))))
+             (set (apply set/union
+                   (mapv trace-node-ids (non-gc-vec invs))))))
          (bind root-count
            (fn [task-id]
              (foreign-select-one STAY root-count-pstate {:pkey task-id})))
@@ -168,7 +172,7 @@
          (is (= (all-agent-invs) (set invs-0)))
 
          (is (= (all-node-ids)
-                (all-trace-node-ids invs-0)))
+                (non-gc-trace-node-ids invs-0)))
 
          (bind invs-0 (new-invs invs-0 0 2))
 
@@ -184,10 +188,9 @@
          (doseq [i (range 1 4)]
            (is (= 0 (root-count i))))
 
-         (is (= (all-agent-invs) (set (subvec invs-0 2))))
+         (is (= (all-agent-invs) (set (non-gc-vec invs-0))))
 
-         (is (= (all-node-ids)
-                (all-trace-node-ids (subvec invs-0 2))))
+         (is (= (all-node-ids) (non-gc-trace-node-ids invs-0)))
 
          (bind invs-1 (new-invs [] 1 3))
          (bind invs-2 (new-invs [] 2 3))
@@ -199,15 +202,15 @@
          (assert-gc-state-empty!)
          (is (= (all-agent-invs)
                 (set/union
-                 (set (subvec invs-0 2))
+                 (set (non-gc-vec invs-0))
                  (set invs-1)
                  (set invs-2)
                  (set invs-3))))
          (is (= (all-node-ids)
-                (set/union (all-trace-node-ids (subvec invs-0 2))
-                           (all-trace-node-ids invs-1)
-                           (all-trace-node-ids invs-2)
-                           (all-trace-node-ids invs-3)
+                (set/union (non-gc-trace-node-ids invs-0)
+                           (non-gc-trace-node-ids invs-1)
+                           (non-gc-trace-node-ids invs-2)
+                           (non-gc-trace-node-ids invs-3)
                 )))
 
 
