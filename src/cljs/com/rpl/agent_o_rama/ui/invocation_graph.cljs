@@ -219,8 +219,8 @@
                                                   (if (and input-tokens output-tokens)
                                                     (str " (" input-tokens "+" output-tokens "=" total-tokens " tokens)")
                                                     (str " (" total-tokens " tokens)"))))
-                                              (when (:finishReason info)
-                                                (str " [" (:finishReason info) "]"))))))
+                                              #_(when (:finishReason info)
+                                                 (str " [" (:finishReason info) "]"))))))
                                  
                                  ;; Input (for model calls)
                                  (when op-input
