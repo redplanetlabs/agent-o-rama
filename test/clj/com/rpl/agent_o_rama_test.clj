@@ -1569,7 +1569,7 @@
                {"a" 115}}
               {:start-time-millis 116
                :finish-time-millis 117
-               :type :agent-invoke
+               :type :agent-call
                :info
                {"a" 118}}
               {:start-time-millis 119
