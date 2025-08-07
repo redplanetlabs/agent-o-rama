@@ -10,11 +10,38 @@
    [com.rpl.specter :as s]
 
    ["react" :refer [useState useCallback useEffect useLayoutEffect]]
-   ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle useReactFlow ReactFlowProvider]]
+   ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle useReactFlow ReactFlowProvider BaseEdge getSmoothStepPath]]
    ["elkjs/lib/elk.bundled.js" :default ELK]))
 
 ;; ELK instance
 (def elk (ELK.))
+
+;; Custom edge component that renders ELK-calculated polylines
+(defn elk-edge-component [props]
+  (let [{:keys [id sourceX sourceY targetX targetY data markerEnd style]} (js->clj props :keywordize-keys true)
+        elk-points (:elkPoints data)
+        ;; Build SVG path from ELK points, or fallback to straight line
+        edge-path (if (and elk-points (seq elk-points))
+                    ;; Create polyline path from ELK points
+                    (let [path-data (reduce-kv 
+                                     (fn [path idx point]
+                                       (let [x (:x point)
+                                             y (:y point)]
+                                         (if (= idx 0)
+                                           (str "M " x " " y)
+                                           (str path " L " x " " y))))
+                                     ""
+                                     (vec elk-points))]
+                      path-data)
+                    ;; Fallback to straight line if no ELK points
+                    (str "M " sourceX " " sourceY " L " targetX " " targetY))]
+    ($ :g
+       ($ :path {:id id
+                 :d edge-path
+                 :fill "none"
+                 :stroke (or (:stroke style) "#a5b4fc")
+                 :strokeWidth (or (:strokeWidth style) 2)
+                 :markerEnd (when markerEnd (str "url(#" (:type markerEnd) ")"))}))))
 
 ;; ELK layout options
 (def elk-options
@@ -55,6 +82,23 @@
      :markerEnd {:type "arrowclosed" :width 20 :height 20}
      })}))
 
+(defn process-elk-edge [edge]
+  "Process an ELK edge to extract routing points for React Flow"
+  (let [sections (or (:sections edge) [])
+        ;; ELK provides edge routing as sections with start, end, and bend points
+        edge-points (when (seq sections)
+                      (mapcat (fn [section]
+                                (concat 
+                                 [(:startPoint section)]
+                                 (:bendPoints section [])
+                                 [(:endPoint section)]))
+                              sections))]
+    (-> edge
+        ;; Add the routing points to the edge data
+        (assoc :data {:elkPoints edge-points})
+        ;; Set edge type to use our custom rendering
+        (assoc :type "elk-edge"))))
+
 (defn get-layouted-elements [nodes edges options]
   "Layout nodes and edges using ELK.js"
   (let [is-horizontal false
@@ -71,14 +115,17 @@
                    :edges (clj->js edges)}]
     (-> (.layout elk graph)
         (.then (fn [layouted-graph]
-                 #js {:nodes (-> (.-children layouted-graph)
-                                (js->clj :keywordize-keys true)
-                                (->> (map (fn [node]
-                                           (-> node
-                                               (assoc :position {:x (:x node) :y (:y node)})
-                                               (dissoc :x :y))))))
-                      :edges (-> (.-edges layouted-graph)
-                                (js->clj :keywordize-keys true))}))
+                 (let [layouted-nodes (-> (.-children layouted-graph)
+                                         (js->clj :keywordize-keys true)
+                                         (->> (map (fn [node]
+                                                    (-> node
+                                                        (assoc :position {:x (:x node) :y (:y node)})
+                                                        (dissoc :x :y))))))
+                       layouted-edges (-> (.-edges layouted-graph)
+                                         (js->clj :keywordize-keys true)
+                                         (->> (map process-elk-edge)))]
+                   #js {:nodes layouted-nodes
+                        :edges layouted-edges})))
         (.catch js/console.error))))
 
 (defui graph-flow [{:keys [initial-data height selected-node set-selected-node]}]
@@ -141,6 +188,8 @@
                                           label)
                                        ($ Handle {:type "target" :position "top"})
                                        ($ Handle {:type "source" :position "bottom"})))))})
+                     :edgeTypes
+                     (clj->js {"elk-edge" (uix.core/as-react elk-edge-component)})
                      :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}
                                           :markerEnd {:type "arrowclosed" :width 20 :height 20}}
                      :onNodeClick (fn [_ node]
