@@ -37,8 +37,8 @@
                 s/ALL]
                graph)]
     (.setDefaultEdgeLabel g (fn [] #js {}))
-    (.setGraph g {})
-    #_(.setGraph g #js {:rankdir "LR"})
+    #_(.setGraph g {})
+    (.setGraph g #js {:rankdir "LR"})
 
     (doall (for [[frm to] edges] (.setEdge g frm to)))
     (doall (for [node nodes] (.setNode g (:id node) (clj->js node))))
@@ -86,8 +86,8 @@
                                        ($ :div {:className node-className
                                                 :style {:width "170px" :height "40px"}}
                                           label)
-                                       ($ Handle {:type "target" :position "top"})
-                                       ($ Handle {:type "source" :position "bottom"})))))})
+                                       ($ Handle {:type "target" :position "left"})
+                                       ($ Handle {:type "source" :position "right"})))))})
                      :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
                      :onNodeClick (fn [_ node]
                                     (if (and selected-node (= (.-id node) (.-id selected-node)))
