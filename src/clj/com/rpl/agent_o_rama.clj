@@ -43,6 +43,12 @@
    [rpl.rama.generated
     TopologyDoesNotExistException]))
 
+(defn- check-unique-agent-name!
+  [agents-vol mirror-agents-vol name]
+  (when (or (contains? @agents-vol name)
+            (contains? @mirror-agents-vol name))
+    (throw (h/ex-info "Agent already exists" {:name name}))))
+
 (defn agents-topology
   [setup topologies]
   (let [^StreamTopology stream-topology (stream-topology
@@ -53,13 +59,13 @@
                               aor-types/AGENTS-MB-TOPOLOGY-NAME)
         defined?-vol         (volatile! false)
         agents-vol           (volatile! {})
+        mirror-agents-vol    (volatile! {})
         store-info-vol       (volatile! {})
         declared-objects-vol (volatile! {})]
     (reify
      AgentsTopology
      (newAgent [this name]
-       (when (contains? @agents-vol name)
-         (throw (h/ex-info "Agent already exists" {:name name})))
+       (check-unique-agent-name! agents-vol mirror-agents-vol name)
        (let [ret (graph/mk-agent-graph)]
          (vswap! agents-vol assoc name ret)
          ret))
@@ -109,6 +115,15 @@
         name
         (h/convert-jfn jfn)
         (i/convert-agent-object-options options)))
+     (declareClusterAgent [this localName moduleName agentName]
+       (check-unique-agent-name! agents-vol mirror-agents-vol localName)
+       ;; this connects the modules so a module update removing an agent needed
+       ;; by another module fails
+       (mirror-depot* setup
+                      (gensym (str "*_mirrorAgentDepot" agentName))
+                      moduleName
+                      (po/agent-depot-name agentName))
+       (vswap! mirror-agents-vol assoc localName [moduleName agentName]))
      (define [this]
        (when @defined?-vol
          (throw (h/ex-info "Agents topology already defined" {})))
@@ -119,6 +134,7 @@
         stream-topology
         mb-topology
         @agents-vol
+        @mirror-agents-vol
         @store-info-vol
         @declared-objects-vol))
      aor-types/AgentsTopologyInternal

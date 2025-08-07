@@ -2,7 +2,7 @@ package com.rpl.agentorama.impl;
 
 import java.io.IOException;
 
-import com.rpl.agentorama.AgentObjectSetup;
+import com.rpl.agentorama.*;
 import com.rpl.rama.integration.*;
 
 import clojure.lang.IFn;
@@ -12,11 +12,16 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   public static ThreadLocal<Long> ACQUIRE_TIMEOUT_MILLIS = new ThreadLocal<>();
 
   Map<String, Map<String, Object>> _builders;
+  Map<String, List<String>> _agentsInfo;
+
   Map<String, WorkerManagedResource> _objects;
+  WorkerManagedResource<Map<String, AgentClient>> _agents;
 
 
-  public AgentDeclaredObjectsTaskGlobal(Map<String, Map<String, Object>> builders) {
+  // agents is localName -> [moduleName, agentName] (nil for local module)
+  public AgentDeclaredObjectsTaskGlobal(Map<String, Map<String, Object>> builders, Map<String, List<String>> agentsInfo) {
     _builders = builders;
+    _agentsInfo = agentsInfo;
   }
 
   public Object getAgentObjectFromResource(String name) {
@@ -36,6 +41,12 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
       if(res instanceof LazyObjectPool) {
         ((LazyObjectPool) res).release(o);
       }
+  }
+
+  public AgentClient getAgentClient(String localName) {
+    AgentClient ret = _agents.getResource().get(localName);
+    if(ret==null) throw new RuntimeException("Tried to fetch non-existent agent: " + localName);
+    return ret;
   }
 
   private static Object makeObject(String name, IFn afn, AgentObjectSetup setup, boolean autoTracing) {
@@ -68,6 +79,27 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
         else return new LazyObjectPool(limit, () -> makeObject(name, afn, setup, autoTracing));
       }));
     }
+
+    _agents = new WorkerManagedResource("__agentClients", context, () -> {
+      Map m = new CloseableMap();
+      Set<String> moduleNames = new HashSet();
+      for(List<String> tuple: _agentsInfo.values()) {
+        String moduleName = tuple.get(0);
+        moduleNames.add(moduleName);
+      }
+      Map<String, AgentManager> managers = new HashMap();
+      for(String moduleName: moduleNames) {
+        String mn = moduleName == null ? context.getModuleInstanceInfo().getModuleName() : moduleName;
+        managers.put(moduleName, AgentManager.create(context.getClusterRetriever(), mn));
+      }
+      for(String localName: _agentsInfo.keySet()) {
+        List<String> tuple = _agentsInfo.get(localName);
+        String moduleName = tuple.get(0);
+        String agentName = tuple.get(1);
+        m.put(localName, managers.get(moduleName).getAgentClient(agentName));
+      }
+      return m;
+    });
   }
 
   @Override
@@ -75,5 +107,6 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     for(WorkerManagedResource resource: _objects.values()) {
       resource.close();
     }
+    _agents.close();
   }
 }

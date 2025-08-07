@@ -1341,7 +1341,7 @@
                (fn [agent-node]
                  (let [v (volatile! 100)]
                    (doseq [t [:store-read :store-write :db-read :db-write
-                              :model-call :agent-invoke :other
+                              :model-call :agent-call :other
                               :human-input :tool-call]]
                      (aor/record-nested-op! agent-node
                                             t

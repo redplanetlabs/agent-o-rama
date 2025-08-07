@@ -23,6 +23,8 @@ public interface AgentsTopology {
   void declareAgentObjectBuilder(String name, RamaFunction1<AgentObjectSetup, Object> builder);
   void declareAgentObjectBuilder(String name, RamaFunction1<AgentObjectSetup, Object> builder, AgentObjectOptions options);
 
+  void declareClusterAgent(String localName, String moduleName, String agentName);
+
   StreamTopology getStreamTopology();
 
   void define();

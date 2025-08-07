@@ -198,9 +198,17 @@
        :exception e}
     )))
 
+(defn mk-agents-info
+  [agent-graphs mirror-agents]
+  (reduce-kv
+   (fn [m agent-name _]
+     (assoc m agent-name [nil agent-name]))
+   mirror-agents
+   agent-graphs))
+
 (defn define-agents!
-  [setup topologies stream-topology mb-topology agent-graphs store-info
-   declared-objects]
+  [setup topologies stream-topology mb-topology agent-graphs mirror-agents
+   store-info declared-objects]
   (declare-object* setup
                    (symbol (po/agents-store-info-name))
                    (aor-types/->valid-StoreInfo store-info {}))
@@ -217,7 +225,9 @@
 
   (declare-object* setup
                    (symbol (po/agent-declared-objects-name))
-                   (AgentDeclaredObjectsTaskGlobal. declared-objects))
+                   (AgentDeclaredObjectsTaskGlobal.
+                    declared-objects
+                    (mk-agents-info agent-graphs mirror-agents)))
 
   (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))

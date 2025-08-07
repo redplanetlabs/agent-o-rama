@@ -8,7 +8,9 @@ public interface AgentNode extends IFetchAgentObject {
   void emit(String node, Object... args);
   void result(Object arg);
   <T extends Store> T getStore(String name);
+  AgentClient getAgent(String name);
   void streamChunk(Object chunk);
   void recordNestedOp(NestedOpType nestedOpType, long startTimeMillis, long finishTimeMillis, Map<String, Object> info);
   String getHumanInput(String prompt);
+
 }
