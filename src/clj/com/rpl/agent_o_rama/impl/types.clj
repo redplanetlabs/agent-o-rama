@@ -101,6 +101,7 @@
            :db-write
            :db-read
            :model-call
+           :tool-call
            :agent-invoke
            :human-input
            :other)

@@ -133,6 +133,7 @@
    :db-read      NestedOpType/DB_READ
    :db-write     NestedOpType/DB_WRITE
    :model-call   NestedOpType/MODEL_CALL
+   :tool-call    NestedOpType/TOOL_CALL
    :agent-invoke NestedOpType/AGENT_INVOKE
    :human-input  NestedOpType/HUMAN_INPUT
    :other        NestedOpType/OTHER
