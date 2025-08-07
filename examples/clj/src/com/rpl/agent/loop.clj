@@ -4,12 +4,9 @@
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
-   [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.langchain4j.json :as lj]
    [com.rpl.rama.aggs :as aggs]
-   [com.rpl.rama.test :as rtest]
-   [jsonista.core :as j]
-   [org.httpkit.client :as http]))
+   [com.rpl.rama.test :as rtest]))
 
 (aor/defagentmodule LoopAgent
   [topology]
@@ -22,14 +19,14 @@
     (fn [agent-node n]
       (if (<= n 0)
         (aor/result! agent-node n)
-        (aor/emit! agent-node "loop2" n))))
+        (aor/emit! agent-node "loop2" (dec n)))))
    (aor/node
     "loop2"
     "loop1"
     (fn [agent-node n]
       (if (<= n 0)
         (aor/result! agent-node n)
-        (aor/emit! agent-node "loop1" n))))))
+        (aor/emit! agent-node "loop1" (dec n)))))))
 
 (defn run-loop-agent
   []
