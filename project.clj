@@ -13,7 +13,10 @@
                  [ring/ring-core "1.9.5"]
                  [ring/ring-jetty-adapter "1.8.2"]
                  [ring/ring-codec "1.2.0"]
-                 [com.taoensso/sente "1.20.0"]
+                 #_[org.eclipse.jetty.websocket/websocket-jakarta-server "9.4.31.v20200723"]
+                 #_[org.eclipse.jetty.websocket/websocket-jakarta-server "11.0.25"]
+                 [org.eclipse.jetty.websocket/websocket-server "9.4.31.v20200723"]
+                 [com.taoensso/sente "1.20.0"] 
                  [metosin/reitit "0.7.2"]]
   :global-vars {*warn-on-reflection* true}
   :repositories

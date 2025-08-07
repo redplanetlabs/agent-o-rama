@@ -5,6 +5,8 @@
    [clojure.string :as str]
    
    [com.rpl.agent-o-rama.ui.agents :as agents]
+   [com.rpl.agent-o-rama.ui.agents-new :as agents-new]
+   [com.rpl.agent-o-rama.ui.sente :as sente]
    ["wouter" :refer [Link Route Switch Router useLocation useRoute]]
    ["@tanstack/react-query" :refer [QueryClient QueryClientProvider]]
    ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon Bars3Icon XMarkIcon]]
@@ -153,14 +155,14 @@
            ($ Route {:path "/agents/:module-id/:agent-name/evaluations" :component agents/evaluations})
            ($ Route {:path "/agents/:module-id/:agent-name/stats" :component stats/stats})
            ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
-           ($ Route {:path "/agents" :component agents/index})
+           ($ Route {:path "/agents" :component agents-new/index})
            
            ;; Dataset routes
            ($ Route {:path "/datasets/:dataset-id" :component datasets/datasets})
            ($ Route {:path "/datasets" :component datasets/datasets})
            
-           ;; Home route
-           ($ Route {:path "/" :component agents/index})))))
+           ;; Home route  
+           ($ Route {:path "/" :component agents-new/index})))))
 
 ;; Main app component
 (defui app []
@@ -169,6 +171,8 @@
      ($ main-content)))
 
 (defn init []
+  ;; Initialize Sente WebSocket connection
+  (sente/init!)
   (uix.dom/render-root
    ($ QueryClientProvider {:client query-client}
       ($ app))
