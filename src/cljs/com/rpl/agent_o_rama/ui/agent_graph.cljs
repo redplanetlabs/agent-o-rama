@@ -67,18 +67,21 @@
                                         ;; Generate interpolated points along the B-spline
                                         curve-points (atom [])]
                                     
+                                    ;; Start with the first point explicitly
+                                    (swap! curve-points conj (first pts))
+                                    
                                     ;; Generate B-spline curve points
                                     (doseq [i (range (- (count extended-pts) 3))]
                                       (let [p0 (nth extended-pts i)
                                             p1 (nth extended-pts (+ i 1))
                                             p2 (nth extended-pts (+ i 2))
                                             p3 (nth extended-pts (+ i 3))]
-                                        (doseq [j (range segments-per-curve)]
+                                        (doseq [j (range 1 segments-per-curve)]  ;; Start from 1 to avoid duplicating start point
                                           (let [t (/ j segments-per-curve)
                                                 pt (calc-spline-point p0 p1 p2 p3 t)]
                                             (swap! curve-points conj pt)))))
                                     
-                                    ;; Add the last point
+                                    ;; Add the last point explicitly
                                     (swap! curve-points conj (last pts))
                                     
                                     ;; Build SVG path from the interpolated points
@@ -118,14 +121,9 @@
                             dy (- (:y last-point) (:y second-last-distinct))]
                         (* (/ 180 js/Math.PI) (js/Math.atan2 dy dx))))
         
-        ;; Calculate arrow position - slightly back from the end
-        arrow-offset 5 ; pixels to offset arrow from end
-        arrow-x (if (and last-point arrow-angle)
-                  (- (:x last-point) (* arrow-offset (js/Math.cos (* (/ js/Math.PI 180) arrow-angle))))
-                  (or (:x last-point) targetX))
-        arrow-y (if (and last-point arrow-angle)
-                  (- (:y last-point) (* arrow-offset (js/Math.sin (* (/ js/Math.PI 180) arrow-angle))))
-                  (or (:y last-point) targetY))]
+        ;; Arrow position at the end point
+        arrow-x (or (:x last-point) targetX)
+        arrow-y (or (:y last-point) targetY)]
     
     ($ :g
        ;; Draw the edge path
