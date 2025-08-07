@@ -214,15 +214,43 @@
                 )))
 
 
+         (bind invs-0 (new-invs invs-0 0 2))
+         (bind invs-1 (new-invs invs-1 1 1))
+         (bind invs-2 (new-invs invs-2 2 1))
+
+         ;; get it mid GC
+         (dotimes [i 3]
+           (foreign-append! gc-depot nil))
+
+         (bind invs-1 (new-invs invs-1 1 1))
+
+         ;; finish GC for everything pending
+         (dotimes [i 7]
+           (foreign-append! gc-depot nil))
+         (assert-gc-state-empty!)
+         (is (= (all-agent-invs)
+                (set/union
+                 (set (non-gc-vec invs-0))
+                 (set (non-gc-vec invs-1))
+                 (set (non-gc-vec invs-2))
+                 (set (non-gc-vec invs-3)))))
+         (is (= (all-node-ids)
+                (set/union (non-gc-trace-node-ids invs-0)
+                           (non-gc-trace-node-ids invs-1)
+                           (non-gc-trace-node-ids invs-2)
+                           (non-gc-trace-node-ids invs-3)
+                )))
+
+
+         (doseq [i (range 1 4)]
+           (is (= 3 (root-count i))))
+
          ;; TODO: <<<<>>>>>
-         ;;  - start a new invoke mid GC, and verify it GCs another invoke while
-         ;;  the other one is running
          ;;  - verify GC of restarted traces (special case)
          ;;  - verify no GC of pending invokes
          ;;  - verify valid-invokes removal
          ;;   - just fail one once, then verify after GC that it gets removed
          ;;     - will need wait-for-mb-processed-count on that mb topology
-         ;;  - verify removal from $$gc
          ;;  - verify $$root-count maintained correctly
          ;;    - check with forks, retries, restarts
         )))))
