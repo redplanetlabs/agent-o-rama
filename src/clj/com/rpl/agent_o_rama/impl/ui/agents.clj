@@ -3,7 +3,7 @@
         [com.rpl.rama.path])
   (:require
    [com.rpl.agent-o-rama :as aor]
-   [com.rpl.agent-o-rama.impl.types :as aort]
+   [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui :as ui]
    [clojure.walk :as walk]
    [muuntaja.core :as m])
@@ -40,7 +40,7 @@
               (ui/get-object :aor-cache)))
 
 (defn objects [module-id agent-name]
-  (aort/underlying-objects (get-client module-id agent-name)))
+  (aor-types/underlying-objects (get-client module-id agent-name)))
 
 (defn get-graph [{{:keys [module-id agent-name]} :path-params}]
   {:status
@@ -219,7 +219,7 @@
                                   (parse-url-pair invoke-id)]
                               (aor/agent-initiate-fork
                                (get-client module-id agent-name)
-                               (AgentInvoke. task-id agent-invoke-id )
+                               (aor-types/->AgentInvokeImpl task-id agent-invoke-id)
                                (transform [MAP-VALS] read-string changed-nodes)))]
     {:status 200
      :body
