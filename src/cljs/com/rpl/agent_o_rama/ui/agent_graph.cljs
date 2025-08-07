@@ -16,10 +16,12 @@
 ;; ELK instance
 (def elk (ELK.))
 
-;; Custom edge component that renders ELK-calculated polylines
+;; Custom edge component that renders ELK-calculated polylines with arrows
 (defn elk-edge-component [props]
   (let [{:keys [id sourceX sourceY targetX targetY data markerEnd style]} (js->clj props :keywordize-keys true)
         elk-points (:elkPoints data)
+        edge-color (or (:stroke style) "#a5b4fc")
+        marker-id (str "arrow-" id)
         ;; Build SVG path from ELK points, or fallback to straight line
         edge-path (if (and elk-points (seq elk-points))
                     ;; Create polyline path from ELK points
@@ -36,12 +38,23 @@
                     ;; Fallback to straight line if no ELK points
                     (str "M " sourceX " " sourceY " L " targetX " " targetY))]
     ($ :g
+       ;; Define arrow marker specific to this edge (for color matching)
+       ($ :defs
+          ($ :marker {:id marker-id
+                      :markerWidth "10"
+                      :markerHeight "10"
+                      :refX "9"
+                      :refY "5"
+                      :orient "auto"}
+             ($ :path {:d "M 0 0 L 10 5 L 0 10 z"
+                       :fill edge-color})))
+       ;; Draw the edge path
        ($ :path {:id id
                  :d edge-path
                  :fill "none"
-                 :stroke (or (:stroke style) "#a5b4fc")
+                 :stroke edge-color
                  :strokeWidth (or (:strokeWidth style) 2)
-                 :markerEnd (when markerEnd (str "url(#" (:type markerEnd) ")"))}))))
+                 :markerEnd (str "url(#" marker-id ")")}))))
 
 ;; ELK layout options
 (def elk-options
@@ -50,7 +63,7 @@
        "elk.spacing.nodeNode" "80"
        "elk.direction" "DOWN"
        "feedbackEdges" "true"
-       "edgeRouting" "POLYLINE"
+       "edgeRouting" "SPLINES"
        "spacing.edgeEdgeBetweenLayers" "100"
        "crossingMinimization.strategy" "LAYER_SWEEP"
        "nodePlacement.strategy" "BRANDES_KOEPF"})
