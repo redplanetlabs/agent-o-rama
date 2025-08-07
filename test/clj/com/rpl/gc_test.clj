@@ -445,7 +445,117 @@
         )))))
 
 (deftest gc-skips-pending-test
-         ;; TODO: <<<<>>>>>
-         ;;  - verify no GC of invokes that haven't finished
-         ;;     - can check that
-)
+  (let [forced-task-atom (atom 1)]
+    (with-redefs [i/SUBSTITUTE-TICK-DEPOTS true
+                  SEM (h/mk-semaphore 0)
+                  apart/next-agent-task (fn [& args] @forced-task-atom)]
+      (with-open [ipc (rtest/create-ipc)]
+        (letlocals
+         (bind module
+           (aor/agentmodule
+            [topology]
+            (-> topology
+                (aor/new-agent "foo")
+                (aor/node
+                 "a"
+                 "b"
+                 (fn [agent-node v]
+                   (aor/emit! agent-node "b" v)))
+                (aor/node
+                 "b"
+                 "c"
+                 (fn [agent-node v]
+                   (when v
+                     (h/acquire-semaphore SEM 1))
+                   (aor/emit! agent-node "c")))
+                (aor/node
+                 "c"
+                 nil
+                 (fn [agent-node]
+                   (aor/result! agent-node "done")))
+            )))
+         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (bind module-name (get-module-name module))
+         (bind agent-manager (aor/agent-manager ipc module-name))
+         (bind foo (aor/agent-client agent-manager "foo"))
+         (bind config-depot
+           (foreign-depot ipc module-name (po/agent-config-depot-name "foo")))
+         (bind gc-depot
+           (foreign-depot ipc module-name (po/agent-gc-tick-depot-name "foo")))
+         (bind root-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name "foo")))
+         (bind root-count-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-count-task-global-name "foo")))
+         (bind node-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-node-task-global-name "foo")))
+         (bind traces-query
+           (foreign-query ipc
+                          module-name
+                          (queries/tracing-query-name "foo")))
+
+         (bind all-agent-invs (all-agent-invs-fn root-pstate 4))
+         (bind all-node-ids (all-node-ids-fn node-pstate 4))
+         (bind [trace-node-ids non-gc-trace-node-ids]
+           (trace-node-ids-fns root-pstate traces-query))
+         (bind root-count
+           (fn [task-id]
+             (foreign-select-one STAY root-count-pstate {:pkey task-id})))
+
+         (foreign-append! config-depot
+                          (aor-types/change-max-traces-per-task 2))
+
+         (bind inv1 (aor/agent-initiate foo true))
+         (bind inv2 (aor/agent-initiate foo false))
+         (bind inv3 (aor/agent-initiate foo false))
+
+         (is (= "done" (aor/agent-result foo inv2)))
+         (is (= "done" (aor/agent-result foo inv3)))
+
+         (is (= 3 (root-count 1)))
+         (doseq [i [0 2 3]]
+           (is (= 0 (root-count i))))
+
+         (dotimes [i 5]
+           (foreign-append! gc-depot nil))
+
+         (is (= 3 (root-count 1)))
+         (doseq [i [0 2 3]]
+           (is (= 0 (root-count i))))
+         (is (= (all-agent-invs) #{inv1 inv2 inv3}))
+         (is (= (all-node-ids)
+                (set/union (trace-node-ids inv1)
+                           (trace-node-ids inv2)
+                           (trace-node-ids inv3))))
+
+         (bind inv4 (aor/agent-initiate foo false))
+         (is (= "done" (aor/agent-result foo inv4)))
+         (is (= 4 (root-count 1)))
+
+         (dotimes [i 5]
+           (foreign-append! gc-depot nil))
+         (is (= 3 (root-count 1)))
+         (doseq [i [0 2 3]]
+           (is (= 0 (root-count i))))
+         (is (= (all-agent-invs) #{inv1 inv3 inv4}))
+         (is (= (all-node-ids)
+                (set/union (trace-node-ids inv1)
+                           (trace-node-ids inv3)
+                           (trace-node-ids inv4))))
+
+         (h/release-semaphore SEM 1)
+         (is (= "done" (aor/agent-result foo inv1)))
+         (dotimes [i 5]
+           (foreign-append! gc-depot nil))
+         (is (= 2 (root-count 1)))
+         (doseq [i [0 2 3]]
+           (is (= 0 (root-count i))))
+         (is (= (all-agent-invs) #{inv3 inv4}))
+         (is (= (all-node-ids)
+                (set/union (trace-node-ids inv3) (trace-node-ids inv4))))
+        )))))
