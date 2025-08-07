@@ -20,6 +20,56 @@
    [com.rpl.rama.test :as rtest]
    [com.rpl.test-common :as tc]))
 
+(defn non-gc-vec
+  [v]
+  (subvec v (- (count v) 3)))
+
+(defn all-agent-invs-fn
+  [root-pstate num-tasks]
+  (fn []
+    (into #{}
+          (apply concat
+           (for [i (range num-tasks)]
+             (foreign-select
+              [MAP-KEYS (view #(aor-types/->AgentInvokeImpl i %))]
+              root-pstate
+              {:pkey i})
+           )))))
+
+(defn all-node-ids-fn
+  [node-pstate num-tasks]
+  (fn []
+    (into #{}
+          (apply concat
+           (for [i (range num-tasks)]
+             (foreign-select MAP-KEYS node-pstate {:pkey i})
+           )))))
+
+(defn trace-node-ids-fns
+  [root-pstate traces-query]
+  (let [trace-node-ids
+        (fn [{:keys [task-id agent-invoke-id]}]
+          (let [root-invoke-id (foreign-select-one [(keypath
+                                                     agent-invoke-id)
+                                                    :root-invoke-id]
+                                                   root-pstate
+                                                   {:pkey task-id})]
+            (->
+              (foreign-invoke-query traces-query
+                                    task-id
+                                    [[task-id root-invoke-id]]
+                                    10000)
+              :invokes-map
+              keys
+              set)))
+
+        non-gc-trace-node-ids
+        (fn [invs]
+          (set (apply set/union
+                (mapv trace-node-ids (non-gc-vec invs)))))]
+    [trace-node-ids non-gc-trace-node-ids]
+  ))
+
 (deftest gc-by-task-test
   (let [forced-task-atom (atom 0)]
     (with-redefs [i/SUBSTITUTE-TICK-DEPOTS true
@@ -104,45 +154,10 @@
                  (throw (ex-info "GC PState not empty" {:count (count elems)})))
              )))
 
-         (bind all-agent-invs
-           (fn []
-             (into #{}
-                   (apply concat
-                    (for [i (range 4)]
-                      (foreign-select
-                       [MAP-KEYS (view #(aor-types/->AgentInvokeImpl i %))]
-                       root-pstate
-                       {:pkey i})
-                    )))))
-         (bind all-node-ids
-           (fn []
-             (into #{}
-                   (apply concat
-                    (for [i (range 4)]
-                      (foreign-select MAP-KEYS node-pstate {:pkey i})
-                    )))))
-         (bind trace-node-ids
-           (fn [{:keys [task-id agent-invoke-id]}]
-             (let [root-invoke-id (foreign-select-one [(keypath
-                                                        agent-invoke-id)
-                                                       :root-invoke-id]
-                                                      root-pstate
-                                                      {:pkey task-id})]
-               (->
-                 (foreign-invoke-query traces-query
-                                       task-id
-                                       [[task-id root-invoke-id]]
-                                       10000)
-                 :invokes-map
-                 keys
-                 set))))
-         (bind non-gc-vec
-           (fn [v]
-             (subvec v (- (count v) 3))))
-         (bind non-gc-trace-node-ids
-           (fn [invs]
-             (set (apply set/union
-                   (mapv trace-node-ids (non-gc-vec invs))))))
+         (bind all-agent-invs (all-agent-invs-fn root-pstate 4))
+         (bind all-node-ids (all-node-ids-fn node-pstate 4))
+         (bind [trace-node-ids non-gc-trace-node-ids]
+           (trace-node-ids-fns root-pstate traces-query))
          (bind root-count
            (fn [task-id]
              (foreign-select-one STAY root-count-pstate {:pkey task-id})))
@@ -241,16 +256,27 @@
                            (non-gc-trace-node-ids invs-3)
                 )))
 
-
          (doseq [i (range 1 4)]
            (is (= 3 (root-count i))))
 
+
+        )))))
+
+(deftest gc-with-failures-test
          ;; TODO: <<<<>>>>>
          ;;  - verify GC of restarted traces (special case)
-         ;;  - verify no GC of pending invokes
-         ;;  - verify valid-invokes removal
-         ;;   - just fail one once, then verify after GC that it gets removed
-         ;;     - will need wait-for-mb-processed-count on that mb topology
-         ;;  - verify $$root-count maintained correctly
-         ;;    - check with forks, retries, restarts
-        )))))
+         ;;     - use a global ATOM and redef to increment graph version and
+         ;;     fail, causing rery where next invoke will do a restart and
+         ;;     succeed
+         ;;       - verify root invoke ID changes
+         ;;         - will need wait-for-mb-processed-count on that mb topology
+         ;;     - same test can verify valid-invokes
+         ;;  - verify root-count remains the same
+         ;;    - do a fork as well to check this
+)
+
+(deftest gc-skips-pending-test
+         ;; TODO: <<<<>>>>>
+         ;;  - verify no GC of invokes that haven't finished
+         ;;     - can check that
+)
