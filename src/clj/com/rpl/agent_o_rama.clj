@@ -547,6 +547,8 @@
             (foreign-append-async!
              human-depot
              (aor-types/->valid-HumanInput request response)))
+          (resultWithHumanForwarding [this agent-invoke]
+            (throw (h/ex-info "Function can only be called on a subagent" {})))
           (close [this]
             (close! agent-depot)
             (close! agent-config-depot))
@@ -643,6 +645,10 @@
 (defn agent-result-async
   ^CompletableFuture [^AgentClient agent-client agent-invoke]
   (.resultAsync agent-client agent-invoke))
+
+(defn agent-result-with-human-forwarding
+  [^AgentClient agent-client agent-invoke]
+  (.resultWithHumanForwarding agent-client agent-invoke))
 
 (defn agent-stream
   (^AgentStream [^AgentClient agent-client agent-invoke node]

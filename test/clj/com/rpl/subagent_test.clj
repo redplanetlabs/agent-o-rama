@@ -33,16 +33,45 @@
              "start"
              "node1"
              (fn [agent-node]
-               ))
-        )))
+               (let [bar (aor/agent-client agent-node "bar")
+                     inv (aor/agent-initiate bar "some input")]
+                 (aor/agent-result-with-human-forwarding bar inv)
+
+               )))
+        )
+
+
+        (-> topology
+            (aor/new-agent "bar")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node input]
+               (aor/get-human-input agent-node "Tell me something.")
+             )))
+       ))
      (rtest/launch-module! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
      (bind agent-manager (aor/agent-manager ipc module-name))
      (bind foo (aor/agent-client agent-manager "foo"))
-  ;; TODO: <<<<>>>>
-  ;;   - include recursion / mutual recursion
-  ;;   - verify trace for every callable method
-  )))
+     ;; TODO: <<<<>>>>
+     ;;   - include recursion / mutual recursion
+     ;;   - proxy the human inputs back and forth
+     ;;     - should there be a helper for this?
+     ;;   - verify trace for every callable method
+
+
+     ;; TODO: <<<<>>>> methods to test
+     ; (aor/agent-invoke bar ...)
+     ; (aor/agent-initiate bar ...)
+     ; (aor/agent-fork bar ...)
+     ; (aor/agent-initiate-fork bar ...)
+     ; (aor/agent-next-step bar agent-invoke)
+     ; (aor/agent-result bar agent-invoke)
+     ; (aor/pending-human-inputs bar agent-invoke)
+     ; (aor/provide-human-input bar request response)
+
+    )))
 
 (deftest mirror-subagent-test
   ;; TODO: <<<<>>>>>

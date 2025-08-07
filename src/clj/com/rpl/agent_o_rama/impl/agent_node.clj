@@ -15,6 +15,7 @@
    [com.rpl.agentorama
     AgentClient
     AgentNode
+    HumanInputRequest
     IUnderlying
     NestedOpType
     StreamingRecorder]
@@ -376,6 +377,16 @@
               "response" "response"}))
           (provideHumanInputAsync [this request response]
             (no-async!))
+          (resultWithHumanForwarding [this agent-invoke]
+            (loop [step (.nextStep this agent-invoke)]
+              (if (instance? HumanInputRequest step)
+                (do
+                  (.provideHumanInput
+                   this
+                   step
+                   (.getHumanInput agent-node (:prompt step)))
+                  (recur (.nextStep this agent-invoke)))
+                (:result step))))
           (close [this]
             (close! client))
          )))
