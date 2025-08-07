@@ -33,10 +33,11 @@
   (with-open [ipc (rtest/create-ipc)
               ui (aor/start-ui ipc)]
     (rtest/launch-module! ipc LoopAgent {:tasks 4 :threads 2})
+    
     (let [module-name   (get-module-name LoopAgent)
           agent-manager (aor/agent-manager ipc module-name)
           researcher    (aor/agent-client agent-manager "looper")
-          inv (aor/agent-initiate 10)]
+          inv (aor/agent-initiate researcher 10)]
       (println (aor/agent-result researcher inv)))))
 
 (comment
