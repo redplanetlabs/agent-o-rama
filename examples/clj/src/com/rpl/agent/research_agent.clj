@@ -449,11 +449,12 @@ Here are the sections to reflect on for writing: %s")
      "feedback"
      ["create-analysts" "questions"]
      (fn [agent-node analysts options]
-       (if (human-yes?
-            agent-node
-            (str
-             "Do you have any feedback on this set of analysts? Answer 'yes' or 'no'.\n\n"
-             (str/join "\n" (mapv str analysts))))
+       (if
+         (human-yes?
+          agent-node
+          (str
+           "Do you have any feedback on this set of analysts? Answer 'yes' or 'no'.\n\n"
+           (str/join "\n" (mapv str analysts))))
          (let [feedback (aor/get-human-input agent-node
                                              "What is your feedback?")]
            (aor/emit! agent-node "create-analysts" feedback options))
@@ -635,8 +636,7 @@ Here are the sections to reflect on for writing: %s")
 
 (defn run-research-agent
   []
-  (with-open [ipc (rtest/create-ipc)
-              ui (aor/start-ui ipc)]
+  (with-open [ipc (rtest/create-ipc)]
     (rtest/launch-module! ipc ResearchAgentModule {:tasks 4 :threads 2})
     (let [module-name   (get-module-name ResearchAgentModule)
           agent-manager (aor/agent-manager ipc module-name)
@@ -657,6 +657,3 @@ Here are the sections to reflect on for writing: %s")
             (recur (aor/agent-next-step researcher inv)))
           (println (:result step))))
     )))
-
-(comment
-  (run-research-agent))
