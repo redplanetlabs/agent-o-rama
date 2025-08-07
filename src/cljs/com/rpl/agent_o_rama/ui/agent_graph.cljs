@@ -10,7 +10,7 @@
    [com.rpl.specter :as s]
 
    ["react" :refer [useState useCallback useEffect useLayoutEffect]]
-   ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle useReactFlow ReactFlowProvider BaseEdge getSmoothStepPath]]
+   ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle useReactFlow ReactFlowProvider]]
    ["elkjs/lib/elk.bundled.js" :default ELK]))
 
 ;; ELK instance
@@ -21,11 +21,22 @@
   (let [{:keys [id sourceX sourceY targetX targetY data markerEnd style]} (js->clj props :keywordize-keys true)
         elk-points (:elkPoints data)
         edge-color (or (:stroke style) "#a5b4fc")
-        marker-id (str "arrow-" id)
-        ;; Build SVG path from ELK points, or fallback to straight line
+        
+        ;; Debug logging
+        _ (when elk-points
+            (js/console.log "Edge:" id)
+            (js/console.log "  Source:" sourceX sourceY "Target:" targetX targetY)
+            (js/console.log "  ELK points count:" (count elk-points))
+            (js/console.log "  Points:" (clj->js elk-points))
+            (when (seq elk-points)
+              (js/console.log "  First point:" (clj->js (first elk-points)))
+              (js/console.log "  Last point:" (clj->js (last elk-points)))))
+        
+        ;; Build SVG path from ELK points
         edge-path (if (and elk-points (seq elk-points))
                     ;; Create polyline path from ELK points
-                    (let [path-data (reduce-kv 
+                    (let [points-vec (vec elk-points)
+                          path-data (reduce-kv 
                                      (fn [path idx point]
                                        (let [x (:x point)
                                              y (:y point)]
@@ -33,28 +44,58 @@
                                            (str "M " x " " y)
                                            (str path " L " x " " y))))
                                      ""
-                                     (vec elk-points))]
+                                     points-vec)]
                       path-data)
                     ;; Fallback to straight line if no ELK points
-                    (str "M " sourceX " " sourceY " L " targetX " " targetY))]
+                    (str "M " sourceX " " sourceY " L " targetX " " targetY))
+        
+        ;; Calculate arrow rotation based on last two DISTINCT points
+        points-vec (when elk-points (vec elk-points))
+        ;; Find the last two distinct points (skip duplicates)
+        [second-last-distinct last-point] 
+        (when (and points-vec (>= (count points-vec) 2))
+          (let [last-pt (last points-vec)]
+            ;; Find the last point that's different from the final point
+            (loop [idx (- (count points-vec) 2)]
+              (if (>= idx 0)
+                (let [pt (nth points-vec idx)]
+                  (if (or (not= (:x pt) (:x last-pt))
+                          (not= (:y pt) (:y last-pt)))
+                    [pt last-pt]
+                    (recur (dec idx))))
+                [nil last-pt]))))
+        
+        arrow-angle (when (and second-last-distinct last-point)
+                      (let [dx (- (:x last-point) (:x second-last-distinct))
+                            dy (- (:y last-point) (:y second-last-distinct))
+                            angle (* (/ 180 js/Math.PI) (js/Math.atan2 dy dx))]
+                        (js/console.log "  Arrow angle calculation:")
+                        (js/console.log "    Second-last distinct:" (clj->js second-last-distinct))
+                        (js/console.log "    Last:" (clj->js last-point))
+                        (js/console.log "    dx:" dx "dy:" dy "angle:" angle)
+                        angle))
+        
+        ;; Calculate arrow position - slightly back from the end
+        arrow-offset 5 ; pixels to offset arrow from end
+        arrow-x (if (and last-point arrow-angle)
+                  (- (:x last-point) (* arrow-offset (js/Math.cos (* (/ js/Math.PI 180) arrow-angle))))
+                  (or (:x last-point) targetX))
+        arrow-y (if (and last-point arrow-angle)
+                  (- (:y last-point) (* arrow-offset (js/Math.sin (* (/ js/Math.PI 180) arrow-angle))))
+                  (or (:y last-point) targetY))]
+    
     ($ :g
-       ;; Define arrow marker specific to this edge (for color matching)
-       ($ :defs
-          ($ :marker {:id marker-id
-                      :markerWidth "10"
-                      :markerHeight "10"
-                      :refX "9"
-                      :refY "5"
-                      :orient "auto"}
-             ($ :path {:d "M 0 0 L 10 5 L 0 10 z"
-                       :fill edge-color})))
        ;; Draw the edge path
-       ($ :path {:id id
-                 :d edge-path
+       ($ :path {:d edge-path
                  :fill "none"
                  :stroke edge-color
-                 :strokeWidth (or (:strokeWidth style) 2)
-                 :markerEnd (str "url(#" marker-id ")")}))))
+                 :strokeWidth (or (:strokeWidth style) 2)})
+       ;; Draw arrow at the end
+       (when markerEnd
+         ($ :g {:transform (str "translate(" arrow-x "," arrow-y ") "
+                               (when arrow-angle (str "rotate(" arrow-angle ")")))}
+            ($ :path {:d "M 0 0 L -10 -4 L -10 4 z"
+                      :fill edge-color}))))))
 
 ;; ELK layout options
 (def elk-options
@@ -99,13 +140,24 @@
   "Process an ELK edge to extract routing points for React Flow"
   (let [sections (or (:sections edge) [])
         ;; ELK provides edge routing as sections with start, end, and bend points
-        edge-points (when (seq sections)
-                      (mapcat (fn [section]
-                                (concat 
-                                 [(:startPoint section)]
-                                 (:bendPoints section [])
-                                 [(:endPoint section)]))
-                              sections))]
+        raw-points (when (seq sections)
+                     (mapcat (fn [section]
+                               (concat 
+                                [(:startPoint section)]
+                                (:bendPoints section [])
+                                [(:endPoint section)]))
+                             sections))
+        ;; Remove consecutive duplicate points
+        edge-points (when raw-points
+                      (reduce (fn [acc point]
+                                (if (or (empty? acc)
+                                        (let [last-pt (last acc)]
+                                          (or (not= (:x last-pt) (:x point))
+                                              (not= (:y last-pt) (:y point)))))
+                                  (conj acc point)
+                                  acc))
+                              []
+                              raw-points))]
     (-> edge
         ;; Add the routing points to the edge data
         (assoc :data {:elkPoints edge-points})
@@ -115,6 +167,8 @@
 (defn get-layouted-elements [nodes edges options]
   "Layout nodes and edges using ELK.js"
   (let [is-horizontal false
+        ;; Create a map of original edges by ID for merging later
+        edge-map (into {} (map (fn [e] [(:id e) e]) edges))
         graph #js {:id "root"
                    :layoutOptions options
                    :children (clj->js 
@@ -136,7 +190,11 @@
                                                         (dissoc :x :y))))))
                        layouted-edges (-> (.-edges layouted-graph)
                                          (js->clj :keywordize-keys true)
-                                         (->> (map process-elk-edge)))]
+                                         (->> (map (fn [elk-edge]
+                                                     ;; Merge original edge properties with ELK results
+                                                     (let [original-edge (get edge-map (:id elk-edge))
+                                                           processed-edge (process-elk-edge elk-edge)]
+                                                       (merge original-edge processed-edge))))))]
                    #js {:nodes layouted-nodes
                         :edges layouted-edges})))
         (.catch js/console.error))))
