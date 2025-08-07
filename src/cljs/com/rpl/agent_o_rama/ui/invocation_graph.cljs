@@ -10,6 +10,7 @@
    [com.rpl.specter :as s]
 
    ["react" :refer [useState useCallback useEffect]]
+   ["react-dom" :refer [createPortal]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
    ["@dagrejs/dagre" :as Dagre]
    ["wouter" :refer [useLocation]]))
@@ -36,28 +37,30 @@
   (not (nil? (:agg-state node))))
 
 (defui expandable-popup-modal [{:keys [content content-index title on-close]}]
-  ($ :div {:className "fixed inset-0 flex items-center justify-center z-50"
-           :style {:backgroundColor "rgba(0, 0, 0, 0.5)"}
-           :onClick (fn [e]
-                      (.preventDefault e)
-                      (.stopPropagation e)
-                      (on-close))}
-     ($ :div {:className "bg-white rounded-lg shadow-xl max-w-4xl max-h-[80vh] overflow-hidden"
-              :onClick (fn [e] 
-                         (.preventDefault e)
-                         (.stopPropagation e))}
-        ($ :div {:className "p-4 border-b border-gray-200 flex justify-between items-center"}
-           ($ :h3 {:className "text-lg font-medium text-gray-800"}
-              title)
-           ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer"
-                       :onClick (fn [e]
-                                  (.preventDefault e)
-                                  (.stopPropagation e)
-                                  (on-close))}
-              "×"))
-        ($ :div {:className "p-4 overflow-auto max-h-96"}
-           ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
-              content)))))
+  (createPortal
+    ($ :div {:className "fixed inset-0 flex items-center justify-center z-50"
+             :style {:backgroundColor "rgba(0, 0, 0, 0.5)"}
+             :onClick (fn [e]
+                        (.preventDefault e)
+                        (.stopPropagation e)
+                        (on-close))}
+       ($ :div {:className "bg-white rounded-lg shadow-xl max-w-4xl max-h-[80vh] overflow-hidden"
+                :onClick (fn [e] 
+                           (.preventDefault e)
+                           (.stopPropagation e))}
+          ($ :div {:className "p-4 border-b border-gray-200 flex justify-between items-center"}
+             ($ :h3 {:className "text-lg font-medium text-gray-800"}
+                title)
+             ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer"
+                         :onClick (fn [e]
+                                    (.preventDefault e)
+                                    (.stopPropagation e)
+                                    (on-close))}
+                "×"))
+          ($ :div {:className "p-4 overflow-auto max-h-96"}
+             ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
+                content))))
+    (.-body js/document)))
 
 
 (defui expandable-item-component [{:keys [item color title truncate-length]
