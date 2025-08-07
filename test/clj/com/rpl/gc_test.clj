@@ -7,6 +7,7 @@
    [clojure.set :as set]
    [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.partitioner :as apart]
@@ -278,7 +279,8 @@
                   FORCED-VERSION-ATOM (atom 0)
                   SEM (h/mk-semaphore 0)
                   apart/next-agent-task (fn [& args] @forced-task-atom)
-                  at/fetch-graph-version forced-graph-version]
+                  at/fetch-graph-version forced-graph-version
+                  anode/log-node-error (fn [& args])]
       (with-open [ipc (rtest/create-ipc)]
         (letlocals
          (bind module
@@ -333,6 +335,10 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-node-task-global-name "foo")))
+         (bind valid-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-valid-invokes-task-global-name "foo")))
          (bind traces-query
            (foreign-query ipc
                           module-name
@@ -345,6 +351,14 @@
          (bind root-count
            (fn [task-id]
              (foreign-select-one STAY root-count-pstate {:pkey task-id})))
+         (bind all-valid
+           (fn []
+             (into #{}
+                   (apply concat
+                    (for [i (range 4)]
+                      (foreign-select MAP-KEYS valid-pstate {:pkey i})
+                    )))
+           ))
 
          (foreign-append! config-depot
                           (aor-types/change-max-traces-per-task 2))
@@ -376,18 +390,38 @@
 
          (is (not= root-invoke-id root-invoke-id2))
          (is (= (all-agent-invs) #{inv}))
+         (is (= 1 (count (all-valid))))
 
 
          (dotimes [i 5]
            (foreign-append! gc-depot nil))
          (is (= (all-node-ids) (trace-node-ids inv)))
 
+         (bind inv2 (aor/agent-initiate foo))
+         (bind inv3 (aor/agent-initiate foo))
+         (is (= "done" (aor/agent-result foo inv2)))
+         (is (= "done" (aor/agent-result foo inv3)))
+
+         (is (= 1 (count (all-valid))))
+         (dotimes [i 5]
+           (foreign-append! gc-depot nil))
+
+         (is (= (all-agent-invs) #{inv2 inv3}))
+         (is (= (all-node-ids)
+                (set/union (trace-node-ids inv2) (trace-node-ids inv3))))
+
+         (is (condition-attained? (= 0 (count (all-valid)))))
+
+         (is (= 2 (root-count 0)))
+         (doseq [i (range 1 4)]
+           (is (= 0 (root-count i))))
+
+
+
 
          ;; TODO: <<<<>>>>>
-         ;;  - verify valid-invokes
-         ;;    - will need wait-for-mb-processed-count on that mb topology
          ;;  - verify root-count remains the same
-         ;;    - do a fork as well to check this
+         ;;    - do forks as well to check this
         )))))
 
 (deftest gc-skips-pending-test
