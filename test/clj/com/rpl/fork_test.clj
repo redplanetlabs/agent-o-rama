@@ -570,7 +570,10 @@
      (swap! *fail-nodes-atom disj *node)
      (depot-partition-append!
       *depot
-      (aor-types/->NodeFailure (ops/current-task-id) *invoke-id *retry-num)
+      (aor-types/->NodeFailure (ops/current-task-id)
+                               *invoke-id
+                               *retry-num
+                               "failure")
       :append-ack)
     (else>)
      (:>)

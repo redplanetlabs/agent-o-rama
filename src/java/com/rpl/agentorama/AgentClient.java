@@ -3,7 +3,6 @@ package com.rpl.agentorama;
 import java.io.Closeable;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import com.rpl.agentorama.ops.*;
 
 public interface AgentClient extends Closeable {
   interface StreamCallback<T> {
@@ -11,7 +10,7 @@ public interface AgentClient extends Closeable {
   }
 
   interface StreamAllCallback<T> {
-    void onUpdate(Map<Long, List<T>> allChunks, Map<Long, List<T>> newChunks, Set<Long> resetInvokeIds, boolean isComplete);
+    void onUpdate(Map<UUID, List<T>> allChunks, Map<UUID, List<T>> newChunks, Set<UUID> resetInvokeIds, boolean isComplete);
   }
 
   <T> T invoke(Object... args);
@@ -19,19 +18,28 @@ public interface AgentClient extends Closeable {
   AgentInvoke initiate(Object... args);
   CompletableFuture<AgentInvoke> initiateAsync(Object... args);
 
-  <T> T fork(AgentInvoke invoke, Map<Long, List> nodeInvokeIdToNewArgs);
-  <T> CompletableFuture<T> forkAsync(AgentInvoke invoke, Map<Long, List> nodeInvokeIdToNewArgs);
-  AgentInvoke initiateFork(AgentInvoke invoke, Map<Long, List> nodeInvokeIdToNewArgs);
-  CompletableFuture<AgentInvoke> initiateForkAsync(AgentInvoke invoke, Map<Long, List> nodeInvokeIdToNewArgs);
+  <T> T fork(AgentInvoke invoke, Map<UUID, List> nodeInvokeIdToNewArgs);
+  <T> CompletableFuture<T> forkAsync(AgentInvoke invoke, Map<UUID, List> nodeInvokeIdToNewArgs);
+  AgentInvoke initiateFork(AgentInvoke invoke, Map<UUID, List> nodeInvokeIdToNewArgs);
+  CompletableFuture<AgentInvoke> initiateForkAsync(AgentInvoke invoke, Map<UUID, List> nodeInvokeIdToNewArgs);
 
-  <T> T agentResult(AgentInvoke invoke);
-  <T> CompletableFuture<T> agentResultAsync(AgentInvoke invoke);
+
+  AgentStep nextStep(AgentInvoke invoke);
+  CompletableFuture<AgentStep> nextStepAsync(AgentInvoke invoke);
+
+  <T> T result(AgentInvoke invoke);
+  <T> CompletableFuture<T> resultAsync(AgentInvoke invoke);
+
   AgentStream stream(AgentInvoke invoke, String node);
   <T> AgentStream stream(AgentInvoke invoke, String node, StreamCallback<T> callback);
-  AgentStream streamSpecific(AgentInvoke invoke, String node, long nodeInvokeId);
-  <T> AgentStream streamSpecific(AgentInvoke invoke, String node, long nodeInvokeId, StreamCallback<T> callback);
+  AgentStream streamSpecific(AgentInvoke invoke, String node, UUID nodeInvokeId);
+  <T> AgentStream streamSpecific(AgentInvoke invoke, String node, UUID nodeInvokeId, StreamCallback<T> callback);
   AgentStreamByInvoke streamAll(AgentInvoke invoke, String node);
   <T> AgentStreamByInvoke streamAll(AgentInvoke invoke,
                                     String node,
                                     StreamAllCallback<T> callback);
+  List<HumanInputRequest> pendingHumanInputs(AgentInvoke invoke);
+  CompletableFuture<List<HumanInputRequest>> pendingHumanInputsAsync(AgentInvoke invoke);
+  void provideHumanInput(HumanInputRequest request, String response);
+  CompletableFuture<Void> provideHumanInputAsync(HumanInputRequest request, String response);
 }

@@ -7,5 +7,6 @@ public enum NestedOpType {
   DB_WRITE,
   MODEL_CALL,
   AGENT_INVOKE,
+  HUMAN_INPUT,
   OTHER
 }

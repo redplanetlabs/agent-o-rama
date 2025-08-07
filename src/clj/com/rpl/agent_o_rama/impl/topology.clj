@@ -15,9 +15,11 @@
    [com.rpl.agentorama
     FinishedAgg]
    [com.rpl.agent_o_rama.impl.types
+    HumanInput
     Node
     NodeAgg
-    NodeAggStart]
+    NodeAggStart
+    NodeHumanInputRequest]
    [com.rpl.agentorama.impl
     AgentNodeExecutorTaskGlobal]))
 
@@ -94,8 +96,8 @@
    (anchor> <regular-emit>)
 
    (hook> <root>)
-   (mapv :invoke-id *emits :> *next-invoke-ids)
-   (reduce bit-xor *invoke-id *next-invoke-ids :> *ack-val)
+   (mapv (comp h/half-uuid :invoke-id) *emits :> *next-ack-vals)
+   (reduce bit-xor (h/half-uuid *invoke-id) *next-ack-vals :> *ack-val)
    (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
                |direct
                *agent-task-id)
@@ -172,16 +174,20 @@
 (deframaop init-root
   [*agent-name *agent-id *retry-num *args]
   (<<with-substitutions
-   [$$root (po/agent-root-task-global *agent-name)]
+   [$$root (po/agent-root-task-global *agent-name)
+    $$root-count (po/agent-root-count-task-global *agent-name)]
    (fetch-graph-version *agent-name :> *version)
-   (h/random-long :> *invoke-id)
+   (random-uuid :> *invoke-id)
    (h/current-time-millis :> *current-time-millis)
+   (local-select> [(keypath *agent-id) (view some?)] $$root :> *exists?)
+   (<<if (not *exists?)
+     (local-transform> (term inc) $$root-count))
    (local-transform>
     [(keypath *agent-id)
      (termval {:root-invoke-id    *invoke-id
                :invoke-args       *args
                :graph-version     *version
-               :ack-val           *invoke-id
+               :ack-val           (h/half-uuid *invoke-id)
                :last-progress-time-millis *current-time-millis
                :retry-num         *retry-num
                :start-time-millis *current-time-millis})]
@@ -196,7 +202,7 @@
   (local-transform> (term inc) $$id)
   (:> *ret))
 
-(deframaop intake-agent-invoke
+(deframaop intake-agent-initiate
   [*agent-name *data]
   (<<with-substitutions
    [$$id-gen (po/agent-id-gen-task-global *agent-name)
@@ -243,7 +249,7 @@
   [*agent-name {:keys [*agent-task-id *agent-id *expected-retry-num]}]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
-    $$gc-invokes (po/agent-gc-invokes-task-global *agent-name)
+    $$gc (po/agent-gc-invokes-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
    (hook:received-retry *agent-task-id *agent-id *expected-retry-num)
    (local-select> (keypath *agent-id)
@@ -288,7 +294,7 @@
     (else>)
      (<<if (= :restart *handle-mode)
        (local-transform> [(keypath *root-invoke-id) (termval nil)]
-                         $$gc-invokes)
+                         $$gc)
        (init-root *agent-name *agent-id *retry-num *args :> *root-invoke-id)
       (else>)
        (identity *root-invoke-id :> *root-invoke-id))
@@ -300,10 +306,11 @@
        (complete-with-failure! *agent-name *agent-id "Max retry limit exceeded")
       (else>)
        (local-transform> [(keypath *agent-id)
-                          (multi-path [:retry-num (termval *retry-num)]
-                                      [:graph-version
-                                       (termval *curr-graph-version)]
-                                      [:ack-val (termval *root-invoke-id)])]
+                          (multi-path
+                           [:retry-num (termval *retry-num)]
+                           [:graph-version
+                            (termval *curr-graph-version)]
+                           [:ack-val (termval (h/half-uuid *root-invoke-id))])]
                          $$root)
 
        (aor-types/->valid-NodeOp *root-invoke-id
@@ -375,9 +382,10 @@
    (:> *agent-task-id *fork-agent-id *retry-num *op)))
 
 (deframaop intake-node-failure
-  [*agent-name {:keys [*invoke-id *retry-num]}]
+  [*agent-name {:keys [*invoke-id *retry-num *throwable-str]}]
   (<<with-substitutions
-   [$$nodes (po/agent-node-task-global *agent-name)
+   [$$root (po/agent-root-task-global *agent-name)
+    $$nodes (po/agent-node-task-global *agent-name)
     *failure-depot (po/agent-failures-depot-task-global *agent-name)]
    (local-select> (keypath *invoke-id)
                   $$nodes
@@ -387,6 +395,13 @@
                                   *agent-task-id
                                   *agent-id
                                   *retry-num)
+   (|direct *agent-task-id)
+   (local-transform>
+    [(must *agent-id)
+     :exceptions
+     AFTER-ELEM
+     (termval *throwable-str)]
+    $$root)
    (depot-partition-append!
     *failure-depot
     (aor-types/->valid-AgentFailure *agent-task-id
@@ -607,7 +622,7 @@
                :agg-inputs          []
                :agg-start-res       *agg-start-res
                :agg-state           *init-agg-state
-               :agg-ack-val         *invoke-id
+               :agg-ack-val         (h/half-uuid *invoke-id)
                :agg-start-invoke-id *invoke-id
               })]
     $$nodes)
@@ -680,10 +695,10 @@
 (deframaop intake-agent-depot
   [*agent-name *data]
   (<<cond
-   (case> (aor-types/AgentInvoke? *data))
-    (intake-agent-invoke *agent-name
-                         *data
-                         :> *agent-task-id *agent-id *retry-num *op)
+   (case> (aor-types/AgentInitiate? *data))
+    (intake-agent-initiate *agent-name
+                           *data
+                           :> *agent-task-id *agent-id *retry-num *op)
     (ack-return> [*agent-task-id *agent-id])
 
    (case> (aor-types/RetryAgentInvoke? *data))
@@ -755,6 +770,38 @@
     $$streaming)
   ))
 
+(defn- complete-human-future!
+  [^AgentNodeExecutorTaskGlobal node-exec invoke-id uuid response]
+  (if-let [cf (.getHumanFuture node-exec invoke-id uuid)]
+    (.complete cf response)))
+
+(deframaop handle-human
+  [*agent-name *data]
+  (<<with-substitutions
+   [$$root (po/agent-root-task-global *agent-name)
+    *node-exec (po/agent-node-executor-task-global)]
+   (<<subsource *data
+    (case> NodeHumanInputRequest :> {:keys [*agent-id]})
+     (local-transform> [(must *agent-id)
+                        :human-requests
+                        NONE-ELEM
+                        (termval *data)]
+                       $$root)
+
+    (case> HumanInput
+           :> {:keys [*request *response]})
+     (identity *request :> {:keys [*agent-id *node-task-id *invoke-id *uuid]})
+     (complete-human-future! *node-exec *invoke-id *uuid *response)
+     (get *request :agent-task-id :> *agent-task-id)
+     (|direct *agent-task-id)
+     (local-transform> [(must *agent-id)
+                        :human-requests
+                        (set-elem *request)
+                        NONE>]
+                       $$root)
+     (local-select> (keypath *agent-id) $$root :> *tmp)
+   )))
+
 (deframaop handle-config
   [*agent-name {:keys [*key *val]}]
   (<<with-substitutions
@@ -813,7 +860,7 @@
       *fork-context)
 
     (case> NodeAggStart :> {:keys [*node-fn *agg-node-name]})
-     (h/random-long :> *new-agg-invoke-id)
+     (random-uuid :> *new-agg-invoke-id)
      (local-transform>
       [(keypath *invoke-id) :started-agg? (termval true)]
       $$nodes)
@@ -881,7 +928,10 @@
      (<<if *finished?
        (complete-agg! *agent-name *agg-invoke-id *retry-num)
       (else>)
-       (ack-agg! *agent-name *agg-invoke-id *retry-num *invoke-id))
+       (ack-agg! *agent-name
+                 *agg-invoke-id
+                 *retry-num
+                 (h/half-uuid *invoke-id)))
    )))
 
 (deframaop handle-node-already-complete
@@ -897,13 +947,12 @@
 
 (deframafn update-forked-emits
   [*emits]
-  (ops/current-random-source :> *random-source)
   (<<ramafn %update-emit
     [{*emit-invoke-id :invoke-id :as *emit}]
     (:>
      (assoc *emit
       :fork-invoke-id *emit-invoke-id
-      :invoke-id (h/random-long *random-source))))
+      :invoke-id (random-uuid))))
   (:> (mapv %update-emit *emits)))
 
 (deframafn copy-unforked-agg-state
@@ -980,7 +1029,7 @@
                                   :agg-invoke-id *agg-invoke-id))]
                        $$nodes)
      (<<if (aor-types/NodeAggStart? *node-obj)
-       (h/random-long (ops/current-random-source) :> *new-agg-invoke-id)
+       (random-uuid :> *new-agg-invoke-id)
        (local-select> (keypath *fork-agg-invoke-id)
                       $$nodes
                       :> {*agg-node      :node
@@ -1031,3 +1080,74 @@
                       *agent-id
                       *retry-num
                       *node-op))))
+
+(deframaop handle-gc
+  [*agent-name]
+  (<<with-substitutions
+   [$$root (po/agent-root-task-global *agent-name)
+    $$root-count (po/agent-root-count-task-global *agent-name)
+    $$nodes (po/agent-node-task-global *agent-name)
+    $$gc (po/agent-gc-invokes-task-global *agent-name)
+    *gc-valid-depot (po/agent-gc-valid-invokes-depot-task-global *agent-name)]
+   (anode/read-config *agent-name
+                      aor-types/MAX-TRACES-PER-TASK-CONFIG
+                      :> *max-traces)
+   (|all)
+   (local-select> STAY $$root-count :> *curr-count)
+   (- *curr-count *max-traces :> *delete-count)
+   (<<if (pos? *delete-count)
+     (<<atomic
+       (local-select> (sorted-map-range-from-start *delete-count)
+                      $$root
+                      {:allow-yield? true}
+                      :> *to-delete)
+       (ops/current-task-id :> *agent-task-id)
+       (select>
+         ALL
+         *to-delete
+         {:allow-yield? true}
+         :> [*agent-id {:keys [*root-invoke-id *retry-num *result]}])
+       (filter> (some? *result))
+       (local-transform> [(keypath *agent-id)
+                          (multi-path [:forks NONE>]
+                                      [:human-requests NONE>])]
+                         $$root)
+       (|direct *agent-task-id)
+       ;; rare possibility it ticks again while partitioning and tries to delete
+       ;; same elements concurrently
+       (local-select> [(keypath *agent-id) (view some?)] $$root :> *exists?)
+       (<<if *exists?
+         (<<if (> *retry-num 0)
+           (depot-partition-append! *gc-valid-depot
+                                    [*agent-task-id *agent-id]
+                                    :append-ack))
+         (local-transform> [(keypath *root-invoke-id) (termval nil)] $$gc)
+         (local-transform> [(keypath *agent-id) NONE>] $$root)
+         (local-transform> (term dec) $$root-count))))
+   (local-select> MAP-KEYS $$gc {:allow-yield? true} :> *invoke-id)
+   (local-select> [(keypath *invoke-id)]
+                  $$nodes
+                  :> {:keys [*emits *started-agg? *agg-invoke-id]})
+   (ops/current-task-id :> *start-task-id)
+   (<<ramafn %to-tuple
+     [{:keys [*target-task-id *invoke-id]}]
+     (:> [*target-task-id *invoke-id]))
+   (mapv %to-tuple *emits :> *tuples)
+   (<<if *started-agg?
+     (conj *tuples [*start-task-id *agg-invoke-id] :> *tuples)
+    (else>)
+     (identity *tuples :> *tuples))
+   (loop<- [*tuples (seq *tuples)]
+     (<<if (empty? *tuples)
+       (:>)
+      (else>)
+       (first *tuples :> [*emit-task-id *emit-invoke-id])
+       (|direct *emit-task-id)
+       (local-transform> [(keypath *emit-invoke-id) (termval nil)] $$gc)
+       (continue> (next *tuples))))
+   (|direct *start-task-id)
+   (local-transform> [(keypath *invoke-id) :agg-inputs NONE>] $$nodes)
+   (|direct *start-task-id)
+   (local-transform> [(keypath *invoke-id) NONE>] $$nodes)
+   (local-transform> [(keypath *invoke-id) NONE>] $$gc)
+  ))

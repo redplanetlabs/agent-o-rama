@@ -12,11 +12,14 @@
     AggInput
     ForkContext
     NestedOpInfo
+    NodeHumanInputRequest
     HistoricalAgentGraphInfo
     Node
     NodeAgg
     NodeAggStart
-    StreamingChunk]))
+    StreamingChunk]
+   [java.util
+    UUID]))
 
 (defn agents-store-info-name
   []
@@ -42,9 +45,17 @@
   [name]
   (RamaClientsTaskGlobal/agentStreamingDepotName name))
 
+(defn agent-human-depot-name
+  [name]
+  (RamaClientsTaskGlobal/agentHumanDepotName name))
+
 (defn agent-config-depot-name
   [name]
   (str "*_agent-config-depot-" name))
+
+(defn agent-gc-tick-depot-name
+  [name]
+  (str "*_agent-gc-tick-depot-" name))
 
 (defn agent-check-tick-depot-name
   [name]
@@ -53,6 +64,10 @@
 (defn agent-failures-depot-name
   [name]
   (str "*_agent-failures-depot-" name))
+
+(defn agent-gc-valid-invokes-depot-name
+  [name]
+  (str "*_agent-gc-valid-invokes-depot-" name))
 
 (defn agents-clients-name
   []
@@ -70,23 +85,29 @@
   [agent-name]
   (str "$$_agent-root-" agent-name))
 
-(def AGENT-INVOKE-PSTATE-SCHEMA
+(def AGENT-ROOT-PSTATE-SCHEMA
   {Long
    (fixed-keys-schema
-    {:root-invoke-id     Long
+    {:root-invoke-id     UUID
      :invoke-args        [Object]
      :graph-version      Long
      :result             AgentResult
+     :exceptions         [String]
      :ack-val            Long
      :start-time-millis  Long
      :finish-time-millis Long
      :last-progress-time-millis Long
      :retry-num          Long
+     :human-requests     (set-schema NodeHumanInputRequest {:subindex? true})
      :fork-of            (fixed-keys-schema
                           {:parent-agent-id Long
                            :fork-context    ForkContext})
      :forks              (set-schema Long {:subindex? true}) ; agent ids
     })})
+
+(defn agent-root-count-task-global-name
+  [agent-name]
+  (str "$$_agent-root-count-" agent-name))
 
 (defn agent-active-invokes-task-global-name
   [agent-name]
@@ -108,7 +129,7 @@
   (str "$$_agent-gc-invokes-" agent-name))
 
 (def AGENT-GC-ROOT-INVOKES-PSTATE-SCHEMA
-  {Long Object})
+  {UUID Object})
 
 (defn agent-streaming-results-task-global-name
   [agent-name]
@@ -121,7 +142,7 @@
     (fixed-keys-schema
      {:all     (vector-schema StreamingChunk {:subindex? true})
       :invokes (map-schema
-                Long ; invoke-id
+                UUID ; invoke-id
                 Long ; index
                 {:subindex? true})})
     {:subindex? true})})
@@ -131,7 +152,7 @@
   (str "$$_agent-node-" agent-name))
 
 (def AGENT-NODE-PSTATE-SCHEMA
-  {Long ; invoke-id
+  {UUID ; invoke-id
    (fixed-keys-schema
     {:agent-id            Long
      :agent-task-id       Long
@@ -142,7 +163,7 @@
      :start-time-millis   Long
      :finish-time-millis  Long
 
-     :agg-invoke-id       Long
+     :agg-invoke-id       UUID
 
      ;; input to regular node
      :input               [Object]
@@ -151,14 +172,14 @@
      :started-agg?        Boolean
 
      ;; invoke of agg node (to make tracing easier)
-     :invoked-agg-invoke-id Long
+     :invoked-agg-invoke-id UUID
 
      ;; agg state
      :agg-inputs          (vector-schema AggInput {:subindex? true})
      :agg-start-res       Object
      :agg-state           Object
      :agg-ack-val         Long
-     :agg-start-invoke-id Long
+     :agg-start-invoke-id UUID
      :agg-finished?       Boolean
     })})
 
@@ -206,6 +227,10 @@
   [name]
   (this-module-pobject-task-global (agent-failures-depot-name name)))
 
+(defn agent-gc-valid-invokes-depot-task-global
+  [name]
+  (this-module-pobject-task-global (agent-gc-valid-invokes-depot-name name)))
+
 (defn agents-clients-task-global
   []
   (declared-object-task-global (agents-clients-name)))
@@ -221,6 +246,10 @@
 (defn agent-root-task-global
   [name]
   (this-module-pobject-task-global (agent-root-task-global-name name)))
+
+(defn agent-root-count-task-global
+  [name]
+  (this-module-pobject-task-global (agent-root-count-task-global-name name)))
 
 (defn agent-active-invokes-task-global
   [name]

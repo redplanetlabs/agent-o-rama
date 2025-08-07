@@ -285,6 +285,10 @@
                                 finish-time-millis
                                 info-map))
 
+(defn get-human-input
+  [^AgentNode agent-node prompt]
+  (.getHumanInput agent-node prompt))
+
 (defn- parse-map-options
   [[arg1 & rest-args :as args]]
   (if (map? arg1) [arg1 rest-args] [{} args]))
@@ -332,6 +336,10 @@
                                                  module-name
                                                  (po/agent-depot-name
                                                   agentName))
+             human-depot          (foreign-depot cluster
+                                                 module-name
+                                                 (po/agent-human-depot-name
+                                                  agentName))
              agent-config-depot   (foreign-depot cluster
                                                  module-name
                                                  (po/agent-config-depot-name
@@ -378,19 +386,19 @@
             (.thenCompose
              (.initiateAsync this args)
              (h/cf-function [agent-invoke]
-               (.agentResultAsync this agent-invoke))))
+               (.resultAsync this agent-invoke))))
           (initiate [this args]
             (.get (.initiateAsync this args)))
           (initiateAsync [this args]
             (.thenApply
              (foreign-append-async!
               agent-depot
-              (aor-types/->AgentInvoke
+              (aor-types/->AgentInitiate
                (vec args)
                (h/current-time-millis)))
              (h/cf-function [{[agent-task-id agent-id]
                               aor-types/AGENTS-TOPOLOGY-NAME}]
-               (AgentInvoke. agent-task-id agent-id)
+               (aor-types/->AgentInvokeImpl agent-task-id agent-id)
              )))
 
           (fork [this invoke nodeInvokeIdToNewArgs]
@@ -399,7 +407,7 @@
             (.thenCompose
              (.initiateForkAsync this invoke nodeInvokeIdToNewArgs)
              (h/cf-function [agent-invoke]
-               (.agentResultAsync this agent-invoke))))
+               (.resultAsync this agent-invoke))))
           (initiateFork [this invoke nodeInvokeIdToNewArgs]
             (.get (.initiateForkAsync this invoke nodeInvokeIdToNewArgs)))
           (initiateForkAsync [this invoke invokeIdToNewArgs]
@@ -412,55 +420,47 @@
                invokeIdToNewArgs))
              (h/cf-function [{[agent-task-id agent-id]
                               aor-types/AGENTS-TOPOLOGY-NAME}]
-               (AgentInvoke. agent-task-id agent-id)
+               (aor-types/->AgentInvokeImpl agent-task-id agent-id)
              )))
 
-          (agentResult [this agent-invoke]
-            (.get (.agentResultAsync this agent-invoke)))
-          (agentResultAsync [this agent-invoke]
-            (let [agent-task-id (.getTaskId ^AgentInvoke agent-invoke)
-                  agent-id      (.getAgentInvokeId ^AgentInvoke agent-invoke)
-                  ret           (CompletableFuture.)
-                  proxy-atom    (atom nil)]
-              (.thenApply
-               (foreign-proxy-async
-                [(keypath agent-id) :result]
-                root-pstate
-                {:pkey        agent-task-id
-                 :callback-fn (fn [new-val _ _]
-                                (when (some? new-val)
-                                  (when-not (.isDone ret)
-                                    (if (:failure? new-val)
-                                      (.completeExceptionally
-                                       ret
-                                       (h/ex-info (:val new-val) {}))
-                                      (.complete ret (:val new-val))))
-                                  (locking proxy-atom
-                                    (cond
-                                      (nil? @proxy-atom)
-                                      (reset! proxy-atom ::close)
 
-                                      (keyword? @proxy-atom) nil
+          (nextStep [this agent-invoke]
+            (.get (.nextStepAsync this agent-invoke)))
+          (nextStepAsync [this agent-invoke]
+            (i/client-wait-for-result
+             root-pstate
+             agent-invoke
+             (fn [{:keys [result human-request exceptions]}]
+               (cond
+                 result
+                 (fn [^CompletableFuture cf]
+                   (if (:failure? result)
+                     (.completeExceptionally
+                      cf
+                      (i/mk-failure-exception result exceptions))
+                     (.complete
+                      cf
+                      (aor-types/->AgentCompleteImpl (:val result)))))
 
-                                      :else
-                                      (do
-                                        (close! @proxy-atom)
-                                        (reset! proxy-atom ::done)
-                                      )))
-                                ))
-                })
-               (h/cf-function [proxy-state]
-                 (i/hook:agent-result-proxy proxy-state)
-                 (locking proxy-atom
-                   (if (= ::close @proxy-atom)
-                     (do
-                       (close! proxy-state)
-                       (reset! proxy-atom ::done))
-                     (reset! proxy-atom proxy-state))
-                 ))
-              )
-              ret
-            ))
+                 human-request
+                 (fn [^CompletableFuture cf]
+                   (.complete cf human-request))
+               ))))
+          (result [this agent-invoke]
+            (.get (.resultAsync this agent-invoke)))
+          (resultAsync [this agent-invoke]
+            (i/client-wait-for-result
+             root-pstate
+             agent-invoke
+             (fn [{:keys [result exceptions]}]
+               (when result
+                 (fn [^CompletableFuture cf]
+                   (if (:failure? result)
+                     (.completeExceptionally
+                      cf
+                      (i/mk-failure-exception result exceptions))
+                     (.complete cf (:val result))))
+               ))))
           (stream [this agent-invoke node]
             (.stream this agent-invoke node nil))
           (stream [this agent-invoke node stream-callback]
@@ -510,6 +510,26 @@
                             new-chunks
                             reset-invoke-ids
                             complete?)))))
+
+          (pendingHumanInputs [this invoke]
+            (.get (.pendingHumanInputsAsync this invoke)))
+          (pendingHumanInputsAsync [this invoke]
+            (let [agent-task-id (.getTaskId invoke)
+                  agent-id      (.getAgentInvokeId invoke)]
+              (foreign-select-async
+               [(keypath agent-id)
+                :human-requests
+                (sorted-set-range-from-start 1000)
+                ALL]
+               root-pstate
+               {:pkey agent-task-id}
+              )))
+          (provideHumanInput [this request response]
+            (.get (.provideHumanInputAsync this request response)))
+          (provideHumanInputAsync [this request response]
+            (foreign-append-async!
+             human-depot
+             (aor-types/->valid-HumanInput request response)))
           (close [this]
             (close! agent-depot)
             (close! agent-config-depot))
@@ -590,13 +610,22 @@
   [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
   (.initiateForkAsync agent-client invoke node-invoke-id->new-args))
 
+(defn agent-next-step
+  [^AgentClient client agent-invoke]
+  (.nextStep client agent-invoke))
+
+(defn agent-next-step-async
+  ^CompletableFuture
+  [^AgentClient client agent-invoke]
+  (.nextStepAsync client agent-invoke))
+
 (defn agent-result
   [^AgentClient agent-client agent-invoke]
-  (.agentResult agent-client agent-invoke))
+  (.result agent-client agent-invoke))
 
 (defn agent-result-async
   ^CompletableFuture [^AgentClient agent-client agent-invoke]
-  (.agentResultAsync agent-client agent-invoke))
+  (.resultAsync agent-client agent-invoke))
 
 (defn agent-stream
   (^AgentStream [^AgentClient agent-client agent-invoke node]
@@ -632,6 +661,24 @@
         (.numResetsByInvoke ^AgentStreamByInvoke stream)
 
         :else (throw (h/ex-info "Unknown type" {:class (class stream)}))))
+
+(defn pending-human-inputs
+  [^AgentClient client agent-invoke]
+  (.pendingHumanInputs client agent-invoke))
+
+(defn pending-human-inputs-async
+  ^CompletableFuture
+  [^AgentClient client agent-invoke]
+  (.pendingHumanInputsAsync client agent-invoke))
+
+(defn provide-human-input
+  [^AgentClient client request response]
+  (.provideHumanInput client request response))
+
+(defn provide-human-input-async
+  ^CompletableFuture
+  [^AgentClient client request response]
+  (.provideHumanInputAsync client request response))
 
 (defn start-ui ^java.io.Closeable [ipc]
   (let [start-fn (requiring-resolve 'com.rpl.agent-o-rama.impl.ui.core/start-ui)]

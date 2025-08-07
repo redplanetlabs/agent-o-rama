@@ -11,6 +11,8 @@
    [jsonista.core :as j]
    [org.httpkit.client :as http])
   (:import
+   [com.rpl.agentorama
+    HumanInputRequest]
    [dev.langchain4j.data.document
     Document]
    [dev.langchain4j.data.message
@@ -379,6 +381,14 @@ Here are the sections to reflect on for writing: %s")
       .aiMessage
       .text))
 
+(defn human-yes?
+  [agent-node prompt]
+  (loop [res (aor/get-human-input agent-node prompt)]
+    (cond (= res "yes") true
+          (= res "no") false
+          :else (recur (aor/get-human-input agent-node
+                                            "Please answer 'yes' or 'no'.")))))
+
 (aor/defagentmodule ResearchAgentModule
   [topology]
   (aor/declare-agent-object topology
@@ -413,9 +423,9 @@ Here are the sections to reflect on for writing: %s")
     (aor/new-agent "researcher")
     (aor/node
      "create-analysts"
-     "questions"
-     (fn [agent-node topic human-feedback options]
-       (let [{:keys [max-analysts max-turns]}
+     "feedback"
+     (fn [agent-node human-feedback options]
+       (let [{:keys [topic max-analysts max-turns] :as options}
              (merge {:max-analysts 4 :max-turns 2} options)
              ;; - JSON schemas not supported by streaming model, so have to use
              ;; non-streaming here
@@ -431,10 +441,24 @@ Here are the sections to reflect on for writing: %s")
                                              ANALYST-RESPONSE-SCHEMA)}))
                         (j/read-value MAPPER))]
          (aor/emit! agent-node
-                    "questions"
+                    "feedback"
                     (:analysts res)
-                    {:topic topic :max-turns max-turns})
+                    options)
        )))
+    (aor/node
+     "feedback"
+     ["create-analysts" "questions"]
+     (fn [agent-node analysts options]
+       (if
+         (human-yes?
+          agent-node
+          (str
+           "Do you have any feedback on this set of analysts? Answer 'yes' or 'no'.\n\n"
+           (str/join "\n" (mapv str analysts))))
+         (let [feedback (aor/get-human-input agent-node
+                                             "What is your feedback?")]
+           (aor/emit! agent-node "create-analysts" feedback options))
+         (aor/emit! agent-node "questions" analysts options))))
     (aor/agg-start-node
      "questions"
      "generate-question"
@@ -618,12 +642,21 @@ Here are the sections to reflect on for writing: %s")
     (let [module-name   (get-module-name ResearchAgentModule)
           agent-manager (aor/agent-manager ipc module-name)
           researcher    (aor/agent-client agent-manager "researcher")
-          _ (println "Enter a topic:")
+          _ (print "Enter a topic: ")
+          _ (flush)
           topic         (read-line)
-          _ (println "Elaborate on research direction:")
-          elaboration   (read-line)
-          inv           (aor/agent-initiate researcher topic elaboration {})]
-      (println (aor/agent-result researcher inv))
+          inv           (aor/agent-initiate researcher "" {:topic topic})]
+      (println)
+      (loop [step (aor/agent-next-step researcher inv)]
+        (if (instance? HumanInputRequest step)
+          (do
+            (println (:prompt step))
+            (print ">> ")
+            (flush)
+            (aor/provide-human-input researcher step (read-line))
+            (println)
+            (recur (aor/agent-next-step researcher inv)))
+          (println (:result step))))
     )))
 
 (comment

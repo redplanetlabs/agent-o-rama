@@ -7,6 +7,8 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops])
   (:import
+   [com.rpl.agentorama.impl
+    AgentNodeExecutorTaskGlobal]
    [clojure.lang
     PersistentQueue]
    [java.util
@@ -43,8 +45,11 @@
   (reduce conj PersistentQueue/EMPTY coll))
 
 (defn- to-trace-invoke-info
-  [all-invoke-info]
-  (let [all-invoke-info
+  [all-invoke-info human-request]
+  (let [all-invoke-info (if human-request
+                          (assoc all-invoke-info :human-request human-request)
+                          all-invoke-info)
+        all-invoke-info
         (if (contains? all-invoke-info :agg-inputs)
           (let [ai       (:agg-inputs all-invoke-info)
                 ai-count (count ai)]
@@ -69,11 +74,16 @@
   [emits]
   (mapv (fn [emit] [(:target-task-id emit) (:invoke-id emit)]) emits))
 
+(defn pending-human-request
+  [^AgentNodeExecutorTaskGlobal node-exec invoke-id]
+  (.getHumanRequest node-exec invoke-id))
+
 (defn declare-tracing-query-topology
   [topologies agent-name]
   (let [topo-name    (tracing-query-name agent-name)
         scratch-sym  (symbol (str "$$" topo-name "$$"))
-        nodes-pstate (symbol (po/agent-node-task-global-name agent-name))]
+        nodes-pstate (symbol (po/agent-node-task-global-name agent-name))
+        node-exec    (symbol (po/agent-node-executor-name))]
     (<<query-topology topologies
       topo-name
       [*agent-task-id *task-invoke-pairs *limit :> *res]
@@ -99,7 +109,10 @@
           (local-select> (keypath *invoke-id)
                          nodes-pstate
                          :> *all-invoke-info)
-          (to-trace-invoke-info (into {} *all-invoke-info) :> *invoke-info)
+          (pending-human-request node-exec *invoke-id :> *human-request)
+          (to-trace-invoke-info (into {} *all-invoke-info)
+                                *human-request
+                                :> *invoke-info)
           (|direct *agent-task-id)
           (local-select> STAY scratch-sym :> {*p :ti *m :m})
           (emits->pairs (get *invoke-info :emits) :> *pairs)
@@ -234,9 +247,15 @@
 
 (defn relevant-invoke-submap
   [m]
-  (select-keys m
-               [:start-time-millis :finish-time-millis :invoke-args
-                :result :graph-version]))
+  (let [ret (select-keys m
+                         [:start-time-millis :finish-time-millis
+                          :invoke-args :result :graph-version])]
+    (assoc ret
+     :human-request?
+     (-> m
+         :human-requests
+         empty?
+         not))))
 
 ;; returns map of form:
 ;; {:agent-invokes

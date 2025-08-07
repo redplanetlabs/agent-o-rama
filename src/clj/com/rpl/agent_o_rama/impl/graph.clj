@@ -155,7 +155,7 @@
        (lgraph/nodes agg-graph)))
      start-node
      update-mode
-     (str (UUID/randomUUID)))))
+     (h/random-uuid-str))))
 
 
 (defmacro reify-AgentGraph

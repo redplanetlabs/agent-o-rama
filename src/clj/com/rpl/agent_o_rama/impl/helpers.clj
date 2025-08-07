@@ -2,12 +2,18 @@
   (:refer-clojure :exclude [ex-info])
   (:use [com.rpl.rama.path])
   (:require
+   [clojure.string :as str]
    [com.rpl.rama.ops :as ops])
   (:import
    [com.rpl.agentorama.impl
     AORExceptionInfo]
    [com.rpl.rama.helpers
     TopologyUtils]
+   [java.io
+    PrintWriter
+    StringWriter]
+   [java.util
+    UUID]
    [java.util.concurrent
     Semaphore]
    [java.util.function
@@ -83,11 +89,6 @@
 
 (mk-jfn-converter)
 
-(defn random-long
-  ([] (random-long (ops/current-random-source)))
-  ([random-source]
-   (.nextLong ^java.util.Random random-source)))
-
 (defn invoke
   ([afn] (afn))
   ([afn a] (afn a))
@@ -119,12 +120,6 @@
 (defn srange-dynamic-end-index
   [s start-index]
   (count s))
-
-(defmacro returning
-  [expr & body]
-  `(let [rv# ~expr]
-     ~@body
-     rv#))
 
 (defn mk-semaphore
   (^Semaphore [permits] (mk-semaphore permits false))
@@ -205,3 +200,21 @@
   (setval [MAP-VALS #(or (nil? %) (and (coll? %) (empty? %)))]
           NONE
           m))
+
+(defn random-uuid-str
+  []
+  (str (random-uuid)))
+
+(defn half-uuid
+  [^UUID uuid]
+  (.getLeastSignificantBits uuid))
+
+(defn throwable->str
+  [^Throwable t]
+  (let [sw (StringWriter.)]
+    (.printStackTrace t (PrintWriter. sw))
+    (.toString sw)))
+
+(defn first-line
+  [s]
+  (first (str/split s #"\n" 2)))
