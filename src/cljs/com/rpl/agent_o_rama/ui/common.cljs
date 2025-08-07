@@ -2,7 +2,8 @@
   (:require ["@tanstack/react-query" :as rq]
             ["axios" :as axios]
             [cognitect.transit :as t]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [uix.core :as uix]))
 
 (defn url-decode [s] (str/replace s #"::" "/"))
 
@@ -52,3 +53,30 @@
      :loading? result.isPending
      :success? result.isSuccess
      :error? result.isError}))
+
+(defn use-local-storage
+  "Hook for localStorage functionality
+  
+  `key` string key for localStorage
+  `initial-value` default value if key doesn't exist in localStorage"
+  [key initial-value]
+  (let [get-stored-value (fn []
+                           (try
+                             (let [item (js/localStorage.getItem key)]
+                               (if (some? item)
+                                 (js/JSON.parse item)
+                                 initial-value))
+                             (catch js/Error _
+                               initial-value)))
+        [stored-value set-stored-value] (uix/use-state get-stored-value)]
+    
+    ;; Update localStorage when value changes
+    (uix/use-effect
+     (fn []
+       (try
+         (js/localStorage.setItem key (js/JSON.stringify stored-value))
+         (catch js/Error e
+           (.error js/console "Error saving to localStorage:" e))))
+     [stored-value key])
+    
+    [stored-value set-stored-value]))

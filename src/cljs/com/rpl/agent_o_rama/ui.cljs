@@ -18,7 +18,7 @@
 ;; Sidebar navigation component
 (defui sidebar-nav []
   (let [[location _] (useLocation)
-        [collapsed set-collapsed] (uix/use-state false)
+        [collapsed set-collapsed] (common/use-local-storage "sidebar-collapsed" false)
         toggle-collapsed #(set-collapsed not)]
     ($ :div {:className (str "h-screen flex flex-col bg-gray-100 transition-all duration-300 "
                              (if collapsed "w-16" "w-64"))}
