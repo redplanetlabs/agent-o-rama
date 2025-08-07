@@ -262,18 +262,133 @@
 
         )))))
 
+(def RESTART-ATOM)
+(def FORCED-VERSION-ATOM)
+(def SEM)
+
+(deframaop forced-graph-version
+  [*agent-name]
+  (deref (var-get (clj! var FORCED-VERSION-ATOM)) :> *ret)
+  (:> *ret))
+
 (deftest gc-with-failures-test
+  (let [forced-task-atom (atom 0)]
+    (with-redefs [i/SUBSTITUTE-TICK-DEPOTS true
+                  RESTART-ATOM (atom nil)
+                  FORCED-VERSION-ATOM (atom 0)
+                  SEM (h/mk-semaphore 0)
+                  apart/next-agent-task (fn [& args] @forced-task-atom)
+                  at/fetch-graph-version forced-graph-version]
+      (with-open [ipc (rtest/create-ipc)]
+        (letlocals
+         (bind module
+           (aor/agentmodule
+            [topology]
+            (-> topology
+                (aor/new-agent "foo")
+                (aor/set-update-mode :restart)
+                (aor/node
+                 "a"
+                 "b"
+                 (fn [agent-node]
+                   (aor/emit! agent-node "b")))
+                (aor/node
+                 "b"
+                 "c"
+                 (fn [agent-node]
+                   (aor/emit! agent-node "c")))
+                (aor/node
+                 "c"
+                 "d"
+                 (fn [agent-node]
+                   (when (> @RESTART-ATOM 0)
+                     (swap! RESTART-ATOM dec)
+                     (swap! FORCED-VERSION-ATOM inc)
+                     (h/acquire-semaphore SEM 1)
+                     (throw (ex-info "fail" {})))
+                   (aor/emit! agent-node "d")))
+                (aor/node
+                 "d"
+                 nil
+                 (fn [agent-node]
+                   (aor/result! agent-node "done")))
+            )))
+         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (bind module-name (get-module-name module))
+         (bind agent-manager (aor/agent-manager ipc module-name))
+         (bind foo (aor/agent-client agent-manager "foo"))
+         (bind config-depot
+           (foreign-depot ipc module-name (po/agent-config-depot-name "foo")))
+         (bind gc-depot
+           (foreign-depot ipc module-name (po/agent-gc-tick-depot-name "foo")))
+         (bind root-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name "foo")))
+         (bind root-count-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-count-task-global-name "foo")))
+         (bind node-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-node-task-global-name "foo")))
+         (bind traces-query
+           (foreign-query ipc
+                          module-name
+                          (queries/tracing-query-name "foo")))
+
+         (bind all-agent-invs (all-agent-invs-fn root-pstate 4))
+         (bind all-node-ids (all-node-ids-fn node-pstate 4))
+         (bind [trace-node-ids non-gc-trace-node-ids]
+           (trace-node-ids-fns root-pstate traces-query))
+         (bind root-count
+           (fn [task-id]
+             (foreign-select-one STAY root-count-pstate {:pkey task-id})))
+
+         (foreign-append! config-depot
+                          (aor-types/change-max-traces-per-task 2))
+
+         (reset! RESTART-ATOM 1)
+
+         (bind inv (aor/agent-initiate foo))
+         (is (condition-attained? (= 0 @RESTART-ATOM)))
+
+         (bind root-invoke-id
+           (foreign-select-one [(keypath (:agent-invoke-id inv))
+                                :root-invoke-id]
+                               root-pstate
+                               {:pkey (:task-id inv)}))
+
+         (h/release-semaphore SEM 1)
+
+         (is (= "done" (aor/agent-result foo inv)))
+         (is (= 1 (root-count 0)))
+         (doseq [i (range 1 4)]
+           (is (= 0 (root-count i))))
+
+
+         (bind root-invoke-id2
+           (foreign-select-one [(keypath (:agent-invoke-id inv))
+                                :root-invoke-id]
+                               root-pstate
+                               {:pkey (:task-id inv)}))
+
+         (is (not= root-invoke-id root-invoke-id2))
+         (is (= (all-agent-invs) #{inv}))
+
+
+         (dotimes [i 5]
+           (foreign-append! gc-depot nil))
+         (is (= (all-node-ids) (trace-node-ids inv)))
+
+
          ;; TODO: <<<<>>>>>
-         ;;  - verify GC of restarted traces (special case)
-         ;;     - use a global ATOM and redef to increment graph version and
-         ;;     fail, causing rery where next invoke will do a restart and
-         ;;     succeed
-         ;;       - verify root invoke ID changes
-         ;;         - will need wait-for-mb-processed-count on that mb topology
-         ;;     - same test can verify valid-invokes
+         ;;  - verify valid-invokes
+         ;;    - will need wait-for-mb-processed-count on that mb topology
          ;;  - verify root-count remains the same
          ;;    - do a fork as well to check this
-)
+        )))))
 
 (deftest gc-skips-pending-test
          ;; TODO: <<<<>>>>>
