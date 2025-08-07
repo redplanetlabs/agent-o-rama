@@ -29,6 +29,7 @@
     MultiAgg$Impl
     UpdateMode]
    [com.rpl.agentorama.impl
+    IFetchAgentClient
     IFetchAgentObject]
    [com.rpl.rama
     PState$Declaration
@@ -584,8 +585,8 @@
          ))))))
 
 (defn agent-client
-  ^AgentClient [^AgentManager agent-manager agent-name]
-  (.getAgentClient agent-manager agent-name))
+  ^AgentClient [^IFetchAgentClient agent-client-fetcher agent-name]
+  (.getAgentClient agent-client-fetcher agent-name))
 
 (defn agent-names
   [^AgentManager agent-manager]

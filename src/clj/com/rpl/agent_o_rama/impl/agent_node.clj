@@ -277,7 +277,7 @@
                              {:name name
                               :type (get store-info name)}))
          )))
-     (getAgent [agent-node name]
+     (getAgentClient [agent-node name]
        (let [client (.getAgentClient declared-objects-tg name)]
          (reify
           AgentClient
