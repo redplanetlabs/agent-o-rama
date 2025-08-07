@@ -33,10 +33,8 @@
              "start"
              "node1"
              (fn [agent-node]
-               (let [bar (aor/agent-client agent-node "bar")
-                     inv (aor/agent-initiate bar "some input")]
-                 (aor/agent-result-with-human-forwarding bar inv)
-
+               (let [bar (aor/agent-client agent-node "bar")]
+                 (aor/result! agent-node (aor/agent-invoke bar "some input"))
                )))
         )
 
@@ -47,7 +45,9 @@
              "start"
              nil
              (fn [agent-node input]
-               (aor/get-human-input agent-node "Tell me something.")
+               (aor/result! agent-node
+                            (aor/get-human-input agent-node
+                                                 "Tell me something."))
              )))
        ))
      (rtest/launch-module! ipc module {:tasks 4 :threads 2})

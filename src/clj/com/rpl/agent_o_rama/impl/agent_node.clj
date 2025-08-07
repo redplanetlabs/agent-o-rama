@@ -283,13 +283,8 @@
          (reify
           AgentClient
           (invoke [this args]
-            (timed-agent-call
-             (.invoke client args)
-             agent-node
-             [res]
-             {"op"     "invoke"
-              "args"   args
-              "result" res}))
+            (let [inv (.initiate this args)]
+              (.result this inv)))
           (invokeAsync [this args]
             (no-async!))
           (initiate [this args]
@@ -303,14 +298,8 @@
           (initiateAsync [this args]
             (no-async!))
           (fork [this invoke nodeInvokeIdToNewArgs]
-            (timed-agent-call
-             (.fork client invoke nodeInvokeIdToNewArgs)
-             agent-node
-             [res]
-             {"op"           "fork"
-              "invoke"       invoke
-              "new-args-map" nodeInvokeIdToNewArgs
-              "result"       res}))
+            (let [inv (.initiateFork this invoke nodeInvokeIdToNewArgs)]
+              (.result this inv)))
           (forkAsync [this invoke nodeInvokeIdToNewArgs]
             (no-async!))
           (initiateFork [this invoke nodeInvokeIdToNewArgs]
