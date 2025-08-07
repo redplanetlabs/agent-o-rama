@@ -13,6 +13,7 @@
                  [ring/ring-core "1.9.5"]
                  [ring/ring-jetty-adapter "1.8.2"]
                  [ring/ring-codec "1.2.0"]
+                 [com.taoensso/sente "1.20.0"]
                  [metosin/reitit "0.7.2"]]
   :global-vars {*warn-on-reflection* true}
   :repositories
