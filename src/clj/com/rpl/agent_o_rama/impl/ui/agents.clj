@@ -206,18 +206,10 @@
 
 (defmethod api-handler :api/get-invocations
   [_ {:keys [module-id agent-name pagination]} uid]
-  (let [parsed-pagination-information
-        ;; TODO remove pagination parsing, no longer neceseary with sente
-        (when pagination
-          (transform [(multi-path MAP-KEYS MAP-VALS)]
-                     parse-long
-                     pagination))
-        final-pagination (if (empty? parsed-pagination-information)
-                           nil
-                           parsed-pagination-information)]
+  (let [pagintation (if (empty? pagination) nil pagination)]
     (filter-encodable (foreign-invoke-query
                        (:invokes-page-query (objects module-id agent-name))
-                       10 final-pagination))))
+                       1 pagination))))
 
 (defmethod api-handler :api/get-graph
   [_ {:keys [module-id agent-name]} uid]

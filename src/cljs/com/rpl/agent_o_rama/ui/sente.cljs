@@ -41,13 +41,13 @@
         connected? (boolean (:open? new-state))]
     (.log js/console "Sente connection state change:" new-state)
     ;; Update app-db with connection state
-    (state/dispatch [:sente/connection-state-changed new-state])
-    (state/dispatch [:sente/set-connected connected?])))
+    (state/dispatch [:db/set-value [:sente :connection-state] new-state])
+    (state/dispatch [:db/set-value [:sente :connected?] connected?])))
 
 ;; Handler for successful handshake
 (defmethod -event-msg-handler :chsk/handshake [{:as ev-msg :keys [?data]}]
   (.log js/console "✅ Sente handshake successful!" ?data)
-  (state/dispatch [:sente/set-connected true]))
+  (state/dispatch [:db/set-value [:sente :connected?] true]))
 
 ;; 4. Router lifecycle functions
 (defonce router_ (atom nil))

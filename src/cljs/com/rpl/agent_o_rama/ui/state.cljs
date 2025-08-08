@@ -13,9 +13,10 @@
                         :invoke-id nil
                         :module-id nil
                         :agent-name nil}
-   :agents {:agents []
-            :loading? false
-            :error nil}
+   :invocations {:all-invokes []
+                 :pagination-params {}
+                 :next-pagination-params {}
+                 :has-more? true}
    :queries {} ; New map to store all query states
    :ui {:selected-node-id nil
         :forking-mode? false
@@ -52,12 +53,13 @@
       (try
         (let [current-db @app-db
               result (apply handler current-db event-args)]
-          (if (vector? result)
-            (let [[specter-path transform-fn] result]
-              (if (and specter-path transform-fn)
-                (swap! app-db (fn [db] (s/transform specter-path transform-fn db)))
-                (println "⚠️ Event handler" event-id "returned invalid [path transform-fn] tuple:" result)))
-            (println "❌ Event handler" event-id "must return a vector [path transform-fn], got:" result)))
+          (when result ;; Allow handlers to return nil to indicate they handled the update themselves
+            (if (vector? result)
+              (let [[specter-path transform-fn] result]
+                (if (and specter-path transform-fn)
+                  (swap! app-db #(s/transform specter-path transform-fn %))
+                  (println "⚠️ Event handler" event-id "returned invalid [path transform-fn] tuple:" result)))
+              (println "❌ Event handler" event-id "must return a vector [path transform-fn], got:" result))))
         (catch :default e
           (println "💥 Error in event handler" event-id ":" e)))
       (js/console.warn "No handler registered for event:" event-id))))
@@ -93,39 +95,26 @@
 ;; CORE EVENT HANDLERS
 ;; =============================================================================
 
-;; UI Events
-(reg-event :ui/select-node
-  (fn [db node-id]
-    [[:ui :selected-node-id] (constantly node-id)]))
-
+;; UI Events - Only keep complex or toggle events
 (reg-event :ui/toggle-forking-mode
   (fn [db]
     [[:ui :forking-mode?] not]))
-
-(reg-event :ui/set-changed-node
-  (fn [db node-id changes]
-    [[:ui :changed-nodes node-id] (constantly changes)]))
-
-(reg-event :ui/clear-changed-nodes
-  (fn [db]
-    [[:ui :changed-nodes] (constantly {})]))
 
 (reg-event :ui/toggle-sidebar
   (fn [db]
     [[:ui :sidebar-collapsed?] not]))
 
-(reg-event :ui/set-route
-  (fn [db route]
-    [[:ui :current-route] (constantly route)]))
+;; Note: Simple setters should use :db/set-value
+;; Examples:
+;; (dispatch [:db/set-value [:ui :selected-node-id] node-id])
+;; (dispatch [:db/set-value [:ui :current-route] route])
+;; (dispatch [:db/set-value [:ui :changed-nodes node-id] changes])
+;; (dispatch [:db/set-value [:ui :changed-nodes] {}])
 
-;; Sente Connection Events
-(reg-event :sente/connection-state-changed
-  (fn [db new-state]
-    [[:sente :connection-state] (constantly new-state)]))
-
-(reg-event :sente/set-connected
-  (fn [db connected?]
-    [[:sente :connected?] (constantly connected?)]))
+;; Note: Sente connection events should use :db/set-value
+;; Examples:
+;; (dispatch [:db/set-value [:sente :connection-state] new-state])
+;; (dispatch [:db/set-value [:sente :connected?] connected?])
 
 ;; Current Invocation Events
 (reg-event :invocation/set-current
@@ -149,30 +138,34 @@
   (fn [db node-id node-data]
     [[:current-invocation :graph :nodes node-id] (constantly node-data)]))
 
-;; Agent Events
-(reg-event :agents/set-loading
-  (fn [db loading?]
-    [[:agents :loading?] (constantly loading?)]))
+;; Generic state update events
+;; Usage: (dispatch [:db/set-value [:some :path] value])
+(reg-event :db/set-value
+  (fn [db path value]
+    ;; Return path and a function that ignores the old value and returns the new one
+    [path (fn [_] value)]))
 
-(reg-event :agents/load-success
-  (fn [db agents-data]
-    [[:agents] (constantly {:agents agents-data
-                            :loading? false
-                            :error nil})]))
+;; Usage: (dispatch [:db/update-value [:some :path] update-fn])
+(reg-event :db/update-value
+  (fn [db path update-fn]
+    [path update-fn]))
 
-(reg-event :agents/load-error
-  (fn [db error]
-    [[:agents] (constantly {:agents []
-                            :loading? false
-                            :error error})]))
 
-;; Agent Loading Effect
-(reg-event :agents/load
+;; Specific complex events that do more than just setting a value
+(reg-event :invocations/update-data
+  (fn [db {:keys [invokes append?]}]
+    ;; If append? is true, concat new invokes to existing ones
+    ;; Otherwise replace all invokes
+    (if append?
+      [[:invocations :all-invokes] #(concat % invokes)]
+      [[:invocations :all-invokes] (constantly invokes)])))
+
+(reg-event :invocations/reset
   (fn [db]
-    ;; This event triggers the async loading
-    ;; We set loading state immediately, then trigger the request
-    ;; Note: The actual request will be triggered from the component
-    [[:agents :loading?] (constantly true)]))
+    [[:invocations] (constantly {:all-invokes []
+                                 :pagination-params {}
+                                 :next-pagination-params {}
+                                 :has-more? true})]))
 
 ;; =============================================================================
 ;; GENERIC QUERY HANDLERS - For useSenteQuery hook

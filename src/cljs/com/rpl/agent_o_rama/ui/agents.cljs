@@ -96,48 +96,61 @@
 
 (defui invocations []
   (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
-         ;; TODO remove this state management, use app-db instead
-        [requested-pagination-params set-requested-pagination-params] (uix/use-state {})
-        [all-invokes set-all-invokes] (uix/use-state [])
-        [has-more? set-has-more?] (uix/use-state true)
-        [next-pagination-params set-next-pagination-params] (uix/use-state {})
         
-        ;; Use Sente query with pagination data
+        ;; Subscribe to invocations state from app-db
+        all-invokes (state/use-sub [:invocations :all-invokes])
+        pagination-params (state/use-sub [:invocations :pagination-params])
+        next-pagination-params (state/use-sub [:invocations :next-pagination-params])
+        has-more? (state/use-sub [:invocations :has-more?])
+        
+        ;; For query key, use first task-id and first item-id from pagination
+        ;; This avoids stringifying the whole map
+        [first-task-id first-item-id] (first pagination-params)
+        
+        ;; Use Sente query with cleaner query key
         {:keys [data loading? error]}
-        (queries/use-sente-query {:query-key [:invocations module-id agent-name requested-pagination-params]
+        (queries/use-sente-query {:query-key [:invocations module-id agent-name first-task-id first-item-id]
                                   :sente-event [:api/get-invocations {:module-id module-id
                                                                       :agent-name agent-name
-                                                                      :pagination requested-pagination-params}]})
+                                                                      :pagination pagination-params}]})
         
         [location navigate] (useLocation)
+        
+        ;; Reset invocations when component mounts or route changes
+        _ (uix/use-effect
+           (fn []
+             (state/dispatch [:invocations/reset])
+             (constantly nil))
+           [module-id agent-name])
         
         ;; Update accumulated data when new data arrives
         _ (uix/use-effect
            (fn []
              (when data
                (let [new-invokes (:agent-invokes data)
-                     new-pagination (:pagination-params data)]
-                 (if (empty? requested-pagination-params)
-                   ;; First load - replace all data
-                   (set-all-invokes new-invokes)
-                   ;; Subsequent loads - append new data
-                   (set-all-invokes (fn [current] (concat current new-invokes))))
+                     new-pagination (:pagination-params data)
+                     is-first-load? (empty? pagination-params)]
                  
-                 ;; Store next pagination params for the "Load More" button
+                 ;; Update invokes (replace or append based on whether it's first load)
+                 (state/dispatch [:invocations/update-data 
+                                 {:invokes new-invokes
+                                  :append? (not is-first-load?)}])
+                 
+                 ;; Update pagination state using generic set-value
                  (let [has-valid-pagination? (and new-pagination 
                                                   (not (empty? new-pagination))
                                                   (some (fn [[_ item-id]] (not (nil? item-id))) new-pagination))]
                    (if has-valid-pagination?
                      (do
-                       (set-next-pagination-params new-pagination)
-                       (set-has-more? true))
-                     (set-has-more? false))))))
-           [data requested-pagination-params])
+                       (state/dispatch [:db/set-value [:invocations :next-pagination-params] new-pagination])
+                       (state/dispatch [:db/set-value [:invocations :has-more?] true]))
+                     (state/dispatch [:db/set-value [:invocations :has-more?] false]))))))
+           [data first-task-id first-item-id])
         
         load-more (fn []
                     (when (and has-more? (not loading?))
-                      ;; Trigger next page by updating requested pagination params
-                      (set-requested-pagination-params next-pagination-params)))]
+                      ;; Trigger next page by updating pagination params
+                      (state/dispatch [:db/set-value [:invocations :pagination-params] next-pagination-params])))]
     
     (cond
       ;; Still loading initial data
@@ -180,6 +193,7 @@
                                ($ :path {:fillRule "evenodd"
                                          :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
                                          :clipRule "evenodd"}))))))))))))))
+
 
 (defui mini-invocations []
   (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
