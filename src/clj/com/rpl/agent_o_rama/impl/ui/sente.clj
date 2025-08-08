@@ -85,6 +85,10 @@
   [ev-msg]
   (handle-api-event ev-msg))
 
+(defmethod -event-msg-handler :api/get-graph
+  [ev-msg]
+  (handle-api-event ev-msg))
+
 ;; Handler for client connecting/disconnecting
 (defmethod -event-msg-handler :chsk/uidport-open
   [{:as ev-msg :keys [uid]}]

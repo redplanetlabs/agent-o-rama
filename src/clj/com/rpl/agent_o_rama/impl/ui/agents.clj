@@ -47,16 +47,6 @@
 (defn objects [module-id agent-name]
   (aor-types/underlying-objects (get-client module-id agent-name)))
 
-(defn get-graph [{{:keys [module-id agent-name]} :path-params}]
-  {:status
-   200
-   
-   :body
-   {:graph
-    (foreign-invoke-query
-     (:current-graph-query
-      (objects module-id agent-name)))}})
-
 (defn manually-trigger-invoke [{{:keys [module-id agent-name]} :path-params
                                 {:keys [args]} :body-params
                                 :as req}]
@@ -228,3 +218,9 @@
     (filter-encodable (foreign-invoke-query
                        (:invokes-page-query (objects module-id agent-name))
                        10 final-pagination))))
+
+(defmethod api-handler :api/get-graph
+  [_ {:keys [module-id agent-name]} uid]
+  {:graph (foreign-invoke-query
+           (:current-graph-query
+            (objects module-id agent-name)))})

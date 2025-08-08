@@ -96,6 +96,7 @@
 
 (defui invocations []
   (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
+         ;; TODO remove this state management, use app-db instead
         [requested-pagination-params set-requested-pagination-params] (uix/use-state {})
         [all-invokes set-all-invokes] (uix/use-state [])
         [has-more? set-has-more?] (uix/use-state true)
@@ -231,15 +232,19 @@
 
 (defui agent-graph []
   (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
-        {:keys [data loading?]}
-        (common/use-query {:query-key ["agent" module-id agent-name "graph"]
-                           :query-url (str "/api/agents/" module-id "/" agent-name "/graph")})]
-    (if loading?
-      "...loading"
-      ($ agent-graph/graph {:initial-data data
-                            :height "500px"
-                            :selected-node nil
-                            :set-selected-node (fn [_])}))))
+        {:keys [data loading? error]}
+        (queries/use-sente-query {:query-key [:graph module-id agent-name]
+                                  :sente-event [:api/get-graph {:module-id module-id
+                                                                :agent-name agent-name}]})]
+    (cond
+      loading? ($ :div.flex.justify-center.items-center.py-8
+                 ($ :div.text-gray-500 "Loading graph via Sente..."))
+      error ($ :div.flex.justify-center.items-center.py-8
+              ($ :div.text-red-500 "Error loading graph: " error))
+      :else ($ agent-graph/graph {:initial-data data
+                                  :height "500px"
+                                  :selected-node nil
+                                  :set-selected-node (fn [_])}))))
 
 (defui stats-summary [{:keys [module-id agent-name]}]
   ($ :div.p-4.flex.gap-1

@@ -35,16 +35,6 @@
 (defmethod -event-msg-handler :example/hello-response [{:as ev-msg :keys [?data]}]
   (.log js/console "Server replied to hello:" ?data))
 
-;; Handle API responses
-(defmethod -event-msg-handler :api/agents-response [{:as ev-msg :keys [?data]}]
-  (if (:success ?data)
-    (do
-      (println "✅ Agents loaded successfully:" (count (:data ?data)) "agents")
-      (state/dispatch [:agents/load-success (:data ?data)]))
-    (do
-      (println "❌ Failed to load agents:" (:error ?data))
-      (state/dispatch [:agents/load-error (:error ?data)]))))
-
 ;; Handler to log connection state changes
 (defmethod -event-msg-handler :chsk/state [{:as ev-msg :keys [?data]}]
   (let [[old-state new-state] ?data
@@ -92,22 +82,3 @@
   "Send a one-way message to the server (no response expected)."
   [event-vec]
   (chsk-send! event-vec))
-
-;; =============================================================================
-;; API HELPERS
-;; =============================================================================
-
-(defn load-agents!
-  "Load agents list from server via Sente"
-  []
-  (println "🔄 Loading agents via Sente...")
-  (println "Sending request: [:api/get-agents]")
-  (println "chsk-state:" @chsk-state)
-  (chsk-send! [:api/get-agents] 5000
-              (fn [reply]
-                (println "Got reply from server:" reply)
-                (if (and reply (true? (:success reply)))
-                  (state/dispatch [:agents/load-success (:data reply)])
-                  (state/dispatch [:agents/load-error (or (:error reply)
-                                                        (when (= reply :chsk/closed) "Connection closed")
-                                                        "Request failed")])))))
