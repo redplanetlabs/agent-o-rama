@@ -72,7 +72,6 @@
   (transform [ATOM :aor-cache MAP-VALS :clients MAP-VALS] close! ui/system)
   (setval [ATOM :aor-cache MAP-VALS :clients MAP-VALS] NONE ui/system)
   (.stop ^org.eclipse.jetty.server.Server (:jetty @ui/system))
-  (close! (:rama-client @ui/system))
   (.shutdownNow ^ScheduledThreadPoolExecutor (:background-exec @ui/system)))
 
 (defn start-ui ^java.io.Closeable [ipc]
