@@ -10,6 +10,20 @@
   (:import
    [com.rpl.agentorama AgentInvoke]))
 
+(def m (m/create))
+(def encoder (m/encoder m "application/transit+json"))
+
+(defn filter-encodable
+  [data]
+  (walk/postwalk
+   (fn [x]
+     (try
+       (encoder x)
+       x
+       (catch Exception e
+         (str x))))
+   data))
+
 (defn replace-slash [s]
   "because urlencoding causes jetty to 400 with Ambiguous URI path separator"
   ;; TODO use proper urlencoding, fix jetty error
@@ -77,9 +91,9 @@
      200
      
      :body
-     (foreign-invoke-query
-      (:invokes-page-query (objects module-id agent-name))
-      10 pagination)}))
+     (filter-encodable (foreign-invoke-query
+                        (:invokes-page-query (objects module-id agent-name))
+                        10 pagination))}))
 
 (defn remove-implicit-nodes
   "Preprocesses the invokes-map to remove implicit nodes and rewire edges to real nodes.
@@ -142,19 +156,6 @@
   (let [[task-id agent-id] (clojure.string/split s #"-")]
     [(parse-long task-id) (parse-long agent-id)]))
 
-(def m (m/create))
-(def encoder (m/encoder m "application/transit+json"))
-
-(defn filter-encodable
-  [data]
-  (walk/postwalk
-   (fn [x]
-     (try
-       (encoder x)
-       x
-       (catch Exception e
-         (str x))))
-   data))
 
 
 (defn invoke-paginated
