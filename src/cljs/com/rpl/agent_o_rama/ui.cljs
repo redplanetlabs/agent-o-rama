@@ -7,7 +7,7 @@
    [com.rpl.agent-o-rama.ui.agents :as agents]
    ["wouter" :refer [Link Route Switch Router useLocation useRoute]]
    ["@tanstack/react-query" :refer [QueryClient QueryClientProvider]]
-   ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon Bars3Icon XMarkIcon]]
+   ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon ChevronLeftIcon ChevronRightIcon]]
    
    [com.rpl.agent-o-rama.ui.datasets :as datasets]
    [com.rpl.agent-o-rama.ui.common :as common]
@@ -23,16 +23,16 @@
     ($ :div {:className (str "h-screen flex flex-col bg-gray-100 transition-all duration-300 "
                              (if collapsed "w-16" "w-64"))}
        ;; Header with toggle button
-       ($ :div.flex.items-center.justify-between.p-4.border-b.border-gray-200
+       ($ :div.flex.items-center.justify-between.p-4.border-b.border-gray-200.overflow-hidden
           (when-not collapsed
-            ($ :h1.text-lg.font-semibold.text-gray-800 "Agent-O-Rama"))
+            ($ :h1.text-lg.font-semibold.text-gray-800.truncate.min-w-0 "Agent-O-Rama"))
           ($ :button
              {:onClick toggle-collapsed
               :className "p-2 rounded-md hover:bg-gray-200 transition-colors"
               :title (if collapsed "Expand sidebar" "Collapse sidebar")}
              (if collapsed
-               ($ Bars3Icon {:className "h-5 w-5"})
-               ($ XMarkIcon {:className "h-5 w-5"}))))
+               ($ ChevronRightIcon {:className "h-5 w-5"})
+               ($ ChevronLeftIcon {:className "h-5 w-5"}))))
        
        ;; Navigation
        ($ :nav.flex-1.p-3
