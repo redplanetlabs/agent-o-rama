@@ -1,14 +1,20 @@
 (ns com.rpl.agent-o-rama.ui.sente
   (:require [taoensso.sente :as sente]
+            [taoensso.sente.packers.transit :as sente-transit]
             [uix.core :as uix]
             [com.rpl.agent-o-rama.ui.state :as state]))
+
+;; Create Transit packer for serialization (must match server)
+(def transit-packer
+  (sente-transit/get-packer :json))
 
 ;; 1. Instantiate the Sente channel socket client
 (let [{:keys [chsk ch-recv send-fn state]}
       (sente/make-channel-socket-client!
        "/chsk"
        nil ; No CSRF token for development
-       {:type :auto})] ; :auto will prefer WebSockets with Ajax fallback
+       {:type :auto  ; :auto will prefer WebSockets with Ajax fallback
+        :packer transit-packer})]
 
   ;; 2. Define the vars for our Sente client
   (def chsk chsk) ; The channel socket itself

@@ -2,8 +2,13 @@
   (:require
    [taoensso.sente :as sente]
    [taoensso.sente.server-adapters.http-kit :as http-kit-adapter]
+   [taoensso.sente.packers.transit :as sente-transit]
    [clojure.tools.logging :as log]
    [com.rpl.agent-o-rama.impl.ui.agents :as agents]))
+
+;; Create Transit packer for serialization
+(def transit-packer
+  (sente-transit/get-packer :json))
 
 ;; 1. Instantiate the Sente channel socket server
 (let [{:keys [ch-recv send-fn connected-uids
@@ -15,7 +20,10 @@
         ;; in the session. This will be nil for now for all anonymous users.
         
         ;; Disable CSRF token check for development
-        :csrf-token-fn nil})]
+        :csrf-token-fn nil
+        
+        ;; Use Transit packer for proper serialization
+        :packer transit-packer})]
 
   ;; 2. Define the vars for our Sente server
   (def ring-ajax-post ajax-post-fn)
