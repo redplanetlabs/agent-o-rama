@@ -11,7 +11,8 @@
    
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.sente :as sente]))
+   [com.rpl.agent-o-rama.ui.sente :as sente]
+   [com.rpl.agent-o-rama.ui.queries :as queries]))
 
 
 (defui spinner [{:keys [size]}]
@@ -64,19 +65,11 @@
           ($ result-badge {:result (:result invoke)})))))
 
 (defui index []
-  (let [agents-state (state/use-sub [:agents])
-        {:keys [agents loading? error]} agents-state
-        connected? (state/use-sub [:sente :connected?])]
+  ;; The entire complex useEffect is replaced by this single line!
+  (let [{:keys [data loading? error]} 
+        (queries/use-sente-query {:query-key [:agents]
+                                  :sente-event [:api/get-agents]})]
     
-    ;; Load agents when Sente connects (handles initial closed state)
-    (uix/use-effect
-     (fn []
-       (when connected?
-         (println "🚀 Connected. Loading agents...")
-         (state/dispatch [:agents/load])
-         (sente/load-agents!))
-       (constantly nil))
-     [connected?])
     
     (cond
       ;; Still loading initial data
@@ -86,10 +79,10 @@
       error ($ :div.flex.justify-center.items-center.py-8
                 ($ :div.text-red-500 "Error loading agents: " error))
       ;; No agents returned from the API
-      (empty? agents) ($ :div.flex.justify-center.items-center.py-8
+      (empty? data) ($ :div.flex.justify-center.items-center.py-8
                          ($ :div.text-gray-500 "No agents found"))
       :else ($ :div.p-4
-              (for [agent agents
+              (for [agent data
                     :let [url (str "/agents/" (:module-id agent) "/" (:agent-name agent))]]
                 ($ :div.p-4.transition-colors.duration-150.hover:bg-gray-200.bg-gray-100.m-4  {:key url}
                   ($ wouter/Link {:href url}

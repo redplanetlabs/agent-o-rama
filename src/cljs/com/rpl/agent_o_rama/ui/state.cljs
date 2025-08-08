@@ -16,6 +16,7 @@
    :agents {:agents []
             :loading? false
             :error nil}
+   :queries {} ; New map to store all query states
    :ui {:selected-node-id nil
         :forking-mode? false
         :changed-nodes {}
@@ -172,6 +173,27 @@
     ;; We set loading state immediately, then trigger the request
     ;; Note: The actual request will be triggered from the component
     [[:agents :loading?] (constantly true)]))
+
+;; =============================================================================
+;; GENERIC QUERY HANDLERS - For useSenteQuery hook
+;; =============================================================================
+
+(reg-event :query/fetch-start
+  (fn [db {:keys [query-key]}]
+    [(into [:queries] query-key)
+     (fn [current-state]
+       (assoc current-state :status :loading :error nil))]))
+
+(reg-event :query/fetch-success
+  (fn [db {:keys [query-key data]}]
+    [(into [:queries] query-key)
+     (constantly {:status :success :data data :error nil})]))
+
+(reg-event :query/fetch-error
+  (fn [db {:keys [query-key error]}]
+    [(into [:queries] query-key)
+     (fn [current-state]
+       (assoc current-state :status :error :error error))]))
 
 ;; =============================================================================
 ;; DEBUGGING HELPERS
