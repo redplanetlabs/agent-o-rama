@@ -37,15 +37,6 @@
   (replace-slash "example.core/FlowModule")
   (unreplace-slash "example.core::FlowModule"))
 
-(defn index [{:keys [parameters]}]
-  {:status
-   200
-   
-   :body
-   (for [[module-name agent-name]
-         (select [ALL (collect-one FIRST) LAST :clients MAP-KEYS] (ui/get-object :aor-cache))]
-     {:module-id (replace-slash module-name)
-      :agent-name (replace-slash agent-name)})})
 
 (defn get-client [module-id agent-name]
   (select-one [(unreplace-slash module-id)
@@ -225,3 +216,18 @@
      {:agent-invoke-id (:agentInvokeId (bean result))
       :task-id (:taskId (bean result))}}))
 
+;; =============================================================================
+;; SENTE API HANDLERS
+;; =============================================================================
+
+(defmulti api-handler
+  "Handle API requests. Receives [event-id data uid] and returns response data.
+   Exceptions are automatically caught and returned as errors."
+  (fn [event-id data uid] event-id))
+
+(defmethod api-handler :api/get-agents
+  [_ data uid]
+  (for [[module-name agent-name]
+        (select [ALL (collect-one FIRST) LAST :clients MAP-KEYS] (ui/get-object :aor-cache))]
+    {:module-id (replace-slash module-name)
+     :agent-name (replace-slash agent-name)}))

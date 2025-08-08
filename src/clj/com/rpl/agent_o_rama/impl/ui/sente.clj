@@ -48,28 +48,8 @@
 ;; API HANDLERS - Clean abstraction for request/response pattern
 ;; =============================================================================
 
-(defmulti api-handler
-  "Handle API requests. Receives [event-id data uid] and returns response data.
-   Exceptions are automatically caught and returned as errors."
-  (fn [event-id data uid] event-id))
-
-(defmethod api-handler :default
-  [event-id data uid]
-  (throw (ex-info (str "Unknown API event: " event-id) 
-                  {:event-id event-id :data data})))
-
-;; API endpoint implementations - just return the data!
-;; The wrapper handles success/error responses automatically
-
-(defmethod api-handler :api/get-agents
-  [_ data uid]
-  (println "[SERVER] Loading agents list for uid:" uid)
-  (let [agents-data (:body (agents/index {}))]
-    (println "[SERVER] Sending agents data:" (count agents-data) "agents")
-    agents-data))
-
 ;; Example of how to add more endpoints:
-;; (defmethod api-handler :api/get-graph
+;; (defmethod agents/api-handler :api/get-graph
 ;;   [_ {:keys [module-id agent-name]} uid]
 ;;   (:body (agents/get-graph {:path-params {:module-id module-id 
 ;;                                           :agent-name agent-name}})))
@@ -80,7 +60,7 @@
   (println "[SERVER] Received" id "request from uid:" uid "with data:" ?data)
   (when ?reply-fn
     (try
-      (let [result (api-handler id ?data uid)]
+      (let [result (agents/api-handler id ?data uid)]
         (println "[SERVER] Sending response for" id)
         (?reply-fn {:success true :data result}))
       (catch Exception e

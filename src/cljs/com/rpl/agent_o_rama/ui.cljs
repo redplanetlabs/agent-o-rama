@@ -170,23 +170,6 @@
      ($ sidebar-nav)
      ($ :div.flex-1.flex.flex-col.min-h-0
         ($ breadcrumb)
-
-        ;; START: Add a test button and connection status
-        ($ :div.m-4.space-y-2
-           (let [connected? (state/use-sub [:sente :connected?])]
-             ($ :div.text-sm
-                ($ :span {:className (str "inline-block w-2 h-2 rounded-full mr-2 "
-                                          (if connected? "bg-green-500" "bg-red-500"))}
-                   )
-                ($ :span (if connected? "Connected" "Disconnected"))))
-           ($ :button.p-2.bg-blue-500.text-white.rounded.hover:bg-blue-600
-              {:onClick (fn []
-                          (println "Sending hello to server via state system...")
-                          (sente/push! [:example/hello {:msg "Hello from the new state system!"}]))}
-              "Say Hello to Server via State System"))
-
-        ;; END: Add a test button and connection status
-
         ($ :div.flex-1.overflow-auto
            ($ Router
               ;; Agent routes
