@@ -173,9 +173,9 @@
                 s/ALL]
                graph)]
     {:nodes nodes
-     :edges (for [[frm to] edges] {:id (str frm "-" to) :source frm :target to
-     :markerEnd {:type "arrowclosed" :width 20 :height 20}
-     })}))
+     :edges (for [[frm to] edges]
+       {:id (str frm "-" to) :source frm :target to
+        :markerEnd {:type "arrowclosed" :width 20 :height 20}})}))
 
 (defn process-elk-edge [edge]
   "Process an ELK edge to extract routing points for React Flow"
