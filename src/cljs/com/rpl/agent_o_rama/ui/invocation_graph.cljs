@@ -86,38 +86,22 @@
                                     :title title
                                     :on-close #(set-show-modal false)})))))
 
+;; Declare generic-data-viewer first to avoid circular dependency
+(declare generic-data-viewer)
+
 (defui expandable-list-component [{:keys [items color title-singular truncate-length]
                                    :or {truncate-length 50}}]
-  (let [[selected-item set-selected-item] (uix/use-state nil)]
-    ($ :<>
-         ($ :div {:className (str "text-" color "-500 mt-1 space-y-1")}
-            (for [[idx item] (map-indexed vector items)]
-              (let [item-str (if (string? item) 
-                                   item 
-                                   (pr-str item))
-                    is-long? (> (count item-str) truncate-length)
-                    truncated-str (if is-long?
-                                    (str (subs item-str 0 (- truncate-length 3)) "...")
-                                    item-str)]
-                ($ :div {:key idx
-                         :className "flex items-center gap-2"}
-                   ($ :span {:className (str "text-" color "-400 text-xs")}
-                      (str (inc idx) "."))
-                                    ($ :span {:className (str "break-words cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded")
-                           :onClick (fn [e]
-                                      (.stopPropagation e)
-                                      (set-selected-item {:content (if (string? item) item (pr-str item))
-                                                          :index idx 
-                                                          :title (str title-singular " " (inc idx))}))
-                           :title "Click to expand"}
-                      truncated-str)))))
-         
-       ;; Popup modal
-       (when selected-item
-         ($ expandable-popup-modal {:content (:content selected-item)
-                                    :content-index (:index selected-item)
-                                    :title (:title selected-item)
-                                    :on-close #(set-selected-item nil)})))))
+  ($ :div {:className (str "text-" color "-500 mt-1 space-y-1")}
+     (for [[idx item] (map-indexed vector items)]
+       ($ :div {:key idx
+                :className "flex items-start gap-2"}
+          ($ :span {:className (str "text-" color "-400 text-xs flex-shrink-0 mt-0.5")}
+             (str (inc idx) "."))
+          ;; Recursively render each item using the generic viewer
+          ($ :div {:className "flex-1"}
+             ($ generic-data-viewer {:data item 
+                                     :color color 
+                                     :truncate-length truncate-length}))))))
 
 (defui generic-data-viewer [{:keys [data color truncate-length]
                              :or {truncate-length 80}}]
@@ -176,10 +160,9 @@
             (when result
               ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-blue-700 mb-1"} "Result")
-                 ($ expandable-item-component {:item result
-                                               :color "blue"
-                                               :title "Result"
-                                               :truncate-length 100})))
+                 ($ generic-data-viewer {:data result
+                                         :color "blue"
+                                         :truncate-length 100})))
             (when (and start-time finish-time)
               ($ :div {:className "bg-yellow-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-yellow-700 mb-2"} "Timing")
@@ -198,10 +181,9 @@
             (when input
               ($ :div {:className "bg-green-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
-                 ($ expandable-list-component {:items input
-                                               :color "green"
-                                               :title-singular "Input"
-                                               :truncate-length 100})))
+                 ($ generic-data-viewer {:data input
+                                         :color "green"
+                                         :truncate-length 100})))
             
             (when (not (empty? (:nested-ops data)))
               ($ :div {:className "bg-sky-50 p-3 rounded-md mt-4"}
@@ -273,9 +255,9 @@
                            ($ :div {:className "text-xs text-purple-600"}
                               ($ :div (str "→ " (:node-name emit)))
                               (when (:args emit)
-                                ($ expandable-list-component {:items (:args emit)
-                                                              :color "purple"
-                                                              :title-singular "Argument"}))
+                                ($ generic-data-viewer {:data (:args emit)
+                                                        :color "purple"
+                                                        :truncate-length 60}))
                               ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
                                  (str "ID: " emit-id))
                               (when is-loading
@@ -323,10 +305,9 @@
                     "This node's execution will be re-determined when the fork is executed.")
                  ($ :div {:className "text-xs text-gray-500"}
                     ($ :span {:className "font-medium"} "Current input: ")
-                    ($ expandable-list-component {:items (if (array? original-input) original-input [original-input])
-                                                  :color "gray"
-                                                  :title-singular "Input"
-                                                  :truncate-length 80}))))
+                    ($ generic-data-viewer {:data original-input
+                                            :color "gray"
+                                            :truncate-length 80}))))
               
               ;; Show normal editing interface for unaffected nodes
               ($ :div {:className "space-y-4"}
@@ -343,10 +324,10 @@
                  
                  ($ :div {:className "text-xs text-gray-500"}
                     ($ :span {:className "font-medium"} "Original: ")
-                    ($ expandable-list-component {:items (if (array? original-input) original-input [original-input])
-                                                  :color "gray"
-                                                  :title-singular "Original Input"
-                                                  :truncate-length 80}))))))))
+                    ($ generic-data-viewer {:data original-input
+                                            :color "gray"
+                                            :truncate-length 80}))))))))
+
 
 (defui info-panel [{:keys [graph-data summary-data]}]
   (let [result (:result summary-data)
@@ -363,9 +344,9 @@
                (if failure?
                  ($ :span {:className "px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium"} "Failed")
                  ($ :span {:className "px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium"} "Success")))
-            ($ expandable-item-component {:item result-val
-                                          :color (if failure? "red" "green")
-                                          :title "Final Result Details"})))
+            ($ generic-data-viewer {:data result-val
+                                    :color (if failure? "red" "green")
+                                    :truncate-length 100})))
 
        ($ :div {:className "text-sm font-medium text-gray-700 pt-2 border-t border-gray-200"} "Overall Stats")
 
