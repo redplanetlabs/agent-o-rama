@@ -137,42 +137,36 @@
       ($ :div {:className "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl"}
          ($ :div {:className "p-6"}
             ;; Node Info Section
-            ($ :div {:className "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"}
-               ($ :div {:className "bg-indigo-50 p-3 rounded-md"}
-                  ($ :div {:className "flex justify-between items-center"}
-                     ($ :span {:className "text-sm font-medium text-indigo-700"} "Node")
-                     ($ :span {:className "text-sm text-indigo-600 font-mono"} node-name))
-                  ($ :div {:className "flex justify-between items-center mt-1"}
-                     ($ :span {:className "text-sm font-medium text-indigo-700"} "ID")
-                     ($ :span {:className "text-xs text-indigo-500 font-mono"} node-id)))
-               
-               
-               ;; Result Section - only show if result is not nil
-               (when result
-                 ($ :div {:className "bg-blue-50 p-3 rounded-md"}
-                    ($ :div {:className "text-sm font-medium text-blue-700 mb-1"} "Result")
-                    ($ expandable-item-component {:item result
-                                                  :color "blue"
-                                                  :title "Result"
-                                                  :truncate-length 100})))
-               
-               ;; Timing Section
-               (when (and start-time finish-time)
-                 ($ :div {:className "bg-yellow-50 p-3 rounded-md"}
-                    ($ :div {:className "text-sm font-medium text-yellow-700 mb-2"} "Timing")
-                    ($ :div {:className "space-y-1"}
-                       ($ :div {:className "flex justify-between"}
-                          ($ :span {:className "text-xs text-yellow-600"} "Duration")
-                          ($ :span {:className "text-xs text-yellow-600 font-mono"} (str duration "ms")))
-                       ($ :div {:className "flex justify-between"}
-                          ($ :span {:className "text-xs text-yellow-600"} "Started")
-                          ($ :span {:className "text-xs text-yellow-600 font-mono"} 
-                             (.toLocaleTimeString (js/Date. start-time))))
-                       ($ :div {:className "flex justify-between"}
-                          ($ :span {:className "text-xs text-yellow-600"} "Finished")
-                          ($ :span {:className "text-xs text-yellow-600 font-mono"} 
-                             (.toLocaleTimeString (js/Date. finish-time))))))))
+            ($ :div {:className "bg-indigo-50 p-3 rounded-md"}
+               ($ :div {:className "flex justify-between items-center"}
+                  ($ :span {:className "text-sm font-medium text-indigo-700"} "Node")
+                  ($ :span {:className "text-sm text-indigo-600 font-mono"} node-name))
+               ($ :div {:className "flex justify-between items-center mt-1"}
+                  ($ :span {:className "text-sm font-medium text-indigo-700"} "ID")
+                  ($ :span {:className "text-xs text-indigo-500 font-mono"} node-id)))
             
+            (when result
+              ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4"}
+                 ($ :div {:className "text-sm font-medium text-blue-700 mb-1"} "Result")
+                 ($ expandable-item-component {:item result
+                                               :color "blue"
+                                               :title "Result"
+                                               :truncate-length 100})))
+            (when (and start-time finish-time)
+              ($ :div {:className "bg-yellow-50 p-3 rounded-md mt-4"}
+                 ($ :div {:className "text-sm font-medium text-yellow-700 mb-2"} "Timing")
+                 ($ :div {:className "space-y-1"}
+                    ($ :div {:className "flex justify-between"}
+                       ($ :span {:className "text-xs text-yellow-600"} "Duration")
+                       ($ :span {:className "text-xs text-yellow-600 font-mono"} (str duration "ms")))
+                    ($ :div {:className "flex justify-between"}
+                       ($ :span {:className "text-xs text-yellow-600"} "Started")
+                       ($ :span {:className "text-xs text-yellow-600 font-mono"} 
+                          (.toLocaleTimeString (js/Date. start-time))))
+                    ($ :div {:className "flex justify-between"}
+                       ($ :span {:className "text-xs text-yellow-600"} "Finished")
+                       ($ :span {:className "text-xs text-yellow-600 font-mono"} 
+                          (.toLocaleTimeString (js/Date. finish-time)))))))
             (when input
               ($ :div {:className "bg-green-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
