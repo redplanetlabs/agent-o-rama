@@ -11,7 +11,7 @@
                  
                  ;; ui dependencies
                  [ring/ring-core "1.9.5"]
-                 [ring/ring-jetty-adapter "1.8.2"]
+                 [http-kit "2.8.0"]
                  [ring/ring-codec "1.2.0"]
                  [metosin/reitit "0.7.2"]]
   :global-vars {*warn-on-reflection* true}

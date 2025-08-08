@@ -7,7 +7,7 @@
    [com.rpl.agent-o-rama.impl.ui.server :as srv]
    [com.rpl.agent-o-rama.impl.ui :as ui]
    [clojure.tools.logging :as cljlogging]
-   [ring.adapter.jetty :as jetty])
+   [org.httpkit.server :as http-kit])
   (:import
    [java.util.concurrent ScheduledThreadPoolExecutor TimeUnit]))
 
@@ -53,9 +53,9 @@
         (setval [ATOM :aor-cache (keypath mod)] NONE ui/system)))))
 
 (defn start [ipc]
-  (swap! ui/system assoc :jetty (jetty/run-jetty #'srv/handler
-                                                 {:port 1974 ;; TODO make configurable
-                                                  :join? false}))
+  (swap! ui/system assoc :server (http-kit/run-server #'srv/handler
+                                                     {:port 1974 ;; TODO make configurable
+                                                      :join? false}))
   (swap! ui/system assoc :rama-client ipc)
   (swap! ui/system assoc :background-exec (ScheduledThreadPoolExecutor. 1))
   (.scheduleAtFixedRate
@@ -71,7 +71,7 @@
 (defn stop-ui []
   (transform [ATOM :aor-cache MAP-VALS :clients MAP-VALS] close! ui/system)
   (setval [ATOM :aor-cache MAP-VALS :clients MAP-VALS] NONE ui/system)
-  (.stop ^org.eclipse.jetty.server.Server (:jetty @ui/system))
+  ((:server @ui/system))
   (.shutdownNow ^ScheduledThreadPoolExecutor (:background-exec @ui/system)))
 
 (defn start-ui ^java.io.Closeable [ipc]
