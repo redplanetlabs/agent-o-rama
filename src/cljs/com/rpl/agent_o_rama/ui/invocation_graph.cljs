@@ -21,7 +21,7 @@
         formatter (js/Intl.DateTimeFormat.
                    "en-US"
                    #js {:year          "numeric"
-                        :month         "long"
+                        :month         "short"
                         :day           "numeric"
                         :hour          "2-digit"
                         :minute        "2-digit"
@@ -204,15 +204,17 @@
                  ($ :div {:className "space-y-1"}
                     ($ :div {:className "flex justify-between"}
                        ($ :span {:className "text-xs text-yellow-600"} "Duration")
-                       ($ :span {:className "text-xs text-yellow-600 font-mono"} (str duration "ms")))
+                       ($ :span {:className "text-xs text-yellow-600 font-mono"
+                                 :title (str "Started: " (format-ms start-time) "\nFinished: " (format-ms finish-time))} 
+                          (str duration "ms")))
                     ($ :div {:className "flex justify-between"}
                        ($ :span {:className "text-xs text-yellow-600"} "Started")
                        ($ :span {:className "text-xs text-yellow-600 font-mono"} 
-                          (.toLocaleTimeString (js/Date. start-time))))
+                          (format-ms start-time)))
                     ($ :div {:className "flex justify-between"}
                        ($ :span {:className "text-xs text-yellow-600"} "Finished")
                        ($ :span {:className "text-xs text-yellow-600 font-mono"} 
-                          (.toLocaleTimeString (js/Date. finish-time)))))))
+                          (format-ms finish-time))))))
             (when input
               ($ :div {:className "bg-green-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
@@ -249,9 +251,7 @@
                               ;; Always display the duration
                               (when duration
                                 ($ :div {:className "text-xs text-sky-500 font-mono"
-                                         :title (str (format-ms start-time)
-                                                     " to "
-                                                     (format-ms finish-time))}
+                                         :title (str "Started: " (format-ms start-time) "\nFinished: " (format-ms finish-time))}
                                    (str duration "ms"))))
 
                            ;; 2. The Body: Replace all specific logic with the generic viewer
