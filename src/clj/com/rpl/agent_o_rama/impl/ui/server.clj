@@ -68,9 +68,6 @@
      ;; END: Add Sente routes
 
      ["/api" ; This comes AFTER /chsk so /chsk isn't treated as an API call
-      ["/agents/:module-id/:agent-name/invocations"
-       {:get {:handler #'agents/get-invokes}
-        :post {:handler #'agents/manually-trigger-invoke}}]
       ["/agents/:module-id/:agent-name/graph"
        {:get {:handler #'agents/get-graph}}]
       ["/agents/:module-id/:agent-name/fork"

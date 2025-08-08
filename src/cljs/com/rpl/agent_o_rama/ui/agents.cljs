@@ -101,21 +101,12 @@
         [has-more? set-has-more?] (uix/use-state true)
         [next-pagination-params set-next-pagination-params] (uix/use-state {})
         
-        ;; Build query URL with pagination params
-        query-url (let [base-url (str "/api/agents/" module-id "/" agent-name "/invocations")]
-                    (if (empty? requested-pagination-params)
-                      base-url
-                      (let [valid-params (filter (fn [[task-id item-id]] (not (nil? item-id))) requested-pagination-params)
-                            params-str (->> valid-params
-                                           (map (fn [[task-id item-id]] (str task-id "=" item-id)))
-                                           (clojure.string/join "&"))]
-                        (if (empty? params-str)
-                          base-url
-                          (str base-url "?" params-str)))))
-        
-        {:keys [data loading?]}
-        (common/use-query {:query-key ["agent" module-id agent-name requested-pagination-params]
-                           :query-url query-url})
+        ;; Use Sente query with pagination data
+        {:keys [data loading? error]}
+        (queries/use-sente-query {:query-key [:invocations module-id agent-name requested-pagination-params]
+                                  :sente-event [:api/get-invocations {:module-id module-id
+                                                                      :agent-name agent-name
+                                                                      :pagination requested-pagination-params}]})
         
         [location navigate] (useLocation)
         
@@ -148,8 +139,13 @@
                       (set-requested-pagination-params next-pagination-params)))]
     
     (cond
+      ;; Still loading initial data
       (and loading? (empty? all-invokes)) ($ :div.flex.justify-center.items-center.py-8
-                                            ($ :div.text-gray-500 "Loading invocations..."))
+                                            ($ :div.text-gray-500 "Loading invocations via Sente..."))
+      ;; Request errored
+      error ($ :div.flex.justify-center.items-center.py-8
+              ($ :div.text-red-500 "Error loading invocations: " error))
+      ;; No data returned
       (and (not data) (empty? all-invokes)) ($ :div.flex.justify-center.items-center.py-8
                                               ($ :div.text-gray-500 "No invocations found"))
       :else
@@ -186,14 +182,18 @@
 
 (defui mini-invocations []
   (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
-        {:keys [data loading?]}
-        (common/use-query {:query-key ["agent" module-id agent-name]
-                           :query-url (str "/api/agents/" module-id "/" agent-name "/invocations")})
+        {:keys [data loading? error]}
+        (queries/use-sente-query {:query-key [:mini-invocations module-id agent-name]
+                                  :sente-event [:api/get-invocations {:module-id module-id
+                                                                      :agent-name agent-name
+                                                                      :pagination {}}]})
 
         [location navigate] (useLocation)]
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
-                 ($ :div.text-gray-500 "Loading invocations..."))
+                 ($ :div.text-gray-500 "Loading invocations via Sente..."))
+      error ($ :div.flex.justify-center.items-center.py-8
+              ($ :div.text-red-500 "Error loading invocations: " error))
       (not data) ($ :div.flex.justify-center.items-center.py-8
                    ($ :div.text-gray-500 "No invocations found"))
       :else

@@ -68,24 +68,6 @@
      {:task-id (.getTaskId inv)
       :invoke-id (.getAgentInvokeId inv)}}))
 
-(defn get-invokes [{{:keys [module-id agent-name]} :path-params :as req}]
-  (let [parsed-pagination-information
-        (transform [(multi-path MAP-KEYS
-                                MAP-VALS)]
-                   parse-long
-                   (-> req :query-params))
-        pagination
-        (if (= {} parsed-pagination-information)
-          nil
-          parsed-pagination-information)]
-    {:status
-     200
-     
-     :body
-     (filter-encodable (foreign-invoke-query
-                        (:invokes-page-query (objects module-id agent-name))
-                        10 pagination))}))
-
 (defn remove-implicit-nodes
   "Preprocesses the invokes-map to remove implicit nodes and rewire edges to real nodes.
    Returns a new map without implicit nodes where all references are updated."
@@ -231,3 +213,20 @@
         (select [ALL (collect-one FIRST) LAST :clients MAP-KEYS] (ui/get-object :aor-cache))]
     {:module-id (replace-slash module-name)
      :agent-name (replace-slash agent-name)}))
+
+(defmethod api-handler :api/get-invocations
+  [_ {:keys [module-id agent-name pagination]} uid]
+  (println "[AGENTS] Loading invocations for" module-id agent-name "with pagination:" pagination "for uid:" uid)
+  (let [parsed-pagination-information
+        (when pagination
+          (transform [(multi-path MAP-KEYS MAP-VALS)]
+                     parse-long
+                     pagination))
+        final-pagination (if (empty? parsed-pagination-information)
+                           nil
+                           parsed-pagination-information)
+        result (filter-encodable (foreign-invoke-query
+                                  (:invokes-page-query (objects module-id agent-name))
+                                  10 final-pagination))]
+    (println "[AGENTS] Sending invocations data:" (count (:agent-invokes result)) "invocations")
+    result))
