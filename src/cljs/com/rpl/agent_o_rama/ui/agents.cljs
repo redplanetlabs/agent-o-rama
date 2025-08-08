@@ -12,6 +12,52 @@
    [com.rpl.agent-o-rama.ui.common :as common]))
 
 
+(defui spinner [{:keys [size]}]
+  (let [size-class (case size
+                      :small "h-3 w-3"
+                      :medium "h-4 w-4"
+                      "h-4 w-4")]
+    ($ :svg.animate-spin.text-blue-600 
+       {:className size-class
+        :viewBox "0 0 24 24"
+        :fill "none"
+        :xmlns "http://www.w3.org/2000/svg"}
+       ($ :circle.opacity-25 
+          {:cx "12" :cy "12" :r "10" 
+           :stroke "currentColor" :strokeWidth "4"})
+       ($ :path.opacity-75 
+          {:fill "currentColor" 
+           :d "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"}))))
+
+(defui result-badge [{:keys [result]}]
+  (cond 
+    (nil? result)
+    ($ :span.px-2.py-1.bg-blue-100.text-blue-800.rounded-full.text-xs.font-medium.inline-flex.items-center.gap-1
+       ($ spinner {:size :small})
+       "Pending")
+    (:failure? result)
+    ($ :span.px-2.py-1.bg-red-100.text-red-800.rounded-full.text-xs.font-medium "Failed")
+    :else
+    ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs.font-medium "Success")))
+
+(defui invocation-row [{:keys [invoke module-id agent-name on-click]}]
+  (let [task-id (:task-id invoke)
+        agent-id (:agent-id invoke)
+        url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" agent-id)]
+    ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
+       {:key url
+        :onClick (fn [e]
+                   (when on-click
+                     (. e stopPropagation)
+                     (on-click url)))}
+       ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium (str task-id "-" agent-id))
+       ($ :td.px-4.py-3.max-w-xs
+          ($ :div.truncate.text-gray-900
+             (common/pp (:invoke-args invoke))))
+       ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
+       ($ :td.px-4.py-3.text-sm
+          ($ result-badge {:result (:result invoke)})))))
+
 (defui index []
   (let [{:keys [data loading?]}
         (common/use-query {:query-key ["agents"]
@@ -108,26 +154,12 @@
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")))
                ($ :tbody.divide-y.divide-gray-200
-                  (for [invoke all-invokes
-                        :let [task-id (:task-id invoke)
-                              agent-id (:agent-id invoke)
-                              url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" agent-id)]]
-                    ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
-                       {:key url
-                        :onClick (fn [e]
-                                   (println e)
-                                   (. e stopPropagation)
-                                   (navigate url))}
-                       ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium (str task-id "-" agent-id))
-                       ($ :td.px-4.py-3.max-w-xs
-                          ($ :div.truncate.text-gray-900
-                             (common/pp (:invoke-args invoke))))
-                       ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
-                       ($ :td.px-4.py-3.text-sm
-                          (let [result (:result invoke)]
-                            (if (:failure? result)
-                              ($ :span.px-2.py-1.bg-red-100.text-red-800.rounded-full.text-xs.font-medium "Failed")
-                              ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs.font-medium "Success")))))))
+                  (for [invoke all-invokes]
+                    ($ invocation-row {:key (str (:task-id invoke) "-" (:agent-id invoke))
+                                      :invoke invoke
+                                      :module-id module-id
+                                      :agent-name agent-name
+                                      :on-click navigate})))
             
             ;; Load More button
             (when has-more?
@@ -165,23 +197,12 @@
                   ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
                   ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")))
             ($ :tbody.divide-y.divide-gray-200
-               (for [invoke (:agent-invokes data)
-                     :let [task-id (:task-id invoke)
-                           agent-id (:agent-id invoke)
-                           url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" agent-id)]]
-                 ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
-                    {:key url
-                     :onClick (fn [_] (navigate url))}
-                    ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium (str task-id "-" agent-id))
-                    ($ :td.px-4.py-3.max-w-xs
-                       ($ :div.truncate.text-gray-900 
-                          (common/pp (:invoke-args invoke))))
-                    ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
-                    ($ :td.px-4.py-3.text-sm
-                       (let [result (:result invoke)]
-                         (if (:failure? result)
-                           ($ :span.px-2.py-1.bg-red-100.text-red-800.rounded-full.text-xs.font-medium "Failed")
-                           ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs.font-medium "Success")))))))
+               (for [invoke (:agent-invokes data)]
+                 ($ invocation-row {:key (str (:task-id invoke) "-" (:agent-id invoke))
+                                   :invoke invoke
+                                   :module-id module-id
+                                   :agent-name agent-name
+                                   :on-click (fn [url] (navigate url))})))
             ($ :tfoot.bg-gray-50.border-t.border-gray-200
                ($ :tr.hover:bg-gray-100.transition-colors.duration-150
                   {:onClick (fn [_] (navigate (str "/agents/" module-id "/" agent-name "/invocations")))}
