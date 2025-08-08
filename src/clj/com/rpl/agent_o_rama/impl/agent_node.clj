@@ -164,12 +164,21 @@
   []
   (throw (h/ex-info "Streaming not implemented for subagents" {})))
 
+(defn record-nested-op!-impl
+  [^AgentNode agent-node nested-op-type start-time-millis finish-time-millis
+   info-map]
+  (.recordNestedOp agent-node
+                   (nested-op-type->java nested-op-type)
+                   start-time-millis
+                   finish-time-millis
+                   info-map))
+
 (defmacro timed-agent-call
   [expr agent-node-sym [res-sym] info-map-expr]
   `(let [start-time-millis# (h/current-time-millis)
          ~res-sym ~expr
          finish-time-millis# (h/current-time-millis)]
-     (.recordNestedOp
+     (record-nested-op!-impl
       ~agent-node-sym
       :agent-call
       start-time-millis#
@@ -279,6 +288,8 @@
                               :type (get store-info name)}))
          )))
      (getAgentClient [agent-node name]
+       ;; TODO: <<<<>>>> need to add agent module name and agent name to the
+       ;; trace
        (let [client (.getAgentClient declared-objects-tg name)]
          (reify
           AgentClient
@@ -434,15 +445,6 @@
   (cljlogging/error t msg data))
 
 (def AGENT-NODE-CONTEXT (ThreadLocal.))
-
-(defn record-nested-op!-impl
-  [^AgentNode agent-node nested-op-type start-time-millis finish-time-millis
-   info-map]
-  (.recordNestedOp agent-node
-                   (nested-op-type->java nested-op-type)
-                   start-time-millis
-                   finish-time-millis
-                   info-map))
 
 (defn try-close!
   [obj]

@@ -22,7 +22,8 @@
    [com.rpl.test-common :as tc]))
 
 (deftest local-subagent-test
-  (with-open [ipc (rtest/create-ipc)]
+  (with-open [ipc (rtest/create-ipc)
+              ui  (aor/start-ui ipc)]
     (letlocals
      (bind module
        (aor/agentmodule
@@ -34,26 +35,59 @@
              "node1"
              (fn [agent-node]
                (let [bar (aor/agent-client agent-node "bar")]
-                 (aor/result! agent-node (aor/agent-invoke bar "some input"))
+                 (aor/emit! agent-node
+                            "node1"
+                            (aor/agent-invoke bar "some input"))
                )))
-        )
-
-
+            (aor/node
+             "node1"
+             nil
+             (fn [agent-node s]
+               (aor/result! agent-node (str s "!")))
+            ))
         (-> topology
             (aor/new-agent "bar")
             (aor/node
              "start"
-             nil
+             "q"
              (fn [agent-node input]
-               (aor/result! agent-node
-                            (aor/get-human-input agent-node
-                                                 "Tell me something."))
+               (aor/emit! agent-node
+                          "a"
+                          input
+                          (aor/get-human-input agent-node
+                                               "Tell me something."))
+             ))
+            (aor/node
+             "q"
+             nil
+             (fn [agent-node input res]
+               (aor/result!
+                agent-node
+                (str input res (aor/get-human-input agent-node "More.")))
              )))
+        (-> topology
+            (aor/new-agent "fib")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node v]
+               (let [fib (aor/agent-client agent-node "fib")]
+                 (if (#{0 1} v)
+                   (aor/result! agent-node 1)
+                   (aor/result!
+                    agent-node
+                    (+ (aor/agent-invoke fib (- v 1))
+                       (aor/agent-invoke fib (- v 2)))
+                   ))
+               ))))
        ))
      (rtest/launch-module! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
      (bind agent-manager (aor/agent-manager ipc module-name))
      (bind foo (aor/agent-client agent-manager "foo"))
+     (bind fib (aor/agent-client agent-manager "fib"))
+
+     (println "RES:" (aor/agent-invoke fib 4))
      ;; TODO: <<<<>>>>
      ;;   - include recursion / mutual recursion
      ;;   - proxy the human inputs back and forth
