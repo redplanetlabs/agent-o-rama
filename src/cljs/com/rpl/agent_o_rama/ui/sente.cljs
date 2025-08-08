@@ -6,7 +6,7 @@
 
 ;; Create Transit packer for serialization (must match server)
 (def transit-packer
-  (sente-transit/get-packer :json))
+  (sente-transit/get-transit-packer :json))
 
 ;; 1. Instantiate the Sente channel socket client
 (let [{:keys [chsk ch-recv send-fn state]}

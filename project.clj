@@ -18,6 +18,8 @@
                  ;; START: Add Sente and Ring Defaults
                  [com.taoensso/sente "1.20.0"] ; A recent stable version
                  [ring/ring-defaults "0.4.0"] ; Sente needs this for sessions
+                 [com.cognitect/transit-clj "1.0.333"] ; Transit for server-side
+                 [com.cognitect/transit-cljs "0.8.280"] ; Transit for client-side
                  ;; END: Add Sente and Ring Defaults
                  ]
   :global-vars {*warn-on-reflection* true}
@@ -48,6 +50,7 @@
 
                                  ;; START: Add Sente to cljs profile
                                  [com.taoensso/sente "1.20.0"]
+                                 [com.cognitect/transit-cljs "0.8.280"]
                                  ;; END: Add Sente to cljs profile
                                  ]}}
   :plugins [[lein-exec "0.3.7"]])
