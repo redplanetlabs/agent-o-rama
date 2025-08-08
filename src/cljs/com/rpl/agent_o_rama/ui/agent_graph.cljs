@@ -152,17 +152,19 @@
 
 (defn extract-graph-elements [{:keys [graph]}]
   "Extract nodes, edges, and start node from graph data without layout"
-  (let [nodes (s/select [:node-map
-                         s/MAP-KEYS
-                         (s/view
-                          (fn [k]
-                            {:id k
-                             :type "custom"
-                             :draggable false
-                             :data {:label k :node-id k}
-                             :width 170
-                             :height 40}))]
-                        graph)
+  (let [start-id (:start-node graph)
+        ;; Build nodes with extra metadata for coloring (node-type and start?)
+        nodes (->> (get graph :node-map)
+                   (map (fn [[k v]]
+                          {:id k
+                           :type "custom"
+                           :draggable false
+                           :data {:label k
+                                  :node-id k
+                                  :node-type (:node-type v)
+                                  :is-start? (= k start-id)}
+                           :width 170
+                           :height 40})))
         
         edges (s/select
                [:node-map
@@ -171,12 +173,11 @@
                 s/LAST
                 :output-nodes
                 s/ALL]
-               graph)
-        start-id (:start-node graph)]
+               graph)]
     {:nodes nodes
      :edges (for [[frm to] edges]
-       {:id (str frm "-" to) :source frm :target to
-        :markerEnd {:type "arrowclosed" :width 20 :height 20}})
+              {:id (str frm "-" to) :source frm :target to
+               :markerEnd {:type "arrowclosed" :width 20 :height 20}})
      :start-id start-id}))
 
 (defn process-elk-edge [edge]
@@ -286,11 +287,16 @@
                      (clj->js {"custom"
                                (uix.core/as-react
                                 (fn [{:keys [data id]}]
-                                  (let [data (js->clj data :keywordize-keys true)
+                                   (let [data (js->clj data :keywordize-keys true)
                                         label (:label data)
                                         node-id (:node-id data)
+                                        node-type (:node-type data)
                                         selected (= (when selected-node (.-id selected-node)) id)
                                         base-classes (cond
+                                                       (= "agg-start-node" node-type)
+                                                       ["bg-green-500" "text-white" "border-2" "border-green-600"]
+                                                       (= "agg-node" node-type)
+                                                       ["bg-yellow-500" "text-white" "border-2" "border-yellow-600"]
                                                        :else
                                                        ["bg-white" "text-gray-800" "border-2" "border-gray-300"])
                                         selection-classes (if selected
