@@ -119,6 +119,34 @@
                                     :title (:title selected-item)
                                     :on-close #(set-selected-item nil)})))))
 
+(defui generic-data-viewer [{:keys [data color truncate-length]
+                             :or {truncate-length 80}}]
+  (cond
+    ;; Case 1: The data is a map. Render its key-value pairs.
+    (map? data)
+    ($ :div {:className "mt-1 space-y-1 pl-2 border-l border-gray-200"}
+       (for [[k v] (sort-by key data)]
+         ($ :div {:key (str k)}
+            ($ :div {:className "flex items-start gap-1"}
+               ($ :span {:className "text-gray-500 font-medium"} (str (name k) ":"))
+               ;; Recursive call to render the value, whatever its type.
+               ($ generic-data-viewer {:data v :color color :truncate-length truncate-length})))))
+
+    ;; Case 2: The data is a list or vector. Use the existing list component.
+    (sequential? data)
+    ($ expandable-list-component {:items data
+                                   :color color
+                                   :title-singular "Item"
+                                   :truncate-length truncate-length})
+    
+    ;; Case 3: The data is a scalar value (string, number, bool, etc.).
+    ;; Use the existing item component.
+    :else
+    ($ expandable-item-component {:item data
+                                  :color color
+                                  :title "Value Details"
+                                  :truncate-length truncate-length})))
+
 (defui selected-node-component [{:keys [selected-node graph-data handle-paginate-node loading-nodes flow-nodes set-selected-node set-nodes]}]
   (let [data (when selected-node 
                (js->clj (.-data selected-node) :keywordize-keys true))
@@ -182,116 +210,35 @@
                  ($ :div {:className "space-y-2"}
                     (for [op (:nested-ops data)]
                       (let [info (:info op)
-                            op-type (:type op)  ; type is at op level, not in info
-                            op-input (:input info)  ; input is nested inside info
-                            op-response (:response info)  ; FIXED: response is nested inside info
+                            op-type (:type op)
                             start-time (:start-time-millis op)
                             finish-time (:finish-time-millis op)
                             duration (when (and start-time finish-time)
                                        (- finish-time start-time))]
                         ($ :div {:key (str start-time "-" finish-time)
                                  :className "bg-white p-3 rounded border border-sky-200"}
+                           
+                           ;; 1. The Header: Keep this part to display consistent op-level info
                            ($ :div {:className "flex justify-between items-start mb-2"}
                               ($ :div {:className "flex-1"}
                                  ($ :div {:className "flex items-center gap-2"}
                                     ($ :span {:className "text-sm font-medium text-sky-800 bg-sky-100 px-2 py-1 rounded"} 
                                        op-type)
+                                    ;; The generic viewer will show objectName, so this is optional, but nice for a header
                                     (when (:objectName info)
                                       ($ :span {:className "text-sm font-mono text-sky-700"} 
-                                         (:objectName info))))
-                                 
-                                 ;; Model Info (if available)
-                                 (when (and info (or (:modelName info) (:totalTokenCount info)))
-                                   ($ :div {:className "text-xs text-sky-600 mt-1"}
-                                      ($ :span {:className "font-medium"} "model: ")
-                                      ($ :span {:className "text-sky-500"}
-                                         (str (or (:modelName info) "unknown")
-                                              (when (:totalTokenCount info)
-                                                (let [input-tokens (:inputTokenCount info)
-                                                      output-tokens (:outputTokenCount info)
-                                                      total-tokens (:totalTokenCount info)]
-                                                  (if (and input-tokens output-tokens)
-                                                    (str " (" input-tokens "+" output-tokens "=" total-tokens " tokens)")
-                                                    (str " (" total-tokens " tokens)"))))
-                                              #_(when (:finishReason info)
-                                                 (str " [" (:finishReason info) "]"))))))
-                                 
-                                 ;; Input (for model calls)
-                                 (when op-input
-                                   ($ :div {:className "text-xs text-sky-600 mt-1"}
-                                      ($ :span {:className "font-medium"} "input: ")
-                                      ($ expandable-list-component {:items op-input
-                                                                    :color "sky"
-                                                                    :title-singular "Input Message"
-                                                                    :truncate-length 60})))
-                                 
-                                 ;; Response (for model calls)
-                                 (when op-response
-                                   ($ :div {:className "text-xs text-sky-600 mt-1"}
-                                      ($ :span {:className "font-medium"} "response: ")
-                                      ($ expandable-item-component {:item op-response
-                                                                    :color "sky"
-                                                                    :title "Model Response"
-                                                                    :truncate-length 60})))
-                                 
-                                 ;; Store Operation Details
-                                 (when (and info (contains? #{:store-read :store-write} op-type))
-                                   ($ :<>
-                                      (when (:op info)
-                                        ($ :div {:className "text-xs text-sky-600 mt-1"}
-                                           ($ :span {:className "font-medium"} "operation: ")
-                                           ($ :span {:className "text-sky-500 font-mono"} (:op info))))
-                                      (when (:params info)
-                                        ($ :div {:className "text-xs text-sky-600 mt-1"}
-                                           ($ :span {:className "font-medium"} "params: ")
-                                           ($ expandable-item-component {:item (:params info)
-                                                                         :color "sky"
-                                                                         :title "Store Parameters"
-                                                                         :truncate-length 60})))
-                                      (when (and (:result info) (= op-type :store-read))
-                                        ($ :div {:className "text-xs text-sky-600 mt-1"}
-                                           ($ :span {:className "font-medium"} "result: ")
-                                           ($ expandable-item-component {:item (:result info)
-                                                                         :color "sky"
-                                                                         :title "Store Result"
-                                                                         :truncate-length 60})))))
-                                 
-                                 ;; DB Operation Details
-                                 (when (and info (contains? #{:db-read :db-write} op-type))
-                                   ($ :<>
-                                      (when (:op info)
-                                        ($ :div {:className "text-xs text-sky-600 mt-1"}
-                                           ($ :span {:className "font-medium"} "operation: ")
-                                           ($ :span {:className "text-sky-500 font-mono"} (:op info))))
-                                      (when (:params info)
-                                        ($ :div {:className "text-xs text-sky-600 mt-1"}
-                                           ($ :span {:className "font-medium"} "params: ")
-                                           ($ expandable-item-component {:item (:params info)
-                                                                         :color "sky"
-                                                                         :title "DB Parameters"
-                                                                         :truncate-length 60})))
-                                      (when (:result info)
-                                        ($ :div {:className "text-xs text-sky-600 mt-1"}
-                                           ($ :span {:className "font-medium"} "result: ")
-                                           ($ expandable-item-component {:item (:result info)
-                                                                         :color "sky"
-                                                                         :title "DB Result"
-                                                                         :truncate-length 60})))))
-                                 
-                                 ;; Custom Operation Details (for :other and :agent-invoke)
-                                 (when (and info (contains? #{:other :agent-invoke} op-type) (not (empty? info)))
-                                   ($ :div {:className "text-xs text-sky-600 mt-1"}
-                                      ($ :span {:className "font-medium"} "details: ")
-                                      ($ expandable-item-component {:item info
-                                                                    :color "sky"
-                                                                    :title (str "Custom Operation Info (" (name op-type) ")")
-                                                                    :truncate-length 60}))))
+                                         (:objectName info)))))
+                              ;; Always display the duration
                               (when duration
                                 ($ :div {:className "text-xs text-sky-500 font-mono"
                                          :title (str (format-ms start-time)
                                                      " to "
                                                      (format-ms finish-time))}
-                                   (str duration "ms"))))))))))
+                                   (str duration "ms"))))
+
+                           ;; 2. The Body: Replace all specific logic with the generic viewer
+                           ($ :div {:className "text-xs text-sky-600 mt-1"}
+                              ($ generic-data-viewer {:data info :color "sky"})))))))))
             
                ;; Emits Section (full width)
             (when (and emits (> (count emits) 0))
@@ -335,7 +282,7 @@
                                 ($ :div {:className "text-purple-400 mt-1 text-xs italic"}
                                    "Loading...")))))))))
             
-               )))))
+               ))))
 
 (defui forking-input-component [{:keys [selected-node changed-nodes set-changed-nodes affected-nodes]}]
   (let [data (when selected-node 
