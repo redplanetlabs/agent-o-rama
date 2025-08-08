@@ -12,26 +12,27 @@
    [com.rpl.agent-o-rama.ui.datasets :as datasets]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.stats :as stats]
-   [com.rpl.agent-o-rama.ui.sente :as sente])) ; <--- Add this
+   [com.rpl.agent-o-rama.ui.sente :as sente]
+   [com.rpl.agent-o-rama.ui.state :as state])) ; <--- Add this
 
 (def query-client (QueryClient.))
 
 ;; Sidebar navigation component
 (defui sidebar-nav []
   (let [[location _] (useLocation)
-        [collapsed set-collapsed] (common/use-local-storage "sidebar-collapsed" false)
-        toggle-collapsed #(set-collapsed not)]
+        collapsed? (state/use-sub [:ui :sidebar-collapsed?])
+        toggle-collapsed #(state/dispatch [:ui/toggle-sidebar])]
     ($ :div {:className (str "h-screen flex flex-col bg-gray-100 transition-all duration-300 "
-                             (if collapsed "w-16" "w-64"))}
+                             (if collapsed? "w-16" "w-64"))}
        ;; Header with toggle button
        ($ :div.flex.items-center.justify-between.p-4.border-b.border-gray-200.overflow-hidden
-          (when-not collapsed
+          (when-not collapsed?
             ($ :h1.text-lg.font-semibold.text-gray-800.truncate.min-w-0 "Agent-O-Rama"))
           ($ :button
              {:onClick toggle-collapsed
               :className "p-2 rounded-md hover:bg-gray-200 transition-colors"
-              :title (if collapsed "Expand sidebar" "Collapse sidebar")}
-             (if collapsed
+              :title (if collapsed? "Expand sidebar" "Collapse sidebar")}
+             (if collapsed?
                ($ ChevronRightIcon {:className "h-5 w-5"})
                ($ ChevronLeftIcon {:className "h-5 w-5"}))))
        
@@ -42,41 +43,41 @@
              ($ Link
                 {:href "/"
                  :className (str "flex items-center px-3 py-2 rounded-md transition-colors "
-                                 (if collapsed "justify-center" "")
+                                 (if collapsed? "justify-center" "")
                                  (if (= location "/")
                                    "bg-gray-300 text-gray-900"
                                    "hover:bg-gray-200 text-gray-700"))
-                 :title (when collapsed "Overview")}
+                 :title (when collapsed? "Overview")}
                 ($ HomeIcon {:className "h-5 w-5 flex-shrink-0"})
-                (when-not collapsed
+                (when-not collapsed?
                   ($ :span.ml-3 "Overview")))
              
              ;; Agents link
              ($ Link
                 {:href "/agents"
                  :className (str "flex items-center px-3 py-2 rounded-md transition-colors "
-                                 (if collapsed "justify-center" "")
+                                 (if collapsed? "justify-center" "")
                                  (if (or (= location "/agents") 
                                          (.startsWith location "/agents/"))
                                    "bg-gray-300 text-gray-900"
                                    "hover:bg-gray-200 text-gray-700"))
-                 :title (when collapsed "Agents")}
+                 :title (when collapsed? "Agents")}
                 ($ CpuChipIcon {:className "h-5 w-5 flex-shrink-0"})
-                (when-not collapsed
+                (when-not collapsed?
                   ($ :span.ml-3 "Agents")))
              
              ;; Datasets link
              ($ Link
                 {:href "/datasets"
                  :className (str "flex items-center px-3 py-2 rounded-md transition-colors "
-                                 (if collapsed "justify-center" "")
+                                 (if collapsed? "justify-center" "")
                                  (if (or (= location "/datasets")
                                          (.startsWith location "/datasets/"))
                                    "bg-gray-300 text-gray-900"
                                    "hover:bg-gray-200 text-gray-700"))
-                 :title (when collapsed "Datasets")}
+                 :title (when collapsed? "Datasets")}
                 ($ CircleStackIcon {:className "h-5 w-5 flex-shrink-0"})
-                (when-not collapsed
+                (when-not collapsed?
                   ($ :span.ml-3 "Datasets"))))))))
 
 ;; Breadcrumb for sub-navigation within sections
@@ -170,13 +171,21 @@
      ($ :div.flex-1.flex.flex-col.min-h-0
         ($ breadcrumb)
 
-        ;; START: Add a test button
-        ($ :button.m-4.p-2.bg-blue-500.text-white.rounded.hover:bg-blue-600
-           {:onClick (fn []
-                       (println "Sending hello to server...")
-                       (sente/chsk-send! [:example/hello {:msg "Hello from the UI!"}]))}
-           "Say Hello to Server via Sente")
-        ;; END: Add a test button
+        ;; START: Add a test button and connection status
+        ($ :div.m-4.space-y-2
+           (let [connected? (state/use-sub [:sente :connected?])]
+             ($ :div.text-sm
+                ($ :span {:className (str "inline-block w-2 h-2 rounded-full mr-2 "
+                                          (if connected? "bg-green-500" "bg-red-500"))}
+                   )
+                ($ :span (if connected? "Connected" "Disconnected"))))
+           ($ :button.p-2.bg-blue-500.text-white.rounded.hover:bg-blue-600
+              {:onClick (fn []
+                          (println "Sending hello to server via state system...")
+                          (sente/push! [:example/hello {:msg "Hello from the new state system!"}]))}
+              "Say Hello to Server via State System"))
+
+        ;; END: Add a test button and connection status
 
         ($ :div.flex-1.overflow-auto
            ($ Router

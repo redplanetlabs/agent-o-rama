@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.sente
   (:require [taoensso.sente :as sente]
-            [uix.core :as uix]))
+            [uix.core :as uix]
+            [com.rpl.agent-o-rama.ui.state :as state]))
 
 ;; 1. Instantiate the Sente channel socket client
 (let [{:keys [chsk ch-recv send-fn state]}
@@ -24,14 +25,23 @@
 (defmethod -event-msg-handler :default [{:as ev-msg :keys [id ?data]}]
   (.log js/console (str "Unhandled Sente event: " id) ?data))
 
+;; Handle server responses and forward them to our event system
+(defmethod -event-msg-handler :example/hello-response [{:as ev-msg :keys [?data]}]
+  (.log js/console "Server replied to hello:" ?data))
+
 ;; Handler to log connection state changes
 (defmethod -event-msg-handler :chsk/state [{:as ev-msg :keys [?data]}]
-  (let [[old-state new-state] ?data]
-    (.log js/console "Sente connection state change:" new-state)))
+  (let [[old-state new-state] ?data
+        connected? (boolean (:open? new-state))]
+    (.log js/console "Sente connection state change:" new-state)
+    ;; Update app-db with connection state
+    (state/dispatch [:sente/connection-state-changed new-state])
+    (state/dispatch [:sente/set-connected connected?])))
 
 ;; Handler for successful handshake
 (defmethod -event-msg-handler :chsk/handshake [{:as ev-msg :keys [?data]}]
-  (.log js/console "✅ Sente handshake successful!" ?data))
+  (.log js/console "✅ Sente handshake successful!" ?data)
+  (state/dispatch [:sente/set-connected true]))
 
 ;; 4. Router lifecycle functions
 (defonce router_ (atom nil))
@@ -47,3 +57,22 @@
 
 (defn init! []
   (start-router!))
+
+;; =============================================================================
+;; REQUEST HELPERS
+;; =============================================================================
+
+(defn request!
+  "Make a request through Sente with optional timeout and callback.
+   Usage: (request! [:api/get-agents] 5000 (fn [reply] ...))"
+  ([event-vec]
+   (request! event-vec 5000 nil))
+  ([event-vec timeout-ms]
+   (request! event-vec timeout-ms nil))
+  ([event-vec timeout-ms callback]
+   (chsk-send! event-vec timeout-ms callback)))
+
+(defn push!
+  "Send a one-way message to the server (no response expected)."
+  [event-vec]
+  (chsk-send! event-vec))
