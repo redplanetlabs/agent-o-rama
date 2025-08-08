@@ -13,7 +13,7 @@
 
 (defn stop-repl [ipc]
   (aor/stop-ui)
-  (close! (:rama-client ipc)))
+  (close! ipc))
 
 (comment
   (def ipc (open-cluster-manager-internal {"conductor.host" "localhost"}))
