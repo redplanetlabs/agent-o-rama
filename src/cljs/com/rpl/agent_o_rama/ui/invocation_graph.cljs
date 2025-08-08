@@ -91,7 +91,7 @@
 
 (defui expandable-list-component [{:keys [items color title-singular truncate-length]
                                    :or {truncate-length 50}}]
-  ($ :div {:className (str "text-" color "-500 mt-1 space-y-1")}
+  ($ :div {:className (str "text-" color "-500 mt-1 space-y-1 pl-2 border-l border-gray-200")}
      (for [[idx item] (map-indexed vector items)]
        ($ :div {:key idx
                 :className "flex items-start gap-2"}
