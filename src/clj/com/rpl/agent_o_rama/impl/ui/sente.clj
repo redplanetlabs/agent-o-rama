@@ -74,21 +74,24 @@
 ;;   (:body (agents/get-graph {:path-params {:module-id module-id 
 ;;                                           :agent-name agent-name}})))
 
-;; Generic API event handler that wraps api-handler with error handling
-(defmethod -event-msg-handler :chsk/ws-msg
-  [{:as ev-msg :keys [?data ?reply-fn uid]}]
-  (when (vector? ?data)
-    (let [[event-id event-data] ?data]
-      (when (and (keyword? event-id) 
-                 (= "api" (namespace event-id))
-                 ?reply-fn)
-        (try
-          (let [result (api-handler event-id event-data uid)]
-            (?reply-fn {:success true :data result}))
-          (catch Exception e
-            (log/error e "Error handling API event" event-id)
-            (?reply-fn {:success false 
-                        :error (.getMessage e)})))))))
+;; Generic handler for all API events
+(defn handle-api-event
+  [{:as ev-msg :keys [id ?data ?reply-fn uid]}]
+  (println "[SERVER] Received" id "request from uid:" uid "with data:" ?data)
+  (when ?reply-fn
+    (try
+      (let [result (api-handler id ?data uid)]
+        (println "[SERVER] Sending response for" id)
+        (?reply-fn {:success true :data result}))
+      (catch Exception e
+        (log/error e "Error handling API event" id)
+        (?reply-fn {:success false 
+                    :error (.getMessage e)})))))
+
+;; Register handlers for each API endpoint
+(defmethod -event-msg-handler :api/get-agents
+  [ev-msg]
+  (handle-api-event ev-msg))
 
 ;; Handler for client connecting/disconnecting
 (defmethod -event-msg-handler :chsk/uidport-open

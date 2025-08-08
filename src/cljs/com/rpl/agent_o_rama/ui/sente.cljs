@@ -95,8 +95,13 @@
   "Load agents list from server via Sente"
   []
   (println "🔄 Loading agents via Sente...")
-  (request! [:api/get-agents] 5000
-            (fn [reply]
-              (if reply
-                (state/dispatch [:api/agents-response reply])
-                (state/dispatch [:agents/load-error "Request timeout"])))))
+  (println "Sending request: [:api/get-agents]")
+  (println "chsk-state:" @chsk-state)
+  (chsk-send! [:api/get-agents] 5000
+              (fn [reply]
+                (println "Got reply from server:" reply)
+                (if (and reply (true? (:success reply)))
+                  (state/dispatch [:agents/load-success (:data reply)])
+                  (state/dispatch [:agents/load-error (or (:error reply)
+                                                        (when (= reply :chsk/closed) "Connection closed")
+                                                        "Request failed")])))))

@@ -65,17 +65,18 @@
 
 (defui index []
   (let [agents-state (state/use-sub [:agents])
-        {:keys [agents loading? error]} agents-state]
+        {:keys [agents loading? error]} agents-state
+        connected? (state/use-sub [:sente :connected?])]
     
-    ;; Load agents when component mounts
+    ;; Load agents when Sente connects (handles initial closed state)
     (uix/use-effect
      (fn []
-       (println "🚀 Agents component mounted, loading agents...")
-       (state/dispatch [:agents/load])
-       (sente/load-agents!)
-       ;; No cleanup needed
+       (when connected?
+         (println "🚀 Connected. Loading agents...")
+         (state/dispatch [:agents/load])
+         (sente/load-agents!))
        (constantly nil))
-     []) ; Empty deps - run once on mount
+     [connected?])
     
     (cond
       ;; Still loading initial data
