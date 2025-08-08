@@ -216,17 +216,15 @@
 
 (defmethod api-handler :api/get-invocations
   [_ {:keys [module-id agent-name pagination]} uid]
-  (println "[AGENTS] Loading invocations for" module-id agent-name "with pagination:" pagination "for uid:" uid)
   (let [parsed-pagination-information
+        ;; TODO remove pagination parsing, no longer neceseary with sente
         (when pagination
           (transform [(multi-path MAP-KEYS MAP-VALS)]
                      parse-long
                      pagination))
         final-pagination (if (empty? parsed-pagination-information)
                            nil
-                           parsed-pagination-information)
-        result (filter-encodable (foreign-invoke-query
-                                  (:invokes-page-query (objects module-id agent-name))
-                                  10 final-pagination))]
-    (println "[AGENTS] Sending invocations data:" (count (:agent-invokes result)) "invocations")
-    result))
+                           parsed-pagination-information)]
+    (filter-encodable (foreign-invoke-query
+                       (:invokes-page-query (objects module-id agent-name))
+                       10 final-pagination))))
