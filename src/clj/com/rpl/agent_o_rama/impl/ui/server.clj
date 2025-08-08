@@ -14,6 +14,9 @@
    [reitit.coercion.malli :as rcm]
    [reitit.ring.coercion :as rrc]
    [malli.core :as mc]
+   [ring.middleware.defaults :refer [wrap-defaults site-defaults]] ; Add this
+   [clojure.string]
+   [com.rpl.agent-o-rama.impl.ui.sente :as sente] ; Add this
 
    [com.rpl.agent-o-rama.impl.ui.agents :as agents]))
 
@@ -58,21 +61,27 @@
 (defn app-routes []
   (ring/ring-handler
    (ring/router
-    ["/api"
-     ["/agents"
-      {:get {:handler #'agents/index}}]
-     ["/agents/:module-id/:agent-name/invocations"
-      {:get {:handler #'agents/get-invokes}
-       :post {:handler #'agents/manually-trigger-invoke}}]
-     ["/agents/:module-id/:agent-name/graph"
-      {:get {:handler #'agents/get-graph}}]
-     ["/agents/:module-id/:agent-name/fork"
-      {:post {:handler #'agents/fork}}]
-     ["/agents/:module-id/:agent-name/invocations/:invoke-id/paginated"
-      {:get {:parameters {:query [:map
-                                  [:paginate-task-id {:optional true} int?]
-                                  [:missing-node-id {:optional true} string?]]}
-             :handler #'agents/invoke-paginated}}]]
+    [""
+     ;; START: Add Sente routes
+     ["/chsk" {:get  {:handler #'sente/ring-ajax-get-or-ws-handshake}
+               :post {:handler #'sente/ring-ajax-post}}]
+     ;; END: Add Sente routes
+
+     ["/api" ; This comes AFTER /chsk so /chsk isn't treated as an API call
+      ["/agents"
+       {:get {:handler #'agents/index}}]
+      ["/agents/:module-id/:agent-name/invocations"
+       {:get {:handler #'agents/get-invokes}
+        :post {:handler #'agents/manually-trigger-invoke}}]
+      ["/agents/:module-id/:agent-name/graph"
+       {:get {:handler #'agents/get-graph}}]
+      ["/agents/:module-id/:agent-name/fork"
+       {:post {:handler #'agents/fork}}]
+      ["/agents/:module-id/:agent-name/invocations/:invoke-id/paginated"
+       {:get {:parameters {:query [:map
+                                   [:paginate-task-id {:optional true} int?]
+                                   [:missing-node-id {:optional true} string?]]}
+              :handler #'agents/invoke-paginated}}]]]
     {:data {:muuntaja m/instance
             :middleware [exception-middleware
                          parameters/parameters-middleware
@@ -83,4 +92,11 @@
             :coercion rcm/coercion}})
    default-handler))
 
-(def handler (#'app-routes))
+;; The main change is wrapping the entire router with `wrap-defaults`
+;; This adds the necessary session middleware Sente requires.
+;; We disable CSRF protection for development.
+(def handler
+  (-> (#'app-routes)
+      (wrap-defaults (-> site-defaults
+                         (assoc-in [:security :anti-forgery] false)
+                         (assoc-in [:security :ssl-redirect] false)))))

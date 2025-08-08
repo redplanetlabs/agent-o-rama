@@ -11,7 +11,8 @@
    
    [com.rpl.agent-o-rama.ui.datasets :as datasets]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.stats :as stats]))
+   [com.rpl.agent-o-rama.ui.stats :as stats]
+   [com.rpl.agent-o-rama.ui.sente :as sente])) ; <--- Add this
 
 (def query-client (QueryClient.))
 
@@ -166,9 +167,36 @@
 (defui app []
   ($ :div.flex.h-screen.bg-gray-50
      ($ sidebar-nav)
-     ($ main-content)))
+     ($ :div.flex-1.flex.flex-col.min-h-0
+        ($ breadcrumb)
+
+        ;; START: Add a test button
+        ($ :button.m-4.p-2.bg-blue-500.text-white.rounded.hover:bg-blue-600
+           {:onClick (fn []
+                       (println "Sending hello to server...")
+                       (sente/chsk-send! [:example/hello {:msg "Hello from the UI!"}]))}
+           "Say Hello to Server via Sente")
+        ;; END: Add a test button
+
+        ($ :div.flex-1.overflow-auto
+           ($ Router
+              ;; Agent routes
+              ($ Route {:path "/agents/:module-id/:agent-name/invocations" :component agents/invocations})
+              ($ Route {:path "/agents/:module-id/:agent-name/invocations/:invoke-id" :component agents/invoke})
+              ($ Route {:path "/agents/:module-id/:agent-name/evaluations" :component agents/evaluations})
+              ($ Route {:path "/agents/:module-id/:agent-name/stats" :component stats/stats})
+              ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
+              ($ Route {:path "/agents" :component agents/index})
+              
+              ;; Dataset routes
+              ($ Route {:path "/datasets/:dataset-id" :component datasets/datasets})
+              ($ Route {:path "/datasets" :component datasets/datasets})
+              
+              ;; Home route
+              ($ Route {:path "/" :component agents/index}))))))
 
 (defn init []
+  (sente/init!) ; <--- Add this to start the client-side router
   (uix.dom/render-root
    ($ QueryClientProvider {:client query-client}
       ($ app))

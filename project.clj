@@ -13,7 +13,13 @@
                  [ring/ring-core "1.9.5"]
                  [http-kit "2.8.0"]
                  [ring/ring-codec "1.2.0"]
-                 [metosin/reitit "0.7.2"]]
+                 [metosin/reitit "0.7.2"]
+
+                 ;; START: Add Sente and Ring Defaults
+                 [com.taoensso/sente "1.20.0"] ; A recent stable version
+                 [ring/ring-defaults "0.4.0"] ; Sente needs this for sessions
+                 ;; END: Add Sente and Ring Defaults
+                 ]
   :global-vars {*warn-on-reflection* true}
   :repositories
   [["releases"
@@ -38,6 +44,10 @@
                                  [com.pitch/uix.dom "1.4.3"]
                                  [thheller/shadow-cljs "3.1.7"]
                                  [net.java.dev.jna/jna "5.17.0"] ;; to fix dynlink error on arm macs
-                                 [org.clojure/clojure "1.12.0"] 
+                                 [org.clojure/clojure "1.12.0"]
+
+                                 ;; START: Add Sente to cljs profile
+                                 [com.taoensso/sente "1.20.0"]
+                                 ;; END: Add Sente to cljs profile
                                  ]}}
   :plugins [[lein-exec "0.3.7"]])

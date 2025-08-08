@@ -5,6 +5,7 @@
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.ui.server :as srv]
+   [com.rpl.agent-o-rama.impl.ui.sente :as sente] ; <--- Add this
    [com.rpl.agent-o-rama.impl.ui :as ui]
    [clojure.tools.logging :as cljlogging]
    [org.httpkit.server :as http-kit])
@@ -53,6 +54,7 @@
         (setval [ATOM :aor-cache (keypath mod)] NONE ui/system)))))
 
 (defn start [ipc]
+  (sente/start-sente!) ; <--- Start the Sente router
   (swap! ui/system assoc :server (http-kit/run-server #'srv/handler
                                                      {:port 1974 ;; TODO make configurable
                                                       :join? false}))
@@ -69,6 +71,7 @@
    TimeUnit/SECONDS))
 
 (defn stop-ui []
+  (sente/stop-sente!) ; <--- Stop the Sente router
   (transform [ATOM :aor-cache MAP-VALS :clients MAP-VALS] close! ui/system)
   (setval [ATOM :aor-cache MAP-VALS :clients MAP-VALS] NONE ui/system)
   ((:server @ui/system))
