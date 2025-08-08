@@ -12,7 +12,7 @@
   (aor/start-ui ipc))
 
 (defn stop-repl [ipc]
-  (close! (:rama-client @ui/system))
+  (close! (:rama-client ipc))
   (aor/stop-ui))
 
 (comment
