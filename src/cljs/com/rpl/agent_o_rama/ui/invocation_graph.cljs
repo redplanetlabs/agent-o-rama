@@ -117,6 +117,10 @@
   (let [max-depth 3
         next-depth (inc depth)]
     (cond
+      ;; Handle nil explicitly
+      (nil? data)
+      ($ :span {:className (str "text-" color "-500 italic")} "nil")
+      
       ;; If we've hit max depth, fall back to expandable components
       (>= depth max-depth)
       (cond
