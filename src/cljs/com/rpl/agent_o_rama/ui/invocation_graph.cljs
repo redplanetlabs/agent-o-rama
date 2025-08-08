@@ -2,6 +2,7 @@
   (:require
    [com.rpl.agent-o-rama.ui.common :as common]
    [clojure.string :as str]
+   [clojure.pprint]
    [goog.i18n.DateTimeFormat :as dtf]
    [goog.date.UtcDateTime    :as utc-dt]
    
@@ -63,10 +64,17 @@
     (.-body js/document)))
 
 
+(defn pretty-format [item]
+  "Format data structure with proper indentation and formatting using pprint"
+  (if (string? item)
+    item
+    (with-out-str (clojure.pprint/pprint item))))
+
 (defui expandable-item-component [{:keys [item color title truncate-length]
                                    :or {truncate-length 50}}]
   (let [[show-modal set-show-modal] (uix/use-state false)
         item-str (if (string? item) item (pr-str item))
+        pretty-str (pretty-format item)
         is-long? (> (count item-str) truncate-length)
         truncated-str (if is-long?
                         (str (subs item-str 0 (- truncate-length 3)) "...")
@@ -80,17 +88,17 @@
                     :title "Click to expand"}
              truncated-str))
        
-       ;; Popup modal
+       ;; Popup modal with pretty formatting
        (when show-modal
-         ($ expandable-popup-modal {:content item-str
+         ($ expandable-popup-modal {:content pretty-str
                                     :title title
                                     :on-close #(set-show-modal false)})))))
 
 ;; Declare generic-data-viewer first to avoid circular dependency
 (declare generic-data-viewer)
 
-(defui expandable-list-component [{:keys [items color title-singular truncate-length]
-                                   :or {truncate-length 50}}]
+(defui expandable-list-component [{:keys [items color title-singular truncate-length depth]
+                                   :or {truncate-length 50 depth 0}}]
   ($ :div {:className (str "text-" color "-500 mt-1 space-y-1")}
      (for [[idx item] (map-indexed vector items)]
        ($ :div {:key idx
@@ -101,35 +109,61 @@
           ($ :div {:className "flex-1"}
              ($ generic-data-viewer {:data item 
                                      :color color 
-                                     :truncate-length truncate-length}))))))
+                                     :truncate-length truncate-length
+                                     :depth depth}))))))
 
-(defui generic-data-viewer [{:keys [data color truncate-length]
-                             :or {truncate-length 80}}]
-  (cond
-    ;; Case 1: The data is a map. Render its key-value pairs.
-    (map? data)
-    ($ :div {:className "mt-1 space-y-1 pl-2 border-l border-gray-200"}
-       (for [[k v] (sort-by key data)]
-         ($ :div {:key (str k)}
-            ($ :div {:className "flex items-start gap-1"}
-               ($ :span {:className "text-gray-500 font-medium"} (str (name k) ":"))
-               ;; Recursive call to render the value, whatever its type.
-               ($ generic-data-viewer {:data v :color color :truncate-length truncate-length})))))
+(defui generic-data-viewer [{:keys [data color truncate-length depth]
+                             :or {truncate-length 80 depth 0}}]
+  (let [max-depth 3
+        next-depth (inc depth)]
+    (cond
+      ;; If we've hit max depth, fall back to expandable components
+      (>= depth max-depth)
+      (cond
+        (map? data)
+        ($ expandable-item-component {:item data
+                                      :color color
+                                      :title "Map Details"
+                                      :truncate-length truncate-length})
+        (sequential? data)
+        ($ expandable-item-component {:item data
+                                      :color color  
+                                      :title "List Details"
+                                      :truncate-length truncate-length})
+        :else
+        ($ expandable-item-component {:item data
+                                      :color color
+                                      :title "Value Details"
+                                      :truncate-length truncate-length}))
+      
+      ;; Case 1: The data is a map. Render its key-value pairs.
+      (map? data)
+      ($ :div {:className "mt-1 space-y-1 pl-2 border-l border-gray-200"}
+         (for [[k v] (sort-by key data)]
+           ($ :div {:key (str k)}
+              ($ :div {:className "flex items-start gap-1"}
+                 ($ :span {:className "text-gray-500 font-medium"} (str (name k) ":"))
+                 ;; Recursive call to render the value, whatever its type.
+                 ($ generic-data-viewer {:data v 
+                                         :color color 
+                                         :truncate-length truncate-length
+                                         :depth next-depth})))))
 
-    ;; Case 2: The data is a list or vector. Use the existing list component.
-    (sequential? data)
-    ($ expandable-list-component {:items data
-                                   :color color
-                                   :title-singular "Item"
-                                   :truncate-length truncate-length})
-    
-    ;; Case 3: The data is a scalar value (string, number, bool, etc.).
-    ;; Use the existing item component.
-    :else
-    ($ expandable-item-component {:item data
-                                  :color color
-                                  :title "Value Details"
-                                  :truncate-length truncate-length})))
+      ;; Case 2: The data is a list or vector. Use the existing list component.
+      (sequential? data)
+      ($ expandable-list-component {:items data
+                                     :color color
+                                     :title-singular "Item"
+                                     :truncate-length truncate-length
+                                     :depth next-depth})
+      
+      ;; Case 3: The data is a scalar value (string, number, bool, etc.).
+      ;; Use the existing item component.
+      :else
+      ($ expandable-item-component {:item data
+                                    :color color
+                                    :title "Value Details"
+                                    :truncate-length truncate-length}))))
 
 (defui selected-node-component [{:keys [selected-node graph-data handle-paginate-node loading-nodes flow-nodes set-selected-node set-nodes]}]
   (let [data (when selected-node 
@@ -162,7 +196,8 @@
                  ($ :div {:className "text-sm font-medium text-blue-700 mb-1"} "Result")
                  ($ generic-data-viewer {:data result
                                          :color "blue"
-                                         :truncate-length 100})))
+                                         :truncate-length 100
+                                         :depth 0})))
             (when (and start-time finish-time)
               ($ :div {:className "bg-yellow-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-yellow-700 mb-2"} "Timing")
@@ -183,7 +218,8 @@
                  ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
                  ($ generic-data-viewer {:data input
                                          :color "green"
-                                         :truncate-length 100})))
+                                         :truncate-length 100
+                                         :depth 0})))
             
             (when (not (empty? (:nested-ops data)))
               ($ :div {:className "bg-sky-50 p-3 rounded-md mt-4"}
@@ -220,7 +256,7 @@
 
                            ;; 2. The Body: Replace all specific logic with the generic viewer
                            ($ :div {:className "text-xs text-sky-600 mt-1"}
-                              ($ generic-data-viewer {:data info :color "sky"})))))))))
+                              ($ generic-data-viewer {:data info :color "sky" :depth 0})))))))))
             
                ;; Emits Section (full width)
             (when (and emits (> (count emits) 0))
@@ -257,7 +293,8 @@
                               (when (:args emit)
                                 ($ generic-data-viewer {:data (:args emit)
                                                         :color "purple"
-                                                        :truncate-length 60}))
+                                                        :truncate-length 60
+                                                        :depth 0}))
                               ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
                                  (str "ID: " emit-id))
                               (when is-loading
@@ -307,7 +344,8 @@
                     ($ :span {:className "font-medium"} "Current input: ")
                     ($ generic-data-viewer {:data original-input
                                             :color "gray"
-                                            :truncate-length 80}))))
+                                            :truncate-length 80
+                                            :depth 0}))))
               
               ;; Show normal editing interface for unaffected nodes
               ($ :div {:className "space-y-4"}
@@ -326,7 +364,8 @@
                     ($ :span {:className "font-medium"} "Original: ")
                     ($ generic-data-viewer {:data original-input
                                             :color "gray"
-                                            :truncate-length 80}))))))))
+                                            :truncate-length 80
+                                            :depth 0}))))))))
 
 
 (defui info-panel [{:keys [graph-data summary-data]}]
@@ -346,7 +385,8 @@
                  ($ :span {:className "px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium"} "Success")))
             ($ generic-data-viewer {:data result-val
                                     :color (if failure? "red" "green")
-                                    :truncate-length 100})))
+                                    :truncate-length 100
+                                    :depth 0})))
 
        ($ :div {:className "text-sm font-medium text-gray-700 pt-2 border-t border-gray-200"} "Overall Stats")
 
