@@ -52,18 +52,22 @@
         (transform [ATOM :aor-cache (keypath mod) :clients MAP-VALS] close! ui/system)
         (setval [ATOM :aor-cache (keypath mod)] NONE ui/system)))))
 
-(defn start [ipc]
-  (swap! ui/system assoc :jetty (jetty/run-jetty #'srv/handler
-                                                 {:port 1974 ;; TODO make configurable
-                                                  :join? false}))
+(defn start
+  [ipc port]
+  (swap! ui/system assoc
+    :jetty
+    (jetty/run-jetty #'srv/handler
+                     {:port  port
+                      :join? false}))
   (swap! ui/system assoc :rama-client ipc)
   (swap! ui/system assoc :background-exec (ScheduledThreadPoolExecutor. 1))
   (.scheduleAtFixedRate
    ^ScheduledThreadPoolExecutor (:background-exec @ui/system)
-   (fn [] (try
-            (refresh-agent-modules!)
-            (catch Throwable t
-              (cljlogging/error t "Error in refreshing agent modules" {}))))
+   (fn []
+     (try
+       (refresh-agent-modules!)
+       (catch Throwable t
+         (cljlogging/error t "Error in refreshing agent modules" {}))))
    0
    5
    TimeUnit/SECONDS))
@@ -75,12 +79,17 @@
   (close! (:rama-client @ui/system))
   (.shutdownNow ^ScheduledThreadPoolExecutor (:background-exec @ui/system)))
 
-(defn start-ui ^java.io.Closeable [ipc]
-  (start ipc)
-  (reify java.io.Closeable
-    (close [this]
-      (println "press enter to close the ui, default port is 1974")
-      (read-line)
-      (stop-ui)
-      :closed)))
-
+(defn start-ui
+  ^java.io.Closeable
+  ([ipc] (start-ui ipc nil))
+  ([ipc options]
+   (let [options (merge {:port 1974} options)]
+     (println "Starting Agent-o-rama UI on port" (:port options))
+     (start ipc (:port options))
+     (reify
+      java.io.Closeable
+      (close [this]
+        (println "press enter to close the ui, default port is 1974")
+        (read-line)
+        (stop-ui)
+        :closed)))))
