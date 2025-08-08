@@ -13,7 +13,7 @@
                         :invoke-id nil
                         :module-id nil
                         :agent-name nil}
-   :agents {:modules {}
+   :agents {:agents []
             :loading? false
             :error nil}
    :ui {:selected-node-id nil
@@ -154,16 +154,24 @@
     [[:agents :loading?] (constantly loading?)]))
 
 (reg-event :agents/load-success
-  (fn [db modules-data]
-    [[:agents] (constantly {:modules modules-data
+  (fn [db agents-data]
+    [[:agents] (constantly {:agents agents-data
                             :loading? false
                             :error nil})]))
 
 (reg-event :agents/load-error
   (fn [db error]
-    [[:agents] (constantly {:modules {}
+    [[:agents] (constantly {:agents []
                             :loading? false
                             :error error})]))
+
+;; Agent Loading Effect
+(reg-event :agents/load
+  (fn [db]
+    ;; This event triggers the async loading
+    ;; We set loading state immediately, then trigger the request
+    ;; Note: The actual request will be triggered from the component
+    [[:agents :loading?] (constantly true)]))
 
 ;; =============================================================================
 ;; DEBUGGING HELPERS

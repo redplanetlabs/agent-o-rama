@@ -9,7 +9,9 @@
 
 
    
-   [com.rpl.agent-o-rama.ui.common :as common]))
+   [com.rpl.agent-o-rama.ui.common :as common]
+   [com.rpl.agent-o-rama.ui.state :as state]
+   [com.rpl.agent-o-rama.ui.sente :as sente]))
 
 
 (defui spinner [{:keys [size]}]
@@ -62,21 +64,31 @@
           ($ result-badge {:result (:result invoke)})))))
 
 (defui index []
-  (let [{:keys [data loading?]}
-        (common/use-query {:query-key ["agents"]
-                           :query-url "/api/agents"})]
+  (let [agents-state (state/use-sub [:agents])
+        {:keys [agents loading? error]} agents-state]
+    
+    ;; Load agents when component mounts
+    (uix/use-effect
+     (fn []
+       (println "🚀 Agents component mounted, loading agents...")
+       (state/dispatch [:agents/load])
+       (sente/load-agents!)
+       ;; No cleanup needed
+       (constantly nil))
+     []) ; Empty deps - run once on mount
+    
     (cond
       ;; Still loading initial data
       loading? ($ :div.flex.justify-center.items-center.py-8
-                     ($ :div.text-gray-500 "Loading agents..."))
-      ;; Request errored or returned nil
-      (not data) ($ :div.flex.justify-center.items-center.py-8
-                    ($ :div.text-gray-500 "Unable to retrieve agents"))
+                     ($ :div.text-gray-500 "Loading agents via Sente..."))
+      ;; Request errored
+      error ($ :div.flex.justify-center.items-center.py-8
+                ($ :div.text-red-500 "Error loading agents: " error))
       ;; No agents returned from the API
-      (empty? data) ($ :div.flex.justify-center.items-center.py-8
-                      ($ :div.text-gray-500 "No agents found"))
+      (empty? agents) ($ :div.flex.justify-center.items-center.py-8
+                         ($ :div.text-gray-500 "No agents found"))
       :else ($ :div.p-4
-              (for [agent data
+              (for [agent agents
                     :let [url (str "/agents/" (:module-id agent) "/" (:agent-name agent))]]
                 ($ :div.p-4.transition-colors.duration-150.hover:bg-gray-200.bg-gray-100.m-4  {:key url}
                   ($ wouter/Link {:href url}
