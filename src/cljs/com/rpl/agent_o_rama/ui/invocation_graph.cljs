@@ -72,7 +72,7 @@
                         (str (subs item-str 0 (- truncate-length 3)) "...")
                         item-str)]
     ($ :<>
-       ($ :div {:className (str "text-" color "-500 mt-1")}
+       ($ :div {:className (str "text-" color "-500")}
           ($ :span {:className (str "break-words cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded")
                     :onClick (fn [e]
                                (.stopPropagation e)
@@ -91,7 +91,7 @@
 
 (defui expandable-list-component [{:keys [items color title-singular truncate-length]
                                    :or {truncate-length 50}}]
-  ($ :div {:className (str "text-" color "-500 mt-1 space-y-1 pl-2 border-l border-gray-200")}
+  ($ :div {:className (str "text-" color "-500 mt-1 space-y-1")}
      (for [[idx item] (map-indexed vector items)]
        ($ :div {:key idx
                 :className "flex items-start gap-2"}
