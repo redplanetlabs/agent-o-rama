@@ -296,15 +296,22 @@
                                 :clipRule "evenodd"})))))))))
 
 (defui manual-run [{:keys [module-id agent-name]}]
-  (let [[args set-args] (uix/use-state "")
-        [loading? set-loading] (uix/use-state false)
-        [error-msg set-error-msg] (uix/use-state nil)
+  (let [;; Subscribe to state from app-db
+        manual-run-state (state/use-sub [:ui :manual-run module-id agent-name])
+        args (or (:args manual-run-state) "")
+        loading? (or (:loading? manual-run-state) false)
+        error-msg (:error-msg manual-run-state)
+        
         [location navigate] (useLocation)
+        
+        ;; State update helper
+        update-field (fn [field value]
+                       (state/dispatch [:db/set-value [:ui :manual-run module-id agent-name field] value]))
         
         handle-submit (fn [e]
                         (.preventDefault e)
-                        (set-error-msg nil)
-                        (set-loading true)
+                        (update-field :error-msg nil)
+                        (update-field :loading? true)
                         
                         ;; Parse JSON arguments
                         (let [parsed-args (try
@@ -319,17 +326,18 @@
                                             :args parsed-args}]
                              5000
                              (fn [reply]
-                               (set-loading false)
+                               (update-field :loading? false)
                                (if (:success reply)
                                  (let [data (:data reply)
                                        trace-url (str "/agents/" module-id "/" agent-name "/invocations/" 
                                                      (:task-id data) "-" (:invoke-id data))]
+                                   (update-field :args "") ;; Clear args on success
                                    (navigate trace-url))
-                                 (set-error-msg (str "Error: " (or (:error reply) "Unknown error"))))))
+                                 (update-field :error-msg (str "Error: " (or (:error reply) "Unknown error"))))))
                             ;; Invalid JSON
                             (do
-                              (set-loading false)
-                              (set-error-msg "Error: Invalid JSON format")))))]
+                              (update-field :loading? false)
+                              (update-field :error-msg "Error: Invalid JSON format")))))]
     
     ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6
        ($ :form {:onSubmit handle-submit}
@@ -338,7 +346,7 @@
              ($ :textarea.flex-1.p-3.border.border-gray-300.rounded-md.text-sm.focus:ring-2.focus:ring-blue-500.focus:border-blue-500.transition-colors.duration-150
                 {:placeholder "[arg1, arg2, arg3, ...] (json)"
                  :value args
-                 :onChange #(set-args (.. % -target -value))
+                 :onChange #(update-field :args (.. % -target -value))
                  :rows 3
                  :disabled loading?})
              ($ :button
