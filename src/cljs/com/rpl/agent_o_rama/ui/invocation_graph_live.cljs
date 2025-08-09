@@ -23,37 +23,56 @@
    Pure view component - subscription management happens in state layer."
   [{:keys [module-id agent-name invoke-id]}]
   (println "graph" module-id agent-name invoke-id)
-  (let [;; Subscribe to the nodes for this specific invocation
+  (let [;; Check if we're connected first
+        connected? (state/use-sub [:sente :connected?])
+        ;; Subscribe to the nodes for this specific invocation
         nodes (state/use-sub [:invocations-data invoke-id :graph :nodes])
         current-invoke-id (state/use-sub [:current-invocation :invoke-id])]
     
-    ;; Single effect that manages subscription lifecycle
+    ;; Effect for managing subscription
     (uix/use-effect
      (fn []
-       (when (and module-id agent-name invoke-id)
-         ;; Always dispatch when params are valid - let the state layer decide if it's a change
-         (println "Component requesting invocation:" invoke-id "current:" current-invoke-id)
+       (when (and connected? module-id agent-name invoke-id)
+         ;; Only subscribe when connected and params are valid
+         (println "Component requesting invocation:" invoke-id "current:" current-invoke-id "connected:" connected?)
          (state/dispatch [:invocation/view-live
                           {:module-id module-id
                            :agent-name agent-name
                            :invoke-id invoke-id}]))
-       ;; Don't stop subscription on cleanup - let the state layer manage it
-       ;; The subscription will be stopped when switching to a different invocation
-       ;; or when the window/tab is closed
-       nil)
+       nil) ;; No cleanup here - let state manage switching between invocations
      ;; Re-run when any of these change
-     #js [module-id agent-name invoke-id])
+     #js [connected? module-id agent-name invoke-id])
+    
+    ;; Separate effect for cleanup when component fully unmounts
+    (uix/use-effect
+     (fn []
+       ;; Return cleanup that only runs on unmount
+       (fn []
+         (println "Component fully unmounting, checking if we should stop subscription")
+         ;; Check app-db directly in cleanup
+         (let [db @state/app-db
+               connected? (get-in db [:sente :connected?])
+               active-sub (get-in db [:sente :active-subscription])]
+           (when (and connected? active-sub)
+             (println "Stopping subscription on unmount")
+             (state/dispatch [:invocation/stop-live])))))
+     []) ;; Empty deps - only run on mount/unmount
 
-    ($ :div
-       ($ :div.flex.items-center.justify-between.mb-3
-          ($ :h3.text-lg.font-semibold.text-gray-700 "Live Invocation")
-          ($ :div.font-mono.text-xs.text-gray-500
-             (str (or invoke-id ""))))
+    ;; Don't render the live view until we're connected
+    (if-not connected?
+      ($ :div.flex.items-center.justify-center.p-8
+         ($ :div.text-gray-500 "Connecting to server..."))
+      
+      ($ :div
+         ($ :div.flex.items-center.justify-between.mb-3
+            ($ :h3.text-lg.font-semibold.text-gray-700 "Live Invocation")
+            ($ :div.font-mono.text-xs.text-gray-500
+               (str (or invoke-id ""))))
 
-       (if (and nodes (seq nodes))
-         ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.divide-y.divide-gray-100
-            (for [[nid ndata] nodes]
-              ($ node-row {:key (str nid)
-                           :node-id nid
-                           :node-data ndata})))
-         ($ :div.text-gray-500 "Waiting for node updates...")))))
+         (if (and nodes (seq nodes))
+           ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.divide-y.divide-gray-100
+              (for [[nid ndata] nodes]
+                ($ node-row {:key (str nid)
+                             :node-id nid
+                             :node-data ndata})))
+           ($ :div.text-gray-500 "Waiting for node updates..."))))))
