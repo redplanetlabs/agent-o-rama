@@ -799,7 +799,6 @@
                         (set-elem *request)
                         NONE>]
                        $$root)
-     (local-select> (keypath *agent-id) $$root :> *tmp)
    )))
 
 (deframaop handle-config
@@ -920,7 +919,6 @@
                     (termval (aor-types/->valid-AggInput *invoke-id
                                                          *args))])]
       $$nodes)
-     (local-select> (keypath *agg-invoke-id) $$nodes :> *tmp)
 
      ;; by not acking here and going straight go complete-agg!, it also prevents
      ;; rest of agg subgraph from ever completing and calling complete-agg!
@@ -1066,7 +1064,6 @@
          )))
      ;; replicate writes before initiating RetryNodeComplete
      (|direct (ops/current-task-id))
-     (local-select> [(keypath *invoke-id) :emits] $$nodes :> *tmp)
      (depot-partition-append!
       *agent-depot
       (aor-types/->valid-RetryNodeComplete *invoke-id
