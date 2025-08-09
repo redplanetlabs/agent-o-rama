@@ -53,9 +53,11 @@
 ;; Batch/merge of nodes from server polling
 (defmethod -event-msg-handler :graph/nodes-merge [{:as ev-msg :keys [?data]}]
   (let [{:keys [invoke-id nodes]} ?data]
-    (when (map? nodes)
+    ;; Always store the data under the correct invoke-id
+    (when (and invoke-id (map? nodes))
+      (println "Storing nodes for invocation:" invoke-id)
       (doseq [[node-id node-data] nodes]
-        (state/dispatch [:invocation/update-node node-id node-data])))))
+        (state/dispatch [:invocation/update-node invoke-id node-id node-data])))))
 
 ;; Handler to log connection state changes
 (defmethod -event-msg-handler :chsk/state [{:as ev-msg :keys [?data]}]

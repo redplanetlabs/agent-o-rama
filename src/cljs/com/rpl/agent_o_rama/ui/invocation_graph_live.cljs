@@ -8,7 +8,7 @@
 
 (defui node-row [{:keys [node-id node-data]}]
   ($ :div.flex.items-start.justify-between.py-2.border-b.border-gray-100
-     ($ :div.flex-1
+     ($ :div
         ($ :div.font-mono.text-xs.text-gray-500 (str node-id))
         ($ :div.mt-1.text-sm.text-gray-800
            (common/pp (dissoc node-data :chunks :stream)))))
@@ -22,8 +22,9 @@
   "Minimal live invocation graph that reacts to server pushes.
    Pure view component - subscription management happens in state layer."
   [{:keys [module-id agent-name invoke-id]}]
-  (let [ ;; Just subscribe to the data we need
-        nodes (state/use-sub [:current-invocation :graph :nodes])
+  (println "graph" module-id agent-name invoke-id)
+  (let [;; Subscribe to the nodes for this specific invocation
+        nodes (state/use-sub [:invocations-data invoke-id :graph :nodes])
         current-invoke-id (state/use-sub [:current-invocation :invoke-id])]
     
     ;; Super simple: just tell state what we want to view
@@ -31,22 +32,22 @@
     (uix/use-effect
      (fn []
        (when (and module-id agent-name invoke-id)
-         ;; Only dispatch if we're changing to a different invocation
-         (when (not= current-invoke-id final-invoke-id)
-           (state/dispatch [:invocation/view-live
-                            {:module-id module-id
-                             :agent-name agent-name
-                             :invoke-id invoke-id}])))
+         ;; Always dispatch when params are valid - let the state layer decide if it's a change
+         (println "Component requesting invocation:" invoke-id "current:" current-invoke-id)
+         (state/dispatch [:invocation/view-live
+                          {:module-id module-id
+                           :agent-name agent-name
+                           :invoke-id invoke-id}]))
        ;; No cleanup - state manages everything
        nil)
-     ;; Minimal deps - just the invocation ID we want to view
-     #js [final-invoke-id])
+     ;; Re-run when any of these change
+     #js [module-id agent-name invoke-id])
 
     ($ :div
        ($ :div.flex.items-center.justify-between.mb-3
           ($ :h3.text-lg.font-semibold.text-gray-700 "Live Invocation")
           ($ :div.font-mono.text-xs.text-gray-500
-             (str (or final-invoke-id ""))))
+             (str (or invoke-id ""))))
 
        (if (and nodes (seq nodes))
          ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.divide-y.divide-gray-100

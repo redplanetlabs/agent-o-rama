@@ -9,31 +9,37 @@
 (state/reg-event :invocation/view-live
   (fn [db {:keys [module-id agent-name invoke-id] :as params}]
     (let [current-sub (get-in db [:sente :active-subscription])
+          current-invoke-id (get-in db [:current-invocation :invoke-id])
           new-sub-key (str (random-uuid))]
       
-      ;; If we have an active subscription, stop it first
-      (when current-sub
-        (println "Stopping previous subscription:" (:sub-key current-sub))
-        (sente/push! [:live/unsubscribe {:sub-key (:sub-key current-sub)
-                                         :sub-type :live-graph}]))
-      
-      ;; Start new subscription
-      (println "Starting new subscription for:" invoke-id)
-      (sente/push! [:live/subscribe {:sub-key new-sub-key
-                                     :sub-type :live-graph
-                                     :params params}])
-      
-      ;; Store the active subscription
-      (state/dispatch [:db/set-value [:sente :active-subscription] 
-                       {:sub-key new-sub-key :params params}])
-      
-      ;; Update current invocation and clear old data
-      [[:current-invocation]
-       (constantly {:invoke-id invoke-id
-                   :module-id module-id
-                   :agent-name agent-name
-                   :graph {}
-                   :summary {}})])))
+      ;; Only switch if we're actually changing invocations
+      (if (= invoke-id current-invoke-id)
+        (do
+          (println "Already viewing invocation:" invoke-id)
+          nil) ;; No state change needed
+        (do
+          ;; If we have an active subscription, stop it first
+          (when current-sub
+            (let [prev-invoke-id (get-in current-sub [:params :invoke-id])]
+              (println "Stopping previous subscription:" (:sub-key current-sub) "for invoke:" prev-invoke-id)
+              (sente/push! [:live/unsubscribe {:sub-key (:sub-key current-sub)
+                                              :sub-type :live-graph}])))
+          
+          ;; Start new subscription
+          (println "Starting new subscription for:" invoke-id "with key:" new-sub-key)
+          (sente/push! [:live/subscribe {:sub-key new-sub-key
+                                        :sub-type :live-graph
+                                        :params params}])
+          
+          ;; Store the active subscription
+          (state/dispatch [:db/set-value [:sente :active-subscription] 
+                          {:sub-key new-sub-key :params params}])
+          
+          ;; Just update current invocation pointer - data is stored separately
+          [[:current-invocation]
+           (constantly {:invoke-id invoke-id
+                       :module-id module-id
+                       :agent-name agent-name})])))))
 
 ;; Clean up on app shutdown/navigation away
 (state/reg-event :invocation/stop-live
@@ -44,5 +50,3 @@
         (sente/push! [:live/unsubscribe {:sub-key (:sub-key current-sub)
                                          :sub-type :live-graph}]))
       [[:sente :active-subscription] (constantly nil)])))
-
-

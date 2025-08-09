@@ -8,11 +8,10 @@
 ;; =============================================================================
 
 (def initial-db
-  {:current-invocation {:graph {}
-                        :summary {}
-                        :invoke-id nil
+  {:current-invocation {:invoke-id nil
                         :module-id nil
                         :agent-name nil}
+   :invocations-data {} ;; Keyed by invoke-id -> {:graph {:nodes ...} :summary ...}
    :invocations {:all-invokes []
                  :pagination-params nil ;; Next pagination params from server
                  :has-more? true
@@ -120,25 +119,23 @@
 (reg-event :invocation/set-current
   (fn [db {:keys [invoke-id module-id agent-name]}]
     ;; Simply set the current invocation context
-    ;; Subscription management is now handled by components with proper cleanup
+    ;; Data is stored separately under invocations-data
     [[:current-invocation]
      (constantly {:invoke-id invoke-id
                   :module-id module-id
-                  :agent-name agent-name
-                  :graph {}
-                  :summary {}})]))
+                  :agent-name agent-name})]))
 
 (reg-event :invocation/load-graph-success
-  (fn [db graph-data]
-    [[:current-invocation :graph] (constantly graph-data)]))
+  (fn [db invoke-id graph-data]
+    [[:invocations-data invoke-id :graph] (constantly graph-data)]))
 
 (reg-event :invocation/load-summary-success
-  (fn [db summary-data]
-    [[:current-invocation :summary] (constantly summary-data)]))
+  (fn [db invoke-id summary-data]
+    [[:invocations-data invoke-id :summary] (constantly summary-data)]))
 
 (reg-event :invocation/update-node
-  (fn [db node-id node-data]
-    [[:current-invocation :graph :nodes]
+  (fn [db invoke-id node-id node-data]
+    [[:invocations-data invoke-id :graph :nodes]
      (fn [nodes]
        (assoc (or nodes {}) node-id node-data))]))
 
