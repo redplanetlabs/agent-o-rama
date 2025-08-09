@@ -5,42 +5,44 @@
 ;; Orchestration events that perform side-effects using sente helpers,
 ;; keeping React components pure.
 
-;; Legacy events for backward compatibility
-(state/reg-event :live/start
-  (fn [db {:keys [module-id agent-name invoke-id interval-ms] :as data}]
-    (when (and module-id agent-name invoke-id)
-      (sente/live-start! data))
-    nil))
+;; Single active subscription management - much simpler!
+(state/reg-event :invocation/view-live
+  (fn [db {:keys [module-id agent-name invoke-id] :as params}]
+    (let [current-sub (get-in db [:sente :active-subscription])
+          new-sub-key (str (random-uuid))]
+      
+      ;; If we have an active subscription, stop it first
+      (when current-sub
+        (println "Stopping previous subscription:" (:sub-key current-sub))
+        (sente/push! [:live/unsubscribe {:sub-key (:sub-key current-sub)
+                                         :sub-type :live-graph}]))
+      
+      ;; Start new subscription
+      (println "Starting new subscription for:" invoke-id)
+      (sente/push! [:live/subscribe {:sub-key new-sub-key
+                                     :sub-type :live-graph
+                                     :params params}])
+      
+      ;; Store the active subscription
+      (state/dispatch [:db/set-value [:sente :active-subscription] 
+                       {:sub-key new-sub-key :params params}])
+      
+      ;; Update current invocation and clear old data
+      [[:current-invocation]
+       (constantly {:invoke-id invoke-id
+                   :module-id module-id
+                   :agent-name agent-name
+                   :graph {}
+                   :summary {}})])))
 
-(state/reg-event :live/stop
-  (fn [db {:keys [module-id agent-name invoke-id] :as data}]
-    (when (and module-id agent-name invoke-id)
-      (sente/live-stop! data))
-    nil))
-
-;; New subscription-based events with proper cleanup tracking
-(state/reg-event :live/subscribe-with-key
-  (fn [db {:keys [sub-key sub-type params] :as data}]
-    (println [[memory:5635510]] "Subscribing with key:" sub-key "type:" sub-type)
-    ;; Send subscription request to server
-    (sente/request! [:live/subscribe data] 5000
-                    (fn [reply]
-                      (when-not (:success reply)
-                        (println "Subscription failed:" reply))))
-    ;; Track active subscriptions in app-db for debugging
-    [[:sente :subscriptions sub-key] 
-     (constantly {:sub-type sub-type :params params})]))
-
-(state/reg-event :live/unsubscribe-with-key
-  (fn [db {:keys [sub-key sub-type] :as data}]
-    (println [[memory:5635510]] "Unsubscribing with key:" sub-key "type:" sub-type)
-    ;; Send unsubscribe request to server
-    (sente/request! [:live/unsubscribe data] 3000
-                    (fn [reply]
-                      (when-not (:success reply)
-                        (println "Unsubscribe failed:" reply))))
-    ;; Remove from app-db tracking
-    [[:sente :subscriptions]
-     #(dissoc % sub-key)]))
+;; Clean up on app shutdown/navigation away
+(state/reg-event :invocation/stop-live
+  (fn [db]
+    (let [current-sub (get-in db [:sente :active-subscription])]
+      (when current-sub
+        (println "Stopping subscription:" (:sub-key current-sub))
+        (sente/push! [:live/unsubscribe {:sub-key (:sub-key current-sub)
+                                         :sub-type :live-graph}]))
+      [[:sente :active-subscription] (constantly nil)])))
 
 
