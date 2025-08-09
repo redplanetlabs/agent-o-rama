@@ -27,21 +27,35 @@
         module-id (or module-id module-id)
         agent-name (or agent-name p-agent-name)
         invoke-id (or invoke-id p-invoke-id)
-
+        
+        ;; Generate a unique key for THIS component instance
+        [subscription-key] (uix/use-state (str (random-uuid)))
         nodes (state/use-sub [:current-invocation :graph :nodes])]
 
-    ;; Initialize current invocation context only; polling managed in state event
+    ;; Manage subscription lifecycle with proper cleanup
     (uix/use-effect
      (fn []
        (when (and module-id agent-name invoke-id)
+         ;; Set current invocation in app-db
          (state/dispatch [:invocation/set-current
                           {:module-id module-id
                            :agent-name agent-name
-                           :invoke-id invoke-id}]))
-       (constantly nil))
-     #js [module-id agent-name invoke-id])
-
-    ;; No start/stop here; handled by :invocation/set-current in state.cljs
+                           :invoke-id invoke-id}])
+         
+         ;; Subscribe to live updates with unique key
+         (state/dispatch [:live/subscribe-with-key
+                          {:sub-key subscription-key
+                           :sub-type :live-graph
+                           :params {:module-id module-id
+                                   :agent-name agent-name
+                                   :invoke-id invoke-id}}])
+         
+         ;; Return cleanup function - React calls this when component unmounts
+         (fn []
+           (state/dispatch [:live/unsubscribe-with-key
+                            {:sub-key subscription-key
+                             :sub-type :live-graph}]))))
+     #js [module-id agent-name invoke-id subscription-key])
 
     ($ :div
        ($ :div.flex.items-center.justify-between.mb-3

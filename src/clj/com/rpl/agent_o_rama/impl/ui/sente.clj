@@ -94,53 +94,104 @@
   (handle-api-event ev-msg))
 
 ;; =============================================================================
-;; LIVE GRAPH POLLING via Sente
+;; ROBUST SUBSCRIPTION MANAGEMENT
 ;; =============================================================================
 
-(defonce live-pollers (atom {}))
-;; Structure: {uid { [module-id agent-name invoke-id] {:stop? atom<boolean>}}}
+;; The single source of truth for all client subscriptions on the server.
+;; Structure: {
+;;   :live-graph #{ {:uid "..." :module-id "..." :agent-name "..." :invoke-id "..."} ... },
+;;   :token-stream #{ {:uid "..." :stream-key "..."} ... },
+;;   :human-input-waiter #{ {:uid "..." :invoke-id "..."} ... }
+;; }
+(defonce subscriptions (atom {}))
 
-(defn- poll-once-and-push!
-  [uid {:keys [module-id agent-name invoke-id]}]
-  (try
-    (when-let [nodes-map (agents/current-invocation-invokes-map module-id agent-name invoke-id)]
-      ;; Push a merge of all nodes at once to minimize client work
-      (chsk-send! uid [:graph/nodes-merge {:invoke-id invoke-id :nodes nodes-map}]))
-    (catch Exception e
-      (log/error e "Error during live graph poll" {:uid uid :invoke-id invoke-id}))))
+;; Track subscriptions per uid/sub-key for proper cleanup
+;; Structure: {uid {sub-key {:sub-type ... :params ...}}}
+(defonce client-subscriptions (atom {}))
 
-(defn- start-live-poller!
-  [uid {:keys [module-id agent-name invoke-id interval-ms] :as params}]
-  (let [interval (long (or interval-ms 1000))
-        key [module-id agent-name invoke-id]
-        stop? (atom false)]
-    (swap! live-pollers assoc-in [uid key] {:stop? stop?})
+(defn subscribe!
+  "Add a subscription to the registry"
+  [uid sub-type params]
+  (let [subscription-data (assoc params :uid uid)]
+    (swap! subscriptions update sub-type (fnil conj #{}) subscription-data)
+    (log/info "Client subscribed:" {:uid uid :type sub-type :params params})))
+
+(defn unsubscribe!
+  "Remove a subscription from the registry"
+  [uid sub-type params]
+  (let [subscription-data (assoc params :uid uid)]
+    (swap! subscriptions update sub-type disj subscription-data)
+    (log/info "Client unsubscribed:" {:uid uid :type sub-type :params params})))
+
+;; =============================================================================
+;; MASTER POLLING LOOP - Single loop services all subscriptions
+;; =============================================================================
+
+(defonce master-poller (atom nil))
+
+(defn stop-master-poller! []
+  (when-let [stop-fn @master-poller]
+    (stop-fn)
+    (log/info "Master poller stopped")))
+
+(defn start-master-poller! []
+  (stop-master-poller!)
+  (let [stop? (atom false)]
+    (reset! master-poller (fn [] (reset! stop? true)))
+    (log/info "Starting master poller")
     (future
       (loop []
         (when-not @stop?
-          (poll-once-and-push! uid params)
-          (Thread/sleep interval)
-          (recur))))))
+          (try
+            ;; Process live-graph subscriptions
+            (let [graph-subs (get @subscriptions :live-graph)]
+              (doseq [sub graph-subs]
+                (let [{:keys [uid module-id agent-name invoke-id]} sub]
+                  (try
+                    (when-let [nodes-map (agents/current-invocation-invokes-map module-id agent-name invoke-id)]
+                      ;; Push a merge of all nodes at once to minimize client work
+                      (chsk-send! uid [:graph/nodes-merge {:invoke-id invoke-id :nodes nodes-map}]))
+                    (catch Exception e
+                      (log/error e "Error polling for subscription" sub))))))
+            
+            ;; TODO: Add similar logic here for :token-stream subscriptions
+            ;; TODO: Add similar logic here for :human-input-waiter subscriptions
+            
+            (catch Exception e
+              (log/error e "Error in master poller loop")))
+          
+          (Thread/sleep 1000) ; Poll interval
+          (recur))))
+    (log/info "Master poller started")))
 
-(defn- stop-live-poller!
-  [uid {:keys [module-id agent-name invoke-id]}]
-  (let [key [module-id agent-name invoke-id]
-        entry (get-in @live-pollers [uid key])]
-    (when entry
-      (reset! (:stop? entry) true)
-      (swap! live-pollers update uid dissoc key))))
+;; =============================================================================
+;; SUBSCRIPTION EVENT HANDLERS
+;; =============================================================================
 
-(defmethod -event-msg-handler :agent/live-graph-start
+(defmethod -event-msg-handler :live/subscribe
   [{:as ev-msg :keys [?data uid ?reply-fn]}]
-  (start-live-poller! uid ?data)
-  (when ?reply-fn
-    (?reply-fn {:success true :data {:started true}})))
+  (let [{:keys [sub-key sub-type params]} ?data]
+    (log/info "Subscription request:" {:uid uid :sub-key sub-key :sub-type sub-type})
+    ;; Track this subscription for this client
+    (swap! client-subscriptions assoc-in [uid sub-key] {:sub-type sub-type :params params})
+    ;; Add to master subscription registry
+    (subscribe! uid sub-type params)
+    (when ?reply-fn
+      (?reply-fn {:success true :data {:subscribed true}}))))
 
-(defmethod -event-msg-handler :agent/live-graph-stop
+(defmethod -event-msg-handler :live/unsubscribe
   [{:as ev-msg :keys [?data uid ?reply-fn]}]
-  (stop-live-poller! uid ?data)
-  (when ?reply-fn
-    (?reply-fn {:success true :data {:stopped true}})))
+  (let [{:keys [sub-key sub-type]} ?data
+        subscription (get-in @client-subscriptions [uid sub-key])]
+    (log/info "Unsubscribe request:" {:uid uid :sub-key sub-key :sub-type sub-type})
+    (when subscription
+      (let [{:keys [params]} subscription]
+        ;; Remove from client tracking
+        (swap! client-subscriptions update uid dissoc sub-key)
+        ;; Remove from master subscription registry
+        (unsubscribe! uid sub-type params)))
+    (when ?reply-fn
+      (?reply-fn {:success true :data {:unsubscribed true}}))))
 
 ;; Handler for client connecting/disconnecting
 (defmethod -event-msg-handler :chsk/uidport-open
@@ -149,23 +200,24 @@
 
 (defmethod -event-msg-handler :chsk/uidport-close
   [{:as ev-msg :keys [uid]}]
-  (log/info (str "Sente client disconnected, uid: " uid))
-  ;; Stop any live pollers tied to this uid
-  (when-let [entries (get @live-pollers uid)]
-    (doseq [[k {:keys [stop?]}] entries]
-      (when stop?
-        (reset! stop? true)))
-    (swap! live-pollers dissoc uid)))
+  (log/info (str "Sente client disconnected, cleaning up subscriptions for uid: " uid))
+  ;; Clean up all subscriptions for this client
+  (when-let [client-subs (get @client-subscriptions uid)]
+    (doseq [[sub-key {:keys [sub-type params]}] client-subs]
+      (unsubscribe! uid sub-type params))
+    (swap! client-subscriptions dissoc uid)))
 
 ;; 4. Router lifecycle functions
 (defonce router_ (atom nil))
 
 (defn stop-sente! []
   (when-let [stop-fn @router_]
-    (stop-fn)))
+    (stop-fn))
+  (stop-master-poller!))
 
 (defn start-sente! []
   (stop-sente!)
   (reset! router_
           (sente/start-server-chsk-router!
-           ch-chsk event-msg-handler)))
+           ch-chsk event-msg-handler))
+  (start-master-poller!))

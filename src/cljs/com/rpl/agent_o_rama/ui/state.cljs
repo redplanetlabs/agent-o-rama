@@ -119,19 +119,14 @@
 ;; Current Invocation Events
 (reg-event :invocation/set-current
   (fn [db {:keys [invoke-id module-id agent-name]}]
-    (let [prev (get-in db [:sente :live :active])
-          new  {:invoke-id invoke-id :module-id module-id :agent-name agent-name}]
-      (when (and prev (not= prev new))
-        (dispatch [:live/stop prev]))
-      (when (and new (seq new) (not= prev new))
-        (dispatch [:live/start (assoc new :interval-ms 1000)]))
-      (dispatch [:db/set-value [:sente :live :active] new])
-      [[:current-invocation]
-       (constantly {:invoke-id invoke-id
-                    :module-id module-id
-                    :agent-name agent-name
-                    :graph {}
-                    :summary {}})])))
+    ;; Simply set the current invocation context
+    ;; Subscription management is now handled by components with proper cleanup
+    [[:current-invocation]
+     (constantly {:invoke-id invoke-id
+                  :module-id module-id
+                  :agent-name agent-name
+                  :graph {}
+                  :summary {}})]))
 
 (reg-event :invocation/load-graph-success
   (fn [db graph-data]
