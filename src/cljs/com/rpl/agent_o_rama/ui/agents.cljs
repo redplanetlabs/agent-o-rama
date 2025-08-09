@@ -1,6 +1,6 @@
 (ns com.rpl.agent-o-rama.ui.agents
   (:require
-   [com.rpl.agent-o-rama.ui.invocation-graph :as invocation-graph]
+   [com.rpl.agent-o-rama.ui.invocation-graph-live :as invocation-graph-live]
    [com.rpl.agent-o-rama.ui.agent-graph :as agent-graph]
    
    [uix.core :as uix :refer [defui defhook $]]
@@ -392,8 +392,8 @@
        
        ;; Graph content
        ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
-          ($ invocation-graph/graph {:module-id module-id
-                                     :agent-name agent-name
-                                     :invoke-id invoke-id})))))
+          ($ invocation-graph-live/graph {:module-id module-id
+                                          :agent-name agent-name
+                                          :invoke-id invoke-id})))))
 
 

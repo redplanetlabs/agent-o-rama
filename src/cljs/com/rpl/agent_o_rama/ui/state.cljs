@@ -119,12 +119,19 @@
 ;; Current Invocation Events
 (reg-event :invocation/set-current
   (fn [db {:keys [invoke-id module-id agent-name]}]
-    [[:current-invocation] 
-     (constantly {:invoke-id invoke-id
-                  :module-id module-id
-                  :agent-name agent-name
-                  :graph {}
-                  :summary {}})]))
+    (let [prev (get-in db [:sente :live :active])
+          new  {:invoke-id invoke-id :module-id module-id :agent-name agent-name}]
+      (when (and prev (not= prev new))
+        (dispatch [:live/stop prev]))
+      (when (and new (seq new) (not= prev new))
+        (dispatch [:live/start (assoc new :interval-ms 1000)]))
+      (dispatch [:db/set-value [:sente :live :active] new])
+      [[:current-invocation]
+       (constantly {:invoke-id invoke-id
+                    :module-id module-id
+                    :agent-name agent-name
+                    :graph {}
+                    :summary {}})])))
 
 (reg-event :invocation/load-graph-success
   (fn [db graph-data]
@@ -136,7 +143,9 @@
 
 (reg-event :invocation/update-node
   (fn [db node-id node-data]
-    [[:current-invocation :graph :nodes node-id] (constantly node-data)]))
+    [[:current-invocation :graph :nodes]
+     (fn [nodes]
+       (assoc (or nodes {}) node-id node-data))]))
 
 ;; Generic state update events
 ;; Usage: (dispatch [:db/set-value [:some :path] value])
@@ -212,10 +221,3 @@
   ([specter-path]
    (js/console.log "Value at path" specter-path ":" 
                    (clj->js (s/select-one specter-path @app-db)))))
-
-;; Development helpers - expose globally for REPL access
-(when ^boolean goog.DEBUG
-  (set! js/window.appDb app-db)
-  (set! js/window.dispatch dispatch)
-  (set! js/window.debugState debug-state)
-  (set! js/window.resetDb reset-db!))

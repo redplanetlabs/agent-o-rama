@@ -35,6 +35,28 @@
 (defmethod -event-msg-handler :example/hello-response [{:as ev-msg :keys [?data]}]
   (.log js/console "Server replied to hello:" ?data))
 
+;; Live graph and run lifecycle updates
+(defmethod -event-msg-handler :graph/node-update [{:as ev-msg :keys [?data]}]
+  (let [{:keys [node-id node-data]} ?data]
+    (when node-id
+      (state/dispatch [:invocation/update-node node-id node-data]))))
+
+(defmethod -event-msg-handler :agent/run-started [{:as ev-msg :keys [?data]}]
+  (println "agent run started" ?data))
+
+(defmethod -event-msg-handler :agent/run-complete [{:as ev-msg :keys [?data]}]
+  (println "agent run complete" ?data))
+
+(defmethod -event-msg-handler :agent/run-failed [{:as ev-msg :keys [?data]}]
+  (println "agent run failed" ?data))
+
+;; Batch/merge of nodes from server polling
+(defmethod -event-msg-handler :graph/nodes-merge [{:as ev-msg :keys [?data]}]
+  (let [{:keys [invoke-id nodes]} ?data]
+    (when (map? nodes)
+      (doseq [[node-id node-data] nodes]
+        (state/dispatch [:invocation/update-node node-id node-data])))))
+
 ;; Handler to log connection state changes
 (defmethod -event-msg-handler :chsk/state [{:as ev-msg :keys [?data]}]
   (let [[old-state new-state] ?data
@@ -82,3 +104,20 @@
   "Send a one-way message to the server (no response expected)."
   [event-vec]
   (chsk-send! event-vec))
+
+;; =============================================================================
+;; LIVE CONTROL (decoupled from React components)
+;; =============================================================================
+
+(defn live-start! [{:keys [module-id agent-name invoke-id interval-ms] :as opts}]
+  (request! [:agent/live-graph-start
+             {:module-id module-id
+              :agent-name agent-name
+              :invoke-id invoke-id
+              :interval-ms (or interval-ms 1000)}] 5000 nil))
+
+(defn live-stop! [{:keys [module-id agent-name invoke-id] :as opts}]
+  (request! [:agent/live-graph-stop
+             {:module-id module-id
+              :agent-name agent-name
+              :invoke-id invoke-id}] 3000 nil))

@@ -93,6 +93,55 @@
   [ev-msg]
   (handle-api-event ev-msg))
 
+;; =============================================================================
+;; LIVE GRAPH POLLING via Sente
+;; =============================================================================
+
+(defonce live-pollers (atom {}))
+;; Structure: {uid { [module-id agent-name invoke-id] {:stop? atom<boolean>}}}
+
+(defn- poll-once-and-push!
+  [uid {:keys [module-id agent-name invoke-id]}]
+  (try
+    (when-let [nodes-map (agents/current-invocation-invokes-map module-id agent-name invoke-id)]
+      ;; Push a merge of all nodes at once to minimize client work
+      (chsk-send! uid [:graph/nodes-merge {:invoke-id invoke-id :nodes nodes-map}]))
+    (catch Exception e
+      (log/error e "Error during live graph poll" {:uid uid :invoke-id invoke-id}))))
+
+(defn- start-live-poller!
+  [uid {:keys [module-id agent-name invoke-id interval-ms] :as params}]
+  (let [interval (long (or interval-ms 1000))
+        key [module-id agent-name invoke-id]
+        stop? (atom false)]
+    (swap! live-pollers assoc-in [uid key] {:stop? stop?})
+    (future
+      (loop []
+        (when-not @stop?
+          (poll-once-and-push! uid params)
+          (Thread/sleep interval)
+          (recur))))))
+
+(defn- stop-live-poller!
+  [uid {:keys [module-id agent-name invoke-id]}]
+  (let [key [module-id agent-name invoke-id]
+        entry (get-in @live-pollers [uid key])]
+    (when entry
+      (reset! (:stop? entry) true)
+      (swap! live-pollers update uid dissoc key))))
+
+(defmethod -event-msg-handler :agent/live-graph-start
+  [{:as ev-msg :keys [?data uid ?reply-fn]}]
+  (start-live-poller! uid ?data)
+  (when ?reply-fn
+    (?reply-fn {:success true :data {:started true}})))
+
+(defmethod -event-msg-handler :agent/live-graph-stop
+  [{:as ev-msg :keys [?data uid ?reply-fn]}]
+  (stop-live-poller! uid ?data)
+  (when ?reply-fn
+    (?reply-fn {:success true :data {:stopped true}})))
+
 ;; Handler for client connecting/disconnecting
 (defmethod -event-msg-handler :chsk/uidport-open
   [{:as ev-msg :keys [uid]}]
@@ -100,7 +149,13 @@
 
 (defmethod -event-msg-handler :chsk/uidport-close
   [{:as ev-msg :keys [uid]}]
-  (log/info (str "Sente client disconnected, uid: " uid)))
+  (log/info (str "Sente client disconnected, uid: " uid))
+  ;; Stop any live pollers tied to this uid
+  (when-let [entries (get @live-pollers uid)]
+    (doseq [[k {:keys [stop?]}] entries]
+      (when stop?
+        (reset! stop? true)))
+    (swap! live-pollers dissoc uid)))
 
 ;; 4. Router lifecycle functions
 (defonce router_ (atom nil))
