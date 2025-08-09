@@ -216,3 +216,11 @@
   {:graph (foreign-invoke-query
            (:current-graph-query
             (objects module-id agent-name)))})
+
+(defmethod api-handler :api/run-agent
+  [_ {:keys [module-id agent-name args]} uid]
+  (when-not (vector? args)
+    (throw (ex-info "must be a json list of args" {:bad-args args})))
+  (let [^AgentInvoke inv (apply aor/agent-initiate (get-client module-id agent-name) args)]
+    {:task-id (.getTaskId inv)
+     :invoke-id (.getAgentInvokeId inv)}))

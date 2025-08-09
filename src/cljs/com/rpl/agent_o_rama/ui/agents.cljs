@@ -4,10 +4,7 @@
    [com.rpl.agent-o-rama.ui.agent-graph :as agent-graph]
    
    [uix.core :as uix :refer [defui defhook $]]
-   ["axios" :as axios]
    ["wouter" :as wouter :refer [useLocation]]
-
-
    
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
@@ -300,33 +297,39 @@
 
 (defui manual-run [{:keys [module-id agent-name]}]
   (let [[args set-args] (uix/use-state "")
-        [result set-result] (uix/use-state nil)
+        [loading? set-loading] (uix/use-state false)
         [error-msg set-error-msg] (uix/use-state nil)
         [location navigate] (useLocation)
-        
-        run-agent (common/use-mutation 
-                   {:mutation-fn (fn [variables]
-                                   (let [parsed-args (try
-                                                       (js/JSON.parse variables)
-                                                       (catch js/Error e
-                                                         (throw (js/Error. "Invalid JSON format"))))]
-                                     (common/post (str "/api/agents/" module-id "/" agent-name "/invocations")
-                                                  {:args parsed-args})))
-                    :on-success (fn [data]
-                                  (set-error-msg nil)
-                                  ;; Navigate to the trace instead of showing result
-                                  (let [trace-url (str "/agents/" module-id "/" agent-name "/invocations/" 
-                                                       (:task-id data) "-" (:invoke-id data))]
-                                    (navigate trace-url)))
-                    :on-error (fn [error]
-                                (set-error-msg (str "Error: " (or (.-message error) "Unknown error")))
-                                (set-result nil))})
         
         handle-submit (fn [e]
                         (.preventDefault e)
                         (set-error-msg nil)
-                        (set-result nil)
-                        ((:mutate run-agent) args))]
+                        (set-loading true)
+                        
+                        ;; Parse JSON arguments
+                        (let [parsed-args (try
+                                           (js->clj (js/JSON.parse args))
+                                           (catch js/Error e
+                                             nil))]
+                          (if parsed-args
+                            ;; Make Sente request
+                            (sente/request! 
+                             [:api/run-agent {:module-id module-id
+                                            :agent-name agent-name
+                                            :args parsed-args}]
+                             5000
+                             (fn [reply]
+                               (set-loading false)
+                               (if (:success reply)
+                                 (let [data (:data reply)
+                                       trace-url (str "/agents/" module-id "/" agent-name "/invocations/" 
+                                                     (:task-id data) "-" (:invoke-id data))]
+                                   (navigate trace-url))
+                                 (set-error-msg (str "Error: " (or (:error reply) "Unknown error"))))))
+                            ;; Invalid JSON
+                            (do
+                              (set-loading false)
+                              (set-error-msg "Error: Invalid JSON format")))))]
     
     ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6
        ($ :form {:onSubmit handle-submit}
@@ -337,14 +340,14 @@
                  :value args
                  :onChange #(set-args (.. % -target -value))
                  :rows 3
-                 :disabled (:loading? run-agent)})
+                 :disabled loading?})
              ($ :button
                 {:type "submit"
-                 :disabled (:loading? run-agent)
-                 :className (if (:loading? run-agent)
+                 :disabled loading?
+                 :className (if loading?
                               "w-32 h-20 text-white px-4 rounded-md focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm font-semibold cursor-not-allowed transition-colors duration-150 bg-gray-400"
                               "w-32 h-20 text-white px-4 rounded-md focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm font-semibold cursor-pointer transition-colors duration-150 bg-blue-600 hover:bg-blue-700")}
-                (if (:loading? run-agent) "Running..." "Submit"))))
+                (if loading? "Running..." "Submit"))))
        
        ;; Show errors only (success navigates to trace)
        (when error-msg
