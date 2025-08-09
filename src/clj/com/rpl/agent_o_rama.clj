@@ -213,6 +213,10 @@
                                                     afn
                                                     options)))
 
+(defn declare-cluster-agent
+  [^AgentsTopology agents-topology local-name module-name agent-name]
+  (.declareClusterAgent agents-topology local-name module-name agent-name))
+
 (defn setup-object-name
   [^AgentObjectSetup setup]
   (.getObjectName setup))

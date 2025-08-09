@@ -99,7 +99,6 @@
                  (let [error (aor/agent-client agent-node "error")]
                    (aor/result! (aor/agent-invoke error))
                  ))))
-
           (->
             topology
             (aor/new-agent "all-methods")
@@ -384,6 +383,40 @@
       ))))
 
 (deftest mirror-subagent-test
-         ;; TODO: <<<<>>>>>
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module1
+       (aor/agentmodule
+        [topology]
+        (-> topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node v]
+               (aor/result! agent-node (inc v))
+             )))
+       ))
+     (bind module-name1 (get-module-name module1))
+     (bind module2
+       (aor/agentmodule
+        [topology]
+        (aor/declare-cluster-agent topology "foo2" module-name1 "foo")
+        (-> topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node v]
+               (let [foo2 (aor/agent-client agent-node "foo2")]
+                 (aor/result! agent-node (aor/agent-invoke foo2 (* 10 v))))
+             )))
+       ))
+     (bind module-name2 (get-module-name module2))
+     (rtest/launch-module! ipc module1 {:tasks 2 :threads 1})
+     (rtest/launch-module! ipc module2 {:tasks 4 :threads 2})
+     (bind agent-manager (aor/agent-manager ipc module-name2))
+     (bind foo (aor/agent-client agent-manager "foo"))
 
-)
+     (is (= 31 (aor/agent-invoke foo 3)))
+    )))
