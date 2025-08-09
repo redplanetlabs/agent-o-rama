@@ -12,7 +12,9 @@
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
-   [com.rpl.agent-o-rama.impl.types :as aor-types])
+   [com.rpl.agent-o-rama.impl.tools :as tools]
+   [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.rama.aggs :as aggs])
   (:import
    [com.rpl.agentorama
     AgentClient
@@ -299,8 +301,7 @@
   (.streamChunk agent-node chunk))
 
 (defn record-nested-op!
-  [agent-node nested-op-type start-time-millis finish-time-millis
-   info-map]
+  [agent-node nested-op-type start-time-millis finish-time-millis info-map]
   (anode/record-nested-op!-impl agent-node
                                 nested-op-type
                                 start-time-millis
@@ -716,3 +717,31 @@
 (defn stop-ui []
   (let [stop-fn (requiring-resolve 'com.rpl.agent-o-rama.impl.ui.core/stop-ui)]
     (stop-fn)))
+
+(defn tools-agent
+  ([topology name tools]
+   (tools-agent topology name tools nil))
+  ([topology name tools options]
+   ;; TODO: <<<<>>>> validate options and extract error-handler
+   (-> topology
+       (new-agent name)
+       (agg-start-node
+        "begin"
+        "tool"
+        (fn begin
+          ([agent-node requests]
+           (begin agent-node requests nil))
+          ([agent-node requests context]
+           (doseq [r requests]
+             (emit! agent-node r context)))))
+       (node
+        "tool"
+        "agg-results"
+        (tools/mk-tool-fn tools error-handler))
+       (agg-node
+        "agg-results"
+        nil
+        aggs/+vec-agg
+        (fn [agent-node agg-state _]
+          (aor/result! agent-node agg-state)))
+   )))
