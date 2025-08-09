@@ -57,3 +57,4 @@
       {:data (:data current-state)
        :loading? (= (:status current-state) :loading)
        :error (:error current-state)})))
+

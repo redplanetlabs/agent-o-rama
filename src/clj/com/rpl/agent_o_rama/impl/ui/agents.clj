@@ -206,10 +206,10 @@
 
 (defmethod api-handler :api/get-invocations
   [_ {:keys [module-id agent-name pagination]} uid]
-  (let [pagintation (if (empty? pagination) nil pagination)]
+  (let [pages (if (empty? pagination) nil pagination)]
     (filter-encodable (foreign-invoke-query
                        (:invokes-page-query (objects module-id agent-name))
-                       1 pagination))))
+                       1 pages))))
 
 (defmethod api-handler :api/get-graph
   [_ {:keys [module-id agent-name]} uid]
