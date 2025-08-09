@@ -1087,6 +1087,7 @@
    [$$root (po/agent-root-task-global *agent-name)
     $$root-count (po/agent-root-count-task-global *agent-name)
     $$nodes (po/agent-node-task-global *agent-name)
+    $$streaming (po/agent-streaming-results-task-global *agent-name)
     $$gc (po/agent-gc-invokes-task-global *agent-name)
     *gc-valid-depot (po/agent-gc-valid-invokes-depot-task-global *agent-name)]
    (anode/read-config *agent-name
@@ -1112,7 +1113,11 @@
                           (multi-path [:forks NONE>]
                                       [:human-requests NONE>])]
                          $$root)
-       ;; TODO: <<<<>>>> need to GC streaming PState here
+       (local-transform> [(keypath *agent-id)
+                          MAP-VALS
+                          (multi-path [:all NONE>]
+                                      [:invokes NONE>])]
+                         $$streaming)
        (|direct *agent-task-id)
        ;; rare possibility it ticks again while partitioning and tries to delete
        ;; same elements concurrently
@@ -1124,6 +1129,7 @@
                                     :append-ack))
          (local-transform> [(keypath *root-invoke-id) (termval nil)] $$gc)
          (local-transform> [(keypath *agent-id) NONE>] $$root)
+         (local-transform> [(keypath *agent-id) NONE>] $$streaming)
          (local-transform> (term dec) $$root-count))))
    (local-select> MAP-KEYS $$gc {:allow-yield? true} :> *invoke-id)
    (local-select> [(keypath *invoke-id)]
