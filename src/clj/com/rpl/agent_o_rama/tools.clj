@@ -51,14 +51,14 @@
 
 (defn error-handler-static-string-by-type
   [tuples]
-  (let [tuples (transform [(view vec) LAST] (fn [s] (constantly s)) tuples)]
+  (let [tuples (transform [(view vec) ALL LAST] (fn [s] (constantly s)) tuples)]
     (error-handler-by-type tuples)))
 
 (defn tools-agent
   ([topology name tools]
    (tools-agent topology name tools nil))
   ([topology name tools options]
-   (let [options (merge {:error-handler (fn [e] (throw e))}
+   (let [options (merge {:error-handler error-handler-default}
                         options)]
      (h/validate-options! name
                           options
