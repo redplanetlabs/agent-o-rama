@@ -207,10 +207,9 @@
 (defmethod api-handler :api/get-invocations
   [_ {:keys [module-id agent-name pagination]} uid]
   (let [pages (if (empty? pagination) nil pagination)]
-    (println "pages" pages)
     (filter-encodable (foreign-invoke-query
                        (:invokes-page-query (objects module-id agent-name))
-                       1 pages))))
+                       10 pages))))
 
 (defmethod api-handler :api/get-graph
   [_ {:keys [module-id agent-name]} uid]

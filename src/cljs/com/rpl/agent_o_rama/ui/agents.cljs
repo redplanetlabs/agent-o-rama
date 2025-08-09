@@ -102,6 +102,7 @@
         pagination-params (state/use-sub [:invocations :pagination-params])
         has-more? (state/use-sub [:invocations :has-more?])
         loading? (state/use-sub [:invocations :loading?])
+        connected? (state/use-sub [:sente :connected?])
         
         [location navigate] (useLocation)
         
@@ -130,14 +131,15 @@
                                                   {:pagination-params (when has-more? new-pagination)
                                                    :has-more? has-more?}]))))))
         
-        ;; Initial load - fetch first page when component mounts
+        ;; Initial load - fetch first page when connected
         _ (uix/use-effect
            (fn []
-             (println "🔄 Initial load for invocations")
-             (state/dispatch [:invocations/reset])
-             (fetch-invocations {} false)
+             (when connected?
+               (println "🔄 Initial load for invocations (connected)")
+               (state/dispatch [:invocations/reset])
+               (fetch-invocations {} false))
              (constantly nil))
-           [module-id agent-name])
+           [module-id agent-name connected?])
         
         load-more (fn []
                     (when (and has-more? (not loading?) pagination-params)
