@@ -441,7 +441,7 @@
                 ($ :div {:className "text-right"}
                    ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens)))))))))))
 
-(defui right-panel [{:keys [graph-data summary-data changed-nodes set-changed-nodes affected-nodes flow-nodes set-selected-node on-execute-fork on-clear-fork forking-mode? set-forking-mode? fork-loading? fork-error]}]
+(defui right-panel [{:keys [graph-data summary-data changed-nodes set-changed-nodes affected-nodes flow-nodes set-selected-node on-execute-fork on-clear-fork forking-mode? set-forking-mode? fork-loading? fork-error live-mode?]}]
   (let [[active-tab set-active-tab] (uix/use-state :info)]
     
     ;; Update forking mode when tab changes
@@ -460,12 +460,14 @@
                                            "text-gray-600 hover:text-gray-900"))
                          :onClick #(set-active-tab :info)}
                 "Info")
-             ($ :button {:className (str "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors "
-                                         (if (= active-tab :fork)
-                                           "bg-white text-gray-900 shadow-sm"
-                                           "text-gray-600 hover:text-gray-900"))
-                         :onClick #(set-active-tab :fork)}
-                (str "Fork" (when (> (count changed-nodes) 0) (str " (" (count changed-nodes) ")"))))))
+             ;; Only show Fork tab when not in live mode
+             (when-not live-mode?
+               ($ :button {:className (str "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors "
+                                           (if (= active-tab :fork)
+                                             "bg-white text-gray-900 shadow-sm"
+                                             "text-gray-600 hover:text-gray-900"))
+                           :onClick #(set-active-tab :fork)}
+                  (str "Fork" (when (> (count changed-nodes) 0) (str " (" (count changed-nodes) ")")))))))
        
        ;; Tab content
        ($ :div {:className "p-4 h-full overflow-y-auto"}
@@ -648,7 +650,7 @@
             #{}
             modified-node-ids)))
 
-(defui graph [{:keys [module-id agent-name invoke-id]}]
+(defui graph [{:keys [module-id agent-name invoke-id initial-data live-mode?]}]
   (let [[location set-location] (useLocation)
         [selected-node set-selected-node] (uix/use-state nil)
         [loading-nodes set-loading-nodes] (uix/use-state #{})
@@ -658,7 +660,7 @@
         [forking-mode? set-forking-mode?] (uix/use-state false)
         [implicit-edges set-implicit-edges] (uix/use-state []) ; State for implicit edges
         
-        ;; Fetch initial data
+        ;; Fetch initial data (skip if we have initial-data from live mode)
         initial-data-url (str "/api/agents/"
                               module-id
                               "/"
@@ -667,8 +669,11 @@
                               invoke-id
                               "/paginated")
         
-        {:keys [data loading?]} (common/use-query {:query-key ["invocation-graph" module-id agent-name invoke-id]
-                                                   :query-url initial-data-url})
+        ;; Only fetch if not in live mode or no initial data provided
+        {:keys [data loading?]} (if (and live-mode? initial-data)
+                                   {:data initial-data :loading? false}
+                                   (common/use-query {:query-key ["invocation-graph" module-id agent-name invoke-id]
+                                                     :query-url initial-data-url}))
         
         [changed-nodes set-changed-nodes] (uix/use-state {})
         
@@ -742,13 +747,15 @@
         handle-paginate-node
         (uix/use-callback
          (fn [missing-node-id]
-           ;; Find the task-id for this missing node from next-task-invoke-pairs
-           ;; Convert to string for comparison since JS numbers truncate longs
-           (let [[task-id _] (first (filter (fn [[a b]] (= (str b) (str missing-node-id))) next-task-invoke-pairs))]
-             (when-not (contains? loading-nodes missing-node-id)
-               (set-loading-nodes #(conj % missing-node-id))
-               ((:mutate pagination-mutation) (clj->js {:task-id task-id :missing-node-id missing-node-id})))))
-         [graph-data loading-nodes next-task-invoke-pairs initial-data-url pagination-mutation])
+           ;; Disable pagination in live mode
+           (when-not live-mode?
+             ;; Find the task-id for this missing node from next-task-invoke-pairs
+             ;; Convert to string for comparison since JS numbers truncate longs
+             (let [[task-id _] (first (filter (fn [[a b]] (= (str b) (str missing-node-id))) next-task-invoke-pairs))]
+               (when-not (contains? loading-nodes missing-node-id)
+                 (set-loading-nodes #(conj % missing-node-id))
+                 ((:mutate pagination-mutation) (clj->js {:task-id task-id :missing-node-id missing-node-id}))))))
+         [graph-data loading-nodes next-task-invoke-pairs initial-data-url pagination-mutation live-mode?])
         
         ;; Fork execution mutation
         fork-mutation (common/use-mutation
@@ -899,5 +906,6 @@
                          :forking-mode? forking-mode?
                          :set-forking-mode? set-forking-mode?
                          :fork-loading? (:loading? fork-mutation)
-                         :fork-error (:error fork-mutation)})))))
+                         :fork-error (:error fork-mutation)
+                         :live-mode? live-mode?})))))
 

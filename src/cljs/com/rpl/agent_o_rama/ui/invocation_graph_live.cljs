@@ -4,30 +4,32 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.events] ;; ensure side-effecting events are registered
+   [com.rpl.agent-o-rama.ui.invocation-graph :as ig] ;; Import the main graph component
    ["wouter" :as wouter :refer [useParams]]))
 
-(defui node-row [{:keys [node-id node-data]}]
-  ($ :div.flex.items-start.justify-between.py-2.border-b.border-gray-100
-     ($ :div
-        ($ :div.font-mono.text-xs.text-gray-500 (str node-id))
-        ($ :div.mt-1.text-sm.text-gray-800
-           (common/pp (dissoc node-data :chunks :stream)))))
-     ($ :div.ml-4.text-xs
-        (cond
-          (:failure? node-data) ($ :span.px-2.py-1.bg-red-100.text-red-700.rounded "Failed")
-          (:success? node-data) ($ :span.px-2.py-1.bg-green-100.text-green-700.rounded "Success")
-          :else ($ :span.px-2.py-1.bg-blue-100.text-blue-700.rounded "Running"))))
-
 (defui graph
-  "Minimal live invocation graph that reacts to server pushes.
-   Pure view component - subscription management happens in state layer."
+  "Live invocation graph that reacts to server pushes.
+   Reuses the main invocation-graph component with live data."
   [{:keys [module-id agent-name invoke-id]}]
-  (println "graph" module-id agent-name invoke-id)
+  (println "Live graph" module-id agent-name invoke-id)
   (let [;; Check if we're connected first
         connected? (state/use-sub [:sente :connected?])
         ;; Subscribe to the nodes for this specific invocation
         nodes (state/use-sub [:invocations-data invoke-id :graph :nodes])
-        current-invoke-id (state/use-sub [:current-invocation :invoke-id])]
+        current-invoke-id (state/use-sub [:current-invocation :invoke-id])
+        
+        ;; Convert nodes map to invokes-map format expected by the main graph
+        invokes-map (when nodes
+                      (into {} 
+                        (for [[node-id node-data] nodes]
+                          [node-id node-data])))
+        
+        ;; Create mock data structure that the main graph component expects
+        mock-data (when invokes-map
+                    {:invokes-map invokes-map
+                     :summary {:result nil} ;; Will be populated as nodes complete
+                     :implicit-edges []
+                     :next-task-invoke-pairs []})]
     
     ;; Effect for managing subscription
     (uix/use-effect
@@ -63,16 +65,24 @@
       ($ :div.flex.items-center.justify-center.p-8
          ($ :div.text-gray-500 "Connecting to server..."))
       
+      ;; Use the main graph component with live data
       ($ :div
-         ($ :div.flex.items-center.justify-between.mb-3
-            ($ :h3.text-lg.font-semibold.text-gray-700 "Live Invocation")
-            ($ :div.font-mono.text-xs.text-gray-500
-               (str (or invoke-id ""))))
-
-         (if (and nodes (seq nodes))
-           ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.divide-y.divide-gray-100
-              (for [[nid ndata] nodes]
-                ($ node-row {:key (str nid)
-                             :node-id nid
-                             :node-data ndata})))
-           ($ :div.text-gray-500 "Waiting for node updates..."))))))
+         ($ :div.mb-4.bg-blue-50.border.border-blue-200.rounded-lg.p-4
+            ($ :div.flex.items-center.justify-between
+               ($ :div.flex.items-center.gap-2
+                  ($ :div.h-3.w-3.bg-green-500.rounded-full.animate-pulse)
+                  ($ :span.text-sm.font-medium.text-blue-700 "Live Mode")
+                  ($ :span.text-sm.text-blue-600 
+                     (str "Viewing: " (or invoke-id "..."))))
+               ($ :div.text-xs.text-blue-500
+                  (str (count nodes) " nodes loaded"))))
+         
+         ;; Render the main graph component with our live data
+         (if mock-data
+           ($ ig/graph {:module-id module-id
+                       :agent-name agent-name
+                       :invoke-id invoke-id
+                       :initial-data mock-data
+                       :live-mode? true})
+           ($ :div.flex.items-center.justify-center.p-8
+              ($ :div.text-gray-500 "Waiting for nodes...")))))))
