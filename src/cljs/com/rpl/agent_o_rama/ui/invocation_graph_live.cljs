@@ -27,8 +27,7 @@
         nodes (state/use-sub [:invocations-data invoke-id :graph :nodes])
         current-invoke-id (state/use-sub [:current-invocation :invoke-id])]
     
-    ;; Super simple: just tell state what we want to view
-    ;; State layer handles all subscription lifecycle
+    ;; Single effect that manages subscription lifecycle
     (uix/use-effect
      (fn []
        (when (and module-id agent-name invoke-id)
@@ -38,7 +37,9 @@
                           {:module-id module-id
                            :agent-name agent-name
                            :invoke-id invoke-id}]))
-       ;; No cleanup - state manages everything
+       ;; Don't stop subscription on cleanup - let the state layer manage it
+       ;; The subscription will be stopped when switching to a different invocation
+       ;; or when the window/tab is closed
        nil)
      ;; Re-run when any of these change
      #js [module-id agent-name invoke-id])

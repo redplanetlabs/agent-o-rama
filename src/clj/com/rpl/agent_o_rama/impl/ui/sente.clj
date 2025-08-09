@@ -119,9 +119,13 @@
 (defn unsubscribe!
   "Remove a subscription from the registry"
   [uid sub-type params]
-  (let [subscription-data (assoc params :uid uid)]
+  (let [subscription-data (assoc params :uid uid)
+        before-count (count (get @subscriptions sub-type))]
     (swap! subscriptions update sub-type disj subscription-data)
-    (log/info "Client unsubscribed:" {:uid uid :type sub-type :params params})))
+    (let [after-count (count (get @subscriptions sub-type))]
+      (log/info "Client unsubscribed:" {:uid uid :type sub-type :params params
+                                        :before-count before-count :after-count after-count
+                                        :removed? (not= before-count after-count)}))))
 
 ;; =============================================================================
 ;; MASTER POLLING LOOP - Single loop services all subscriptions
@@ -171,9 +175,10 @@
 (defmethod -event-msg-handler :live/subscribe
   [{:as ev-msg :keys [?data uid ?reply-fn]}]
   (let [{:keys [sub-key sub-type params]} ?data]
-    (log/info "Subscription request:" {:uid uid :sub-key sub-key :sub-type sub-type})
+    (log/info "Subscription request:" {:uid uid :sub-key sub-key :sub-type sub-type :params params})
     ;; Track this subscription for this client
     (swap! client-subscriptions assoc-in [uid sub-key] {:sub-type sub-type :params params})
+    (log/info "Stored subscription. Current keys for uid" uid ":" (keys (get @client-subscriptions uid)))
     ;; Add to master subscription registry
     (subscribe! uid sub-type params)
     (when ?reply-fn
@@ -184,12 +189,15 @@
   (let [{:keys [sub-key sub-type]} ?data
         subscription (get-in @client-subscriptions [uid sub-key])]
     (log/info "Unsubscribe request:" {:uid uid :sub-key sub-key :sub-type sub-type})
-    (when subscription
+    (if subscription
       (let [{:keys [params]} subscription]
+        (log/info "Found subscription to remove:" {:sub-key sub-key :params params})
         ;; Remove from client tracking
         (swap! client-subscriptions update uid dissoc sub-key)
         ;; Remove from master subscription registry
-        (unsubscribe! uid sub-type params)))
+        (unsubscribe! uid sub-type params))
+      (log/warn "No subscription found for sub-key:" sub-key "uid:" uid 
+                "Available keys:" (keys (get @client-subscriptions uid))))
     (when ?reply-fn
       (?reply-fn {:success true :data {:unsubscribed true}}))))
 

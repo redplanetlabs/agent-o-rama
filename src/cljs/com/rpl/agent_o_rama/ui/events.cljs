@@ -22,6 +22,8 @@
           (when current-sub
             (let [prev-invoke-id (get-in current-sub [:params :invoke-id])]
               (println "Stopping previous subscription:" (:sub-key current-sub) "for invoke:" prev-invoke-id)
+              (println "Sending unsubscribe event with data:" {:sub-key (:sub-key current-sub)
+                                                               :sub-type :live-graph})
               (sente/push! [:live/unsubscribe {:sub-key (:sub-key current-sub)
                                               :sub-type :live-graph}])))
           
