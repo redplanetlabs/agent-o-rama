@@ -1,0 +1,32 @@
+the frontend refactor is not fully done though. i have many features left to port, particularly the most complex part of the app, the invocation_graph.cljs. i also need to keep in mind many new features. 
+ * i need to remove the many (20+) usestate's, and move them into app-db
+* i need to handle streaming in new node invokes as they appear.
+ * i need to handle streaming in tokens form the backend.
+* i need to handle when the model hits a new human in the loop event, and present that to the user. 
+
+like consider the loop in (defn run-research-agent
+  []
+  (with-open [ipc (rtest/create-ipc)
+              ui (aor/start-ui ipc)]
+    (rtest/launch-module! ipc ResearchAgentModule {:tasks 4 :threads 2})
+    (let [module-name   (get-module-name ResearchAgentModule)
+          agent-manager (aor/agent-manager ipc module-name)
+          researcher    (aor/agent-client agent-manager "researcher")
+          _ (print "Enter a topic: ")
+          _ (flush)
+          topic         (read-line)
+          inv           (aor/agent-initiate researcher "" {:topic topic})]
+      (println)
+      (loop [step (aor/agent-next-step researcher inv)]
+        (if (instance? HumanInputRequest step)
+          (do
+            (println (:prompt step))
+            (print ">> ")
+            (flush)
+            (aor/provide-human-input researcher step (read-line))
+            (println)
+            (recur (aor/agent-next-step researcher inv)))
+          (println (:result step))))
+    )))
+
+i need this loop to exist somewhere and send websocket data back to my frontend, right? 
