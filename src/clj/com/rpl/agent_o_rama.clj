@@ -41,6 +41,8 @@
    [com.rpl.rama.ops
     RamaAccumulatorAgg
     RamaCombinerAgg]
+   [dev.langchain4j.agent.tool
+    ToolSpecification]
    [java.util.concurrent
     CompletableFuture]
    [rpl.rama.generated
@@ -706,40 +708,52 @@
   (let [stop-fn (requiring-resolve 'com.rpl.agent-o-rama.impl.ui.core/stop-ui)]
     (stop-fn)))
 
-; (defn tool-info
-;   ([tool-specification tool-fn]
-;    (tool-info tool-specification tool-fn nil))
-;   ([tool-specification tool-fn options]
-;    ;; TODO: <<<<>>>> validate options
-;    (...aor-types/->ToolInfo tool-specification
-;                             tool-fn
-;                             (:include-context? options))
-;   ))
+(defn tool-info
+  ([tool-specification tool-fn]
+   (tool-info tool-specification tool-fn nil))
+  ([tool-specification tool-fn options]
+   (let [options (merge {:include-context? false} options)]
+     (h/validate-options! tool-specification
+                          options
+                          {:include-context? h/boolean-spec})
+     (when-not (ifn? tool-fn)
+       (throw (h/ex-info "Invalid tool function" {:type (class tool-fn)})))
+     (when-not (instance? ToolSpecification tool-specification)
+       (throw (h/ex-info "Invalid tool specification"
+                         {:type (class tool-specification)})))
+     (aor-types/->ToolInfo tool-specification
+                           tool-fn
+                           (:include-context? options))
+   )))
 
 (defn tools-agent
   ([topology name tools]
    (tools-agent topology name tools nil))
   ([topology name tools options]
-   ;; TODO: <<<<>>>> validate options and extract error-handler
-   (-> topology
-       (new-agent name)
-       (agg-start-node
-        "begin"
-        "tool"
-        (fn begin
-          ([agent-node requests]
-           (begin agent-node requests nil))
-          ([agent-node requests caller-data]
-           (doseq [r requests]
-             (emit! agent-node r caller-data)))))
-       (node
-        "tool"
-        "agg-results"
-        (tools/mk-tool-fn tools error-handler))
-       (agg-node
-        "agg-results"
-        nil
-        aggs/+vec-agg
-        (fn [agent-node agg-state _]
-          (result! agent-node agg-state)))
-   )))
+   (let [options (merge {:error-handler (fn [e] (throw e))}
+                        options)]
+     (h/validate-options! name
+                          options
+                          {:error-handler h/fn-spec})
+     (-> topology
+         (new-agent name)
+         (agg-start-node
+          "begin"
+          "tool"
+          (fn begin
+            ([agent-node requests]
+             (begin agent-node requests nil))
+            ([agent-node requests caller-data]
+             (doseq [r requests]
+               (emit! agent-node r caller-data)))))
+         (node
+          "tool"
+          "agg-results"
+          (tools/mk-tool-fn tools (:error-handler options)))
+         (agg-node
+          "agg-results"
+          nil
+          aggs/+vec-agg
+          (fn [agent-node agg-state _]
+            (result! agent-node agg-state)))
+     ))))

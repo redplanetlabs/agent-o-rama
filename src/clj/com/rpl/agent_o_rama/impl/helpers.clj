@@ -233,3 +233,8 @@
   [v]
   (when-not (boolean? v)
     "value must be boolean"))
+
+(defn fn-spec
+  [v]
+  (when-not (ifn? v)
+    "value must be a function"))

@@ -15,6 +15,8 @@
     NippyMap]
    [com.rpl.rama.integration
     TaskGlobalObject]
+   [dev.langchain4j.agent.tool
+    ToolSpecification]
    [java.util
     UUID]
    [java.util.concurrent
@@ -224,6 +226,11 @@
    pstate-name :- String
    path :- s/Any
    key :- s/Any])
+
+(drp/defrecord+ ToolInfo
+  [tool-specification :- ToolSpecification
+   tool-fn :- clojure.lang.IFn
+   include-context? :- Boolean])
 
 (defprotocol AgentsTopologyInternal
   (declare-agent-object-builder-internal [this name afn options]))
