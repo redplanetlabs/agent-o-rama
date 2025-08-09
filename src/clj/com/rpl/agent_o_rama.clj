@@ -2,7 +2,6 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
-   [clojure.set :as set]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.core :as i]
@@ -148,26 +147,15 @@
                            {:actual-type (class afn)})))
        (when (contains? @declared-objects-vol name)
          (throw (h/ex-info "Object already declared" {:name name})))
-       (let [invalid-opts (set/difference (-> options
-                                              keys
-                                              set)
-                                          #{:thread-safe?
-                                            :auto-tracing?
-                                            :worker-object-limit})
-             full-options (merge {:thread-safe?        false
+       (let [full-options (merge {:thread-safe?        false
                                   :auto-tracing?       true
                                   :worker-object-limit 1000}
                                  options)]
-         (when-not (empty? invalid-opts)
-           (throw (h/ex-info "Invalid agent object options"
-                             {:name name :invalid-keys invalid-opts})))
-         (h/validate-option! name full-options :thread-safe? boolean?)
-         (h/validate-option! name full-options :auto-tracing? boolean?)
-         (h/validate-option! name
-                             full-options
-                             :worker-object-limit
-                             integer?
-                             pos?)
+         (h/validate-options! name
+                              full-options
+                              {:thread-safe?        h/boolean-spec
+                               :auto-tracing?       h/boolean-spec
+                               :worker-object-limit h/positive-number-spec})
          (vswap! declared-objects-vol
                  assoc
                  name
@@ -718,6 +706,16 @@
   (let [stop-fn (requiring-resolve 'com.rpl.agent-o-rama.impl.ui.core/stop-ui)]
     (stop-fn)))
 
+; (defn tool-info
+;   ([tool-specification tool-fn]
+;    (tool-info tool-specification tool-fn nil))
+;   ([tool-specification tool-fn options]
+;    ;; TODO: <<<<>>>> validate options
+;    (...aor-types/->ToolInfo tool-specification
+;                             tool-fn
+;                             (:include-context? options))
+;   ))
+
 (defn tools-agent
   ([topology name tools]
    (tools-agent topology name tools nil))
@@ -731,9 +729,9 @@
         (fn begin
           ([agent-node requests]
            (begin agent-node requests nil))
-          ([agent-node requests context]
+          ([agent-node requests caller-data]
            (doseq [r requests]
-             (emit! agent-node r context)))))
+             (emit! agent-node r caller-data)))))
        (node
         "tool"
         "agg-results"
@@ -743,5 +741,5 @@
         nil
         aggs/+vec-agg
         (fn [agent-node agg-state _]
-          (aor/result! agent-node agg-state)))
+          (result! agent-node agg-state)))
    )))
