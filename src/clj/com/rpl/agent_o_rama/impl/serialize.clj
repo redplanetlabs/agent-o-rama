@@ -19,8 +19,6 @@
     UserMessage]
    [dev.langchain4j.data.segment
     TextSegment]
-   [dev.langchain4j.model.chat.request
-    ChatRequest]
    [dev.langchain4j.model.chat.response
     ChatResponse]
    [dev.langchain4j.model.output
