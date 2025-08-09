@@ -100,68 +100,57 @@
         ;; Subscribe to invocations state from app-db
         all-invokes (state/use-sub [:invocations :all-invokes])
         pagination-params (state/use-sub [:invocations :pagination-params])
-        next-pagination-params (state/use-sub [:invocations :next-pagination-params])
         has-more? (state/use-sub [:invocations :has-more?])
-        
-        ;; For query key, use first task-id and first item-id from pagination
-        ;; This avoids stringifying the whole map
-        [first-task-id first-item-id] (first pagination-params)
-        
-        ;; Use Sente query with cleaner query key
-        {:keys [data loading? error]}
-        (queries/use-sente-query {:query-key [:invocations module-id agent-name first-task-id first-item-id]
-                                  :sente-event [:api/get-invocations {:module-id module-id
-                                                                      :agent-name agent-name
-                                                                      :pagination pagination-params}]})
+        loading? (state/use-sub [:invocations :loading?])
         
         [location navigate] (useLocation)
         
-        ;; Reset invocations when component mounts or route changes
+        ;; Fetch function that handles the entire flow
+        fetch-invocations (fn [pagination append?]
+                           (state/dispatch [:invocations/set-loading true])
+                           (sente/request! 
+                            [:api/get-invocations {:module-id module-id
+                                                  :agent-name agent-name
+                                                  :pagination pagination}]
+                            5000
+                            (fn [reply]
+                              (state/dispatch [:invocations/set-loading false])
+                              (when (:success reply)
+                                (let [data (:data reply)
+                                      new-invokes (:agent-invokes data)
+                                      new-pagination (:pagination-params data)
+                                      has-more? (and new-pagination 
+                                                    (not (empty? new-pagination))
+                                                    (some (fn [[_ item-id]] (not (nil? item-id))) 
+                                                          new-pagination))]
+                                  (if append?
+                                    (state/dispatch [:invocations/append new-invokes])
+                                    (state/dispatch [:db/set-value [:invocations :all-invokes] new-invokes]))
+                                  (state/dispatch [:invocations/set-pagination 
+                                                  {:pagination-params (when has-more? new-pagination)
+                                                   :has-more? has-more?}]))))))
+        
+        ;; Initial load - fetch first page when component mounts
         _ (uix/use-effect
            (fn []
+             (println "🔄 Initial load for invocations")
              (state/dispatch [:invocations/reset])
+             (fetch-invocations {} false)
              (constantly nil))
            [module-id agent-name])
         
-        ;; Update accumulated data when new data arrives
-        _ (uix/use-effect
-           (fn []
-             (when data
-               (let [new-invokes (:agent-invokes data)
-                     new-pagination (:pagination-params data)
-                     is-first-load? (empty? pagination-params)]
-                 
-                 ;; Update invokes (replace or append based on whether it's first load)
-                 (state/dispatch [:invocations/update-data 
-                                 {:invokes new-invokes
-                                  :append? (not is-first-load?)}])
-                 
-                 ;; Update pagination state using generic set-value
-                 (let [has-valid-pagination? (and new-pagination 
-                                                  (not (empty? new-pagination))
-                                                  (some (fn [[_ item-id]] (not (nil? item-id))) new-pagination))]
-                   (if has-valid-pagination?
-                     (do
-                       (state/dispatch [:db/set-value [:invocations :next-pagination-params] new-pagination])
-                       (state/dispatch [:db/set-value [:invocations :has-more?] true]))
-                     (state/dispatch [:db/set-value [:invocations :has-more?] false]))))))
-           [data first-task-id first-item-id])
-        
         load-more (fn []
-                    (when (and has-more? (not loading?))
-                      ;; Trigger next page by updating pagination params
-                      (state/dispatch [:db/set-value [:invocations :pagination-params] next-pagination-params])))]
+                    (when (and has-more? (not loading?) pagination-params)
+                      (println "🔄 Loading more with params:" pagination-params)
+                      (fetch-invocations pagination-params true)))]
     
     (cond
       ;; Still loading initial data
       (and loading? (empty? all-invokes)) ($ :div.flex.justify-center.items-center.py-8
                                             ($ :div.text-gray-500 "Loading invocations via Sente..."))
-      ;; Request errored
-      error ($ :div.flex.justify-center.items-center.py-8
-              ($ :div.text-red-500 "Error loading invocations: " error))
       ;; No data returned
-      (and (not data) (empty? all-invokes)) ($ :div.flex.justify-center.items-center.py-8
-                                              ($ :div.text-gray-500 "No invocations found"))
+      (and (not loading?) (empty? all-invokes)) ($ :div.flex.justify-center.items-center.py-8
+                                                   ($ :div.text-gray-500 "No invocations found"))
       :else
       ($ :div.p-4
          ($ :div.bg-white.rounded-md.border.border-gray-200.overflow-hidden.shadow-sm

@@ -14,9 +14,9 @@
                         :module-id nil
                         :agent-name nil}
    :invocations {:all-invokes []
-                 :pagination-params {}
-                 :next-pagination-params {}
-                 :has-more? true}
+                 :pagination-params nil ;; Next pagination params from server
+                 :has-more? true
+                 :loading? false}
    :queries {} ; New map to store all query states
    :ui {:selected-node-id nil
         :forking-mode? false
@@ -152,20 +152,26 @@
 
 
 ;; Specific complex events that do more than just setting a value
-(reg-event :invocations/update-data
-  (fn [db {:keys [invokes append?]}]
-    ;; If append? is true, concat new invokes to existing ones
-    ;; Otherwise replace all invokes
-    (if append?
-      [[:invocations :all-invokes] #(concat % invokes)]
-      [[:invocations :all-invokes] (constantly invokes)])))
+(reg-event :invocations/append
+  (fn [db invokes]
+    [[:invocations :all-invokes] #(concat % invokes)]))
+
+(reg-event :invocations/set-loading
+  (fn [db loading?]
+    [[:invocations :loading?] (constantly loading?)]))
+
+(reg-event :invocations/set-pagination
+  (fn [db {:keys [pagination-params has-more?]}]
+    [[:invocations] #(assoc % 
+                           :pagination-params pagination-params
+                           :has-more? has-more?)]))
 
 (reg-event :invocations/reset
   (fn [db]
     [[:invocations] (constantly {:all-invokes []
-                                 :pagination-params {}
-                                 :next-pagination-params {}
-                                 :has-more? true})]))
+                                 :pagination-params nil
+                                 :has-more? true
+                                 :loading? false})]))
 
 ;; =============================================================================
 ;; GENERIC QUERY HANDLERS - For useSenteQuery hook
