@@ -26,6 +26,7 @@
     AgentsTopology
     AgentStream
     AgentStreamByInvoke
+    HumanInputRequest
     MultiAgg$Impl
     UpdateMode]
    [com.rpl.agentorama.impl
@@ -635,6 +636,10 @@
   ^CompletableFuture
   [^AgentClient client agent-invoke]
   (.nextStepAsync client agent-invoke))
+
+(defn human-input-request?
+  [obj]
+  (instance? HumanInputRequest obj))
 
 (defn agent-result
   [^AgentClient agent-client agent-invoke]

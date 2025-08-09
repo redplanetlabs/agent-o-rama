@@ -15,6 +15,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   Map<String, List<String>> _agentsInfo;
 
   Map<String, WorkerManagedResource> _objects;
+  String _thisModuleName;
   WorkerManagedResource<Map<String, AgentClient>> _agents;
 
 
@@ -49,6 +50,16 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     return ret;
   }
 
+  public List<String> getAgentInfo(String localName) {
+    List<String> ret = _agentsInfo.get(localName);
+    if(ret==null) throw new RuntimeException("Could not find agent " + localName);
+    if(ret.get(0)==null) {
+      return Arrays.asList(_thisModuleName, ret.get(1));
+    } else {
+      return ret;
+    }
+  }
+
   private static Object makeObject(String name, IFn afn, AgentObjectSetup setup, boolean autoTracing) {
     Object o = afn.invoke(setup);
     return autoTracing ? AORHelpers.WRAP_AGENT_OBJECT.invoke(name, o) : o;
@@ -56,6 +67,8 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
 
   @Override
   public void prepareForTask(int taskId, TaskGlobalContext context) {
+    _thisModuleName = context.getModuleInstanceInfo().getModuleName();
+
     _objects = new HashMap();
     for(String name: _builders.keySet()) {
       Map info = _builders.get(name);

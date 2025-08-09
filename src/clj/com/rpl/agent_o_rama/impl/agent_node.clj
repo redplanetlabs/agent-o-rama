@@ -174,16 +174,19 @@
                    info-map))
 
 (defmacro timed-agent-call
-  [expr agent-node-sym [res-sym] info-map-expr]
+  [expr agent-node-sym agent-info-tuple [res-sym] info-map-expr]
   `(let [start-time-millis# (h/current-time-millis)
          ~res-sym ~expr
-         finish-time-millis# (h/current-time-millis)]
+         finish-time-millis# (h/current-time-millis)
+         [agent-module-name# agent-name#] ~agent-info-tuple]
      (record-nested-op!-impl
       ~agent-node-sym
       :agent-call
       start-time-millis#
       finish-time-millis#
-      ~info-map-expr)
+      (assoc ~info-map-expr
+       "agent-module-name" agent-module-name#
+       "agent-name" agent-name#))
      ~res-sym
    ))
 
@@ -288,9 +291,10 @@
                               :type (get store-info name)}))
          )))
      (getAgentClient [agent-node name]
-       ;; TODO: <<<<>>>> need to add agent module name and agent name to the
-       ;; trace
-       (let [client (.getAgentClient declared-objects-tg name)]
+       (let [client (.getAgentClient declared-objects-tg name)
+
+             agent-info-tuple
+             (.getAgentInfo declared-objects-tg name)]
          (reify
           AgentClient
           (invoke [this args]
@@ -302,9 +306,10 @@
             (timed-agent-call
              (.initiate client args)
              agent-node
+             agent-info-tuple
              [res]
              {"op"     "initiate"
-              "args"   args
+              "args"   (vec args) ; so it doesn't put a raw array in the trace
               "result" res}))
           (initiateAsync [this args]
             (no-async!))
@@ -317,6 +322,7 @@
             (timed-agent-call
              (.initiateFork client invoke nodeInvokeIdToNewArgs)
              agent-node
+             agent-info-tuple
              [res]
              {"op"           "initiateFork"
               "invoke"       invoke
@@ -328,6 +334,7 @@
             (timed-agent-call
              (.nextStep client agent-invoke)
              agent-node
+             agent-info-tuple
              [res]
              {"op"           "nextStep"
               "agent-invoke" agent-invoke
@@ -363,6 +370,7 @@
             (timed-agent-call
              (.pendingHumanInputs client agent-invoke)
              agent-node
+             agent-info-tuple
              [res]
              {"op"           "pendingHumanInputs"
               "agent-invoke" agent-invoke
@@ -373,10 +381,11 @@
             (timed-agent-call
              (.provideHumanInput client request response)
              agent-node
+             agent-info-tuple
              [res]
              {"op"       "provideHumanInput"
               "request"  request
-              "response" "response"}))
+              "response" response}))
           (provideHumanInputAsync [this request response]
             (no-async!))
           (close [this]
