@@ -71,6 +71,7 @@
     [trace-node-ids non-gc-trace-node-ids]
   ))
 
+;; TODO: <<<<>>>>> verify $$streaming is cleared
 (deftest gc-by-task-test
   (let [forced-task-atom (atom 0)]
     (with-redefs [i/SUBSTITUTE-TICK-DEPOTS true
