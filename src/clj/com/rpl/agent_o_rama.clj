@@ -11,7 +11,6 @@
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
-   [com.rpl.agent-o-rama.impl.tools :as tools]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs])
   (:import
@@ -41,8 +40,6 @@
    [com.rpl.rama.ops
     RamaAccumulatorAgg
     RamaCombinerAgg]
-   [dev.langchain4j.agent.tool
-    ToolSpecification]
    [java.util.concurrent
     CompletableFuture]
    [rpl.rama.generated
@@ -214,33 +211,20 @@
   (.getObjectName setup))
 
 (defn new-agent
-  [^AgentsTopology agents-topology name]
-  (.newAgent agents-topology name))
+  [agents-topology name]
+  (i/new-agent agents-topology name))
 
 (defn node
   [agent-graph name output-nodes-spec node-fn]
-  (graph/internal-add-node!
-   agent-graph
-   name
-   output-nodes-spec
-   (aor-types/->Node node-fn)))
+  (i/node agent-graph name output-nodes-spec node-fn))
 
 (defn agg-start-node
   [agent-graph name output-nodes-spec node-fn]
-  (graph/internal-add-node!
-   agent-graph
-   name
-   output-nodes-spec
-   (aor-types/->NodeAggStart node-fn nil)))
+  (i/agg-start-node agent-graph name output-nodes-spec node-fn))
 
 (defn agg-node
   [agent-graph name output-nodes-spec agg node-fn]
-  (graph/internal-add-agg-node!
-   agent-graph
-   name
-   output-nodes-spec
-   agg
-   node-fn))
+  (i/agg-node agent-graph name output-nodes-spec agg node-fn))
 
 (defn set-update-mode
   [^AgentGraph agent-graph mode]
@@ -271,12 +255,12 @@
      )))
 
 (defn emit!
-  [^AgentNode agent-node node & args]
-  (.emit agent-node node (into-array Object args)))
+  [agent-node node & args]
+  (apply i/emit! agent-node node args))
 
 (defn result!
-  [^AgentNode agent-node val]
-  (.result agent-node val))
+  [agent-node val]
+  (i/result! agent-node val))
 
 (defn get-store
   [^AgentNode agent-node name]
@@ -704,56 +688,7 @@
                    'com.rpl.agent-o-rama.impl.ui.core/start-ui)]
      (start-fn ipc options))))
 
-(defn stop-ui []
+(defn stop-ui
+  []
   (let [stop-fn (requiring-resolve 'com.rpl.agent-o-rama.impl.ui.core/stop-ui)]
     (stop-fn)))
-
-(defn tool-info
-  ([tool-specification tool-fn]
-   (tool-info tool-specification tool-fn nil))
-  ([tool-specification tool-fn options]
-   (let [options (merge {:include-context? false} options)]
-     (h/validate-options! tool-specification
-                          options
-                          {:include-context? h/boolean-spec})
-     (when-not (ifn? tool-fn)
-       (throw (h/ex-info "Invalid tool function" {:type (class tool-fn)})))
-     (when-not (instance? ToolSpecification tool-specification)
-       (throw (h/ex-info "Invalid tool specification"
-                         {:type (class tool-specification)})))
-     (aor-types/->ToolInfo tool-specification
-                           tool-fn
-                           (:include-context? options))
-   )))
-
-(defn tools-agent
-  ([topology name tools]
-   (tools-agent topology name tools nil))
-  ([topology name tools options]
-   (let [options (merge {:error-handler (fn [e] (throw e))}
-                        options)]
-     (h/validate-options! name
-                          options
-                          {:error-handler h/fn-spec})
-     (-> topology
-         (new-agent name)
-         (agg-start-node
-          "begin"
-          "tool"
-          (fn begin
-            ([agent-node requests]
-             (begin agent-node requests nil))
-            ([agent-node requests caller-data]
-             (doseq [r requests]
-               (emit! agent-node r caller-data)))))
-         (node
-          "tool"
-          "agg-results"
-          (tools/mk-tool-fn tools (:error-handler options)))
-         (agg-node
-          "agg-results"
-          nil
-          aggs/+vec-agg
-          (fn [agent-node agg-state _]
-            (result! agent-node agg-state)))
-     ))))

@@ -16,7 +16,9 @@
    [com.rpl.agentorama
     AgentFailedException
     AgentInvoke
-    AgentObjectOptions$Impl]
+    AgentNode
+    AgentObjectOptions$Impl
+    AgentsTopology]
    [com.rpl.agentorama.impl
     RamaClientsTaskGlobal
     AgentDeclaredObjectsTaskGlobal
@@ -335,3 +337,40 @@
        )))
     ret
   ))
+
+(defn new-agent
+  [^AgentsTopology agents-topology name]
+  (.newAgent agents-topology name))
+
+(defn node
+  [agent-graph name output-nodes-spec node-fn]
+  (graph/internal-add-node!
+   agent-graph
+   name
+   output-nodes-spec
+   (aor-types/->Node node-fn)))
+
+(defn agg-start-node
+  [agent-graph name output-nodes-spec node-fn]
+  (graph/internal-add-node!
+   agent-graph
+   name
+   output-nodes-spec
+   (aor-types/->NodeAggStart node-fn nil)))
+
+(defn agg-node
+  [agent-graph name output-nodes-spec agg node-fn]
+  (graph/internal-add-agg-node!
+   agent-graph
+   name
+   output-nodes-spec
+   agg
+   node-fn))
+
+(defn emit!
+  [^AgentNode agent-node node & args]
+  (.emit agent-node node (into-array Object args)))
+
+(defn result!
+  [^AgentNode agent-node val]
+  (.result agent-node val))

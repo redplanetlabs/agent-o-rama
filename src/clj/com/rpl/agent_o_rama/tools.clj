@@ -1,0 +1,87 @@
+(ns com.rpl.agent-o-rama.tools
+  (:use [com.rpl.rama]
+        [com.rpl.rama.path])
+  (:require
+   [com.rpl.agent-o-rama.impl.core :as i]
+   [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.tools-impl :as tools-impl]
+   [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.rama.aggs :as aggs])
+  (:import
+   [dev.langchain4j.agent.tool
+    ToolSpecification]))
+
+(defn tool-info
+  ([tool-specification tool-fn]
+   (tool-info tool-specification tool-fn nil))
+  ([tool-specification tool-fn options]
+   (let [options (merge {:include-context? false} options)]
+     (h/validate-options! tool-specification
+                          options
+                          {:include-context? h/boolean-spec})
+     (when-not (ifn? tool-fn)
+       (throw (h/ex-info "Invalid tool function" {:type (class tool-fn)})))
+     (when-not (instance? ToolSpecification tool-specification)
+       (throw (h/ex-info "Invalid tool specification"
+                         {:type (class tool-specification)})))
+     (aor-types/->ToolInfo tool-specification
+                           tool-fn
+                           (:include-context? options))
+   )))
+
+(defn error-handler-static-string [s]
+  (constantly s))
+
+(defn error-handler-rethrow []
+  (fn [e] (throw e)))
+
+(defn error-handler-default
+  []
+  h/throwable->str)
+
+(defn error-handler-by-type
+  [tuples]
+  (fn [e]
+    (reduce
+     (fn [_ [ex-type afn]]
+       (if (instance? ex-type e)
+         (reduced (afn e))))
+     nil
+     tuples)))
+
+(defn error-handler-static-string-by-type
+  [tuples]
+  (let [tuples (transform [(view vec) LAST] (fn [s] (constantly s)) tuples)]
+    (error-handler-by-type tuples)))
+
+(defn tools-agent
+  ([topology name tools]
+   (tools-agent topology name tools nil))
+  ([topology name tools options]
+   (let [options (merge {:error-handler (fn [e] (throw e))}
+                        options)]
+     (h/validate-options! name
+                          options
+                          {:error-handler h/fn-spec})
+     (-> topology
+         (i/new-agent name)
+         (i/agg-start-node
+          "begin"
+          "tool"
+          (fn begin
+            ([agent-node requests]
+             (begin agent-node requests nil))
+            ([agent-node requests caller-data]
+             (doseq [r requests]
+               (i/emit! agent-node r caller-data)))))
+         (i/node
+          "tool"
+          "agg-results"
+          (tools-impl/mk-tool-fn tools (:error-handler options)))
+         (i/agg-node
+          "agg-results"
+          nil
+          aggs/+vec-agg
+          (fn [agent-node agg-state _]
+            (i/result! agent-node agg-state)))
+     ))))
