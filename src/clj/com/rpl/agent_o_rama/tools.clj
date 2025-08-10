@@ -66,7 +66,7 @@
 
 (defn new-tools-agent
   ([topology name tools]
-   (tools-agent topology name tools nil))
+   (new-tools-agent topology name tools nil))
   ([topology name tools options]
    (let [options (merge {:error-handler error-handler-default}
                         options)]
