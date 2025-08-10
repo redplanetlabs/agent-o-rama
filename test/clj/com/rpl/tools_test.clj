@@ -19,4 +19,9 @@
 
 (deftest tools-test
          ;; TODO: <<<<>>>>
+         ;; - test all the nested ops cases
+         ;;  - success
+         ;;  - invalid tool call
+         ;;  - exception rethrow
+         ;;  - a new exception during error handling
 )

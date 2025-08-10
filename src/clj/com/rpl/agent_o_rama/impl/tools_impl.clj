@@ -2,32 +2,100 @@
   (:use [com.rpl.rama]
         [com.rpl.rama path])
   (:require
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
+   [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.rama.ops :as ops])
+   [com.rpl.rama.ops :as ops]
+   [jsonista.core :as j])
   (:import
    [dev.langchain4j.agent.tool
-    ToolExecutionRequest]))
+    ToolExecutionRequest
+    ToolSpecification]
+   [dev.langchain4j.data.message
+    ToolExecutionResultMessage]))
 
+(def MAPPER (j/object-mapper {:decode-key-fn str}))
 
-;; TODO: <<<<>>>>
-;;  - how to get this to work with annotation driven tools
-;;  - handle hallucinated tool (error with error handler)
+(defn- mk-tools-by-name
+  [tools]
+  (let [tools-by-name (group-by #(.name ^ToolSpecification
+                                        (:tool-specification %))
+                                tools)
+        invalid       (select [ALL
+                               (selected? LAST (view count) (pred> 1))
+                               FIRST]
+                              tools-by-name)]
+    (when-not (empty? invalid)
+      (throw (h/ex-info "Cannot have multiple tools with the same name"
+                        {:conflicting-names invalid})))
+    (transform MAP-VALS first tools-by-name)))
+
 (defn mk-tool-fn
   [tools error-handler]
-  ;; TODO: <<<<>>>> make map here from tool name -> tool
-  (fn [agent-node ^ToolExecutionRequest request caller-data]
-      ;; TODO: <<<<>>>>
-      ;;  - this should produce ToolExecutionResultMessage
-      ;;  - capture :tool-call nested op
-      ;;    - or should that be captured by caller of the tools agent?
-      ;;      - in which case, sub-agent would pass back more info...
-      ;;        - could be special type handled by AOR that's merged into the
-      ;;        info map for results
-      ;;  - tool is given agent-node and context arguments followed by tool args
-      ;;    - what if you just want to provide a simple function as a tool?
-      ;;     - could have helper (simple-function-tool afn)
-      ;;       - no, it should be the opposite. a declaration for a function
-      ;;       that wants the context
-      ;;    - or, could make agent-node and context thread locals
-  ))
+  (let [tools-by-name (mk-tools-by-name tools)]
+    (fn [agent-node ^ToolExecutionRequest request caller-data]
+      (let [start-time-millis (h/current-time-millis)
+            tool-name (.name request)
+            args      (-> request
+                          .arguments
+                          (j/read-value MAPPER))
+            base-info {"id"   (.id request)
+                       "name" tool-name
+                       "args" args}]
+        (try
+          (if-let [{:keys [tool-fn include-context?]}
+                   (get tools-by-name tool-name)]
+            (let [ret (if include-context?
+                        (tool-fn agent-node caller-data args)
+                        (tool-fn args))]
+              (anode/record-nested-op!-impl agent-node
+                                            :tool-call
+                                            start-time-millis
+                                            (h/current-time-millis)
+                                            (merge base-info
+                                                   {"type"   "success"
+                                                    "result" ret}))
+              (i/emit! agent-node
+                       "agg-results"
+                       (ToolExecutionResultMessage/from request ret)))
+
+            (do
+              (anode/record-nested-op!-impl agent-node
+                                            :tool-call
+                                            start-time-millis
+                                            (h/current-time-millis)
+                                            (assoc base-info "type" "invalid"))
+              (throw (h/ex-info "Invalid tool name" {:request request}))))
+          (catch Throwable t
+            (try
+              (let [error-ret (error-handler t)]
+                (i/emit! agent-node
+                         "agg-results"
+                         (ToolExecutionResultMessage/from request error-ret))
+                (anode/record-nested-op!-impl
+                 agent-node
+                 :tool-call
+                 start-time-millis
+                 (h/current-time-millis)
+                 (merge base-info
+                        {"type"      "failure"
+                         "exception" (h/throwable->str t)
+                         "result"    error-ret})))
+              (catch Throwable t2
+                (anode/record-nested-op!-impl
+                 agent-node
+                 :tool-call
+                 start-time-millis
+                 (h/current-time-millis)
+                 (merge base-info
+                        (if (identical? t t2)
+                          {"type"      "throw"
+                           "exception" (h/throwable->str t)}
+                          {"type"       "throw"
+                           "exception1" (h/throwable->str t)
+                           "exception2" (h/throwable->str t2)})))
+                (throw t2)
+              ))
+          ))
+      ))))
