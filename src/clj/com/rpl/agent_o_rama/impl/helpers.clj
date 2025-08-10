@@ -238,3 +238,18 @@
   [v]
   (when-not (ifn? v)
     "value must be a function"))
+
+(defn list-spec
+  [v]
+  (when-not (instance? java.util.List v)
+    "value must be a list"))
+
+(defn map-spec
+  [v]
+  (when-not (map? v)
+    "value must be a map"))
+
+(defn string-spec
+  [v]
+  (when-not (string? v)
+    "value must be a string"))

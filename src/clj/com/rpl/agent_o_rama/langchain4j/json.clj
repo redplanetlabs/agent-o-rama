@@ -1,5 +1,7 @@
 (ns com.rpl.agent-o-rama.langchain4j.json
   (:refer-clojure :exclude [boolean int])
+  (:require
+   [com.rpl.agent-o-rama.impl.helpers :as h])
   (:import
    [dev.langchain4j.model.chat.request.json
     JsonAnyOfSchema
@@ -69,6 +71,12 @@
    (let [{:keys [description required definitions additional-properties?]
           :as   options}
          (if (string? options) {:description options} options)]
+     (h/validate-options! nil
+                          options
+                          {:description h/string-spec
+                           :required    h/list-spec
+                           :additional-properties? h/boolean-spec
+                           :definitions h/map-spec})
      (-> (JsonObjectSchema/builder)
          (.addProperties name->schema)
          (.additionalProperties (clojure.core/boolean additional-properties?))
