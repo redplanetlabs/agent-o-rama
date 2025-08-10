@@ -82,7 +82,7 @@
          (.stopSequences stop-sequences)
          (.temperature temperature)
          (.toolChoice (get TOOL-CHOICES tool-choice))
-         (.toolSpecifications (mapv :tool-specification tools))
+         (.toolSpecifications ^List (mapv :tool-specification tools))
          (.topK (if top-k (int top-k)))
          (.topP top-p)
          .build))))
