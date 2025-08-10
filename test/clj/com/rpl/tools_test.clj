@@ -19,7 +19,9 @@
    [meander.epsilon :as m])
   (:import
    [dev.langchain4j.agent.tool
-    ToolExecutionRequest]))
+    ToolExecutionRequest]
+   [dev.langchain4j.data.message
+    ToolExecutionResultMessage]))
 
 (def TOOLS
   [(tools/tool-info
@@ -77,6 +79,16 @@
       (.name tool-name)
       .build))
 
+(defn res=
+  [^ToolExecutionResultMessage res id name text]
+  (let [t (.text res)]
+    (and (= id (.id res))
+         (= name (.toolName res))
+         (if (string? text)
+           (= text t)
+           (some? (re-matches text t)
+           )))))
+
 (deftest tools-test
   (with-redefs [aor-types/get-config (max-retries-override 0)]
     (with-open [ipc (rtest/create-ipc)]
@@ -121,14 +133,27 @@
        (bind agent-manager (aor/agent-manager ipc module-name))
        (bind foo (aor/agent-client agent-manager "foo"))
 
+       (bind sort-res
+         (fn [res]
+           (sort-by #(.id ^ToolExecutionResultMessage %) res)))
+
        (bind requests
          [(mk-request "add" "id1" {"a" 1 "b" 3})
-          (mk-request "math-with-context" "id2" {"a" 1 "b" 3 "c" 5})
+          (mk-request "math-with-context" "id2" {"a" 6 "b" 3 "c" 5})
           (mk-request "throw" "id3" {"type" "arith"})])
-       (clojure.pprint/pprint (aor/agent-invoke foo "tools1" 11 requests))
+       (bind [r1 r2 r3 :as res]
+         (sort-res (aor/agent-invoke foo "tools1" 11 requests)))
+       (is (= 3 (count res)))
+       (is (res= r1 "id1" "add" "4"))
+       (is (res= r2 "id2" "math-with-context" "225"))
+       (is
+        (res= r3
+              "id3"
+              "throw"
+              #"java.lang.ArithmeticException: intentional[\s\S]*"))
 
        ;; TODO: <<<<>>>>
-       ;; - test all the nested ops cases
+       ;; - test all the nested ops tracing cases
        ;;   - success
        ;;   - invalid tool call
        ;;   - exception rethrow
