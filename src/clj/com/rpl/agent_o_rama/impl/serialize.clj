@@ -556,7 +556,7 @@
  (nippy/freeze-to-out! out (.additionalProperties obj))
  (nippy/freeze-to-out! out (empty-map (.definitions obj)))
  (nippy/freeze-to-out! out (empty-map (.properties obj)))
- (nippy/freeze-to-out! out (.required obj)))
+ (nippy/freeze-to-out! out (empty-coll (.required obj))))
 
 (ser/extend-8-byte-thaw
  JsonObjectSchema

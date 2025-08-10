@@ -15,6 +15,7 @@
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
    [com.rpl.test-common :as tc]
+   [jsonista.core :as j]
    [meander.epsilon :as m])
   (:import
    [dev.langchain4j.agent.tool
@@ -72,7 +73,7 @@
   [tool-name id args]
   (-> (ToolExecutionRequest/builder)
       (.id id)
-      (.arguments args)
+      (.arguments (j/write-value-as-string args))
       (.name tool-name)
       .build))
 
@@ -89,7 +90,7 @@
                "start"
                nil
                (fn [agent-node tools-agent-name caller-data requests]
-                 (let [tools (aor/agent-client topology tools-agent-name)]
+                 (let [tools (aor/agent-client agent-node tools-agent-name)]
                    (aor/result!
                     agent-node
                     (if caller-data
@@ -116,14 +117,14 @@
                                     [clojure.lang.ExceptionInfo "ei"]])})
          ))
        (bind module-name (get-module-name module))
-       (rtest/launch-module! ipc module {:tasks 24 :threads 2})
+       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
        (bind agent-manager (aor/agent-manager ipc module-name))
        (bind foo (aor/agent-client agent-manager "foo"))
 
        (bind requests
          [(mk-request "add" "id1" {"a" 1 "b" 3})
           (mk-request "math-with-context" "id2" {"a" 1 "b" 3 "c" 5})
-          (mk-request "error" "id3" {"type" "arith"})])
+          (mk-request "throw" "id3" {"type" "arith"})])
        (clojure.pprint/pprint (aor/agent-invoke foo "tools1" 11 requests))
 
        ;; TODO: <<<<>>>>

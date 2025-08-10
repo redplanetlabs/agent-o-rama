@@ -183,3 +183,5 @@
                 (.aiMessage (AiMessage/aiMessage "bar"))
                 .build)))
 )
+
+;: TODO: <<<<>>>>> test ToolSpecification and JSON schema types

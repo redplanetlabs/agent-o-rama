@@ -58,7 +58,7 @@
                                                     "result" ret}))
               (i/emit! agent-node
                        "agg-results"
-                       (ToolExecutionResultMessage/from request ret)))
+                       (ToolExecutionResultMessage/from request (str ret))))
 
             (do
               (anode/record-nested-op!-impl agent-node

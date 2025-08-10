@@ -68,7 +68,7 @@
   ([topology name tools]
    (new-tools-agent topology name tools nil))
   ([topology name tools options]
-   (let [options (merge {:error-handler error-handler-default}
+   (let [options (merge {:error-handler (error-handler-default)}
                         options)]
      (h/validate-options! name
                           options
@@ -83,7 +83,7 @@
              (begin agent-node requests nil))
             ([agent-node requests caller-data]
              (doseq [r requests]
-               (i/emit! agent-node r caller-data)))))
+               (i/emit! agent-node "tool" r caller-data)))))
          (i/node
           "tool"
           "agg-results"
