@@ -9,6 +9,8 @@
    [com.rpl.rama.ops :as ops]
    [jsonista.core :as j])
   (:import
+   [com.rpl.agentorama
+    InvalidToolNameException]
    [dev.langchain4j.agent.tool
     ToolExecutionRequest
     ToolSpecification]
@@ -66,7 +68,8 @@
                                             start-time-millis
                                             (h/current-time-millis)
                                             (assoc base-info "type" "invalid"))
-              (throw (h/ex-info "Invalid tool name" {:request request}))))
+              (throw (InvalidToolNameException. (str "Invalid tool name: "
+                                                     request)))))
           (catch Throwable t
             (try
               (let [error-ret (error-handler t)]

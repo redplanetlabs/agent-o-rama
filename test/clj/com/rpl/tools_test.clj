@@ -152,6 +152,20 @@
               "throw"
               #"java.lang.ArithmeticException: intentional[\s\S]*"))
 
+       (bind requests
+         [(mk-request "blah" "id1" {"a" 1 "b" 3})
+          (mk-request "add" "id2" {"a" 9 "b" 100})])
+       (bind [r1 r2 :as res]
+         (sort-res (aor/agent-invoke foo "tools1" 11 requests)))
+       (is (= 2 (count res)))
+       (is
+        (res=
+         r1
+         "id1"
+         "blah"
+         #"com.rpl.agentorama.InvalidToolNameException: Invalid tool name[\s\S]*"))
+       (is (res= r2 "id2" "add" "109"))
+
        ;; TODO: <<<<>>>>
        ;; - test all the nested ops tracing cases
        ;;   - success
@@ -159,6 +173,10 @@
        ;;   - exception rethrow
        ;;   - a new exception during error handling
        ;; - test all error handlers
+       ;;   - default (print it)
+       ;;   - static string
+       ;;   - rethrow
+       ;;   - static-string-by-type
       ))))
 
 ;; TODO: <<<<>>>>
