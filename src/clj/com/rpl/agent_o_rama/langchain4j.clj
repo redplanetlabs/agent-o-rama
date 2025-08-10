@@ -3,8 +3,6 @@
   (:require
    [com.rpl.agent-o-rama.impl.helpers :as h])
   (:import
-   [dev.langchain4j.agent.tool
-    ToolSpecification]
    [dev.langchain4j.data.message
     UserMessage]
    [dev.langchain4j.model.chat
@@ -53,16 +51,6 @@
            (.rootElement schema)
            .build))
       .build))
-
-(defn tool-specification
-  ([name parameters-json-schema]
-   (tool-specification name parameters-json-schema nil))
-  ([name parameters-json-schema description]
-   (-> (ToolSpecification/builder)
-       (.name name)
-       (.parameters parameters-json-schema)
-       (.description description)
-       .build)))
 
 ;; TODO: document :tools option, which is vector of ToolInfo
 (defn chat-request

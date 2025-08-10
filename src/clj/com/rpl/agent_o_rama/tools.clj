@@ -11,6 +11,16 @@
    [dev.langchain4j.agent.tool
     ToolSpecification]))
 
+(defn tool-specification
+  ([name parameters-json-schema]
+   (tool-specification name parameters-json-schema nil))
+  ([name parameters-json-schema description]
+   (-> (ToolSpecification/builder)
+       (.name name)
+       (.parameters parameters-json-schema)
+       (.description description)
+       .build)))
+
 (defn tool-info
   ([tool-specification tool-fn]
    (tool-info tool-specification tool-fn nil))
@@ -54,7 +64,7 @@
   (let [tuples (transform [(view vec) ALL LAST] (fn [s] (constantly s)) tuples)]
     (error-handler-by-type tuples)))
 
-(defn tools-agent
+(defn new-tools-agent
   ([topology name tools]
    (tools-agent topology name tools nil))
   ([topology name tools options]
