@@ -97,14 +97,13 @@
     "chat"
     "chat"
     (fn chat-fn [agent-node messages]
-      (let [openai       (aor/get-agent-object agent-node "openai")
-            tools        (aor/agent-client agent-node "tools")
-            chat-options {:tools TOOLS}
-            response     (lc4j/chat
-                          openai
-                          (lc4j/chat-request messages chat-options))
-            ai-message   (.aiMessage response)
-            tool-calls   (not-empty (vec (.toolExecutionRequests ai-message)))]
+      (let [openai     (aor/get-agent-object agent-node "openai")
+            tools      (aor/agent-client agent-node "tools")
+            response   (lc4j/chat
+                        openai
+                        (lc4j/chat-request messages {:tools TOOLS}))
+            ai-message (.aiMessage response)
+            tool-calls (not-empty (vec (.toolExecutionRequests ai-message)))]
         (if tool-calls
           (let [tool-results  (aor/agent-invoke tools tool-calls)
                 next-messages (into (conj messages ai-message) tool-results)]
