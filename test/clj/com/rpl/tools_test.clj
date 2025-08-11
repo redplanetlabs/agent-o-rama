@@ -127,7 +127,8 @@
                                  {:error-handler
                                   (tools/error-handler-static-string-by-type
                                    [[ArithmeticException "ae"]
-                                    [clojure.lang.ExceptionInfo "ei"]])})
+                                    [clojure.lang.ExceptionInfo "ei"]
+                                    [ClassCastException ""]])})
          ))
        (bind module-name (get-module-name module))
        (rtest/launch-module! ipc module {:tasks 4 :threads 2})
@@ -350,23 +351,31 @@
        (is (= 1 (count res)))
        (is (res= r1 "id11" "throw" "ei"))
 
-       (is (thrown? Exception
-                    (aor/agent-invoke
-                     foo
-                     "tools4"
-                     nil
-                     [(mk-request "throw" "id11" {"type" "none"})])))
-
-       ;; TODO: <<<<>>>>
-       ;; - test all the nested ops tracing cases
-       ;;   x success
-       ;;   x invalid tool call
-       ;;   x exception default handler
-       ;;   x exception rethrow
-       ;;   - a new exception during error handling
-       ;;     - could give static string of "" to induce a langchain4j error for
-       ;;     a different exception type
+       (bind inv
+         (aor/agent-initiate
+          foo
+          "tools4"
+          nil
+          [(mk-request "throw" "id11" {"type" "none"})]))
+       (is (thrown? Exception (aor/agent-result foo inv)))
+       (bind n (tool-nested-ops inv))
+       (is (= 1 (count n)))
+       (bind o (first n))
+       (is (= :tool-call (:type o)))
+       (bind info (:info o))
+       (is (= 6 (count info)))
+       (is (= {"id"   "id11"
+               "name" "throw"
+               "args" {"type" "none"}
+               "type" "throw"}
+              (select-keys info ["id" "name" "args" "type"])))
+       (is (re-matches
+            #"java.lang.ClassCastException: cce[\s\S]*"
+            (get info "exception1")))
+       ;; this is from trying to construct tool result with blank string, which
+       ;; isn't allowed by langchain4j
+       (is
+        (re-matches
+         #"java.lang.IllegalArgumentException: text cannot be null or blank[\s\S]*"
+         (get info "exception2")))
       ))))
-
-;; TODO: <<<<>>>>
-;;  - add test using OpenAI with tools

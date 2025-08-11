@@ -60,3 +60,6 @@
        (bind res (aor/agent-invoke foo "What is 11*13?"))
        (is (str/includes? res "143"))
       ))))
+
+;; TODO: <<<<>>>>
+;;  - add test using OpenAI with tools
