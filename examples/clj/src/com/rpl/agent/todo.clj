@@ -3,26 +3,23 @@
   Uses long term memory for accumulating a profile and the TODO items."
   (:require
    [clojure.string :as str]
-   [clojure.tools.logging :as cljlogging]
    [com.rpl.agent-o-rama :as aor]
-   [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.langchain4j.json :as lj]
    [com.rpl.agent-o-rama.store :as store]
    [com.rpl.agent-o-rama.tools :as tools]
    [com.rpl.rama :as rama]
-   [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.path :as path]
    [com.rpl.rama.test :as rtest]
    [jsonista.core :as j])
   (:import
    [com.rpl.agentorama
     AgentComplete]
-   [dev.langchain4j.agent.tool ToolExecutionRequest]
-   [dev.langchain4j.data.message SystemMessage
-    ToolExecutionResultMessage
+   [dev.langchain4j.data.message
+    SystemMessage
     UserMessage]
-   [dev.langchain4j.model.openai OpenAiChatModel
+   [dev.langchain4j.model.openai
+    OpenAiChatModel
     OpenAiStreamingChatModel]))
 
 (defn under->dash [s]
@@ -152,8 +149,8 @@ Your current instructions are:
                  "List of specific, actionable solutions (e.g., specific ideas, service providers, or concrete options relevant to completing the task)",
                  (lj/string "A specific, actionable solution"))
     "status"    (lj/enum
-                "Current status of the task"
-                ["not started" "in progress" "done" "archived"])}))
+                 "Current status of the task"
+                 ["not started" "in progress" "done" "archived"])}))
 
 (def ^:private ToDoList
   (lj/object {:description "ToDos"} {"todos" (lj/array "ToDo list" ToDo)}))
