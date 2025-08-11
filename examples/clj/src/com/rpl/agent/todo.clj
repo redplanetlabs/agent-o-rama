@@ -93,8 +93,9 @@ or if no tool call was made.")
 Extract a profile of the user.
 
 Create the expected response format based solely on the information available in
-the chat. If you don't have information to put in specific fields, leave them
-blank.
+the chat. If you don't have information to put in specific fields, or you want
+to leave them with their current values, then leave them out of the returned
+object.
 
 <current_profile>
 %s
@@ -217,7 +218,9 @@ Your current instructions are:
                         chat-messages
                         chat-options))
         new-profile   (j/read-value (.text (.aiMessage response)))]
-    (store/put! store user-id new-profile))
+    (prn :old-profile profile)
+    (prn :new-profile new-profile)
+    (store/update! store user-id #(merge % new-profile)))
   "updated")
 
 (defn update-todo
@@ -322,8 +325,17 @@ Your current instructions are:
          (.logResponses true)
          .build)))
 
-  (aor/declare-key-value-store topology "$$profiles" Long Object)
+  (aor/declare-document-store
+   topology
+   "$$profiles"
+   Long
+   "name" String
+   "job" String
+   "connections" java.util.List
+   "interests" java.util.List)
+
   (aor/declare-key-value-store topology "$$todos" Long Object)
+
   (aor/declare-key-value-store topology "$$instructions" Long Object)
 
   (->
