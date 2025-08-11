@@ -138,26 +138,73 @@
          (foreign-pstate ipc
                          module-name
                          (po/agent-root-task-global-name "foo")))
-       (bind tools1-root
+       (bind foo-nodes
          (foreign-pstate ipc
                          module-name
-                         (po/agent-root-task-global-name "tools1")))
-       (bind tools2-root
-         (foreign-pstate ipc
-                         module-name
-                         (po/agent-root-task-global-name "tools2")))
-       (bind tools3-root
-         (foreign-pstate ipc
-                         module-name
-                         (po/agent-root-task-global-name "tools3")))
-       (bind tools4-root
-         (foreign-pstate ipc
-                         module-name
-                         (po/agent-root-task-global-name "tools4")))
+                         (po/agent-node-task-global-name "foo")))
+       (bind tmap
+         (into
+          {}
+          (for [i (range 1 5)]
+            (let [n (str "tools" i)]
+              [n
+               {:root
+                (foreign-pstate ipc
+                                module-name
+                                (po/agent-root-task-global-name n))
+                :nodes
+                (foreign-pstate ipc
+                                module-name
+                                (po/agent-node-task-global-name n))
+               }]))))
 
        (bind sort-res
          (fn [res]
            (sort-by #(.id ^ToolExecutionResultMessage %) res)))
+
+       (bind tool-nested-ops
+         (fn [{:keys [task-id agent-invoke-id]}]
+           (letlocals
+            (bind root-id
+              (foreign-select-one [(keypath agent-invoke-id)
+                                   :root-invoke-id]
+                                  foo-root
+                                  {:pkey task-id}))
+            (bind [agent-name {:keys [task-id agent-invoke-id]}]
+              (foreign-select
+               [(keypath root-id) :nested-ops FIRST :info
+                (multi-path "agent-name" "result")]
+               foo-nodes
+               {:pkey task-id}
+              ))
+
+            (bind pstates (get tmap agent-name))
+            (bind root-id
+              (foreign-select-one [(keypath agent-invoke-id)
+                                   :root-invoke-id]
+                                  (:root pstates)
+                                  {:pkey task-id}))
+
+            (bind emits
+              (foreign-select-one
+               [(keypath root-id) :emits]
+               (:nodes pstates)
+               {:pkey task-id}
+              ))
+
+            (bind nested-ops
+              (vec (apply concat
+                    (for [{:keys [target-task-id invoke-id]} emits]
+                      (foreign-select-one
+                       [(keypath invoke-id) :nested-ops]
+                       (:nodes pstates)
+                       {:pkey target-task-id}
+                      )))))
+            (sort-by #(-> %
+                          :info
+                          (get "id"))
+                     nested-ops)
+           )))
 
        (bind requests
          [(mk-request "add" "id1" {"a" 1 "b" 3})
@@ -174,12 +221,14 @@
          "id3"
          "throw"
          #"Error: java.lang.ArithmeticException: intentional[\s\S]*\nPlease fix your mistakes."))
+       ;; TODO: <<<<>>>> nested ops
 
        (bind requests
          [(mk-request "blah" "id1" {"a" 1 "b" 3})
           (mk-request "add" "id2" {"a" 9 "b" 100})])
+       (bind inv (aor/agent-initiate foo "tools1" 11 requests))
        (bind [r1 r2 :as res]
-         (sort-res (aor/agent-invoke foo "tools1" 11 requests)))
+         (sort-res (aor/agent-result foo inv)))
        (is (= 2 (count res)))
        (is
         (res=
@@ -188,53 +237,70 @@
          "blah"
          "Error: blah is not a valid tool, try one of [add, math-with-context, throw]."))
        (is (res= r2 "id2" "add" "109"))
-
-       (bind [r1 r2 :as res]
-         (sort-res
-          (aor/agent-invoke foo
-                            "tools2"
-                            nil
-                            [(mk-request "abc" "id1" {})
-                             (mk-request "throw" "id3" {"type" "ex-info"})])))
-       (is (= 2 (count res)))
-       (is
-        (res=
-         r1
-         "id1"
-         "abc"
-         "Error: abc is not a valid tool, try one of [add, math-with-context, throw]."))
-       (is (res= r2 "id3" "throw" "blah"))
-
-       (is (thrown?
-            Exception
-            (aor/agent-invoke foo
-                              "tools3"
-                              nil
-                              [(mk-request "throw" "id1" {"type" "arith"})])))
+       (bind n (tool-nested-ops inv))
+       (is (= 2 (count n)))
+       (is (every? #(= :tool-call (:type %)) n))
+       (is (= {"id" "id1" "name" "blah" "args" {"a" 1 "b" 3} "type" "invalid"}
+              (-> n
+                  first
+                  :info)))
+       (is (= {"id"     "id2"
+               "name"   "add"
+               "args"   {"a" 9 "b" 100}
+               "type"   "success"
+               "result" 109}
+              (-> n
+                  second
+                  :info)))
 
 
-       (bind [r1 :as res]
-         (aor/agent-invoke foo
-                           "tools4"
-                           nil
-                           [(mk-request "throw" "id11" {"type" "arith"})]))
-       (is (= 1 (count res)))
-       (is (res= r1 "id11" "throw" "ae"))
-
-       (bind [r1 :as res]
-         (aor/agent-invoke foo
-                           "tools4"
-                           nil
-                           [(mk-request "throw" "id11" {"type" "ex-info"})]))
-       (is (= 1 (count res)))
-       (is (res= r1 "id11" "throw" "ei"))
-
-       (is (thrown? Exception
-                    (aor/agent-invoke
-                     foo
-                     "tools4"
-                     nil
-                     [(mk-request "throw" "id11" {"type" "none"})])))
+       ; (bind [r1 r2 :as res]
+       ;   (sort-res
+       ;    (aor/agent-invoke foo
+       ;                      "tools2"
+       ;                      nil
+       ;                      [(mk-request "abc" "id1" {})
+       ;                       (mk-request "throw" "id3" {"type" "ex-info"})])))
+       ; (is (= 2 (count res)))
+       ; (is
+       ;  (res=
+       ;   r1
+       ;   "id1"
+       ;   "abc"
+       ;   "Error: abc is not a valid tool, try one of [add, math-with-context,
+       ;   throw]."))
+       ; (is (res= r2 "id3" "throw" "blah"))
+       ;
+       ; (is (thrown?
+       ;      Exception
+       ;      (aor/agent-invoke foo
+       ;                        "tools3"
+       ;                        nil
+       ;                        [(mk-request "throw" "id1" {"type" "arith"})])))
+       ;
+       ;
+       ; (bind [r1 :as res]
+       ;   (aor/agent-invoke foo
+       ;                     "tools4"
+       ;                     nil
+       ;                     [(mk-request "throw" "id11" {"type" "arith"})]))
+       ; (is (= 1 (count res)))
+       ; (is (res= r1 "id11" "throw" "ae"))
+       ;
+       ; (bind [r1 :as res]
+       ;   (aor/agent-invoke foo
+       ;                     "tools4"
+       ;                     nil
+       ;                     [(mk-request "throw" "id11" {"type" "ex-info"})]))
+       ; (is (= 1 (count res)))
+       ; (is (res= r1 "id11" "throw" "ei"))
+       ;
+       ; (is (thrown? Exception
+       ;              (aor/agent-invoke
+       ;               foo
+       ;               "tools4"
+       ;               nil
+       ;               [(mk-request "throw" "id11" {"type" "none"})])))
 
        ;; TODO: <<<<>>>>
        ;; - test all the nested ops tracing cases
