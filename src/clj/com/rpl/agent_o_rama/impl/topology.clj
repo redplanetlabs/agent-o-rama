@@ -382,7 +382,7 @@
    (:> *agent-task-id *fork-agent-id *retry-num *op)))
 
 (deframaop intake-node-failure
-  [*agent-name {:keys [*invoke-id *retry-num *throwable-str]}]
+  [*agent-name {:keys [*invoke-id *retry-num *throwable-str *nested-ops]}]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
     $$nodes (po/agent-node-task-global *agent-name)
@@ -395,6 +395,8 @@
                                   *agent-task-id
                                   *agent-id
                                   *retry-num)
+   (local-transform> [(keypath *invoke-id) :nested-ops (termval *nested-ops)]
+                     $$nodes)
    (|direct *agent-task-id)
    (local-transform>
     [(must *agent-id)

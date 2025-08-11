@@ -146,6 +146,7 @@
    invoke-id :- UUID
    retry-num :- Long
    throwable-str :- String
+   nested-ops :- [NestedOpInfo]
   ])
 
 (drp/defrecord+ AgentFailure

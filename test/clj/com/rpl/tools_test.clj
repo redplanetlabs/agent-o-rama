@@ -134,6 +134,26 @@
        (rtest/launch-module! ipc module {:tasks 4 :threads 2})
        (bind agent-manager (aor/agent-manager ipc module-name))
        (bind foo (aor/agent-client agent-manager "foo"))
+       (bind foo-root
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "foo")))
+       (bind tools1-root
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "tools1")))
+       (bind tools2-root
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "tools2")))
+       (bind tools3-root
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "tools3")))
+       (bind tools4-root
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "tools4")))
 
        (bind sort-res
          (fn [res]
