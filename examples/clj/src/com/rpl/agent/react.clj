@@ -10,12 +10,13 @@
    [com.rpl.rama :as rama]
    [com.rpl.rama.test :as rtest])
   (:import
-   [com.rpl.agentorama AgentComplete]
-   [dev.langchain4j.data.document Document]
+   [dev.langchain4j.data.document
+    Document]
    [dev.langchain4j.data.message
     SystemMessage
     UserMessage]
-   [dev.langchain4j.model.openai OpenAiChatModel]
+   [dev.langchain4j.model.openai
+    OpenAiChatModel]
    [dev.langchain4j.web.search
     WebSearchRequest]
    [dev.langchain4j.web.search.tavily
