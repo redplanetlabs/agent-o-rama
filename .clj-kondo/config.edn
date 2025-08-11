@@ -1,0 +1,2 @@
+{:lint-as
+ {com.rpl.agent-o-rama/defagentmodule clojure.core/defn}}
