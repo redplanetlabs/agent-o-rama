@@ -47,8 +47,7 @@
        :other
        10
        11
-       {"caller-data" caller-data
-        "args"        args})
+       {"caller-data" caller-data})
       (+ (get args "c")
          (* (-> args
                 (get "a")
@@ -210,8 +209,9 @@
          [(mk-request "add" "id1" {"a" 1 "b" 3})
           (mk-request "math-with-context" "id2" {"a" 6 "b" 3 "c" 5})
           (mk-request "throw" "id3" {"type" "arith"})])
+       (bind inv (aor/agent-initiate foo "tools1" 11 requests))
        (bind [r1 r2 r3 :as res]
-         (sort-res (aor/agent-invoke foo "tools1" 11 requests)))
+         (sort-res (aor/agent-result foo inv)))
        (is (= 3 (count res)))
        (is (res= r1 "id1" "add" "4"))
        (is (res= r2 "id2" "math-with-context" "225"))
@@ -221,7 +221,46 @@
          "id3"
          "throw"
          #"Error: java.lang.ArithmeticException: intentional[\s\S]*\nPlease fix your mistakes."))
-       ;; TODO: <<<<>>>> nested ops
+       (bind n (tool-nested-ops inv))
+       ;; also captures record-nested-op call in the math-with-context tool
+       (is (= 4 (count n)))
+       (is (every? #(= :tool-call (:type %)) (rest n)))
+       (is (= :other
+              (-> n
+                  first
+                  :type)))
+       (is (= {"caller-data" 11}
+              (-> n
+                  first
+                  :info)))
+       (is (= {"id"     "id1"
+               "name"   "add"
+               "args"   {"a" 1 "b" 3}
+               "type"   "success"
+               "result" 4}
+              (-> n
+                  second
+                  :info)))
+       (is (= {"id"     "id2"
+               "name"   "math-with-context"
+               "args"   {"a" 6 "b" 3 "c" 5}
+               "type"   "success"
+               "result" 225}
+              (-> n
+                  (nth 2)
+                  :info)))
+       (bind info (:info (nth n 3)))
+       (is (= {"id"   "id3"
+               "name" "throw"
+               "args" {"type" "arith"}
+               "type" "failure"}
+              (select-keys info ["id" "name" "args" "type"])))
+       (is (re-matches #"java.lang.ArithmeticException: intentional[\s\S]*"
+                       (get info "exception")))
+       (is
+        (re-matches
+         #"Error: java.lang.ArithmeticException: intentional[\s\S]*\nPlease fix your mistakes."
+         (get info "result")))
 
        (bind requests
          [(mk-request "blah" "id1" {"a" 1 "b" 3})
@@ -253,32 +292,50 @@
                   second
                   :info)))
 
+       (bind [r1 r2 :as res]
+         (sort-res
+          (aor/agent-invoke foo
+                            "tools2"
+                            nil
+                            [(mk-request "abc" "id1" {})
+                             (mk-request "throw" "id3" {"type" "ex-info"})])))
+       (is (= 2 (count res)))
+       (is
+        (res=
+         r1
+         "id1"
+         "abc"
+         "Error: abc is not a valid tool, try one of [add, math-with-context, throw]."))
+       (is (res= r2 "id3" "throw" "blah"))
 
-       ; (bind [r1 r2 :as res]
-       ;   (sort-res
-       ;    (aor/agent-invoke foo
-       ;                      "tools2"
-       ;                      nil
-       ;                      [(mk-request "abc" "id1" {})
-       ;                       (mk-request "throw" "id3" {"type" "ex-info"})])))
-       ; (is (= 2 (count res)))
-       ; (is
-       ;  (res=
-       ;   r1
-       ;   "id1"
-       ;   "abc"
-       ;   "Error: abc is not a valid tool, try one of [add, math-with-context,
-       ;   throw]."))
-       ; (is (res= r2 "id3" "throw" "blah"))
-       ;
-       ; (is (thrown?
-       ;      Exception
-       ;      (aor/agent-invoke foo
-       ;                        "tools3"
-       ;                        nil
-       ;                        [(mk-request "throw" "id1" {"type" "arith"})])))
-       ;
-       ;
+
+       (bind inv
+         (aor/agent-initiate foo
+                             "tools3"
+                             nil
+                             [(mk-request "throw" "id1" {"type" "arith"})]))
+       (is (thrown?
+            Exception
+            (aor/agent-result foo inv)))
+
+       (bind n (tool-nested-ops inv))
+       (is (= 1 (count n)))
+       (is (every? #(= :tool-call (:type %)) n))
+       (bind info
+         (-> n
+             first
+             :info))
+       (is (= {"id"   "id1"
+               "name" "throw"
+               "args" {"type" "arith"}
+               "type" "throw"}
+              (select-keys info ["id" "name" "args" "type"])))
+       (is (= 5 (count info)))
+       (is (re-matches
+            #"java.lang.ArithmeticException: intentional[\s\S]*"
+            (get info "exception")))
+
+
        ; (bind [r1 :as res]
        ;   (aor/agent-invoke foo
        ;                     "tools4"
@@ -304,9 +361,10 @@
 
        ;; TODO: <<<<>>>>
        ;; - test all the nested ops tracing cases
-       ;;   - success
-       ;;   - invalid tool call
-       ;;   - exception rethrow
+       ;;   x success
+       ;;   x invalid tool call
+       ;;   x exception default handler
+       ;;   x exception rethrow
        ;;   - a new exception during error handling
        ;;     - could give static string of "" to induce a langchain4j error for
        ;;     a different exception type
