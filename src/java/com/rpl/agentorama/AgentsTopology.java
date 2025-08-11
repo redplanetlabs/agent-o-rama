@@ -13,6 +13,8 @@ public interface AgentsTopology {
   }
 
   AgentGraph newAgent(String name);
+  AgentGraph newToolsAgent(String name, List<ToolInfo> tools);
+  AgentGraph newToolsAgent(String name, List<ToolInfo> tools, ToolsAgentOptions options);
 
   void declareKeyValueStore(String name, Class keyClass, Class valClass);
   void declareDocumentStore(String name, Class keyClass, Object... keyAndValClasses);
