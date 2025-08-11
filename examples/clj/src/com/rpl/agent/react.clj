@@ -22,14 +22,14 @@
    [dev.langchain4j.web.search.tavily
     TavilyWebSearchEngine]))
 
-(defn tavily-web-search-engine
+(defn- tavily-web-search-engine
   [api-key]
   (-> (TavilyWebSearchEngine/builder)
       (.apiKey api-key)
       (.excludeDomains ["en.wikipedia.org"])
       .build))
 
-(defn mk-tavily-search [{:keys [max-results] :or {max-results 3}}]
+(defn- mk-tavily-search [{:keys [max-results] :or {max-results 3}}]
   (fn tavily-search
     [agent-node _ arguments]
     (let [terms                         (get arguments "terms")
@@ -47,7 +47,8 @@
         (.toDocuments
          (.search tavily search-results)))))))
 
-(def TOOLS
+(def ^:private TOOLS
+  "Description of available tools"
   [(tools/tool-info
     (tools/tool-specification
      "tavily"
@@ -59,17 +60,11 @@
     (mk-tavily-search {:max-results 3})
     {:include-context? true})])
 
-(def ^:private SYSTEM-PROMPT "You are a helpful AI assistant.
-
-System time: %s")
-
-(def ^:private openai-key-name "openai-api-key")
-
 (aor/defagentmodule ReActModule
   [topology]
   (aor/declare-agent-object
    topology
-   openai-key-name
+   "openai-api-key"
    (System/getenv "OPENAI_API_KEY"))
 
   (aor/declare-agent-object
@@ -80,11 +75,11 @@ System time: %s")
   (aor/declare-agent-object-builder
    topology
    "openai"
-   (fn [setup]
+   (fn chat-model [setup]
      ;; NOTE Using non-streaming model as 1.2 seems to have an issue wrapping
      ;; ToolExecutionRequest for the return value from the chat.
      (-> (OpenAiChatModel/builder)
-         (.apiKey (aor/get-agent-object setup openai-key-name))
+         (.apiKey (aor/get-agent-object setup "openai-api-key"))
          (.modelName "gpt-4o-mini")
          .build)))
 
@@ -115,7 +110,14 @@ System time: %s")
                 next-messages (into (conj messages ai-message) tool-results)]
             (aor/emit! agent-node "chat" next-messages))
           (aor/result! agent-node (.text ai-message)))))))
+
   (tools/new-tools-agent topology "tools" TOOLS))
+
+;;; Example Invocation
+
+(def ^:private SYSTEM-PROMPT "You are a helpful AI assistant.
+
+System time: %s")
 
 (defn run-agent
   []
