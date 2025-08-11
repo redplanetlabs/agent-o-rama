@@ -317,7 +317,6 @@
        (is (thrown?
             Exception
             (aor/agent-result foo inv)))
-
        (bind n (tool-nested-ops inv))
        (is (= 1 (count n)))
        (is (every? #(= :tool-call (:type %)) n))
@@ -335,29 +334,28 @@
             #"java.lang.ArithmeticException: intentional[\s\S]*"
             (get info "exception")))
 
+       (bind [r1 :as res]
+         (aor/agent-invoke foo
+                           "tools4"
+                           nil
+                           [(mk-request "throw" "id11" {"type" "arith"})]))
+       (is (= 1 (count res)))
+       (is (res= r1 "id11" "throw" "ae"))
 
-       ; (bind [r1 :as res]
-       ;   (aor/agent-invoke foo
-       ;                     "tools4"
-       ;                     nil
-       ;                     [(mk-request "throw" "id11" {"type" "arith"})]))
-       ; (is (= 1 (count res)))
-       ; (is (res= r1 "id11" "throw" "ae"))
-       ;
-       ; (bind [r1 :as res]
-       ;   (aor/agent-invoke foo
-       ;                     "tools4"
-       ;                     nil
-       ;                     [(mk-request "throw" "id11" {"type" "ex-info"})]))
-       ; (is (= 1 (count res)))
-       ; (is (res= r1 "id11" "throw" "ei"))
-       ;
-       ; (is (thrown? Exception
-       ;              (aor/agent-invoke
-       ;               foo
-       ;               "tools4"
-       ;               nil
-       ;               [(mk-request "throw" "id11" {"type" "none"})])))
+       (bind [r1 :as res]
+         (aor/agent-invoke foo
+                           "tools4"
+                           nil
+                           [(mk-request "throw" "id11" {"type" "ex-info"})]))
+       (is (= 1 (count res)))
+       (is (res= r1 "id11" "throw" "ei"))
+
+       (is (thrown? Exception
+                    (aor/agent-invoke
+                     foo
+                     "tools4"
+                     nil
+                     [(mk-request "throw" "id11" {"type" "none"})])))
 
        ;; TODO: <<<<>>>>
        ;; - test all the nested ops tracing cases
