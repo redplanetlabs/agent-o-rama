@@ -47,7 +47,8 @@
 
 (defn error-handler-default
   []
-  h/throwable->str)
+  (fn [e]
+    (tools-impl/tool-error-string (h/throwable->str e))))
 
 (defn error-handler-by-type
   [tuples]

@@ -149,10 +149,11 @@
        (is (res= r1 "id1" "add" "4"))
        (is (res= r2 "id2" "math-with-context" "225"))
        (is
-        (res= r3
-              "id3"
-              "throw"
-              #"java.lang.ArithmeticException: intentional[\s\S]*"))
+        (res=
+         r3
+         "id3"
+         "throw"
+         #"Error: java.lang.ArithmeticException: intentional[\s\S]*\nPlease fix your mistakes."))
 
        (bind requests
          [(mk-request "blah" "id1" {"a" 1 "b" 3})
@@ -165,17 +166,31 @@
          r1
          "id1"
          "blah"
-         #"com.rpl.agentorama.InvalidToolNameException: Invalid tool name[\s\S]*"))
+         "Error: blah is not a valid tool, try one of [add, math-with-context, throw]."))
        (is (res= r2 "id2" "add" "109"))
 
-       (bind [r1 :as res]
-         (aor/agent-invoke foo "tools2" nil [(mk-request "abc" "id1" {})]))
-       (is (= 1 (count res)))
-       (is (res= r1 "id1" "abc" "blah"))
+       (bind [r1 r2 :as res]
+         (sort-res
+          (aor/agent-invoke foo
+                            "tools2"
+                            nil
+                            [(mk-request "abc" "id1" {})
+                             (mk-request "throw" "id3" {"type" "ex-info"})])))
+       (is (= 2 (count res)))
+       (is
+        (res=
+         r1
+         "id1"
+         "abc"
+         "Error: abc is not a valid tool, try one of [add, math-with-context, throw]."))
+       (is (res= r2 "id3" "throw" "blah"))
 
        (is (thrown?
             Exception
-            (aor/agent-invoke foo "tools3" nil [(mk-request "abc" "id1" {})])))
+            (aor/agent-invoke foo
+                              "tools3"
+                              nil
+                              [(mk-request "throw" "id1" {"type" "arith"})])))
 
 
        (bind [r1 :as res]

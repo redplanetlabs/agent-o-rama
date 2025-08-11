@@ -2,6 +2,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama path])
   (:require
+   [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -17,11 +18,19 @@
    [dev.langchain4j.data.message
     ToolExecutionResultMessage]))
 
-;; TODO: <<<<>>>> use error templates
-; INVALID_TOOL_NAME_ERROR_TEMPLATE = (
-;     "Error: {requested_tool} is not a valid tool, try one of [{available_tools}]."
-; )
-; TOOL_CALL_ERROR_TEMPLATE = "Error: {error}\n Please fix your mistakes."
+(def INVALID-ERROR-TEMPLATE
+  "Error: %s is not a valid tool, try one of [%s].")
+
+(def ERROR-TEMPLATE
+  "Error: %s\nPlease fix your mistakes.")
+
+(defn tool-invalid-error-string
+  [invalid-name tool-names]
+  (format INVALID-ERROR-TEMPLATE invalid-name (str/join ", " tool-names)))
+
+(defn tool-error-string
+  [s]
+  (format ERROR-TEMPLATE s))
 
 (def MAPPER (j/object-mapper {:decode-key-fn str}))
 
@@ -41,7 +50,10 @@
 
 (defn mk-tool-fn
   [tools error-handler]
-  (let [tools-by-name (mk-tools-by-name tools)]
+  (let [tools-by-name (mk-tools-by-name tools)
+        tool-names    (-> tools-by-name
+                          keys
+                          sort)]
     (fn [agent-node ^ToolExecutionRequest request caller-data]
       (let [start-time-millis (h/current-time-millis)
             tool-name (.name request)
@@ -74,8 +86,12 @@
                                             start-time-millis
                                             (h/current-time-millis)
                                             (assoc base-info "type" "invalid"))
-              (throw (InvalidToolNameException. (str "Invalid tool name: "
-                                                     request)))))
+              (i/emit! agent-node
+                       "agg-results"
+                       (ToolExecutionResultMessage/from
+                        request
+                        (tool-invalid-error-string tool-name tool-names)))
+            ))
           (catch Throwable t
             (try
               (let [error-ret (error-handler t)]
