@@ -52,12 +52,15 @@
 (defn error-handler-by-type
   [tuples]
   (fn [e]
-    (reduce
-     (fn [_ [ex-type afn]]
-       (if (instance? ex-type e)
-         (reduced (afn e))))
-     nil
-     tuples)))
+    (if-let [ret (reduce
+                  (fn [_ [ex-type afn]]
+                    (when (instance? ex-type e)
+                      (reduced (afn e))))
+                  nil
+                  tuples)]
+      ret
+      (throw e)
+    )))
 
 (defn error-handler-static-string-by-type
   [tuples]

@@ -17,6 +17,12 @@
    [dev.langchain4j.data.message
     ToolExecutionResultMessage]))
 
+;; TODO: <<<<>>>> use error templates
+; INVALID_TOOL_NAME_ERROR_TEMPLATE = (
+;     "Error: {requested_tool} is not a valid tool, try one of [{available_tools}]."
+; )
+; TOOL_CALL_ERROR_TEMPLATE = "Error: {error}\n Please fix your mistakes."
+
 (def MAPPER (j/object-mapper {:decode-key-fn str}))
 
 (defn- mk-tools-by-name

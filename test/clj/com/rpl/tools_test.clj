@@ -7,6 +7,7 @@
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.langchain4j.json :as lj]
    [com.rpl.agent-o-rama.tools :as tools]
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.queries :as queries]
@@ -66,7 +67,7 @@
       (let [type (get args "type")]
         (condp = type
           "arith" (throw (ArithmeticException. "intentional"))
-          "ex-info" (throw (ex-info "ex-info"))
+          "ex-info" (throw (ex-info "ex-info" {}))
           (throw (ClassCastException. "cce"))
         ))))
   ])
@@ -90,7 +91,8 @@
            )))))
 
 (deftest tools-test
-  (with-redefs [aor-types/get-config (max-retries-override 0)]
+  (with-redefs [anode/log-node-error (fn [& args])
+                aor-types/get-config (max-retries-override 0)]
     (with-open [ipc (rtest/create-ipc)]
       (letlocals
        (bind module
@@ -166,17 +168,47 @@
          #"com.rpl.agentorama.InvalidToolNameException: Invalid tool name[\s\S]*"))
        (is (res= r2 "id2" "add" "109"))
 
+       (bind [r1 :as res]
+         (aor/agent-invoke foo "tools2" nil [(mk-request "abc" "id1" {})]))
+       (is (= 1 (count res)))
+       (is (res= r1 "id1" "abc" "blah"))
+
+       (is (thrown?
+            Exception
+            (aor/agent-invoke foo "tools3" nil [(mk-request "abc" "id1" {})])))
+
+
+       (bind [r1 :as res]
+         (aor/agent-invoke foo
+                           "tools4"
+                           nil
+                           [(mk-request "throw" "id11" {"type" "arith"})]))
+       (is (= 1 (count res)))
+       (is (res= r1 "id11" "throw" "ae"))
+
+       (bind [r1 :as res]
+         (aor/agent-invoke foo
+                           "tools4"
+                           nil
+                           [(mk-request "throw" "id11" {"type" "ex-info"})]))
+       (is (= 1 (count res)))
+       (is (res= r1 "id11" "throw" "ei"))
+
+       (is (thrown? Exception
+                    (aor/agent-invoke
+                     foo
+                     "tools4"
+                     nil
+                     [(mk-request "throw" "id11" {"type" "none"})])))
+
        ;; TODO: <<<<>>>>
        ;; - test all the nested ops tracing cases
        ;;   - success
        ;;   - invalid tool call
        ;;   - exception rethrow
        ;;   - a new exception during error handling
-       ;; - test all error handlers
-       ;;   - default (print it)
-       ;;   - static string
-       ;;   - rethrow
-       ;;   - static-string-by-type
+       ;;     - could give static string of "" to induce a langchain4j error for
+       ;;     a different exception type
       ))))
 
 ;; TODO: <<<<>>>>
