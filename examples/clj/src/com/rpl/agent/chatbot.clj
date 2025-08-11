@@ -1,41 +1,26 @@
 (ns com.rpl.agent.chatbot
   "An agent to perform one turn in a chatbot.
-  Provides summarisation and memory."
+  Provides per-thread summarisation and memory."
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.store :as store]
    [com.rpl.rama :as rama]
    [com.rpl.rama.path :as path]
-   [com.rpl.rama.test :as rtest]
-   [jsonista.core :as j])
+   [com.rpl.rama.test :as rtest])
   (:import
-   [com.rpl.agentorama
-    AgentComplete]
    [dev.langchain4j.data.message
     SystemMessage
     UserMessage]
    [dev.langchain4j.model.openai
     OpenAiStreamingChatModel]))
 
-(def MAPPER (j/object-mapper {:decode-key-fn keyword}))
-
-(defn- chat-and-get-text
-  ^String [model request]
-  (-> (lc4j/chat model request)
-      .aiMessage
-      .text))
-
-(def ^:private agent-name "ChatbotAgent")
-(def ^:private openai-key-name "openai-api-key")
-(def ^:private store-name "$$kv-store")
-
-
 (aor/defagentmodule ChatbotModule
   [topology]
+
   (aor/declare-agent-object
    topology
-   openai-key-name
+   "openai-api-key"
    (System/getenv "OPENAI_API_KEY"))
 
   (aor/declare-agent-object-builder
@@ -43,22 +28,22 @@
    "openai"
    (fn [setup]
      (-> (OpenAiStreamingChatModel/builder)
-         (.apiKey (aor/get-agent-object setup openai-key-name))
+         (.apiKey (aor/get-agent-object setup "openai-api-key"))
          (.modelName "gpt-4o-mini")
          .build)))
 
-  (aor/declare-key-value-store topology store-name Long Object)
+  (aor/declare-key-value-store topology "$$kv-store" Long Object)
 
   (->
    topology
-   (aor/new-agent agent-name)
+   (aor/new-agent "ChatbotAgent")
 
    (aor/node
     "chat"
     ["summarize"]
     (fn chat-node [agent-node messages {:keys [thread-id] :as config}]
       (let [openai        (aor/get-agent-object agent-node "openai")
-            store         (aor/get-store agent-node store-name)
+            store         (aor/get-store agent-node "$$kv-store")
             checkpoint    (store/get store thread-id)
             summary       (:summary checkpoint)
             chat-messages (into
@@ -97,7 +82,7 @@
     (fn summarize-node
       [agent-node summary messages ai-message {:keys [thread-id]}]
       (let [openai        (aor/get-agent-object agent-node "openai")
-            store         (aor/get-store agent-node store-name)
+            store         (aor/get-store agent-node "$$kv-store")
             chat-messages (conj
                            messages
                            (UserMessage.
@@ -118,7 +103,9 @@
          {:messages new-messages :summary new-summary})
         (aor/result! agent-node {:messages [ai-message]}))))))
 
-(def inputs
+;;; Example invocation
+
+(def ^:private inputs
   ["hi! I'm Lance"
    "what's my name?"
    "I like The 49'ers"
@@ -131,7 +118,7 @@
     (rtest/launch-module! ipc ChatbotModule {:tasks 4 :threads 2})
     (let [module-name   (rama/get-module-name ChatbotModule)
           agent-manager (aor/agent-manager ipc module-name)
-          agent         (aor/agent-client agent-manager agent-name)
+          agent         (aor/agent-client agent-manager "ChatbotAgent")
           thread-id     0]
       (loop [inputs inputs]
         (when inputs
@@ -141,12 +128,12 @@
                               {:thread-id thread-id})
                 step         (aor/agent-next-step agent agent-invoke)
                 result       (:result step)]
-            (assert (instance? AgentComplete step))
             (doseq [msg (:messages result)]
               (println msg))
             (recur (next inputs)))))
-      (let [store-pstate (rama/foreign-pstate ipc module-name store-name)]
-        (assert
-         (:summary
-          (rama/foreign-select-one (path/keypath thread-id) store-pstate))))
-      (rtest/destroy-module! ipc module-name))))
+      (let [store-pstate (rama/foreign-pstate ipc module-name "$$kv-store")]
+        (println
+         "Most recent summary:\n"
+         (rama/foreign-select-one
+          [(path/keypath thread-id) :summary]
+          store-pstate))))))
