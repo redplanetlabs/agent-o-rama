@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.langchain4j.json :as lj]
    [com.rpl.agent-o-rama.store :as store]
+   [com.rpl.agent-o-rama.tools :as tools]
    [com.rpl.rama :as rama]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.path :as path]
@@ -130,7 +131,7 @@ Your current instructions are:
 
 (def ^:private Profile
   (lj/object
-   {"description" "The profile of a user."}
+   {:description "The profile of a user."}
    {"name"        (lj/string "The user's name")
     "job"         (lj/string "The user's job")
     "connections" (lj/array
@@ -164,40 +165,40 @@ Your current instructions are:
 (def ^:private agent-name "ChatbotAgent")
 (def ^:private openai-key-name "openai-api-key")
 
-(defn- update-tool-spec []
-  (lc4j/tool-specification
-   "UpdateMemory"
-   (lj/object
-    {:description "Updates persistent memory for info from chat messages"
-     :required    ["update_type"]}
-    {"update_type" (lj/enum ["profile" "todo" "instructions"])})
-   "Updates profile, todo or instruction memory with info from chat messages"))
+;; (defn- update-tool-spec []
+;;   (tools/tool-specification
+;;    "UpdateMemory"
+;;    (lj/object
+;;     {:description "Updates persistent memory for info from chat messages"
+;;      :required    ["update_type"]}
+;;     {"update_type" (lj/enum ["profile" "todo" "instructions"])})
+;;    "Updates profile, todo or instruction memory with info from chat messages"))
 
-(defn- tool-specs []
-  [(update-tool-spec)])
+;; (defn- tool-specs []
+;;   [(update-tool-spec)])
 
-(def ^:private TOOL-CALL-ERROR-TEMPLATE
-  "Error: %s\n Please fix your mistakes.")
+;; (def ^:private TOOL-CALL-ERROR-TEMPLATE
+;;   "Error: %s\n Please fix your mistakes.")
 
-(defn tool-error-message
-  [e]
-  (format TOOL-CALL-ERROR-TEMPLATE e))
+;; (defn tool-error-message
+;;   [e]
+;;   (format TOOL-CALL-ERROR-TEMPLATE e))
 
-(defn- wrap-tool-fn
-  [tool-fn]
-  (fn wrapped-tool-fn [agent-node id tool-name arguments messages config]
-    (try
-      (ToolExecutionResultMessage.
-       id
-       tool-name
-       (tool-fn agent-node id tool-name arguments messages config))
-      (catch Exception e
-        ;; NOTE we don't seem able to set the `status` field to `error`
-        (cljlogging/error e "tool call failed")
-        (ToolExecutionResultMessage.
-         id
-         tool-name
-         (tool-error-message e))))))
+;; (defn- wrap-tool-fn
+;;   [tool-fn]
+;;   (fn wrapped-tool-fn [agent-node id tool-name arguments messages config]
+;;     (try
+;;       (ToolExecutionResultMessage.
+;;        id
+;;        tool-name
+;;        (tool-fn agent-node id tool-name arguments messages config))
+;;       (catch Exception e
+;;         ;; NOTE we don't seem able to set the `status` field to `error`
+;;         (cljlogging/error e "tool call failed")
+;;         (ToolExecutionResultMessage.
+;;          id
+;;          tool-name
+;;          (tool-error-message e))))))
 
 (defn update-profile
   [agent-node messages {:keys [user-id]}]
@@ -266,14 +267,28 @@ Your current instructions are:
     "updated"))
 
 (defn update-tool
-  [agent-node id tool-name arguments messages config]
-  (let [update-type (:update-type arguments)]
+  [agent-node config arguments]
+  (prn :update-tool :config config :args arguments)
+  (let [update-type (get arguments "update_type")
+        messages    (:messages config)]
     (case update-type
       "profile"      (update-profile agent-node messages config)
       "todo"         (update-todo agent-node messages config)
       "instructions" (update-instruction agent-node messages config))))
 
-(def tool-fns {"UpdateMemory" (wrap-tool-fn update-tool)})
+(def TOOLS
+  [(tools/tool-info
+    (tools/tool-specification
+     "UpdateMemory"
+     (lj/object
+      {:description "Updates persistent memory for info from chat messages"
+       :required    ["update_type"]}
+      {"update_type" (lj/enum ["profile" "todo" "instructions"])})
+     "Updates profile, todo or instruction memory with info from chat messages")
+    update-tool
+    {:include-context? true})])
+
+;; (def tool-fns {"UpdateMemory" (wrap-tool-fn update-tool)})
 
 (aor/defagentmodule TodoModule
   [topology]
@@ -317,11 +332,12 @@ Your current instructions are:
 
    (aor/node
     "maestro"
-    "tools"
+    "maestro"
     (fn maestro-node [agent-node messages {:keys [user-id] :as config}]
       (let [chat-model         (aor/get-agent-object
                                 agent-node
                                 "openai-non-streaming")
+            tools-exec         (aor/agent-client agent-node "tools-execution")
             profiles-store     (aor/get-store agent-node "$$profiles")
             todos-store        (aor/get-store agent-node "$$todos")
             instructions-store (aor/get-store agent-node "$$instructions")
@@ -334,87 +350,96 @@ Your current instructions are:
             chat-messages      (into
                                 [(SystemMessage. system-msg)]
                                 messages)
-            chat-options       {:tool-specifications (tool-specs)}
+            chat-options       {:tools TOOLS}
             response           (lc4j/chat
                                 chat-model
                                 (lc4j/chat-request
                                  chat-messages
                                  chat-options))
             ai-message         (.aiMessage response)
-            tool-calls         (vec (.toolExecutionRequests ai-message))
+            tool-calls         (not-empty
+                                (vec
+                                 (.toolExecutionRequests ai-message)))
             next-messages      (conj messages ai-message)]
-        (if (seq tool-calls)
-          (aor/emit! agent-node
-                     "tools"
-                     tool-calls
-                     messages
-                     config)
+        (if tool-calls
+          (let [tool-results  (aor/agent-invoke
+                               tools-exec
+                               tool-calls
+                               (assoc config :messages messages))
+                next-messages (into next-messages tool-results)]
+            (prn :tool-results tool-results)
+            (prn :next-messages next-messages)
+            (aor/emit! agent-node
+                       "maestro"
+                       next-messages
+                       config))
           (aor/result! agent-node {:messages next-messages})))))
 
-   (aor/agg-start-node
-    ;; Handle all LLM tool calls from an AiResponse
-    "tools"
-    "tool"
-    (fn tools-fn [agent-node tool-calls messages config]
-      (doseq [^ToolExecutionRequest tool-exec-req tool-calls]
-        (let [id          (.id tool-exec-req)
-              tool-name   (.name tool-exec-req)
-              args-string (.arguments tool-exec-req)]
-          (aor/emit!
-           agent-node
-           "tool"
-           id
-           tool-name
-           args-string
-           messages
-           config)))
-      {:messages messages :config config}))
+   ;; (aor/agg-start-node
+   ;;  ;; Handle all LLM tool calls from an AiResponse
+   ;;  "tools"
+   ;;  "tool"
+   ;;  (fn tools-fn [agent-node tool-calls messages config]
+   ;;    (doseq [^ToolExecutionRequest tool-exec-req tool-calls]
+   ;;      (let [id          (.id tool-exec-req)
+   ;;            tool-name   (.name tool-exec-req)
+   ;;            args-string (.arguments tool-exec-req)]
+   ;;        (aor/emit!
+   ;;         agent-node
+   ;;         "tool"
+   ;;         id
+   ;;         tool-name
+   ;;         args-string
+   ;;         messages
+   ;;         config)))
+   ;;    {:messages messages :config config}))
 
-   (aor/node
-    ;; Handle one LLM tool execution request
-    "tool"
-    "tool-results-agg"
-    (fn tool-node [agent-node id tool-name arguments messages config]
-      (let [start-time-millis                      (h/current-time-millis)
-            data                                   (j/read-value
-                                                    arguments
-                                                    MAPPER)
-            tool-fn                                (tool-fns tool-name)
-            ^ToolExecutionResultMessage result-msg (tool-fn
-                                                    agent-node
-                                                    id
-                                                    tool-name
-                                                    data
-                                                    messages
-                                                    config)
-            end-time-millis                        (h/current-time-millis)]
-        (aor/record-nested-op!
-         agent-node
-         :other
-         start-time-millis
-         end-time-millis
-         {"tool-call-id" id
-          "tool-name"    tool-name
-          "arguments"    data
-          "result"       (.text result-msg)})
-        (aor/emit!
-         agent-node
-         "tool-results-agg"
-         result-msg))))
+   ;; (aor/node
+   ;;  ;; Handle one LLM tool execution request
+   ;;  "tool"
+   ;;  "tool-results-agg"
+   ;;  (fn tool-node [agent-node id tool-name arguments messages config]
+   ;;    (let [start-time-millis                      (h/current-time-millis)
+   ;;          data                                   (j/read-value
+   ;;                                                  arguments
+   ;;                                                  MAPPER)
+   ;;          tool-fn                                (tool-fns tool-name)
+   ;;          ^ToolExecutionResultMessage result-msg (tool-fn
+   ;;                                                  agent-node
+   ;;                                                  id
+   ;;                                                  tool-name
+   ;;                                                  data
+   ;;                                                  messages
+   ;;                                                  config)
+   ;;          end-time-millis                        (h/current-time-millis)]
+   ;;      (aor/record-nested-op!
+   ;;       agent-node
+   ;;       :other
+   ;;       start-time-millis
+   ;;       end-time-millis
+   ;;       {"tool-call-id" id
+   ;;        "tool-name"    tool-name
+   ;;        "arguments"    data
+   ;;        "result"       (.text result-msg)})
+   ;;      (aor/emit!
+   ;;       agent-node
+   ;;       "tool-results-agg"
+   ;;       result-msg))))
 
-   (aor/agg-node
-    "tool-results-agg"
-    ["maestro"]
-    aggs/+vec-agg
-    (fn [agent-node results {:keys [messages config]}]
-      (aor/result! agent-node {:messages messages})
-      #_(aor/emit!
-         agent-node
-         "maestro"
-         (into messages results)
-         config))))
+   ;; (aor/agg-node
+   ;;  "tool-results-agg"
+   ;;  ["maestro"]
+   ;;  aggs/+vec-agg
+   ;;  (fn [agent-node results {:keys [messages config]}]
+   ;;    (aor/result! agent-node {:messages messages})
+   ;;    #_(aor/emit!
+   ;;       agent-node
+   ;;       "maestro"
+   ;;       (into messages results)
+   ;;       config)))
+   )
 
-  )
+  (tools/new-tools-agent topology "tools-execution" TOOLS))
 
 (def inputs
   ["My name is Lance. I live in SF with my wife. I have a 1 year old daughter."
