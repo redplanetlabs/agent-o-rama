@@ -8,8 +8,7 @@
    [com.rpl.agent-o-rama.langchain4j.json :as lj]
    [com.rpl.agent-o-rama.tools :as tools]
    [com.rpl.rama :as rama]
-   [com.rpl.rama.test :as rtest]
-   [jsonista.core :as j])
+   [com.rpl.rama.test :as rtest])
   (:import
    [com.rpl.agentorama AgentComplete]
    [dev.langchain4j.data.document Document]
@@ -21,8 +20,6 @@
     WebSearchRequest]
    [dev.langchain4j.web.search.tavily
     TavilyWebSearchEngine]))
-
-(def MAPPER (j/object-mapper {:decode-key-fn keyword}))
 
 (defn tavily-web-search-engine
   [api-key]
@@ -65,8 +62,6 @@
 
 System time: %s")
 
-(def ^:private react-agent-name "ReActAgent")
-
 (def ^:private openai-key-name "openai-api-key")
 
 (aor/defagentmodule ReActModule
@@ -100,14 +95,14 @@ System time: %s")
 
   (->
    topology
-   (aor/new-agent react-agent-name)
+   (aor/new-agent "ReActAgent")
 
    (aor/node
     "chat"
-    ["chat"]
+    "chat"
     (fn chat-fn [agent-node messages]
       (let [openai       (aor/get-agent-object agent-node "openai")
-            tools-exec   (aor/agent-client agent-node "tools-execution")
+            tools        (aor/agent-client agent-node "tools")
             chat-options {:tools TOOLS}
             response     (lc4j/chat
                           openai
@@ -115,13 +110,11 @@ System time: %s")
             ai-message   (.aiMessage response)
             tool-calls   (not-empty (vec (.toolExecutionRequests ai-message)))]
         (if tool-calls
-          (let [tool-results  (aor/agent-invoke tools-exec tool-calls)
-                _             (prn :tool-results tool-results)
+          (let [tool-results  (aor/agent-invoke tools tool-calls)
                 next-messages (into (conj messages ai-message) tool-results)]
-            (prn :results tool-results)
             (aor/emit! agent-node "chat" next-messages))
-          (aor/result! agent-node {:messages (conj messages ai-message)}))))))
-  (tools/new-tools-agent topology "tools-execution" TOOLS))
+          (aor/result! agent-node (.text ai-message)))))))
+  (tools/new-tools-agent topology "tools" TOOLS))
 
 (defn run-agent
   []
@@ -130,18 +123,15 @@ System time: %s")
     (rtest/launch-module! ipc ReActModule {:tasks 4 :threads 2})
     (let [module-name   (rama/get-module-name ReActModule)
           agent-manager (aor/agent-manager ipc module-name)
-          agent         (aor/agent-client agent-manager react-agent-name)
-          agent-invoke  (aor/agent-initiate
+          agent         (aor/agent-client agent-manager "ReActAgent")
+          _             (print "Ask your question (agent has web search access): ")
+          _             (flush)
+          user-input    (read-line)
+          result        (aor/agent-invoke
                          agent
                          [(SystemMessage/from
                            (format
                             SYSTEM-PROMPT
                             (.toString (java.time.Instant/now))))
-                          (UserMessage. "Who is the founder of LangChain?")])
-          step          (aor/agent-next-step agent agent-invoke)]
-      (assert (instance? AgentComplete step))
-      (rtest/destroy-module! ipc module-name)
-      (assert (str/includes?
-               (str/lower-case (last (:messages (:result step))))
-               "harrison"))
-      (:result step))))
+                          (UserMessage. user-input)])]
+      (println result))))
