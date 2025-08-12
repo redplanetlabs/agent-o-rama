@@ -76,6 +76,7 @@
        (.newToolsAgent this name tools nil))
      (newToolsAgent [this name tools options]
        (tools/new-tools-agent
+        this
         name
         tools
         (if options @options)))

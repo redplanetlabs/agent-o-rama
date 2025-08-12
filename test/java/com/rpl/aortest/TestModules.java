@@ -3,6 +3,8 @@ package com.rpl.aortest;
 import java.util.Arrays;
 
 import com.rpl.agentorama.*;
+import com.rpl.rama.*;
+import com.rpl.rama.test.*;
 
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
@@ -38,8 +40,8 @@ public class TestModules {
                                                      .addIntegerProperty("b")
                                                      .build())
                          .build(),
-        (AgentNode node, Integer context, Map<String, Integer> args) -> {
-          return "" + (args.get("a") * args.get("b") + context);
+        (AgentNode node, Integer callerData, Map<String, Integer> args) -> {
+          return "" + (args.get("a") * args.get("b") + callerData);
         })
       );
 
@@ -56,7 +58,7 @@ public class TestModules {
                                    .build());
       List requests = response.aiMessage().toolExecutionRequests();
       if(requests.size() != 1) throw new RuntimeException("failed");
-      List<ToolExecutionResultMessage> results = tools.invoke(requests);
+      List<ToolExecutionResultMessage> results = tools.invoke(requests, 6);
       if(results.size() != 1) throw new RuntimeException("failed");
       node.emit("agg", k, results.get(0).text());
     }
@@ -67,6 +69,7 @@ public class TestModules {
       topology.declareAgentObjectBuilder("openai", (AgentObjectSetup setup) -> {
         return OpenAiChatModel.builder()
                               .apiKey(setup.getAgentObject("openai-key"))
+                              .modelName("gpt-4o-mini")
                               .build();
       });
       topology.newToolsAgent("tools", TOOLS);
@@ -93,9 +96,19 @@ public class TestModules {
                 "agg",
                 null,
                 BuiltIn.MAP_AGG,
-                (AgentNode node, List ret, Object aggStartRes) -> {
+                (AgentNode node, Map ret, Object aggStartRes) -> {
                   node.result(ret);
                 });
+    }
+  }
+
+  public static Map runBasicToolsOpenAIAgent() throws Exception {
+    try(InProcessCluster ipc = InProcessCluster.create()) {
+      RamaModule module = new BasicToolsOpenAIAgent();
+      ipc.launchModule(module, new LaunchConfig(4, 2));
+      AgentManager manager = AgentManager.create(ipc, module.getModuleName());
+      AgentClient foo = manager.getAgentClient("foo");
+      return foo.invoke();
     }
   }
 }

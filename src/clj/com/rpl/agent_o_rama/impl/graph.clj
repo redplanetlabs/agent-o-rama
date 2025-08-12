@@ -175,7 +175,7 @@
              ~osym
              (aor-types/->Node (h/convert-void-jfn ~jfn-sym)))
            )))
-    ~@(for [i (range 2 (inc h/MAX-ARITY))]
+    ~@(for [i (range 1 (inc h/MAX-ARITY))]
         (let [name-sym (h/type-hinted String 'name#)
               osym     (h/type-hinted Object 'outputNodesSpec#)
               jfn-sym  (h/type-hinted (h/rama-function-class i) 'jfn#)
@@ -186,7 +186,7 @@
              this#
              ~name-sym
              ~osym
-             (aor-types/->NodeAggStart (h/convert-void-jfn ~jfn-sym) nil))
+             (aor-types/->NodeAggStart (h/convert-jfn ~jfn-sym) nil))
            )))
     ~@body
    ))
