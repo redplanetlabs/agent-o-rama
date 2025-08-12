@@ -5,6 +5,7 @@ import com.rpl.rama.PState;
 import com.rpl.rama.RamaModule.*;
 import com.rpl.rama.module.*;
 import com.rpl.rama.ops.*;
+import java.util.*;
 
 public interface AgentsTopology {
 
