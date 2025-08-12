@@ -15,11 +15,9 @@
   (:import
    [com.rpl.agentorama
     AgentComplete]
-   [dev.langchain4j.data.message
-    SystemMessage
+   [dev.langchain4j.data.message SystemMessage
     UserMessage]
-   [dev.langchain4j.model.openai
-    OpenAiChatModel
+   [dev.langchain4j.model.openai OpenAiChatModel
     OpenAiStreamingChatModel]))
 
 (defn under->dash [s]
@@ -51,9 +49,9 @@ collected yet):
 </user_profile>
 
 Here is the current ToDo List (may be empty if no tasks have been added yet):
-<todo>
+<todos>
 %s
-</todo>
+</todos>
 
 Here are the current user-specified preferences for updating the ToDo list (may
 be empty if no preferences have been specified yet):
@@ -139,64 +137,95 @@ Your current instructions are:
                    "Interests that the user has"
                    (lj/string "An interest that the user has"))}))
 
+(def ^:private ToDoFields
+  {"task"      (lj/string "The task to be completed.")
+   "deadline"  (lj/string
+                "When the task needs to be completed by (if applicable)")
+   "solutions" (lj/array
+                "List of specific, actionable solutions (e.g., specific ideas, service providers, or concrete options relevant to completing the task)",
+                (lj/string "A specific, actionable solution"))
+   "status"    (lj/enum
+                "Current status of the task"
+                ["not started" "in progress" "done" "archived"])})
+
 (def ^:private ToDo
   (lj/object
-   {:description "A ToDo item"}
-   {"task"      (lj/string "The task to be completed.")
-    "deadline"  (lj/string
-                 "When the task needs to be completed by (if applicable)")
-    "solutions" (lj/array
-                 "List of specific, actionable solutions (e.g., specific ideas, service providers, or concrete options relevant to completing the task)",
-                 (lj/string "A specific, actionable solution"))
-    "status"    (lj/enum
-                 "Current status of the task"
-                 ["not started" "in progress" "done" "archived"])}))
-
-(def ^:private ToDoList
-  (lj/object {:description "ToDos"} {"todos" (lj/array "ToDo list" ToDo)}))
+   {:description "A ToDo item"
+    :required    ["task"]}
+   ToDoFields))
 
 (def ^:pricate Instruction
   (lj/object
    {:description "Instruction"}
    {"instructions" (lj/string "instructions")}))
 
-(def ^:private agent-name "ChatbotAgent")
-(def ^:private openai-key-name "openai-api-key")
+(defn create-todo-tool
+  [agent-node {:keys [user-id]} todo]
+  (let [store (aor/get-store agent-node "$$todos")
+        uuid  (str (random-uuid))]
+    (prn :create-todo user-id uuid todo)
+    (store/pstate-transform!
+     [(path/keypath user-id)
+      (path/keypath uuid)
+      (path/termval todo)]
+     store
+     user-id)
+    (prn :create-todo :created uuid)
+    "created"))
 
-;; (defn- update-tool-spec []
-;;   (tools/tool-specification
-;;    "UpdateMemory"
-;;    (lj/object
-;;     {:description "Updates persistent memory for info from chat messages"
-;;      :required    ["update_type"]}
-;;     {"update_type" (lj/enum ["profile" "todo" "instructions"])})
-;;    "Updates profile, todo or instruction memory with info from chat messages"))
+(defn update-todo-tool
+  [agent-node {:keys [user-id]} arguments]
+  (let [store (aor/get-store agent-node "$$todos")
+        uuid  (arguments "uuid")
+        todo  (arguments "todo")]
+    (prn :update-todo user-id uuid todo)
+    (store/pstate-transform!
+     [(path/keypath user-id)
+      (path/keypath uuid)
+      (path/term #(merge % todo))]
+     store
+     user-id)
+    "updated"))
 
-;; (defn- tool-specs []
-;;   [(update-tool-spec)])
+(defn delete-todo-tool
+  [agent-node {:keys [user-id]} arguments]
+  (let [store (aor/get-store agent-node "$$todos")
+        uuid  (arguments "uuid")]
+    (prn :delete-todo user-id uuid)
+    (store/pstate-transform!
+     [(path/keypath user-id)
+      (path/keypath uuid)
+      path/NONE]
+     store
+     user-id)
+    "deleted"))
 
-;; (def ^:private TOOL-CALL-ERROR-TEMPLATE
-;;   "Error: %s\n Please fix your mistakes.")
-
-;; (defn tool-error-message
-;;   [e]
-;;   (format TOOL-CALL-ERROR-TEMPLATE e))
-
-;; (defn- wrap-tool-fn
-;;   [tool-fn]
-;;   (fn wrapped-tool-fn [agent-node id tool-name arguments messages config]
-;;     (try
-;;       (ToolExecutionResultMessage.
-;;        id
-;;        tool-name
-;;        (tool-fn agent-node id tool-name arguments messages config))
-;;       (catch Exception e
-;;         ;; NOTE we don't seem able to set the `status` field to `error`
-;;         (cljlogging/error e "tool call failed")
-;;         (ToolExecutionResultMessage.
-;;          id
-;;          tool-name
-;;          (tool-error-message e))))))
+(def TODO-TOOLS
+  [(tools/tool-info
+    (tools/tool-specification
+     "CreateToDo"
+     ToDo
+     "Creates a todo using info from chat messages")
+    create-todo-tool
+    {:include-context? true})
+   (tools/tool-info
+    (tools/tool-specification
+     "UpdateToDo"
+     (lj/object
+      {:description "Instruction to update an existing ToDo item"}
+      {"uuid" (lj/string "The uuid identifying the ToDo item to update")
+       "todo" ToDo})
+     "Updates an existing todo using from chat messages")
+    update-todo-tool
+    {:include-context? true})
+   (tools/tool-info
+    (tools/tool-specification
+     "DeleteToDo"
+     (lj/object
+      {"uuid" (lj/string "The uuid identifying the ToDo item to delete")})
+     "Updates profile, todo or instruction memory with info from chat messages")
+    delete-todo-tool
+    {:include-context? true})])
 
 (defn update-profile
   [agent-node messages {:keys [user-id]}]
@@ -221,24 +250,41 @@ Your current instructions are:
   "updated")
 
 (defn update-todo
-  [agent-node messages {:keys [user-id]}]
+  [agent-node messages {:keys [user-id] :as config}]
+  (prn :update-todo)
   (let [chat-model    (aor/get-agent-object agent-node "openai-non-streaming")
+        todo-tools    (aor/agent-client agent-node "todo-tools")
         store         (aor/get-store agent-node "$$todos")
-        todos         (store/get store user-id)
-        system-msg    (format UPDATE-TODOS (str/join "\n" todos))
-        chat-messages (into
+        _             (prn :update-todo 1)
+        todos         (into
+                       {}
+                       (store/pstate-select
+                        [(path/keypath user-id) path/ALL]
+                        store
+                        user-id))
+        _             (prn :update-todo :todos todos)
+        system-msg    (format
+                       UPDATE-TODOS
+                       (j/write-value-as-string todos MAPPER))
+        chat-messages (->
                        [(SystemMessage. system-msg)]
-                       messages)
-        chat-options  {:response-format
-                       (lc4j/json-response-format "ToDoList" ToDoList)}
+                       (into messages)
+                       #_(conj
+                          (UserMessage.
+                           "Please update the ToDos based on the conversation")))
+        chat-options  {:tools TODO-TOOLS}
+        _             (prn :update-todo 2)
         response      (lc4j/chat
                        chat-model
-                       (lc4j/chat-request
-                        chat-messages
-                        chat-options))
-        new-todos     (j/read-value (.text (.aiMessage response)))]
-    (store/put! store user-id new-todos))
-  "updated")
+                       (lc4j/chat-request chat-messages chat-options))
+        ai-message    (.aiMessage response)
+        tool-calls    (not-empty (vec (.toolExecutionRequests ai-message)))]
+    (prn :update-todo :tool-calls tool-calls)
+    (when tool-calls
+      (prn :update-todo :invoke-tools config)
+      (aor/agent-invoke todo-tools tool-calls config))
+    "updated"))
+
 
 (defn update-instruction
   [agent-node messages {:keys [user-id]}]
@@ -288,14 +334,12 @@ Your current instructions are:
     update-tool
     {:include-context? true})])
 
-;; (def tool-fns {"UpdateMemory" (wrap-tool-fn update-tool)})
-
 (aor/defagentmodule TodoModule
   [topology]
 
   (aor/declare-agent-object
    topology
-   openai-key-name
+   "openai-api-key"
    (System/getenv "OPENAI_API_KEY"))
 
   (aor/declare-agent-object-builder
@@ -303,7 +347,7 @@ Your current instructions are:
    "openai"
    (fn [setup]
      (-> (OpenAiStreamingChatModel/builder)
-         (.apiKey (aor/get-agent-object setup openai-key-name))
+         (.apiKey (aor/get-agent-object setup "openai-api-key"))
          (.modelName "gpt-4o-mini")
          (.temperature 0.0)
          (.logRequests true)
@@ -315,7 +359,7 @@ Your current instructions are:
    "openai-non-streaming"
    (fn [setup]
      (-> (OpenAiChatModel/builder)
-         (.apiKey (aor/get-agent-object setup openai-key-name))
+         (.apiKey (aor/get-agent-object setup "openai-api-key"))
          (.modelName "gpt-4o-mini")
          (.temperature 0.0)
          (.logRequests true)
@@ -331,13 +375,16 @@ Your current instructions are:
    "connections" java.util.List
    "interests" java.util.List)
 
-  (aor/declare-key-value-store topology "$$todos" Long Object)
+  (aor/declare-pstate-store
+   topology
+   "$$todos"
+   {Long (rama/map-schema String java.util.Map {:subindex? true})})
 
   (aor/declare-key-value-store topology "$$instructions" Long Object)
 
   (->
    topology
-   (aor/new-agent agent-name)
+   (aor/new-agent "ToDoAgent")
 
    (aor/node
     "maestro"
@@ -346,16 +393,24 @@ Your current instructions are:
       (let [chat-model         (aor/get-agent-object
                                 agent-node
                                 "openai-non-streaming")
-            tools-exec         (aor/agent-client agent-node "tools-execution")
+            tools              (aor/agent-client agent-node "tools")
             profiles-store     (aor/get-store agent-node "$$profiles")
             todos-store        (aor/get-store agent-node "$$todos")
             instructions-store (aor/get-store agent-node "$$instructions")
             profile            (store/get profiles-store user-id)
-            todos              (store/get todos-store user-id)
+            todos              (into
+                                {}
+                                (store/pstate-select
+                                 [(path/keypath user-id) path/ALL]
+                                 todos-store
+                                 user-id))
+            _                  (prn :maestro :todos user-id todos)
             instructions       (store/get instructions-store user-id)
             system-msg         (format
                                 MODEL-SYSTEM-MESSAGE
-                                profile todos instructions)
+                                profile
+                                (j/write-value-as-string todos MAPPER)
+                                instructions)
             chat-messages      (into
                                 [(SystemMessage. system-msg)]
                                 messages)
@@ -372,7 +427,7 @@ Your current instructions are:
             next-messages      (conj messages ai-message)]
         (if tool-calls
           (let [tool-results  (aor/agent-invoke
-                               tools-exec
+                               tools
                                tool-calls
                                (assoc config :messages messages))
                 next-messages (into next-messages tool-results)]
@@ -448,7 +503,8 @@ Your current instructions are:
    ;;       config)))
    )
 
-  (tools/new-tools-agent topology "tools-execution" TOOLS))
+  (tools/new-tools-agent topology "tools" TOOLS)
+  (tools/new-tools-agent topology "todo-tools" TODO-TOOLS))
 
 (def inputs
   ["My name is Lance. I live in SF with my wife. I have a 1 year old daughter."
@@ -464,37 +520,30 @@ Your current instructions are:
 (defn run-agent
   []
   (with-open [ipc (rtest/create-ipc)
-              ui  (aor/start-ui ipc)]
-    (loop []
-      (rtest/launch-module! ipc TodoModule {:tasks 4 :threads 2})
-      (let [module-name   (rama/get-module-name TodoModule)
-            agent-manager (aor/agent-manager ipc module-name)
-            user-id       0]
-        (with-open [agent (aor/agent-client agent-manager agent-name)]
-          (try
-            (loop [inputs inputs]
-              (when inputs
-                (let [agent-invoke (aor/agent-initiate
-                                    agent
-                                    [(UserMessage. (first inputs))]
-                                    {:user-id user-id})
-                      step         (aor/agent-next-step agent agent-invoke)
-                      result       (:result step)]
-                  (assert (instance? AgentComplete step))
-                  (doseq [msg (:messages result)]
-                    (println msg))
-                  (recur (next inputs)))))
-            (catch Exception e
-              (prn :exeception e))))
-        (let [profile-pstate (rama/foreign-pstate ipc module-name "$$profiles")]
-          (prn :profile
-               (rama/foreign-select-one (path/keypath user-id) profile-pstate))
-          (assert
-           (rama/foreign-select-one (path/keypath user-id) profile-pstate)
-           "Has a profile"))
-        (println "iterate> (bye to exit)")
-        (if (str/includes? @(future (read-line)) "bye")
-          (rtest/destroy-module! ipc module-name)
-          (do
-            (rtest/destroy-module! ipc module-name)
-            (recur)))))))
+              _   (aor/start-ui ipc)]
+    (rtest/launch-module! ipc TodoModule {:tasks 4 :threads 2})
+    (let [module-name   (rama/get-module-name TodoModule)
+          agent-manager (aor/agent-manager ipc module-name)
+          user-id       0]
+      (with-open [agent (aor/agent-client agent-manager "ToDoAgent")]
+        (try
+          (loop [inputs inputs]
+            (when inputs
+              (let [agent-invoke (aor/agent-initiate
+                                  agent
+                                  [(UserMessage. (first inputs))]
+                                  {:user-id user-id})
+                    step         (aor/agent-next-step agent agent-invoke)
+                    result       (:result step)]
+                (assert (instance? AgentComplete step))
+                (doseq [msg (:messages result)]
+                  (println msg))
+                (recur (next inputs)))))
+          (catch Exception e
+            (prn :exeception e))))
+      (let [profile-pstate (rama/foreign-pstate ipc module-name "$$profiles")]
+        (prn :profile
+             (rama/foreign-select-one (path/keypath user-id) profile-pstate))
+        (assert
+         (rama/foreign-select-one (path/keypath user-id) profile-pstate)
+         "Has a profile")))))
