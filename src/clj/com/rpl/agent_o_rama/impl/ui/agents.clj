@@ -265,11 +265,10 @@
         ;; Determine if invocation is complete
         is-complete (boolean (:finish-time-millis summary-info))
         
-        ;; Get root invoke id for live invocations
-        root-invoke-id (when-not is-complete
-                        (foreign-select-one [(keypath agent-id) :root-invoke-id]
+        ;; Always get root invoke id (needed for both live and historical paths)
+        root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
                                           root-pstate
-                                          {:pkey agent-task-id}))]
+                                          {:pkey agent-task-id})]
     
     {:is-complete is-complete
      :root-invoke-id root-invoke-id

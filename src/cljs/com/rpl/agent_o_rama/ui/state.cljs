@@ -11,7 +11,7 @@
   {:current-invocation {:invoke-id nil
                         :module-id nil
                         :agent-name nil}
-   :invocations-data {} ;; Keyed by invoke-id -> {:graph {:nodes ...} :summary ...}
+   :invocations-data {} ;; Keyed by invoke-id -> {:graph {:nodes ...} :summary ... :root-invoke-id ... :task-id ...}
    :invocations {:all-invokes []
                  :pagination-params nil ;; Next pagination params from server
                  :has-more? true

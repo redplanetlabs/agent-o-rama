@@ -75,7 +75,7 @@
 ;; Process the summary and decide loading strategy
 (state/reg-event :invocation/process-summary
   (fn [db {:keys [invoke-id module-id agent-name summary]}]
-    (let [{:keys [is-complete]} summary]
+    (let [{:keys [is-complete root-invoke-id task-id]} summary]
       ;; Store the summary
       (state/dispatch [:db/set-value [:invocations-data invoke-id :summary] summary])
       
@@ -91,11 +91,17 @@
                            (state/dispatch [:invocation/load-full-graph 
                                           invoke-id 
                                           (:data reply)]))))
-        ;; LIVE: Start live subscription (reuse existing logic)
-        (state/dispatch [:invocation/view-live 
-                        {:module-id module-id 
-                         :agent-name agent-name 
-                         :invoke-id invoke-id}]))
+        ;; LIVE: Store root info and start subscription
+        (do
+          ;; Store the root invoke ID and task ID to bootstrap polling
+          (state/dispatch [:db/set-value [:invocations-data invoke-id :root-invoke-id] root-invoke-id])
+          (state/dispatch [:db/set-value [:invocations-data invoke-id :task-id] task-id])
+          
+          ;; Start live subscription
+          (state/dispatch [:invocation/view-live 
+                          {:module-id module-id 
+                           :agent-name agent-name 
+                           :invoke-id invoke-id}])))
       nil)))
 
 ;; Load complete historical graph

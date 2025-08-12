@@ -17,6 +17,8 @@
         next-leaves (state/use-sub [:invocations-data invoke-id :next-leaves])
         is-complete (state/use-sub [:invocations-data invoke-id :is-complete])
         implicit-edges (state/use-sub [:invocations-data invoke-id :implicit-edges])
+        root-invoke-id (state/use-sub [:invocations-data invoke-id :root-invoke-id])
+        task-id (state/use-sub [:invocations-data invoke-id :task-id])
         
         ;; UI state subscriptions
         selected-node-id (state/use-sub [:ui :selected-node-id])
@@ -48,13 +50,15 @@
         ;; 3. Polling effect for live invocations (only when not complete)
         _ (uix/use-effect
            (fn []
-             (when (and connected? (not is-complete) invoke-id (seq nodes))
+             ;; Start polling when we have root-invoke-id, not when we have nodes
+             (when (and connected? (not is-complete) invoke-id root-invoke-id task-id)
                (let [poll-fn (fn []
                               (let [current-db @state/app-db
                                     local-leaves (state/get-unfinished-leaves current-db invoke-id)
+                                    ;; If no leaves yet (first run), use root-invoke-id to bootstrap
                                     leaves-to-use (if (seq local-leaves)
                                                    local-leaves
-                                                   [])]
+                                                   [[task-id root-invoke-id]])]
                                 (sente/push! 
                                  [:live/get-updates 
                                   {:module-id module-id
@@ -62,11 +66,11 @@
                                    :invoke-id invoke-id
                                    :leaves leaves-to-use}])))
                      interval-id (js/setInterval poll-fn 2000)]
-                 ;; Initial fetch
+                 ;; Initial fetch immediately
                  (poll-fn)
                  ;; Cleanup
                  (fn [] (js/clearInterval interval-id)))))
-           [invoke-id connected? is-complete module-id agent-name nodes])
+           [invoke-id connected? is-complete module-id agent-name root-invoke-id task-id])
         
         ;; 4. Define callback functions that dispatch events
         handle-select-node (fn [node-id]
