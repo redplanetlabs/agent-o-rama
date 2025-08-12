@@ -11,7 +11,6 @@
   "Live invocation graph that uses client-driven polling for updates.
    Reuses the main invocation-graph component with live data."
   [{:keys [module-id agent-name invoke-id]}]
-  (println "Live graph" module-id agent-name invoke-id)
   (let [;; Check if we're connected first
         connected? (state/use-sub [:sente :connected?])
         ;; Subscribe to the nodes for this specific invocation
@@ -40,7 +39,6 @@
      (fn []
        (when (and connected? module-id agent-name invoke-id)
          ;; Only subscribe when connected and params are valid
-         (println "Component requesting invocation:" invoke-id "current:" current-invoke-id "connected:" connected?)
          (state/dispatch [:invocation/view-live
                           {:module-id module-id
                            :agent-name agent-name
@@ -68,8 +66,6 @@
                               leaves-to-use (if (seq current-leaves)
                                              current-leaves
                                              [])]
-                          (println "Polling for updates with leaves:" leaves-to-use 
-                                  "(" (count leaves-to-use) "unfinished nodes)")
                           (com.rpl.agent-o-rama.ui.sente/push! 
                            [:live/get-updates 
                             {:module-id module-id
@@ -93,13 +89,11 @@
      (fn []
        ;; Return cleanup that only runs on unmount
        (fn []
-         (println "Component fully unmounting, checking if we should stop subscription")
          ;; Check app-db directly in cleanup
          (let [db @state/app-db
                connected? (get-in db [:sente :connected?])
                active-sub (get-in db [:sente :active-subscription])]
            (when (and connected? active-sub)
-             (println "Stopping subscription on unmount")
              (state/dispatch [:invocation/stop-live])))))
      []) ;; Empty deps - only run on mount/unmount
 

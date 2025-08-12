@@ -41,21 +41,17 @@
     (when node-id
       (state/dispatch [:invocation/update-node node-id node-data]))))
 
-(defmethod -event-msg-handler :agent/run-started [{:as ev-msg :keys [?data]}]
-  (println "agent run started" ?data))
+(defmethod -event-msg-handler :agent/run-started [{:as ev-msg :keys [?data]}])
 
-(defmethod -event-msg-handler :agent/run-complete [{:as ev-msg :keys [?data]}]
-  (println "agent run complete" ?data))
+(defmethod -event-msg-handler :agent/run-complete [{:as ev-msg :keys [?data]}])
 
-(defmethod -event-msg-handler :agent/run-failed [{:as ev-msg :keys [?data]}]
-  (println "agent run failed" ?data))
+(defmethod -event-msg-handler :agent/run-failed [{:as ev-msg :keys [?data]}])
 
 ;; Batch/merge of nodes from server polling
 (defmethod -event-msg-handler :graph/nodes-merge [{:as ev-msg :keys [?data]}]
   (let [{:keys [invoke-id nodes]} ?data]
     ;; Always store the data under the correct invoke-id
     (when (and invoke-id (map? nodes))
-      (println "Storing nodes for invocation:" invoke-id)
       (doseq [[node-id node-data] nodes]
         (state/dispatch [:invocation/update-node invoke-id node-id node-data])))))
 
@@ -65,30 +61,23 @@
         current-db @state/app-db
         nodes (get-in current-db [:invocations-data invoke-id :graph :nodes])
         local-unfinished (state/get-unfinished-leaves current-db invoke-id)]
-    (println "Updating next-leaves for invocation:" invoke-id 
-             "server-leaves:" (count next-leaves)
-             "local-unfinished:" (count local-unfinished)
-             "total-nodes:" (count nodes))
     (state/dispatch [:db/set-value [:invocations-data invoke-id :next-leaves] next-leaves])
     ;; Only mark complete if we have nodes AND no unfinished leaves locally
     (when (and (seq nodes) ;; We have at least some nodes
                (empty? local-unfinished) ;; No unfinished nodes locally
                (empty? next-leaves)) ;; Server also says no more
-      (println "Graph complete for invocation:" invoke-id)
       (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] true]))))
 
 ;; Handler to log connection state changes
 (defmethod -event-msg-handler :chsk/state [{:as ev-msg :keys [?data]}]
   (let [[old-state new-state] ?data
         connected? (boolean (:open? new-state))]
-    (.log js/console "Sente connection state change:" new-state)
     ;; Update app-db with connection state
     (state/dispatch [:db/set-value [:sente :connection-state] new-state])
     (state/dispatch [:db/set-value [:sente :connected?] connected?])))
 
 ;; Handler for successful handshake
 (defmethod -event-msg-handler :chsk/handshake [{:as ev-msg :keys [?data]}]
-  (.log js/console "✅ Sente handshake successful!" ?data)
   (state/dispatch [:db/set-value [:sente :connected?] true]))
 
 ;; 4. Router lifecycle functions
@@ -108,7 +97,6 @@
   ;; Clean up subscriptions when the window/tab is closed
   (.addEventListener js/window "beforeunload" 
                      (fn [_]
-                       (println "Window closing, stopping all subscriptions")
                        ;; Send synchronous unsubscribe if possible
                        (when-let [active-sub (get-in @state/app-db [:sente :active-subscription])]
                          (push! [:live/unsubscribe {:sub-key (:sub-key active-sub)

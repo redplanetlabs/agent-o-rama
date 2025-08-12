@@ -13,11 +13,8 @@
       
       ;; Only switch if we're actually changing invocations
       (if (= invoke-id current-invoke-id)
+        nil ;; No state change needed
         (do
-          (println "Already viewing invocation:" invoke-id)
-          nil) ;; No state change needed
-        (do
-          (println "Switching to live view for:" invoke-id)
           
           ;; Register with server that we want to watch this invocation
           ;; (for security/tracking purposes)
@@ -44,7 +41,6 @@
   (fn [db]
     (let [current-sub (get-in db [:sente :active-subscription])]
       (when current-sub
-        (println "Stopping subscription:" (:sub-key current-sub))
         (sente/push! [:live/unsubscribe {:sub-key (:sub-key current-sub)
                                          :sub-type :live-graph}]))
       [[:sente :active-subscription] (constantly nil)])))
