@@ -73,7 +73,7 @@ public class TestModules {
                               .build();
       });
       topology.newToolsAgent("tools", TOOLS);
-      topology.newToolsAgent("tools2", TOOLS);
+      topology.newToolsAgent("tools2", TOOLS, ToolsAgentOptions.errorHandlerStaticString("edcba"));
       topology.newAgent("foo")
               .node(
                 "start",
