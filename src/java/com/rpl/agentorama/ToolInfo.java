@@ -8,7 +8,7 @@ import com.rpl.rama.ops.*;
 import dev.langchain4j.agent.tool.ToolSpecification;
 
 public interface ToolInfo {
-  static <T1, T2> ToolInfo createt(ToolSpecification spec, RamaFunction1<Map<String, T1>, String> toolFn) {
+  static <T1> ToolInfo create(ToolSpecification spec, RamaFunction1<Map<String, T1>, String> toolFn) {
     return (ToolInfo) AORHelpers.CREATE_TOOL_INFO.invoke(spec, toolFn);
   }
 

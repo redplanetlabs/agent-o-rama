@@ -6,35 +6,35 @@ import com.rpl.agentorama.impl.AORHelpers;
 
 
 public interface ToolsAgentOptions {
-  public final class StaticStringHandler<T extends Throwable> {
-    public final Class<T> type;
+  public final class StaticStringHandler {
+    public final Class type;
     public final String message;
 
-    private StaticStringHandler(Class<T> type, String message) {
+    private StaticStringHandler(Class type, String message) {
         this.type = type;
         this.message = message;
     }
 
-    public static <T extends Throwable> StaticStringHandler<T> create(
+    public static <T extends Throwable> StaticStringHandler create(
             Class<T> type,
             String message) {
-        return new StaticStringHandler<>(type, message);
+        return new StaticStringHandler(type, message);
     }
   }
 
-  public final class FunctionHandler<T extends Throwable> {
-    public final Class<T> type;
-    public final RamaFunction1<? super T, String> function;
+  public final class FunctionHandler {
+    public final Class type;
+    public final RamaFunction1 function;
 
-    private FunctionHandler(Class<T> type, RamaFunction1<? super T, String> function) {
+    private FunctionHandler(Class type, RamaFunction1 function) {
         this.type = type;
         this.function = function;
     }
 
-    public static <T extends Throwable> FunctionHandler<T> create(
+    public static <T extends T2, T2 extends Throwable> FunctionHandler create(
             Class<T> type,
-            RamaFunction1<? super T, String> function) {
-        return new FunctionHandler<>(type, function);
+            RamaFunction1<T2, String> function) {
+        return new FunctionHandler(type, function);
     }
   }
 
