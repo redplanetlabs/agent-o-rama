@@ -2,6 +2,7 @@
   (:require 
    [uix.core :as uix :refer [$ defui]]
    [com.rpl.agent-o-rama.ui.state :as state]
+   [com.rpl.agent-o-rama.ui.events] ;; Load event handlers
    [com.rpl.agent-o-rama.ui.invocation-graph-view :as view]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    ["wouter" :refer [useParams useLocation]]))

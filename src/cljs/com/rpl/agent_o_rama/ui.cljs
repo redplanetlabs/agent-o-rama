@@ -13,7 +13,8 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.stats :as stats]
    [com.rpl.agent-o-rama.ui.sente :as sente]
-   [com.rpl.agent-o-rama.ui.state :as state])) ; <--- Add this
+   [com.rpl.agent-o-rama.ui.state :as state]
+   [com.rpl.agent-o-rama.ui.events])) ;; Ensure event handlers are registered at app startup
 
 (def query-client (QueryClient.))
 
