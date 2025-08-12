@@ -71,8 +71,11 @@
   "Subscribe to a value at the given Specter path in app-db.
    Component will re-render only when the value at that path changes."
   [specter-path]
-  (let [extract-value (fn [db] (s/select-one specter-path db))
-        [value set-value] (uix/use-state (extract-value @app-db))]
+  (let [;; Memoize the extractor function to have stable reference
+        extract-value (uix/use-callback
+                       (fn [db] (s/select-one specter-path db))
+                       [specter-path])
+        [value set-value] (uix/use-state (fn [] (extract-value @app-db)))]
     
     (uix/use-effect
      (fn []
@@ -86,7 +89,7 @@
          ;; Cleanup function
          (fn []
            (remove-watch app-db watch-key))))
-     []) ; Empty deps array - only run once
+     [extract-value]) ; Include extract-value as dependency
     
     value))
 

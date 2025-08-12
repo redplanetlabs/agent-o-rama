@@ -95,6 +95,22 @@
   [ev-msg]
   (handle-api-event ev-msg))
 
+(defmethod -event-msg-handler :api/get-invocation-summary
+  [ev-msg]
+  (handle-api-event ev-msg))
+
+(defmethod -event-msg-handler :api/get-full-graph
+  [ev-msg]
+  (handle-api-event ev-msg))
+
+(defmethod -event-msg-handler :api/paginate-node
+  [ev-msg]
+  (handle-api-event ev-msg))
+
+(defmethod -event-msg-handler :api/execute-fork
+  [ev-msg]
+  (handle-api-event ev-msg))
+
 ;; =============================================================================
 ;; ROBUST SUBSCRIPTION MANAGEMENT
 ;; =============================================================================

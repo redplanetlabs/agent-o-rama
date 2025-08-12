@@ -44,3 +44,93 @@
         (sente/push! [:live/unsubscribe {:sub-key (:sub-key current-sub)
                                          :sub-type :live-graph}]))
       [[:sente :active-subscription] (constantly nil)])))
+
+;; =============================================================================
+;; UNIFIED INVOCATION LOADING
+;; =============================================================================
+
+;; Main entry point for loading any invocation (live or historical)
+(state/reg-event :invocation/load-or-subscribe
+  (fn [db {:keys [invoke-id module-id agent-name]}]
+    ;; First, check if we need to load this invocation
+    (let [existing-summary (get-in db [:invocations-data invoke-id :summary])]
+      (when-not existing-summary
+        ;; Request summary to determine if live or historical
+        (sente/request! [:api/get-invocation-summary 
+                        {:invoke-id invoke-id 
+                         :module-id module-id 
+                         :agent-name agent-name}]
+                       5000
+                       (fn [reply]
+                         (if (:success reply)
+                           (state/dispatch [:invocation/process-summary 
+                                          {:invoke-id invoke-id
+                                           :module-id module-id  
+                                           :agent-name agent-name
+                                           :summary (:data reply)}])
+                           (js/console.error "Failed to get invocation summary:" (:error reply))))))
+      ;; Return nil to indicate no immediate state change
+      nil)))
+
+;; Process the summary and decide loading strategy
+(state/reg-event :invocation/process-summary
+  (fn [db {:keys [invoke-id module-id agent-name summary]}]
+    (let [{:keys [is-complete]} summary]
+      ;; Store the summary
+      (state/dispatch [:db/set-value [:invocations-data invoke-id :summary] summary])
+      
+      (if is-complete
+        ;; HISTORICAL: Fetch the complete graph at once
+        (sente/request! [:api/get-full-graph 
+                        {:invoke-id invoke-id 
+                         :module-id module-id 
+                         :agent-name agent-name}]
+                       10000
+                       (fn [reply]
+                         (when (:success reply)
+                           (state/dispatch [:invocation/load-full-graph 
+                                          invoke-id 
+                                          (:data reply)]))))
+        ;; LIVE: Start live subscription (reuse existing logic)
+        (state/dispatch [:invocation/view-live 
+                        {:module-id module-id 
+                         :agent-name agent-name 
+                         :invoke-id invoke-id}]))
+      nil)))
+
+;; Load complete historical graph
+(state/reg-event :invocation/load-full-graph
+  (fn [db invoke-id graph-data]
+    ;; Store all the graph data at once
+    (let [{:keys [invokes-map implicit-edges summary]} graph-data]
+      (state/dispatch [:db/set-value [:invocations-data invoke-id :graph :nodes] invokes-map])
+      (state/dispatch [:db/set-value [:invocations-data invoke-id :implicit-edges] implicit-edges])
+      (state/dispatch [:db/set-value [:invocations-data invoke-id :summary] summary])
+      (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] true])
+      nil)))
+
+;; Handle paginated data merge
+(state/reg-event :invocation/merge-paginated-data
+  (fn [db invoke-id paginated-data]
+    (let [{:keys [invokes-map]} paginated-data
+          current-nodes (get-in db [:invocations-data invoke-id :graph :nodes])]
+      [[:invocations-data invoke-id :graph :nodes] 
+       #(merge % invokes-map)])))
+
+;; Cleanup when leaving an invocation
+(state/reg-event :invocation/cleanup
+  (fn [db {:keys [invoke-id]}]
+    ;; Stop any live subscriptions
+    (state/dispatch [:invocation/stop-live])
+    ;; Clear UI state
+    (state/dispatch [:ui/clear-fork-state])
+    (state/dispatch [:db/set-value [:ui :selected-node-id] nil])
+    nil))
+
+;; UI state management for forking
+(state/reg-event :ui/clear-fork-state
+  (fn [db]
+    [[:ui] #(assoc % 
+                  :changed-nodes {}
+                  :selected-node-id nil
+                  :forking-mode? false)]))

@@ -249,3 +249,110 @@
   (let [^AgentInvoke inv (apply aor/agent-initiate (get-client module-id agent-name) args)]
     {:task-id (.getTaskId inv)
      :invoke-id (.getAgentInvokeId inv)}))
+
+(defmethod api-handler :api/get-invocation-summary
+  [_ {:keys [module-id agent-name invoke-id]} uid]
+  (let [client-objects (objects module-id agent-name)
+        root-pstate (:root-pstate client-objects)
+        [agent-task-id agent-id] (parse-url-pair invoke-id)
+        
+        ;; Get basic summary info
+        summary-info (foreign-select-one [(keypath agent-id)
+                                          (submap [:result :start-time-millis :finish-time-millis])]
+                                        root-pstate
+                                        {:pkey agent-task-id})
+        
+        ;; Determine if invocation is complete
+        is-complete (boolean (:finish-time-millis summary-info))
+        
+        ;; Get root invoke id for live invocations
+        root-invoke-id (when-not is-complete
+                        (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                                          root-pstate
+                                          {:pkey agent-task-id}))]
+    
+    {:is-complete is-complete
+     :root-invoke-id root-invoke-id
+     :task-id agent-task-id
+     :agent-id agent-id
+     :result (:result summary-info)
+     :start-time-millis (:start-time-millis summary-info)
+     :finish-time-millis (:finish-time-millis summary-info)}))
+
+(defmethod api-handler :api/get-full-graph
+  [_ {:keys [module-id agent-name invoke-id]} uid]
+  ;; Reuse the existing paginated logic but fetch everything at once
+  (let [client-objects (objects module-id agent-name)
+        root-pstate (:root-pstate client-objects)
+        history-pstate (:graph-history-pstate client-objects)
+        tracing-query (:tracing-query client-objects)
+        
+        [agent-task-id agent-id] (parse-url-pair invoke-id)
+        
+        ;; Fetch summary and graph version
+        summary-info (foreign-select-one [(keypath agent-id)
+                                         (submap [:invoke-args :result :start-time-millis :finish-time-millis :graph-version])]
+                                        root-pstate
+                                        {:pkey agent-task-id})
+        
+        graph-version (:graph-version summary-info)
+        
+        ;; Fetch historical graph
+        historical-graph (foreign-select-one [(keypath graph-version)]
+                                           history-pstate
+                                           {:pkey agent-task-id})
+        
+        ;; Get root invoke id
+        root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                                          root-pstate
+                                          {:pkey agent-task-id})
+        
+        ;; Fetch complete trace - use a larger limit for complete graphs
+        dynamic-trace (when (and root-invoke-id historical-graph)
+                       (foreign-invoke-query tracing-query 
+                                           agent-task-id 
+                                           [[agent-task-id root-invoke-id]] 
+                                           1000)) ;; Higher limit for complete graphs
+        
+        invokes-map-cleaned (when dynamic-trace
+                             (-> (:invokes-map dynamic-trace)
+                                 (remove-implicit-nodes)
+                                 (filter-encodable)))
+        
+        implicit-edges (when (and invokes-map-cleaned historical-graph)
+                        (generate-implicit-edges invokes-map-cleaned historical-graph))]
+    
+    {:invokes-map invokes-map-cleaned
+     :implicit-edges implicit-edges
+     :summary (filter-encodable summary-info)}))
+
+(defmethod api-handler :api/paginate-node
+  [_ {:keys [module-id agent-name invoke-id missing-node-id]} uid]
+  ;; Find the task-id for the missing node and fetch it
+  (let [client-objects (objects module-id agent-name)
+        root-pstate (:root-pstate client-objects)
+        tracing-query (:tracing-query client-objects)
+        
+        [agent-task-id _] (parse-url-pair invoke-id)
+        
+        ;; TODO: Need to find the task-id for the missing node
+        ;; For now, we'll need to track this in the client state
+        dynamic-trace (foreign-invoke-query tracing-query
+                                           agent-task-id
+                                           [[agent-task-id (parse-long missing-node-id)]]
+                                           100)]
+    
+    (when dynamic-trace
+      {:invokes-map (-> (:invokes-map dynamic-trace)
+                       (remove-implicit-nodes)
+                       (filter-encodable))})))
+
+(defmethod api-handler :api/execute-fork
+  [_ {:keys [module-id agent-name invoke-id changed-nodes]} uid]
+  (let [[task-id agent-invoke-id] (parse-url-pair invoke-id)
+        ^AgentInvoke result (aor/agent-initiate-fork
+                            (get-client module-id agent-name)
+                            (aor-types/->AgentInvokeImpl task-id agent-invoke-id)
+                            (transform [MAP-VALS] read-string changed-nodes))]
+    {:agent-invoke-id (:agentInvokeId (bean result))
+     :task-id (:taskId (bean result))}))

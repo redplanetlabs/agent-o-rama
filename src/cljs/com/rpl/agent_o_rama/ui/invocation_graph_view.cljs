@@ -1,6 +1,5 @@
-(ns com.rpl.agent-o-rama.ui.invocation-graph
+(ns com.rpl.agent-o-rama.ui.invocation-graph-view
   (:require
-   [com.rpl.agent-o-rama.ui.common :as common]
    [clojure.string :as str]
    [clojure.pprint]
    [goog.i18n.DateTimeFormat :as dtf]
@@ -13,8 +12,7 @@
    ["react" :refer [useState useCallback useEffect]]
    ["react-dom" :refer [createPortal]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
-   ["@dagrejs/dagre" :as Dagre]
-   ["wouter" :refer [useLocation]]))
+   ["@dagrejs/dagre" :as Dagre]))
 
 (defn format-ms [ms]
   (let [date (js/Date. ms)
@@ -169,7 +167,7 @@
                                     :title "Value Details"
                                     :truncate-length truncate-length}))))
 
-(defui selected-node-component [{:keys [selected-node graph-data handle-paginate-node loading-nodes flow-nodes set-selected-node set-nodes]}]
+(defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes]}]
   (let [data (when selected-node 
                (js->clj (.-data selected-node) :keywordize-keys true))
         node-id (str (:node-id data))
@@ -271,27 +269,25 @@
                     (for [[idx emit] (map-indexed vector (js->clj emits :keywordize-keys true))]
                       (let [emit-id (str (:invoke-id emit))
                             is-loaded (contains? graph-data (:invoke-id emit))
-                            is-loading (contains? loading-nodes emit-id)
+                            ;; We no longer track loading state locally
                             border-class (if is-loaded "border-purple-200" "border-dashed border-purple-300")
-                            cursor-class (if is-loading "cursor-wait" "cursor-pointer")
+                            cursor-class "cursor-pointer"
                             bg-class (if is-loaded "bg-gray-50" "bg-white hover:bg-purple-50")]
                         ($ :div {:key (str "emit-" idx)
                                  :className (str bg-class " p-2 rounded border " border-class " " cursor-class " transition-colors")
                                  :onClick (fn [e]
                                             (.stopPropagation e)
-                                            (when-not is-loading
-                                              (if is-loaded
+                                            (if is-loaded
                                                 ;; Find and select the loaded node
                                                 (let [nodes (js->clj flow-nodes :keywordize-keys true)
                                                       target-node (->> nodes
                                                                        (filter #(= (-> % :data :node-id) (:invoke-id emit)))
                                                                        first)]
-                                                  
-                                                  (set-selected-node (clj->js target-node)))
-                                                ;; Load the unloaded node
-
-                                                (when handle-paginate-node
-                                                  (handle-paginate-node emit-id)))))}
+                                                  (when (and target-node on-select-node)
+                                                    (on-select-node (:invoke-id emit))))
+                                              ;; Load the unloaded node
+                                              (when on-paginate-node
+                                                  (on-paginate-node emit-id))))}
                            ($ :div {:className "text-xs text-purple-600"}
                               ($ :div (str "→ " (:node-name emit)))
                               (when (:args emit)
@@ -300,14 +296,11 @@
                                                         :truncate-length 60
                                                         :depth 0}))
                               ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
-                                 (str "ID: " emit-id))
-                              (when is-loading
-                                ($ :div {:className "text-purple-400 mt-1 text-xs italic"}
-                                   "Loading...")))))))))
+                                 (str "ID: " emit-id)))))))))
             
                ))))
 
-(defui forking-input-component [{:keys [selected-node changed-nodes set-changed-nodes affected-nodes]}]
+(defui forking-input-component [{:keys [selected-node changed-nodes on-change-node-input affected-nodes]}]
   (let [data (when selected-node 
                (js->clj (.-data selected-node) :keywordize-keys true))
         node-id (:node-id data)
@@ -361,7 +354,8 @@
                                   :onChange (fn [e]
                                               (let [new-value (.-value (.-target e))]
                                                 (set-input-text new-value)
-                                                (set-changed-nodes #(assoc % node-id new-value))))
+                                                (when on-change-node-input
+                                                  (on-change-node-input node-id new-value))))
                                   :placeholder "Enter new input value..."}))
                  
                  ($ :div {:className "text-xs text-gray-500"}
@@ -441,14 +435,17 @@
                 ($ :div {:className "text-right"}
                    ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens)))))))))))
 
-(defui right-panel [{:keys [graph-data summary-data changed-nodes set-changed-nodes affected-nodes flow-nodes set-selected-node on-execute-fork on-clear-fork forking-mode? set-forking-mode? fork-loading? fork-error live-mode?]}]
+(defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live]}]
   (let [[active-tab set-active-tab] (uix/use-state :info)]
     
     ;; Update forking mode when tab changes
     (uix/use-effect
      (fn []
-       (set-forking-mode? (= active-tab :fork)))
-     [active-tab set-forking-mode?])
+       (when on-toggle-forking-mode
+         (let [should-be-forking (= active-tab :fork)]
+           (when (not= forking-mode? should-be-forking)
+             (on-toggle-forking-mode)))))
+     [active-tab forking-mode? on-toggle-forking-mode])
     
     ($ :div {:className "fixed right-0 top-32 h-[calc(100vh-8rem)] w-80 bg-white shadow-lg border-l border-gray-200 overflow-hidden z-40"}
        ;; Tab header
@@ -461,7 +458,7 @@
                          :onClick #(set-active-tab :info)}
                 "Info")
              ;; Only show Fork tab when not in live mode
-             (when-not live-mode?
+             (when-not is-live
                ($ :button {:className (str "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors "
                                            (if (= active-tab :fork)
                                              "bg-white text-gray-900 shadow-sm"
@@ -491,8 +488,9 @@
                                                           target-node (->> nodes
                                                                            (filter #(= (-> % :data :node-id) node-id))
                                                                            first)]
-                                                      (when target-node
-                                                        (set-selected-node (clj->js target-node)))))]
+                                                      (when (and target-node on-select-node)
+                                                        (on-select-node node-id))))]
+
                            ($ :div {:key node-id
                                     :className (str "border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow " 
                                                     (if is-overridden 
@@ -510,7 +508,8 @@
                                  ($ :button {:className "cursor-pointer text-red-500 hover:text-red-700 text-sm"
                                              :onClick (fn [e] 
                                                         (.stopPropagation e)
-                                                        (set-changed-nodes #(dissoc % node-id)))}
+                                                        (when on-remove-node-change
+                                                          (on-remove-node-change node-id)))}
                                     "Remove"))
                               
                               ($ :div {:className "text-xs"}
@@ -522,24 +521,10 @@
                        
                        ;; Action buttons
                        ($ :div {:className "pt-4 border-t border-gray-200 space-y-2"}
-                          ;; Error message
-                          (when fork-error
-                            ($ :div {:className "bg-red-50 border border-red-200 rounded-md p-3"}
-                               ($ :div {:className "text-sm font-medium text-red-800"} "Fork execution failed")
-                               ($ :div {:className "text-xs text-red-600 mt-1"} 
-                                  (or (:message fork-error) "An error occurred while executing the fork"))))
-                          
-                          ($ :button {:className (str "w-full font-medium py-2 px-4 rounded-md transition-colors "
-                                                      (if fork-loading?
-                                                        "bg-gray-400 text-gray-700 cursor-not-allowed"
-                                                        "bg-blue-600 hover:bg-blue-700 text-white"))
-                                      :disabled fork-loading?
+                          ($ :button {:className "w-full font-medium py-2 px-4 rounded-md transition-colors bg-blue-600 hover:bg-blue-700 text-white"
                                       :onClick on-execute-fork}
-                             (if fork-loading?
-                               "Executing Fork..."
-                               (str "Execute Fork (" (count changed-nodes) " changes)")))
+                             (str "Execute Fork (" (count changed-nodes) " changes)"))
                           ($ :button {:className "w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors"
-                                      :disabled fork-loading?
                                       :onClick on-clear-fork}
                              "Clear All Changes")))))))))
 
@@ -650,32 +635,16 @@
             #{}
             modified-node-ids)))
 
-(defui graph [{:keys [module-id agent-name invoke-id initial-data live-mode?]}]
-  (let [[location set-location] (useLocation)
-        [selected-node set-selected-node] (uix/use-state nil)
-        [loading-nodes set-loading-nodes] (uix/use-state #{})
-        [graph-data set-graph-data] (uix/use-state {})
-        [summary-data set-summary-data] (uix/use-state nil)
-        [next-task-invoke-pairs set-next-task-invoke-pairs] (uix/use-state [])
-        [forking-mode? set-forking-mode?] (uix/use-state false)
-        [implicit-edges set-implicit-edges] (uix/use-state []) ; State for implicit edges
-        
-        ;; Fetch initial data (skip if we have initial-data from live mode)
-        initial-data-url (str "/api/agents/"
-                              module-id
-                              "/"
-                              agent-name
-                              "/invocations/"
-                              invoke-id
-                              "/paginated")
-        
-        ;; Only fetch if not in live mode or no initial data provided
-        {:keys [data loading?]} (if (and live-mode? initial-data)
-                                   {:data initial-data :loading? false}
-                                   (common/use-query {:query-key ["invocation-graph" module-id agent-name invoke-id]
-                                                     :query-url initial-data-url}))
-        
-        [changed-nodes set-changed-nodes] (uix/use-state {})
+(defui graph-view [{:keys [module-id agent-name invoke-id 
+                            graph-data summary-data implicit-edges
+                            is-complete is-live connected?
+                            selected-node-id forking-mode? changed-nodes
+                            on-select-node on-execute-fork on-clear-fork
+                            on-change-node-input on-remove-node-change
+                            on-toggle-forking-mode on-paginate-node]}]
+  (let [;; Convert selected-node-id to actual node object when needed
+        [selected-node set-selected-node-internal] (uix/use-state nil)
+
         
         affected-nodes (when forking-mode?
                          (find-downstream-nodes graph-data (set (keys changed-nodes))))
@@ -684,30 +653,13 @@
         [flow-nodes set-nodes on-nodes-change] (useNodesState (clj->js []))
         [flow-edges set-edges on-edges-change] (useEdgesState (clj->js []))
         
-        ;; Two-stage data processing pattern:
-        ;; We need separate useEffects because pagination updates graph-data directly,
-        ;; which wouldn't trigger a merged useEffect that only depends on [data].
-        _ (uix/use-effect
-           (fn []
-             (when data
-               (set-graph-data (:invokes-map data))
-               (set-summary-data (:summary data))
-               ;; NEW: Store implicit edges from the API response
-               (set-implicit-edges (get data :implicit-edges []))
-               (set-next-task-invoke-pairs (:next-task-invoke-pairs data))))
-           [data])
-        
-        ;; Update React Flow nodes/edges when graph data changes (initial load or pagination)
-        ;; NOTE: We can't initialize useNodesState/useEdgesState with processed data directly
-        ;; because those hooks only use their initial value on first render when data is empty.
+        ;; Update React Flow nodes/edges when graph data changes
         _ (uix/use-effect
            (fn []
              (when (not (empty? graph-data))
-               ;; NEW: Pass both data sets to process-graph-data
-               (let [{:keys [nodes edges]} (process-graph-data graph-data implicit-edges)]
+               (let [{:keys [nodes edges]} (process-graph-data graph-data (or implicit-edges []))]
                  (println "Updating flow with nodes:" (count nodes) "and edges:" (count edges))
                  (set-nodes (clj->js nodes))
-                 ;; NEW: Apply styling based on :implicit? flag
                  (set-edges (clj->js (for [edge edges]
                                        (if (:implicit? edge)
                                          (assoc edge :style #js {:strokeDasharray "5 5"
@@ -715,104 +667,44 @@
                                          edge)))))))
            [graph-data implicit-edges])
         
-        ;; Pagination mutation
-        pagination-mutation (common/use-mutation
-                             {:mutation-fn (fn [variables]
-                                             (let [{:keys [task-id missing-node-id]} (js->clj variables :keywordize-keys true)]
-                                               (common/fetch (str initial-data-url 
-                                                                  "?paginate-task-id=" task-id "&missing-node-id=" missing-node-id))))
-                              :on-success (fn [response variables]
-                                            (let [response-data (js->clj response :keywordize-keys true)
-                                                  {:keys [missing-node-id]} (js->clj variables :keywordize-keys true)
-                                                  new-data (:invokes-map response-data)
-                                                  new-task-pairs (:next-task-invoke-pairs response-data)
-                                                  
-                                                  ;; Merge new data with existing graph data
-                                                  combined-data (merge graph-data new-data)]
-                                              
-                                              ;; Update the graph data state (this will trigger useEffect to update nodes/edges)
-                                              (set-graph-data combined-data)
-                                              
-                                              ;; Update next-task-invoke-pairs if new ones came back
-                                              (when new-task-pairs
-                                                (set-next-task-invoke-pairs 
-                                                 (concat next-task-invoke-pairs new-task-pairs)))
-                                              
-                                              (set-loading-nodes #(disj % missing-node-id))))
-                              :on-error (fn [error variables]
-                                          (let [{:keys [missing-node-id]} (js->clj variables :keywordize-keys true)]
-                                            (js/console.error "Failed to load paginated data:" error)
-                                            (set-loading-nodes #(disj % missing-node-id))))})
-
-        handle-paginate-node
-        (uix/use-callback
-         (fn [missing-node-id]
-           ;; Disable pagination in live mode
-           (when-not live-mode?
-             ;; Find the task-id for this missing node from next-task-invoke-pairs
-             ;; Convert to string for comparison since JS numbers truncate longs
-             (let [[task-id _] (first (filter (fn [[a b]] (= (str b) (str missing-node-id))) next-task-invoke-pairs))]
-               (when-not (contains? loading-nodes missing-node-id)
-                 (set-loading-nodes #(conj % missing-node-id))
-                 ((:mutate pagination-mutation) (clj->js {:task-id task-id :missing-node-id missing-node-id}))))))
-         [graph-data loading-nodes next-task-invoke-pairs initial-data-url pagination-mutation live-mode?])
+        ;; Update selected node when selected-node-id changes
+        _ (uix/use-effect
+           (fn []
+             (when selected-node-id
+               (let [nodes (js->clj flow-nodes :keywordize-keys true)
+                     target-node (->> nodes
+                                     (filter #(= (-> % :data :node-id) selected-node-id))
+                                     first)]
+                 (when target-node
+                   (set-selected-node-internal (clj->js target-node))))))
+           [selected-node-id flow-nodes])
         
-        ;; Fork execution mutation
-        fork-mutation (common/use-mutation
-                       {:mutation-fn (fn [variables]
-                                       (let [fork-url (str "/api/agents/" module-id "/" agent-name "/fork")]
-                                         (common/post fork-url variables)))
-                        :on-success (fn [response variables]
-                                      (js/console.log "Fork executed successfully:" response)
-                                      ;; Clear changes after successful execution
-                                      (set-changed-nodes {})
-                                      (set-selected-node nil)
-                                      ;; Redirect to the new invocation page
-                                      (let [new-path (str "/agents/"
-                                                          module-id
-                                                          "/"
-                                                          agent-name
-                                                          "/invocations/"
-                                                          (:task-id response)
-                                                          "-"
-                                                          (:agent-invoke-id response))]
-                                        (js/console.log "Redirecting to:" new-path)
-                                        (set-location new-path)))
-                        :on-error (fn [error variables]
-                                    (js/console.error "Failed to execute fork:" error)
-                                    ;; TODO: Show user-friendly error message
-                                    )})
-
-        handle-execute-fork (uix/use-callback
-                             (fn []
-                               (when (not (empty? changed-nodes))
-                                 ;; Pass data directly as Clojure map to preserve long precision
-                                 ((:mutate fork-mutation) {:changed-nodes changed-nodes
-                                                           :invoke-id invoke-id})))
-                             [changed-nodes invoke-id fork-mutation])
+        ;; Use callbacks passed as props
+        handle-select-node-click (fn [node]
+                                   (when on-select-node
+                                     (let [node-data (js->clj (.-data node) :keywordize-keys true)]
+                                       (on-select-node (:node-id node-data)))))
         
-        handle-cancel-fork (uix/use-callback
-                            (fn []
-                              (set-changed-nodes {})
-                              (set-selected-node nil))
-                            [])
-        
-        handle-clear-fork (uix/use-callback
-                           (fn []
-                             (set-changed-nodes {})
-                             (set-selected-node nil))
-                           [])]
+        ;; Status indicators for live mode
+        show-live-indicator (and is-live (not is-complete))]
     
-    (cond
-      loading? ($ :div.flex.justify-center.items-center.py-8
-                 ($ :div.text-gray-500 "Loading invocation graph..."))
-      (not data) ($ :div.flex.justify-center.items-center.py-8
-                   ($ :div.text-gray-500 "No invocation data found"))
-      :else
+    (if (empty? graph-data)
+      ($ :div.flex.justify-center.items-center.py-8
+         ($ :div.text-gray-500 "No graph data available"))
       ($ :<>
+         ;; Live indicator if needed
+         (when show-live-indicator
+           ($ :div.mb-4.bg-blue-50.border.border-blue-200.rounded-lg.p-4
+              ($ :div.flex.items-center.justify-between
+                 ($ :div.flex.items-center.gap-2
+                    ($ :div.h-3.w-3.bg-green-500.rounded-full.animate-pulse)
+                    ($ :span.text-sm.font-medium.text-blue-700 "Live Mode (Polling)")
+                    ($ :span.text-sm.text-blue-600 
+                       (str "Viewing: " (or invoke-id "...")))))))
+         
          ;; Main content area with right margin for the stats panel
-                    ($ :div {:className "mr-80"}
-              ($ :div {:style {:width "100%" :height "500px"}}
+         ($ :div {:className "mr-80"}
+            ($ :div {:style {:width "100%" :height "500px"}}
                  ($ ReactFlow {:nodes flow-nodes 
                              :edges flow-edges
                              :onNodesChange on-nodes-change
@@ -867,13 +759,13 @@
                                                                 :onClick (fn [e]
                                                                            (.stopPropagation e)
                                                                            (println "phantom data" data)
-                                                                           (handle-paginate-node missing-node-id))}
+                                                                           (on-paginate-node missing-node-id))}
                                                           ($ :div {:className "bg-gray-100 text-gray-600 p-3 rounded-md shadow-lg border-2 border-dashed border-gray-400 hover:bg-gray-200 transition-colors"
                                                                    :style {:width "170px" :height "40px"}}
                                                              (:label data))
                                                           ($ Handle {:type "target" :position "top"})))))})
                              :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
-                             :onNodeClick (fn [_ node] (set-selected-node node))}
+                             :onNodeClick (fn [_ node] (handle-select-node-click node))}
                   ($ MiniMap {:position "bottom-right" :pannable true :zoomable true})
                   ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
                   ($ Controls {:className "fill-gray-500 stroke-gray-500"})))
@@ -883,29 +775,25 @@
               (if forking-mode?
                 ($ forking-input-component {:selected-node selected-node
                                             :changed-nodes changed-nodes
-                                            :set-changed-nodes set-changed-nodes
+                                            :on-change-node-input on-change-node-input
                                             :affected-nodes affected-nodes})
                 ($ selected-node-component {:selected-node selected-node
                                             :graph-data graph-data
-                                            :handle-paginate-node handle-paginate-node
-                                            :loading-nodes loading-nodes
-                                            :flow-nodes flow-nodes
-                                            :set-nodes set-nodes
-                                            :set-selected-node set-selected-node}))))
+                                            :on-paginate-node on-paginate-node
+                                            :on-select-node on-select-node
+                                            :flow-nodes flow-nodes}))))
          
          ;; Always-visible right panel with tabs
          ($ right-panel {:graph-data graph-data
                          :summary-data summary-data
                          :changed-nodes changed-nodes
-                         :set-changed-nodes set-changed-nodes
+                         :on-remove-node-change on-remove-node-change
                          :affected-nodes affected-nodes
                          :flow-nodes flow-nodes
-                         :set-selected-node set-selected-node
-                         :on-execute-fork handle-execute-fork
-                         :on-clear-fork handle-clear-fork
+                         :on-select-node on-select-node
+                         :on-execute-fork on-execute-fork
+                         :on-clear-fork on-clear-fork
                          :forking-mode? forking-mode?
-                         :set-forking-mode? set-forking-mode?
-                         :fork-loading? (:loading? fork-mutation)
-                         :fork-error (:error fork-mutation)
-                         :live-mode? live-mode?})))))
+                         :on-toggle-forking-mode on-toggle-forking-mode
+                         :is-live is-live})))))
 
