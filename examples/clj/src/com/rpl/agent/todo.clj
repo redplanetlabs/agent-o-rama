@@ -163,14 +163,12 @@ Your current instructions are:
   [agent-node {:keys [user-id]} todo]
   (let [store (aor/get-store agent-node "$$todos")
         uuid  (str (random-uuid))]
-    (prn :create-todo user-id uuid todo)
     (store/pstate-transform!
      [(path/keypath user-id)
       (path/keypath uuid)
       (path/termval todo)]
      store
      user-id)
-    (prn :create-todo :created uuid)
     "created"))
 
 (defn update-todo-tool
@@ -178,7 +176,6 @@ Your current instructions are:
   (let [store (aor/get-store agent-node "$$todos")
         uuid  (arguments "uuid")
         todo  (arguments "todo")]
-    (prn :update-todo user-id uuid todo)
     (store/pstate-transform!
      [(path/keypath user-id)
       (path/keypath uuid)
@@ -191,7 +188,6 @@ Your current instructions are:
   [agent-node {:keys [user-id]} arguments]
   (let [store (aor/get-store agent-node "$$todos")
         uuid  (arguments "uuid")]
-    (prn :delete-todo user-id uuid)
     (store/pstate-transform!
      [(path/keypath user-id)
       (path/keypath uuid)
@@ -244,25 +240,20 @@ Your current instructions are:
                         chat-messages
                         chat-options))
         new-profile   (j/read-value (.text (.aiMessage response)))]
-    (prn :old-profile profile)
-    (prn :new-profile new-profile)
     (store/update! store user-id #(merge % new-profile)))
   "updated")
 
 (defn update-todo
   [agent-node messages {:keys [user-id] :as config}]
-  (prn :update-todo)
   (let [chat-model    (aor/get-agent-object agent-node "openai-non-streaming")
         todo-tools    (aor/agent-client agent-node "todo-tools")
         store         (aor/get-store agent-node "$$todos")
-        _             (prn :update-todo 1)
         todos         (into
                        {}
                        (store/pstate-select
                         [(path/keypath user-id) path/ALL]
                         store
                         user-id))
-        _             (prn :update-todo :todos todos)
         system-msg    (format
                        UPDATE-TODOS
                        (j/write-value-as-string todos MAPPER))
@@ -273,15 +264,12 @@ Your current instructions are:
                           (UserMessage.
                            "Please update the ToDos based on the conversation")))
         chat-options  {:tools TODO-TOOLS}
-        _             (prn :update-todo 2)
         response      (lc4j/chat
                        chat-model
                        (lc4j/chat-request chat-messages chat-options))
         ai-message    (.aiMessage response)
         tool-calls    (not-empty (vec (.toolExecutionRequests ai-message)))]
-    (prn :update-todo :tool-calls tool-calls)
     (when tool-calls
-      (prn :update-todo :invoke-tools config)
       (aor/agent-invoke todo-tools tool-calls config))
     "updated"))
 
@@ -314,7 +302,6 @@ Your current instructions are:
 
 (defn update-tool
   [agent-node config arguments]
-  (prn :update-tool :config config :args arguments)
   (let [update-type (get arguments "update_type")
         messages    (:messages config)]
     (case update-type
@@ -404,7 +391,6 @@ Your current instructions are:
                                  [(path/keypath user-id) path/ALL]
                                  todos-store
                                  user-id))
-            _                  (prn :maestro :todos user-id todos)
             instructions       (store/get instructions-store user-id)
             system-msg         (format
                                 MODEL-SYSTEM-MESSAGE
@@ -431,8 +417,6 @@ Your current instructions are:
                                tool-calls
                                (assoc config :messages messages))
                 next-messages (into next-messages tool-results)]
-            (prn :tool-results tool-results)
-            (prn :next-messages next-messages)
             (aor/emit! agent-node
                        "maestro"
                        next-messages
@@ -542,8 +526,9 @@ Your current instructions are:
           (catch Exception e
             (prn :exeception e))))
       (let [profile-pstate (rama/foreign-pstate ipc module-name "$$profiles")]
-        (prn :profile
-             (rama/foreign-select-one (path/keypath user-id) profile-pstate))
+        (println
+         :profile
+         (rama/foreign-select-one (path/keypath user-id) profile-pstate))
         (assert
          (rama/foreign-select-one (path/keypath user-id) profile-pstate)
          "Has a profile")))))
