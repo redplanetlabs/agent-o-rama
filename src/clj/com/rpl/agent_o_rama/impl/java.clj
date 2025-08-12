@@ -18,7 +18,7 @@
      (errorHandlerDefault [this]
        (vswap! options assoc :error-handler (tools/error-handler-default))
        this)
-     (errorHandlerRetry [this]
+     (errorHandlerRethrow [this]
        (vswap! options assoc :error-handler (tools/error-handler-rethrow))
        this)
      (errorHandlerStaticStringByType [this handlers]

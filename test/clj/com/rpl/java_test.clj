@@ -23,5 +23,28 @@
     (is (= {"a" "8" "m" "54"} (TestModules/runBasicToolsOpenAIAgent)))
   ))
 
+
+(deftest tools-agent-options-test
+  (let [res (TestSnippets/toolsAgentOptionsCases)
+        [o1 o2 o3 o4 o5] (mapv deref res)]
+    (is (= [:error-handler] (keys o1)))
+    (is (= "Error: clojure.lang.ExceptionInfo: fail {}"
+           (h/first-line ((:error-handler o1) (ex-info "fail" {})))))
+
+    (is (= [:error-handler] (keys o2)))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 ((:error-handler o2) (ex-info "fail" {}))))
+
+    (is (= [:error-handler] (keys o3)))
+    (is (= "ei" ((:error-handler o3) (ex-info "fail" {}))))
+    (is (= "ae" ((:error-handler o3) (ArithmeticException.))))
+
+    (is (= [:error-handler] (keys o4)))
+    (is (= "blah" ((:error-handler o4) (ex-info "fail" {"a" "blah"}))))
+    (is (= "java.lang.ClassCastException"
+           ((:error-handler o4) (ClassCastException.))))
+
+    (is (= {} o5))
+  ))
 ;; TODO: <<<<>>>>
-;; (TestSnippets/toolsAgentOptionsCases)
+;; - also need to test that tools agent funnels options through properly

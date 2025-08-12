@@ -44,8 +44,8 @@ public interface ToolsAgentOptions {
   }
 
   /**
-   * Creates an empty ToolsAgentOptions. {@code ToolsAgentOptions.errorHandlerRetry()} is the
-   * same as {@code ToolsAgentOptions.create().errorHandlerRetry()}
+   * Creates an empty ToolsAgentOptions. {@code ToolsAgentOptions.errorHandlerRethrow()} is the
+   * same as {@code ToolsAgentOptions.create().errorHandlerRethrow()}
    */
   static Impl create() {
     return (Impl) AORHelpers.MAKE_OPTIONS.invoke();

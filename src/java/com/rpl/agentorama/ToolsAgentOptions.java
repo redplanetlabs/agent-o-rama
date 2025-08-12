@@ -42,7 +42,7 @@ public interface ToolsAgentOptions {
     
     ToolsAgentOptions.Impl errorHandlerDefault();
     
-    ToolsAgentOptions.Impl errorHandlerRetry();
+    ToolsAgentOptions.Impl errorHandlerRethrow();
     
     ToolsAgentOptions.Impl errorHandlerStaticStringByType(StaticStringHandler... handlers);
     
@@ -51,8 +51,8 @@ public interface ToolsAgentOptions {
   }
 
   /**
-   * Creates an empty ToolsAgentOptions. {@code ToolsAgentOptions.errorHandlerRetry()} is the
-   * same as {@code ToolsAgentOptions.create().errorHandlerRetry()}
+   * Creates an empty ToolsAgentOptions. {@code ToolsAgentOptions.errorHandlerRethrow()} is the
+   * same as {@code ToolsAgentOptions.create().errorHandlerRethrow()}
    */
   static Impl create() {
     return (Impl) AORHelpers.MAKE_OPTIONS.invoke();
@@ -62,8 +62,8 @@ public interface ToolsAgentOptions {
     return create().errorHandlerDefault();
   }
   
-  static ToolsAgentOptions.Impl errorHandlerRetry() {
-    return create().errorHandlerRetry();
+  static ToolsAgentOptions.Impl errorHandlerRethrow() {
+    return create().errorHandlerRethrow();
   }
   
   static ToolsAgentOptions.Impl errorHandlerStaticStringByType(StaticStringHandler... handlers) {

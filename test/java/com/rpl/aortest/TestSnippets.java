@@ -11,7 +11,7 @@ public class TestSnippets {
   public static List<ToolsAgentOptions> toolsAgentOptionsCases() {
     return Arrays.asList(
       ToolsAgentOptions.errorHandlerDefault(),
-      ToolsAgentOptions.errorHandlerRetry(),
+      ToolsAgentOptions.errorHandlerRethrow(),
       ToolsAgentOptions.errorHandlerStaticStringByType(
         StaticStringHandler.create(ClassCastException.class, "cc"),
         StaticStringHandler.create(ExceptionInfo.class, "ei"),

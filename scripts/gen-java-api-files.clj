@@ -81,7 +81,7 @@
 
 (def TOOLS-AGENT-OPTIONS-METHODS
   [["errorHandlerDefault" "ToolsAgentOptions.Impl" []]
-   ["errorHandlerRetry" "ToolsAgentOptions.Impl" []]
+   ["errorHandlerRethrow" "ToolsAgentOptions.Impl" []]
    ["errorHandlerStaticStringByType" "ToolsAgentOptions.Impl"
     [["StaticStringHandler..." "handlers"]]]
    ["errorHandlerByType" "ToolsAgentOptions.Impl"
