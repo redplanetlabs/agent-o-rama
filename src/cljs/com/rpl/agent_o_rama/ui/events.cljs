@@ -5,11 +5,10 @@
 ;; Orchestration events that perform side-effects using sente helpers,
 ;; keeping React components pure.
 
-;; Single active subscription management - much simpler!
+;; Simplified view-live event - just track which invocation we're viewing
 (state/reg-event :invocation/view-live
   (fn [db {:keys [module-id agent-name invoke-id] :as params}]
-    (let [current-sub (get-in db [:sente :active-subscription])
-          current-invoke-id (get-in db [:current-invocation :invoke-id])
+    (let [current-invoke-id (get-in db [:current-invocation :invoke-id])
           new-sub-key (str (random-uuid))]
       
       ;; Only switch if we're actually changing invocations
@@ -18,26 +17,22 @@
           (println "Already viewing invocation:" invoke-id)
           nil) ;; No state change needed
         (do
-          ;; If we have an active subscription, stop it first
-          (when current-sub
-            (let [prev-invoke-id (get-in current-sub [:params :invoke-id])]
-              (println "Stopping previous subscription:" (:sub-key current-sub) "for invoke:" prev-invoke-id)
-              (println "Sending unsubscribe event with data:" {:sub-key (:sub-key current-sub)
-                                                               :sub-type :live-graph})
-              (sente/push! [:live/unsubscribe {:sub-key (:sub-key current-sub)
-                                              :sub-type :live-graph}])))
+          (println "Switching to live view for:" invoke-id)
           
-          ;; Start new subscription
-          (println "Starting new subscription for:" invoke-id "with key:" new-sub-key)
+          ;; Register with server that we want to watch this invocation
+          ;; (for security/tracking purposes)
           (sente/push! [:live/subscribe {:sub-key new-sub-key
                                         :sub-type :live-graph
                                         :params params}])
           
-          ;; Store the active subscription
+          ;; Store the active subscription key for cleanup
           (state/dispatch [:db/set-value [:sente :active-subscription] 
                           {:sub-key new-sub-key :params params}])
           
-          ;; Just update current invocation pointer - data is stored separately
+          ;; Clear any existing nodes data for clean start
+          (state/dispatch [:db/set-value [:invocations-data invoke-id] {}])
+          
+          ;; Update current invocation pointer
           [[:current-invocation]
            (constantly {:invoke-id invoke-id
                        :module-id module-id

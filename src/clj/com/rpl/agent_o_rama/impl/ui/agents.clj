@@ -180,27 +180,25 @@
 ;; ============================================================================
 
 (defn current-invocation-invokes-map
-  "Return the cleaned invokes-map for a specific invocation.
+  "Return the cleaned invokes-map for a specific invocation starting from given leaves.
    - Keeps filter-encodable and remove-implicit-nodes
-   - Ignores historical graph and pagination
-   - Requires root-invoke-id from root pstate
-   - Runs the tracing query with a fixed page size (100)"
-  [module-id agent-name invoke-id]
+   - Supports pagination from leaf nodes or root
+   - Returns both the invokes-map and next-task-invoke-pairs for continued pagination"
+  [module-id agent-name invoke-id start-pairs]
   (let [client-objects (objects module-id agent-name)
-        root-pstate (:root-pstate client-objects)
         tracing-query (:tracing-query client-objects)
-        ;; TODO doesn't need parsing cause sente.
-        [agent-task-id agent-id] (parse-url-pair invoke-id)
-        root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                                           root-pstate
-                                           {:pkey agent-task-id})
-        pair [agent-task-id root-invoke-id]
-        dynamic-trace (when (and agent-task-id root-invoke-id)
-                        (foreign-invoke-query tracing-query agent-task-id [pair] 100))]
-    (when-let [invokes-map (:invokes-map dynamic-trace)]
-      (-> invokes-map
-          (remove-implicit-nodes)
-          (filter-encodable)))))
+        [agent-task-id _] (parse-url-pair invoke-id)
+        dynamic-trace (when (and agent-task-id (seq start-pairs))
+                        (foreign-invoke-query tracing-query 
+                                            agent-task-id 
+                                            start-pairs 
+                                            100))]
+    (when dynamic-trace
+      {:invokes-map (when-let [invokes-map (:invokes-map dynamic-trace)]
+                     (-> invokes-map
+                         (remove-implicit-nodes)
+                         (filter-encodable)))
+       :next-task-invoke-pairs (:next-task-invoke-pairs dynamic-trace)})))
 
 (defn fork [{{:keys [module-id agent-name]} :path-params
              {:keys [changed-nodes invoke-id]} :body-params}]

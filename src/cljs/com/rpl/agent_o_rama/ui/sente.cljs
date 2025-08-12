@@ -59,6 +59,16 @@
       (doseq [[node-id node-data] nodes]
         (state/dispatch [:invocation/update-node invoke-id node-id node-data])))))
 
+;; Handler for next leaves update from server
+(defmethod -event-msg-handler :live/update-next-leaves [{:as ev-msg :keys [?data]}]
+  (let [{:keys [invoke-id next-leaves]} ?data]
+    (println "Updating next-leaves for invocation:" invoke-id "leaves:" next-leaves)
+    (state/dispatch [:db/set-value [:invocations-data invoke-id :next-leaves] next-leaves])
+    ;; If next-leaves is empty, the graph is complete!
+    (when (empty? next-leaves)
+      (println "Graph complete for invocation:" invoke-id)
+      (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] true]))))
+
 ;; Handler to log connection state changes
 (defmethod -event-msg-handler :chsk/state [{:as ev-msg :keys [?data]}]
   (let [[old-state new-state] ?data

@@ -1,4 +1,6 @@
 (ns com.rpl.agent-o-rama.impl.ui.sente
+  (:use [com.rpl.rama]
+        [com.rpl.rama.path])
   (:require
    [taoensso.sente :as sente]
    [taoensso.sente.server-adapters.http-kit :as http-kit-adapter]
@@ -128,45 +130,40 @@
                                         :removed? (not= before-count after-count)}))))
 
 ;; =============================================================================
-;; MASTER POLLING LOOP - Single loop services all subscriptions
+;; CLIENT-DRIVEN UPDATE HANDLER - Clients request updates based on their state
 ;; =============================================================================
 
-(defonce master-poller (atom nil))
-
-(defn stop-master-poller! []
-  (when-let [stop-fn @master-poller]
-    (stop-fn)
-    (log/info "Master poller stopped")))
-
-(defn start-master-poller! []
-  (stop-master-poller!)
-  (let [stop? (atom false)]
-    (reset! master-poller (fn [] (reset! stop? true)))
-    (log/info "Starting master poller")
-    (future
-      (loop []
-        (when-not @stop?
-          (try
-            ;; Process live-graph subscriptions
-            (let [graph-subs (get @subscriptions :live-graph)]
-              (doseq [sub graph-subs]
-                (let [{:keys [uid module-id agent-name invoke-id]} sub]
-                  (try
-                    (when-let [nodes-map (agents/current-invocation-invokes-map module-id agent-name invoke-id)]
-                      ;; Push a merge of all nodes at once to minimize client work
-                      (chsk-send! uid [:graph/nodes-merge {:invoke-id invoke-id :nodes nodes-map}]))
-                    (catch Exception e
-                      (log/error e "Error polling for subscription" sub))))))
+(defmethod -event-msg-handler :live/get-updates
+  [{:as ev-msg :keys [?data uid ?reply-fn]}]
+  (let [{:keys [module-id agent-name invoke-id leaves]} ?data]
+    ;; Check if uid is actually subscribed to this invoke-id
+    (let [subscribed? (contains? (get @subscriptions :live-graph)
+                                 {:uid uid :module-id module-id 
+                                  :agent-name agent-name :invoke-id invoke-id})]
+      (if-not subscribed?
+        (log/warn "Client" uid "requested updates for" invoke-id "without subscription")
+        (try
+          (let [client-objects (agents/objects module-id agent-name)
+                
+                ;; If there are no leaves, start from the root. Otherwise, start from the leaves.
+                start-pairs (if (empty? leaves)
+                              (let [root-pstate (:root-pstate client-objects)
+                                    [task-id agent-id] (agents/parse-url-pair invoke-id)
+                                    root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id] 
+                                                                       root-pstate {:pkey task-id})]
+                                [[task-id root-invoke-id]])
+                              leaves)]
             
-            ;; TODO: Add similar logic here for :token-stream subscriptions
-            ;; TODO: Add similar logic here for :human-input-waiter subscriptions
-            
-            (catch Exception e
-              (log/error e "Error in master poller loop")))
-          
-          (Thread/sleep 1000) ; Poll interval
-          (recur))))
-    (log/info "Master poller started")))
+            ;; Use the helper function that returns both nodes and next leaves
+            (when-let [result (agents/current-invocation-invokes-map module-id agent-name invoke-id start-pairs)]
+              (when-let [nodes-map (:invokes-map result)]
+                (chsk-send! uid [:graph/nodes-merge {:invoke-id invoke-id :nodes nodes-map}]))
+              
+              ;; Send back the next set of leaves to continue from!
+              (chsk-send! uid [:live/update-next-leaves {:invoke-id invoke-id
+                                                         :next-leaves (:next-task-invoke-pairs result)}]))
+          (catch Exception e
+            (log/error e "Error fetching live updates for" invoke-id)))))))
 
 ;; =============================================================================
 ;; SUBSCRIPTION EVENT HANDLERS
@@ -220,12 +217,10 @@
 
 (defn stop-sente! []
   (when-let [stop-fn @router_]
-    (stop-fn))
-  (stop-master-poller!))
+    (stop-fn)))
 
 (defn start-sente! []
   (stop-sente!)
   (reset! router_
           (sente/start-server-chsk-router!
-           ch-chsk event-msg-handler))
-  (start-master-poller!))
+           ch-chsk event-msg-handler)))

@@ -8,7 +8,7 @@
    ["wouter" :as wouter :refer [useParams]]))
 
 (defui graph
-  "Live invocation graph that reacts to server pushes.
+  "Live invocation graph that uses client-driven polling for updates.
    Reuses the main invocation-graph component with live data."
   [{:keys [module-id agent-name invoke-id]}]
   (println "Live graph" module-id agent-name invoke-id)
@@ -16,6 +16,10 @@
         connected? (state/use-sub [:sente :connected?])
         ;; Subscribe to the nodes for this specific invocation
         nodes (state/use-sub [:invocations-data invoke-id :graph :nodes])
+        ;; Get the next leaves for pagination
+        next-leaves (state/use-sub [:invocations-data invoke-id :next-leaves])
+        ;; Check if the graph is complete
+        is-complete (state/use-sub [:invocations-data invoke-id :is-complete])
         current-invoke-id (state/use-sub [:current-invocation :invoke-id])
         
         ;; Convert nodes map to invokes-map format expected by the main graph
@@ -44,6 +48,32 @@
        nil) ;; No cleanup here - let state manage switching between invocations
      ;; Re-run when any of these change
      #js [connected? module-id agent-name invoke-id])
+    
+    ;; Polling effect for fetching updates
+    (uix/use-effect
+     (fn []
+       (when (and connected? (not is-complete) invoke-id)
+         (let [leaves (or next-leaves [])
+               ;; Define the polling function
+               poll-fn (fn []
+                        (println "Polling for updates with leaves:" leaves)
+                        (com.rpl.agent-o-rama.ui.sente/push! 
+                         [:live/get-updates 
+                          {:module-id module-id
+                           :agent-name agent-name
+                           :invoke-id invoke-id
+                           :leaves leaves}]))
+               ;; Start the poller with 2 second interval
+               interval-id (js/setInterval poll-fn 2000)]
+           
+           ;; Initial fetch immediately
+           (poll-fn)
+           
+           ;; Cleanup function to stop the poller
+           (fn [] 
+             (js/clearInterval interval-id)))))
+     ;; Re-run when these change
+     #js [invoke-id connected? is-complete next-leaves module-id agent-name])
     
     ;; Separate effect for cleanup when component fully unmounts
     (uix/use-effect
