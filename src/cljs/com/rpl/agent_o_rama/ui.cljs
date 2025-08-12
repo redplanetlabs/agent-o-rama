@@ -157,10 +157,6 @@
            ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
            ($ Route {:path "/agents" :component agents/index})
            
-           ;; Dataset routes
-           ($ Route {:path "/datasets/:dataset-id" :component datasets/datasets})
-           ($ Route {:path "/datasets" :component datasets/datasets})
-           
            ;; Home route
            ($ Route {:path "/" :component agents/index})))))
 

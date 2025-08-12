@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.events
   (:require [com.rpl.agent-o-rama.ui.sente :as sente]
-            [com.rpl.agent-o-rama.ui.state :as state]))
+            [com.rpl.agent-o-rama.ui.state :as state]
+            [com.rpl.specter :as s]))
 
 ;; Orchestration events that perform side-effects using sente helpers,
 ;; keeping React components pure.
@@ -22,19 +23,14 @@
                                         :sub-type :live-graph
                                         :params params}])
           
-          ;; Store the active subscription key for cleanup
-          (state/dispatch [:db/set-value [:sente :active-subscription] 
-                          {:sub-key new-sub-key :params params}])
-          
-          ;; Reset completion flag but keep existing nodes (they might still be valid)
-          (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] false])
-          (state/dispatch [:db/set-value [:invocations-data invoke-id :next-leaves] nil])
-          
-          ;; Update current invocation pointer
-          [[:current-invocation]
-           (constantly {:invoke-id invoke-id
-                       :module-id module-id
-                       :agent-name agent-name})])))))
+          ;; Return atomic multi-transform for local state updates
+          (s/multi-path
+            [:sente :active-subscription (s/terminal-val {:sub-key new-sub-key :params params})]
+            [:invocations-data invoke-id :is-complete (s/terminal-val false)]
+            [:invocations-data invoke-id :next-leaves (s/terminal-val nil)]
+            [:current-invocation (s/terminal-val {:invoke-id invoke-id
+                                                  :module-id module-id
+                                                  :agent-name agent-name})]))))))
 
 ;; Clean up on app shutdown/navigation away
 (state/reg-event :invocation/stop-live
@@ -43,7 +39,7 @@
       (when current-sub
         (sente/push! [:live/unsubscribe {:sub-key (:sub-key current-sub)
                                          :sub-type :live-graph}]))
-      [[:sente :active-subscription] (constantly nil)])))
+      [:sente :active-subscription (s/terminal-val nil)])))
 
 ;; =============================================================================
 ;; UNIFIED INVOCATION LOADING
@@ -76,9 +72,9 @@
 (state/reg-event :invocation/process-summary
   (fn [db {:keys [invoke-id module-id agent-name summary]}]
     (let [{:keys [is-complete root-invoke-id task-id]} summary]
-      ;; Store the summary
+      ;; Optimistically return an update for the summary, and possibly more below
       (state/dispatch [:db/set-value [:invocations-data invoke-id :summary] summary])
-      
+      ;; Note: We keep this dispatch for compatibility; we could also include it in a returned multi-path
       (if is-complete
         ;; HISTORICAL: Fetch the complete graph at once
         (sente/request! [:api/get-full-graph 
@@ -93,15 +89,14 @@
                                           (:data reply)]))))
         ;; LIVE: Store root info and start subscription
         (do
-          ;; Store the root invoke ID and task ID to bootstrap polling
-          (state/dispatch [:db/set-value [:invocations-data invoke-id :root-invoke-id] root-invoke-id])
-          (state/dispatch [:db/set-value [:invocations-data invoke-id :task-id] task-id])
-          
-          ;; Start live subscription
+          ;; Atomically set root/task and then start live subscription
+          (state/dispatch [:db/set-values
+                           [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]
+                           [[:invocations-data invoke-id :task-id] task-id]])
           (state/dispatch [:invocation/view-live 
-                          {:module-id module-id 
-                           :agent-name agent-name 
-                           :invoke-id invoke-id}])))
+                           {:module-id module-id 
+                            :agent-name agent-name 
+                            :invoke-id invoke-id}])))
       nil)))
 
 ;; Load complete historical graph
@@ -109,19 +104,20 @@
   (fn [db invoke-id graph-data]
     ;; Store all the graph data at once
     (let [{:keys [invokes-map implicit-edges summary]} graph-data]
-      (state/dispatch [:db/set-value [:invocations-data invoke-id :graph :nodes] invokes-map])
-      (state/dispatch [:db/set-value [:invocations-data invoke-id :implicit-edges] implicit-edges])
-      (state/dispatch [:db/set-value [:invocations-data invoke-id :summary] summary])
-      (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] true])
-      nil)))
+      [:invocations-data invoke-id
+       (s/multi-path
+         [:graph :nodes (s/terminal-val invokes-map)]
+         [:implicit-edges (s/terminal-val implicit-edges)]
+         [:summary (s/terminal-val summary)]
+         [:is-complete (s/terminal-val true)])])))
 
 ;; Handle paginated data merge
 (state/reg-event :invocation/merge-paginated-data
   (fn [db invoke-id paginated-data]
     (let [{:keys [invokes-map]} paginated-data
           current-nodes (get-in db [:invocations-data invoke-id :graph :nodes])]
-      [[:invocations-data invoke-id :graph :nodes] 
-       #(merge % invokes-map)])))
+      [:invocations-data invoke-id :graph :nodes 
+       (s/terminal #(merge % invokes-map))])))
 
 ;; Cleanup when leaving an invocation
 (state/reg-event :invocation/cleanup
@@ -130,13 +126,12 @@
     (state/dispatch [:invocation/stop-live])
     ;; Clear UI state
     (state/dispatch [:ui/clear-fork-state])
-    (state/dispatch [:db/set-value [:ui :selected-node-id] nil])
-    nil))
+    [:ui :selected-node-id (s/terminal-val nil)]))
 
 ;; UI state management for forking
 (state/reg-event :ui/clear-fork-state
   (fn [db]
-    [[:ui] #(assoc % 
-                  :changed-nodes {}
-                  :selected-node-id nil
-                  :forking-mode? false)]))
+    [:ui (s/multi-path
+           [:changed-nodes (s/terminal-val {})]
+           [:selected-node-id (s/terminal-val nil)]
+           [:forking-mode? (s/terminal-val false)])]))

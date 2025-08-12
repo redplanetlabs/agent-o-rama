@@ -38,12 +38,15 @@
 (defonce event-handlers (atom {}))
 
 (defn reg-event
-  "Register an event handler. Handler should return [specter-path transform-fn] tuple."
+  "Register an event handler. Handler should return a Specter path (navigator)
+   that will be applied to the current app-db via s/multi-transform. Handlers
+   may return nil to indicate no state change is needed."
   [event-id handler-fn]
   (swap! event-handlers assoc event-id handler-fn))
 
 (defn dispatch
-  "Dispatch an event to update app-db. Event is a vector [event-id & args]."
+  "Dispatch an event to update app-db. Event is a vector [event-id & args].
+   The handler must return a Specter path navigator suitable for s/multi-transform."
   [event]
   (let [event-id (first event)
         event-args (rest event)
@@ -51,17 +54,13 @@
     (if handler
       (try
         (let [current-db @app-db
-              result (apply handler current-db event-args)]
-          (when result ;; Allow handlers to return nil to indicate they handled the update themselves
-            (if (vector? result)
-              (let [[specter-path transform-fn] result]
-                (if (and specter-path transform-fn)
-                  (swap! app-db #(s/transform specter-path transform-fn %))
-                  (println "⚠️ Event handler" event-id "returned invalid [path transform-fn] tuple:" result)))
-              (println "❌ Event handler" event-id "must return a vector [path transform-fn], got:" result))))
+              specter-path (apply handler current-db event-args)]
+          ;; Allow handlers to return nil to indicate they handled the update themselves
+          (when specter-path
+            (swap! app-db #(s/multi-transform specter-path %))))
         (catch :default e
           (println "💥 Error in event handler" event-id ":" e)))
-      (js/console.warn "No handler registered for event:" event-id))))
+      (println "⚠️ No handler registered for event:" event-id))))
 
 ;; =============================================================================
 ;; SUBSCRIPTIONS (REACTIVE STATE ACCESS)
@@ -122,11 +121,11 @@
 ;; UI Events - Only keep complex or toggle events
 (reg-event :ui/toggle-forking-mode
   (fn [db]
-    [[:ui :forking-mode?] not]))
+    [:ui :forking-mode? (s/terminal not)]))
 
 (reg-event :ui/toggle-sidebar
   (fn [db]
-    [[:ui :sidebar-collapsed?] not]))
+    [:ui :sidebar-collapsed? (s/terminal not)]))
 
 ;; Note: Simple setters should use :db/set-value
 ;; Examples:
@@ -145,59 +144,66 @@
   (fn [db {:keys [invoke-id module-id agent-name]}]
     ;; Simply set the current invocation context
     ;; Data is stored separately under invocations-data
-    [[:current-invocation]
-     (constantly {:invoke-id invoke-id
-                  :module-id module-id
-                  :agent-name agent-name})]))
+    [:current-invocation (s/terminal-val {:invoke-id invoke-id
+                                          :module-id module-id
+                                          :agent-name agent-name})]))
 
 (reg-event :invocation/load-graph-success
   (fn [db invoke-id graph-data]
-    [[:invocations-data invoke-id :graph] (constantly graph-data)]))
+    [:invocations-data invoke-id :graph (s/terminal-val graph-data)]))
 
 (reg-event :invocation/load-summary-success
   (fn [db invoke-id summary-data]
-    [[:invocations-data invoke-id :summary] (constantly summary-data)]))
+    [:invocations-data invoke-id :summary (s/terminal-val summary-data)]))
 
 (reg-event :invocation/update-node
   (fn [db invoke-id node-id node-data]
-    [[:invocations-data invoke-id :graph :nodes]
-     (fn [nodes]
-       (assoc (or nodes {}) node-id node-data))]))
+    [:invocations-data invoke-id :graph :nodes
+     (s/terminal (fn [nodes]
+                   (assoc (or nodes {}) node-id node-data)))]))
 
 ;; Generic state update events
 ;; Usage: (dispatch [:db/set-value [:some :path] value])
 (reg-event :db/set-value
   (fn [db path value]
-    ;; Return path and a function that ignores the old value and returns the new one
-    [path (fn [_] value)]))
+    ;; Build a Specter navigator that sets the value at the given path
+    (into path [(s/terminal-val value)])))
 
 ;; Usage: (dispatch [:db/update-value [:some :path] update-fn])
 (reg-event :db/update-value
   (fn [db path update-fn]
-    [path update-fn]))
+    (into path [(s/terminal update-fn)])))
+
+;; Usage: (dispatch [:db/set-values [[:path1] v1] [[:path2 :k] v2] ...])
+(reg-event :db/set-values
+  (fn [db & path-value-pairs]
+    (apply s/multi-path
+           (map (fn [[path value]]
+                  (into path [(s/terminal-val value)]))
+                path-value-pairs))))
 
 
 ;; Specific complex events that do more than just setting a value
 (reg-event :invocations/append
   (fn [db invokes]
-    [[:invocations :all-invokes] #(concat % invokes)]))
+    [:invocations :all-invokes (s/terminal #(concat % invokes))]))
 
 (reg-event :invocations/set-loading
   (fn [db loading?]
-    [[:invocations :loading?] (constantly loading?)]))
+    [:invocations :loading? (s/terminal-val loading?)]))
 
 (reg-event :invocations/set-pagination
   (fn [db {:keys [pagination-params has-more?]}]
-    [[:invocations] #(assoc % 
-                           :pagination-params pagination-params
-                           :has-more? has-more?)]))
+    [:invocations (s/terminal #(assoc %
+                                      :pagination-params pagination-params
+                                      :has-more? has-more?))]))
 
 (reg-event :invocations/reset
   (fn [db]
-    [[:invocations] (constantly {:all-invokes []
-                                 :pagination-params nil
-                                 :has-more? true
-                                 :loading? false})]))
+    [:invocations (s/terminal-val {:all-invokes []
+                                   :pagination-params nil
+                                   :has-more? true
+                                   :loading? false})]))
 
 ;; =============================================================================
 ;; GENERIC QUERY HANDLERS - For useSenteQuery hook
@@ -205,20 +211,20 @@
 
 (reg-event :query/fetch-start
   (fn [db {:keys [query-key]}]
-    [(into [:queries] query-key)
-     (fn [current-state]
-       (assoc current-state :status :loading :error nil))]))
+    (into (into [:queries] query-key)
+          [(s/terminal (fn [current-state]
+                         (assoc current-state :status :loading :error nil)))])))
 
 (reg-event :query/fetch-success
   (fn [db {:keys [query-key data]}]
-    [(into [:queries] query-key)
-     (constantly {:status :success :data data :error nil})]))
+    (into (into [:queries] query-key)
+          [(s/terminal-val {:status :success :data data :error nil})])))
 
 (reg-event :query/fetch-error
   (fn [db {:keys [query-key error]}]
-    [(into [:queries] query-key)
-     (fn [current-state]
-       (assoc current-state :status :error :error error))]))
+    (into (into [:queries] query-key)
+          [(s/terminal (fn [current-state]
+                         (assoc current-state :status :error :error error)))])))
 
 ;; =============================================================================
 ;; DEBUGGING HELPERS
