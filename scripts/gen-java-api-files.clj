@@ -68,6 +68,27 @@
        (.endsWith (.getName f) ".java"))
      fs)))
 
+(defn args-declaration-str
+  [args]
+  (str/join ", "
+            (dofor [[t v] args]
+              (str t " " v)
+            )))
+
+(defn args-vars-str
+  [args]
+  (str/join ", " (mapv second args)))
+
+(def TOOLS-AGENT-OPTIONS-METHODS
+  [["errorHandlerDefault" "ToolsAgentOptions.Impl" []]
+   ["errorHandlerRetry" "ToolsAgentOptions.Impl" []]
+   ["errorHandlerStaticStringByType" "ToolsAgentOptions.Impl"
+    [["StaticStringHandler..." "handlers"]]]
+   ["errorHandlerByType" "ToolsAgentOptions.Impl"
+    [["FunctionHandler..." "handlers"]]]
+  ])
+
+
 (def ^:dynamic *operation-index*)
 
 (try

@@ -11,6 +11,8 @@ public class AORHelpers {
   public static final IFn WRAP_AGENT_OBJECT = Util.getIFn("com.rpl.agent-o-rama.impl.agent-node", "wrap-agent-object");
   public static IFn FREEZE = Util.getIFn("taoensso.nippy", "freeze");
   public static IFn THAW = Util.getIFn("taoensso.nippy", "thaw");
+  public static IFn MAKE_OPTIONS = Util.getIFn("com.rpl.agent-o-rama.impl.java", "mk-tools-agent-options");
+
 
   public static byte[] freeze(Object v) {
     return (byte[]) FREEZE.invoke(v);

@@ -12,6 +12,7 @@
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.tools :as tools]
    [com.rpl.rama.aggs :as aggs])
   (:import
    [com.rpl.agentorama
@@ -71,6 +72,13 @@
        (let [ret (graph/mk-agent-graph)]
          (vswap! agents-vol assoc name ret)
          ret))
+     (newToolsAgent [this name tools]
+       (.newToolsAgent this name tools nil))
+     (newToolsAgent [this name tools options]
+       (tools/new-tools-agent
+        name
+        (mapv deref tools)
+        (if options @options)))
      (getStreamTopology [this] stream-topology)
      (declareKeyValueStore [this name key-class val-class]
        (simpl/declare-store* stream-topology
