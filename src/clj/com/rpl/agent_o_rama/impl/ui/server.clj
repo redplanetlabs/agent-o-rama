@@ -69,12 +69,7 @@
 
      ["/api" ; This comes AFTER /chsk so /chsk isn't treated as an API call
       ["/agents/:module-id/:agent-name/fork"
-       {:post {:handler #'agents/fork}}]
-      ["/agents/:module-id/:agent-name/invocations/:invoke-id/paginated"
-       {:get {:parameters {:query [:map
-                                   [:paginate-task-id {:optional true} int?]
-                                   [:missing-node-id {:optional true} string?]]}
-              :handler #'agents/invoke-paginated}}]]]
+       {:post {:handler #'agents/fork}}] ]]
     {:data {:muuntaja m/instance
             :middleware [exception-middleware
                          parameters/parameters-middleware
