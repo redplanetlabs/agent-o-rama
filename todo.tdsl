@@ -1,3 +1,5 @@
+refactor nested dispatch calls to use a single specter multi-trasnform with termval/term
+
 the frontend refactor is not fully done though. i have many features left to port, particularly the most complex part of the app, the invocation_graph.cljs. i also need to keep in mind many new features. 
  * i need to remove the many (20+) usestate's, and move them into app-db
 * i need to handle streaming in new node invokes as they appear.
