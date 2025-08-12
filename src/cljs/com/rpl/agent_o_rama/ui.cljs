@@ -9,7 +9,6 @@
    ["@tanstack/react-query" :refer [QueryClient QueryClientProvider]]
    ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon ChevronLeftIcon ChevronRightIcon]]
    
-   [com.rpl.agent-o-rama.ui.datasets :as datasets]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.stats :as stats]
    [com.rpl.agent-o-rama.ui.sente :as sente]
@@ -180,10 +179,6 @@
               ($ Route {:path "/agents/:module-id/:agent-name/stats" :component stats/stats})
               ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
               ($ Route {:path "/agents" :component agents/index})
-              
-              ;; Dataset routes
-              ($ Route {:path "/datasets/:dataset-id" :component datasets/datasets})
-              ($ Route {:path "/datasets" :component datasets/datasets})
               
               ;; Home route
               ($ Route {:path "/" :component agents/index}))))))
