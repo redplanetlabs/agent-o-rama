@@ -161,7 +161,7 @@
               
               ;; Send back the next set of leaves to continue from!
               (chsk-send! uid [:live/update-next-leaves {:invoke-id invoke-id
-                                                         :next-leaves (:next-task-invoke-pairs result)}]))
+                                                         :next-leaves (:next-task-invoke-pairs result)}])))
           (catch Exception e
             (log/error e "Error fetching live updates for" invoke-id)))))))
 

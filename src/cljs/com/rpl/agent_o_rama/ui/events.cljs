@@ -29,8 +29,9 @@
           (state/dispatch [:db/set-value [:sente :active-subscription] 
                           {:sub-key new-sub-key :params params}])
           
-          ;; Clear any existing nodes data for clean start
-          (state/dispatch [:db/set-value [:invocations-data invoke-id] {}])
+          ;; Reset completion flag but keep existing nodes (they might still be valid)
+          (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] false])
+          (state/dispatch [:db/set-value [:invocations-data invoke-id :next-leaves] nil])
           
           ;; Update current invocation pointer
           [[:current-invocation]

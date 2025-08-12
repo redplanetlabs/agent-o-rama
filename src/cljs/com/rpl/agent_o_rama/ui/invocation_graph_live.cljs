@@ -53,16 +53,29 @@
     (uix/use-effect
      (fn []
        (when (and connected? (not is-complete) invoke-id)
-         (let [leaves (or next-leaves [])
+         (let [;; Calculate current leaves from our local state
+               current-db @state/app-db
+               local-leaves (state/get-unfinished-leaves current-db invoke-id)
+               ;; Use server-provided leaves only as fallback or if we have no nodes yet
+               leaves (if (seq local-leaves)
+                       local-leaves
+                       (or next-leaves []))
                ;; Define the polling function
                poll-fn (fn []
-                        (println "Polling for updates with leaves:" leaves)
-                        (com.rpl.agent-o-rama.ui.sente/push! 
-                         [:live/get-updates 
-                          {:module-id module-id
-                           :agent-name agent-name
-                           :invoke-id invoke-id
-                           :leaves leaves}]))
+                        (let [;; Recalculate leaves each time we poll
+                              current-db @state/app-db
+                              current-leaves (state/get-unfinished-leaves current-db invoke-id)
+                              leaves-to-use (if (seq current-leaves)
+                                             current-leaves
+                                             [])]
+                          (println "Polling for updates with leaves:" leaves-to-use 
+                                  "(" (count leaves-to-use) "unfinished nodes)")
+                          (com.rpl.agent-o-rama.ui.sente/push! 
+                           [:live/get-updates 
+                            {:module-id module-id
+                             :agent-name agent-name
+                             :invoke-id invoke-id
+                             :leaves leaves-to-use}])))
                ;; Start the poller with 2 second interval
                interval-id (js/setInterval poll-fn 2000)]
            
@@ -73,7 +86,7 @@
            (fn [] 
              (js/clearInterval interval-id)))))
      ;; Re-run when these change
-     #js [invoke-id connected? is-complete next-leaves module-id agent-name])
+     #js [invoke-id connected? is-complete module-id agent-name])
     
     ;; Separate effect for cleanup when component fully unmounts
     (uix/use-effect
@@ -100,12 +113,17 @@
          ($ :div.mb-4.bg-blue-50.border.border-blue-200.rounded-lg.p-4
             ($ :div.flex.items-center.justify-between
                ($ :div.flex.items-center.gap-2
-                  ($ :div.h-3.w-3.bg-green-500.rounded-full.animate-pulse)
-                  ($ :span.text-sm.font-medium.text-blue-700 "Live Mode")
+                  (if is-complete
+                    ($ :div.h-3.w-3.bg-gray-400.rounded-full)
+                    ($ :div.h-3.w-3.bg-green-500.rounded-full.animate-pulse))
+                  ($ :span.text-sm.font-medium.text-blue-700 
+                     (if is-complete "Live Mode (Complete)" "Live Mode (Polling)"))
                   ($ :span.text-sm.text-blue-600 
                      (str "Viewing: " (or invoke-id "..."))))
                ($ :div.text-xs.text-blue-500
-                  (str (count nodes) " nodes loaded"))))
+                  (let [unfinished-count (count (state/get-unfinished-leaves @state/app-db invoke-id))]
+                    (str (count nodes) " nodes, " 
+                         unfinished-count " pending")))))
          
          ;; Render the main graph component with our live data
          (if mock-data

@@ -61,11 +61,19 @@
 
 ;; Handler for next leaves update from server
 (defmethod -event-msg-handler :live/update-next-leaves [{:as ev-msg :keys [?data]}]
-  (let [{:keys [invoke-id next-leaves]} ?data]
-    (println "Updating next-leaves for invocation:" invoke-id "leaves:" next-leaves)
+  (let [{:keys [invoke-id next-leaves]} ?data
+        current-db @state/app-db
+        nodes (get-in current-db [:invocations-data invoke-id :graph :nodes])
+        local-unfinished (state/get-unfinished-leaves current-db invoke-id)]
+    (println "Updating next-leaves for invocation:" invoke-id 
+             "server-leaves:" (count next-leaves)
+             "local-unfinished:" (count local-unfinished)
+             "total-nodes:" (count nodes))
     (state/dispatch [:db/set-value [:invocations-data invoke-id :next-leaves] next-leaves])
-    ;; If next-leaves is empty, the graph is complete!
-    (when (empty? next-leaves)
+    ;; Only mark complete if we have nodes AND no unfinished leaves locally
+    (when (and (seq nodes) ;; We have at least some nodes
+               (empty? local-unfinished) ;; No unfinished nodes locally
+               (empty? next-leaves)) ;; Server also says no more
       (println "Graph complete for invocation:" invoke-id)
       (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] true]))))
 

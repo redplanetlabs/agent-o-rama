@@ -100,8 +100,7 @@
   [db invoke-id]
   (let [nodes-map (s/select-one [:invocations-data invoke-id :graph :nodes] db)]
     (s/select [s/MAP-VALS
-               (s/selected? (s/must :node-task-id)
-                           (s/pred #(not (:finish-time-millis %))))
+               (s/selected? (s/must :node-task-id))
                (s/view (fn [node-data]
                         [(:node-task-id node-data) (:node-id node-data)]))]
               (or nodes-map {}))))
