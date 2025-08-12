@@ -92,16 +92,6 @@
   (reset! router_
           (sente/start-client-chsk-router! ch-chsk event-msg-handler)))
 
-(defn init! []
-  (start-router!)
-  ;; Clean up subscriptions when the window/tab is closed
-  (.addEventListener js/window "beforeunload" 
-                     (fn [_]
-                       ;; Send synchronous unsubscribe if possible
-                       (when-let [active-sub (get-in @state/app-db [:sente :active-subscription])]
-                         (push! [:live/unsubscribe {:sub-key (:sub-key active-sub)
-                                                    :sub-type :live-graph}])))))
-
 ;; =============================================================================
 ;; REQUEST HELPERS
 ;; =============================================================================
@@ -120,6 +110,16 @@
   "Send a one-way message to the server (no response expected)."
   [event-vec]
   (chsk-send! event-vec))
+
+(defn init! []
+  (start-router!)
+  ;; Clean up subscriptions when the window/tab is closed
+  (.addEventListener js/window "beforeunload" 
+                     (fn [_]
+                       ;; Send synchronous unsubscribe if possible
+                       (when-let [active-sub (get-in @state/app-db [:sente :active-subscription])]
+                         (push! [:live/unsubscribe {:sub-key (:sub-key active-sub)
+                                                    :sub-type :live-graph}])))))
 
 ;; =============================================================================
 ;; LIVE CONTROL (decoupled from React components)
