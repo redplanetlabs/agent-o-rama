@@ -44,3 +44,11 @@
      (deref [this]
        @options
      ))))
+
+(defn create-tool-info
+  [tool-spec jfn]
+  (tools/tool-info tool-spec (h/convert-jfn jfn)))
+
+(defn create-tool-info-with-context
+  [tool-spec jfn]
+  (tools/tool-info tool-spec (h/convert-jfn jfn) {:include-context? true}))

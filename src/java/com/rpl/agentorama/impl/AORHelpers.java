@@ -12,7 +12,8 @@ public class AORHelpers {
   public static IFn FREEZE = Util.getIFn("taoensso.nippy", "freeze");
   public static IFn THAW = Util.getIFn("taoensso.nippy", "thaw");
   public static IFn MAKE_OPTIONS = Util.getIFn("com.rpl.agent-o-rama.impl.java", "mk-tools-agent-options");
-
+  public static IFn CREATE_TOOL_INFO = Util.getIFn("com.rpl.agent-o-rama.impl.java", "create-tool-info");
+  public static IFn CREATE_TOOL_INFO_WITH_CONTEXT = Util.getIFn("com.rpl.agent-o-rama.impl.java", "create-tool-info-with-context");
 
   public static byte[] freeze(Object v) {
     return (byte[]) FREEZE.invoke(v);

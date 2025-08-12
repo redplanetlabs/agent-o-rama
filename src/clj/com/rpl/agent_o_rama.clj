@@ -77,7 +77,7 @@
      (newToolsAgent [this name tools options]
        (tools/new-tools-agent
         name
-        (mapv deref tools)
+        tools
         (if options @options)))
      (getStreamTopology [this] stream-topology)
      (declareKeyValueStore [this name key-class val-class]
