@@ -421,71 +421,7 @@ Your current instructions are:
                        "maestro"
                        next-messages
                        config))
-          (aor/result! agent-node {:messages next-messages})))))
-
-   ;; (aor/agg-start-node
-   ;;  ;; Handle all LLM tool calls from an AiResponse
-   ;;  "tools"
-   ;;  "tool"
-   ;;  (fn tools-fn [agent-node tool-calls messages config]
-   ;;    (doseq [^ToolExecutionRequest tool-exec-req tool-calls]
-   ;;      (let [id          (.id tool-exec-req)
-   ;;            tool-name   (.name tool-exec-req)
-   ;;            args-string (.arguments tool-exec-req)]
-   ;;        (aor/emit!
-   ;;         agent-node
-   ;;         "tool"
-   ;;         id
-   ;;         tool-name
-   ;;         args-string
-   ;;         messages
-   ;;         config)))
-   ;;    {:messages messages :config config}))
-
-   ;; (aor/node
-   ;;  ;; Handle one LLM tool execution request
-   ;;  "tool"
-   ;;  "tool-results-agg"
-   ;;  (fn tool-node [agent-node id tool-name arguments messages config]
-   ;;    (let [start-time-millis                      (h/current-time-millis)
-   ;;          data                                   (j/read-value
-   ;;                                                  arguments
-   ;;                                                  MAPPER)
-   ;;          tool-fn                                (tool-fns tool-name)
-   ;;          ^ToolExecutionResultMessage result-msg (tool-fn
-   ;;                                                  agent-node
-   ;;                                                  id
-   ;;                                                  tool-name
-   ;;                                                  data
-   ;;                                                  messages
-   ;;                                                  config)
-   ;;          end-time-millis                        (h/current-time-millis)]
-   ;;      (aor/record-nested-op!
-   ;;       agent-node
-   ;;       :other
-   ;;       start-time-millis
-   ;;       end-time-millis
-   ;;       {"tool-call-id" id
-   ;;        "tool-name"    tool-name
-   ;;        "arguments"    data
-   ;;        "result"       (.text result-msg)})
-   ;;      (aor/emit!
-   ;;       agent-node
-   ;;       "tool-results-agg"
-   ;;       result-msg))))
-
-   ;; (aor/agg-node
-   ;;  "tool-results-agg"
-   ;;  ["maestro"]
-   ;;  aggs/+vec-agg
-   ;;  (fn [agent-node results {:keys [messages config]}]
-   ;;    (aor/result! agent-node {:messages messages})
-   ;;    #_(aor/emit!
-   ;;       agent-node
-   ;;       "maestro"
-   ;;       (into messages results)
-   ;;       config)))
-   )
+          (aor/result! agent-node {:messages next-messages}))))))
 
   (tools/new-tools-agent topology "tools" TOOLS)
   (tools/new-tools-agent topology "todo-tools" TODO-TOOLS))
