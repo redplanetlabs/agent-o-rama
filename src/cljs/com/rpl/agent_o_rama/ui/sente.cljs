@@ -51,9 +51,9 @@
 (defmethod -event-msg-handler :graph/nodes-merge [{:as ev-msg :keys [?data]}]
   (let [{:keys [invoke-id nodes]} ?data]
     ;; Always store the data under the correct invoke-id
-    (when (and invoke-id (map? nodes))
-      (doseq [[node-id node-data] nodes]
-        (state/dispatch [:invocation/update-node invoke-id node-id node-data])))))
+    (when (and invoke-id (map? nodes) (not-empty nodes))
+      ;; Dispatch a single event with the whole batch of nodes
+      (state/dispatch [:invocation/merge-live-nodes invoke-id nodes]))))
 
 ;; Handler for next leaves update from server
 (defmethod -event-msg-handler :live/update-next-leaves [{:as ev-msg :keys [?data]}]

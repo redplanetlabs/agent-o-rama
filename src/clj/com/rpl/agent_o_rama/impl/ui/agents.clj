@@ -81,40 +81,6 @@
                     #(get implicit->real % %)))))
 
 
-(defn generate-implicit-edges
-  "Compares the static historical graph with the dynamic invocation trace to find
-   paths to aggregation nodes that could have been taken but were not."
-  [invokes-map historical-graph]
-  (let [;; A map from {agg-node-invoke-id -> #{emitter-invoke-ids}}
-        actual-emits-to-aggs (into {}
-                                   (for [[id data] invokes-map
-                                         :when (:agg-state data)] ; Check if it's an agg-node trace
-                                     [id (set (map :invoke-id (:agg-inputs-first-10 data)))]))]
-    (->> invokes-map
-         (mapcat (fn [[invoke-id invoke-data]]
-                   (let [node-name     (:node invoke-data)
-                         static-info   (get-in historical-graph [:node-map node-name])
-                         agg-context   (:agg-context static-info)
-                         potential-outputs (:output-nodes static-info)]
-                     
-                     ;; Only consider nodes that are inside an aggregation context
-                     (when agg-context
-                       (for [out-name potential-outputs
-                             ;; We only care about potential outputs that ARE aggregation nodes
-                             :when (= :agg-node (get-in historical-graph [:node-map out-name :node-type]))]
-                         (let [;; This is the invoke-id of the aggregation this node belongs to.
-                               agg-node-invoke-id (:agg-invoke-id invoke-data)
-                               actual-emitters    (get actual-emits-to-aggs agg-node-invoke-id)
-                               did-emit?          (contains? actual-emitters invoke-id)]
-                           
-                           (when (and (not did-emit?) agg-node-invoke-id)
-                             {:source      (str invoke-id)
-                              :target      (str agg-node-invoke-id)
-                              :id          (str "implicit-" invoke-id "-" agg-node-invoke-id)
-                              :implicit?   true})))))))
-         (filter some?)
-         (vec))))
-
 (defn parse-url-pair [s]
   (let [[task-id agent-id] (clojure.string/split s #"-")]
     [(parse-long task-id) (parse-long agent-id)]))
@@ -198,11 +164,12 @@
   [_ {:keys [module-id agent-name invoke-id]} uid]
   (let [client-objects (objects module-id agent-name)
         root-pstate (:root-pstate client-objects)
+        history-pstate (:graph-history-pstate client-objects)
         [agent-task-id agent-id] (parse-url-pair invoke-id)
         
-        ;; Get basic summary info
+        ;; Get basic summary info including graph-version
         summary-info (foreign-select-one [(keypath agent-id)
-                                          (submap [:result :start-time-millis :finish-time-millis])]
+                                          (submap [:result :start-time-millis :finish-time-millis :graph-version])]
                                         root-pstate
                                         {:pkey agent-task-id})
         
@@ -212,15 +179,21 @@
         ;; Always get root invoke id (needed for both live and historical paths)
         root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
                                           root-pstate
-                                          {:pkey agent-task-id})]
+                                          {:pkey agent-task-id})
+        
+        ;; Fetch the historical graph for implicit edge calculation on client
+        graph-version (:graph-version summary-info)
+        historical-graph (when graph-version
+                          (foreign-select-one [(keypath graph-version)]
+                                              history-pstate
+                                              {:pkey agent-task-id}))]
     
-    {:is-complete is-complete
-     :root-invoke-id root-invoke-id
-     :task-id agent-task-id
-     :agent-id agent-id
-     :result (:result summary-info)
-     :start-time-millis (:start-time-millis summary-info)
-     :finish-time-millis (:finish-time-millis summary-info)}))
+    (merge (filter-encodable summary-info)
+           {:is-complete is-complete
+            :root-invoke-id root-invoke-id
+            :task-id agent-task-id
+            :agent-id agent-id
+            :historical-graph (filter-encodable historical-graph)})))
 
 (defmethod api-handler :api/get-full-graph
   [_ {:keys [module-id agent-name invoke-id]} uid]
@@ -260,13 +233,9 @@
         invokes-map-cleaned (when dynamic-trace
                              (-> (:invokes-map dynamic-trace)
                                  (remove-implicit-nodes)
-                                 (filter-encodable)))
-        
-        implicit-edges (when (and invokes-map-cleaned historical-graph)
-                        (generate-implicit-edges invokes-map-cleaned historical-graph))]
+                                 (filter-encodable)))]
     
     {:invokes-map invokes-map-cleaned
-     :implicit-edges implicit-edges
      :summary (filter-encodable summary-info)}))
 
 (defmethod api-handler :api/paginate-node
