@@ -684,24 +684,12 @@
                                    (when on-select-node
                                      (let [node-data (js->clj (.-data node) :keywordize-keys true)]
                                        (on-select-node (:node-id node-data)))))
-        
-        ;; Status indicators for live mode
-        show-live-indicator (and is-live (not is-complete))]
+]
     
     (if (empty? graph-data)
       ($ :div.flex.justify-center.items-center.py-8
          ($ :div.text-gray-500 "No graph data available"))
       ($ :<>
-         ;; Live indicator if needed
-         (when show-live-indicator
-           ($ :div.mb-4.bg-blue-50.border.border-blue-200.rounded-lg.p-4
-              ($ :div.flex.items-center.justify-between
-                 ($ :div.flex.items-center.gap-2
-                    ($ :div.h-3.w-3.bg-green-500.rounded-full.animate-pulse)
-                    ($ :span.text-sm.font-medium.text-blue-700 "Live Mode (Polling)")
-                    ($ :span.text-sm.text-blue-600 
-                       (str "Viewing: " (or invoke-id "...")))))))
-         
          ;; Main content area with right margin for the stats panel
          ($ :div {:className "mr-80"}
             ($ :div {:style {:width "100%" :height "500px"}}
