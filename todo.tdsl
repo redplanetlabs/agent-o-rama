@@ -1,6 +1,3 @@
-refactor nested dispatch calls to use a single specter multi-trasnform with termval/term
-
-* i need to handle streaming in new node invokes as they appear.
 * i need to handle streaming in tokens form the backend.
 * i need to handle when the model hits a new human in the loop event, and present that to the user. 
 
