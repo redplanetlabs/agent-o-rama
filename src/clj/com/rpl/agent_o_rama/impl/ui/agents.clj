@@ -119,62 +119,6 @@
   (let [[task-id agent-id] (clojure.string/split s #"-")]
     [(parse-long task-id) (parse-long agent-id)]))
 
-(defn invoke-paginated
-  [{{:keys [module-id agent-name invoke-id]} :path-params
-    {:strs [paginate-task-id missing-node-id]} :query-params
-    :as req}]
-
-  (let [
-        client-objects (objects module-id agent-name)
-        root-pstate (:root-pstate client-objects)
-        history-pstate (:graph-history-pstate client-objects)
-        tracing-query (:tracing-query client-objects)
-        
-        [agent-task-id agent-id] (parse-url-pair invoke-id)
-        
-        ;; 1. Fetch the summary info for this invocation
-        ;;    (This is the main new piece of logic)
-        summary-info (foreign-select-one [
-                                          (keypath agent-id)
-                                          (submap [:invoke-args :result :start-time-millis :finish-time-millis :graph-version])]
-                                         root-pstate
-                                         {:pkey agent-task-id})
-        
-        ;; 2. Use graph-version from summary to get historical graph
-        graph-version (:graph-version summary-info)
-        
-        ;; 3. Fetch the corresponding historical graph
-        historical-graph (foreign-select-one [(keypath graph-version)]
-                                             history-pstate
-                                             {:pkey agent-task-id})
-        
-        ;; 4. Fetch the dynamic trace (existing logic)
-        root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                                           root-pstate
-                                           {:pkey agent-task-id})
-
-        pair (cond
-               (and (string? paginate-task-id) (string? missing-node-id))
-               [(parse-long paginate-task-id) (parse-long missing-node-id)]
-               
-               (and (nil? paginate-task-id) (nil? missing-node-id))
-               [agent-task-id root-invoke-id])]
-
-    (when-let [dynamic-trace (when (and pair historical-graph)
-                               (foreign-invoke-query tracing-query agent-task-id [pair] 100))]
-      (let [invokes-map-cleaned (-> (:invokes-map dynamic-trace)
-                                    (remove-implicit-nodes)
-                                    (filter-encodable))
-            
-            ;; 5. Generate implicit edges (existing logic)
-            implicit-edges (generate-implicit-edges invokes-map-cleaned historical-graph)]
-        {:status 200
-         :body {:invokes-map          invokes-map-cleaned
-                :next-task-invoke-pairs (:next-task-invoke-pairs dynamic-trace)
-                :implicit-edges       implicit-edges
-                ;; 6. Add the summary-info to the response payload
-                :summary              (filter-encodable summary-info)}}))))
-
 ;; ============================================================================
 ;; LIVE GRAPH SUPPORT (server-side helper)
 ;; ============================================================================
@@ -190,14 +134,14 @@
         [agent-task-id _] (parse-url-pair invoke-id)
         dynamic-trace (when (and agent-task-id (seq start-pairs))
                         (foreign-invoke-query tracing-query 
-                                            agent-task-id 
-                                            start-pairs 
-                                            100))]
+                                              agent-task-id 
+                                              start-pairs 
+                                              100))]
     (when dynamic-trace
       {:invokes-map (when-let [invokes-map (:invokes-map dynamic-trace)]
-                     (-> invokes-map
-                         (remove-implicit-nodes)
-                         (filter-encodable)))
+                      (-> invokes-map
+                          (remove-implicit-nodes)
+                          (filter-encodable)))
        :next-task-invoke-pairs (:next-task-invoke-pairs dynamic-trace)})))
 
 (defn fork [{{:keys [module-id agent-name]} :path-params
