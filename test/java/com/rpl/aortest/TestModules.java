@@ -73,6 +73,7 @@ public class TestModules {
                               .build();
       });
       topology.newToolsAgent("tools", TOOLS);
+      topology.newToolsAgent("tools2", TOOLS);
       topology.newAgent("foo")
               .node(
                 "start",

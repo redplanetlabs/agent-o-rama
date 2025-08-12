@@ -19,7 +19,8 @@ public class TestSnippets {
       ToolsAgentOptions.errorHandlerByType(
         FunctionHandler.create(ClassCastException.class, (Throwable t) -> t.getClass().getName()),
         FunctionHandler.create(ExceptionInfo.class, (ExceptionInfo t) -> (String) t.getData().valAt("a"))),
-      ToolsAgentOptions.create()
+      ToolsAgentOptions.create(),
+      ToolsAgentOptions.errorHandlerStaticString("abcde")
       );
   }
 }

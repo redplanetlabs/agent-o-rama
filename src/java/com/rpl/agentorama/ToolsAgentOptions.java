@@ -42,6 +42,8 @@ public interface ToolsAgentOptions {
     
     ToolsAgentOptions.Impl errorHandlerDefault();
     
+    ToolsAgentOptions.Impl errorHandlerStaticString(String message);
+    
     ToolsAgentOptions.Impl errorHandlerRethrow();
     
     ToolsAgentOptions.Impl errorHandlerStaticStringByType(StaticStringHandler... handlers);
@@ -60,6 +62,10 @@ public interface ToolsAgentOptions {
   
   static ToolsAgentOptions.Impl errorHandlerDefault() {
     return create().errorHandlerDefault();
+  }
+  
+  static ToolsAgentOptions.Impl errorHandlerStaticString(String message) {
+    return create().errorHandlerStaticString(message);
   }
   
   static ToolsAgentOptions.Impl errorHandlerRethrow() {

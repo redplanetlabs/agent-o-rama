@@ -18,6 +18,12 @@
      (errorHandlerDefault [this]
        (vswap! options assoc :error-handler (tools/error-handler-default))
        this)
+     (errorHandlerStaticString [this message]
+       (vswap! options
+               assoc
+               :error-handler
+               (tools/error-handler-static-string message))
+       this)
      (errorHandlerRethrow [this]
        (vswap! options assoc :error-handler (tools/error-handler-rethrow))
        this)

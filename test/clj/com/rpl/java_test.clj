@@ -26,7 +26,7 @@
 
 (deftest tools-agent-options-test
   (let [res (TestSnippets/toolsAgentOptionsCases)
-        [o1 o2 o3 o4 o5] (mapv deref res)]
+        [o1 o2 o3 o4 o5 o6] (mapv deref res)]
     (is (= [:error-handler] (keys o1)))
     (is (= "Error: clojure.lang.ExceptionInfo: fail {}"
            (h/first-line ((:error-handler o1) (ex-info "fail" {})))))
@@ -45,6 +45,10 @@
            ((:error-handler o4) (ClassCastException.))))
 
     (is (= {} o5))
+
+    (is (= [:error-handler] (keys o6)))
+    (is (= "abcde" ((:error-handler o6) (ex-info "fail" {}))))
   ))
+
 ;; TODO: <<<<>>>>
 ;; - also need to test that tools agent funnels options through properly
