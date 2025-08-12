@@ -233,7 +233,8 @@
   [tool-specification :- ToolSpecification
    tool-fn :- clojure.lang.IFn
    include-context? :- Boolean]
-  ToolInfo)
+  ToolInfo
+  (getToolSpecification [this] tool-specification))
 
 (defprotocol AgentsTopologyInternal
   (declare-agent-object-builder-internal [this name afn options]))

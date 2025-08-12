@@ -15,4 +15,6 @@ public interface ToolInfo {
   static <T1, T2> ToolInfo createWithContext(ToolSpecification spec, RamaFunction3<AgentNode, T1, Map<String, T2>, String> toolFn) {
     return (ToolInfo) AORHelpers.CREATE_TOOL_INFO_WITH_CONTEXT.invoke(spec, toolFn);
   }
+
+  ToolSpecification getToolSpecification();
 }

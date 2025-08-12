@@ -15,6 +15,7 @@ public interface AgentGraph {
   <T0,T1,T2,T3,T4> AgentGraph node(String name, Object outputNodesSpec, RamaVoidFunction6<AgentNode,T0,T1,T2,T3,T4> impl);
   <T0,T1,T2,T3,T4,T5> AgentGraph node(String name, Object outputNodesSpec, RamaVoidFunction7<AgentNode,T0,T1,T2,T3,T4,T5> impl);
   <T0,T1,T2,T3,T4,T5,T6> AgentGraph node(String name, Object outputNodesSpec, RamaVoidFunction8<AgentNode,T0,T1,T2,T3,T4,T5,T6> impl);
+   AgentGraph aggStartNode(String name, Object outputNodesSpec, RamaFunction1<AgentNode,Object> impl);
   <T0> AgentGraph aggStartNode(String name, Object outputNodesSpec, RamaFunction2<AgentNode,T0,Object> impl);
   <T0,T1> AgentGraph aggStartNode(String name, Object outputNodesSpec, RamaFunction3<AgentNode,T0,T1,Object> impl);
   <T0,T1,T2> AgentGraph aggStartNode(String name, Object outputNodesSpec, RamaFunction4<AgentNode,T0,T1,T2,Object> impl);

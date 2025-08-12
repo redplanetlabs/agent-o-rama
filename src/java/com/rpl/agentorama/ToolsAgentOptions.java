@@ -6,48 +6,48 @@ import com.rpl.agentorama.impl.AORHelpers;
 
 
 public interface ToolsAgentOptions {
-  public final class StaticStringHandler {
-    public final Class type;
+  public final class StaticStringHandler<T extends Throwable> {
+    public final Class<T> type;
     public final String message;
 
-    private StaticStringHandler(Class type, String message) {
+    private StaticStringHandler(Class<T> type, String message) {
         this.type = type;
         this.message = message;
     }
 
-    public static <T extends Throwable> StaticStringHandler create(
+    public static <T extends Throwable> StaticStringHandler<T> create(
             Class<T> type,
             String message) {
-        return new StaticStringHandler(type, message);
+        return new StaticStringHandler<>(type, message);
     }
   }
 
-  public final class FunctionHandler {
-    public final Class type;
-    public final RamaFunction1 function;
+  public final class FunctionHandler<T extends Throwable> {
+    public final Class<T> type;
+    public final RamaFunction1<? super T, String> function;
 
-    private FunctionHandler(Class type, RamaFunction1 function) {
+    private FunctionHandler(Class<T> type, RamaFunction1<? super T, String> function) {
         this.type = type;
         this.function = function;
     }
 
-    public static <T extends T2, T2 extends Throwable> FunctionHandler create(
+    public static <T extends Throwable> FunctionHandler<T> create(
             Class<T> type,
-            RamaFunction1<T2, String> function) {
-        return new FunctionHandler(type, function);
+            RamaFunction1<? super T, String> function) {
+        return new FunctionHandler<>(type, function);
     }
   }
 
   interface Impl extends ToolsAgentOptions {
-
+    
     ToolsAgentOptions.Impl errorHandlerDefault();
-
+    
     ToolsAgentOptions.Impl errorHandlerRetry();
-
+    
     ToolsAgentOptions.Impl errorHandlerStaticStringByType(StaticStringHandler... handlers);
-
+    
     ToolsAgentOptions.Impl errorHandlerByType(FunctionHandler... handlers);
-
+    
   }
 
   /**
@@ -57,21 +57,21 @@ public interface ToolsAgentOptions {
   static Impl create() {
     return (Impl) AORHelpers.MAKE_OPTIONS.invoke();
   }
-
+  
   static ToolsAgentOptions.Impl errorHandlerDefault() {
     return create().errorHandlerDefault();
   }
-
+  
   static ToolsAgentOptions.Impl errorHandlerRetry() {
     return create().errorHandlerRetry();
   }
-
+  
   static ToolsAgentOptions.Impl errorHandlerStaticStringByType(StaticStringHandler... handlers) {
     return create().errorHandlerStaticStringByType(handlers);
   }
-
+  
   static ToolsAgentOptions.Impl errorHandlerByType(FunctionHandler... handlers) {
     return create().errorHandlerByType(handlers);
   }
-
+  
 }
