@@ -63,6 +63,3 @@
     (is (= [:error-handler] (keys o6)))
     (is (= "abcde" ((:error-handler o6) (ex-info "fail" {}))))
   ))
-
-;; TODO: <<<<>>>>
-;; - also need to test that tools agent funnels options through properly
