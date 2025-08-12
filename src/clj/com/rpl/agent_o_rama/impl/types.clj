@@ -229,7 +229,7 @@
    path :- s/Any
    key :- s/Any])
 
-(drp/defrecord+ ToolInfo
+(drp/defrecord+ ToolInfoImpl
   [tool-specification :- ToolSpecification
    tool-fn :- clojure.lang.IFn
    include-context? :- Boolean]

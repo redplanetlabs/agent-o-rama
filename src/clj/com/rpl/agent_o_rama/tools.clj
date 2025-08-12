@@ -34,9 +34,9 @@
      (when-not (instance? ToolSpecification tool-specification)
        (throw (h/ex-info "Invalid tool specification"
                          {:type (class tool-specification)})))
-     (aor-types/->ToolInfo tool-specification
-                           tool-fn
-                           (:include-context? options))
+     (aor-types/->ToolInfoImpl tool-specification
+                               tool-fn
+                               (:include-context? options))
    )))
 
 (defn error-handler-static-string [s]

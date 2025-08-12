@@ -19,7 +19,7 @@
        (vswap! options assoc :error-handler (tools/error-handler-default))
        this)
      (errorHandlerRetry [this]
-       (vswap! options assoc :error-handler (tools/error-handler-retry))
+       (vswap! options assoc :error-handler (tools/error-handler-rethrow))
        this)
      (errorHandlerStaticStringByType [this handlers]
        (let [tuples (mapv (fn [^ToolsAgentOptions$StaticStringHandler h]
