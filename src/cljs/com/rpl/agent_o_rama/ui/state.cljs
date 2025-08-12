@@ -20,7 +20,6 @@
    :ui {:selected-node-id nil
         :forking-mode? false
         :changed-nodes {}
-        :sidebar-collapsed? false
         :current-route "/"
         :breadcrumbs []}
    :sente {:connected? false
@@ -123,9 +122,7 @@
   (fn [db]
     [:ui :forking-mode? (s/terminal not)]))
 
-(reg-event :ui/toggle-sidebar
-  (fn [db]
-    [:ui :sidebar-collapsed? (s/terminal not)]))
+
 
 ;; Note: Simple setters should use :db/set-value
 ;; Examples:

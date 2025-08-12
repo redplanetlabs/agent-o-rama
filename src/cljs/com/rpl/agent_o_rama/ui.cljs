@@ -20,8 +20,9 @@
 ;; Sidebar navigation component
 (defui sidebar-nav []
   (let [[location _] (useLocation)
-        collapsed? (state/use-sub [:ui :sidebar-collapsed?])
-        toggle-collapsed #(state/dispatch [:ui/toggle-sidebar])]
+        ;; NEW: Use the hook from common.cljs
+        [collapsed? set-collapsed] (common/use-local-storage "sidebar-collapsed?" false)
+        toggle-collapsed #(set-collapsed (not collapsed?))]
     ($ :div {:className (str "h-screen flex flex-col bg-gray-100 transition-all duration-300 "
                              (if collapsed? "w-16" "w-64"))}
        ;; Header with toggle button
