@@ -24,9 +24,11 @@
   [["releases"
     {:id  "maven-releases"
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
+  :test-paths ["test"]
   :profiles {:dev      {:resource-paths ["test/resources/"]
                         :src-paths      ["src" "test"]
-                        :dependencies   [[meander/epsilon "0.0.650"]]}
+                        :dependencies   [[meander/epsilon "0.0.650"]]
+                        :jvm-opts       ["-Xss6m"]}
              :provided {:dependencies
                         [[com.rpl/rama "1.2.0"]
                          [org.apache.logging.log4j/log4j-slf4j18-impl

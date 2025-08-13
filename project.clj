@@ -61,6 +61,9 @@
                                             "examples/clj/test"]
                         :test-paths        ["test/clj"]
                         :java-source-paths ["src/java" "test/java"]
+                        :jvm-opts          ["-Xss6m"
+                                            "-Xms6g"
+                                            "-Xmx6g"]
                         :dependencies
                         [[org.clojure/clojure "1.12.2"]
                          [meander/epsilon "0.0.650"]
