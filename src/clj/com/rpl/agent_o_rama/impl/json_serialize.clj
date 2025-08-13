@@ -478,7 +478,6 @@
       (.result (get m "result"))
       .build))
 
-;; comparison filters
 (extend-protocol JSONFreeze
   ContainsString
   (json-freeze* [this]
@@ -569,7 +568,6 @@
   [m]
   (IsNotIn. (get m "key") (get m "comparisonValues")))
 
-;; logical filters
 (extend-protocol JSONFreeze
   And
   (json-freeze* [this]

@@ -196,5 +196,16 @@
               {"a" (lj/string) "b" (lj/int)}))))
 
 
-;: TODO: <<<<>>>> add tests of nested things, like it will be in reality
-;;  - verify case of a user editing _aor-type to something invalid
+(deftest compound-test
+         ;: TODO: <<<<>>>> add tests of nested things, like it will be in
+         ;reality
+         ;;  - verify case of a user editing _aor-type to something invalid
+         ;;  - test [list<different message types>, {"a" list<different message
+         ;;  types> {"b" <some other type>} "c" <some string>}]
+)
+
+(deftest unhandled-test
+         ;; TODO: <<<<>>>> verify behavior with UNHANDLED TYPES
+         ;;    - like Result, EmbeddingMatch
+         ;;    - should just become a string, and should throw reasonable error
+)
