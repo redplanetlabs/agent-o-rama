@@ -1,6 +1,8 @@
 (ns com.rpl.agent-o-rama.impl.json-serialize
+  (:use [com.rpl.rama path])
   (:require
-   [com.rpl.agent-o-rama.impl.helpers :as h])
+   [com.rpl.agent-o-rama.impl.helpers :as h]
+   [jsonista.core :as j])
   (:import
    [dev.langchain4j.agent.tool
     ToolExecutionRequest
@@ -59,32 +61,64 @@
    [java.util
     List]))
 
+(def MAPPER (j/object-mapper {:decode-key-fn str}))
+
 (defprotocol JSONFreeze
   (json-freeze* [this]))
 
+(defn- freeze-walk
+  [x]
+  (if (satisfies? JSONFreeze x)
+    (let [m (json-freeze* x)]
+      (when-not (map? m)
+        (throw (ex-info "json-freeze* must return a map"
+                        {:value x :returned m})))
+      (assoc m
+       "_aor-type"
+       (-> x
+           class
+           .getName)))
+    (cond
+      (map? x) (transform MAP-VALS freeze-walk x)
+      (sequential? x) (transform ALL freeze-walk x)
+      :else x)))
+
 (defn json-freeze
   [obj]
-  (let [res (json-freeze* obj)]
-    (if (map? res)
-      (assoc
-       map
-       "_aor-type"
-       (-> obj
-           class
-           .getName))
-      res)))
+  (j/write-value-as-string (freeze-walk obj) MAPPER))
 
-(defmulti json-thaw
-  (fn [m]
-    (if (and (map? m) (contains? m "_aor-type"))
-      (get m "_aor-type")
-      ::error
+(defmulti json-thaw*
+  (fn [obj]
+    (if (and (map? obj) (contains? obj "_aor-type"))
+      (get obj "_aor-type")
     )))
 
-(defmethod json-thaw ::error
+(defmethod json-thaw* :default
   [obj]
-  (throw (h/ex-info "Could not deserialize string into first-class type"
-                    {:value obj})))
+  (if (and (map? obj) (contains? obj "_aor-type"))
+    (throw (h/ex-info "No deserializer found for AOR type" {:obj obj}))
+    obj))
+
+(defn walk-json-thaw*
+  [obj]
+  (let [obj2 (json-thaw* obj)]
+    (if-not (identical? obj obj2)
+      obj2
+      (cond (map? obj)
+            (transform MAP-VALS walk-json-thaw* obj)
+
+            (sequential? obj)
+            (transform ALL walk-json-thaw* obj)
+
+            :else
+            obj
+      ))))
+
+(defn json-thaw
+  [str]
+  (let [obj (j/read-value str MAPPER)]
+    (walk-json-thaw* obj)))
+
 
 (extend-protocol JSONFreeze
   Object
@@ -98,7 +132,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName ToolExecutionRequest)
+(defmethod json-thaw* (.getName ToolExecutionRequest)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -109,7 +143,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName ToolSpecification)
+(defmethod json-thaw* (.getName ToolSpecification)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -120,7 +154,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName Document)
+(defmethod json-thaw* (.getName Document)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -131,7 +165,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName Metadata)
+(defmethod json-thaw* (.getName Metadata)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -142,7 +176,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName Embedding)
+(defmethod json-thaw* (.getName Embedding)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -153,7 +187,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName AiMessage)
+(defmethod json-thaw* (.getName AiMessage)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -164,7 +198,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName CustomMessage)
+(defmethod json-thaw* (.getName CustomMessage)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -175,7 +209,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName SystemMessage)
+(defmethod json-thaw* (.getName SystemMessage)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -186,7 +220,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName TextContent)
+(defmethod json-thaw* (.getName TextContent)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -197,7 +231,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName ToolExecutionResultMessage)
+(defmethod json-thaw* (.getName ToolExecutionResultMessage)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -208,7 +242,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName UserMessage)
+(defmethod json-thaw* (.getName UserMessage)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -219,7 +253,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName TextSegment)
+(defmethod json-thaw* (.getName TextSegment)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -230,7 +264,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName JsonAnyOfSchema)
+(defmethod json-thaw* (.getName JsonAnyOfSchema)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -241,7 +275,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName JsonArraySchema)
+(defmethod json-thaw* (.getName JsonArraySchema)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -252,7 +286,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName JsonBooleanSchema)
+(defmethod json-thaw* (.getName JsonBooleanSchema)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -263,7 +297,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName JsonEnumSchema)
+(defmethod json-thaw* (.getName JsonEnumSchema)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -274,7 +308,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName JsonIntegerSchema)
+(defmethod json-thaw* (.getName JsonIntegerSchema)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -285,7 +319,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName JsonNullSchema)
+(defmethod json-thaw* (.getName JsonNullSchema)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -296,7 +330,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName JsonNumberSchema)
+(defmethod json-thaw* (.getName JsonNumberSchema)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -307,7 +341,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName JsonObjectSchema)
+(defmethod json-thaw* (.getName JsonObjectSchema)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -318,7 +352,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName JsonReferenceSchema)
+(defmethod json-thaw* (.getName JsonReferenceSchema)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -329,7 +363,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName JsonStringSchema)
+(defmethod json-thaw* (.getName JsonStringSchema)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -340,7 +374,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName ChatResponse)
+(defmethod json-thaw* (.getName ChatResponse)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -351,7 +385,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName FinishReason)
+(defmethod json-thaw* (.getName FinishReason)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -362,7 +396,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName TokenUsage)
+(defmethod json-thaw* (.getName TokenUsage)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -373,7 +407,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName Result)
+(defmethod json-thaw* (.getName Result)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -384,7 +418,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName ToolExecution)
+(defmethod json-thaw* (.getName ToolExecution)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -396,7 +430,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName EmbeddingMatch)
+(defmethod json-thaw* (.getName EmbeddingMatch)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -407,7 +441,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName EmbeddingSearchResult)
+(defmethod json-thaw* (.getName EmbeddingSearchResult)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -418,7 +452,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName ContainsString)
+(defmethod json-thaw* (.getName ContainsString)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -429,7 +463,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName IsEqualTo)
+(defmethod json-thaw* (.getName IsEqualTo)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -440,7 +474,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName IsGreaterThan)
+(defmethod json-thaw* (.getName IsGreaterThan)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -451,7 +485,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName IsGreaterThanOrEqualTo)
+(defmethod json-thaw* (.getName IsGreaterThanOrEqualTo)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -462,7 +496,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName IsIn)
+(defmethod json-thaw* (.getName IsIn)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -474,7 +508,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName IsLessThan)
+(defmethod json-thaw* (.getName IsLessThan)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -485,7 +519,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName IsLessThanOrEqualTo)
+(defmethod json-thaw* (.getName IsLessThanOrEqualTo)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -496,7 +530,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName IsNotEqualTo)
+(defmethod json-thaw* (.getName IsNotEqualTo)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -507,7 +541,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName IsNotIn)
+(defmethod json-thaw* (.getName IsNotIn)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -518,7 +552,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName And)
+(defmethod json-thaw* (.getName And)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -529,7 +563,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName Not)
+(defmethod json-thaw* (.getName Not)
   [obj]
   ;; TODO: <<<<>>>>
 )
@@ -540,7 +574,7 @@
                 ;; TODO:
   ))
 
-(defmethod json-thaw (.getName Or)
+(defmethod json-thaw* (.getName Or)
   [obj]
   ;; TODO: <<<<>>>>
 )
