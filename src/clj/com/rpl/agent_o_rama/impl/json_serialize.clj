@@ -8,7 +8,7 @@
     ToolExecutionRequest
     ToolSpecification]
    [dev.langchain4j.data.document
-    Document
+    DefaultDocument
     Metadata]
    [dev.langchain4j.data.embedding
     Embedding]
@@ -61,23 +61,32 @@
    [java.util
     List]))
 
+(defn to-float-array
+  ^floats [v]
+  (float-array (mapv float v)))
+
 (def MAPPER (j/object-mapper {:decode-key-fn str}))
 
 (defprotocol JSONFreeze
   (json-freeze* [this]))
 
+(defn json-freeze*-with-type
+  [x]
+  (let [m (json-freeze* x)]
+    (when-not (map? m)
+      (throw (ex-info "json-freeze* must return a map"
+                      {:value x :returned m})))
+    (assoc
+     (setval [MAP-VALS nil?] NONE m)
+     "_aor-type"
+     (-> x
+         class
+         .getName))))
+
 (defn- freeze-walk
   [x]
   (if (satisfies? JSONFreeze x)
-    (let [m (json-freeze* x)]
-      (when-not (map? m)
-        (throw (ex-info "json-freeze* must return a map"
-                        {:value x :returned m})))
-      (assoc m
-       "_aor-type"
-       (-> x
-           class
-           .getName)))
+    (json-freeze*-with-type x)
     (cond
       (map? x) (transform MAP-VALS freeze-walk x)
       (sequential? x) (transform ALL freeze-walk x)
@@ -96,7 +105,8 @@
 (defmethod json-thaw* :default
   [obj]
   (if (and (map? obj) (contains? obj "_aor-type"))
-    (throw (h/ex-info "No deserializer found for AOR type" {:obj obj}))
+    (throw (h/ex-info "No deserializer found for AOR type"
+                      {:aor-type (get obj "_aor-type")}))
     obj))
 
 (defn walk-json-thaw*
@@ -129,452 +139,462 @@
 (extend-protocol JSONFreeze
   ToolExecutionRequest
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"id"        (.id this)
+     "name"      (.name this)
+     "arguments" (.arguments this)}))
+
 
 (defmethod json-thaw* (.getName ToolExecutionRequest)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (-> (ToolExecutionRequest/builder)
+      (.id (get m "id"))
+      (.name (get m "name"))
+      (.arguments (get m "arguments"))
+      .build))
+
+(defn maybe-json-freeze*
+  [o]
+  (if o (json-freeze*-with-type o) o))
+
+(defn maybe-json-thaw*
+  [o]
+  (if o (json-thaw* o) o))
+
+(defn maybe-mapv-json-freeze*
+  [o]
+  (if o (mapv json-freeze*-with-type o) o))
+
+(defn maybe-mapv-json-thaw*
+  [o]
+  (if o (mapv json-thaw* o) o))
 
 (extend-protocol JSONFreeze
   ToolSpecification
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"name"        (.name this)
+     "parameters"  (maybe-json-freeze* (.parameters this))
+     "description" (.description this)}))
 
 (defmethod json-thaw* (.getName ToolSpecification)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (-> (ToolSpecification/builder)
+      (.name (get m "name"))
+      (.parameters (maybe-json-thaw* (get m "parameters")))
+      (.description (get m "description"))
+      .build))
 
 (extend-protocol JSONFreeze
-  Document
+  DefaultDocument
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"text"     (.text this)
+     "metadata" (maybe-json-freeze* (.metadata this))}))
 
-(defmethod json-thaw* (.getName Document)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+(defmethod json-thaw* (.getName DefaultDocument)
+  [m]
+  (DefaultDocument.
+   (get m "text")
+   (maybe-json-thaw* (get m "metadata"))))
 
 (extend-protocol JSONFreeze
   Metadata
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    (into {} (.toMap this))))
 
 (defmethod json-thaw* (.getName Metadata)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (Metadata. (dissoc m "_aor-type")))
 
 (extend-protocol JSONFreeze
   Embedding
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"vector" (into [] (.vector this))}))
 
 (defmethod json-thaw* (.getName Embedding)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (Embedding. (to-float-array (get m "vector"))))
 
 (extend-protocol JSONFreeze
   AiMessage
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"text"       (.text this)
+     "toolExecutionRequests" (maybe-mapv-json-freeze*
+                              (.toolExecutionRequests this))
+     "thinking"   (.thinking this)
+     "attributes" (into {} (.attributes this))}))
 
 (defmethod json-thaw* (.getName AiMessage)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (-> (AiMessage/builder)
+      (.text (get m "text"))
+      (.toolExecutionRequests (maybe-mapv-json-thaw*
+                               (get m "toolExecutionRequests")))
+      (.thinking (get m "thinking"))
+      (.attributes (get m "attributes"))
+      .build))
 
 (extend-protocol JSONFreeze
   CustomMessage
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"attributes" (into {} (.attributes this))}))
 
 (defmethod json-thaw* (.getName CustomMessage)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (CustomMessage. (get m "attributes")))
 
 (extend-protocol JSONFreeze
   SystemMessage
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"text" (.text this)}))
 
 (defmethod json-thaw* (.getName SystemMessage)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (SystemMessage. (get m "text")))
 
 (extend-protocol JSONFreeze
   TextContent
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"text" (.text this)}))
 
 (defmethod json-thaw* (.getName TextContent)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (TextContent. (get m "text")))
 
 (extend-protocol JSONFreeze
   ToolExecutionResultMessage
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"id"       (.id this)
+     "toolName" (.toolName this)
+     "text"     (.text this)}))
 
 (defmethod json-thaw* (.getName ToolExecutionResultMessage)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (ToolExecutionResultMessage.
+   (get m "id")
+   (get m "toolName")
+   (get m "text")))
 
 (extend-protocol JSONFreeze
   UserMessage
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"name"     (.name this)
+     "contents" (maybe-mapv-json-freeze* (.contents this))}))
 
 (defmethod json-thaw* (.getName UserMessage)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (UserMessage. ^String (get m "name")
+                ^java.util.List (maybe-mapv-json-thaw* (get m "contents"))))
 
 (extend-protocol JSONFreeze
   TextSegment
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"text"     (.text this)
+     "metadata" (maybe-json-freeze* (.metadata this))}))
 
 (defmethod json-thaw* (.getName TextSegment)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (TextSegment. (get m "text") (maybe-json-thaw* (get m "metadata"))))
 
 (extend-protocol JSONFreeze
   JsonAnyOfSchema
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"anyOf"       (maybe-mapv-json-freeze* (.anyOf this))
+     "description" (.description this)}))
 
 (defmethod json-thaw* (.getName JsonAnyOfSchema)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (-> (JsonAnyOfSchema/builder)
+      (.anyOf ^java.util.List (maybe-mapv-json-thaw* (get m "anyOf")))
+      (.description (get m "description"))
+      .build))
 
 (extend-protocol JSONFreeze
   JsonArraySchema
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"items"       (maybe-json-freeze* (.items this))
+     "description" (.description this)}))
 
 (defmethod json-thaw* (.getName JsonArraySchema)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (-> (JsonArraySchema/builder)
+      (.items (maybe-json-thaw* (get m "items")))
+      (.description (get m "description"))
+      .build))
 
 (extend-protocol JSONFreeze
   JsonBooleanSchema
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"description" (.description this)}))
 
 (defmethod json-thaw* (.getName JsonBooleanSchema)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (-> (JsonBooleanSchema/builder)
+      (.description (get m "description"))
+      .build))
 
 (extend-protocol JSONFreeze
   JsonEnumSchema
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"enumValues"  (into [] (.enumValues this))
+     "description" (.description this)}))
 
 (defmethod json-thaw* (.getName JsonEnumSchema)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (-> (JsonEnumSchema/builder)
+      (.enumValues ^java.util.List (get m "enumValues"))
+      (.description (get m "description"))
+      .build))
 
 (extend-protocol JSONFreeze
   JsonIntegerSchema
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"description" (.description this)}))
 
 (defmethod json-thaw* (.getName JsonIntegerSchema)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (-> (JsonIntegerSchema/builder)
+      (.description (get m "description"))
+      .build))
 
 (extend-protocol JSONFreeze
   JsonNullSchema
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {}))
 
 (defmethod json-thaw* (.getName JsonNullSchema)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [_]
+  (JsonNullSchema.))
 
 (extend-protocol JSONFreeze
   JsonNumberSchema
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"description" (.description this)}))
 
 (defmethod json-thaw* (.getName JsonNumberSchema)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (-> (JsonNumberSchema/builder)
+      (.description (get m "description"))
+      .build))
 
 (extend-protocol JSONFreeze
   JsonObjectSchema
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"description"          (.description this)
+     "additionalProperties" (.additionalProperties this)
+     "definitions"          (->>
+                             (.definitions this)
+                             (into {})
+                             (transform MAP-VALS maybe-json-freeze*))
+     "properties"           (->>
+                             (.properties this)
+                             (into {})
+                             (transform MAP-VALS maybe-json-freeze*))
+     "required"             (into [] (.required this))}))
 
 (defmethod json-thaw* (.getName JsonObjectSchema)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (-> (JsonObjectSchema/builder)
+      (.description (get m "description"))
+      (.additionalProperties (get m "additionalProperties"))
+      (.definitions (transform MAP-VALS maybe-json-thaw* (get m "definitions")))
+      (.addProperties
+       (transform MAP-VALS maybe-json-thaw* (get m "properties")))
+      (.required ^java.util.List (get m "required"))
+      .build))
 
 (extend-protocol JSONFreeze
   JsonReferenceSchema
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"reference" (.reference this)}))
 
 (defmethod json-thaw* (.getName JsonReferenceSchema)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (-> (JsonReferenceSchema/builder)
+      (.reference (get m "reference"))
+      .build))
 
 (extend-protocol JSONFreeze
   JsonStringSchema
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"description" (.description this)}))
 
 (defmethod json-thaw* (.getName JsonStringSchema)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (-> (JsonStringSchema/builder)
+      (.description (get m "description"))
+      .build))
 
 (extend-protocol JSONFreeze
   ChatResponse
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"aiMessage"    (maybe-json-freeze* (.aiMessage this))
+     "finishReason" (maybe-json-freeze* (.finishReason this))
+     "id"           (.id this)
+     "modelName"    (.modelName this)
+     "tokenUsage"   (maybe-json-freeze* (.tokenUsage this))}))
 
 (defmethod json-thaw* (.getName ChatResponse)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (-> (ChatResponse/builder)
+      (.aiMessage (maybe-json-thaw* (get m "aiMessage")))
+      (.finishReason (maybe-json-thaw* (get m "finishReason")))
+      (.id (get m "id"))
+      (.modelName (get m "modelName"))
+      (.tokenUsage (maybe-json-thaw* (get m "tokenUsage")))
+      .build))
 
 (extend-protocol JSONFreeze
   FinishReason
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"name" (.name this)}))
 
 (defmethod json-thaw* (.getName FinishReason)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (FinishReason/valueOf (get m "name")))
 
 (extend-protocol JSONFreeze
   TokenUsage
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"inputTokenCount"  (.inputTokenCount this)
+     "outputTokenCount" (.outputTokenCount this)
+     "totalTokenCount"  (.totalTokenCount this)}))
 
 (defmethod json-thaw* (.getName TokenUsage)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
-
-(extend-protocol JSONFreeze
-  Result
-  (json-freeze* [this]
-                ;; TODO:
-  ))
-
-(defmethod json-thaw* (.getName Result)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (TokenUsage.
+   (get m "inputTokenCount")
+   (get m "outputTokenCount")
+   (get m "totalTokenCount")))
 
 (extend-protocol JSONFreeze
   ToolExecution
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"request" (maybe-json-freeze* (.request this))
+     "result"  (.result this)}))
 
 (defmethod json-thaw* (.getName ToolExecution)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (-> (ToolExecution/builder)
+      (.request (maybe-json-thaw* (get m "request")))
+      (.result (get m "result"))
+      .build))
 
-
-(extend-protocol JSONFreeze
-  EmbeddingMatch
-  (json-freeze* [this]
-                ;; TODO:
-  ))
-
-(defmethod json-thaw* (.getName EmbeddingMatch)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
-
-(extend-protocol JSONFreeze
-  EmbeddingSearchResult
-  (json-freeze* [this]
-                ;; TODO:
-  ))
-
-(defmethod json-thaw* (.getName EmbeddingSearchResult)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
-
+;; comparison filters
 (extend-protocol JSONFreeze
   ContainsString
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"key" (.key this)
+     "comparisonValue" (.comparisonValue this)}))
 
 (defmethod json-thaw* (.getName ContainsString)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (ContainsString. (get m "key") (get m "comparisonValue")))
 
 (extend-protocol JSONFreeze
   IsEqualTo
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"key" (.key this)
+     "comparisonValue" (.comparisonValue this)}))
 
 (defmethod json-thaw* (.getName IsEqualTo)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (IsEqualTo. (get m "key") (get m "comparisonValue")))
 
 (extend-protocol JSONFreeze
   IsGreaterThan
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"key" (.key this)
+     "comparisonValue" (.comparisonValue this)}))
 
 (defmethod json-thaw* (.getName IsGreaterThan)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (IsGreaterThan. (get m "key") (get m "comparisonValue")))
 
 (extend-protocol JSONFreeze
   IsGreaterThanOrEqualTo
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"key" (.key this)
+     "comparisonValue" (.comparisonValue this)}))
 
 (defmethod json-thaw* (.getName IsGreaterThanOrEqualTo)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
-
-(extend-protocol JSONFreeze
-  IsIn
-  (json-freeze* [this]
-                ;; TODO:
-  ))
-
-(defmethod json-thaw* (.getName IsIn)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
-
+  [m]
+  (IsGreaterThanOrEqualTo. (get m "key") (get m "comparisonValue")))
 
 (extend-protocol JSONFreeze
   IsLessThan
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"key" (.key this)
+     "comparisonValue" (.comparisonValue this)}))
 
 (defmethod json-thaw* (.getName IsLessThan)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (IsLessThan. (get m "key") (get m "comparisonValue")))
 
 (extend-protocol JSONFreeze
   IsLessThanOrEqualTo
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"key" (.key this)
+     "comparisonValue" (.comparisonValue this)}))
 
 (defmethod json-thaw* (.getName IsLessThanOrEqualTo)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (IsLessThanOrEqualTo. (get m "key") (get m "comparisonValue")))
 
 (extend-protocol JSONFreeze
   IsNotEqualTo
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"key" (.key this)
+     "comparisonValue" (.comparisonValue this)}))
 
 (defmethod json-thaw* (.getName IsNotEqualTo)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (IsNotEqualTo. (get m "key") (get m "comparisonValue")))
+
+(extend-protocol JSONFreeze
+  IsIn
+  (json-freeze* [this]
+    {"key" (.key this)
+     "comparisonValues" (.comparisonValues this)}))
+
+(defmethod json-thaw* (.getName IsIn)
+  [m]
+  (IsIn. (get m "key") (get m "comparisonValues")))
 
 (extend-protocol JSONFreeze
   IsNotIn
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"key" (.key this)
+     "comparisonValues" (.comparisonValues this)}))
 
 (defmethod json-thaw* (.getName IsNotIn)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (IsNotIn. (get m "key") (get m "comparisonValues")))
 
+;; logical filters
 (extend-protocol JSONFreeze
   And
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"left"  (maybe-json-freeze* (.left this))
+     "right" (maybe-json-freeze* (.right this))}))
 
 (defmethod json-thaw* (.getName And)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (And. (maybe-json-thaw* (get m "left")) (maybe-json-thaw* (get m "right"))))
 
 (extend-protocol JSONFreeze
   Not
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"expression" (maybe-json-freeze* (.expression this))}))
 
 (defmethod json-thaw* (.getName Not)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (Not. (maybe-json-thaw* (get m "expression"))))
 
 (extend-protocol JSONFreeze
   Or
   (json-freeze* [this]
-                ;; TODO:
-  ))
+    {"left"  (maybe-json-freeze* (.left this))
+     "right" (maybe-json-freeze* (.right this))}))
 
 (defmethod json-thaw* (.getName Or)
-  [obj]
-  ;; TODO: <<<<>>>>
-)
+  [m]
+  (Or. (maybe-json-thaw* (get m "left")) (maybe-json-thaw* (get m "right"))))
