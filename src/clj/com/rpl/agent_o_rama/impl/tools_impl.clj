@@ -7,6 +7,7 @@
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.throttled-logging :as tl]
    [com.rpl.rama.ops :as ops]
    [jsonista.core :as j])
   (:import
@@ -54,13 +55,13 @@
                           sort)]
     (fn [agent-node ^ToolExecutionRequest request caller-data]
       (let [start-time-millis (h/current-time-millis)
-            tool-name (.name request)
-            args      (-> request
-                          .arguments
-                          (j/read-value MAPPER))
-            base-info {"id"   (.id request)
-                       "name" tool-name
-                       "args" args}]
+            tool-name         (.name request)
+            args              (-> request
+                                  .arguments
+                                  (j/read-value MAPPER))
+            base-info         {"id"   (.id request)
+                               "name" tool-name
+                               "args" args}]
         (try
           (if-let [{:keys [tool-fn include-context?]}
                    (get tools-by-name tool-name)]
@@ -89,13 +90,14 @@
                        (ToolExecutionResultMessage/from
                         request
                         (tool-invalid-error-string tool-name tool-names)))
-            ))
+              ))
           (catch Throwable t
             (try
               (let [error-ret (error-handler t)]
                 (i/emit! agent-node
                          "agg-results"
                          (ToolExecutionResultMessage/from request error-ret))
+                (tl/info :tool-exec-error t "Tool execution texception")
                 (anode/record-nested-op!-impl
                  agent-node
                  :tool-call
@@ -119,6 +121,6 @@
                            "exception1" (h/throwable->str t)
                            "exception2" (h/throwable->str t2)})))
                 (throw t2)
-              ))
-          ))
-      ))))
+                ))
+            ))
+        ))))

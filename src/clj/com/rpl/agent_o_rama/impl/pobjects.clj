@@ -5,6 +5,7 @@
   (:import
    [com.rpl.agentorama.impl
     AgentDeclaredObjectsTaskGlobal
+    AgentNodeExecutorTaskGlobal
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     AgentNodeEmit
@@ -32,6 +33,10 @@
 (defn agent-declared-objects-name
   []
   "*_agent-declared-objects")
+
+(defn log-throttler-name
+  []
+  "*_log-throttler")
 
 (defn agent-pstate-write-depot-name
   []
@@ -208,7 +213,7 @@
 ;; Task global fetch helpers
 
 (defn agent-node-executor-task-global
-  []
+  ^AgentNodeExecutorTaskGlobal []
   (declared-object-task-global (agent-node-executor-name)))
 
 (defn agent-store-info-task-global
@@ -280,3 +285,6 @@
 (defn agent-config-task-global
   [name]
   (this-module-pobject-task-global (agent-config-task-global-name name)))
+
+(defn log-throttler []
+  (.getLogThrottler (agent-node-executor-task-global)))

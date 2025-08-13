@@ -14,6 +14,7 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
 
   WorkerManagedResource<ExecutorService> _execServResource;
   ConcurrentHashMap<UUID, List> _runningInvokeIds;
+  Object _throttler; // type is opaque here - only passed into clojure
 
   public void submitTask(UUID invokeId, clojure.lang.AFn f) {
     _runningInvokeIds.put(invokeId, Arrays.asList());
@@ -36,6 +37,7 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
   public void prepareForTask(int taskId, TaskGlobalContext context) {
     _execServResource = new WorkerManagedResource("agentVirtualThreads", context, () -> Executors.newVirtualThreadPerTaskExecutor());
     _runningInvokeIds = new ConcurrentHashMap();
+    _throttler = context.getLogThrottler();
   }
 
   public void removeTrackedInvokeId(UUID invokeId) {
@@ -61,6 +63,10 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
     List tuple = _runningInvokeIds.get(invokeId);
     if(tuple!=null && !tuple.isEmpty()) return tuple.get(0);
     return null;
+  }
+
+  public Object getLogThrottler() {
+    return _throttler;
   }
 
   @Override

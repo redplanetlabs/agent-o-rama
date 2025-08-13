@@ -226,6 +226,11 @@
                    (AgentNodeExecutorTaskGlobal.))
 
   (declare-object* setup
+                   (symbol (ag/log-throttler-name))
+                   (LogThrotterTaskGlobal.))
+
+
+  (declare-object* setup
                    (symbol (po/agent-declared-objects-name))
                    (AgentDeclaredObjectsTaskGlobal.
                     declared-objects
@@ -238,33 +243,33 @@
                                        "depot.max.entries.per.partition"
                                        500)
     (<<sources stream-topology
-     (source> pstate-write-depot-sym
-               {:retry-mode :none}
-              :> {:keys [*pstate-name *path *agent-name *agent-task-id
-                          *agent-id *retry-num]})
-      (<<if (apart/valid-retry-num? *agent-name
-                                    *agent-task-id
-                                    *agent-id
-                                    *retry-num)
-        (this-module-pobject-task-global *pstate-name :> $$p)
-        (do-transform! *path $$p :> *ret)
-        (ack-return> *ret)
-       (else>)
-        (ack-return> {:type      :failure
-                      :exception (h/ex-info "Agent invoke has been retried"
-                                            {})})
-      )))
+               (source> pstate-write-depot-sym
+                        {:retry-mode :none}
+                        :> {:keys [*pstate-name *path *agent-name *agent-task-id
+                                   *agent-id *retry-num]})
+               (<<if (apart/valid-retry-num? *agent-name
+                                             *agent-task-id
+                                             *agent-id
+                                             *retry-num)
+                 (this-module-pobject-task-global *pstate-name :> $$p)
+                 (do-transform! *path $$p :> *ret)
+                 (ack-return> *ret)
+                (else>)
+                 (ack-return> {:type      :failure
+                               :exception (h/ex-info "Agent invoke has been retried"
+                                                     {})})
+                 )))
   (queries/declare-agent-get-names-query-topology topologies
                                                   (-> agent-graphs
                                                       keys
                                                       set))
   (doseq [[agent-name agent-graph] agent-graphs]
     (define-agent! agent-name
-                   setup
-                   topologies
-                   stream-topology
-                   mb-topology
-                   agent-graph)))
+      setup
+      topologies
+      stream-topology
+      mb-topology
+      agent-graph)))
 
 (defn convert-agent-object-options
   [^AgentObjectOptions$Impl options]
