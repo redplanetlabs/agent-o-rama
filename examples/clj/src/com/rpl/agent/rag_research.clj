@@ -487,7 +487,28 @@ addresses all aspects of the question.")
    "LangChain provides extensive RAG capabilities including document loaders, text splitters, vector stores, and retrievers. The RAG chain in LangChain combines retrieval with generation. LangChain supports various vector databases like Chroma, Pinecone, and FAISS for document storage and retrieval."})
 
 (defn run-agent
-  "Run the RAG research agent with test queries"
+  "Run the RAG research agent with test queries.
+
+  Environment Requirements:
+  - OPENAI_API_KEY must be set in the shell environment
+  - Requires OpenAI API access for both chat completion (gpt-4o-mini) and embeddings (text-embedding-3-small)
+
+  The agent demonstrates sophisticated RAG capabilities including:
+  - Smart query routing (simple retrieval vs complex research vs LangChain-specific)
+  - Parallel document retrieval for improved performance
+  - Multi-step research planning and execution
+  - Vector-based semantic document search with cosine similarity
+  - Structured JSON response generation and synthesis
+
+  Usage:
+    (run-agent)                    ; Run with default test queries
+    (run-agent [\"custom query\"])  ; Run with custom queries
+
+  The function will:
+  1. Start the agent-o-rama module with UI
+  2. Index sample documents (LangChain, Agent-o-rama, RAG concepts)
+  3. Process each query through the intelligent routing system
+  4. Display results including research plans and classifications"
   ([]
    (run-agent
     ["What is LangChain and how does it work?" ;; LangChain-specific
