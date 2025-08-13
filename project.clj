@@ -1,6 +1,6 @@
 (defproject com.rpl/agent-o-rama "0.9.0-SNAPSHOT"
   :source-paths ["src/clj" "src/cljs" "resource"]
-  :java-source-paths ["src/java" "test/java"]
+  :java-source-paths ["src/java"]
   :test-paths ["test/clj"]
   :jvm-opts ["-Xss6m"]
   :dependencies [[org.clojure/clojure "1.12.0"]
@@ -20,7 +20,8 @@
   [["releases"
     {:id  "maven-releases"
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
-  :profiles {:dev      {:resource-paths ["test/resources/"]
+  :profiles {:dev      {:resource-paths    ["test/resources/"]
+                        :java-source-paths ["src/java" "test/java"]
                         :dependencies
                         [[meander/epsilon "0.0.650"]
                          [dev.langchain4j/langchain4j-open-ai "1.2.0"]]}
