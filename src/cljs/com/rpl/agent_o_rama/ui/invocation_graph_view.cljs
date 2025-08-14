@@ -136,7 +136,7 @@
         ($ expandable-item-component {:item data
                                       :color color
                                       :title "Value Details"
-                                      :truncate-length truncate-length})))
+                                      :truncate-length truncate-length}))
       
       ;; Case 1: The data is a map. Render its key-value pairs.
       (map? data)
@@ -154,10 +154,10 @@
       ;; Case 2: The data is a list or vector. Use the existing list component.
       (sequential? data)
       ($ expandable-list-component {:items data
-                                     :color color
-                                     :title-singular "Item"
-                                     :truncate-length truncate-length
-                                     :depth next-depth})
+                                    :color color
+                                    :title-singular "Item"
+                                    :truncate-length truncate-length
+                                    :depth next-depth})
       
       ;; Case 3: The data is a scalar value (string, number, bool, etc.).
       ;; Use the existing item component.
@@ -784,4 +784,3 @@
                          :forking-mode? forking-mode?
                          :on-toggle-forking-mode on-toggle-forking-mode
                          :is-live is-live})))))
-
