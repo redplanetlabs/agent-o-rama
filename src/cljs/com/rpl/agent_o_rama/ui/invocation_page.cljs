@@ -28,6 +28,12 @@
         ;; Connection state
         connected? (state/use-sub [:sente :connected?])
         
+        ;; Agent lifecycle state
+        agent-status (state/use-sub [:invocations-data invoke-id :status])
+        human-input-request (state/use-sub [:invocations-data invoke-id :human-input-request])
+        agent-error (state/use-sub [:invocations-data invoke-id :error])
+        token-streams (state/use-sub [:invocations-data invoke-id :streams :by-node])
+        
         ;; Transform nodes to graph-data format
         graph-data (when nodes
                     (into {} 
@@ -122,6 +128,18 @@
                                                       invoke-id 
                                                       (:data reply)]))))))
         
+        handle-run-agent (fn [args stream-node]
+                          (state/dispatch [:agent/ui-run 
+                                          {:module-id module-id
+                                           :agent-name agent-name
+                                           :args args
+                                           :stream-node stream-node}]))
+        
+        handle-provide-human-input (fn [response]
+                                     (state/dispatch [:agent/ui-provide-human-input 
+                                                     {:invoke-id invoke-id
+                                                      :response response}]))
+        
         ;; Prepare the data for the view
         view-props {:module-id module-id
                     :agent-name agent-name
@@ -154,4 +172,28 @@
          ($ :div.text-gray-500 "Loading invocation..."))
       
       :else
-      ($ view/graph-view view-props))))
+      ($ :<>
+         ;; Agent status banner
+         ($ view/agent-status-banner {:status agent-status :error agent-error})
+         
+         ;; Agent runner panel (only for non-live invocations or when no current invocation)
+         (when (and connected? (not is-complete))
+           ($ view/agent-runner-panel {:module-id module-id
+                                       :agent-name agent-name
+                                       :on-run-agent handle-run-agent}))
+         
+         ;; Human input modal
+         (when human-input-request
+           ($ view/human-input-modal {:request human-input-request
+                                      :on-provide-input handle-provide-human-input
+                                      :on-cancel #(state/dispatch [:db/set-value 
+                                                                   [:invocations-data invoke-id :human-input-request] 
+                                                                   nil])}))
+         
+         ;; Main graph view
+         ($ view/graph-view view-props)
+         
+         ;; Token stream display for selected node
+         (when selected-node-id
+           ($ view/token-stream-display {:streams token-streams
+                                         :selected-node-id selected-node-id}))))))

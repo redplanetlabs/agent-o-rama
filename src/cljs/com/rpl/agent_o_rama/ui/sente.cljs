@@ -41,11 +41,47 @@
     (when node-id
       (state/dispatch [:invocation/update-node node-id node-data]))))
 
-(defmethod -event-msg-handler :agent/run-started [{:as ev-msg :keys [?data]}])
+;; =============================================================================
+;; AGENT LIFECYCLE EVENT HANDLERS
+;; =============================================================================
 
-(defmethod -event-msg-handler :agent/run-complete [{:as ev-msg :keys [?data]}])
+(defmethod -event-msg-handler :agent/run-started [{:as ev-msg :keys [?data]}]
+  (let [{:keys [invoke-id task-id]} ?data]
+    (println "[CLIENT] Agent run started:" invoke-id "task-id:" task-id)
+    (state/dispatch [:db/set-values
+                     [[:invocations-data invoke-id :status] :running]
+                     [[:invocations-data invoke-id :task-id] task-id]])))
 
-(defmethod -event-msg-handler :agent/run-failed [{:as ev-msg :keys [?data]}])
+(defmethod -event-msg-handler :agent/token-chunk [{:as ev-msg :keys [?data]}]
+  (let [{:keys [invoke-id node-invoke-id chunks reset? complete?]} ?data]
+    (when (and invoke-id chunks)
+      (state/dispatch [:agent/append-token-chunks invoke-id node-invoke-id chunks reset?]))))
+
+(defmethod -event-msg-handler :agent/human-input-request [{:as ev-msg :keys [?data]}]
+  (let [{:keys [invoke-id request-id prompt node node-invoke-id]} ?data]
+    (println "[CLIENT] Human input requested for invoke-id:" invoke-id "prompt:" prompt)
+    (state/dispatch [:db/set-value 
+                     [:invocations-data invoke-id :human-input-request] 
+                     {:request-id request-id
+                      :prompt prompt
+                      :node node
+                      :node-invoke-id node-invoke-id}])))
+
+(defmethod -event-msg-handler :agent/run-complete [{:as ev-msg :keys [?data]}]
+  (let [{:keys [invoke-id result]} ?data]
+    (println "[CLIENT] Agent run completed:" invoke-id "result:" result)
+    (state/dispatch [:db/set-values
+                     [[:invocations-data invoke-id :status] :complete]
+                     [[:invocations-data invoke-id :result] result]
+                     [[:invocations-data invoke-id :human-input-request] nil]])))
+
+(defmethod -event-msg-handler :agent/run-failed [{:as ev-msg :keys [?data]}]
+  (let [{:keys [invoke-id error]} ?data]
+    (println "[CLIENT] Agent run failed:" invoke-id "error:" error)
+    (state/dispatch [:db/set-values
+                     [[:invocations-data invoke-id :status] :failed]
+                     [[:invocations-data invoke-id :error] error]
+                     [[:invocations-data invoke-id :human-input-request] nil]])))
 
 ;; Batch/merge of nodes from server polling
 (defmethod -event-msg-handler :graph/nodes-merge [{:as ev-msg :keys [?data]}]

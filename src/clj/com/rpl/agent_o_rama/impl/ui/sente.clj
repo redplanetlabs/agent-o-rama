@@ -112,6 +112,160 @@
   (handle-api-event ev-msg))
 
 ;; =============================================================================
+;; AGENT LIFECYCLE EVENT HANDLERS
+;; =============================================================================
+
+(defmethod -event-msg-handler :agent/run
+  [{:as ev-msg :keys [?data uid ?reply-fn]}]
+  (let [{:keys [module-id agent-name args] :as params} ?data
+        args (or args [])]
+    (try
+      (let [client (agents/get-client module-id agent-name)
+            ^AgentInvoke inv (apply aor/agent-initiate client args)
+            invoke-id (invoke-id-str inv)
+            stream (start-streaming! client inv uid invoke-id params)]
+        (swap! drivers assoc [uid invoke-id]
+               {:client client
+                :invoke inv
+                :params params
+                :status :starting
+                :stream stream})
+        (chsk-send! uid [:agent/run-started {:invoke-id invoke-id
+                                             :task-id (.getTaskId inv)}])
+        (resume-driver-loop! uid params inv)
+        (when ?reply-fn (?reply-fn {:success true :data {:invoke-id invoke-id :task-id (.getTaskId inv)}})))
+      (catch Exception e
+        (log/error e "Error starting agent run" {:params ?data})
+        (when ?reply-fn (?reply-fn {:success false :error (.getMessage e)}))))))
+
+(defmethod -event-msg-handler :agent/provide-human-input
+  [{:as ev-msg :keys [?data uid ?reply-fn]}]
+  (let [{:keys [invoke-id request-id response]} ?data]
+    (if-let [{:keys [client invoke current-request params]} (get @drivers [uid invoke-id])]
+      (try
+        (aor/provide-human-input client current-request response)
+        ;; Clear waiting state and resume
+        (swap! drivers update [uid invoke-id]
+               dissoc :current-request :request-id)
+        (resume-driver-loop! uid params invoke)
+        (when ?reply-fn (?reply-fn {:success true}))
+        (catch Exception e
+          (log/error e "Error providing human input" {:invoke-id invoke-id :request-id request-id})
+          (when ?reply-fn (?reply-fn {:success false :error (.getMessage e)}))))
+      (do
+        (log/warn "No driver found for human input" {:uid uid :invoke-id invoke-id :request-id request-id})
+        (when ?reply-fn (?reply-fn {:success false :error "No active driver"}))))))
+
+(defmethod -event-msg-handler :agent/cancel-run
+  [{:as ev-msg :keys [?data uid ?reply-fn]}]
+  (let [{:keys [invoke-id]} ?data]
+    (if (contains? @drivers [uid invoke-id])
+      (do
+        (stop-driver! uid invoke-id)
+        (chsk-send! uid [:agent/run-failed {:invoke-id invoke-id :error "Cancelled by user"}])
+        (when ?reply-fn (?reply-fn {:success true})))
+      (when ?reply-fn (?reply-fn {:success false :error "No active driver"})))))
+
+;; =============================================================================
+;; AGENT RUN/STREAM/HITL DRIVER SYSTEM
+;; =============================================================================
+
+;; Unified driver system for managing agent lifecycles per user session
+;; Each driver handles: initiation, token streaming, step advancement, HITL pauses/resumes
+;; Structure: {[uid invoke-id] {:client agent-client
+;;                              :invoke agent-invoke 
+;;                              :params original-params
+;;                              :status :starting|:running|:waiting-human|:complete|:failed
+;;                              :stream stream-object
+;;                              :loop-thread thread
+;;                              :current-request human-input-request
+;;                              :request-id uuid}}
+(defonce drivers (atom {}))
+
+(defn- invoke-id-str ^String [^AgentInvoke inv]
+  (str (.getTaskId inv) "-" (.getAgentInvokeId inv)))
+
+(defn- stop-driver! [uid invoke-id]
+  (when-let [driver (get @drivers [uid invoke-id])]
+    (when-let [stream (:stream driver)]
+      (try
+        (.close stream)
+        (catch Exception _)) )
+    (when-let [^Thread t (:loop-thread driver)]
+      (try
+        (.interrupt t)
+        (catch Exception _)))
+    (swap! drivers dissoc [uid invoke-id])
+    (log/info "Stopped driver" {:uid uid :invoke-id invoke-id})))
+
+(defn- start-streaming!
+  "Optionally start a streamAll for a given node name. Returns the stream object or nil."
+  [client ^AgentInvoke inv uid invoke-id {:keys [stream-node]}]
+  (when (and stream-node (string? stream-node) (not (clojure.string/blank? stream-node)))
+    (log/info "Starting token stream" {:uid uid :invoke-id invoke-id :node stream-node})
+    (aor/agent-stream-all
+     client
+     inv
+     stream-node
+     (fn [all-chunks new-chunks reset-invoke-ids complete?]
+       (try
+         ;; Send per node-invoke-id updates for simplicity
+         (doseq [[node-invoke-id chunks] new-chunks]
+           (when (seq chunks)
+             (chsk-send! uid
+                         [:agent/token-chunk
+                          {:invoke-id invoke-id
+                           :node-invoke-id (str node-invoke-id)
+                           :chunks chunks
+                           :reset? (boolean (and reset-invoke-ids (contains? (set reset-invoke-ids) node-invoke-id)))
+                           :complete? complete?}])) )
+         (catch Exception e
+           (log/warn e "Failed sending token chunk" {:invoke-id invoke-id})))))))
+
+(defn- resume-driver-loop!
+  [uid {:keys [module-id agent-name] :as params} ^AgentInvoke inv]
+  (let [client (agents/get-client module-id agent-name)
+        invoke-id (invoke-id-str inv)
+        loop-fn (fn loop-fn []
+                  (try
+                    (loop []
+                      (let [step (aor/agent-next-step client inv)]
+                        (cond
+                          (instance? AgentComplete step)
+                          (do
+                            (chsk-send! uid [:agent/run-complete {:invoke-id invoke-id
+                                                                 :result (.getResult ^AgentComplete step)}])
+                            (stop-driver! uid invoke-id))
+
+                          (instance? HumanInputRequest step)
+                          (let [^HumanInputRequest req step
+                                req-id (str (UUID/randomUUID))
+                                req-info {:invoke-id invoke-id
+                                          :request-id req-id
+                                          :prompt (.getPrompt req)
+                                          :node (.getNode req)
+                                          :node-invoke-id (str (.getNodeInvokeId req))}]
+                            ;; Store waiting request and notify client, then exit loop to wait for response
+                            (swap! drivers update [uid invoke-id]
+                                   assoc :status :waiting-human :current-request req :request-id req-id)
+                            (chsk-send! uid [:agent/human-input-request req-info]))
+
+                          :else
+                          (recur))))
+                    (catch InterruptedException _
+                      (log/info "Driver loop interrupted" {:uid uid :invoke-id invoke-id}))
+                    (catch Exception e
+                      (log/error e "Driver loop error" {:uid uid :invoke-id invoke-id})
+                      (chsk-send! uid [:agent/run-failed {:invoke-id invoke-id :error (.getMessage e)}])
+                      (stop-driver! uid invoke-id))))
+        thread (doto (Thread. ^Runnable loop-fn)
+                 (.setName (str "aor-driver-" uid "-" invoke-id))
+                 (.start))]
+    (swap! drivers update [uid invoke-id]
+           assoc :loop-thread thread :status :running)
+    nil))
+
+;; =============================================================================
 ;; ROBUST SUBSCRIPTION MANAGEMENT
 ;; =============================================================================
 
@@ -221,12 +375,16 @@
 
 (defmethod -event-msg-handler :chsk/uidport-close
   [{:as ev-msg :keys [uid]}]
-  (log/info (str "Sente client disconnected, cleaning up subscriptions for uid: " uid))
+  (log/info (str "Sente client disconnected, cleaning up subscriptions and drivers for uid: " uid))
   ;; Clean up all subscriptions for this client
   (when-let [client-subs (get @client-subscriptions uid)]
     (doseq [[sub-key {:keys [sub-type params]}] client-subs]
       (unsubscribe! uid sub-type params))
-    (swap! client-subscriptions dissoc uid)))
+    (swap! client-subscriptions dissoc uid))
+  ;; Clean up all drivers for this client
+  (let [user-drivers (filter #(= uid (first (first %))) @drivers)]
+    (doseq [[[driver-uid invoke-id] _] user-drivers]
+      (stop-driver! driver-uid invoke-id))))
 
 ;; 4. Router lifecycle functions
 (defonce router_ (atom nil))

@@ -189,9 +189,47 @@
   (fn [db {:keys [invoke-id]}]
     ;; Stop any live subscriptions
     (state/dispatch [:invocation/stop-live])
+    ;; Cancel any running agents
+    (when invoke-id
+      (sente/push! [:agent/cancel-run {:invoke-id invoke-id}]))
     ;; Clear UI state
     (state/dispatch [:ui/clear-fork-state])
     [:ui :selected-node-id (s/terminal-val nil)]))
+
+;; =============================================================================
+;; AGENT LIFECYCLE ORCHESTRATION
+;; =============================================================================
+
+;; Start an agent run from the UI
+(state/reg-event :agent/ui-run
+  (fn [db {:keys [module-id agent-name args stream-node] :as params}]
+    (sente/request! [:agent/run params]
+                   10000
+                   (fn [reply]
+                     (if (:success reply)
+                       (let [{:keys [invoke-id task-id]} (:data reply)]
+                         (println "[CLIENT] Agent run initiated:" invoke-id)
+                         ;; Switch to viewing this new invocation
+                         (state/dispatch [:invocation/set-current {:invoke-id invoke-id
+                                                                   :module-id module-id
+                                                                   :agent-name agent-name}]))
+                       (do
+                         (println "[CLIENT] Failed to start agent:" (:error reply))
+                         (js/alert (str "Failed to start agent: " (:error reply)))))))
+    ;; No immediate state change - wait for server response
+    nil))
+
+;; Provide human input from the UI
+(state/reg-event :agent/ui-provide-human-input
+  (fn [db {:keys [invoke-id response]}]
+    (when-let [request (get-in db [:invocations-data invoke-id :human-input-request])]
+      (let [{:keys [request-id]} request]
+        (sente/push! [:agent/provide-human-input 
+                     {:invoke-id invoke-id 
+                      :request-id request-id 
+                      :response response}])
+        ;; Clear the request from UI immediately for responsive feel
+        [:invocations-data invoke-id :human-input-request (s/terminal-val nil)]))))
 
 ;; UI state management for forking
 (state/reg-event :ui/clear-fork-state
