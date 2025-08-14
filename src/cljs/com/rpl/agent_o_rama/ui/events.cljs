@@ -79,26 +79,19 @@
 ;; This is the single entry point to start or restart polling
 (state/reg-event :invocation/start-graph-loading
                  (fn [db {:keys [invoke-id module-id agent-name]}]
-    ;; Set current invocation context first
                    (state/dispatch [:invocation/set-current {:invoke-id invoke-id
                                                              :module-id module-id
                                                              :agent-name agent-name}])
 
-    ;; Check if the agent is already complete
                    (let [is-complete? (get-in db [:invocations-data invoke-id :is-complete])]
 
-      ;; Start loading if the agent isn't already marked as complete
-      ;; The loop will naturally stop when the server reports completion
                      (when-not is-complete?
-        ;; Start from root. Mark this explicitly as the initial load.
                        (state/dispatch [:invocation/fetch-graph-page
                                         {:invoke-id invoke-id
                                          :module-id module-id
                                          :agent-name agent-name
                                          :leaves []
                                          :initial? true}]))
-
-      ;; Return nil to indicate no immediate state change
                      nil)))
 
 ;; =============================================================================
@@ -122,16 +115,13 @@
                         nil)))
                    nil))
 
-;; Process a page response, merge nodes, and implement robust loop logic
 (state/reg-event :invocation/process-graph-page
                  (fn [db invoke-id page-data]
                    (let [{:keys [nodes next-leaves summary historical-graph root-invoke-id
                                  task-id is-complete]} page-data
                          current-invocation (get-in db [:current-invocation])
-          ;; Check if we previously thought it was incomplete
                          was-incomplete? (not (get-in db [:invocations-data invoke-id :is-complete]))]
 
-      ;; Merge summary if it exists (happens on initial load AND our new final load)
                      (when summary
                        (state/dispatch [:db/set-values
                                         [[:invocations-data invoke-id :summary] summary]
@@ -139,35 +129,28 @@
                                         [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]
                                         [[:invocations-data invoke-id :task-id] task-id]]))
 
-      ;; Always update completion status
                      (when (contains? page-data :is-complete)
                        (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] is-complete]))
 
-      ;; Merge nodes if they exist
                      (when (and nodes (seq nodes))
                        (state/dispatch [:invocation/merge-nodes invoke-id nodes]))
 
-      ;; STATE MACHINE LOGIC (Now with the fix)
                      (cond
-        ;; NEW: If we just found out the agent is complete, trigger a final summary fetch.
                        (and is-complete was-incomplete?)
                        (do
                          (println "[POLLING-STATELESS] Agent is complete. Fetching final summary for" invoke-id)
                          (state/dispatch [:invocation/fetch-graph-page
                                           (assoc current-invocation :leaves [] :initial? true)]))
 
-        ;; If complete and we already knew, stop.
                        is-complete
                        (do (println "[POLLING-STATELESS] Loop ended.") nil)
 
-        ;; Fast pagination
                        (seq next-leaves)
                        (do
                          (println "[POLLING-STATELESS] Fast pagination: continuing...")
                          (state/dispatch [:invocation/fetch-graph-page
                                           (assoc current-invocation :leaves (vec next-leaves) :initial? false)]))
 
-        ;; Delayed re-poll (with failsafe removed)
                        :else
                        (do
                          (println "[POLLING-STATELESS] Scheduling delayed re-poll...")
@@ -187,40 +170,29 @@
                           2000)))
                      nil)))
 
-;; Unified node merging with automatic implicit edge recalculation
 (state/reg-event :invocation/merge-nodes
                  (fn [db invoke-id new-nodes-map]
                    (let [historical-graph (get-in db [:invocations-data invoke-id :historical-graph])
-          ;; First, merge new raw data with existing raw data
                          current-raw-nodes (get-in db [:invocations-data invoke-id :graph :raw-nodes])
                          merged-raw-nodes (merge current-raw-nodes new-nodes-map)
 
-          ;; Get metadata needed for processing
                          root-invoke-id (get-in db [:invocations-data invoke-id :root-invoke-id])
 
-          ;; Call our new unified function once to get the complete drawable graph state
                          {:keys [nodes edges implicit-edges]}
                          (build-drawable-graph merged-raw-nodes root-invoke-id historical-graph)]
 
-      ;; Atomically update both nodes and edges
                      [:invocations-data invoke-id
                       (s/multi-path
-                       [:graph :raw-nodes (s/terminal-val merged-raw-nodes)] ; Store all data received
-                       [:graph :nodes (s/terminal-val nodes)] ; Store drawable nodes
-                       [:graph :edges (s/terminal-val edges)] ; Store real drawable edges
+                       [:graph :raw-nodes (s/terminal-val merged-raw-nodes)]
+                       [:graph :nodes (s/terminal-val nodes)]
+                       [:graph :edges (s/terminal-val edges)]
                        [:implicit-edges (s/terminal-val implicit-edges)])])))
 
-;; Cleanup when leaving an invocation
 (state/reg-event :invocation/cleanup
                  (fn [db {:keys [invoke-id]}]
-    ;; Any pending setTimeout callbacks will now see that
-    ;; :is-complete is (or will be) true, or the invocation-data will be gone,
-    ;; and will naturally stop themselves.
-    ;; The main action is clearing UI state.
                    (state/dispatch [:ui/clear-fork-state])
                    [:ui :selected-node-id (s/terminal-val nil)]))
 
-;; UI state management for forking
 (state/reg-event :ui/clear-fork-state
                  (fn [db]
                    [:ui (s/multi-path
@@ -235,7 +207,6 @@
 
 (state/reg-event :hitl/submit
                  (fn [db {:keys [module-id agent-name invoke-id request response]}]
-    ;; Set submitting flag to disable UI
                    (state/dispatch [:db/set-value [:ui :hitl :submitting (s/keypath (:invoke-id request))] true])
 
                    (sente/request!
@@ -247,32 +218,8 @@
                       :response response}]
                     5000
                     (fn [reply]
-        ;; Clear submitting flag
                       (state/dispatch [:db/set-value [:ui :hitl :submitting (s/keypath (:invoke-id request))] false])
                       (if (:success reply)
-                        (do
-
-            ;; CRITICAL: Restart polling to pick up new nodes created after HITL unblock
-            ;; This gracefully restarts the loop from the root, finding new state
-                          (state/dispatch [:invocation/restart-polling
-                                           {:invoke-id invoke-id
-                                            :module-id module-id
-                                            :agent-name agent-name}]))
+                        (println "HITL response submitted successfully. Polling loop will automatically pick up new nodes.")
                         (js/console.error "HITL submit failed" (:error reply)))))
-                   nil))
-
-;; Restart polling after external events (like HITL submission)
-(state/reg-event :invocation/restart-polling
-                 (fn [db {:keys [invoke-id module-id agent-name]}]
-
-    ;; With the stateless approach, we simply trigger a new fetch
-    ;; Any existing setTimeout callbacks will see the updated state and act accordingly
-    ;; Start fresh from root after a brief delay to let the server settle
-                   (js/setTimeout
-                    (fn []
-                      (state/dispatch [:invocation/start-graph-loading
-                                       {:invoke-id invoke-id
-                                        :module-id module-id
-                                        :agent-name agent-name}]))
-                    500) ; 500ms delay to allow server state to settle
                    nil))
