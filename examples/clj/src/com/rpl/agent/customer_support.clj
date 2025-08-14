@@ -16,7 +16,8 @@
    [com.rpl.rama.test :as rtest]
    [jsonista.core :as j])
   (:import
-   [java.util UUID]))
+   [java.util
+    UUID]))
 
 (def CUSTOMER-SUPPORT-SYSTEM-MESSAGE
   "You are a helpful customer support assistant for Swiss Airlines.
@@ -75,12 +76,21 @@
     :price-per-night 180}])
 
 (def MOCK-CAR-RENTALS
-  [{:rental-id     "R001" :location  "New York" :car-type "Economy"
-    :price-per-day 45     :available true}
-   {:rental-id     "R002" :location  "New York" :car-type "Luxury"
-    :price-per-day 120    :available true}
-   {:rental-id     "R003" :location  "Los Angeles" :car-type "SUV"
-    :price-per-day 85     :available true}])
+  [{:rental-id     "R001"
+    :location      "New York"
+    :car-type      "Economy"
+    :price-per-day 45
+    :available     true}
+   {:rental-id     "R002"
+    :location      "New York"
+    :car-type      "Luxury"
+    :price-per-day 120
+    :available     true}
+   {:rental-id     "R003"
+    :location      "Los Angeles"
+    :car-type      "SUV"
+    :price-per-day 85
+    :available     true}])
 
 (def POLICIES
   {"baggage"
@@ -136,7 +146,8 @@
       :message (format
                 "Found %d flights from %s to %s"
                 (count matching-flights)
-                departure-airport arrival-airport)})))
+                departure-airport
+                arrival-airport)})))
 
 (defn update-ticket-to-new-flight
   "Update a passenger's ticket to a new flight."
@@ -150,16 +161,19 @@
                          MOCK-FLIGHTS))]
     (if flight
       (do
-        (store/put! bookings-store ticket-no
-                    (merge flight {:ticket-no    ticket-no
-                                   :booking-date (str (LocalDateTime/now))}))
+        (store/put! bookings-store
+                    ticket-no
+                    (merge flight
+                           {:ticket-no    ticket-no
+                            :booking-date (str (LocalDateTime/now))}))
         (j/write-value-as-string
          {:status  "success"
           :message (format
                     "Successfully updated ticket %s to flight %s"
-                    ticket-no new-flight-id)}))
+                    ticket-no
+                    new-flight-id)}))
       (j/write-value-as-string
-       {:status "error"
+       {:status  "error"
         :message
         (format "Flight %s not found or not available" new-flight-id)}))))
 
@@ -171,7 +185,9 @@
     (if (store/get bookings-store ticket-no)
       (do
         (store/pstate-transform!
-         [(path/keypath ticket-no) path/NONE] bookings-store ticket-no)
+         [(path/keypath ticket-no) path/NONE]
+         bookings-store
+         ticket-no)
         (j/write-value-as-string
          {:status  "success"
           :message (format
@@ -189,15 +205,16 @@
         price-tier      (get arguments "price-tier")
         checkin-date    (get arguments "checkin-date")
         checkout-date   (get arguments "checkout-date")
-        matching-hotels (filter (fn [hotel]
-                                  (and (= (:location hotel) location)
-                                       (or (nil? price-tier)
-                                           (= (:price-tier hotel) price-tier))
-                                       (or (nil? name)
-                                           (str/includes?
-                                            (str/lower-case (:name hotel))
-                                            (str/lower-case name)))))
-                                MOCK-HOTELS)]
+        matching-hotels (filter
+                         (fn [hotel]
+                           (and (= (:location hotel) location)
+                                (or (nil? price-tier)
+                                    (= (:price-tier hotel) price-tier))
+                                (or (nil? name)
+                                    (str/includes?
+                                     (str/lower-case (:name hotel))
+                                     (str/lower-case name)))))
+                         MOCK-HOTELS)]
     (j/write-value-as-string
      {:status  "success"
       :hotels  matching-hotels
@@ -209,26 +226,30 @@
 (defn book-hotel
   "Book a hotel reservation."
   [agent-node {:keys [passenger-id]} arguments]
-  (let [hotel-id             (get arguments "hotel-id")
-        checkin-date         (get arguments "checkin-date")
-        checkout-date        (get arguments "checkout-date")
+  (let [hotel-id      (get arguments "hotel-id")
+        checkin-date  (get arguments "checkin-date")
+        checkout-date (get arguments "checkout-date")
         hotel-bookings-store (aor/get-store agent-node "$$hotel-bookings")
-        hotel                (first
-                              (filter #(= (:hotel-id %) hotel-id) MOCK-HOTELS))
-        booking-id           (str (UUID/randomUUID))]
+        hotel         (first
+                       (filter #(= (:hotel-id %) hotel-id) MOCK-HOTELS))
+        booking-id    (str (UUID/randomUUID))]
     (if hotel
       (do
-        (store/put! hotel-bookings-store booking-id
-                    (merge hotel {:booking-id    booking-id
-                                  :passenger-id  passenger-id
-                                  :checkin-date  checkin-date
-                                  :checkout-date checkout-date
-                                  :booking-date  (str (LocalDateTime/now))}))
+        (store/put! hotel-bookings-store
+                    booking-id
+                    (merge hotel
+                           {:booking-id    booking-id
+                            :passenger-id  passenger-id
+                            :checkin-date  checkin-date
+                            :checkout-date checkout-date
+                            :booking-date  (str (LocalDateTime/now))}))
         (j/write-value-as-string
          {:status     "success"
           :booking-id booking-id
           :message    (format "Successfully booked %s for %s to %s"
-                              (:name hotel) checkin-date checkout-date)}))
+                              (:name hotel)
+                              checkin-date
+                              checkout-date)}))
       (j/write-value-as-string
        {:status  "error"
         :message (format "Hotel %s not found" hotel-id)}))))
@@ -245,7 +266,7 @@
                                         (:available rental)
                                         (or (nil? car-type)
                                             (= (:car-type rental) car-type))))
-                                 MOCK-CAR-RENTALS)]
+                          MOCK-CAR-RENTALS)]
     (j/write-value-as-string
      {:status  "success"
       :rentals matching-rentals
@@ -268,17 +289,21 @@
         booking-id         (str (UUID/randomUUID))]
     (if (and rental (:available rental))
       (do
-        (store/put! car-bookings-store booking-id
-                    (merge rental {:booking-id   booking-id
-                                   :passenger-id passenger-id
-                                   :start-date   start-date
-                                   :end-date     end-date
-                                   :booking-date (str (LocalDateTime/now))}))
+        (store/put! car-bookings-store
+                    booking-id
+                    (merge rental
+                           {:booking-id   booking-id
+                            :passenger-id passenger-id
+                            :start-date   start-date
+                            :end-date     end-date
+                            :booking-date (str (LocalDateTime/now))}))
         (j/write-value-as-string
          {:status     "success"
           :booking-id booking-id
           :message    (format "Successfully booked %s car for %s to %s"
-                              (:car-type rental) start-date end-date)}))
+                              (:car-type rental)
+                              start-date
+                              end-date)}))
       (j/write-value-as-string
        {:status  "error"
         :message (format "Car rental %s not available" rental-id)}))))
@@ -286,17 +311,18 @@
 (defn lookup-policy
   "Look up company policy information."
   [agent-node config arguments]
-  (let [query             (get arguments "query")
-        query-lower       (str/lower-case query)
+  (let [query       (get arguments "query")
+        query-lower (str/lower-case query)
         matching-policies (filter (fn [[key _]]
                                     (str/includes? query-lower key))
-                                  POLICIES)]
+                           POLICIES)]
     (if (seq matching-policies)
       (j/write-value-as-string
        {:status   "success"
         :policies (into {} matching-policies)
         :message  (format "Found %d policy matches for '%s'"
-                          (count matching-policies) query)})
+                          (count matching-policies)
+                          query)})
       (j/write-value-as-string
        {:status  "not-found"
         :message (format "No policies found matching '%s'" query)}))))
@@ -309,7 +335,7 @@
      (lj/object
       {:description
        "Retrieve current flight booking information for a specific passenger"
-       :required ["passenger-id"]}
+       :required    ["passenger-id"]}
       {"passenger-id" (lj/string "The passenger ID to look up")})
      "Retrieve current flight booking information for a specific passenger")
     fetch-user-flight-information
@@ -447,45 +473,47 @@
 
   ;; Define the agent workflow
   (->
-   topology
-   (aor/new-agent "customer-support")
+    topology
+    (aor/new-agent "customer-support")
 
-   ;; Main assistant node - handles conversation and tool decisions
-   (aor/node
-    "chat"
-    "chat"
-    (fn [agent-node messages config]
-      (let [openai                 (aor/get-agent-object
-                                    agent-node
-                                    "openai-model")
-            conversation-store     (aor/get-store agent-node "$$conversations")
-            {:keys [passenger-id]} config
-            tools                  (aor/agent-client agent-node "tools")
+    ;; Main assistant node - handles conversation and tool decisions
+    (aor/node
+     "chat"
+     "chat"
+     (fn [agent-node messages config]
+       (let [openai             (aor/get-agent-object
+                                 agent-node
+                                 "openai-model")
+             conversation-store (aor/get-store agent-node "$$conversations")
+             {:keys [passenger-id]} config
+             tools              (aor/agent-client agent-node "tools")
 
-            ;; Build conversation history
-            system-msg   (SystemMessage. CUSTOMER-SUPPORT-SYSTEM-MESSAGE)
-            all-messages (concat [system-msg] messages)
+             ;; Build conversation history
+             system-msg         (SystemMessage. CUSTOMER-SUPPORT-SYSTEM-MESSAGE)
+             all-messages       (concat [system-msg] messages)
 
-            ;; Make API call with tools
-            response   (lc4j/chat openai
-                                  (lc4j/chat-request
-                                   all-messages
-                                   {:tools CUSTOMER-SUPPORT-TOOLS}))
-            ai-message (.aiMessage response)
-            tool-calls (not-empty (vec (.toolExecutionRequests ai-message)))]
+             ;; Make API call with tools
+             response           (lc4j/chat openai
+                                           (lc4j/chat-request
+                                            all-messages
+                                            {:tools CUSTOMER-SUPPORT-TOOLS}))
+             ai-message         (.aiMessage response)
+             tool-calls         (not-empty (vec (.toolExecutionRequests
+                                                 ai-message)))]
 
-        ;; Store conversation state
-        (when passenger-id
-          (store/put! conversation-store passenger-id
-                      {:messages     (conj messages ai-message)
-                       :last-updated (str (LocalDateTime/now))}))
+         ;; Store conversation state
+         (when passenger-id
+           (store/put! conversation-store
+                       passenger-id
+                       {:messages     (conj messages ai-message)
+                        :last-updated (str (LocalDateTime/now))}))
 
-        ;; Check if assistant wants to use tools
-        (if tool-calls
-          (let [tool-results  (aor/agent-invoke tools tool-calls config)
-                next-messages (into (conj messages ai-message) tool-results)]
-            (aor/emit! agent-node "chat" next-messages config))
-          (aor/result! agent-node (.text ai-message)))))))
+         ;; Check if assistant wants to use tools
+         (if tool-calls
+           (let [tool-results  (aor/agent-invoke tools tool-calls config)
+                 next-messages (into (conj messages ai-message) tool-results)]
+             (aor/emit! agent-node "chat" next-messages config))
+           (aor/result! agent-node (.text ai-message)))))))
 
   (tools/new-tools-agent topology "tools" CUSTOMER-SUPPORT-TOOLS))
 
@@ -496,7 +524,7 @@
   []
   (println "Starting Customer Support Agent...")
   (with-open [ipc (rtest/create-ipc)
-              _   (aor/start-ui ipc)]
+              _ (aor/start-ui ipc)]
     ;; Launch the topology
     (rtest/launch-module! ipc CustomerSupportModule {:tasks 4 :threads 2})
 
@@ -531,12 +559,13 @@
 
       ;; Test 3: Hotel search
       (println "🏨 Testing hotel search...")
-      (let [result
-            (aor/agent-invoke
-             agent
-             [(UserMessage.
-               "I need a hotel in New York for March 15-17, preferably budget-friendly")]
-             {:passenger-id "P125"})]
+      (let
+        [result
+         (aor/agent-invoke
+          agent
+          [(UserMessage.
+            "I need a hotel in New York for March 15-17, preferably budget-friendly")]
+          {:passenger-id "P125"})]
         (println
          "Customer:"
          "I need a hotel in New York for March 15-17, preferably budget-friendly")
