@@ -16,13 +16,8 @@
    [com.rpl.agentorama AgentComplete]
    [dev.langchain4j.data.message SystemMessage UserMessage]
    [dev.langchain4j.model.openai OpenAiChatModel OpenAiEmbeddingModel]
-   [dev.langchain4j.data.embedding Embedding]
-   [dev.langchain4j.data.document Document DocumentSplitter]
    [dev.langchain4j.data.document.splitter DocumentSplitters]
-   [dev.langchain4j.store.embedding EmbeddingStore]
-   [dev.langchain4j.store.embedding.inmemory InMemoryEmbeddingStore]
-   [dev.langchain4j.agent.tool ToolExecutionRequest]
-   [dev.langchain4j.model.output Response]))
+   [dev.langchain4j.agent.tool ToolExecutionRequest]))
 
 ;; Configuration
 (def ^:const DOCUMENTS-STORE "$$documents")
