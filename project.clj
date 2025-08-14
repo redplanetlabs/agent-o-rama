@@ -2,7 +2,14 @@
   :source-paths ["src/clj" "src/cljs" "resource"]
   :java-source-paths ["src/java"]
   :test-paths ["test/clj"]
-  :jvm-opts ["-Xss6m"]
+  :jvm-opts ["-Xss6m"
+             "-Xms6g"
+             "-Xmx6g"
+             "-XX:+UseG1GC"
+             "-XX:MetaspaceSize=500000000"
+             ;; this gives us stack traces directly in output instead of an edn
+             ;; file in tmp, which will be lost on CI
+             "-Dclojure.main.report=stderr"]
   :dependencies [[org.clojure/clojure "1.12.0"]
                  [com.rpl/rama-helpers "0.10.0"]
                  [dev.langchain4j/langchain4j
