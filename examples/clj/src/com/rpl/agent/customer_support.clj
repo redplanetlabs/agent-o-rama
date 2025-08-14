@@ -140,13 +140,16 @@
         arrival-airport   (get arguments "arrival-airport")
         start-date        (get arguments "start-date")
         end-date          (get arguments "end-date")
+        flights-by-departure-store (aor/get-store agent-node
+                                                  "$$flights-by-departure")
+        departure-flights (store/get flights-by-departure-store
+                                     departure-airport)
         matching-flights  (filterv
                            (fn [flight]
                              (and
-                              (= (:departure-airport flight) departure-airport)
                               (= (:arrival-airport flight) arrival-airport)
                               (>= (:available-seats flight) 1)))
-                           MOCK-FLIGHTS)]
+                           (or departure-flights []))]
     (j/write-value-as-string
      {:status  "success"
       :flights matching-flights
@@ -159,13 +162,11 @@
 (defn update-ticket-to-new-flight
   "Update a passenger's ticket to a new flight."
   [agent-node config arguments]
-  (let [ticket-no      (get arguments "ticket-no")
-        new-flight-id  (get arguments "new-flight-id")
-        bookings-store (aor/get-store agent-node "$$bookings")
-        flight         (first
-                        (filter
-                         #(= (:flight-id %) new-flight-id)
-                         MOCK-FLIGHTS))]
+  (let [ticket-no           (get arguments "ticket-no")
+        new-flight-id       (get arguments "new-flight-id")
+        bookings-store      (aor/get-store agent-node "$$bookings")
+        flights-by-id-store (aor/get-store agent-node "$$flights-by-id")
+        flight              (store/get flights-by-id-store new-flight-id)]
     (if flight
       (do
         (store/put! bookings-store
@@ -212,16 +213,18 @@
         price-tier      (get arguments "price-tier")
         checkin-date    (get arguments "checkin-date")
         checkout-date   (get arguments "checkout-date")
+        hotels-by-location-store (aor/get-store agent-node
+                                                "$$hotels-by-location")
+        location-hotels (store/get hotels-by-location-store location)
         matching-hotels (filter
                          (fn [hotel]
-                           (and (= (:location hotel) location)
-                                (or (nil? price-tier)
+                           (and (or (nil? price-tier)
                                     (= (:price-tier hotel) price-tier))
                                 (or (nil? name)
                                     (str/includes?
                                      (str/lower-case (:name hotel))
                                      (str/lower-case name)))))
-                         MOCK-HOTELS)]
+                         (or location-hotels []))]
     (j/write-value-as-string
      {:status  "success"
       :hotels  matching-hotels
@@ -233,13 +236,13 @@
 (defn book-hotel
   "Book a hotel reservation."
   [agent-node {:keys [passenger-id]} arguments]
-  (let [hotel-id      (get arguments "hotel-id")
-        checkin-date  (get arguments "checkin-date")
-        checkout-date (get arguments "checkout-date")
+  (let [hotel-id           (get arguments "hotel-id")
+        checkin-date       (get arguments "checkin-date")
+        checkout-date      (get arguments "checkout-date")
         hotel-bookings-store (aor/get-store agent-node "$$hotel-bookings")
-        hotel         (first
-                       (filter #(= (:hotel-id %) hotel-id) MOCK-HOTELS))
-        booking-id    (str (UUID/randomUUID))]
+        hotels-by-id-store (aor/get-store agent-node "$$hotels-by-id")
+        hotel              (store/get hotels-by-id-store hotel-id)
+        booking-id         (str (UUID/randomUUID))]
     (if hotel
       (do
         (store/put! hotel-bookings-store
@@ -268,12 +271,14 @@
         start-date       (get arguments "start-date")
         end-date         (get arguments "end-date")
         car-type         (get arguments "car-type")
+        car-rentals-by-location-store
+        (aor/get-store agent-node "$$car-rentals-by-location")
+        location-rentals (store/get car-rentals-by-location-store location)
         matching-rentals (filter (fn [rental]
-                                   (and (= (:location rental) location)
-                                        (:available rental)
+                                   (and (:available rental)
                                         (or (nil? car-type)
                                             (= (:car-type rental) car-type))))
-                          MOCK-CAR-RENTALS)]
+                          (or location-rentals []))]
     (j/write-value-as-string
      {:status  "success"
       :rentals matching-rentals
@@ -289,10 +294,8 @@
         start-date         (get arguments "start-date")
         end-date           (get arguments "end-date")
         car-bookings-store (aor/get-store agent-node "$$car-bookings")
-        rental             (first
-                            (filter
-                             #(= (:rental-id %) rental-id)
-                             MOCK-CAR-RENTALS))
+        car-rentals-by-id-store (aor/get-store agent-node "$$car-rentals-by-id")
+        rental             (store/get car-rentals-by-id-store rental-id)
         booking-id         (str (UUID/randomUUID))]
     (if (and rental (:available rental))
       (do
@@ -318,11 +321,13 @@
 (defn lookup-policy
   "Look up company policy information."
   [agent-node config arguments]
-  (let [query       (get arguments "query")
-        query-lower (str/lower-case query)
+  (let [query             (get arguments "query")
+        query-lower       (str/lower-case query)
+        policies-store    (aor/get-store agent-node "$$policies")
+        all-policies      (store/get policies-store "all-policies")
         matching-policies (filter (fn [[key _]]
                                     (str/includes? query-lower key))
-                           POLICIES)]
+                           all-policies)]
     (if (seq matching-policies)
       (j/write-value-as-string
        {:status   "success"
@@ -455,6 +460,8 @@
     lookup-policy
     {:include-context? true})])
 
+;; Initialization will be handled by the initialization agent
+
 (aor/defagentmodule CustomerSupportModule
   [topology]
 
@@ -478,7 +485,88 @@
   (aor/declare-key-value-store topology "$$car-bookings" String Object)
   (aor/declare-key-value-store topology "$$conversations" String Object)
 
-  ;; Define the agent workflow
+  ;; Declare stores for reference data
+
+  ;; departure airport -> list of flights
+  (aor/declare-key-value-store topology "$$flights-by-departure" String Object)
+  ;; flight-id -> flight details
+  (aor/declare-key-value-store topology "$$flights-by-id" String Object)
+  ;; location -> list of hotels
+  (aor/declare-key-value-store topology "$$hotels-by-location" String Object)
+  ;; hotel-id -> hotel details
+  (aor/declare-key-value-store topology "$$hotels-by-id" String Object)
+  ;; location -> list of car rentals
+  (aor/declare-key-value-store topology
+                               "$$car-rentals-by-location"
+                               String
+                               Object)
+  ;; rental-id -> rental details
+  (aor/declare-key-value-store topology "$$car-rentals-by-id" String Object)
+
+  (aor/declare-key-value-store topology "$$policies" String Object)
+
+  ;; Define the initialization agent
+  (->
+    topology
+    (aor/new-agent "data-initializer")
+    (aor/node
+     "initialize"
+     nil
+     (fn iniitalize-node [agent-node]
+       (let [flights-by-departure-store (aor/get-store agent-node
+                                                       "$$flights-by-departure")
+             flights-by-id-store        (aor/get-store agent-node
+                                                       "$$flights-by-id")
+             hotels-by-location-store   (aor/get-store agent-node
+                                                       "$$hotels-by-location")
+             hotels-by-id-store         (aor/get-store agent-node
+                                                       "$$hotels-by-id")
+             car-rentals-by-location-store
+             (aor/get-store agent-node "$$car-rentals-by-location")
+             car-rentals-by-id-store    (aor/get-store agent-node
+                                                       "$$car-rentals-by-id")
+             policies-store             (aor/get-store agent-node "$$policies")]
+
+         (prn :A)
+
+         ;; Populate flights stores - organize by departure airport and by ID
+         (let [flights-by-departure (group-by :departure-airport MOCK-FLIGHTS)]
+           (doseq [[departure-airport flights] flights-by-departure]
+             (store/put! flights-by-departure-store departure-airport flights)))
+
+         (prn :B)
+         (doseq [flight MOCK-FLIGHTS]
+           (store/put! flights-by-id-store (:flight-id flight) flight))
+
+         (prn :C)
+         ;; Populate hotels stores - organize by location and by ID
+         (let [hotels-by-location (group-by :location MOCK-HOTELS)]
+           (doseq [[location hotels] hotels-by-location]
+             (store/put! hotels-by-location-store location hotels)))
+
+         (prn :D)
+         (doseq [hotel MOCK-HOTELS]
+           (store/put! hotels-by-id-store (:hotel-id hotel) hotel))
+
+         (prn :E)
+         ;; Populate car rentals stores - organize by location and by ID
+         (let [car-rentals-by-location (group-by :location MOCK-CAR-RENTALS)]
+           (doseq [[location car-rentals] car-rentals-by-location]
+             (store/put! car-rentals-by-location-store location car-rentals)))
+
+         (prn :F)
+         (doseq [rental MOCK-CAR-RENTALS]
+           (store/put! car-rentals-by-id-store (:rental-id rental) rental))
+
+         (prn :G)
+         ;; Populate policies store - store all policies as a single map
+         (store/put! policies-store "all-policies" POLICIES)
+
+         (prn :H)
+         (aor/result! agent-node
+                      "Reference data stores initialized successfully")))))
+
+  ;; Define the customer support agent workflow
   (->
     topology
     (aor/new-agent "customer-support")
@@ -537,7 +625,13 @@
 
     (let [module-name   (rama/get-module-name CustomerSupportModule)
           agent-manager (aor/agent-manager ipc module-name)
+          initializer   (aor/agent-client agent-manager "data-initializer")
           agent         (aor/agent-client agent-manager "customer-support")]
+
+      ;; Initialize stores with mock data using the initialization agent
+      (println "Initializing reference data stores...")
+      (let [init-result (aor/agent-invoke initializer)]
+        (println init-result))
 
       ;; Sample interactions
       (println "\n=== Sample Customer Support Interactions ===\n")
