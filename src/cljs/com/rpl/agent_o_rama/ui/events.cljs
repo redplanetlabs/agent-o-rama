@@ -199,6 +199,7 @@
                          [:changed-nodes (s/terminal-val {})]
                          [:selected-node-id (s/terminal-val nil)]
                          [:forking-mode? (s/terminal-val false)]
+                         [:active-tab (s/terminal-val :info)]
                          [:hitl :responses (s/terminal-val {})])]))
 
 ;; =============================================================================

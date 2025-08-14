@@ -470,7 +470,7 @@
                      ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens)))))))))))
 
 (defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live]}]
-  (let [[active-tab set-active-tab] (uix/use-state :info)]
+  (let [active-tab (state/use-sub [:ui :active-tab])]
 
     ;; Update forking mode when tab changes
     (uix/use-effect
@@ -481,6 +481,14 @@
              (on-toggle-forking-mode)))))
      [active-tab forking-mode? on-toggle-forking-mode])
 
+    ;; Ensure we switch back to Info tab when a new invocation starts (live)
+    ;; or when fork changes are cleared
+    (uix/use-effect
+     (fn []
+       (when (or is-live (empty? changed-nodes))
+         (state/dispatch [:db/set-value [:ui :active-tab] :info])))
+     [is-live changed-nodes])
+
     ($ :div {:className "fixed right-0 top-32 h-[calc(100vh-8rem)] w-80 bg-white shadow-lg border-l border-gray-200 overflow-hidden z-40"}
        ;; Tab header
        ($ :div {:className "border-b border-gray-200 p-4"}
@@ -489,7 +497,7 @@
                                          (if (= active-tab :info)
                                            "bg-white text-gray-900 shadow-sm"
                                            "text-gray-600 hover:text-gray-900"))
-                         :onClick #(set-active-tab :info)}
+                         :onClick #(state/dispatch [:db/set-value [:ui :active-tab] :info])}
                 "Info")
              ;; Only show Fork tab when not in live mode
              (when-not is-live
@@ -497,7 +505,7 @@
                                            (if (= active-tab :fork)
                                              "bg-white text-gray-900 shadow-sm"
                                              "text-gray-600 hover:text-gray-900"))
-                           :onClick #(set-active-tab :fork)}
+                           :onClick #(state/dispatch [:db/set-value [:ui :active-tab] :fork])}
                   (str "Fork" (when (> (count changed-nodes) 0) (str " (" (count changed-nodes) ")")))))))
 
        ;; Tab content

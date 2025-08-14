@@ -20,6 +20,7 @@
    :ui {:selected-node-id nil
         :forking-mode? false
         :changed-nodes {}
+        :active-tab :info
         :current-route "/"
         :breadcrumbs []
         :hitl {:responses {} ;; Keyed by invoke-id -> response text
