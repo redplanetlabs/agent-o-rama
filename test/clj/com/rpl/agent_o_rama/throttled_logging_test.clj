@@ -13,7 +13,8 @@
    [com.rpl.rama :refer :all]
    [com.rpl.rama.path :refer :all]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.test-helpers :refer [invoke-agent-and-wait!]]))
+   [com.rpl.test-helpers :refer [invoke-agent-and-wait!]]
+   [rpl.rama.distributed.daemon.worker :as worker]))
 
 (def ^:private captured-logs (atom []))
 
@@ -71,8 +72,7 @@
 (deftest throttled-logging-rate-limit-test
   (reset! captured-logs [])
   (let [rate-limit 4]
-    (with-redefs [rpl.rama.distributed.daemon.worker/log-throttle-rate
-                  (constantly rate-limit)]
+    (with-redefs [worker/log-throttle-rate (constantly rate-limit)]
       (with-open [ipc (rtest/create-ipc)]
         (rtest/launch-module!
          ipc ThrottledLoggingTestModule
@@ -103,8 +103,7 @@
 (deftest throttled-logging-different-callsites-test
   (reset! captured-logs [])
   (let [rate-limit 4]
-    (with-redefs [rpl.rama.distributed.daemon.worker/log-throttle-rate
-                  (constantly rate-limit)]
+    (with-redefs [worker/log-throttle-rate (constantly rate-limit)]
       (with-open [ipc (rtest/create-ipc)]
         (rtest/launch-module!
          ipc ThrottledLoggingTestModule
@@ -160,10 +159,8 @@
   (let [time-window-secs 3
         time-window-millis (* time-window-secs 1000)
         rate-limit 3]
-    (with-redefs [rpl.rama.distributed.daemon.worker/log-throttle-time-window
-                  (constantly time-window-secs)
-                  rpl.rama.distributed.daemon.worker/log-throttle-rate
-                  (constantly rate-limit)]
+    (with-redefs [worker/log-throttle-time-window (constantly time-window-secs)
+                  worker/log-throttle-rate (constantly rate-limit)]
       (with-open [ipc (rtest/create-ipc)]
         (rtest/launch-module! ipc TimeWindowTestModule {:tasks 1 :threads 1})
         (let [module-name (get-module-name TimeWindowTestModule)
@@ -208,8 +205,7 @@
 (deftest throttled-logging-callsite-isolation-test
   (reset! captured-logs [])
   (let [rate-limit 4]
-    (with-redefs [rpl.rama.distributed.daemon.worker/log-throttle-rate
-                  (constantly rate-limit)]
+    (with-redefs [worker/log-throttle-rate (constantly rate-limit)]
       (with-open [ipc (rtest/create-ipc)]
         (rtest/launch-module!
          ipc ThrottledLoggingTestModule
