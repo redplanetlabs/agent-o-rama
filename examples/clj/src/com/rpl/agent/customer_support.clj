@@ -16,6 +16,13 @@
    [com.rpl.rama.test :as rtest]
    [jsonista.core :as j])
   (:import
+   [dev.langchain4j.data.message
+    SystemMessage
+    UserMessage]
+   [dev.langchain4j.model.openai
+    OpenAiChatModel]
+   [java.time
+    LocalDateTime]
    [java.util
     UUID]))
 

@@ -29,7 +29,8 @@
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
   :profiles {:dev      {:resource-paths    ["test/resources/"]
                         :source-paths      ["src/clj" "src/cljs" "resource"
-                                            "examples/clj"]
+                                            "examples/clj/src"]
+                        :test-paths ["test/clj" "examples/clj/test"]
                         :java-source-paths ["src/java" "test/java"]
                         :dependencies
                         [[meander/epsilon "0.0.650"]

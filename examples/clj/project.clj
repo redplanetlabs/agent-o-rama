@@ -7,13 +7,29 @@
                  [dev.langchain4j/langchain4j-web-search-engine-tavily
                   "1.2.0-beta8"]
                  [http-kit "2.8.0"]]
+  :test-paths ["test" "../../test/clj"]
   :global-vars {*warn-on-reflection* true}
   :repositories
   [["releases"
     {:id  "maven-releases"
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
   :profiles {:dev      {:resource-paths ["test/resources/"]
-                        :jvm-opts       ["-Xss6m"]}
+                        :src-paths      ["src" "../../test/clj"]
+                        :jvm-opts       ["-Xss6m"
+                                         "-Xms6g"
+                                         "-Xmx6g"
+                                         "-XX:+UseG1GC"
+                                         "-XX:MetaspaceSize=500000000"
+                                         ;; this gives us stack traces directly
+                                         ;; in output instead of an edn
+                                         ;; file in tmp, which will be lost on
+                                         ;; CI
+                                         "-Dclojure.main.report=stderr"]
+                        :dependencies
+                        ;; TODO: fix Rama version
+                        [[com.rpl/rama "0.0.6-SNAPSHOT"]
+                         [org.apache.logging.log4j/log4j-slf4j18-impl
+                          "2.16.0"]]}
              :provided {:dependencies
                         ;; TODO: fix Rama version
                         [[com.rpl/rama "0.0.6-SNAPSHOT"]
