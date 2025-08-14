@@ -35,38 +35,11 @@
 (defmethod -event-msg-handler :example/hello-response [{:as ev-msg :keys [?data]}]
   (.log js/console "Server replied to hello:" ?data))
 
-;; Live graph and run lifecycle updates
-(defmethod -event-msg-handler :graph/node-update [{:as ev-msg :keys [?data]}]
-  (let [{:keys [node-id node-data]} ?data]
-    (when node-id
-      (state/dispatch [:invocation/update-node node-id node-data]))))
 
-(defmethod -event-msg-handler :agent/run-started [{:as ev-msg :keys [?data]}])
 
-(defmethod -event-msg-handler :agent/run-complete [{:as ev-msg :keys [?data]}])
 
-(defmethod -event-msg-handler :agent/run-failed [{:as ev-msg :keys [?data]}])
 
-;; Batch/merge of nodes from server polling
-(defmethod -event-msg-handler :graph/nodes-merge [{:as ev-msg :keys [?data]}]
-  (let [{:keys [invoke-id nodes]} ?data]
-    ;; Always store the data under the correct invoke-id
-    (when (and invoke-id (map? nodes) (not-empty nodes))
-      ;; Dispatch a single event with the whole batch of nodes
-      (state/dispatch [:invocation/merge-live-nodes invoke-id nodes]))))
 
-;; Handler for next leaves update from server
-(defmethod -event-msg-handler :live/update-next-leaves [{:as ev-msg :keys [?data]}]
-  (let [{:keys [invoke-id next-leaves]} ?data
-        current-db @state/app-db
-        nodes (get-in current-db [:invocations-data invoke-id :graph :nodes])
-        local-unfinished (state/get-unfinished-leaves current-db invoke-id)]
-    (state/dispatch [:db/set-value [:invocations-data invoke-id :next-leaves] next-leaves])
-    ;; Only mark complete if we have nodes AND no unfinished leaves locally
-    (when (and (seq nodes) ;; We have at least some nodes
-               (empty? local-unfinished) ;; No unfinished nodes locally
-               (empty? next-leaves)) ;; Server also says no more
-      (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] true]))))
 
 ;; Handler to log connection state changes
 (defmethod -event-msg-handler :chsk/state [{:as ev-msg :keys [?data]}]

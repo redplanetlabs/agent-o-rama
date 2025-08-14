@@ -38,7 +38,7 @@
         _ (uix/use-effect
            (fn []
              (when (and invoke-id module-id agent-name connected?)
-               (state/dispatch [:invocation/load-or-subscribe 
+               (state/dispatch [:invocation/start-graph-loading 
                                {:invoke-id invoke-id 
                                 :module-id module-id 
                                 :agent-name agent-name}]))
@@ -95,9 +95,11 @@
                                   5000
                                   (fn [reply]
                                     (when (:success reply)
-                                      (state/dispatch [:invocation/merge-paginated-data 
-                                                      invoke-id 
-                                                      (:data reply)]))))))
+                                      ;; Extract nodes from paginated response format
+                                      (let [{:keys [invokes-map]} (:data reply)]
+                                        (state/dispatch [:invocation/merge-nodes 
+                                                        invoke-id 
+                                                        invokes-map])))))))
         
         ;; Prepare the data for the view
         view-props {:module-id module-id

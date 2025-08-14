@@ -51,7 +51,8 @@
 ;; =============================================================================
 
 ;; Main entry point for loading any invocation (live or historical)
-(state/reg-event :invocation/load-or-subscribe
+(state/reg-event :invocation/start-graph-loading
+
   (fn [db {:keys [invoke-id module-id agent-name]}]
     ;; Check if we already have data for this invocation
     (let [existing-summary (get-in db [:invocations-data invoke-id :summary])]
@@ -103,9 +104,9 @@
                          [[:invocations-data invoke-id :task-id] task-id]
                          [[:invocations-data invoke-id :is-complete] is-complete]])) 
       
-      ;; Merge new nodes and recompute implicit edges via existing event
+      ;; Merge new nodes and recompute implicit edges via unified event
       (when (and nodes (seq nodes))
-        (state/dispatch [:invocation/merge-live-nodes invoke-id nodes]))
+        (state/dispatch [:invocation/merge-nodes invoke-id nodes]))
 
       (if is-stream-complete
         ;; Mark complete when the stream finishes
@@ -116,23 +117,15 @@
                            (assoc current :leaves (or next-leaves []))])))
       nil)))
 
-;; Handle paginated data merge
-(state/reg-event :invocation/merge-paginated-data
-  (fn [db invoke-id paginated-data]
-    (let [{:keys [invokes-map]} paginated-data
-          current-nodes (get-in db [:invocations-data invoke-id :graph :nodes])]
-      [:invocations-data invoke-id :graph :nodes 
-       (s/terminal #(merge % invokes-map))])))
-
-;; New event for batched live node updates with implicit edge recalculation
-(state/reg-event :invocation/merge-live-nodes
+;; Unified node merging with automatic implicit edge recalculation
+(state/reg-event :invocation/merge-nodes
   (fn [db invoke-id new-nodes-map]
     (let [historical-graph (get-in db [:invocations-data invoke-id :historical-graph])
           ;; Merge new nodes with existing ones
           current-nodes (get-in db [:invocations-data invoke-id :graph :nodes])
           merged-nodes (merge current-nodes new-nodes-map)
           
-          ;; Recalculate implicit edges with the updated graph
+          ;; Always recalculate implicit edges when we have the historical graph
           implicit-edges (if (and merged-nodes historical-graph)
                           (generate-implicit-edges merged-nodes historical-graph)
                           [])]

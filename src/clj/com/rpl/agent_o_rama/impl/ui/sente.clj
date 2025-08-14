@@ -109,77 +109,14 @@
   [ev-msg]
   (handle-api-event ev-msg))
 
-;; =============================================================================
-;; ROBUST SUBSCRIPTION MANAGEMENT
-;; =============================================================================
 
-;; The single source of truth for all client subscriptions on the server.
-;; Structure: {
-;;   :live-graph #{ {:uid "..." :module-id "..." :agent-name "..." :invoke-id "..."} ... },
-;;   :token-stream #{ {:uid "..." :stream-key "..."} ... },
-;;   :human-input-waiter #{ {:uid "..." :invoke-id "..."} ... }
-;; }
-(defonce subscriptions (atom {}))
-
-;; Track subscriptions per uid/sub-key for proper cleanup
-;; Structure: {uid {sub-key {:sub-type ... :params ...}}}
-(defonce client-subscriptions (atom {}))
-
-(defn subscribe!
-  "Add a subscription to the registry"
-  [uid sub-type params]
-  (let [subscription-data (assoc params :uid uid)]
-    (swap! subscriptions update sub-type (fnil conj #{}) subscription-data)
-    (log/info "Client subscribed:" {:uid uid :type sub-type :params params})))
-
-(defn unsubscribe!
-  "Remove a subscription from the registry"
-  [uid sub-type params]
-  (let [subscription-data (assoc params :uid uid)
-        before-count (count (get @subscriptions sub-type))]
-    (swap! subscriptions update sub-type disj subscription-data)
-    (let [after-count (count (get @subscriptions sub-type))]
-      (log/info "Client unsubscribed:" {:uid uid :type sub-type :params params
-                                        :before-count before-count :after-count after-count
-                                        :removed? (not= before-count after-count)}))))
 
 ;; New unified page fetch endpoint
 (defmethod -event-msg-handler :api/fetch-graph-page
   [ev-msg]
   (handle-api-event ev-msg))
 
-;; =============================================================================
-;; SUBSCRIPTION EVENT HANDLERS
-;; =============================================================================
 
-(defmethod -event-msg-handler :live/subscribe
-  [{:as ev-msg :keys [?data uid ?reply-fn]}]
-  (let [{:keys [sub-key sub-type params]} ?data]
-    (log/info "Subscription request:" {:uid uid :sub-key sub-key :sub-type sub-type :params params})
-    ;; Track this subscription for this client
-    (swap! client-subscriptions assoc-in [uid sub-key] {:sub-type sub-type :params params})
-    (log/info "Stored subscription. Current keys for uid" uid ":" (keys (get @client-subscriptions uid)))
-    ;; Add to master subscription registry
-    (subscribe! uid sub-type params)
-    (when ?reply-fn
-      (?reply-fn {:success true :data {:subscribed true}}))))
-
-(defmethod -event-msg-handler :live/unsubscribe
-  [{:as ev-msg :keys [?data uid ?reply-fn]}]
-  (let [{:keys [sub-key sub-type]} ?data
-        subscription (get-in @client-subscriptions [uid sub-key])]
-    (log/info "Unsubscribe request:" {:uid uid :sub-key sub-key :sub-type sub-type})
-    (if subscription
-      (let [{:keys [params]} subscription]
-        (log/info "Found subscription to remove:" {:sub-key sub-key :params params})
-        ;; Remove from client tracking
-        (swap! client-subscriptions update uid dissoc sub-key)
-        ;; Remove from master subscription registry
-        (unsubscribe! uid sub-type params))
-      (log/warn "No subscription found for sub-key:" sub-key "uid:" uid 
-                "Available keys:" (keys (get @client-subscriptions uid))))
-    (when ?reply-fn
-      (?reply-fn {:success true :data {:unsubscribed true}}))))
 
 ;; Handler for client connecting/disconnecting
 (defmethod -event-msg-handler :chsk/uidport-open
@@ -188,12 +125,7 @@
 
 (defmethod -event-msg-handler :chsk/uidport-close
   [{:as ev-msg :keys [uid]}]
-  (log/info (str "Sente client disconnected, cleaning up subscriptions and drivers for uid: " uid))
-  ;; Clean up all subscriptions for this client
-  (when-let [client-subs (get @client-subscriptions uid)]
-    (doseq [[sub-key {:keys [sub-type params]}] client-subs]
-      (unsubscribe! uid sub-type params))
-    (swap! client-subscriptions dissoc uid)))
+  (log/info (str "Sente client disconnected, uid: " uid)))
 
 ;; 4. Router lifecycle functions
 (defonce router_ (atom nil))
