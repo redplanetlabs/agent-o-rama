@@ -4,13 +4,13 @@
    [clojure.string :as str]
    
    [uix.core :as uix :refer [defui defhook $]]
-   ["axios" :as axios]
    ["wouter" :as wouter :refer [useLocation]]
    ["uplot" :as uplot]
    ["css-element-queries/src/ResizeSensor" :as ResizeSensor]
 
    
-   [com.rpl.agent-o-rama.ui.common :as common]))
+   [com.rpl.agent-o-rama.ui.common :as common]
+   [com.rpl.agent-o-rama.ui.queries :as queries]))
 
 ;; Dummy git SHA data
 (def dummy-versions
@@ -175,8 +175,8 @@
 (defui agent-graph [{:keys [selected-version]}]
   (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
         {:keys [data loading?]}
-        (common/use-query {:query-key ["agent" module-id agent-name "graph"]
-                           :query-url (str "/api/agents/" module-id "/" agent-name "/graph")})
+        (queries/use-sente-query {:query-key [:graph module-id agent-name]
+                                  :sente-event [:query/graph module-id agent-name]})
         [selected-node set-selected-node] (uix/use-state nil)]
     (if loading?
       "...loading"

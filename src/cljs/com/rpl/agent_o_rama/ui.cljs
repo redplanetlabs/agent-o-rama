@@ -6,7 +6,6 @@
    
    [com.rpl.agent-o-rama.ui.agents :as agents]
    ["wouter" :refer [Link Route Switch Router useLocation useRoute]]
-   ["@tanstack/react-query" :refer [QueryClient QueryClientProvider]]
    ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon ChevronLeftIcon ChevronRightIcon]]
    
    [com.rpl.agent-o-rama.ui.common :as common]
@@ -14,8 +13,6 @@
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.events])) ;; Ensure event handlers are registered at app startup
-
-(def query-client (QueryClient.))
 
 ;; Sidebar navigation component
 (defui sidebar-nav []
@@ -183,7 +180,6 @@
 (defn init []
   (sente/init!)
   (uix.dom/render-root
-   ($ QueryClientProvider {:client query-client}
-      ($ app))
+   ($ app)
    (uix.dom/create-root
     (.getElementById js/document "root"))))
