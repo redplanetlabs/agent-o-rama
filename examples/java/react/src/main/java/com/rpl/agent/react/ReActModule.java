@@ -4,6 +4,7 @@ import com.rpl.agentorama.*;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.web.search.tavily.TavilyWebSearchEngine;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -42,7 +43,7 @@ public class ReActModule extends AgentsModule {
             String apiKey = (String) setup.getAgentObject("tavily-api-key");
             return TavilyWebSearchEngine.builder()
                 .apiKey(apiKey)
-                .excludeDomains(List.of("en.wikipedia.org"))
+                .excludeDomains(Arrays.asList("en.wikipedia.org"))
                 .build();
         });
 

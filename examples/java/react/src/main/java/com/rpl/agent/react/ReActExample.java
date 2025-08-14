@@ -11,6 +11,7 @@ import dev.langchain4j.data.message.UserMessage;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 
@@ -103,7 +104,7 @@ public class ReActExample {
 
             try {
                 // Create messages with system prompt and user input
-                List<Object> messages = List.of(
+                List<Object> messages = Arrays.asList(
                     SystemMessage.from(String.format(SYSTEM_PROMPT, Instant.now())),
                     UserMessage.from(userInput)
                 );
