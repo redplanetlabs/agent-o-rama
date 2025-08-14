@@ -14,17 +14,20 @@
    [com.rpl.rama.path :refer :all]
    [com.rpl.rama.test :as rtest]
    [com.rpl.test-helpers :refer [invoke-agent-and-wait!]]
-   [rpl.rama.distributed.daemon.worker :as worker]))
+   [rpl.rama.distributed.config :as conf]
+   [rpl.rama.java-api.ipc :as jipc]))
 
 (def ^:private captured-logs (atom []))
 
-(defn- capture-log [_logger level throwable message]
+(defn- capture-log
+  [_logger level throwable message]
   (swap!
-   captured-logs
-   conj
-   {:level level :message message :throwable throwable}))
+    captured-logs
+    conj
+    {:level level :message message :throwable throwable}))
 
-(defn- message-starts-with [prefix]
+(defn- message-starts-with
+  [prefix]
   (fn [r] (str/includes? (:message r) (str " " prefix))))
 
 (aor/defagentmodule ThrottledLoggingTestModule
@@ -34,27 +37,30 @@
   (-> topology
       (aor/new-agent "LoggingAgent")
       (aor/node
-       "log-messages" nil
+       "log-messages"
+       nil
        (fn [agent-node num-messages message-base]
          (dotimes [i num-messages]
            (tl/error (keyword (str "test-callsite-" message-base))
                      (str message-base " message " i)))
          (aor/result! agent-node :completed)))))
 
-(defn- messages [prefix]
+(defn- messages
+  [prefix]
   (filterv (message-starts-with prefix) @captured-logs))
 
 (deftest throttled-logging-basic-test
   (reset! captured-logs [])
   (with-open [ipc (rtest/create-ipc)]
     (rtest/launch-module!
-     ipc ThrottledLoggingTestModule
+     ipc
+     ThrottledLoggingTestModule
      {:tasks 1 :threads 1})
     (let [module-name (get-module-name ThrottledLoggingTestModule)
-          depot (foreign-depot
-                 ipc
-                 module-name
-                 (po/agent-depot-name "LoggingAgent"))
+          depot       (foreign-depot
+                       ipc
+                       module-name
+                       (po/agent-depot-name "LoggingAgent"))
           root-pstate (foreign-pstate
                        ipc
                        module-name
@@ -72,22 +78,25 @@
 (deftest throttled-logging-rate-limit-test
   (reset! captured-logs [])
   (let [rate-limit 4]
-    (with-redefs [worker/log-throttle-rate (constantly rate-limit)
-                  worker/log-throttle-time-window (constantly 600)]
+    (with-redefs [jipc/ipc-cluster-options
+                  (fn []
+                    {:config-overrides
+                     {conf/WORKER-LOG-THROTTLE-RATE rate-limit}})]
       (with-open [ipc (rtest/create-ipc)]
         (rtest/launch-module!
-         ipc ThrottledLoggingTestModule
+         ipc
+         ThrottledLoggingTestModule
          {:tasks 1 :threads 1})
         (let [module-name (get-module-name ThrottledLoggingTestModule)
-              depot (foreign-depot
-                     ipc
-                     module-name
-                     (po/agent-depot-name "LoggingAgent"))
+              depot       (foreign-depot
+                           ipc
+                           module-name
+                           (po/agent-depot-name "LoggingAgent"))
               root-pstate (foreign-pstate
                            ipc
                            module-name
                            (po/agent-root-task-global-name "LoggingAgent"))
-              msg-prefix "rapid"]
+              msg-prefix  "rapid"]
 
           (with-redefs [cljlogging/log* capture-log]
             ;; Generate many log messages rapidly to trigger throttling
@@ -98,23 +107,27 @@
               (is (< message-count 100)
                   "Should have fewer messages due to throttling.")
               ;; But should have at least some messages
-              (is (= (dec rate-limit) message-count)
-                  "Should have correct number of un-throttled log messages"))))))))
+              (is
+               (= (dec rate-limit) message-count)
+               "Should have correct number of un-throttled log messages"))))))))
 
 (deftest throttled-logging-different-callsites-test
   (reset! captured-logs [])
   (let [rate-limit 4]
-    (with-redefs [worker/log-throttle-rate (constantly rate-limit)
-                  worker/log-throttle-time-window (constantly 600)]
+    (with-redefs [jipc/ipc-cluster-options
+                  (fn []
+                    {:config-overrides
+                     {conf/WORKER-LOG-THROTTLE-RATE rate-limit}})]
       (with-open [ipc (rtest/create-ipc)]
         (rtest/launch-module!
-         ipc ThrottledLoggingTestModule
+         ipc
+         ThrottledLoggingTestModule
          {:tasks 1 :threads 1})
         (let [module-name (get-module-name ThrottledLoggingTestModule)
-              depot (foreign-depot
-                     ipc
-                     module-name
-                     (po/agent-depot-name "LoggingAgent"))
+              depot       (foreign-depot
+                           ipc
+                           module-name
+                           (po/agent-depot-name "LoggingAgent"))
               root-pstate (foreign-pstate
                            ipc
                            module-name
@@ -138,7 +151,8 @@
   ;; Agent that can log with controlled timing
   (-> topology
       (aor/new-agent "TimedLoggingAgent")
-      (aor/node "log-with-delay" nil
+      (aor/node "log-with-delay"
+                nil
                 (fn [agent-node burst-size delay-ms final-burst]
                   ;; First burst of messages
                   (dotimes [i burst-size]
@@ -158,18 +172,23 @@
 (deftest throttled-logging-time-window-test
   ;; Test that throttled messages are flushed after the time window expires.
   (reset! captured-logs [])
-  (let [time-window-secs 3
+  (let [time-window-secs   3
         time-window-millis (* time-window-secs 1000)
-        rate-limit 3]
-    (with-redefs [worker/log-throttle-time-window (constantly time-window-secs)
-                  worker/log-throttle-rate (constantly rate-limit)]
+        rate-limit         3]
+    (with-redefs [jipc/ipc-cluster-options
+                  (fn []
+                    {:config-overrides
+                     {conf/WORKER-LOG-THROTTLE-RATE
+                      rate-limit
+                      conf/WORKER-LOG-THROTTLE-MEASUREMENT-TIME-WINDOW-SECONDS
+                      time-window-secs}})]
       (with-open [ipc (rtest/create-ipc)]
         (rtest/launch-module! ipc TimeWindowTestModule {:tasks 1 :threads 1})
         (let [module-name (get-module-name TimeWindowTestModule)
-              depot (foreign-depot
-                     ipc
-                     module-name
-                     (po/agent-depot-name "TimedLoggingAgent"))
+              depot       (foreign-depot
+                           ipc
+                           module-name
+                           (po/agent-depot-name "TimedLoggingAgent"))
               root-pstate (foreign-pstate
                            ipc
                            module-name
@@ -207,24 +226,28 @@
 (deftest throttled-logging-callsite-isolation-test
   (reset! captured-logs [])
   (let [rate-limit 4]
-    (with-redefs [worker/log-throttle-rate (constantly rate-limit)
-                  worker/log-throttle-time-window (constantly 600)]
+    (with-redefs [jipc/ipc-cluster-options
+                  (fn []
+                    {:config-overrides
+                     {conf/WORKER-LOG-THROTTLE-RATE rate-limit}})]
       (with-open [ipc (rtest/create-ipc)]
         (rtest/launch-module!
-         ipc ThrottledLoggingTestModule
+         ipc
+         ThrottledLoggingTestModule
          {:tasks 1 :threads 1})
         (let [module-name (get-module-name ThrottledLoggingTestModule)
-              depot (foreign-depot
-                     ipc
-                     module-name
-                     (po/agent-depot-name "LoggingAgent"))
+              depot       (foreign-depot
+                           ipc
+                           module-name
+                           (po/agent-depot-name "LoggingAgent"))
               root-pstate (foreign-pstate
                            ipc
                            module-name
                            (po/agent-root-task-global-name "LoggingAgent"))]
           (testing "with logging from multiple unique callsites"
             (with-redefs [cljlogging/log* capture-log]
-              ;; Generate messages from different callsites (each with different callsite-id)
+              ;; Generate messages from different callsites (each with different
+              ;; callsite-id)
               (invoke-agent-and-wait! depot root-pstate [5 "isolation1"])
               (invoke-agent-and-wait! depot root-pstate [5 "isolation2"])
               (invoke-agent-and-wait! depot root-pstate [5 "isolation3"])
