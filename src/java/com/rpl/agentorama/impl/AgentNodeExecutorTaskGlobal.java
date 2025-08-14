@@ -14,13 +14,19 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
 
   WorkerManagedResource<ExecutorService> _execServResource;
   ConcurrentHashMap<UUID, List> _runningInvokeIds;
-  Object _throttler; // type is opaque here - only passed into clojure
+
+  // type is opaque here - only passed into clojure
+  private Object _throttler;
+
+  private static final ThreadLocal<Object> LOG_THROTTLER = new ThreadLocal<>();
 
   public void submitTask(UUID invokeId, clojure.lang.AFn f) {
     _runningInvokeIds.put(invokeId, Arrays.asList());
     Runnable wrappedTask = () -> {
       try {
+	LOG_THROTTLER.set(_throttler);
         f.run();
+	LOG_THROTTLER.remove();
       } catch (Throwable t) {
         _runningInvokeIds.remove(invokeId);
         throw t;
@@ -65,8 +71,8 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
     return null;
   }
 
-  public Object getLogThrottler() {
-    return _throttler;
+  public static Object getLogThrottler() {
+    return LOG_THROTTLER.get();
   }
 
   @Override

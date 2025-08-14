@@ -287,4 +287,4 @@
   (this-module-pobject-task-global (agent-config-task-global-name name)))
 
 (defn log-throttler []
-  (.getLogThrottler (agent-node-executor-task-global)))
+  (AgentNodeExecutorTaskGlobal/getLogThrottler))
