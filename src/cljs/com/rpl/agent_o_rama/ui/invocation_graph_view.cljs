@@ -185,8 +185,37 @@
     (when selected-node
       ($ :div {:className "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl"}
          ($ :div {:className "p-6"}
-            ;; Node Info Section
-            ($ :div {:className "bg-indigo-50 p-3 rounded-md"}
+            ;; Human input section
+            (let [[local-response set-local-response] (uix/use-state "")]
+              (when-let [hr (:human-request data)]
+                (let [submitting? (state/use-sub [:ui :hitl :submitting (s/keypath (:invoke-id hr))])]
+                ($ :div {:className "bg-amber-50 p-3 rounded-md mt-4 border border-amber-200"}
+                   ($ :div {:className "text-sm font-medium text-amber-800 mb-2"} "Human input required")
+                   ($ :div {:className "text-sm text-amber-700 mb-3"} (:prompt hr))
+                   ($ :div
+                      ($ :textarea {:className "w-full border rounded p-2 text-sm resize-y"
+                                    :rows 3
+                                    :placeholder "Type your response..."
+                                    :value local-response
+                                    :disabled submitting?
+                                    :onChange #(set-local-response (.. % -target -value))})
+                      ($ :button {:className (str "mt-2 px-3 py-2 rounded text-sm font-medium transition-colors "
+                                                  (if submitting?
+                                                    "bg-gray-400 text-gray-600 cursor-not-allowed"
+                                                    "bg-blue-600 hover:bg-blue-700 text-white"))
+                                  :disabled (or submitting? (empty? (str/trim local-response)))
+                                  :onClick #(when (and (not submitting?) 
+                                                       (not (empty? (str/trim local-response))))
+                                              (state/dispatch [:hitl/submit
+                                                              {:module-id module-id
+                                                               :agent-name agent-name
+                                                               :invoke-id invoke-id
+                                                               :request hr
+                                                               :response (str/trim local-response)}])
+                                              (set-local-response ""))}
+                         (if submitting? "Submitting..." "Submit Response")))))))
+            
+            ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}
                ($ :div {:className "flex justify-between items-center"}
                   ($ :span {:className "text-sm font-medium text-indigo-700"} "Node")
                   ($ :span {:className "text-sm text-indigo-600 font-mono"} node-name))
@@ -218,6 +247,7 @@
                        ($ :span {:className "text-xs text-yellow-600"} "Finished")
                        ($ :span {:className "text-xs text-yellow-600 font-mono"} 
                           (format-ms finish-time))))))
+            
             (when input
               ($ :div {:className "bg-green-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
@@ -225,36 +255,6 @@
                                          :color "green"
                                          :truncate-length 100
                                          :depth 0})))
-            
-            ;; Human Input Request Section
-            (let [[local-response set-local-response] (uix/use-state "")]
-              (when-let [hr (:human-request data)]
-                (let [submitting? (state/use-sub [:ui :hitl :submitting (s/keypath (:invoke-id hr))])]
-                ($ :div {:className "bg-amber-50 p-3 rounded-md mt-4 border border-amber-200"}
-                   ($ :div {:className "text-sm font-medium text-amber-800 mb-2"} "Human input required")
-                   ($ :div {:className "text-sm text-amber-700 mb-3"} (:prompt hr))
-                   ($ :div
-                      ($ :textarea {:className "w-full border rounded p-2 text-sm resize-y"
-                                    :rows 3
-                                    :placeholder "Type your response..."
-                                    :value local-response
-                                    :disabled submitting?
-                                    :onChange #(set-local-response (.. % -target -value))})
-                      ($ :button {:className (str "mt-2 px-3 py-2 rounded text-sm font-medium transition-colors "
-                                                  (if submitting?
-                                                    "bg-gray-400 text-gray-600 cursor-not-allowed"
-                                                    "bg-blue-600 hover:bg-blue-700 text-white"))
-                                  :disabled (or submitting? (empty? (str/trim local-response)))
-                                  :onClick #(when (and (not submitting?) 
-                                                       (not (empty? (str/trim local-response))))
-                                              (state/dispatch [:hitl/submit
-                                                              {:module-id module-id
-                                                               :agent-name agent-name
-                                                               :invoke-id invoke-id
-                                                               :request hr
-                                                               :response (str/trim local-response)}])
-                                              (set-local-response ""))}
-                         (if submitting? "Submitting..." "Submit Response")))))))
             
             (when (not (empty? (:nested-ops data)))
               ($ :div {:className "bg-sky-50 p-3 rounded-md mt-4"}
@@ -752,7 +752,8 @@
                                                                                ["ring-4" "ring-blue-400" "ring-opacity-75" "shadow-2xl" "transform" "scale-105"]
                                                                                ["shadow-lg"])
                                                            common-classes ["p-3" "rounded-md" "transition-all" "duration-200"]
-                                                           node-className (str/join " " (concat base-classes selection-classes common-classes))]
+                                                           node-className (str/join " " (concat base-classes selection-classes common-classes))
+                                                           has-human-request (:human-request data)]
                                                        ($ :div {:className "relative"}
                                                           ($ :div {:className node-className
                                                                    :style {:width "170px" :height "40px" :opacity (if is-affected "0.6" "1.0")}}
@@ -761,6 +762,9 @@
                                                             ($ :div {:className "absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"}))
                                                           (when has-changes
                                                             ($ :div {:className "absolute -top-1 -left-1 w-3 h-3 bg-orange-400 rounded-full border-2 border-white shadow-sm"}))
+                                                          (when (and has-human-request (not is-affected))
+                                                            ($ :div {:className "absolute -top-1 right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white shadow-sm"}
+                                                               ($ :div {:className "absolute inset-0 bg-amber-500 rounded-full animate-pulse"})))
                                                           ($ Handle {:type "target" :position "top"})
                                                           ($ Handle {:type "source" :position "bottom"})))))
                                                   
