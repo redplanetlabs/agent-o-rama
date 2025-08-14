@@ -227,9 +227,9 @@
                                          :depth 0})))
             
             ;; Human Input Request Section
-            (when-let [hr (:human-request data)]
-              (let [[local-response set-local-response] (uix/use-state "")
-                    submitting? (state/use-sub [:ui :hitl :submitting (:invoke-id hr)])]
+            (let [[local-response set-local-response] (uix/use-state "")]
+              (when-let [hr (:human-request data)]
+                (let [submitting? (state/use-sub [:ui :hitl :submitting (s/keypath (:invoke-id hr))])]
                 ($ :div {:className "bg-amber-50 p-3 rounded-md mt-4 border border-amber-200"}
                    ($ :div {:className "text-sm font-medium text-amber-800 mb-2"} "Human input required")
                    ($ :div {:className "text-sm text-amber-700 mb-3"} (:prompt hr))
@@ -254,7 +254,7 @@
                                                                :request hr
                                                                :response (str/trim local-response)}])
                                               (set-local-response ""))}
-                         (if submitting? "Submitting..." "Submit Response"))))))
+                         (if submitting? "Submitting..." "Submit Response")))))))
             
             (when (not (empty? (:nested-ops data)))
               ($ :div {:className "bg-sky-50 p-3 rounded-md mt-4"}
@@ -565,27 +565,22 @@
   [invokes-map implicit-edges]
   (let [g (new (.. Dagre -graphlib -Graph))
 
-        nodes (s/select [s/ALL
-                         (s/selected? s/LAST (s/must :emits))
-                         (s/view (fn [[id data]]
-                                   {:id (str id)
-                                    :type "custom"
-                                    :draggable false
-                                    :data (assoc data
-                                                 :label (str (:node data))
-                                                 :node-id id
-                                                 :is-phantom false)}))]
-                        invokes-map)
+        nodes (->> invokes-map
+                   (map (fn [[id data]]
+                          {:id (str id)
+                           :type "custom"
+                           :draggable false
+                           :data (assoc data
+                                        :label (str (:node data))
+                                        :node-id id
+                                        :is-phantom false)})))
 
-        real-edges (for [[from [idx to]]
-                         (s/select [s/ALL
-                                    (s/collect-one s/FIRST)
-                                    s/LAST
-                                    (s/must :emits)
-                                    s/INDEXED-VALS] invokes-map)]
-                     {:id (str from (:invoke-id to) idx)
-                      :source (str from)
-                      :target (str (:invoke-id to))
+        real-edges (for [[from-id node-data] invokes-map
+                         :when (:emits node-data)
+                         [idx emit] (map-indexed vector (:emits node-data))]
+                     {:id (str from-id (:invoke-id emit) idx)
+                      :source (str from-id)
+                      :target (str (:invoke-id emit))
                       :implicit? false})
 
         ;; All other nodes (phantoms etc.) from your original implementation...
