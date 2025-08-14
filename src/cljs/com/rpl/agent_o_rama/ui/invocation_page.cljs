@@ -13,6 +13,7 @@
         
         ;; 1. Subscribe to all necessary state from app-db
         nodes (state/use-sub [:invocations-data invoke-id :graph :nodes])
+        real-edges (state/use-sub [:invocations-data invoke-id :graph :edges])
         summary-data (state/use-sub [:invocations-data invoke-id :summary])
         next-leaves (state/use-sub [:invocations-data invoke-id :next-leaves])
         is-complete (state/use-sub [:invocations-data invoke-id :is-complete])
@@ -107,6 +108,7 @@
                     :agent-name agent-name
                     :invoke-id invoke-id
                     :graph-data graph-data
+                    :real-edges (or real-edges []) ; NEW: Pass pre-processed real edges
                     :summary-data summary-data
                     :implicit-edges (or implicit-edges [])
                     :is-complete is-complete

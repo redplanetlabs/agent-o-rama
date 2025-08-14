@@ -7,42 +7,69 @@
 ;; keeping React components pure.
 
 ;; =============================================================================
-;; GRAPH UTILITIES
+;; UNIFIED GRAPH PROCESSING
 ;; =============================================================================
 
-(defn generate-implicit-edges
-  "Compares the static historical graph with the dynamic invocation trace to find
-   paths to aggregation nodes that could have been taken but were not."
-  [invokes-map historical-graph]
-  (let [;; A map from {agg-node-invoke-id -> #{emitter-invoke-ids}}
-        actual-emits-to-aggs (into {}
-                                   (for [[id data] invokes-map
-                                         :when (:agg-state data)] ; Check if it's an agg-node trace
-                                     [id (set (map :invoke-id (:agg-inputs-first-10 data)))]))]
-    (->> invokes-map
-         (mapcat (fn [[invoke-id invoke-data]]
-                   (let [node-name     (:node invoke-data)
-                         static-info   (get-in historical-graph [:node-map node-name])
-                         agg-context   (:agg-context static-info)
-                         potential-outputs (:output-nodes static-info)]
-                     
-                     ;; Only consider nodes that are inside an aggregation context
-                     (when agg-context
-                       (for [out-name potential-outputs
-                             ;; We only care about potential outputs that ARE aggregation nodes
-                             :when (= :agg-node (get-in historical-graph [:node-map out-name :node-type]))]
-                         (let [;; This is the invoke-id of the aggregation this node belongs to.
-                               agg-node-invoke-id (:agg-invoke-id invoke-data)
-                               actual-emitters    (get actual-emits-to-aggs agg-node-invoke-id)
-                               did-emit?          (contains? actual-emitters invoke-id)]
-                           
-                           (when (and (not did-emit?) agg-node-invoke-id)
-                             {:source      (str invoke-id)
-                              :target      (str agg-node-invoke-id)
-                              :id          (str "implicit-" invoke-id "-" agg-node-invoke-id)
-                              :implicit?   true})))))))
-         (filter some?)
-         (vec))))
+(defn build-drawable-graph
+  "Traverses the raw graph data to produce a coherent, drawable graph.
+   It builds the set of reachable nodes, real edges, and implicit edges in a single pass."
+  [raw-nodes root-invoke-id historical-graph]
+  (if (or (empty? raw-nodes) (not (get raw-nodes root-invoke-id)))
+    ;; We can't start drawing until the root node is available.
+    {:nodes {} :real-edges [] :implicit-edges []}
+    (loop [to-visit #{root-invoke-id}   ; A queue of nodes to process
+           drawable-nodes {}            ; The final map of nodes to render
+           real-edges []                ; The final list of real edges
+           implicit-edges []            ; The final list of implicit edges
+           visited #{}]
+      (if (empty? to-visit)
+        ;; The traversal is complete.
+        {:nodes drawable-nodes :edges real-edges :implicit-edges implicit-edges}
+        (let [current-id (first to-visit)
+              remaining-to-visit (disj to-visit current-id)]
+          
+          (if (visited current-id)
+            ;; If we've already processed this node, skip it.
+            (recur remaining-to-visit drawable-nodes real-edges implicit-edges visited)
+            
+            (let [node-data (get raw-nodes current-id)
+                  node-name (:node node-data)
+                  static-info (get-in historical-graph [:node-map node-name])
+                  
+                  ;; 1. FIND REAL EDGES & CHILDREN
+                  emitted-ids (set (map :invoke-id (:emits node-data)))
+                  drawable-children (filter #(contains? raw-nodes %) emitted-ids)
+                  new-real-edges (map (fn [child-id]
+                                        {:id (str "real-" current-id "-" child-id)
+                                         :source (str current-id)
+                                         :target (str child-id)})
+                                      drawable-children)
+                                      
+                  ;; 2. FIND IMPLICIT EDGES
+                  agg-context (:agg-context static-info)
+                  potential-outputs (:output-nodes static-info)
+                  new-implicit-edges (when agg-context ; Only applies within an agg context
+                                       (->> potential-outputs
+                                            (filter #(= :agg-node (get-in historical-graph [:node-map % :node-type])))
+                                            (mapcat (fn [out-agg-node-name]
+                                                      (let [agg-node-invoke-id (:agg-invoke-id node-data)]
+                                                        ;; Check if a real emit to this agg node already exists
+                                                        (when (and agg-node-invoke-id
+                                                                   (not (contains? emitted-ids agg-node-invoke-id))
+                                                                   (contains? raw-nodes agg-node-invoke-id))
+                                                          [{:id (str "implicit-" current-id "-" agg-node-invoke-id)
+                                                            :source (str current-id)
+                                                            :target (str agg-node-invoke-id)
+                                                            :implicit? true}]))))
+                                            (filter some?)
+                                            (vec)))]
+
+              ;; 3. RECURSE
+              (recur (into remaining-to-visit drawable-children)
+                     (assoc drawable-nodes current-id node-data)
+                     (into real-edges new-real-edges)
+                     (into implicit-edges (or new-implicit-edges []))
+                     (conj visited current-id)))))))))
 
 
 
@@ -170,19 +197,23 @@
 (state/reg-event :invocation/merge-nodes
   (fn [db invoke-id new-nodes-map]
     (let [historical-graph (get-in db [:invocations-data invoke-id :historical-graph])
-          ;; Merge new nodes with existing ones
-          current-nodes (get-in db [:invocations-data invoke-id :graph :nodes])
-          merged-nodes (merge current-nodes new-nodes-map)
+          ;; First, merge new raw data with existing raw data
+          current-raw-nodes (get-in db [:invocations-data invoke-id :graph :raw-nodes])
+          merged-raw-nodes (merge current-raw-nodes new-nodes-map)
           
-          ;; Always recalculate implicit edges when we have the historical graph
-          implicit-edges (if (and merged-nodes historical-graph)
-                          (generate-implicit-edges merged-nodes historical-graph)
-                          [])]
+          ;; Get metadata needed for processing
+          root-invoke-id (get-in db [:invocations-data invoke-id :root-invoke-id])
+          
+          ;; Call our new unified function once to get the complete drawable graph state
+          {:keys [nodes edges implicit-edges]}
+          (build-drawable-graph merged-raw-nodes root-invoke-id historical-graph)]
                           
       ;; Atomically update both nodes and edges
       [:invocations-data invoke-id
        (s/multi-path
-         [:graph :nodes (s/terminal-val merged-nodes)]
+         [:graph :raw-nodes (s/terminal-val merged-raw-nodes)] ; Store all data received
+         [:graph :nodes (s/terminal-val nodes)]                ; Store drawable nodes
+         [:graph :edges (s/terminal-val edges)]                ; Store real drawable edges
          [:implicit-edges (s/terminal-val implicit-edges)])])))
 
 ;; Cleanup when leaving an invocation

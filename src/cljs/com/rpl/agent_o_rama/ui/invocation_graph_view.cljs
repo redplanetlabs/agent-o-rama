@@ -564,72 +564,33 @@
 
 
 (defn process-graph-data
-  "Process raw graph data into nodes and edges for React Flow"
-  [invokes-map implicit-edges]
+  "Applies Dagre layout to pre-processed nodes and edges."
+  [nodes-map real-edges implicit-edges]
   (let [g (new (.. Dagre -graphlib -Graph))
 
-        nodes (->> invokes-map
+        nodes (->> nodes-map
                    (map (fn [[id data]]
                           {:id (str id)
                            :type "custom"
                            :draggable false
                            :data (assoc data
                                         :label (str (:node data))
-                                        :node-id id
-                                        :is-phantom false)})))
+                                        :node-id id)})))
 
-        real-edges (for [[from-id node-data] invokes-map
-                         :when (:emits node-data)
-                         [idx emit] (map-indexed vector (:emits node-data))]
-                     {:id (str from-id (:invoke-id emit) idx)
-                      :source (str from-id)
-                      :target (str (:invoke-id emit))
-                      :implicit? false})
-
-        ;; All other nodes (phantoms etc.) from your original implementation...
-        get-missing-children (fn [node-id]
-                              (when-let [node-data (get invokes-map node-id)]
-                                 (let [emitted-ids (set (map :invoke-id (:emits node-data)))
-                                       node-ids (set (keys invokes-map))]
-                                   (filter #(not (contains? node-ids %)) emitted-ids))))
-        phantom-nodes (for [node nodes
-                            :let [node-id (-> node :data :node-id)
-                                  missing-children (get-missing-children node-id)]
-                            :when (seq missing-children)]
-                        (for [missing-child-id missing-children]
-                          {:id (str "phantom-" node-id "-" missing-child-id)
-                           :type "phantom"
-                           :data {:label "Click to paginate"
-                                  :parent-node-id node-id
-                                  :missing-node-id missing-child-id
-                                  :is-phantom true}}))
-        phantom-nodes (apply concat phantom-nodes)
-        phantom-edges (for [phantom phantom-nodes
-                            :let [parent-id (-> phantom :data :parent-node-id)]]
-                        {:id (str parent-id "->" (:id phantom))
-                         :source (str parent-id)
-                         :target (:id phantom)
-                         :implicit? true ; Let's consider phantom edges as implicit too
-                         })
-
-        all-nodes (concat nodes phantom-nodes)
-        ;; Combine real, implicit, and phantom edges
-        all-edges (concat real-edges implicit-edges phantom-edges)]
-
+        all-edges (concat real-edges implicit-edges)]
+    
     (.setDefaultEdgeLabel g (fn [] #js {}))
     (.setGraph g #js {})
 
-    (doall (for [edge all-edges] (.setEdge g (:source edge) (:target edge))))
-    (doall (for [node all-nodes]
-             (.setNode g (:id node) (clj->js
-                                     (merge node {:width 170 :height 40})))))
+    (doseq [edge all-edges] (.setEdge g (:source edge) (:target edge)))
+    (doseq [node nodes] 
+      (.setNode g (:id node) (clj->js (merge node {:width 170 :height 40}))))
 
     (Dagre/layout g)
 
-    (let [nodes-with-layout (for [node all-nodes
+    (let [nodes-with-layout (for [node nodes
                                   :let [position (.node g (:id node))]]
-                              (assoc node
-                                     :position position))]
+                              (assoc node :position position))]
       {:nodes nodes-with-layout
        :edges all-edges})))
 
@@ -665,7 +626,7 @@
             modified-node-ids)))
 
 (defui graph-view [{:keys [module-id agent-name invoke-id 
-                            graph-data summary-data implicit-edges
+                            graph-data real-edges summary-data implicit-edges
                             is-complete is-live connected?
                             selected-node-id forking-mode? changed-nodes
                             on-select-node on-execute-fork on-clear-fork
@@ -686,7 +647,7 @@
         _ (uix/use-effect
            (fn []
              (when (not (empty? graph-data))
-               (let [{:keys [nodes edges]} (process-graph-data graph-data (or implicit-edges []))]
+               (let [{:keys [nodes edges]} (process-graph-data graph-data (or real-edges []) (or implicit-edges []))]
                  (println "Updating flow with nodes:" (count nodes) "and edges:" (count edges))
                  (set-nodes (clj->js nodes))
                  (set-edges (clj->js (for [edge edges]
@@ -694,7 +655,7 @@
                                          (assoc edge :style #js {:strokeDasharray "5 5"
                                                                  :stroke "#aaa"})
                                          edge)))))))
-           [graph-data implicit-edges])
+           [graph-data real-edges implicit-edges])
         
         ;; Update selected node when selected-node-id changes
         _ (uix/use-effect
