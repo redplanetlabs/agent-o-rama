@@ -86,15 +86,12 @@
                                               :module-id module-id 
                                               :agent-name agent-name}])
     
-    ;; Check if polling is already active for this invocation
-    (let [polling-active? (get-in db [:invocations-data invoke-id :polling-active?])
-          is-complete? (get-in db [:invocations-data invoke-id :is-complete])]
+    ;; Check if the agent is already complete
+    (let [is-complete? (get-in db [:invocations-data invoke-id :is-complete])]
       
-      ;; Only start polling if it's not already active and the agent isn't complete
-      (when (and (not polling-active?) (not is-complete?))
-        ;; Mark polling as active
-        (state/dispatch [:db/set-value [:invocations-data invoke-id :polling-active?] true])
-        
+      ;; Start loading if the agent isn't already marked as complete
+      ;; The loop will naturally stop when the server reports completion
+      (when-not is-complete?
         ;; Start from root (empty leaves signals "fetch from root")
         (state/dispatch [:invocation/fetch-graph-page
                          {:invoke-id invoke-id
@@ -152,44 +149,47 @@
       (when (and nodes (seq nodes))
         (state/dispatch [:invocation/merge-nodes invoke-id nodes]))
 
-      ;; STATE MACHINE LOGIC: Decide how to continue the polling loop
+      ;; STATE MACHINE LOGIC: Decide how to continue based purely on data
       (cond
-        ;; Case 1: Agent is complete - Stop the loop
+        ;; Case 1: Agent is complete - Chain naturally ends
         is-complete
         (do
-          (println "[POLLING] Agent is complete, stopping loop for" invoke-id)
-          (state/dispatch [:db/set-value [:invocations-data invoke-id :polling-active?] false]))
+          (println "[POLLING-STATELESS] Loop naturally ends. Agent complete for" invoke-id)
+          nil) ; No further action, the chain stops here
         
         ;; Case 2: Fast pagination - More leaves available, continue immediately
         has-more-leaves?
         (do
-          (println "[POLLING] Fast pagination: continuing with" (count (or next-leaves [])) "leaves")
+          (println "[POLLING-STATELESS] Fast pagination: continuing with" (count (or next-leaves [])) "leaves")
           (state/dispatch [:invocation/fetch-graph-page
-                           (assoc current-invocation :leaves (or next-leaves []))] ))
+                           (assoc current-invocation :leaves (or next-leaves []))]))
         
         ;; Case 3: No more known leaves BUT agent is still running - Delayed re-poll
+        ;; We only schedule this if the server tells us it's not complete
         (not is-complete)
         (do
-          (println "[POLLING] No more leaves but agent still running, scheduling delayed re-poll")
+          (println "[POLLING-STATELESS] Scheduling delayed re-poll...")
           (js/setTimeout
             (fn []
-              ;; Double-check that polling is still active before re-polling
+              ;; At the moment this timer fires, re-read the state
+              ;; This check is LOCAL to this closure. No global flag needed.
               (let [current-db @state/app-db
-                    still-polling? (get-in current-db [:invocations-data invoke-id :polling-active?])
-                    still-incomplete? (not (get-in current-db [:invocations-data invoke-id :is-complete]))]
-                (when (and still-polling? still-incomplete?)
-                  (println "[POLLING] Delayed re-poll executing for" invoke-id)
-                  ;; Get current frontier leaves to continue from where we left off
-                  (let [unfinished-leaves (state/get-unfinished-leaves current-db invoke-id)]
+                    is-still-incomplete? (not (get-in current-db [:invocations-data invoke-id :is-complete]))
+                    current-leaves (state/get-unfinished-leaves current-db invoke-id)]
+                
+                (if is-still-incomplete?
+                  (do
+                    (println "[POLLING-STATELESS] Delayed re-poll executing for" invoke-id)
                     (state/dispatch [:invocation/fetch-graph-page
-                                     (assoc current-invocation :leaves unfinished-leaves)])))))
+                                     (assoc current-invocation :leaves current-leaves)]))
+                  (println "[POLLING-STATELESS] Delayed re-poll cancelled. Agent completed in the meantime."))))
             2000)) ; Poll again in 2 seconds
         
-        ;; Case 4: Agent is complete and no more leaves - Stop 
+        ;; Case 4: Base case, is-complete is true but we just found out. Do nothing.
         :else
         (do
-          (println "[POLLING] Agent complete and no leaves, stopping loop for" invoke-id)
-          (state/dispatch [:db/set-value [:invocations-data invoke-id :polling-active?] false])))
+          (println "[POLLING-STATELESS] Agent is now complete. Final poll finished for" invoke-id)
+          nil))
       
       nil)))
 
@@ -219,10 +219,10 @@
 ;; Cleanup when leaving an invocation
 (state/reg-event :invocation/cleanup
   (fn [db {:keys [invoke-id]}]
-    ;; Stop any active polling for this invocation
-    (when invoke-id
-      (state/dispatch [:db/set-value [:invocations-data invoke-id :polling-active?] false]))
-    ;; Clear UI state
+    ;; Any pending setTimeout callbacks will now see that
+    ;; :is-complete is (or will be) true, or the invocation-data will be gone,
+    ;; and will naturally stop themselves.
+    ;; The main action is clearing UI state.
     (state/dispatch [:ui/clear-fork-state])
     [:ui :selected-node-id (s/terminal-val nil)]))
 
@@ -270,9 +270,9 @@
 ;; Restart polling after external events (like HITL submission)
 (state/reg-event :invocation/restart-polling
   (fn [db {:keys [invoke-id module-id agent-name]}]
-    (println "[POLLING] Restarting polling after external event for" invoke-id)
-    ;; Stop current polling cleanly
-    (state/dispatch [:db/set-value [:invocations-data invoke-id :polling-active?] false])
+    (println "[POLLING-STATELESS] Restarting data flow after external event for" invoke-id)
+    ;; With the stateless approach, we simply trigger a new fetch
+    ;; Any existing setTimeout callbacks will see the updated state and act accordingly
     ;; Start fresh from root after a brief delay to let the server settle
     (js/setTimeout 
       (fn []

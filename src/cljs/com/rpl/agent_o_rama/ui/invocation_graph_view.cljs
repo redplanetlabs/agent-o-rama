@@ -186,12 +186,18 @@
       ($ :div {:className "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl"}
          ($ :div {:className "p-6"}
             ;; Human input section
-            (when-let [hr (:human-request data)]
-              (let [hitl-response (state/use-sub [:ui :hitl :responses (s/keypath (:invoke-id hr))])]
-                (let [submitting? (state/use-sub [:ui :hitl :submitting (s/keypath (:invoke-id hr))])]
+            (let [hr (:human-request data)
+                  hr-invoke-id (when hr (:invoke-id hr))
+                  hitl-response (state/use-sub (if hr-invoke-id 
+                                                  [:ui :hitl :responses (s/keypath hr-invoke-id)]
+                                                  [:ui :hitl :responses :placeholder]))
+                  submitting? (state/use-sub (if hr-invoke-id
+                                                [:ui :hitl :submitting (s/keypath hr-invoke-id)]
+                                                [:ui :hitl :submitting :placeholder]))]
+              (when hr
                 ($ :div {:className "bg-amber-50 p-3 rounded-md mt-4 border border-amber-200"}
                    ($ :div {:className "text-sm font-medium text-amber-800 mb-2"} "Human input required")
-                   ($ :div {:className "text-sm text-amber-700 mb-3"} (:prompt hr))
+                   ($ :div {:className "text-sm text-amber-700 mb-3 whitespace-pre-wrap"} (:prompt hr))
                    ($ :div
                       ($ :textarea {:className "w-full border rounded p-2 text-sm resize-y"
                                     :rows 3
@@ -199,7 +205,7 @@
                                     :value (or hitl-response "")
                                     :disabled submitting?
                                     :onChange #(state/dispatch [:db/set-value 
-                                                               [:ui :hitl :responses (s/keypath (:invoke-id hr))] 
+                                                               [:ui :hitl :responses (s/keypath hr-invoke-id)] 
                                                                (.. % -target -value)])})
                       ($ :button {:className (str "mt-2 px-3 py-2 rounded text-sm font-medium transition-colors "
                                                   (if submitting?
@@ -215,8 +221,8 @@
                                                                :request hr
                                                                :response (str/trim hitl-response)}])
                                               ;; Clear the response after submission
-                                              (state/dispatch [:db/set-value [:ui :hitl :responses (s/keypath (:invoke-id hr))] ""]))}
-                         (if submitting? "Submitting..." "Submit Response")))))))
+                                              (state/dispatch [:db/set-value [:ui :hitl :responses (s/keypath hr-invoke-id)] ""]))}
+                         (if submitting? "Submitting..." "Submit Response"))))))
             
             ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}
                ($ :div {:className "flex justify-between items-center"}

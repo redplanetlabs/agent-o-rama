@@ -17,7 +17,6 @@
         summary-data (state/use-sub [:invocations-data invoke-id :summary])
         next-leaves (state/use-sub [:invocations-data invoke-id :next-leaves])
         is-complete (state/use-sub [:invocations-data invoke-id :is-complete])
-        polling-active? (state/use-sub [:invocations-data invoke-id :polling-active?])
         implicit-edges (state/use-sub [:invocations-data invoke-id :implicit-edges])
         root-invoke-id (state/use-sub [:invocations-data invoke-id :root-invoke-id])
         task-id (state/use-sub [:invocations-data invoke-id :task-id])
@@ -113,7 +112,6 @@
                     :implicit-edges (or implicit-edges [])
                     :is-complete is-complete
                     :is-live (not is-complete)
-                    :polling-active? polling-active?
                     :connected? connected?
                     :selected-node-id selected-node-id
                     :forking-mode? forking-mode?
