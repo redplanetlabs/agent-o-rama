@@ -16,10 +16,6 @@
    [com.rpl.rama.test :as rtest]
    [jsonista.core :as j])
   (:import
-   [dev.langchain4j.data.message SystemMessage UserMessage AiMessage]
-   [dev.langchain4j.model.openai OpenAiChatModel OpenAiStreamingChatModel]
-   [java.time LocalDateTime LocalDate]
-   [java.time.format DateTimeFormatter]
    [java.util UUID]))
 
 (def CUSTOMER-SUPPORT-SYSTEM-MESSAGE
@@ -493,7 +489,9 @@
 
   (tools/new-tools-agent topology "tools" CUSTOMER-SUPPORT-TOOLS))
 
-(defn run-customer-support-agent
+;;; Example invocation
+
+(defn run-agent
   "Start the customer support agent with sample interactions."
   []
   (println "Starting Customer Support Agent...")
