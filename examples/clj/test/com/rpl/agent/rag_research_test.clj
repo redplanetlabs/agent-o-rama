@@ -12,14 +12,6 @@
 
 ;; Test fixtures and utilities
 
-(def test-documents
-  {"test-doc-1"
-   "This is a test document about artificial intelligence and machine learning."
-   "test-doc-2"
-   "LangChain is a framework for building applications with language models."
-   "test-doc-3"
-   "Retrieval-Augmented Generation improves LLM responses with external knowledge."})
-
 (defn mock-embedding
   "Create a mock embedding vector for testing"
   [text]

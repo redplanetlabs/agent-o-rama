@@ -19,4 +19,4 @@
                         [[com.rpl/rama "0.0.6-SNAPSHOT"]
                          [org.apache.logging.log4j/log4j-slf4j18-impl
                           "2.16.0"]]}}
-)
+  )

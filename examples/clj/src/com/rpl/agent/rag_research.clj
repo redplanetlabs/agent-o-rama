@@ -15,16 +15,22 @@
   (:import
    [com.rpl.agentorama
     AgentComplete]
+   [dev.langchain4j.agent.tool
+    ToolExecutionRequest]
+   [dev.langchain4j.data.document
+    Document]
+   [dev.langchain4j.data.document.splitter
+    DocumentSplitters]
+   [dev.langchain4j.data.embedding
+    Embedding]
    [dev.langchain4j.data.message
     SystemMessage
     UserMessage]
+   [dev.langchain4j.model.embedding
+    EmbeddingModel]
    [dev.langchain4j.model.openai
     OpenAiChatModel
-    OpenAiEmbeddingModel]
-   [dev.langchain4j.data.document.splitter
-    DocumentSplitters]
-   [dev.langchain4j.agent.tool
-    ToolExecutionRequest]))
+    OpenAiEmbeddingModel]))
 
 ;; Configuration
 (def ^:const DOCUMENTS-STORE "$$documents")
@@ -145,9 +151,9 @@ addresses all aspects of the question.")
 
 (defn create-embedding
   "Create an embedding for the given text"
-  [agent-node text]
+  ^Embedding [agent-node text]
   (let [embedding-model (aor/get-agent-object agent-node "embedding-model")
-        response        (.embed embedding-model text)]
+        response        (.embed ^EmbeddingModel embedding-model text)]
     (.content response)))
 
 (defn store-document-chunks
@@ -177,7 +183,7 @@ addresses all aspects of the question.")
 ;; Similarity calculation (cosine similarity)
 (defn calculate-similarity-vectors
   "Calculate cosine similarity between two vectors"
-  [vec1 vec2]
+  ^double [vec1 vec2]
   (let [dot-product (reduce + (map * vec1 vec2))
         magnitude1  (Math/sqrt (reduce + (map #(* % %) vec1)))
         magnitude2  (Math/sqrt (reduce + (map #(* % %) vec2)))]
@@ -185,7 +191,7 @@ addresses all aspects of the question.")
 
 (defn calculate-similarity
   "Calculate cosine similarity between two embeddings"
-  [embedding1 embedding2]
+  [^Embedding embedding1 ^Embedding embedding2]
   (let [vec1        (.vector embedding1)
         vec2        (.vector embedding2)
         dot-product (reduce + (map * vec1 vec2))
@@ -236,7 +242,7 @@ addresses all aspects of the question.")
 ;; Helper functions
 (defn create-tool-execution-request
   "Create a ToolExecutionRequest for agent invocation"
-  [tool-name arguments-map]
+  ^ToolExecutionRequest [tool-name arguments-map]
   (-> (ToolExecutionRequest/builder)
       (.name tool-name)
       (.arguments (j/write-value-as-string arguments-map))
