@@ -91,7 +91,7 @@
 ;; Process a page response, merge nodes, and loop if needed
 (state/reg-event :invocation/process-graph-page
   (fn [db invoke-id page-data]
-    (let [{:keys [nodes next-leaves is-stream-complete 
+    (let [{:keys [nodes next-leaves has-more-leaves? 
                   summary historical-graph root-invoke-id 
                   task-id is-complete]} page-data]
       
@@ -108,10 +108,9 @@
       (when (and nodes (seq nodes))
         (state/dispatch [:invocation/merge-nodes invoke-id nodes]))
 
-      (if is-stream-complete
-        ;; Mark complete when the stream finishes
-        (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] true])
-        ;; Otherwise, immediately request the next page from returned leaves
+      ;; Only continue the loop if server indicates there are more leaves
+      ;; The :is-complete flag from summary is the source of truth for agent completion
+      (when has-more-leaves?
         (let [current (get-in db [:current-invocation])]
           (state/dispatch [:invocation/fetch-graph-page
                            (assoc current :leaves (or next-leaves []))])))
