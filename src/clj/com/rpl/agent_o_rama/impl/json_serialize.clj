@@ -59,7 +59,8 @@
     Not
     Or]
    [java.util
-    List]))
+    List
+    Map]))
 
 (defn to-float-array
   ^floats [v]
@@ -88,9 +89,19 @@
   (if (satisfies? JSONFreeze x)
     (json-freeze*-with-type x)
     (cond
-      (map? x) (transform MAP-VALS freeze-walk x)
-      (sequential? x) (transform ALL freeze-walk x)
-      :else x)))
+      (instance? Map x)
+      (transform MAP-VALS freeze-walk (into {} x))
+
+      (instance? List x)
+      (transform ALL freeze-walk (into [] x))
+
+      :else
+      (try
+        (j/write-value-as-string x MAPPER)
+        x
+
+        (catch Throwable t
+          (str x))))))
 
 (defn json-freeze
   [obj]
@@ -129,12 +140,6 @@
   (let [obj (j/read-value str MAPPER)]
     (walk-json-thaw* obj)))
 
-
-(extend-protocol JSONFreeze
-  Object
-  ;; fallback case to render as plain strings – these will not be deserializable
-  ;; if modified
-  (json-freeze* [this] (str this)))
 
 (extend-protocol JSONFreeze
   ToolExecutionRequest

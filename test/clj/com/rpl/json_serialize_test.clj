@@ -197,12 +197,28 @@
 
 
 (deftest compound-test
-         ;: TODO: <<<<>>>> add tests of nested things, like it will be in
-         ;reality
-         ;;  - verify case of a user editing _aor-type to something invalid
-         ;;  - test [list<different message types>, {"a" list<different message
-         ;;  types> {"b" <some other type>} "c" <some string>}]
-)
+  (letlocals
+   (bind ^java.util.List content [(TextContent. "abc") (TextContent. "def")])
+   (bind obj
+     [[(SystemMessage. "abc")
+       (UserMessage. "aa" content)
+       (AiMessage/aiMessage "abc"
+                            [(-> (ToolExecutionRequest/builder)
+                                 (.name "foo")
+                                 (.arguments "abcde")
+                                 .build)
+                             (-> (ToolExecutionRequest/builder)
+                                 (.name "foo2")
+                                 (.arguments "abc")
+                                 .build)])]
+      {"a" [(SystemMessage. "abc") (AiMessage/aiMessage "xyz")]
+       "b" FinishReason/STOP
+       "c" (int 45)
+       "d" "some data"}])
+   (bind json (jser/json-freeze obj))
+   (is (string? json))
+   (is (= obj (jser/json-thaw json)))
+  ))
 
 (deftest unhandled-test
          ;; TODO: <<<<>>>> verify behavior with UNHANDLED TYPES
