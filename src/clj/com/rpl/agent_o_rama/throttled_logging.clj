@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.throttled-logging
   (:require
-   [com.rpl.agent-o-rama.impl.pobjects :as po]))
+   [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.rama.throttled-logging :as throttled-logging]))
 
 (defmacro logp
   [callsite-id & args]
