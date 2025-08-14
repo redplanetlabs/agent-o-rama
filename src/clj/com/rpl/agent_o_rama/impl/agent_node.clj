@@ -853,7 +853,7 @@
 (defn hook:appended-agent-failure [agent-task-id agent-id retry-num])
 
 (deframaop invoke-on-task-thread
-  [*agent-name *agent-task-id *agent-id *retry-num *afn *info]
+  [*agent-name *agent-task-id *agent-id *node *invoke-id *retry-num *afn *info]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
     *failure-depot (po/agent-failures-depot-task-global *agent-name)]
@@ -863,9 +863,9 @@
      (|direct *agent-task-id)
      (local-transform>
       [(must *agent-id)
-       :exceptions
+       :exception-summaries
        AFTER-ELEM
-       (termval *s)]
+       (termval (aor-types/->ExceptionSummary *s *node *invoke-id))]
       $$root)
      (depot-partition-append!
       *failure-depot
