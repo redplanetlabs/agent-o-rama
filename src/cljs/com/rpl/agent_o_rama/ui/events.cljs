@@ -201,7 +201,8 @@
     [:ui (s/multi-path
            [:changed-nodes (s/terminal-val {})]
            [:selected-node-id (s/terminal-val nil)]
-           [:forking-mode? (s/terminal-val false)])]))
+           [:forking-mode? (s/terminal-val false)]
+           [:hitl :responses (s/terminal-val {})])]))
 
 ;; =============================================================================
 ;; HUMAN-IN-THE-LOOP (HITL) EVENTS
@@ -210,7 +211,7 @@
 (state/reg-event :hitl/submit
   (fn [db {:keys [module-id agent-name invoke-id request response]}]
     ;; Set submitting flag to disable UI
-    (state/dispatch [:db/set-value [:ui :hitl :submitting (:invoke-id request)] true])
+    (state/dispatch [:db/set-value [:ui :hitl :submitting (s/keypath (:invoke-id request))] true])
     
     (sente/request!
       [:api/provide-human-input
@@ -222,7 +223,7 @@
       5000
       (fn [reply]
         ;; Clear submitting flag
-        (state/dispatch [:db/update-value [:ui :hitl :submitting] #(dissoc % (:invoke-id request))])
+        (state/dispatch [:db/set-value [:ui :hitl :submitting (s/keypath (:invoke-id request))] false])
         (if (:success reply)
           (do
             (println "HITL response submitted successfully")

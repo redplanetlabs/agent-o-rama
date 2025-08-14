@@ -186,8 +186,8 @@
       ($ :div {:className "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl"}
          ($ :div {:className "p-6"}
             ;; Human input section
-            (let [[local-response set-local-response] (uix/use-state "")]
-              (when-let [hr (:human-request data)]
+            (when-let [hr (:human-request data)]
+              (let [hitl-response (state/use-sub [:ui :hitl :responses (s/keypath (:invoke-id hr))])]
                 (let [submitting? (state/use-sub [:ui :hitl :submitting (s/keypath (:invoke-id hr))])]
                 ($ :div {:className "bg-amber-50 p-3 rounded-md mt-4 border border-amber-200"}
                    ($ :div {:className "text-sm font-medium text-amber-800 mb-2"} "Human input required")
@@ -196,23 +196,26 @@
                       ($ :textarea {:className "w-full border rounded p-2 text-sm resize-y"
                                     :rows 3
                                     :placeholder "Type your response..."
-                                    :value local-response
+                                    :value (or hitl-response "")
                                     :disabled submitting?
-                                    :onChange #(set-local-response (.. % -target -value))})
+                                    :onChange #(state/dispatch [:db/set-value 
+                                                               [:ui :hitl :responses (s/keypath (:invoke-id hr))] 
+                                                               (.. % -target -value)])})
                       ($ :button {:className (str "mt-2 px-3 py-2 rounded text-sm font-medium transition-colors "
                                                   (if submitting?
                                                     "bg-gray-400 text-gray-600 cursor-not-allowed"
                                                     "bg-blue-600 hover:bg-blue-700 text-white"))
-                                  :disabled (or submitting? (empty? (str/trim local-response)))
+                                  :disabled (or submitting? (empty? (str/trim (or hitl-response ""))))
                                   :onClick #(when (and (not submitting?) 
-                                                       (not (empty? (str/trim local-response))))
+                                                       (not (empty? (str/trim (or hitl-response "")))))
                                               (state/dispatch [:hitl/submit
                                                               {:module-id module-id
                                                                :agent-name agent-name
                                                                :invoke-id invoke-id
                                                                :request hr
-                                                               :response (str/trim local-response)}])
-                                              (set-local-response ""))}
+                                                               :response (str/trim hitl-response)}])
+                                              ;; Clear the response after submission
+                                              (state/dispatch [:db/set-value [:ui :hitl :responses (s/keypath (:invoke-id hr))] ""]))}
                          (if submitting? "Submitting..." "Submit Response")))))))
             
             ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}

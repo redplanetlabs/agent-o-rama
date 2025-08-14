@@ -21,7 +21,9 @@
         :forking-mode? false
         :changed-nodes {}
         :current-route "/"
-        :breadcrumbs []}
+        :breadcrumbs []
+        :hitl {:responses {} ;; Keyed by invoke-id -> response text
+               :submitting {}}}
    :sente {:connected? false
            :connection-state {}}
    :session {:user-id nil
