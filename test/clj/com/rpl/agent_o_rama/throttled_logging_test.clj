@@ -72,7 +72,8 @@
 (deftest throttled-logging-rate-limit-test
   (reset! captured-logs [])
   (let [rate-limit 4]
-    (with-redefs [worker/log-throttle-rate (constantly rate-limit)]
+    (with-redefs [worker/log-throttle-rate (constantly rate-limit)
+                  worker/log-throttle-time-window (constantly 600)]
       (with-open [ipc (rtest/create-ipc)]
         (rtest/launch-module!
          ipc ThrottledLoggingTestModule
@@ -103,7 +104,8 @@
 (deftest throttled-logging-different-callsites-test
   (reset! captured-logs [])
   (let [rate-limit 4]
-    (with-redefs [worker/log-throttle-rate (constantly rate-limit)]
+    (with-redefs [worker/log-throttle-rate (constantly rate-limit)
+                  worker/log-throttle-time-window (constantly 600)]
       (with-open [ipc (rtest/create-ipc)]
         (rtest/launch-module!
          ipc ThrottledLoggingTestModule
@@ -205,7 +207,8 @@
 (deftest throttled-logging-callsite-isolation-test
   (reset! captured-logs [])
   (let [rate-limit 4]
-    (with-redefs [worker/log-throttle-rate (constantly rate-limit)]
+    (with-redefs [worker/log-throttle-rate (constantly rate-limit)
+                  worker/log-throttle-time-window (constantly 600)]
       (with-open [ipc (rtest/create-ipc)]
         (rtest/launch-module!
          ipc ThrottledLoggingTestModule
