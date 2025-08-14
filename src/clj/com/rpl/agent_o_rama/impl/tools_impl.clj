@@ -55,13 +55,13 @@
                           sort)]
     (fn [agent-node ^ToolExecutionRequest request caller-data]
       (let [start-time-millis (h/current-time-millis)
-            tool-name         (.name request)
-            args              (-> request
-                                  .arguments
-                                  (j/read-value MAPPER))
-            base-info         {"id"   (.id request)
-                               "name" tool-name
-                               "args" args}]
+            tool-name (.name request)
+            args      (-> request
+                          .arguments
+                          (j/read-value MAPPER))
+            base-info {"id"   (.id request)
+                       "name" tool-name
+                       "args" args}]
         (try
           (if-let [{:keys [tool-fn include-context?]}
                    (get tools-by-name tool-name)]
@@ -90,7 +90,7 @@
                        (ToolExecutionResultMessage/from
                         request
                         (tool-invalid-error-string tool-name tool-names)))
-              ))
+            ))
           (catch Throwable t
             (try
               (let [error-ret (error-handler t)]
@@ -121,6 +121,6 @@
                            "exception1" (h/throwable->str t)
                            "exception2" (h/throwable->str t2)})))
                 (throw t2)
-                ))
-            ))
-        ))))
+              ))
+          ))
+      ))))
