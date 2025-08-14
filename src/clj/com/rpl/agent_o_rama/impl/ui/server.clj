@@ -3,6 +3,7 @@
    [com.rpl.agent-o-rama.impl.ui.sente :as sente]
    [ring.util.response :as resp]
    [ring.middleware.resource :as resource]
+   [ring.middleware.file :as ring-file]
    [ring.middleware.defaults :refer [wrap-defaults site-defaults]]))
 
 (defn spa-index-handler [_request]
@@ -10,8 +11,12 @@
       (resp/content-type "text/html")))
 
 ;; Combines static file serving for dev (public/) and prod (resources/public)
+;; This matches the original dual handler setup
 (def file-handler
   (-> (fn [_] nil) ; A fallback handler that does nothing
+      ;; First try serving shadow/watch dev files from public/
+      (ring-file/wrap-file "public")
+      ;; Then try serving files from resources/public (for production JAR)
       (resource/wrap-resource "public")))
 
 (defn routes [request]
