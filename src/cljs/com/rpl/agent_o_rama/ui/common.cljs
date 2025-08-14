@@ -10,17 +10,6 @@
 
 (defn pp [x] (with-out-str (cljs.pprint/pprint x)))
 
-(defn fetch [url]
-  (.then (js/fetch url #js {:headers #js {:Accept "application/transit+json"}})
-         (fn [response] (.then (.text response) (fn [text] (t/read reader text))))))
-
-(defn post [url data]
-  (.then (js/fetch url #js {:method "POST"
-                            :headers #js {:Accept "application/transit+json"
-                                          :Content-Type "application/transit+json"}
-                            :body (t/write writer data)})
-         (fn [response] (.then (.text response) (fn [text] (t/read reader text))))))
-
 (defn use-local-storage
   "Hook for localStorage functionality
   
