@@ -53,7 +53,7 @@
         (transform [ATOM :aor-cache (keypath mod) :clients MAP-VALS] close! ui/system)
         (setval [ATOM :aor-cache (keypath mod)] NONE ui/system)))))
 
-(defn start [ipc]
+(defn start [ipc port]
   (sente/start-sente!) ; <--- Start the Sente router
   (swap! ui/system assoc :server (http-kit/run-server #'srv/handler
                                                      {:port 1974 ;; TODO make configurable
