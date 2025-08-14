@@ -32,8 +32,11 @@
            :fill "currentColor" 
            :d "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"}))))
 
-(defui result-badge [{:keys [result]}]
+(defui result-badge [{:keys [result human-request?]}]
   (cond 
+    human-request?
+    ($ :span.px-2.py-1.bg-amber-100.text-amber-800.rounded-full.text-xs.font-medium.inline-flex.items-center.gap-1
+       "🙋 Needs input")
     (nil? result)
     ($ :span.px-2.py-1.bg-blue-100.text-blue-800.rounded-full.text-xs.font-medium.inline-flex.items-center.gap-1
        ($ spinner {:size :small})
@@ -59,7 +62,8 @@
              (common/pp (:invoke-args invoke))))
        ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
        ($ :td.px-4.py-3.text-sm
-          ($ result-badge {:result (:result invoke)})))))
+          ($ result-badge {:result (:result invoke)
+                          :human-request? (:human-request? invoke)})))))
 
 (defui index []
   ;; The entire complex useEffect is replaced by this single line!

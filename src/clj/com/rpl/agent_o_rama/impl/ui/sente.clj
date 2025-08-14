@@ -111,6 +111,10 @@
   [ev-msg]
   (handle-api-event ev-msg))
 
+(defmethod -event-msg-handler :api/provide-human-input
+  [ev-msg]
+  (handle-api-event ev-msg))
+
 ;; =============================================================================
 ;; ROBUST SUBSCRIPTION MANAGEMENT
 ;; =============================================================================
@@ -221,7 +225,7 @@
 
 (defmethod -event-msg-handler :chsk/uidport-close
   [{:as ev-msg :keys [uid]}]
-  (log/info (str "Sente client disconnected, cleaning up subscriptions for uid: " uid))
+  (log/info (str "Sente client disconnected, cleaning up subscriptions and drivers for uid: " uid))
   ;; Clean up all subscriptions for this client
   (when-let [client-subs (get @client-subscriptions uid)]
     (doseq [[sub-key {:keys [sub-type params]}] client-subs]

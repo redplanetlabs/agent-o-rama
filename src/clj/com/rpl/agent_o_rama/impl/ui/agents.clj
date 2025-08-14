@@ -141,6 +141,8 @@
 
 (defmethod api-handler :api/get-invocations
   [_ {:keys [module-id agent-name pagination]} uid]
+  (def module-id module-id)
+  (println "---")
   (let [pages (if (empty? pagination) nil pagination)]
     (filter-encodable (foreign-invoke-query
                        (:invokes-page-query (objects module-id agent-name))
@@ -250,9 +252,9 @@
         ;; TODO: Need to find the task-id for the missing node
         ;; For now, we'll need to track this in the client state
         dynamic-trace (foreign-invoke-query tracing-query
-                                           agent-task-id
-                                           [[agent-task-id (parse-long missing-node-id)]]
-                                           100)]
+                                            agent-task-id
+                                            [[agent-task-id (parse-long missing-node-id)]]
+                                            100)]
     
     (when dynamic-trace
       {:invokes-map (-> (:invokes-map dynamic-trace)
@@ -268,3 +270,12 @@
                             (transform [MAP-VALS] read-string changed-nodes))]
     {:agent-invoke-id (:agentInvokeId (bean result))
      :task-id (:taskId (bean result))}))
+
+(defmethod api-handler :api/provide-human-input
+  [_ {:keys [module-id agent-name request response]} uid]
+  (let [{:keys [agent-task-id agent-id node node-task-id invoke-id uuid prompt]} request
+        ;; Rebuild a NodeHumanInputRequest record on the server side
+        req (aor-types/->NodeHumanInputRequest
+             agent-task-id agent-id node node-task-id invoke-id prompt uuid)]
+    (aor/provide-human-input (get-client module-id agent-name) req response)
+    {:ok true}))

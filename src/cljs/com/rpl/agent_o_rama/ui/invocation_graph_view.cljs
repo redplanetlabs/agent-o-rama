@@ -8,6 +8,7 @@
    [uix.core :as uix :refer [defui defhook $]]
    
    [com.rpl.specter :as s]
+   [com.rpl.agent-o-rama.ui.state :as state]
 
    ["react" :refer [useState useCallback useEffect]]
    ["react-dom" :refer [createPortal]]
@@ -167,7 +168,7 @@
                                     :title "Value Details"
                                     :truncate-length truncate-length}))))
 
-(defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes]}]
+(defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes module-id agent-name invoke-id]}]
   (let [data (when selected-node 
                (js->clj (.-data selected-node) :keywordize-keys true))
         node-id (str (:node-id data))
@@ -224,6 +225,36 @@
                                          :color "green"
                                          :truncate-length 100
                                          :depth 0})))
+            
+            ;; Human Input Request Section
+            (when-let [hr (:human-request data)]
+              (let [[local-response set-local-response] (uix/use-state "")
+                    submitting? (state/use-sub [:ui :hitl :submitting (:invoke-id hr)])]
+                ($ :div {:className "bg-amber-50 p-3 rounded-md mt-4 border border-amber-200"}
+                   ($ :div {:className "text-sm font-medium text-amber-800 mb-2"} "Human input required")
+                   ($ :div {:className "text-sm text-amber-700 mb-3"} (:prompt hr))
+                   ($ :div
+                      ($ :textarea {:className "w-full border rounded p-2 text-sm resize-y"
+                                    :rows 3
+                                    :placeholder "Type your response..."
+                                    :value local-response
+                                    :disabled submitting?
+                                    :onChange #(set-local-response (.. % -target -value))})
+                      ($ :button {:className (str "mt-2 px-3 py-2 rounded text-sm font-medium transition-colors "
+                                                  (if submitting?
+                                                    "bg-gray-400 text-gray-600 cursor-not-allowed"
+                                                    "bg-blue-600 hover:bg-blue-700 text-white"))
+                                  :disabled (or submitting? (empty? (str/trim local-response)))
+                                  :onClick #(when (and (not submitting?) 
+                                                       (not (empty? (str/trim local-response))))
+                                              (state/dispatch [:hitl/submit
+                                                              {:module-id module-id
+                                                               :agent-name agent-name
+                                                               :invoke-id invoke-id
+                                                               :request hr
+                                                               :response (str/trim local-response)}])
+                                              (set-local-response ""))}
+                         (if submitting? "Submitting..." "Submit Response"))))))
             
             (when (not (empty? (:nested-ops data)))
               ($ :div {:className "bg-sky-50 p-3 rounded-md mt-4"}
@@ -769,7 +800,10 @@
                                             :graph-data graph-data
                                             :on-paginate-node on-paginate-node
                                             :on-select-node on-select-node
-                                            :flow-nodes flow-nodes}))))
+                                            :flow-nodes flow-nodes
+                                            :module-id module-id
+                                            :agent-name agent-name
+                                            :invoke-id invoke-id}))))
          
          ;; Always-visible right panel with tabs
          ($ right-panel {:graph-data graph-data
