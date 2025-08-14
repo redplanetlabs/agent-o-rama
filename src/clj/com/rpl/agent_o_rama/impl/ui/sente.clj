@@ -95,9 +95,7 @@
   [ev-msg]
   (handle-api-event ev-msg))
 
-(defmethod -event-msg-handler :api/get-invocation-summary
-  [ev-msg]
-  (handle-api-event ev-msg))
+
 
 (defmethod -event-msg-handler :api/paginate-node
   [ev-msg]

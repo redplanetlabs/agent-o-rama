@@ -53,43 +53,16 @@
 ;; Main entry point for loading any invocation (live or historical)
 (state/reg-event :invocation/load-or-subscribe
   (fn [db {:keys [invoke-id module-id agent-name]}]
-    ;; First, check if we need to load this invocation
+    ;; Check if we already have data for this invocation
     (let [existing-summary (get-in db [:invocations-data invoke-id :summary])]
       (when-not existing-summary
-        ;; Request summary to determine if live or historical
-        (sente/request! [:api/get-invocation-summary 
-                        {:invoke-id invoke-id 
-                         :module-id module-id 
-                         :agent-name agent-name}]
-                       5000
-                       (fn [reply]
-                          (if (:success reply)
-                             (state/dispatch [:invocation/process-summary 
-                                            {:invoke-id invoke-id
-                                             :module-id module-id  
-                                             :agent-name agent-name
-                                             :summary (:data reply)}])
-                             (println "Failed to get invocation summary:" (:error reply))))))
+        ;; Start unified streaming loop directly - first request includes summary
+        (state/dispatch [:invocation/fetch-graph-page
+                         {:invoke-id invoke-id
+                          :module-id module-id
+                          :agent-name agent-name
+                          :leaves []}]))
       ;; Return nil to indicate no immediate state change
-      nil)))
-
-;; Process the summary and decide loading strategy
-(state/reg-event :invocation/process-summary
-  (fn [db {:keys [invoke-id module-id agent-name summary]}]
-    (let [{:keys [root-invoke-id task-id historical-graph]} summary]
-      ;; Store summary, historical graph, and bootstrap root/task ids atomically
-      (state/dispatch [:db/set-values
-                       [[:invocations-data invoke-id :summary] summary]
-                       [[:invocations-data invoke-id :historical-graph] historical-graph]
-                       [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]
-                       [[:invocations-data invoke-id :task-id] task-id]])
-
-      ;; Kick off unified streaming loop (historical completes after first page)
-      (state/dispatch [:invocation/fetch-graph-page
-                       {:invoke-id invoke-id
-                        :module-id module-id
-                        :agent-name agent-name
-                        :leaves []}])
       nil)))
 
 
@@ -116,19 +89,32 @@
 
 ;; Process a page response, merge nodes, and loop if needed
 (state/reg-event :invocation/process-graph-page
-  (fn [db invoke-id {:keys [nodes next-leaves is-stream-complete]}]
-    ;; Merge new nodes and recompute implicit edges via existing event
-    (when (and nodes (seq nodes))
-      (state/dispatch [:invocation/merge-live-nodes invoke-id nodes]))
+  (fn [db invoke-id page-data]
+    (let [{:keys [nodes next-leaves is-stream-complete 
+                  summary historical-graph root-invoke-id 
+                  task-id is-complete]} page-data]
+      
+      ;; If this is the first page (contains summary), store all metadata
+      (when summary
+        (state/dispatch [:db/set-values
+                         [[:invocations-data invoke-id :summary] summary]
+                         [[:invocations-data invoke-id :historical-graph] historical-graph]
+                         [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]
+                         [[:invocations-data invoke-id :task-id] task-id]
+                         [[:invocations-data invoke-id :is-complete] is-complete]])) 
+      
+      ;; Merge new nodes and recompute implicit edges via existing event
+      (when (and nodes (seq nodes))
+        (state/dispatch [:invocation/merge-live-nodes invoke-id nodes]))
 
-    (if is-stream-complete
-      ;; Mark complete when the stream finishes
-      (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] true])
-      ;; Otherwise, immediately request the next page from returned leaves
-      (let [current (get-in db [:current-invocation])]
-        (state/dispatch [:invocation/fetch-graph-page
-                         (assoc current :leaves (or next-leaves []))])))
-    nil))
+      (if is-stream-complete
+        ;; Mark complete when the stream finishes
+        (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] true])
+        ;; Otherwise, immediately request the next page from returned leaves
+        (let [current (get-in db [:current-invocation])]
+          (state/dispatch [:invocation/fetch-graph-page
+                           (assoc current :leaves (or next-leaves []))])))
+      nil)))
 
 ;; Handle paginated data merge
 (state/reg-event :invocation/merge-paginated-data
