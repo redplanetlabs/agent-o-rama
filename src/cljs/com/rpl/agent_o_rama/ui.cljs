@@ -181,7 +181,7 @@
               ($ Route {:path "/" :component agents/index}))))))
 
 (defn init []
-  (sente/init!) ; <--- Add this to start the client-side router
+  (sente/init!)
   (uix.dom/render-root
    ($ QueryClientProvider {:client query-client}
       ($ app))

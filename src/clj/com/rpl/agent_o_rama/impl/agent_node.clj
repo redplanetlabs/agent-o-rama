@@ -13,7 +13,9 @@
    [com.rpl.rama.ops :as ops])
   (:import
    [com.rpl.agentorama
+    AgentClient
     AgentNode
+    HumanInputRequest
     IUnderlying
     NestedOpType
     StreamingRecorder]
@@ -128,14 +130,15 @@
     )))
 
 (def NESTED-OP-TYPE-CLJ
-  {:store-read   NestedOpType/STORE_READ
-   :store-write  NestedOpType/STORE_WRITE
-   :db-read      NestedOpType/DB_READ
-   :db-write     NestedOpType/DB_WRITE
-   :model-call   NestedOpType/MODEL_CALL
-   :agent-invoke NestedOpType/AGENT_INVOKE
-   :human-input  NestedOpType/HUMAN_INPUT
-   :other        NestedOpType/OTHER
+  {:store-read  NestedOpType/STORE_READ
+   :store-write NestedOpType/STORE_WRITE
+   :db-read     NestedOpType/DB_READ
+   :db-write    NestedOpType/DB_WRITE
+   :model-call  NestedOpType/MODEL_CALL
+   :tool-call   NestedOpType/TOOL_CALL
+   :agent-call  NestedOpType/AGENT_CALL
+   :human-input NestedOpType/HUMAN_INPUT
+   :other       NestedOpType/OTHER
   })
 
 (def NESTED-OP-TYPE-JAVA
@@ -152,6 +155,40 @@
   (if-let [res (get NESTED-OP-TYPE-CLJ v)]
     res
     (throw (h/ex-info "Unknown nested op type" {:val v :type (class v)}))))
+
+(defn- no-async!
+  []
+  (throw (h/ex-info "Async API not implemented for subagents" {})))
+
+(defn- no-stream!
+  []
+  (throw (h/ex-info "Streaming not implemented for subagents" {})))
+
+(defn record-nested-op!-impl
+  [^AgentNode agent-node nested-op-type start-time-millis finish-time-millis
+   info-map]
+  (.recordNestedOp agent-node
+                   (nested-op-type->java nested-op-type)
+                   start-time-millis
+                   finish-time-millis
+                   info-map))
+
+(defmacro timed-agent-call
+  [expr agent-node-sym agent-info-tuple [res-sym] info-map-expr]
+  `(let [start-time-millis# (h/current-time-millis)
+         ~res-sym ~expr
+         finish-time-millis# (h/current-time-millis)
+         [agent-module-name# agent-name#] ~agent-info-tuple]
+     (record-nested-op!-impl
+      ~agent-node-sym
+      :agent-call
+      start-time-millis#
+      finish-time-millis#
+      (assoc ~info-map-expr
+       "agent-module-name" agent-module-name#
+       "agent-name" agent-name#))
+     ~res-sym
+   ))
 
 (defn mk-agent-node
   [agent-name agent-graph agent-task-id agent-id curr-node invoke-id retry-num
@@ -253,6 +290,107 @@
                              {:name name
                               :type (get store-info name)}))
          )))
+     (getAgentClient [agent-node name]
+       (let [client (.getAgentClient declared-objects-tg name)
+
+             agent-info-tuple
+             (.getAgentInfo declared-objects-tg name)]
+         (reify
+          AgentClient
+          (invoke [this args]
+            (let [inv (.initiate this args)]
+              (.result this inv)))
+          (invokeAsync [this args]
+            (no-async!))
+          (initiate [this args]
+            (timed-agent-call
+             (.initiate client args)
+             agent-node
+             agent-info-tuple
+             [res]
+             {"op"     "initiate"
+              "args"   (vec args) ; so it doesn't put a raw array in the trace
+              "result" res}))
+          (initiateAsync [this args]
+            (no-async!))
+          (fork [this invoke nodeInvokeIdToNewArgs]
+            (let [inv (.initiateFork this invoke nodeInvokeIdToNewArgs)]
+              (.result this inv)))
+          (forkAsync [this invoke nodeInvokeIdToNewArgs]
+            (no-async!))
+          (initiateFork [this invoke nodeInvokeIdToNewArgs]
+            (timed-agent-call
+             (.initiateFork client invoke nodeInvokeIdToNewArgs)
+             agent-node
+             agent-info-tuple
+             [res]
+             {"op"           "initiateFork"
+              "invoke"       invoke
+              "new-args-map" nodeInvokeIdToNewArgs
+              "result"       res}))
+          (initiateForkAsync [this invoke invokeIdToNewArgs]
+            (no-async!))
+          (nextStep [this agent-invoke]
+            (timed-agent-call
+             (.nextStep client agent-invoke)
+             agent-node
+             agent-info-tuple
+             [res]
+             {"op"           "nextStep"
+              "agent-invoke" agent-invoke
+              "result"       res}))
+          (nextStepAsync [this agent-invoke]
+            (no-async!))
+          (result [this agent-invoke]
+            (loop [step (.nextStep this agent-invoke)]
+              (if (instance? HumanInputRequest step)
+                (do
+                  (.provideHumanInput
+                   this
+                   step
+                   (.getHumanInput agent-node (:prompt step)))
+                  (recur (.nextStep this agent-invoke)))
+                (:result step))))
+          (resultAsync [this agent-invoke]
+            (no-async!))
+          (stream [this agent-invoke node]
+            (no-stream!))
+          (stream [this agent-invoke node stream-callback]
+            (no-stream!))
+          (streamSpecific [this agent-invoke node node-invoke-id]
+            (no-stream!))
+          (streamSpecific
+            [this agent-invoke node node-invoke-id stream-callback]
+            (no-stream!))
+          (streamAll [this agent-invoke node]
+            (no-stream!))
+          (streamAll [this agent-invoke node stream-all-callback]
+            (no-stream!))
+          (pendingHumanInputs [this agent-invoke]
+            (timed-agent-call
+             (.pendingHumanInputs client agent-invoke)
+             agent-node
+             agent-info-tuple
+             [res]
+             {"op"           "pendingHumanInputs"
+              "agent-invoke" agent-invoke
+              "result"       res}))
+          (pendingHumanInputsAsync [this invoke]
+            (no-async!))
+          (provideHumanInput [this request response]
+            (timed-agent-call
+             (.provideHumanInput client request response)
+             agent-node
+             agent-info-tuple
+             [res]
+             {"op"       "provideHumanInput"
+              "request"  request
+              "response" response}))
+          (provideHumanInputAsync [this request response]
+            (no-async!))
+          (close [this]
+            (close! client))
+         )))
      (streamChunk [this chunk]
        (.streamChunk streaming-recorder chunk))
      (recordNestedOp [this type start-time-millis finish-time-millis info]
@@ -316,15 +454,6 @@
   (cljlogging/error t msg data))
 
 (def AGENT-NODE-CONTEXT (ThreadLocal.))
-
-(defn record-nested-op!-impl
-  [^AgentNode agent-node nested-op-type start-time-millis finish-time-millis
-   info-map]
-  (.recordNestedOp agent-node
-                   (nested-op-type->java nested-op-type)
-                   start-time-millis
-                   finish-time-millis
-                   info-map))
 
 (defn try-close!
   [obj]
@@ -637,7 +766,10 @@
             task-id
             invoke-id
             retry-num
-            (h/throwable->str t))
+            (h/throwable->str t)
+            (-> agent-node
+                agent-node-state
+                :nested-ops))
            :append-ack)
           (throw t))
         (finally

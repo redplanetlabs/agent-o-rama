@@ -3,11 +3,13 @@
         [com.rpl.test-helpers])
   (:require
    [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.langchain4j.json :as lj]
    [com.rpl.test-common :as tc]
    [taoensso.nippy :as nippy])
   (:import
    [dev.langchain4j.agent.tool
-    ToolExecutionRequest]
+    ToolExecutionRequest
+    ToolSpecification]
    [dev.langchain4j.data.document
     Document
     Metadata]
@@ -24,6 +26,17 @@
     TextSegment]
    [dev.langchain4j.model.chat.request
     ChatRequest]
+   [dev.langchain4j.model.chat.request.json
+    JsonAnyOfSchema
+    JsonArraySchema
+    JsonBooleanSchema
+    JsonEnumSchema
+    JsonIntegerSchema
+    JsonNullSchema
+    JsonNumberSchema
+    JsonObjectSchema
+    JsonReferenceSchema
+    JsonStringSchema]
    [dev.langchain4j.model.chat.response
     ChatResponse]
    [dev.langchain4j.model.output
@@ -182,4 +195,39 @@
   (is (ser= (-> (ChatResponse/builder)
                 (.aiMessage (AiMessage/aiMessage "bar"))
                 .build)))
+  (is (ser= (-> (ToolSpecification/builder)
+                (.description "abc")
+                (.name "atool")
+                (.parameters (lj/object {"a" (lj/string)}))
+                .build
+            )))
+  (is (ser= (-> (ToolSpecification/builder)
+                (.name "atool2")
+                (.parameters (lj/object {"a" (lj/string)}))
+                .build
+            )))
+  (is (ser= (lj/any-of [(lj/string) (lj/int)])))
+  (is (ser= (lj/any-of "abc" [(lj/string) (lj/int)])))
+  (is (ser= (lj/array (lj/string "aaa"))))
+  (is (ser= (lj/array "desc" (lj/string "aaa"))))
+  (is (ser= (lj/boolean)))
+  (is (ser= (lj/boolean "cbf")))
+  (is (ser= (lj/int)))
+  (is (ser= (lj/int "a")))
+  ;; since it doesn't implement .equals
+  (is (instance? JsonNullSchema (roundtrip (lj/null))))
+  (is (ser= (lj/number)))
+  (is (ser= (lj/number "zyxw")))
+  (is (ser= (lj/string)))
+  (is (ser= (lj/string "a string desc")))
+  (is (ser= (lj/enum ["a" "b"])))
+  (is (ser= (lj/enum "d q c" ["a" "b" "c"])))
+  (is (ser= (lj/reference "r")))
+  (is (ser= (lj/object {"a" (lj/string) "b" (lj/int)})))
+  (is (ser= (lj/object
+             {:description "abc"
+              :required    ["a"]
+              :definitions {"rrr" (lj/int)}
+              :additional-properties? true}
+             {"a" (lj/string) "b" (lj/int)})))
 )

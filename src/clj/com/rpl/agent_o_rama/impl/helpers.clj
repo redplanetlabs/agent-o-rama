@@ -170,15 +170,6 @@
   [^ThreadLocal t]
   (.get t))
 
-(defn validate-option!
-  [context m key & preds]
-  (let [v (get m key)]
-    (when-not (every? #(% v) preds)
-      (throw (ex-info "Invalid option"
-                      {:context context
-                       :option  key
-                       :val     v})))))
-
 (defmacro safe->
   [x & forms]
   (let [g (gensym "val")]
@@ -218,3 +209,47 @@
 (defn first-line
   [s]
   (first (str/split s #"\n" 2)))
+
+(defn validate-options!
+  [context options spec]
+  (let [errors (->> options
+                    (mapv
+                     (fn [[k v]]
+                       (if-let [sfn (get spec k)]
+                         (if-let [s (sfn v)]
+                           (format "Value for option %s is invalid: %s" k s))
+                         (format "%s is an invalid option" k))))
+                    (filterv some?))]
+    (when-not (empty? errors)
+      (throw (ex-info "Invalid options" {:errors errors :context context}))
+    )))
+
+(defn positive-number-spec
+  [v]
+  (when-not (and (number? v) (pos? v))
+    "value must be positive number"))
+
+(defn boolean-spec
+  [v]
+  (when-not (boolean? v)
+    "value must be boolean"))
+
+(defn fn-spec
+  [v]
+  (when-not (ifn? v)
+    "value must be a function"))
+
+(defn list-spec
+  [v]
+  (when-not (instance? java.util.List v)
+    "value must be a list"))
+
+(defn map-spec
+  [v]
+  (when-not (map? v)
+    "value must be a map"))
+
+(defn string-spec
+  [v]
+  (when-not (string? v)
+    "value must be a string"))

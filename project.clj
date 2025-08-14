@@ -1,14 +1,15 @@
 (defproject com.rpl/agent-o-rama "0.9.0-SNAPSHOT"
   :source-paths ["src/clj" "src/cljs" "resource"]
-  :java-source-paths ["src/java" "test/java"]
+  :java-source-paths ["src/java"]
   :test-paths ["test/clj"]
   :jvm-opts ["-Xss6m"]
-  :dependencies [[com.rpl/rama-helpers "0.10.0"]
+  :dependencies [[org.clojure/clojure "1.12.0"]
+                 [com.rpl/rama-helpers "0.10.0"]
                  [dev.langchain4j/langchain4j
                   "1.2.0"
                   :exclusions
                   [org.slf4j/slf4j-api]]
-                 
+
                  ;; ui dependencies
                  [ring/ring-core "1.9.5"]
                  [http-kit "2.8.0"]
@@ -27,7 +28,10 @@
   [["releases"
     {:id  "maven-releases"
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
-  :profiles {:dev      {:resource-paths ["test/resources/"]
+  :profiles {:dev      {:resource-paths    ["test/resources/"]
+                        :source-paths      ["src/clj" "src/cljs" "resource"
+                                            "examples/clj"]
+                        :java-source-paths ["src/java" "test/java"]
                         :dependencies
                         [[meander/epsilon "0.0.650"]
                          [dev.langchain4j/langchain4j-open-ai "1.2.0"]]}
@@ -48,9 +52,6 @@
                                  [net.java.dev.jna/jna "5.17.0"] ;; to fix dynlink error on arm macs
                                  [org.clojure/clojure "1.12.0"]
 
-                                 ;; START: Add Sente to cljs profile
                                  [com.taoensso/sente "1.20.0"]
-                                 [com.cognitect/transit-cljs "0.8.280"]
-                                 ;; END: Add Sente to cljs profile
-                                 ]}}
+                                 [com.cognitect/transit-cljs "0.8.280"]]}}
   :plugins [[lein-exec "0.3.7"]])

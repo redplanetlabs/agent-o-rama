@@ -167,48 +167,52 @@
                              agent-task-id1
                              [[agent-task-id1 root1]]
                              10000))
+
      (is
-      (trace-matches?
-       (:invokes-map trace)
-       {!id1
-        {:agent-id      ?agent-id
-         :agent-task-id ?agent-task-id
-         :node          "a"
-         :input         [1]
-         :nested-ops    [{:type :human-input
-                          :info
-                          {"prompt" "ABC 1"
-                           "result" "hello there"}}]
-         :human-request nil}
-        !id2
-        {:agent-id      ?agent-id
-         :agent-task-id ?agent-task-id
-         :node          "a"
-         :input         [2]
-         :human-request {:agent-task-id ?agent-task-id
-                         :agent-id      ?agent-id
-                         :node          "a"
-                         :node-task-id  !task-id1
-                         :invoke-id     !id2
-                         :prompt        "ABC 2"
-                         :uuid          !uuid2}}
-        !id3
-        {:agent-id      ?agent-id
-         :agent-task-id ?agent-task-id
-         :node          "b"
-         :input         [3]
-         :human-request {:agent-task-id ?agent-task-id
-                         :agent-id      ?agent-id
-                         :node          "b"
-                         :node-task-id  !task-id2
-                         :invoke-id     !id3
-                         :prompt        "DEF 3"
-                         :uuid          !uuid3}}
-       }
-       (m/guard
-        (and (= ?agent-id agent-id1)
-             (= ?agent-task-id agent-task-id1)))
-      ))
+      ;; provide-human-input only blocks until it's delviered, not until node is
+      ;; complete
+      (condition-attained?
+       (trace-matches?
+        (:invokes-map trace)
+        {!id1
+         {:agent-id      ?agent-id
+          :agent-task-id ?agent-task-id
+          :node          "a"
+          :input         [1]
+          :nested-ops    [{:type :human-input
+                           :info
+                           {"prompt" "ABC 1"
+                            "result" "hello there"}}]
+          :human-request nil}
+         !id2
+         {:agent-id      ?agent-id
+          :agent-task-id ?agent-task-id
+          :node          "a"
+          :input         [2]
+          :human-request {:agent-task-id ?agent-task-id
+                          :agent-id      ?agent-id
+                          :node          "a"
+                          :node-task-id  !task-id1
+                          :invoke-id     !id2
+                          :prompt        "ABC 2"
+                          :uuid          !uuid2}}
+         !id3
+         {:agent-id      ?agent-id
+          :agent-task-id ?agent-task-id
+          :node          "b"
+          :input         [3]
+          :human-request {:agent-task-id ?agent-task-id
+                          :agent-id      ?agent-id
+                          :node          "b"
+                          :node-task-id  !task-id2
+                          :invoke-id     !id3
+                          :prompt        "DEF 3"
+                          :uuid          !uuid3}}
+        }
+        (m/guard
+         (and (= ?agent-id agent-id1)
+              (= ?agent-task-id agent-task-id1)))
+       )))
 
      (aor/provide-human-input foo r1 "aa")
      (aor/provide-human-input foo r2 "bb")

@@ -4,7 +4,8 @@
    [taoensso.nippy :as nippy])
   (:import
    [dev.langchain4j.agent.tool
-    ToolExecutionRequest]
+    ToolExecutionRequest
+    ToolSpecification]
    [dev.langchain4j.data.document
     Document
     Metadata]
@@ -19,8 +20,17 @@
     UserMessage]
    [dev.langchain4j.data.segment
     TextSegment]
-   [dev.langchain4j.model.chat.request
-    ChatRequest]
+   [dev.langchain4j.model.chat.request.json
+    JsonAnyOfSchema
+    JsonArraySchema
+    JsonBooleanSchema
+    JsonEnumSchema
+    JsonIntegerSchema
+    JsonNullSchema
+    JsonNumberSchema
+    JsonObjectSchema
+    JsonReferenceSchema
+    JsonStringSchema]
    [dev.langchain4j.model.chat.response
     ChatResponse]
    [dev.langchain4j.model.output
@@ -82,6 +92,22 @@
      (.id (nippy/thaw-from-in! in))
      (.name (nippy/thaw-from-in! in))
      (.arguments (nippy/thaw-from-in! in))
+     .build))
+
+(ser/extend-8-byte-freeze
+ ToolSpecification
+ [^ToolSpecification obj out]
+ (nippy/freeze-to-out! out (.name obj))
+ (nippy/freeze-to-out! out (.parameters obj))
+ (nippy/freeze-to-out! out (.description obj)))
+
+(ser/extend-8-byte-thaw
+ ToolSpecification
+ [in]
+ (-> (ToolSpecification/builder)
+     (.name (nippy/thaw-from-in! in))
+     (.parameters (nippy/thaw-from-in! in))
+     (.description (nippy/thaw-from-in! in))
      .build))
 
 (ser/extend-8-byte-freeze
@@ -432,4 +458,137 @@
      (.id (nippy/thaw-from-in! in))
      (.modelName (nippy/thaw-from-in! in))
      (.tokenUsage (nippy/thaw-from-in! in))
+     .build))
+
+(ser/extend-8-byte-freeze
+ JsonAnyOfSchema
+ [^JsonAnyOfSchema obj out]
+ (nippy/freeze-to-out! out (.anyOf obj))
+ (nippy/freeze-to-out! out (.description obj)))
+
+(ser/extend-8-byte-thaw
+ JsonAnyOfSchema
+ [in]
+ (-> (JsonAnyOfSchema/builder)
+     (.anyOf ^List (nippy/thaw-from-in! in))
+     (.description (nippy/thaw-from-in! in))
+     .build))
+
+(ser/extend-8-byte-freeze
+ JsonArraySchema
+ [^JsonArraySchema obj out]
+ (nippy/freeze-to-out! out (.items obj))
+ (nippy/freeze-to-out! out (.description obj)))
+
+(ser/extend-8-byte-thaw
+ JsonArraySchema
+ [in]
+ (-> (JsonArraySchema/builder)
+     (.items (nippy/thaw-from-in! in))
+     (.description (nippy/thaw-from-in! in))
+     .build))
+
+(ser/extend-8-byte-freeze
+ JsonBooleanSchema
+ [^JsonBooleanSchema obj out]
+ (nippy/freeze-to-out! out (.description obj)))
+
+(ser/extend-8-byte-thaw
+ JsonBooleanSchema
+ [in]
+ (-> (JsonBooleanSchema/builder)
+     (.description (nippy/thaw-from-in! in))
+     .build))
+
+(ser/extend-8-byte-freeze
+ JsonEnumSchema
+ [^JsonBooleanSchema obj out]
+ (nippy/freeze-to-out! out (.enumValues obj))
+ (nippy/freeze-to-out! out (.description obj)))
+
+(ser/extend-8-byte-thaw
+ JsonEnumSchema
+ [in]
+ (-> (JsonEnumSchema/builder)
+     (.enumValues ^List (nippy/thaw-from-in! in))
+     (.description (nippy/thaw-from-in! in))
+     .build))
+
+(ser/extend-8-byte-freeze
+ JsonIntegerSchema
+ [^JsonIntegerSchema obj out]
+ (nippy/freeze-to-out! out (.description obj)))
+
+(ser/extend-8-byte-thaw
+ JsonIntegerSchema
+ [in]
+ (-> (JsonIntegerSchema/builder)
+     (.description (nippy/thaw-from-in! in))
+     .build))
+
+
+(ser/extend-8-byte-freeze
+ JsonNullSchema
+ [^JsonNullSchema obj out]
+)
+
+(ser/extend-8-byte-thaw
+ JsonNullSchema
+ [in]
+ (JsonNullSchema.))
+
+(ser/extend-8-byte-freeze
+ JsonNumberSchema
+ [^JsonNumberSchema obj out]
+ (nippy/freeze-to-out! out (.description obj)))
+
+(ser/extend-8-byte-thaw
+ JsonNumberSchema
+ [in]
+ (-> (JsonNumberSchema/builder)
+     (.description (nippy/thaw-from-in! in))
+     .build))
+
+(ser/extend-8-byte-freeze
+ JsonObjectSchema
+ [^JsonObjectSchema obj out]
+ (nippy/freeze-to-out! out (.description obj))
+ (nippy/freeze-to-out! out (.additionalProperties obj))
+ (nippy/freeze-to-out! out (empty-map (.definitions obj)))
+ (nippy/freeze-to-out! out (empty-map (.properties obj)))
+ (nippy/freeze-to-out! out (empty-coll (.required obj))))
+
+(ser/extend-8-byte-thaw
+ JsonObjectSchema
+ [in]
+ (-> (JsonObjectSchema/builder)
+     (.description (nippy/thaw-from-in! in))
+     (.additionalProperties (nippy/thaw-from-in! in))
+     (.definitions (nippy/thaw-from-in! in))
+     (.addProperties (nippy/thaw-from-in! in))
+     (.required ^List (nippy/thaw-from-in! in))
+     .build))
+
+(ser/extend-8-byte-freeze
+ JsonReferenceSchema
+ [^JsonReferenceSchema obj out]
+ (nippy/freeze-to-out! out (.reference obj)))
+
+(ser/extend-8-byte-thaw
+ JsonReferenceSchema
+ [in]
+ (-> (JsonReferenceSchema/builder)
+     (.reference (nippy/thaw-from-in! in))
+     .build))
+
+(ser/extend-8-byte-freeze
+ JsonStringSchema
+ [^JsonStringSchema obj out]
+ (nippy/freeze-to-out! out (.description obj)))
+
+(ser/extend-8-byte-thaw
+ JsonStringSchema
+ [in]
+ (-> (JsonStringSchema/builder)
+     (.description (nippy/thaw-from-in! in))
      .build))

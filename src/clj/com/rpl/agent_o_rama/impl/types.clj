@@ -10,11 +10,14 @@
    [com.rpl.agentorama
     AgentComplete
     AgentInvoke
-    HumanInputRequest]
+    HumanInputRequest
+    ToolInfo]
    [com.rpl.agentorama.impl
     NippyMap]
    [com.rpl.rama.integration
     TaskGlobalObject]
+   [dev.langchain4j.agent.tool
+    ToolSpecification]
    [java.util
     UUID]
    [java.util.concurrent
@@ -101,7 +104,8 @@
            :db-write
            :db-read
            :model-call
-           :agent-invoke
+           :tool-call
+           :agent-call
            :human-input
            :other)
    ;; info for models contains token stats, input prompt, output, etc.
@@ -143,6 +147,7 @@
    invoke-id :- UUID
    retry-num :- Long
    throwable-str :- String
+   nested-ops :- [NestedOpInfo]
   ])
 
 (drp/defrecord+ AgentFailure
@@ -223,6 +228,13 @@
    pstate-name :- String
    path :- s/Any
    key :- s/Any])
+
+(drp/defrecord+ ToolInfoImpl
+  [tool-specification :- ToolSpecification
+   tool-fn :- clojure.lang.IFn
+   include-context? :- Boolean]
+  ToolInfo
+  (getToolSpecification [this] tool-specification))
 
 (defprotocol AgentsTopologyInternal
   (declare-agent-object-builder-internal [this name afn options]))

@@ -136,7 +136,7 @@
         ($ expandable-item-component {:item data
                                       :color color
                                       :title "Value Details"
-                                      :truncate-length truncate-length}))
+                                      :truncate-length truncate-length})))
       
       ;; Case 1: The data is a map. Render its key-value pairs.
       (map? data)

@@ -573,7 +573,8 @@
       (aor-types/->NodeFailure (ops/current-task-id)
                                *invoke-id
                                *retry-num
-                               "failure")
+                               "failure"
+                               [])
       :append-ack)
     (else>)
      (:>)

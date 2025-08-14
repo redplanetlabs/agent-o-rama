@@ -5,6 +5,7 @@ import com.rpl.rama.PState;
 import com.rpl.rama.RamaModule.*;
 import com.rpl.rama.module.*;
 import com.rpl.rama.ops.*;
+import java.util.*;
 
 public interface AgentsTopology {
 
@@ -13,6 +14,8 @@ public interface AgentsTopology {
   }
 
   AgentGraph newAgent(String name);
+  AgentGraph newToolsAgent(String name, List<ToolInfo> tools);
+  AgentGraph newToolsAgent(String name, List<ToolInfo> tools, ToolsAgentOptions options);
 
   void declareKeyValueStore(String name, Class keyClass, Class valClass);
   void declareDocumentStore(String name, Class keyClass, Object... keyAndValClasses);
@@ -22,6 +25,8 @@ public interface AgentsTopology {
   void declareAgentObject(String name, Object o);
   void declareAgentObjectBuilder(String name, RamaFunction1<AgentObjectSetup, Object> builder);
   void declareAgentObjectBuilder(String name, RamaFunction1<AgentObjectSetup, Object> builder, AgentObjectOptions options);
+
+  void declareClusterAgent(String localName, String moduleName, String agentName);
 
   StreamTopology getStreamTopology();
 

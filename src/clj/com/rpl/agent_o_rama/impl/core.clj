@@ -16,7 +16,9 @@
    [com.rpl.agentorama
     AgentFailedException
     AgentInvoke
-    AgentObjectOptions$Impl]
+    AgentNode
+    AgentObjectOptions$Impl
+    AgentsTopology]
    [com.rpl.agentorama.impl
     RamaClientsTaskGlobal
     AgentDeclaredObjectsTaskGlobal
@@ -198,9 +200,17 @@
        :exception e}
     )))
 
+(defn mk-agents-info
+  [agent-graphs mirror-agents]
+  (reduce-kv
+   (fn [m agent-name _]
+     (assoc m agent-name [nil agent-name]))
+   mirror-agents
+   agent-graphs))
+
 (defn define-agents!
-  [setup topologies stream-topology mb-topology agent-graphs store-info
-   declared-objects]
+  [setup topologies stream-topology mb-topology agent-graphs mirror-agents
+   store-info declared-objects]
   (declare-object* setup
                    (symbol (po/agents-store-info-name))
                    (aor-types/->valid-StoreInfo store-info {}))
@@ -217,7 +227,9 @@
 
   (declare-object* setup
                    (symbol (po/agent-declared-objects-name))
-                   (AgentDeclaredObjectsTaskGlobal. declared-objects))
+                   (AgentDeclaredObjectsTaskGlobal.
+                    declared-objects
+                    (mk-agents-info agent-graphs mirror-agents)))
 
   (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
@@ -325,3 +337,40 @@
        )))
     ret
   ))
+
+(defn new-agent
+  [^AgentsTopology agents-topology name]
+  (.newAgent agents-topology name))
+
+(defn node
+  [agent-graph name output-nodes-spec node-fn]
+  (graph/internal-add-node!
+   agent-graph
+   name
+   output-nodes-spec
+   (aor-types/->Node node-fn)))
+
+(defn agg-start-node
+  [agent-graph name output-nodes-spec node-fn]
+  (graph/internal-add-node!
+   agent-graph
+   name
+   output-nodes-spec
+   (aor-types/->NodeAggStart node-fn nil)))
+
+(defn agg-node
+  [agent-graph name output-nodes-spec agg node-fn]
+  (graph/internal-add-agg-node!
+   agent-graph
+   name
+   output-nodes-spec
+   agg
+   node-fn))
+
+(defn emit!
+  [^AgentNode agent-node node & args]
+  (.emit agent-node node (into-array Object args)))
+
+(defn result!
+  [^AgentNode agent-node val]
+  (.result agent-node val))
