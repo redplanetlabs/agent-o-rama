@@ -205,22 +205,26 @@
                         (-> m remove-implicit-nodes filter-encodable))
         next-leaves (:next-task-invoke-pairs dynamic-trace)]
     
-    (let [;; Agent is complete only when it has a finish time
-          agent-is-complete? (when is-first-request?
-                               (boolean (:finish-time-millis summary-info)))
-          ;; Stream should continue if agent is still running OR if there are more leaves
+    (let [;; Always fetch completion status directly - simple and consistent
+          agent-is-complete? (boolean 
+                               (:finish-time-millis 
+                                 (foreign-select-one [(keypath agent-id) :finish-time-millis]
+                                                    root-pstate
+                                                    {:pkey agent-task-id})))
+          ;; Stream should continue if agent is still running AND there are more leaves
           has-more-leaves? (and (not agent-is-complete?) (seq next-leaves))]
       (merge {:nodes cleaned-nodes
               :next-leaves next-leaves
-              :has-more-leaves? has-more-leaves?}
+              :has-more-leaves? has-more-leaves?
+              ;; ALWAYS include is-complete status for client state machine
+              :is-complete agent-is-complete?}
              ;; Include summary data only on first request
              (when is-first-request?
                {:summary (filter-encodable summary-info)
                 :historical-graph (filter-encodable historical-graph)
                 :root-invoke-id (when (seq start-pairs) (second (first start-pairs)))
                 :task-id agent-task-id
-                :agent-id agent-id
-                :is-complete agent-is-complete?})))))
+                :agent-id agent-id})))))
 
 (defmethod api-handler :api/execute-fork
   [_ {:keys [module-id agent-name invoke-id changed-nodes]} uid]
