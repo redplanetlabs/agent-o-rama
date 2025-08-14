@@ -11,11 +11,7 @@
   {:current-invocation {:invoke-id nil
                         :module-id nil
                         :agent-name nil}
-   :invocations-data {} ;; Keyed by invoke-id -> {:graph {:nodes ...} :summary ... :root-invoke-id ... :task-id ...
-                        ;;                       :streams {:by-node {node-invoke-id chunks} :all chunks}
-                        ;;                       :human-input-request {:request-id ... :prompt ... :node ...}
-                        ;;                       :status :pending|:running|:complete|:failed
-                        ;;                       :result ... :error ...}
+   :invocations-data {} ;; Keyed by invoke-id -> {:graph {:nodes ...} :summary ... :root-invoke-id ... :task-id ...}
    :invocations {:all-invokes []
                  :pagination-params nil ;; Next pagination params from server
                  :has-more? true
@@ -226,18 +222,6 @@
     (into (into [:queries] query-key)
           [(s/terminal (fn [current-state]
                          (assoc current-state :status :error :error error)))])))
-
-;; =============================================================================
-;; AGENT LIFECYCLE EVENT HANDLERS
-;; =============================================================================
-
-(reg-event :agent/append-token-chunks
-  (fn [db invoke-id node-invoke-id chunks reset?]
-    (let [current-chunks (if reset?
-                          []
-                          (get-in db [:invocations-data invoke-id :streams :by-node node-invoke-id] []))
-          new-chunks (into current-chunks chunks)]
-      [:invocations-data invoke-id :streams :by-node node-invoke-id (s/terminal-val new-chunks)])))
 
 ;; =============================================================================
 ;; DEBUGGING HELPERS
