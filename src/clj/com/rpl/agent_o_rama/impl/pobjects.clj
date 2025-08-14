@@ -34,10 +34,6 @@
   []
   "*_agent-declared-objects")
 
-(defn log-throttler-name
-  []
-  "*_log-throttler")
-
 (defn agent-pstate-write-depot-name
   []
   RamaClientsTaskGlobal/AGENT_PSTATE_WRITE_DEPOT)
