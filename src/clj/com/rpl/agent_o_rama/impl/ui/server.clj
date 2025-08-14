@@ -1,90 +1,46 @@
 (ns com.rpl.agent-o-rama.impl.ui.server
   (:require
-   [ring.middleware.file :as ring-file]
-   [ring.middleware.file-info :as ring-file-info]
-   [reitit.ring :as ring]
-   [reitit.ring.middleware.muuntaja :as muuntaja]
-   [reitit.ring.middleware.parameters :as parameters]
-   [reitit.ring.middleware.exception :as exception]
-   [muuntaja.core :as m]
+   [com.rpl.agent-o-rama.impl.ui.sente :as sente]
    [ring.util.response :as resp]
    [ring.middleware.resource :as resource]
-   [ring.middleware.content-type :as content-type]
-   [ring.middleware.not-modified :as not-modified]
-   [reitit.coercion.malli :as rcm]
-   [reitit.ring.coercion :as rrc]
-   [malli.core :as mc]
-   [ring.middleware.defaults :refer [wrap-defaults site-defaults]] ; Add this
-   [clojure.string]
-   [com.rpl.agent-o-rama.impl.ui.sente :as sente] ; Add this
-
-   [com.rpl.agent-o-rama.impl.ui.agents :as agents]))
+   [ring.middleware.defaults :refer [wrap-defaults site-defaults]]))
 
 (defn spa-index-handler [_request]
   (-> (resp/resource-response "index.html")
       (resp/content-type "text/html")))
 
-(def default-handler (ring/routes
-                      (->
-                       
-                       ;; for serving shadow/watch dev files
-                       (ring/create-file-handler
-                        {:path ""
-                         :root "public"}) ; /public
-                       
-                       ;; TODO make it so we only have one of these
-                       
-                       ;; for serving files out of the jar when used as library
-                       (resource/wrap-resource "public") ; /resources/public
-                       )
-                      (ring/ring-handler
-                       (ring/router
-                        [""
-                         ["/api/*" {:handler (fn [_req] (resp/not-found ""))}]
-                         ;; Return index.html for any non-API routes for History API routing
-                         ["/*" {:get {:handler spa-index-handler}}]]
-                        {:conflicts nil}))))
+;; Combines static file serving for dev (public/) and prod (resources/public)
+(def file-handler
+  (-> (fn [_] nil) ; A fallback handler that does nothing
+      (resource/wrap-resource "public")))
 
-(defn exception-handler [^Exception e request]
-  (def e e)
-  (let [sw (java.io.StringWriter.)
-        pw (java.io.PrintWriter. sw)]
-    (.printStackTrace e pw)
-    {:status 500
-     :headers {"Content-Type" "text/plain"}
-     :body (.toString sw)}))
+(defn routes [request]
+  (let [uri (:uri request)
+        method (:request-method request)]
+    (cond
+      ;; Sente routes are the only specific routes we need
+      (= uri "/chsk")
+      (case method
+        :get (sente/ring-ajax-get-or-ws-handshake request)
+        :post (sente/ring-ajax-post request))
 
-(def exception-middleware
-  (exception/create-exception-middleware
-   {::exception/default exception-handler}))
+      ;; For any other route, return nil to let the next handler take over.
+      :else nil)))
 
-(defn app-routes []
-  (ring/ring-handler
-   (ring/router
-    [""
-     ;; START: Add Sente routes
-     ["/chsk" {:get  {:handler #'sente/ring-ajax-get-or-ws-handshake}
-               :post {:handler #'sente/ring-ajax-post}}]
-     ;; END: Add Sente routes
+(defn app-handler [request]
+  (or
+   ;; 1. Try to serve a static file from "public" or "resources/public".
+   (file-handler request)
+   ;; 2. Try our specific Sente routes.
+   (routes request)
+   ;; 3. As a fallback for any other GET request, serve the SPA's index.html.
+   ;; This enables client-side routing.
+   (when (= :get (:request-method request))
+     (spa-index-handler request))))
 
-     ["/api" ; This comes AFTER /chsk so /chsk isn't treated as an API call
-      ["/agents/:module-id/:agent-name/fork"
-       {:post {:handler #'agents/fork}}] ]]
-    {:data {:muuntaja m/instance
-            :middleware [exception-middleware
-                         parameters/parameters-middleware
-                         muuntaja/format-middleware
-                         rrc/coerce-exceptions-middleware
-                         rrc/coerce-request-middleware
-                         rrc/coerce-response-middleware]
-            :coercion rcm/coercion}})
-   default-handler))
-
-;; The main change is wrapping the entire router with `wrap-defaults`
-;; This adds the necessary session middleware Sente requires.
-;; We disable CSRF protection for development.
+;; Keep wrap-defaults for Sente's session management
 (def handler
-  (-> (#'app-routes)
+  (-> #'app-handler
       (wrap-defaults (-> site-defaults
                          (assoc-in [:security :anti-forgery] false)
                          (assoc-in [:security :ssl-redirect] false)))))

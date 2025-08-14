@@ -14,9 +14,8 @@
                  [ring/ring-core "1.9.5"]
                  [http-kit "2.8.0"]
                  [ring/ring-codec "1.2.0"]
-                 [metosin/reitit "0.7.2"]
 
-                 ;; START: Add Sente and Ring Defaults
+;; START: Add Sente and Ring Defaults
                  [com.taoensso/sente "1.20.0"] ; A recent stable version
                  [ring/ring-defaults "0.4.0"] ; Sente needs this for sessions
                  [com.cognitect/transit-clj "1.0.333"] ; Transit for server-side
@@ -26,26 +25,25 @@
   :global-vars {*warn-on-reflection* true}
   :repositories
   [["releases"
-    {:id  "maven-releases"
+    {:id "maven-releases"
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
-  :profiles {:dev      {:resource-paths    ["test/resources/"]
-                        :source-paths      ["src/clj" "src/cljs" "resource"
-                                            "examples/clj"]
-                        :java-source-paths ["src/java" "test/java"]
-                        :dependencies
-                        [[meander/epsilon "0.0.650"]
-                         [dev.langchain4j/langchain4j-open-ai "1.2.0"]]}
+  :profiles {:dev {:resource-paths ["test/resources/"]
+                   :source-paths ["src/clj" "src/cljs" "resource"
+                                  "examples/clj"]
+                   :java-source-paths ["src/java" "test/java"]
+                   :dependencies
+                   [[meander/epsilon "0.0.650"]
+                    [dev.langchain4j/langchain4j-open-ai "1.2.0"]]}
              :provided {:dependencies
                         ;; TODO: fix Rama version
                         [[com.rpl/rama "0.0.6-SNAPSHOT"]
                          [org.apache.logging.log4j/log4j-slf4j18-impl
                           "2.16.0"]]}
-             :gen {:prep-tasks   []
+             :gen {:prep-tasks []
                    :source-paths ["scripts"]
                    :dependencies [[comb "0.1.1"]
                                   [org.clojure/clojure "1.12.0"]]}
-             :ui {:dependencies [
-                                 [com.rpl/specter "1.1.4"] ;; only cljs
+             :ui {:dependencies [[com.rpl/specter "1.1.4"] ;; only cljs
                                  [com.pitch/uix.core "1.4.3"]
                                  [com.pitch/uix.dom "1.4.3"]
                                  [thheller/shadow-cljs "3.1.7"]
