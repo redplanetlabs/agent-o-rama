@@ -226,11 +226,6 @@
                    (AgentNodeExecutorTaskGlobal.))
 
   (declare-object* setup
-                   (symbol (po/log-throttler-name))
-                   (LogThrotterTaskGlobal.))
-
-
-  (declare-object* setup
                    (symbol (po/agent-declared-objects-name))
                    (AgentDeclaredObjectsTaskGlobal.
                     declared-objects
