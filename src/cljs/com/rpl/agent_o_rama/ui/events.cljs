@@ -105,6 +105,7 @@
 
 
 
+
 ;; =============================================================================
 ;; UNIFIED STREAMING LOOP
 ;; =============================================================================
@@ -182,15 +183,31 @@
             (fn []
               (let [current-db @state/app-db
                     is-still-incomplete? (not (get-in current-db [:invocations-data invoke-id :is-complete]))
-                    current-leaves (state/get-unfinished-leaves current-db invoke-id)]
+                    current-leaves (state/get-unfinished-leaves current-db invoke-id)
+                    prior-idle (or (get-in current-db [:invocations-data invoke-id :idle-polls]) 0)
+                    next-idle (inc prior-idle)]
                 (println "[POLLING-STATELESS] delayed-check"
                          {:invoke-id invoke-id
                           :is-still-incomplete? is-still-incomplete?
-                          :current-leaves (count current-leaves)})
-                (when is-still-incomplete?
-                  (println "[POLLING-STATELESS] Delayed re-poll executing for" invoke-id)
-                  (state/dispatch [:invocation/fetch-graph-page
-                                   (assoc current-invocation :leaves current-leaves :initial? false)]))))
+                          :current-leaves (count current-leaves)
+                          :idle-polls next-idle})
+                (cond
+                  (not is-still-incomplete?)
+                  (println "[POLLING-STATELESS] Delayed re-poll cancelled. Agent completed in the meantime.")
+
+                  (and (zero? (count current-leaves)) (>= next-idle 3))
+                  (do
+                    (println "[POLLING-STATELESS] No leaves for multiple cycles; marking complete locally for" invoke-id)
+                    (state/dispatch [:db/set-values
+                                     [[:invocations-data invoke-id :is-complete] true]
+                                     [[:invocations-data invoke-id :idle-polls] 0]]))
+
+                  :else
+                  (do
+                    (state/dispatch [:db/set-value [:invocations-data invoke-id :idle-polls] next-idle])
+                    (println "[POLLING-STATELESS] Delayed re-poll executing for" invoke-id)
+                    (state/dispatch [:invocation/fetch-graph-page
+                                     (assoc current-invocation :leaves current-leaves :initial? false)])))))
             2000)))
       
       nil)))

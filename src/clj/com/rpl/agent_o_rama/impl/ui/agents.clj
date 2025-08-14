@@ -206,11 +206,12 @@
         next-leaves (:next-task-invoke-pairs dynamic-trace)]
     
     (let [;; Always fetch completion status directly - simple and consistent
-          agent-is-complete? (boolean 
-                               (:finish-time-millis 
-                                 (foreign-select-one [(keypath agent-id) :finish-time-millis]
-                                                    root-pstate
-                                                    {:pkey agent-task-id})))
+          root-status (foreign-select-one [(keypath agent-id)
+                                           (submap [:result :finish-time-millis])]
+                                          root-pstate
+                                          {:pkey agent-task-id})
+          agent-is-complete? (boolean (or (:finish-time-millis root-status)
+                                          (:result root-status)))
           ;; Keep legacy variable for logging only; client no longer depends on it
           has-more-leaves? (and (not agent-is-complete?) (seq next-leaves))]
       ;; Diagnostics: trace what the server is returning for polling loop decisions
