@@ -104,7 +104,7 @@
           (str x))))))
 
 (defn json-freeze
-  [obj]
+  ^String [obj]
   (j/write-value-as-string (freeze-walk obj) MAPPER))
 
 (defmulti json-thaw*

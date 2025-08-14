@@ -45,6 +45,9 @@
     Result]
    [dev.langchain4j.service.tool
     ToolExecution]
+   [dev.langchain4j.store.embedding
+    EmbeddingMatch
+    EmbeddingSearchResult]
    [dev.langchain4j.store.embedding.filter.comparison
     ContainsString
     IsEqualTo
@@ -221,7 +224,28 @@
   ))
 
 (deftest unhandled-test
-         ;; TODO: <<<<>>>> verify behavior with UNHANDLED TYPES
-         ;;    - like Result, EmbeddingMatch
-         ;;    - should just become a string, and should throw reasonable error
-)
+  (letlocals
+   (bind es
+     (EmbeddingSearchResult.
+      [(EmbeddingMatch. 2.0 "a" (tc/embedding 1.1 1.2) nil)
+       (EmbeddingMatch. 2.1 "bb" (tc/embedding 1.1 1.3) "foo")]))
+
+   (bind s (jser/json-freeze es))
+   (is (.startsWith s
+                    "\"dev.langchain4j.store.embedding.EmbeddingSearchResult@"))
+
+
+   (bind em (EmbeddingMatch. 2.0 "a" (tc/embedding 1.1 1.2) nil))
+   (bind s (jser/json-freeze em))
+   (is (and (.contains s "embedding = Embedding { vector = [1.1, 1.2] }")
+            (.contains s "EmbeddingMatch")
+            (.contains s "score = 2.0")))
+
+   (try
+     (jser/json-thaw "{\"_aor-type\": \"foo\"}")
+     (is false)
+     (catch clojure.lang.ExceptionInfo e
+       (is (= (ex-message e)
+              "No deserializer found for AOR type {:aor-type \"foo\"}"))
+     ))
+  ))
