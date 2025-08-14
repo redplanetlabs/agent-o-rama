@@ -146,7 +146,7 @@
                               (str "burst1 message " i)))
 
                   ;; Wait for the specified delay
-                  (Thread/sleep delay-ms)
+                  (Thread/sleep (long delay-ms))
 
                   ;; Second burst of messages
                   (dotimes [i final-burst]
