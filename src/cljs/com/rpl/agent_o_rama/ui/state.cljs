@@ -76,7 +76,7 @@
                        (fn [db] (s/select-one specter-path db))
                        [specter-path])
         [value set-value] (uix/use-state (fn [] (extract-value @app-db)))]
-    
+
     (uix/use-effect
      (fn []
        (let [watch-key (gensym "sub-")]
@@ -90,26 +90,26 @@
          (fn []
            (remove-watch app-db watch-key))))
      [extract-value]) ; Include extract-value as dependency
-    
+
     value))
 
 ;; =============================================================================
 ;; SELECTORS
 ;; =============================================================================
 
-(defn get-unfinished-leaves 
+(defn get-unfinished-leaves
   "Find all unfinished leaf nodes for a given invoke-id.
    Returns a vector of unique [task-id node-id] pairs that can be used for pagination."
   [db invoke-id]
   (let [nodes-map (s/select-one [:invocations-data invoke-id :graph :nodes] db)]
-    (->> (s/select [s/ALL  ;; Use ALL to get [key value] pairs
-                    (s/selected? s/LAST  ;; Check the value (node-data)
-                                (s/must :node-task-id)
-                                (s/pred #(not (:finish-time-millis %))))
-                    (s/view (fn [[node-id node-data]]  ;; Destructure [key value]
-                             [(:node-task-id node-data) 
-                              (or (:invoke-id node-data)   ;; Use invoke-id from data
-                                  node-id)]))]              ;; Or the map key as fallback
+    (->> (s/select [s/ALL ;; Use ALL to get [key value] pairs
+                    (s/selected? s/LAST ;; Check the value (node-data)
+                                 (s/must :node-task-id)
+                                 (s/pred #(not (:finish-time-millis %))))
+                    (s/view (fn [[node-id node-data]] ;; Destructure [key value]
+                              [(:node-task-id node-data)
+                               (or (:invoke-id node-data) ;; Use invoke-id from data
+                                   node-id)]))] ;; Or the map key as fallback
                    (or nodes-map {}))
          ;; Remove duplicates
          distinct
@@ -121,10 +121,8 @@
 
 ;; UI Events - Only keep complex or toggle events
 (reg-event :ui/toggle-forking-mode
-  (fn [db]
-    [:ui :forking-mode? (s/terminal not)]))
-
-
+           (fn [db]
+             [:ui :forking-mode? (s/terminal not)]))
 
 ;; Note: Simple setters should use :db/set-value
 ;; Examples:
@@ -140,90 +138,89 @@
 
 ;; Current Invocation Events
 (reg-event :invocation/set-current
-  (fn [db {:keys [invoke-id module-id agent-name]}]
+           (fn [db {:keys [invoke-id module-id agent-name]}]
     ;; Simply set the current invocation context
     ;; Data is stored separately under invocations-data
-    [:current-invocation (s/terminal-val {:invoke-id invoke-id
-                                          :module-id module-id
-                                          :agent-name agent-name})]))
+             [:current-invocation (s/terminal-val {:invoke-id invoke-id
+                                                   :module-id module-id
+                                                   :agent-name agent-name})]))
 
 (reg-event :invocation/load-graph-success
-  (fn [db invoke-id graph-data]
-    [:invocations-data invoke-id :graph (s/terminal-val graph-data)]))
+           (fn [db invoke-id graph-data]
+             [:invocations-data invoke-id :graph (s/terminal-val graph-data)]))
 
 (reg-event :invocation/load-summary-success
-  (fn [db invoke-id summary-data]
-    [:invocations-data invoke-id :summary (s/terminal-val summary-data)]))
+           (fn [db invoke-id summary-data]
+             [:invocations-data invoke-id :summary (s/terminal-val summary-data)]))
 
 (reg-event :invocation/update-node
-  (fn [db invoke-id node-id node-data]
-    [:invocations-data invoke-id :graph :nodes
-     (s/terminal (fn [nodes]
-                   (assoc (or nodes {}) node-id node-data)))]))
+           (fn [db invoke-id node-id node-data]
+             [:invocations-data invoke-id :graph :nodes
+              (s/terminal (fn [nodes]
+                            (assoc (or nodes {}) node-id node-data)))]))
 
 ;; Generic state update events
 ;; Usage: (dispatch [:db/set-value [:some :path] value])
 (reg-event :db/set-value
-  (fn [db path value]
+           (fn [db path value]
     ;; Build a Specter navigator that sets the value at the given path
-    (into path [(s/terminal-val value)])))
+             (into path [(s/terminal-val value)])))
 
 ;; Usage: (dispatch [:db/update-value [:some :path] update-fn])
 (reg-event :db/update-value
-  (fn [db path update-fn]
-    (into path [(s/terminal update-fn)])))
+           (fn [db path update-fn]
+             (into path [(s/terminal update-fn)])))
 
 ;; Usage: (dispatch [:db/set-values [[:path1] v1] [[:path2 :k] v2] ...])
 (reg-event :db/set-values
-  (fn [db & path-value-pairs]
-    (apply s/multi-path
-           (map (fn [[path value]]
-                  (into path [(s/terminal-val value)]))
-                path-value-pairs))))
-
+           (fn [db & path-value-pairs]
+             (apply s/multi-path
+                    (map (fn [[path value]]
+                           (into path [(s/terminal-val value)]))
+                         path-value-pairs))))
 
 ;; Specific complex events that do more than just setting a value
 (reg-event :invocations/append
-  (fn [db invokes]
-    [:invocations :all-invokes (s/terminal #(concat % invokes))]))
+           (fn [db invokes]
+             [:invocations :all-invokes (s/terminal #(concat % invokes))]))
 
 (reg-event :invocations/set-loading
-  (fn [db loading?]
-    [:invocations :loading? (s/terminal-val loading?)]))
+           (fn [db loading?]
+             [:invocations :loading? (s/terminal-val loading?)]))
 
 (reg-event :invocations/set-pagination
-  (fn [db {:keys [pagination-params has-more?]}]
-    [:invocations (s/terminal #(assoc %
-                                      :pagination-params pagination-params
-                                      :has-more? has-more?))]))
+           (fn [db {:keys [pagination-params has-more?]}]
+             [:invocations (s/terminal #(assoc %
+                                               :pagination-params pagination-params
+                                               :has-more? has-more?))]))
 
 (reg-event :invocations/reset
-  (fn [db]
-    [:invocations (s/terminal-val {:all-invokes []
-                                   :pagination-params nil
-                                   :has-more? true
-                                   :loading? false})]))
+           (fn [db]
+             [:invocations (s/terminal-val {:all-invokes []
+                                            :pagination-params nil
+                                            :has-more? true
+                                            :loading? false})]))
 
 ;; =============================================================================
 ;; GENERIC QUERY HANDLERS - For useSenteQuery hook
 ;; =============================================================================
 
 (reg-event :query/fetch-start
-  (fn [db {:keys [query-key]}]
-    (into (into [:queries] query-key)
-          [(s/terminal (fn [current-state]
-                         (assoc current-state :status :loading :error nil)))])))
+           (fn [db {:keys [query-key]}]
+             (into (into [:queries] query-key)
+                   [(s/terminal (fn [current-state]
+                                  (assoc current-state :status :loading :error nil)))])))
 
 (reg-event :query/fetch-success
-  (fn [db {:keys [query-key data]}]
-    (into (into [:queries] query-key)
-          [(s/terminal-val {:status :success :data data :error nil})])))
+           (fn [db {:keys [query-key data]}]
+             (into (into [:queries] query-key)
+                   [(s/terminal-val {:status :success :data data :error nil})])))
 
 (reg-event :query/fetch-error
-  (fn [db {:keys [query-key error]}]
-    (into (into [:queries] query-key)
-          [(s/terminal (fn [current-state]
-                         (assoc current-state :status :error :error error)))])))
+           (fn [db {:keys [query-key error]}]
+             (into (into [:queries] query-key)
+                   [(s/terminal (fn [current-state]
+                                  (assoc current-state :status :error :error error)))])))
 
 ;; =============================================================================
 ;; DEBUGGING HELPERS
@@ -231,7 +228,7 @@
 
 (defn get-db [] @app-db)
 
-(defn reset-db! 
+(defn reset-db!
   "Reset app-db to initial state. Useful for development."
   []
   (reset! app-db initial-db))
@@ -241,5 +238,5 @@
   ([]
    (js/console.log "Current app-db:" (clj->js @app-db)))
   ([specter-path]
-   (js/console.log "Value at path" specter-path ":" 
+   (js/console.log "Value at path" specter-path ":"
                    (clj->js (s/select-one specter-path @app-db)))))

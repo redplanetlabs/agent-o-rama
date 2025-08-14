@@ -3,10 +3,10 @@
    [clojure.string :as str]
    [clojure.pprint]
    [goog.i18n.DateTimeFormat :as dtf]
-   [goog.date.UtcDateTime    :as utc-dt]
-   
+   [goog.date.UtcDateTime :as utc-dt]
+
    [uix.core :as uix :refer [defui defhook $]]
-   
+
    [com.rpl.specter :as s]
    [com.rpl.agent-o-rama.ui.state :as state]
 
@@ -19,12 +19,12 @@
   (let [date (js/Date. ms)
         formatter (js/Intl.DateTimeFormat.
                    "en-US"
-                   #js {:year          "numeric"
-                        :month         "short"
-                        :day           "numeric"
-                        :hour          "2-digit"
-                        :minute        "2-digit"
-                        :second        "2-digit"
+                   #js {:year "numeric"
+                        :month "short"
+                        :day "numeric"
+                        :hour "2-digit"
+                        :minute "2-digit"
+                        :second "2-digit"
                         :hour12 false})
         base (.format formatter date)
         millis (.padStart (str (.getMilliseconds date)) 3 "0")]
@@ -38,30 +38,29 @@
 
 (defui expandable-popup-modal [{:keys [content content-index title on-close]}]
   (createPortal
-    ($ :div {:className "fixed inset-0 flex items-center justify-center z-50"
-             :style {:backgroundColor "rgba(0, 0, 0, 0.5)"}
-             :onClick (fn [e]
-                        (.preventDefault e)
-                        (.stopPropagation e)
-                        (on-close))}
-       ($ :div {:className "bg-white rounded-lg shadow-xl max-w-4xl max-h-[80vh] overflow-hidden"
-                :onClick (fn [e] 
-                           (.preventDefault e)
-                           (.stopPropagation e))}
-          ($ :div {:className "p-4 border-b border-gray-200 flex justify-between items-center"}
-             ($ :h3 {:className "text-lg font-medium text-gray-800"}
-                title)
-             ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer"
-                         :onClick (fn [e]
-                                    (.preventDefault e)
-                                    (.stopPropagation e)
-                                    (on-close))}
-                "×"))
-          ($ :div {:className "p-4 overflow-auto max-h-96"}
-             ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
-                content))))
-    (.-body js/document)))
-
+   ($ :div {:className "fixed inset-0 flex items-center justify-center z-50"
+            :style {:backgroundColor "rgba(0, 0, 0, 0.5)"}
+            :onClick (fn [e]
+                       (.preventDefault e)
+                       (.stopPropagation e)
+                       (on-close))}
+      ($ :div {:className "bg-white rounded-lg shadow-xl max-w-4xl max-h-[80vh] overflow-hidden"
+               :onClick (fn [e]
+                          (.preventDefault e)
+                          (.stopPropagation e))}
+         ($ :div {:className "p-4 border-b border-gray-200 flex justify-between items-center"}
+            ($ :h3 {:className "text-lg font-medium text-gray-800"}
+               title)
+            ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer"
+                        :onClick (fn [e]
+                                   (.preventDefault e)
+                                   (.stopPropagation e)
+                                   (on-close))}
+               "×"))
+         ($ :div {:className "p-4 overflow-auto max-h-96"}
+            ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
+               content))))
+   (.-body js/document)))
 
 (defn pretty-format [item]
   "Format data structure with proper indentation and formatting using pprint"
@@ -86,7 +85,7 @@
                                (set-show-modal true))
                     :title "Click to expand"}
              truncated-str))
-       
+
        ;; Popup modal with pretty formatting
        (when show-modal
          ($ expandable-popup-modal {:content pretty-str
@@ -106,8 +105,8 @@
              (str (inc idx) "."))
           ;; Recursively render each item using the generic viewer
           ($ :div {:className "flex-1"}
-             ($ generic-data-viewer {:data item 
-                                     :color color 
+             ($ generic-data-viewer {:data item
+                                     :color color
                                      :truncate-length truncate-length
                                      :depth depth}))))))
 
@@ -119,7 +118,7 @@
       ;; Handle nil explicitly
       (nil? data)
       ($ :span {:className (str "text-" color "-500 italic")} "nil")
-      
+
       ;; If we've hit max depth, fall back to expandable components
       (>= depth max-depth)
       (cond
@@ -130,7 +129,7 @@
                                       :truncate-length truncate-length})
         (sequential? data)
         ($ expandable-item-component {:item data
-                                      :color color  
+                                      :color color
                                       :title "List Details"
                                       :truncate-length truncate-length})
         :else
@@ -138,7 +137,7 @@
                                       :color color
                                       :title "Value Details"
                                       :truncate-length truncate-length}))
-      
+
       ;; Case 1: The data is a map. Render its key-value pairs.
       (map? data)
       ($ :div {:className "mt-1 space-y-1 pl-2 border-l border-gray-200"}
@@ -147,8 +146,8 @@
               ($ :div {:className "flex items-start gap-1"}
                  ($ :span {:className "text-gray-500 font-medium"} (str (name k) ":"))
                  ;; Recursive call to render the value, whatever its type.
-                 ($ generic-data-viewer {:data v 
-                                         :color color 
+                 ($ generic-data-viewer {:data v
+                                         :color color
                                          :truncate-length truncate-length
                                          :depth next-depth})))))
 
@@ -159,7 +158,7 @@
                                     :title-singular "Item"
                                     :truncate-length truncate-length
                                     :depth next-depth})
-      
+
       ;; Case 3: The data is a scalar value (string, number, bool, etc.).
       ;; Use the existing item component.
       :else
@@ -169,31 +168,31 @@
                                     :truncate-length truncate-length}))))
 
 (defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes module-id agent-name invoke-id]}]
-  (let [data (when selected-node 
+  (let [data (when selected-node
                (js->clj (.-data selected-node) :keywordize-keys true))
-        node-id (str (:node-id data))
+        node-id (:node-id data)
         node-name (:node data)
         input (:input data)
         result (:result data)
         start-time (:start-time-millis data)
         finish-time (:finish-time-millis data)
         duration (when (and start-time finish-time)
-                   (- finish-time start-time))
+                   (str (- finish-time start-time)))
         emits (:emits data)
         has-paginated (:has-paginated-children data)]
-    
+
     (when selected-node
       ($ :div {:className "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl"}
          ($ :div {:className "p-6"}
             ;; Human input section
             (let [hr (:human-request data)
                   hr-invoke-id (when hr (:invoke-id hr))
-                  hitl-response (state/use-sub (if hr-invoke-id 
-                                                  [:ui :hitl :responses (s/keypath hr-invoke-id)]
-                                                  [:ui :hitl :responses :placeholder]))
+                  hitl-response (state/use-sub (if hr-invoke-id
+                                                 [:ui :hitl :responses (s/keypath hr-invoke-id)]
+                                                 [:ui :hitl :responses :placeholder]))
                   submitting? (state/use-sub (if hr-invoke-id
-                                                [:ui :hitl :submitting (s/keypath hr-invoke-id)]
-                                                [:ui :hitl :submitting :placeholder]))]
+                                               [:ui :hitl :submitting (s/keypath hr-invoke-id)]
+                                               [:ui :hitl :submitting :placeholder]))]
               (when hr
                 ($ :div {:className "bg-amber-50 p-3 rounded-md mt-4 border border-amber-200"}
                    ($ :div {:className "text-sm font-medium text-amber-800 mb-2"} "Human input required")
@@ -204,34 +203,34 @@
                                     :placeholder "Type your response..."
                                     :value (or hitl-response "")
                                     :disabled submitting?
-                                    :onChange #(state/dispatch [:db/set-value 
-                                                               [:ui :hitl :responses (s/keypath hr-invoke-id)] 
-                                                               (.. % -target -value)])})
+                                    :onChange #(state/dispatch [:db/set-value
+                                                                [:ui :hitl :responses (s/keypath hr-invoke-id)]
+                                                                (.. % -target -value)])})
                       ($ :button {:className (str "mt-2 px-3 py-2 rounded text-sm font-medium transition-colors "
                                                   (if submitting?
                                                     "bg-gray-400 text-gray-600 cursor-not-allowed"
                                                     "bg-blue-600 hover:bg-blue-700 text-white"))
                                   :disabled (or submitting? (empty? (str/trim (or hitl-response ""))))
-                                  :onClick #(when (and (not submitting?) 
+                                  :onClick #(when (and (not submitting?)
                                                        (not (empty? (str/trim (or hitl-response "")))))
                                               (state/dispatch [:hitl/submit
-                                                              {:module-id module-id
-                                                               :agent-name agent-name
-                                                               :invoke-id invoke-id
-                                                               :request hr
-                                                               :response (str/trim hitl-response)}])
+                                                               {:module-id module-id
+                                                                :agent-name agent-name
+                                                                :invoke-id invoke-id
+                                                                :request hr
+                                                                :response (str/trim hitl-response)}])
                                               ;; Clear the response after submission
                                               (state/dispatch [:db/set-value [:ui :hitl :responses (s/keypath hr-invoke-id)] ""]))}
                          (if submitting? "Submitting..." "Submit Response"))))))
-            
+
             ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}
                ($ :div {:className "flex justify-between items-center"}
                   ($ :span {:className "text-sm font-medium text-indigo-700"} "Node")
                   ($ :span {:className "text-sm text-indigo-600 font-mono"} node-name))
                ($ :div {:className "flex justify-between items-center mt-1"}
                   ($ :span {:className "text-sm font-medium text-indigo-700"} "ID")
-                  ($ :span {:className "text-xs text-indigo-500 font-mono"} node-id)))
-            
+                  ($ :span {:className "text-xs text-indigo-500 font-mono"} (str node-id))))
+
             (when result
               ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-blue-700 mb-1"} "Result")
@@ -246,17 +245,17 @@
                     ($ :div {:className "flex justify-between"}
                        ($ :span {:className "text-xs text-yellow-600"} "Duration")
                        ($ :span {:className "text-xs text-yellow-600 font-mono"
-                                 :title (str "Started: " (format-ms start-time) "\nFinished: " (format-ms finish-time))} 
+                                 :title (str "Started: " (format-ms start-time) "\nFinished: " (format-ms finish-time))}
                           (str duration "ms")))
                     ($ :div {:className "flex justify-between"}
                        ($ :span {:className "text-xs text-yellow-600"} "Started")
-                       ($ :span {:className "text-xs text-yellow-600 font-mono"} 
+                       ($ :span {:className "text-xs text-yellow-600 font-mono"}
                           (format-ms start-time)))
                     ($ :div {:className "flex justify-between"}
                        ($ :span {:className "text-xs text-yellow-600"} "Finished")
-                       ($ :span {:className "text-xs text-yellow-600 font-mono"} 
+                       ($ :span {:className "text-xs text-yellow-600 font-mono"}
                           (format-ms finish-time))))))
-            
+
             (when input
               ($ :div {:className "bg-green-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
@@ -264,10 +263,10 @@
                                          :color "green"
                                          :truncate-length 100
                                          :depth 0})))
-            
+
             (when (not (empty? (:nested-ops data)))
               ($ :div {:className "bg-sky-50 p-3 rounded-md mt-4"}
-                 ($ :div {:className "text-sm font-medium text-sky-700 mb-2"} 
+                 ($ :div {:className "text-sm font-medium text-sky-700 mb-2"}
                     (str "Operations (" (count (:nested-ops data)) ")"))
                  ($ :div {:className "space-y-2"}
                     (for [op (:nested-ops data)]
@@ -276,19 +275,19 @@
                             start-time (:start-time-millis op)
                             finish-time (:finish-time-millis op)
                             duration (when (and start-time finish-time)
-                                       (- finish-time start-time))]
-                        ($ :div {:key (str start-time "-" finish-time)
+                                       (str (- finish-time start-time)))]
+                        ($ :div {:key (str (str start-time) "-" (str finish-time))
                                  :className "bg-white p-3 rounded border border-sky-200"}
-                           
+
                            ;; 1. The Header: Keep this part to display consistent op-level info
                            ($ :div {:className "flex justify-between items-start mb-2"}
                               ($ :div {:className "flex-1"}
                                  ($ :div {:className "flex items-center gap-2"}
-                                    ($ :span {:className "text-sm font-medium text-sky-800 bg-sky-100 px-2 py-1 rounded"} 
+                                    ($ :span {:className "text-sm font-medium text-sky-800 bg-sky-100 px-2 py-1 rounded"}
                                        op-type)
                                     ;; The generic viewer will show objectName, so this is optional, but nice for a header
                                     (when (:objectName info)
-                                      ($ :span {:className "text-sm font-mono text-sky-700"} 
+                                      ($ :span {:className "text-sm font-mono text-sky-700"}
                                          (:objectName info)))))
                               ;; Always display the duration
                               (when duration
@@ -299,49 +298,47 @@
                            ;; 2. The Body: Replace all specific logic with the generic viewer
                            ($ :div {:className "text-xs text-sky-600 mt-1"}
                               ($ generic-data-viewer {:data info :color "sky" :depth 0})))))))))
-            
+
                ;; Emits Section (full width)
-            (when (and emits (> (count emits) 0))
-              ($ :div {:className "mt-4 bg-purple-50 p-3 rounded-md"}
-                 ($ :div {:className "text-sm font-medium text-purple-700 mb-2"} 
-                    (str "Emits (" (count emits) ")"))
-                 ($ :div {:className "space-y-2"}
-                    (for [[idx emit] (map-indexed vector (js->clj emits :keywordize-keys true))]
-                      (let [emit-id (str (:invoke-id emit))
-                            is-loaded (contains? graph-data (:invoke-id emit))
+         (when (and emits (> (count emits) 0))
+           ($ :div {:className "mt-4 bg-purple-50 p-3 rounded-md"}
+              ($ :div {:className "text-sm font-medium text-purple-700 mb-2"}
+                 (str "Emits (" (count emits) ")"))
+              ($ :div {:className "space-y-2"}
+                 (for [[idx emit] (map-indexed vector (js->clj emits :keywordize-keys true))]
+                   (let [emit-id (str (:invoke-id emit))
+                         is-loaded (contains? graph-data (:invoke-id emit))
                             ;; We no longer track loading state locally
-                            border-class (if is-loaded "border-purple-200" "border-dashed border-purple-300")
-                            cursor-class "cursor-pointer"
-                            bg-class (if is-loaded "bg-gray-50" "bg-white hover:bg-purple-50")]
-                        ($ :div {:key (str "emit-" idx)
-                                 :className (str bg-class " p-2 rounded border " border-class " " cursor-class " transition-colors")
-                                 :onClick (fn [e]
-                                            (.stopPropagation e)
-                                            (if is-loaded
+                         border-class (if is-loaded "border-purple-200" "border-dashed border-purple-300")
+                         cursor-class "cursor-pointer"
+                         bg-class (if is-loaded "bg-gray-50" "bg-white hover:bg-purple-50")]
+                     ($ :div {:key (str "emit-" idx)
+                              :className (str bg-class " p-2 rounded border " border-class " " cursor-class " transition-colors")
+                              :onClick (fn [e]
+                                         (.stopPropagation e)
+                                         (if is-loaded
                                                 ;; Find and select the loaded node
-                                                (let [nodes (js->clj flow-nodes :keywordize-keys true)
-                                                      target-node (->> nodes
-                                                                       (filter #(= (-> % :data :node-id) (:invoke-id emit)))
-                                                                       first)]
-                                                  (when (and target-node on-select-node)
-                                                    (on-select-node (:invoke-id emit))))
+                                           (let [nodes (js->clj flow-nodes :keywordize-keys true)
+                                                 target-node (->> nodes
+                                                                  (filter #(= (-> % :data :node-id) (:invoke-id emit)))
+                                                                  first)]
+                                             (when (and target-node on-select-node)
+                                               (on-select-node (:invoke-id emit))))
                                               ;; Load the unloaded node
-                                              (when on-paginate-node
-                                                  (on-paginate-node emit-id))))}
-                           ($ :div {:className "text-xs text-purple-600"}
-                              ($ :div (str "→ " (:node-name emit)))
-                              (when (:args emit)
-                                ($ generic-data-viewer {:data (:args emit)
-                                                        :color "purple"
-                                                        :truncate-length 60
-                                                        :depth 0}))
-                              ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
-                                 (str "ID: " emit-id)))))))))
-            
-               ))))
+                                           (when on-paginate-node
+                                             (on-paginate-node emit-id))))}
+                        ($ :div {:className "text-xs text-purple-600"}
+                           ($ :div (str "→ " (:node-name emit)))
+                           (when (:args emit)
+                             ($ generic-data-viewer {:data (:args emit)
+                                                     :color "purple"
+                                                     :truncate-length 60
+                                                     :depth 0}))
+                           ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
+                              (str "ID: " emit-id)))))))))))))
 
 (defui forking-input-component [{:keys [selected-node changed-nodes on-change-node-input affected-nodes]}]
-  (let [data (when selected-node 
+  (let [data (when selected-node
                (js->clj (.-data selected-node) :keywordize-keys true))
         node-id (:node-id data)
         node-name (:node data)
@@ -349,7 +346,7 @@
         current-input (get changed-nodes node-id (str original-input))
         [input-text set-input-text] (uix/use-state current-input)
         is-affected (contains? affected-nodes node-id)]
-    
+
     ;; Update input text when selected node changes
     (uix/use-effect
      (fn []
@@ -360,7 +357,7 @@
                current-input (get changed-nodes node-id (str original-input))]
            (set-input-text current-input))))
      [selected-node changed-nodes])
-    
+
     (when selected-node
       ($ :div {:className "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl"}
          ($ :div {:className "p-6"}
@@ -369,7 +366,7 @@
                   (str (if is-affected "Affected Node: " "Editing Input for: ") node-name))
                ($ :div {:className "text-sm text-gray-600 mb-2"}
                   (str "Node ID: " node-id)))
-            
+
             (if is-affected
               ;; Show disabled state for affected nodes
               ($ :div {:className "bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center"}
@@ -383,36 +380,35 @@
                                             :color "gray"
                                             :truncate-length 80
                                             :depth 0}))))
-              
-              ;; Show normal editing interface for unaffected nodes
-              ($ :div {:className "space-y-4"}
-                 ($ :div
-                    ($ :label {:className "block text-sm font-medium text-gray-700 mb-2"}
-                       "New Input:")
-                    ($ :textarea {:className "w-full h-32 p-3 border border-gray-300 rounded-md font-mono text-sm resize-y"
-                                  :value input-text
-                                  :onChange (fn [e]
-                                              (let [new-value (.-value (.-target e))]
-                                                (set-input-text new-value)
-                                                (when on-change-node-input
-                                                  (on-change-node-input node-id new-value))))
-                                  :placeholder "Enter new input value..."}))
-                 
-                 ($ :div {:className "text-xs text-gray-500"}
-                    ($ :span {:className "font-medium"} "Original: ")
-                    ($ generic-data-viewer {:data original-input
-                                            :color "gray"
-                                            :truncate-length 80
-                                            :depth 0}))))))))
 
+              ;; Show normal editing interface for unaffected nodes
+            ($ :div {:className "space-y-4"}
+               ($ :div
+                  ($ :label {:className "block text-sm font-medium text-gray-700 mb-2"}
+                     "New Input:")
+                  ($ :textarea {:className "w-full h-32 p-3 border border-gray-300 rounded-md font-mono text-sm resize-y"
+                                :value input-text
+                                :onChange (fn [e]
+                                            (let [new-value (.-value (.-target e))]
+                                              (set-input-text new-value)
+                                              (when on-change-node-input
+                                                (on-change-node-input node-id new-value))))
+                                :placeholder "Enter new input value..."}))
+
+               ($ :div {:className "text-xs text-gray-500"}
+                  ($ :span {:className "font-medium"} "Original: ")
+                  ($ generic-data-viewer {:data original-input
+                                          :color "gray"
+                                          :truncate-length 80
+                                          :depth 0}))))))))
 
 (defui info-panel [{:keys [graph-data summary-data]}]
   (let [result (:result summary-data)
         failure? (:failure? result)
         result-val (:val result)]
-    
+
     ($ :div {:className "space-y-4"}
-       
+
        ;; NEW: Final Result Panel
        (when result
          ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
@@ -438,46 +434,44 @@
              model-calls 156]
          ($ :div {:className "grid grid-cols-1 gap-3"}
           ;; Execution time
-          ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
-             ($ :div {:className "flex justify-between items-center"}
-                ($ :div
-                   ($ :div {:className "text-sm font-medium text-gray-700"} "Execution Time"))
-                ($ :div {:className "text-right"}
-                   ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-execution-time) "ms")))))
-          
-          
-          ;; Store operations
-          ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
-             ($ :div
-                ($ :div {:className "text-sm font-medium text-gray-700 mb-2"} "Store Operations")
-                ($ :div {:className "flex justify-between items-center"}
-                   ($ :div
-                      ($ :div {:className "text-xs text-gray-600"} "Reads")
-                      ($ :div {:className "text-lg font-bold text-gray-800"} store-reads))
-                   ($ :div
-                      ($ :div {:className "text-xs text-gray-600"} "Writes") 
-                      ($ :div {:className "text-lg font-bold text-gray-800"} store-writes)))))
-          
+            ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
+               ($ :div {:className "flex justify-between items-center"}
+                  ($ :div
+                     ($ :div {:className "text-sm font-medium text-gray-700"} "Execution Time"))
+                  ($ :div {:className "text-right"}
+                     ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-execution-time) "ms")))))
+
+;; Store operations
+            ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
+               ($ :div
+                  ($ :div {:className "text-sm font-medium text-gray-700 mb-2"} "Store Operations")
+                  ($ :div {:className "flex justify-between items-center"}
+                     ($ :div
+                        ($ :div {:className "text-xs text-gray-600"} "Reads")
+                        ($ :div {:className "text-lg font-bold text-gray-800"} store-reads))
+                     ($ :div
+                        ($ :div {:className "text-xs text-gray-600"} "Writes")
+                        ($ :div {:className "text-lg font-bold text-gray-800"} store-writes)))))
+
           ;; Model calls
-          ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
-             ($ :div {:className "flex justify-between items-center"}
-                ($ :div
-                   ($ :div {:className "text-sm font-medium text-gray-700"} "Model Calls")
-                   )
-                ($ :div {:className "text-right"}
-                   ($ :div {:className "text-lg font-bold text-gray-800"} model-calls))))
+            ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
+               ($ :div {:className "flex justify-between items-center"}
+                  ($ :div
+                     ($ :div {:className "text-sm font-medium text-gray-700"} "Model Calls"))
+                  ($ :div {:className "text-right"}
+                     ($ :div {:className "text-lg font-bold text-gray-800"} model-calls))))
 
           ;; Tokens
-          ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
-             ($ :div {:className "flex justify-between items-center"}
-                ($ :div
-                   ($ :div {:className "text-sm font-medium text-gray-700"} "Tokens"))
-                ($ :div {:className "text-right"}
-                   ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens)))))))))))
+            ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
+               ($ :div {:className "flex justify-between items-center"}
+                  ($ :div
+                     ($ :div {:className "text-sm font-medium text-gray-700"} "Tokens"))
+                  ($ :div {:className "text-right"}
+                     ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens)))))))))))
 
 (defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live]}]
   (let [[active-tab set-active-tab] (uix/use-state :info)]
-    
+
     ;; Update forking mode when tab changes
     (uix/use-effect
      (fn []
@@ -486,7 +480,7 @@
            (when (not= forking-mode? should-be-forking)
              (on-toggle-forking-mode)))))
      [active-tab forking-mode? on-toggle-forking-mode])
-    
+
     ($ :div {:className "fixed right-0 top-32 h-[calc(100vh-8rem)] w-80 bg-white shadow-lg border-l border-gray-200 overflow-hidden z-40"}
        ;; Tab header
        ($ :div {:className "border-b border-gray-200 p-4"}
@@ -505,16 +499,16 @@
                                              "text-gray-600 hover:text-gray-900"))
                            :onClick #(set-active-tab :fork)}
                   (str "Fork" (when (> (count changed-nodes) 0) (str " (" (count changed-nodes) ")")))))))
-       
+
        ;; Tab content
        ($ :div {:className "p-4 h-full overflow-y-auto"}
           (case active-tab
             :info ($ info-panel {:graph-data graph-data :summary-data summary-data})
-            
+
             :fork (if (empty? changed-nodes)
                     ($ :div {:className "text-gray-500 text-center py-8"}
                        "No changes yet. Select a node to edit its input.")
-                    
+
                     ($ :div {:className "space-y-3"}
                        ;; Changed nodes list
                        (for [[node-id new-input] changed-nodes]
@@ -532,33 +526,33 @@
                                                         (on-select-node node-id))))]
 
                            ($ :div {:key node-id
-                                    :className (str "border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow " 
-                                                    (if is-overridden 
-                                                      "bg-yellow-50 border-yellow-300 hover:bg-yellow-100" 
+                                    :className (str "border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow "
+                                                    (if is-overridden
+                                                      "bg-yellow-50 border-yellow-300 hover:bg-yellow-100"
                                                       "bg-gray-50 border-gray-200 hover:bg-gray-100"))
                                     :onClick handle-select-node}
                               ($ :div {:className "flex justify-between items-start mb-2"}
                                  ($ :div
-                                    ($ :div {:className "font-medium text-gray-800 text-sm flex items-center gap-2"} 
+                                    ($ :div {:className "font-medium text-gray-800 text-sm flex items-center gap-2"}
                                        node-name)
                                     ($ :div {:className "text-xs text-gray-500 font-mono"} (str "ID: " node-id))
                                     (when is-overridden
                                       ($ :div {:className "bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded mt-1 font-medium"}
                                          "⚠️ This change will not be reached")))
                                  ($ :button {:className "cursor-pointer text-red-500 hover:text-red-700 text-sm"
-                                             :onClick (fn [e] 
+                                             :onClick (fn [e]
                                                         (.stopPropagation e)
                                                         (when on-remove-node-change
                                                           (on-remove-node-change node-id)))}
                                     "Remove"))
-                              
+
                               ($ :div {:className "text-xs"}
                                  ($ :div {:className "text-gray-600 mb-1"} "New input:")
                                  ($ :div {:className "bg-white p-2 rounded border font-mono text-gray-800 break-all"}
                                     (if (> (count new-input) 100)
                                       (str (subs new-input 0 100) "...")
                                       new-input))))))
-                       
+
                        ;; Action buttons
                        ($ :div {:className "pt-4 border-t border-gray-200 space-y-2"}
                           ($ :button {:className "w-full font-medium py-2 px-4 rounded-md transition-colors bg-blue-600 hover:bg-blue-700 text-white"
@@ -567,7 +561,6 @@
                           ($ :button {:className "w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors"
                                       :onClick on-clear-fork}
                              "Clear All Changes")))))))))
-
 
 (defn process-graph-data
   "Applies Dagre layout to pre-processed nodes and edges."
@@ -584,12 +577,12 @@
                                         :node-id id)})))
 
         all-edges (concat real-edges implicit-edges)]
-    
+
     (.setDefaultEdgeLabel g (fn [] #js {}))
     (.setGraph g #js {})
 
     (doseq [edge all-edges] (.setEdge g (:source edge) (:target edge)))
-    (doseq [node nodes] 
+    (doseq [node nodes]
       (.setNode g (:id node) (clj->js (merge node {:width 170 :height 40}))))
 
     (Dagre/layout g)
@@ -600,7 +593,7 @@
       {:nodes nodes-with-layout
        :edges all-edges})))
 
-(defn find-downstream-nodes 
+(defn find-downstream-nodes
   "Find all nodes that are downstream from the given set of modified node IDs.
    This includes nodes that are both modified AND downstream (overridden nodes)."
   [graph-data modified-node-ids]
@@ -622,8 +615,8 @@
                                                                   downstream
                                                                   (conj downstream current))
                                                  new-to-visit (into remaining emitted-ids)]
-                                             (recur new-to-visit 
-                                                    (conj visited current) 
+                                             (recur new-to-visit
+                                                    (conj visited current)
                                                     new-downstream)))))))]
     ;; Collect downstream nodes from all modified nodes
     (reduce (fn [all-downstream modified-node-id]
@@ -631,24 +624,23 @@
             #{}
             modified-node-ids)))
 
-(defui graph-view [{:keys [module-id agent-name invoke-id 
-                            graph-data real-edges summary-data implicit-edges
-                            is-complete is-live connected?
-                            selected-node-id forking-mode? changed-nodes
-                            on-select-node on-execute-fork on-clear-fork
-                            on-change-node-input on-remove-node-change
-                            on-toggle-forking-mode on-paginate-node]}]
+(defui graph-view [{:keys [module-id agent-name invoke-id
+                           graph-data real-edges summary-data implicit-edges
+                           is-complete is-live connected?
+                           selected-node-id forking-mode? changed-nodes
+                           on-select-node on-execute-fork on-clear-fork
+                           on-change-node-input on-remove-node-change
+                           on-toggle-forking-mode on-paginate-node]}]
   (let [;; Convert selected-node-id to actual node object when needed
         [selected-node set-selected-node-internal] (uix/use-state nil)
 
-        
         affected-nodes (when forking-mode?
                          (find-downstream-nodes graph-data (set (keys changed-nodes))))
-        
+
         ;; Use React Flow's state management hooks
         [flow-nodes set-nodes on-nodes-change] (useNodesState (clj->js []))
         [flow-edges set-edges on-edges-change] (useEdgesState (clj->js []))
-        
+
         ;; Update React Flow nodes/edges when graph data changes
         _ (uix/use-effect
            (fn []
@@ -662,26 +654,25 @@
                                                                  :stroke "#aaa"})
                                          edge)))))))
            [graph-data real-edges implicit-edges])
-        
+
         ;; Update selected node when selected-node-id changes
         _ (uix/use-effect
            (fn []
              (when selected-node-id
                (let [nodes (js->clj flow-nodes :keywordize-keys true)
                      target-node (->> nodes
-                                     (filter #(= (-> % :data :node-id) selected-node-id))
-                                     first)]
+                                      (filter #(= (-> % :data :node-id) selected-node-id))
+                                      first)]
                  (when target-node
                    (set-selected-node-internal (clj->js target-node))))))
            [selected-node-id flow-nodes])
-        
+
         ;; Use callbacks passed as props
         handle-select-node-click (fn [node]
                                    (when on-select-node
                                      (let [node-data (js->clj (.-data node) :keywordize-keys true)]
-                                       (on-select-node (:node-id node-data)))))
-]
-    
+                                       (on-select-node (:node-id node-data)))))]
+
     (if (empty? graph-data)
       ($ :div.flex.justify-center.items-center.py-8
          ($ :div.text-gray-500 "No graph data available"))
@@ -689,7 +680,7 @@
          ;; Main content area with right margin for the stats panel
          ($ :div {:className "mr-80"}
             ($ :div {:style {:width "100%" :height "500px"}}
-                 ($ ReactFlow {:nodes flow-nodes 
+               ($ ReactFlow {:nodes flow-nodes
                              :edges flow-edges
                              :onNodesChange on-nodes-change
                              :onEdgesChange on-edges-change
@@ -706,10 +697,10 @@
                                                            base-classes (cond
                                                                           is-affected
                                                                           ["bg-gray-300" "text-gray-500" "border-2" "border-gray-400"]
-                                                                          
+
                                                                           has-changes
                                                                           ["bg-orange-500" "text-white" "border-2" "border-orange-600"]
-                                                                          
+
                                                                           (agg-node? data)
                                                                           ["bg-yellow-500" "text-white" "border-2" "border-yellow-600"]
 
@@ -737,7 +728,7 @@
                                                                ($ :div {:className "absolute inset-0 bg-amber-500 rounded-full animate-pulse"})))
                                                           ($ Handle {:type "target" :position "top"})
                                                           ($ Handle {:type "source" :position "bottom"})))))
-                                                  
+
                                                   "phantom"
                                                   (uix.core/as-react
                                                    (fn [{:keys [data]}]
@@ -757,7 +748,7 @@
                   ($ MiniMap {:position "bottom-right" :pannable true :zoomable true})
                   ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
                   ($ Controls {:className "fill-gray-500 stroke-gray-500"})))
-            
+
             ;; Show selected node details or forking input component
             (when selected-node
               (if forking-mode?
@@ -773,7 +764,7 @@
                                             :module-id module-id
                                             :agent-name agent-name
                                             :invoke-id invoke-id}))))
-         
+
          ;; Always-visible right panel with tabs
          ($ right-panel {:graph-data graph-data
                          :summary-data summary-data
