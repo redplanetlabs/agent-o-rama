@@ -112,28 +112,5 @@
   (chsk-send! event-vec))
 
 (defn init! []
-  (start-router!)
-  ;; Clean up subscriptions when the window/tab is closed
-  (.addEventListener js/window "beforeunload" 
-                     (fn [_]
-                       ;; Send synchronous unsubscribe if possible
-                       (when-let [active-sub (get-in @state/app-db [:sente :active-subscription])]
-                         (push! [:live/unsubscribe {:sub-key (:sub-key active-sub)
-                                                    :sub-type :live-graph}])))))
+  (start-router!))
 
-;; =============================================================================
-;; LIVE CONTROL (decoupled from React components)
-;; =============================================================================
-
-(defn live-start! [{:keys [module-id agent-name invoke-id interval-ms] :as opts}]
-  (request! [:agent/live-graph-start
-             {:module-id module-id
-              :agent-name agent-name
-              :invoke-id invoke-id
-              :interval-ms (or interval-ms 1000)}] 5000 nil))
-
-(defn live-stop! [{:keys [module-id agent-name invoke-id] :as opts}]
-  (request! [:agent/live-graph-stop
-             {:module-id module-id
-              :agent-name agent-name
-              :invoke-id invoke-id}] 3000 nil))

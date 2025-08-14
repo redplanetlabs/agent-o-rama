@@ -141,8 +141,6 @@
 
 (defmethod api-handler :api/get-invocations
   [_ {:keys [module-id agent-name pagination]} uid]
-  (def module-id module-id)
-  (println "---")
   (let [pages (if (empty? pagination) nil pagination)]
     (filter-encodable (foreign-invoke-query
                        (:invokes-page-query (objects module-id agent-name))
@@ -162,104 +160,32 @@
     {:task-id (.getTaskId inv)
      :invoke-id (.getAgentInvokeId inv)}))
 
-(defmethod api-handler :api/get-invocation-summary
-  [_ {:keys [module-id agent-name invoke-id]} uid]
+;; Unified graph page fetcher - replaces separate live/historical flows
+(defmethod api-handler :api/fetch-graph-page
+  [_ {:keys [module-id agent-name invoke-id leaves]} uid]
   (let [client-objects (objects module-id agent-name)
-        root-pstate (:root-pstate client-objects)
-        history-pstate (:graph-history-pstate client-objects)
-        [agent-task-id agent-id] (parse-url-pair invoke-id)
-        
-        ;; Get basic summary info including graph-version
-        summary-info (foreign-select-one [(keypath agent-id)
-                                          (submap [:result :start-time-millis :finish-time-millis :graph-version])]
-                                        root-pstate
-                                        {:pkey agent-task-id})
-        
-        ;; Determine if invocation is complete
-        is-complete (boolean (:finish-time-millis summary-info))
-        
-        ;; Always get root invoke id (needed for both live and historical paths)
-        root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                                          root-pstate
-                                          {:pkey agent-task-id})
-        
-        ;; Fetch the historical graph for implicit edge calculation on client
-        graph-version (:graph-version summary-info)
-        historical-graph (when graph-version
-                          (foreign-select-one [(keypath graph-version)]
-                                              history-pstate
-                                              {:pkey agent-task-id}))]
-    
-    (merge (filter-encodable summary-info)
-           {:is-complete is-complete
-            :root-invoke-id root-invoke-id
-            :task-id agent-task-id
-            :agent-id agent-id
-            :historical-graph (filter-encodable historical-graph)})))
-
-(defmethod api-handler :api/get-full-graph
-  [_ {:keys [module-id agent-name invoke-id]} uid]
-  ;; Reuse the existing paginated logic but fetch everything at once
-  (let [client-objects (objects module-id agent-name)
-        root-pstate (:root-pstate client-objects)
-        history-pstate (:graph-history-pstate client-objects)
         tracing-query (:tracing-query client-objects)
-        
-        [agent-task-id agent-id] (parse-url-pair invoke-id)
-        
-        ;; Fetch summary and graph version
-        summary-info (foreign-select-one [(keypath agent-id)
-                                         (submap [:invoke-args :result :start-time-millis :finish-time-millis :graph-version])]
-                                        root-pstate
-                                        {:pkey agent-task-id})
-        
-        graph-version (:graph-version summary-info)
-        
-        ;; Fetch historical graph
-        historical-graph (foreign-select-one [(keypath graph-version)]
-                                           history-pstate
-                                           {:pkey agent-task-id})
-        
-        ;; Get root invoke id
-        root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                                          root-pstate
-                                          {:pkey agent-task-id})
-        
-        ;; Fetch complete trace - use a larger limit for complete graphs
-        dynamic-trace (when (and root-invoke-id historical-graph)
-                       (foreign-invoke-query tracing-query 
-                                           agent-task-id 
-                                           [[agent-task-id root-invoke-id]] 
-                                           1000)) ;; Higher limit for complete graphs
-        
-        invokes-map-cleaned (when dynamic-trace
-                             (-> (:invokes-map dynamic-trace)
-                                 (remove-implicit-nodes)
-                                 (filter-encodable)))]
-    
-    {:invokes-map invokes-map-cleaned
-     :summary (filter-encodable summary-info)}))
-
-(defmethod api-handler :api/paginate-node
-  [_ {:keys [module-id agent-name invoke-id missing-node-id]} uid]
-  ;; Find the task-id for the missing node and fetch it
-  (let [client-objects (objects module-id agent-name)
         root-pstate (:root-pstate client-objects)
-        tracing-query (:tracing-query client-objects)
-        
-        [agent-task-id _] (parse-url-pair invoke-id)
-        
-        ;; TODO: Need to find the task-id for the missing node
-        ;; For now, we'll need to track this in the client state
-        dynamic-trace (foreign-invoke-query tracing-query
-                                            agent-task-id
-                                            [[agent-task-id (parse-long missing-node-id)]]
-                                            100)]
-    
-    (when dynamic-trace
-      {:invokes-map (-> (:invokes-map dynamic-trace)
-                       (remove-implicit-nodes)
-                       (filter-encodable))})))
+        [agent-task-id agent-id] (parse-url-pair invoke-id)
+        ;; If no leaves, bootstrap from root
+        start-pairs (if (or (nil? leaves) (empty? leaves))
+                      (let [root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                                                              root-pstate {:pkey agent-task-id})]
+                        [[agent-task-id root-invoke-id]])
+                      leaves)
+        ;; Use larger page size on first fetch to fast-path historical data
+        page-limit (if (or (nil? leaves) (empty? leaves)) 1000 100)
+        dynamic-trace (when (seq start-pairs)
+                        (foreign-invoke-query tracing-query
+                                              agent-task-id
+                                              start-pairs
+                                              page-limit))
+        cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
+                        (-> m remove-implicit-nodes filter-encodable))
+        next-leaves (:next-task-invoke-pairs dynamic-trace)]
+    {:nodes cleaned-nodes
+     :next-leaves next-leaves
+     :is-stream-complete (empty? next-leaves)}))
 
 (defmethod api-handler :api/execute-fork
   [_ {:keys [module-id agent-name invoke-id changed-nodes]} uid]

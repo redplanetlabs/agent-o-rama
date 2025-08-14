@@ -99,10 +99,6 @@
   [ev-msg]
   (handle-api-event ev-msg))
 
-(defmethod -event-msg-handler :api/get-full-graph
-  [ev-msg]
-  (handle-api-event ev-msg))
-
 (defmethod -event-msg-handler :api/paginate-node
   [ev-msg]
   (handle-api-event ev-msg))
@@ -149,41 +145,10 @@
                                         :before-count before-count :after-count after-count
                                         :removed? (not= before-count after-count)}))))
 
-;; =============================================================================
-;; CLIENT-DRIVEN UPDATE HANDLER - Clients request updates based on their state
-;; =============================================================================
-
-(defmethod -event-msg-handler :live/get-updates
-  [{:as ev-msg :keys [?data uid ?reply-fn]}]
-  (let [{:keys [module-id agent-name invoke-id leaves]} ?data]
-    ;; Check if uid is actually subscribed to this invoke-id
-    (let [subscribed? (contains? (get @subscriptions :live-graph)
-                                 {:uid uid :module-id module-id 
-                                  :agent-name agent-name :invoke-id invoke-id})]
-      (if-not subscribed?
-        (log/warn "Client" uid "requested updates for" invoke-id "without subscription")
-        (try
-          (let [client-objects (agents/objects module-id agent-name)
-                
-                ;; If there are no leaves, start from the root. Otherwise, start from the leaves.
-                start-pairs (if (empty? leaves)
-                              (let [root-pstate (:root-pstate client-objects)
-                                    [task-id agent-id] (agents/parse-url-pair invoke-id)
-                                    root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id] 
-                                                                       root-pstate {:pkey task-id})]
-                                [[task-id root-invoke-id]])
-                              leaves)]
-            
-            ;; Use the helper function that returns both nodes and next leaves
-            (when-let [result (agents/current-invocation-invokes-map module-id agent-name invoke-id start-pairs)]
-              (when-let [nodes-map (:invokes-map result)]
-                (chsk-send! uid [:graph/nodes-merge {:invoke-id invoke-id :nodes nodes-map}]))
-              
-              ;; Send back the next set of leaves to continue from!
-              (chsk-send! uid [:live/update-next-leaves {:invoke-id invoke-id
-                                                         :next-leaves (:next-task-invoke-pairs result)}])))
-          (catch Exception e
-            (log/error e "Error fetching live updates for" invoke-id)))))))
+;; New unified page fetch endpoint
+(defmethod -event-msg-handler :api/fetch-graph-page
+  [ev-msg]
+  (handle-api-event ev-msg))
 
 ;; =============================================================================
 ;; SUBSCRIPTION EVENT HANDLERS
