@@ -92,12 +92,13 @@
       ;; Start loading if the agent isn't already marked as complete
       ;; The loop will naturally stop when the server reports completion
       (when-not is-complete?
-        ;; Start from root (empty leaves signals "fetch from root")
+        ;; Start from root. Mark this explicitly as the initial load.
         (state/dispatch [:invocation/fetch-graph-page
                          {:invoke-id invoke-id
                           :module-id module-id
                           :agent-name agent-name
-                          :leaves []}]))
+                          :leaves []
+                          :initial? true}]))
       
       ;; Return nil to indicate no immediate state change
       nil)))
@@ -110,13 +111,14 @@
 
 ;; Kick off or continue fetching a page of graph data
 (state/reg-event :invocation/fetch-graph-page
-  (fn [db {:keys [invoke-id module-id agent-name leaves]}]
+  (fn [db {:keys [invoke-id module-id agent-name leaves initial?]}]
     (sente/request!
       [:api/fetch-graph-page
        {:invoke-id invoke-id
         :module-id module-id
         :agent-name agent-name
-        :leaves (or leaves [])}]
+        :leaves (or leaves [])
+        :initial? (boolean initial?)}]
       10000
       (fn [reply]
         (if (:success reply)
@@ -127,10 +129,18 @@
 ;; Process a page response, merge nodes, and implement robust loop logic
 (state/reg-event :invocation/process-graph-page
   (fn [db invoke-id page-data]
-    (let [{:keys [nodes next-leaves has-more-leaves? 
+    (let [{:keys [nodes next-leaves 
                   summary historical-graph root-invoke-id 
                   task-id is-complete]} page-data
           current-invocation (get-in db [:current-invocation])]
+      ;; Diagnostics: log the page payload driving the state machine
+      (println "[POLLING-STATELESS] process-graph-page"
+               {:invoke-id invoke-id
+                :is-complete is-complete
+                :has-more-leaves? (some? next-leaves)
+                :nodes (when nodes (count nodes))
+                :next-leaves (when next-leaves (count next-leaves))
+                :has-summary (boolean summary)})
       
       ;; If this is the first page (contains summary), store all metadata
       (when summary
@@ -149,47 +159,39 @@
       (when (and nodes (seq nodes))
         (state/dispatch [:invocation/merge-nodes invoke-id nodes]))
 
-      ;; STATE MACHINE LOGIC: Decide how to continue based purely on data
+      ;; STATE MACHINE LOGIC: Simplified
       (cond
-        ;; Case 1: Agent is complete - Chain naturally ends
+        ;; Chain ends when complete
         is-complete
         (do
           (println "[POLLING-STATELESS] Loop naturally ends. Agent complete for" invoke-id)
-          nil) ; No further action, the chain stops here
-        
-        ;; Case 2: Fast pagination - More leaves available, continue immediately
-        has-more-leaves?
+          nil)
+
+        ;; Fast pagination if we have next leaves in the payload
+        (seq next-leaves)
         (do
-          (println "[POLLING-STATELESS] Fast pagination: continuing with" (count (or next-leaves [])) "leaves")
+          (println "[POLLING-STATELESS] Fast pagination: continuing with" (count next-leaves) "leaves")
           (state/dispatch [:invocation/fetch-graph-page
-                           (assoc current-invocation :leaves (or next-leaves []))]))
-        
-        ;; Case 3: No more known leaves BUT agent is still running - Delayed re-poll
-        ;; We only schedule this if the server tells us it's not complete
-        (not is-complete)
+                           (assoc current-invocation :leaves (vec next-leaves) :initial? false)]))
+
+        ;; No immediate leaves; schedule delayed re-poll if still incomplete
+        :else
         (do
           (println "[POLLING-STATELESS] Scheduling delayed re-poll...")
           (js/setTimeout
             (fn []
-              ;; At the moment this timer fires, re-read the state
-              ;; This check is LOCAL to this closure. No global flag needed.
               (let [current-db @state/app-db
                     is-still-incomplete? (not (get-in current-db [:invocations-data invoke-id :is-complete]))
                     current-leaves (state/get-unfinished-leaves current-db invoke-id)]
-                
-                (if is-still-incomplete?
-                  (do
-                    (println "[POLLING-STATELESS] Delayed re-poll executing for" invoke-id)
-                    (state/dispatch [:invocation/fetch-graph-page
-                                     (assoc current-invocation :leaves current-leaves)]))
-                  (println "[POLLING-STATELESS] Delayed re-poll cancelled. Agent completed in the meantime."))))
-            2000)) ; Poll again in 2 seconds
-        
-        ;; Case 4: Base case, is-complete is true but we just found out. Do nothing.
-        :else
-        (do
-          (println "[POLLING-STATELESS] Agent is now complete. Final poll finished for" invoke-id)
-          nil))
+                (println "[POLLING-STATELESS] delayed-check"
+                         {:invoke-id invoke-id
+                          :is-still-incomplete? is-still-incomplete?
+                          :current-leaves (count current-leaves)})
+                (when is-still-incomplete?
+                  (println "[POLLING-STATELESS] Delayed re-poll executing for" invoke-id)
+                  (state/dispatch [:invocation/fetch-graph-page
+                                   (assoc current-invocation :leaves current-leaves :initial? false)]))))
+            2000)))
       
       nil)))
 

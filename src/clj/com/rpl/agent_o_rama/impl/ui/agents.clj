@@ -163,39 +163,39 @@
 
 ;; Unified graph page fetcher - replaces separate live/historical flows
 (defmethod api-handler :api/fetch-graph-page
-  [_ {:keys [module-id agent-name invoke-id leaves]} uid]
+  [_ {:keys [module-id agent-name invoke-id leaves initial?]} uid]
   (let [client-objects (objects module-id agent-name)
         tracing-query (:tracing-query client-objects)
         root-pstate (:root-pstate client-objects)
         history-pstate (:graph-history-pstate client-objects)
         [agent-task-id agent-id] (parse-url-pair invoke-id)
         
-        ;; On first request (empty leaves), fetch summary data too
-        is-first-request? (or (nil? leaves) (empty? leaves))
+        ;; Explicit initial flag from client; fallback to leaves-empty for backward compat
+        is-initial-load? (boolean initial?)
         
         ;; Get summary info on first request
-        summary-info (when is-first-request?
+        summary-info (when is-initial-load?
                        (foreign-select-one [(keypath agent-id)
                                            (submap [:result :start-time-millis :finish-time-millis :graph-version])]
                                           root-pstate
                                           {:pkey agent-task-id}))
         
         ;; Get historical graph on first request for implicit edge calculation
-        historical-graph (when is-first-request?
+        historical-graph (when is-initial-load?
                           (when-let [graph-version (:graph-version summary-info)]
                             (foreign-select-one [(keypath graph-version)]
                                                history-pstate
                                                {:pkey agent-task-id})))
         
         ;; If no leaves, bootstrap from root
-        start-pairs (if is-first-request?
+        start-pairs (if is-initial-load?
                       (let [root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
                                                               root-pstate {:pkey agent-task-id})]
                         [[agent-task-id root-invoke-id]])
                       leaves)
         
         ;; Use larger page size on first fetch to fast-path historical data
-        page-limit (if is-first-request? 1000 100)
+        page-limit (if is-initial-load? 1000 100)
         dynamic-trace (when (seq start-pairs)
                         (foreign-invoke-query tracing-query
                                               agent-task-id
@@ -211,20 +211,25 @@
                                  (foreign-select-one [(keypath agent-id) :finish-time-millis]
                                                     root-pstate
                                                     {:pkey agent-task-id})))
-          ;; Stream should continue if agent is still running AND there are more leaves
+          ;; Keep legacy variable for logging only; client no longer depends on it
           has-more-leaves? (and (not agent-is-complete?) (seq next-leaves))]
-      (merge {:nodes cleaned-nodes
-              :next-leaves next-leaves
-              :has-more-leaves? has-more-leaves?
-              ;; ALWAYS include is-complete status for client state machine
-              :is-complete agent-is-complete?}
-             ;; Include summary data only on first request
-             (when is-first-request?
-               {:summary (filter-encodable summary-info)
-                :historical-graph (filter-encodable historical-graph)
-                :root-invoke-id (when (seq start-pairs) (second (first start-pairs)))
-                :task-id agent-task-id
-                :agent-id agent-id})))))
+      ;; Diagnostics: trace what the server is returning for polling loop decisions
+      (println "[SERVER][fetch-graph-page]"
+               {:invoke-id invoke-id
+                :is-initial-load? is-initial-load?
+                :agent-is-complete? agent-is-complete?
+                :has-more-leaves? (boolean has-more-leaves?)
+                :nodes (when cleaned-nodes (count cleaned-nodes))
+                :next-leaves (when next-leaves (count next-leaves))})
+      ;; Construct simplified response. Only include keys that are present.
+      (cond-> {:is-complete agent-is-complete?}
+        (seq cleaned-nodes) (assoc :nodes cleaned-nodes)
+        (seq next-leaves)   (assoc :next-leaves next-leaves)
+        is-initial-load?    (assoc :summary (filter-encodable summary-info)
+                                   :historical-graph (filter-encodable historical-graph)
+                                   :root-invoke-id (when (seq start-pairs) (second (first start-pairs)))
+                                   :task-id agent-task-id
+                                   :agent-id agent-id)))))
 
 (defmethod api-handler :api/execute-fork
   [_ {:keys [module-id agent-name invoke-id changed-nodes]} uid]
