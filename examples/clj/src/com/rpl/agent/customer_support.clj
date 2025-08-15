@@ -527,42 +527,33 @@
                                                        "$$car-rentals-by-id")
              policies-store             (aor/get-store agent-node "$$policies")]
 
-         (prn :A)
-
          ;; Populate flights stores - organize by departure airport and by ID
          (let [flights-by-departure (group-by :departure-airport MOCK-FLIGHTS)]
            (doseq [[departure-airport flights] flights-by-departure]
              (store/put! flights-by-departure-store departure-airport flights)))
 
-         (prn :B)
          (doseq [flight MOCK-FLIGHTS]
            (store/put! flights-by-id-store (:flight-id flight) flight))
 
-         (prn :C)
          ;; Populate hotels stores - organize by location and by ID
          (let [hotels-by-location (group-by :location MOCK-HOTELS)]
            (doseq [[location hotels] hotels-by-location]
              (store/put! hotels-by-location-store location hotels)))
 
-         (prn :D)
          (doseq [hotel MOCK-HOTELS]
            (store/put! hotels-by-id-store (:hotel-id hotel) hotel))
 
-         (prn :E)
          ;; Populate car rentals stores - organize by location and by ID
          (let [car-rentals-by-location (group-by :location MOCK-CAR-RENTALS)]
            (doseq [[location car-rentals] car-rentals-by-location]
              (store/put! car-rentals-by-location-store location car-rentals)))
 
-         (prn :F)
          (doseq [rental MOCK-CAR-RENTALS]
            (store/put! car-rentals-by-id-store (:rental-id rental) rental))
 
-         (prn :G)
          ;; Populate policies store - store all policies as a single map
          (store/put! policies-store "all-policies" POLICIES)
 
-         (prn :H)
          (aor/result! agent-node
                       "Reference data stores initialized successfully")))))
 
