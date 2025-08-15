@@ -209,14 +209,6 @@
                                           (:result root-status)))
           ;; Keep legacy variable for logging only; client no longer depends on it
           has-more-leaves? (and (not agent-is-complete?) (seq next-leaves))]
-      ;; Diagnostics: trace what the server is returning for polling loop decisions
-      (println "[SERVER][fetch-graph-page]"
-               {:invoke-id invoke-id
-                :is-initial-load? is-initial-load?
-                :agent-is-complete? agent-is-complete?
-                :has-more-leaves? (boolean has-more-leaves?)
-                :nodes (when final-cleaned-nodes (count final-cleaned-nodes))
-                :next-leaves (when next-leaves (count next-leaves))})
       ;; Construct simplified response. Only include keys that are present.
       (cond-> {:is-complete agent-is-complete?}
         (seq final-cleaned-nodes) (assoc :nodes final-cleaned-nodes)
