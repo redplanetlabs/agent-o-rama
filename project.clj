@@ -7,55 +7,48 @@
              "-Xmx6g"
              "-XX:+UseG1GC"
              "-XX:MetaspaceSize=500000000"
-             ;; this gives us stack traces directly in output instead of an edn
-             ;; file in tmp, which will be lost on CI
+             ;; this gives us stack traces directly in output instead of an
+             ;; edn file in tmp, which will be lost on CI
              "-Dclojure.main.report=stderr"]
-  :dependencies [[org.clojure/clojure "1.12.0"]
-                 [com.rpl/rama-helpers "0.10.0"]
-                 [dev.langchain4j/langchain4j
-                  "1.2.0"
-                  :exclusions
-                  [org.slf4j/slf4j-api]]
-
-                 ;; ui dependencies
-                 [ring/ring-core "1.9.5"]
-                 [http-kit "2.8.0"]
-                 [ring/ring-codec "1.2.0"]
-
-                 ;; things needed for sente
-                 [com.taoensso/sente "1.20.0"]
-                 [ring/ring-defaults "0.4.0"]
-                 [com.cognitect/transit-clj "1.0.333"]
-                 [com.cognitect/transit-cljs "0.8.280"]
-                 ]
+  :dependencies
+    [[org.clojure/clojure "1.12.0"]
+     [com.rpl/rama-helpers "0.10.0"]
+     [dev.langchain4j/langchain4j "1.2.0" :exclusions [org.slf4j/slf4j-api]]
+     ;; ui dependencies
+     [ring/ring-core "1.9.5"]
+     [http-kit "2.8.0"]
+     [ring/ring-codec "1.2.0"]
+     ;; things needed for sente
+     [com.taoensso/sente "1.20.0"]
+     [ring/ring-defaults "0.4.0"]
+     [com.cognitect/transit-clj "1.0.333"]
+     [com.cognitect/transit-cljs "0.8.280"]]
   :global-vars {*warn-on-reflection* true}
   :repositories
-  [["releases"
-    {:id "maven-releases"
-     :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
-  :profiles {:dev {:resource-paths ["test/resources/"]
-                   :source-paths ["src/clj" "src/cljs" "resource"
-                                  "examples/clj"]
-                   :java-source-paths ["src/java" "test/java"]
-                   :dependencies
-                   [[meander/epsilon "0.0.650"]
-                    [dev.langchain4j/langchain4j-open-ai "1.2.0"]]}
-             :provided {:dependencies
-                        ;; TODO: fix Rama version
-                        [[com.rpl/rama "0.0.6-SNAPSHOT"]
-                         [org.apache.logging.log4j/log4j-slf4j18-impl
-                          "2.16.0"]]}
-             :gen {:prep-tasks []
-                   :source-paths ["scripts"]
-                   :dependencies [[comb "0.1.1"]
-                                  [org.clojure/clojure "1.12.0"]]}
-             :ui {:dependencies [[com.rpl/specter "1.1.4"] ;; only cljs
-                                 [com.pitch/uix.core "1.4.3"]
-                                 [com.pitch/uix.dom "1.4.3"]
-                                 [thheller/shadow-cljs "3.1.7"]
-                                 [net.java.dev.jna/jna "5.17.0"] ;; to fix dynlink error on arm macs
-                                 [org.clojure/clojure "1.12.0"]
-
-                                 [com.taoensso/sente "1.20.0"]
-                                 [com.cognitect/transit-cljs "0.8.280"]]}}
+    [["releases"
+      {:id "maven-releases",
+       :url
+         "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
+  :profiles
+    {:dev {:resource-paths ["test/resources/"],
+           :source-paths ["src/clj" "src/cljs" "resource" "examples/clj"],
+           :java-source-paths ["src/java" "test/java"],
+           :dependencies [[meander/epsilon "0.0.650"]
+                          [dev.langchain4j/langchain4j-open-ai "1.2.0"]]},
+     :provided {:dependencies
+                  ;; TODO: fix Rama version
+                  [[com.rpl/rama "0.0.6-SNAPSHOT"]
+                   [org.apache.logging.log4j/log4j-slf4j18-impl "2.16.0"]]},
+     :gen {:prep-tasks [],
+           :source-paths ["scripts"],
+           :dependencies [[comb "0.1.1"] [org.clojure/clojure "1.12.0"]]},
+     :ui {:dependencies [[com.rpl/specter "1.1.4"] ;; only cljs
+                         [com.pitch/uix.core "1.4.3"]
+                         [com.pitch/uix.dom "1.4.3"]
+                         [thheller/shadow-cljs "3.1.7"]
+                         [net.java.dev.jna/jna "5.17.0"] ;; to fix dynlink
+                                                         ;; error on arm macs
+                         [org.clojure/clojure "1.12.0"]
+                         [com.taoensso/sente "1.20.0"]
+                         [com.cognitect/transit-cljs "0.8.280"]]}}
   :plugins [[lein-exec "0.3.7"]])
