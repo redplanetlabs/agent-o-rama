@@ -20,10 +20,10 @@
        ;; Sente options:
        {;; We'll just use the default user-id-fn, which looks for a `:uid`
         ;; in the session. This will be nil for now for all anonymous users.
-        
+
         ;; Disable CSRF token check for development
         :csrf-token-fn nil
-        
+
         ;; Use Transit packer for proper serialization
         :packer transit-packer})]
 
@@ -46,66 +46,17 @@
 
 ;; Default handler for events that don't have a specific implementation
 (defmethod -event-msg-handler :default
-  [{:as ev-msg :keys [id ?data]}]
-  :do-nothing)
-
-;; =============================================================================
-;; API HANDLERS - Clean abstraction for request/response pattern
-;; =============================================================================
-
-;; Generic handler for all API events
-(defn handle-api-event
   [{:as ev-msg :keys [id ?data ?reply-fn uid]}]
-  (when ?reply-fn
-    (try
-      (let [result (agents/api-handler id ?data uid)]
-        (?reply-fn {:success true :data result}))
-      (catch Exception e
-        (?reply-fn {:success false 
-                    :error (.getMessage e)})))))
+  (try
+    (let [result (agents/api-handler id ?data uid)]
+      (?reply-fn {:success true :data result}))
+    (catch Exception e
+      (?reply-fn {:success false
+                  :error (.getMessage e)}))))
 
-;; Register handlers for each API endpoint
-(defmethod -event-msg-handler :api/get-agents
-  [ev-msg]
-  (handle-api-event ev-msg))
-
-(defmethod -event-msg-handler :api/get-invocations
-  [ev-msg]
-  (handle-api-event ev-msg))
-
-(defmethod -event-msg-handler :api/get-graph
-  [ev-msg]
-  (handle-api-event ev-msg))
-
-(defmethod -event-msg-handler :api/run-agent
-  [ev-msg]
-  (handle-api-event ev-msg))
-
-(defmethod -event-msg-handler :api/paginate-node
-  [ev-msg]
-  (handle-api-event ev-msg))
-
-(defmethod -event-msg-handler :api/execute-fork
-  [ev-msg]
-  (handle-api-event ev-msg))
-
-(defmethod -event-msg-handler :api/provide-human-input
-  [ev-msg]
-  (handle-api-event ev-msg))
-
-(defmethod -event-msg-handler :api/fetch-graph-page
-  [ev-msg]
-  (handle-api-event ev-msg))
-
-
-;; Handler for client connecting/disconnecting
-(defmethod -event-msg-handler :chsk/uidport-open
-  [{:as ev-msg :keys [uid]}]
-  :do-nothing)
-
-(defmethod -event-msg-handler :chsk/uidport-close
-  [{:as ev-msg :keys [uid]}]
-  :do-nothing)
+;; do nothing
+(defmethod -event-msg-handler :chsk/uidport-open [{:as ev-msg :keys [uid]}])
+(defmethod -event-msg-handler :chsk/uidport-close [{:as ev-msg :keys [uid]}])
 
 ;; 4. Router lifecycle functions
 (defonce router_ (atom nil))

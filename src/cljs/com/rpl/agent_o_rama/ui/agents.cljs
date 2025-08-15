@@ -72,7 +72,8 @@
   ;; The entire complex useEffect is replaced by this single line!
   (let [{:keys [data loading? error]}
         (queries/use-sente-query {:query-key [:agents]
-                                  :sente-event [:api/get-agents]})]
+                                  :sente-event [:api/get-agents]
+                                  :refetch-interval-ms 2000})]
 
     (cond
       ;; Still loading initial data
@@ -194,7 +195,8 @@
         (queries/use-sente-query {:query-key [:mini-invocations module-id agent-name]
                                   :sente-event [:api/get-invocations {:module-id module-id
                                                                       :agent-name agent-name
-                                                                      :pagination {}}]})
+                                                                      :pagination {}}]
+                                  :refetch-interval-ms 2000})
 
         [location navigate] (useLocation)]
     (cond
@@ -243,7 +245,8 @@
         {:keys [data loading? error]}
         (queries/use-sente-query {:query-key [:graph module-id agent-name]
                                   :sente-event [:api/get-graph {:module-id module-id
-                                                                :agent-name agent-name}]})]
+                                                                :agent-name agent-name}]
+                                  :refetch-interval-ms 2000})]
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
                   ($ :div.text-gray-500 "Loading graph via Sente..."))

@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.common
   (:require [cognitect.transit :as t]
             [clojure.string :as str]
-            [uix.core :as uix]))
+            [uix.core :as uix :refer [defhook]]))
 
 (defn url-decode [s]
   "Decode URL-encoded string using standard browser decoding"
@@ -79,3 +79,18 @@
      [stored-value key])
 
     [stored-value set-stored-value]))
+
+(defhook use-page-visibility
+  "Returns true if the document is currently visible, false otherwise.
+   Updates reactively when the tab visibility changes."
+  []
+  (let [[is-visible set-is-visible] (uix/use-state (not (.-hidden js/document)))]
+    (uix/use-effect
+     (fn []
+       (let [handler (fn [] (set-is-visible (not (.-hidden js/document))))]
+         (.addEventListener js/document "visibilitychange" handler)
+          ;; Cleanup function
+         (fn []
+           (.removeEventListener js/document "visibilitychange" handler))))
+     [])
+    is-visible))
