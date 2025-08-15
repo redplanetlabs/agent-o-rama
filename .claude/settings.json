@@ -1,0 +1,16 @@
+{
+  "includeCoAuthoredBy": false,
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|mcp__clojure-mcp__file_edit|mcp__clojure-mcp__file_write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "scripts/claude-java-formatter.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
