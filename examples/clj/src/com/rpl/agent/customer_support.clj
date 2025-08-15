@@ -32,14 +32,18 @@
 
 (def CUSTOMER-SUPPORT-SYSTEM-MESSAGE
   "You are a helpful customer support assistant for Swiss Airlines.
-   You help customers with flight bookings, changes, cancellations, and general
-   travel assistance.
+   You help customers with comprehensive travel planning including flight bookings,
+   changes, cancellations, and general travel assistance.
 
    You have access to tools to:
    - Search and view flight information
    - Update or cancel bookings
    - Search for hotels and make reservations
-   - Find car rental options
+   - Find and book car rental options
+   - Update or cancel car rental bookings
+   - Search for local excursions and activities
+   - Book excursions and experiences
+   - Search the web for travel-related information
    - Look up company policies
 
    Always be polite, helpful, and professional. If you cannot help with
@@ -102,6 +106,49 @@
     :car-type      "SUV"
     :price-per-day 85
     :available     true}])
+
+(def MOCK-EXCURSIONS
+  [{:excursion-id "E001"
+    :name "Statue of Liberty Tour"
+    :location "New York"
+    :category "sightseeing"
+    :duration "4 hours"
+    :price 89
+    :description
+    "Visit the iconic Statue of Liberty and Ellis Island with guided tour"
+    :available true}
+   {:excursion-id "E002"
+    :name         "Central Park Walking Tour"
+    :location     "New York"
+    :category     "nature"
+    :duration     "2 hours"
+    :price        35
+    :description  "Explore Central Park's highlights with an experienced guide"
+    :available    true}
+   {:excursion-id "E003"
+    :name         "Broadway Show Package"
+    :location     "New York"
+    :category     "entertainment"
+    :duration     "3 hours"
+    :price        150
+    :description  "Premium Broadway show tickets with pre-theater dinner"
+    :available    true}
+   {:excursion-id "E004"
+    :name         "Hollywood Studio Tour"
+    :location     "Los Angeles"
+    :category     "entertainment"
+    :duration     "6 hours"
+    :price        125
+    :description  "Behind-the-scenes tour of major Hollywood studios"
+    :available    true}
+   {:excursion-id "E005"
+    :name         "Santa Monica Beach Experience"
+    :location     "Los Angeles"
+    :category     "nature"
+    :duration     "3 hours"
+    :price        45
+    :description  "Beach activities, pier visit, and sunset viewing"
+    :available    true}])
 
 (def POLICIES
   {"baggage"
@@ -322,6 +369,115 @@
        {:status  "error"
         :message (format "Car rental %s not available" rental-id)}))))
 
+(defn search-excursions
+  "Search for available excursions in a location."
+  [agent-node config arguments]
+  (let [location (get arguments "location")
+        category (get arguments "category")
+        excursions-by-location-store
+        (aor/get-store agent-node "$$excursions-by-location")
+        location-excursions (store/get excursions-by-location-store location)
+        matching-excursions (filter (fn [excursion]
+                                      (and (:available excursion)
+                                           (or (nil? category)
+                                               (= (:category excursion)
+                                                  category))))
+                             (or location-excursions []))]
+    (j/write-value-as-string
+     {:status     "success"
+      :excursions matching-excursions
+      :message    (format
+                   "Found %d excursions in %s"
+                   (count matching-excursions)
+                   location)})))
+
+(defn book-excursion
+  "Book an excursion."
+  [agent-node {:keys [passenger-id]} arguments]
+  (let [excursion-id (get arguments "excursion-id")
+        date         (get arguments "date")
+        excursion-bookings-store (aor/get-store agent-node
+                                                "$$excursion-bookings")
+        excursions-by-id-store (aor/get-store agent-node "$$excursions-by-id")
+        excursion    (store/get excursions-by-id-store excursion-id)
+        booking-id   (str (UUID/randomUUID))]
+    (if (and excursion (:available excursion))
+      (do
+        (store/put! excursion-bookings-store
+                    booking-id
+                    (merge excursion
+                           {:booking-id   booking-id
+                            :passenger-id passenger-id
+                            :date         date
+                            :booking-date (str (LocalDateTime/now))}))
+        (j/write-value-as-string
+         {:status     "success"
+          :booking-id booking-id
+          :message    (format "Successfully booked %s for %s"
+                              (:name excursion)
+                              date)}))
+      (j/write-value-as-string
+       {:status  "error"
+        :message (format "Excursion %s not available" excursion-id)}))))
+
+(defn update-car-rental
+  "Update an existing car rental booking."
+  [agent-node config arguments]
+  (let [booking-id         (get arguments "booking-id")
+        start-date         (get arguments "start-date")
+        end-date           (get arguments "end-date")
+        car-bookings-store (aor/get-store agent-node "$$car-bookings")]
+    (if-let [existing-booking (store/get car-bookings-store booking-id)]
+      (do
+        (store/put! car-bookings-store
+                    booking-id
+                    (merge existing-booking
+                           {:start-date   start-date
+                            :end-date     end-date
+                            :last-updated (str (LocalDateTime/now))}))
+        (j/write-value-as-string
+         {:status  "success"
+          :message (format "Successfully updated car rental booking %s"
+                           booking-id)}))
+      (j/write-value-as-string
+       {:status  "not-found"
+        :message (format "Car rental booking %s not found" booking-id)}))))
+
+(defn cancel-car-rental
+  "Cancel a car rental booking."
+  [agent-node config arguments]
+  (let [booking-id         (get arguments "booking-id")
+        car-bookings-store (aor/get-store agent-node "$$car-bookings")]
+    (if (store/get car-bookings-store booking-id)
+      (do
+        (store/pstate-transform!
+         [(path/keypath booking-id) path/NONE]
+         car-bookings-store
+         booking-id)
+        (j/write-value-as-string
+         {:status  "success"
+          :message (format
+                    "Car rental booking %s has been cancelled successfully"
+                    booking-id)}))
+      (j/write-value-as-string
+       {:status  "not-found"
+        :message (format "Car rental booking %s not found" booking-id)}))))
+
+(defn web-search
+  "Perform web search for travel-related information."
+  [agent-node config arguments]
+  (let [query (get arguments "query")]
+    (j/write-value-as-string
+     {:status "success"
+      :results
+      [{:title "Travel Information"
+        :url "https://example.com"
+        :snippet
+        (format
+         "Here are search results for: %s. Note: This is a mock implementation for demonstration purposes."
+         query)}]
+      :message (format "Found search results for '%s'" query)})))
+
 (defn lookup-policy
   "Look up company policy information."
   [agent-node config arguments]
@@ -342,6 +498,8 @@
       (j/write-value-as-string
        {:status  "not-found"
         :message (format "No policies found matching '%s'" query)}))))
+
+;; Tool definitions for new functionality
 
 ;; Tool definitions using agent-o-rama tools framework
 (def CUSTOMER-SUPPORT-TOOLS
@@ -462,6 +620,67 @@
         "Policy topic to search for (e.g., baggage, cancellation, refund)")})
      "Look up company policies and procedures")
     lookup-policy
+    {:include-context? true})
+
+   (tools/tool-info
+    (tools/tool-specification
+     "search_excursions"
+     (lj/object
+      {:description "Search for available excursions and activities"
+       :required    ["location"]}
+      {"location" (lj/string "City or location to search for excursions")
+       "category" (lj/enum
+                   "Type of excursion"
+                   ["sightseeing" "nature" "entertainment" "adventure"])})
+     "Search for available excursions and activities")
+    search-excursions
+    {:include-context? true})
+
+   (tools/tool-info
+    (tools/tool-specification
+     "book_excursion"
+     (lj/object
+      {:description "Book an excursion or activity"
+       :required    ["excursion-id" "date"]}
+      {"excursion-id" (lj/string "Excursion ID to book")
+       "date"         (lj/string "Date for the excursion (YYYY-MM-DD)")})
+     "Book an excursion or activity")
+    book-excursion
+    {:include-context? true})
+
+   (tools/tool-info
+    (tools/tool-specification
+     "update_car_rental"
+     (lj/object
+      {:description "Update an existing car rental booking"
+       :required    ["booking-id" "start-date" "end-date"]}
+      {"booking-id" (lj/string "Car rental booking ID to update")
+       "start-date" (lj/string "New rental start date (YYYY-MM-DD)")
+       "end-date"   (lj/string "New rental end date (YYYY-MM-DD)")})
+     "Update an existing car rental booking")
+    update-car-rental
+    {:include-context? true})
+
+   (tools/tool-info
+    (tools/tool-specification
+     "cancel_car_rental"
+     (lj/object
+      {:description "Cancel a car rental booking"
+       :required    ["booking-id"]}
+      {"booking-id" (lj/string "Car rental booking ID to cancel")})
+     "Cancel a car rental booking")
+    cancel-car-rental
+    {:include-context? true})
+
+   (tools/tool-info
+    (tools/tool-specification
+     "web_search"
+     (lj/object
+      {:description "Search for travel-related information online"
+       :required    ["query"]}
+      {"query" (lj/string "Search query for travel information")})
+     "Search for travel-related information online")
+    web-search
     {:include-context? true})])
 
 ;; Initialization will be handled by the initialization agent
@@ -505,7 +724,20 @@
                                String
                                Object)
   ;; rental-id -> rental details
+
+  ;; location -> list of excursions
+  ;; rental-id -> rental details
   (aor/declare-key-value-store topology "$$car-rentals-by-id" String Object)
+
+  ;; excursion-bookings store
+  (aor/declare-key-value-store topology "$$excursion-bookings" String Object)
+  ;; location -> list of excursions
+  (aor/declare-key-value-store topology
+                               "$$excursions-by-location"
+                               String
+                               Object)
+  ;; excursion-id -> excursion details
+  (aor/declare-key-value-store topology "$$excursions-by-id" String Object)
 
   (aor/declare-key-value-store topology "$$policies" String Object)
 
