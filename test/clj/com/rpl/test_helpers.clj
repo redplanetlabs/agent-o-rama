@@ -208,3 +208,12 @@
       (if (= (:name config) (:name aor-types/MAX-RETRIES-CONFIG))
         max-retries
         (prev m config)))))
+
+(defmethod report :begin-test-var
+  [m]
+  (println "Running test:"
+           (-> m
+               :var
+               meta
+               :name))
+  (flush))
