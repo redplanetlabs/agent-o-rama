@@ -389,20 +389,23 @@
     *failure-depot (po/agent-failures-depot-task-global *agent-name)]
    (local-select> (keypath *invoke-id)
                   $$nodes
-                  :> {:keys [*agent-task-id *agent-id]})
+                  :> {:keys [*agent-task-id *agent-id *node]})
    (filter> (some? *agent-id))
    (apart/filter-valid-retry-num> *agent-name
                                   *agent-task-id
                                   *agent-id
                                   *retry-num)
-   (local-transform> [(keypath *invoke-id) :nested-ops (termval *nested-ops)]
+   (local-transform> [(keypath *invoke-id)
+                      (multi-path
+                       [:nested-ops (termval *nested-ops)]
+                       [:exceptions AFTER-ELEM (termval *throwable-str)])]
                      $$nodes)
    (|direct *agent-task-id)
    (local-transform>
     [(must *agent-id)
-     :exceptions
+     :exception-summaries
      AFTER-ELEM
-     (termval *throwable-str)]
+     (termval (aor-types/->ExceptionSummary *throwable-str *node *invoke-id))]
     $$root)
    (depot-partition-append!
     *failure-depot
@@ -604,6 +607,8 @@
    (anode/invoke-on-task-thread *agent-name
                                 *agent-task-id
                                 *agent-id
+                                *agg-node-name
+                                *agg-invoke-id
                                 *retry-num
                                 *init-fn
                                 :agg-init
@@ -908,6 +913,8 @@
      (anode/invoke-on-task-thread *agent-name
                                   *agent-task-id
                                   *agent-id
+                                  *next-node
+                                  *agg-invoke-id
                                   *retry-num
                                   %update-fn
                                   :agg-update

@@ -150,6 +150,11 @@
    nested-ops :- [NestedOpInfo]
   ])
 
+(drp/defrecord+ ExceptionSummary
+  [throwable-str :- String
+   node :- String
+   invoke-id :- UUID])
+
 (drp/defrecord+ AgentFailure
   [agent-task-id :- Long
    agent-id :- Long

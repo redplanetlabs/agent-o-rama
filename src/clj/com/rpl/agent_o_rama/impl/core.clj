@@ -301,8 +301,11 @@
     (.thenApply
      (foreign-proxy-async
       [(keypath agent-id)
-       (submap [:result :exceptions :human-requests])
+       (submap [:result :exception-summaries :human-requests])
        (transformed :human-requests first)
+       (transformed [:exception-summaries ALL] :throwable-str)
+       (multi-transformed [(map-key :exception-summaries)
+                           (termval :exceptions)])
        (multi-transformed [(map-key :human-requests) (termval :human-request)])]
       root-pstate
       {:pkey        agent-task-id

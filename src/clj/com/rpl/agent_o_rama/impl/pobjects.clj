@@ -10,6 +10,7 @@
     AgentNodeEmit
     AgentResult
     AggInput
+    ExceptionSummary
     ForkContext
     NestedOpInfo
     NodeHumanInputRequest
@@ -92,7 +93,7 @@
      :invoke-args        [Object]
      :graph-version      Long
      :result             AgentResult
-     :exceptions         [String]
+     :exception-summaries [ExceptionSummary]
      :ack-val            Long
      :start-time-millis  Long
      :finish-time-millis Long
@@ -162,6 +163,7 @@
      :result              AgentResult
      :start-time-millis   Long
      :finish-time-millis  Long
+     :exceptions          [String] ; throwable strs
 
      :agg-invoke-id       UUID
 

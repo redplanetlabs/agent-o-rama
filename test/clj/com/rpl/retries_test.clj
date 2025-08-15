@@ -1203,16 +1203,21 @@
          (foreign-pstate ipc
                          module-name
                          (po/agent-root-task-global-name "foo")))
+       (bind traces-query
+         (foreign-query ipc
+                        module-name
+                        (queries/tracing-query-name "foo")))
+
        (bind foo (aor/agent-client agent-manager "foo"))
        (bind get-exceptions
          (fn [{:keys [task-id agent-invoke-id]}]
-           (foreign-select-one [(keypath agent-invoke-id) :exceptions]
+           (foreign-select-one [(keypath agent-invoke-id) :exception-summaries]
                                root-pstate
                                {:pkey task-id})
          ))
 
        (reset! VAL-ATOM 5)
-       (bind inv (aor/agent-initiate foo))
+       (bind {:keys [task-id agent-invoke-id] :as inv} (aor/agent-initiate foo))
 
        (h/release-semaphore SEM 1)
        (is (condition-attained? (= 1
@@ -1223,6 +1228,7 @@
               (-> inv
                   get-exceptions
                   first
+                  :throwable-str
                   h/first-line)))
 
        (h/release-semaphore SEM 1000)
@@ -1230,13 +1236,15 @@
                                    (-> inv
                                        get-exceptions
                                        count))))
+       (bind es (get-exceptions inv))
        (is (= ["clojure.lang.ExceptionInfo: intentional {:v 4}"
                "clojure.lang.ExceptionInfo: intentional {:v 3}"
                "clojure.lang.ExceptionInfo: intentional {:v 2}"
                "clojure.lang.ExceptionInfo: intentional {:v 1}"]
-              (->> inv
-                   get-exceptions
+              (->> es
+                   (mapv :throwable-str)
                    (mapv h/first-line))))
+       (is (every? #(= "start" %) (mapv :node es)))
 
        (try
          (aor/agent-result foo inv)
@@ -1259,4 +1267,24 @@
                   (ex-message e)
                   "clojure.lang.ExceptionInfo: intentional {:v 1}"))
            )))
+
+       (bind root-invoke-id
+         (foreign-select-one [(keypath agent-invoke-id) :root-invoke-id]
+                             root-pstate
+                             {:pkey task-id}))
+
+       (bind trace
+         (:invokes-map
+          (foreign-invoke-query traces-query
+                                task-id
+                                [[task-id root-invoke-id]]
+                                10000)))
+
+       (is (= 1 (count trace)))
+       (bind excs (select [MAP-VALS :exceptions ALL] trace))
+       (is (= ["clojure.lang.ExceptionInfo: intentional {:v 4}"
+               "clojure.lang.ExceptionInfo: intentional {:v 3}"
+               "clojure.lang.ExceptionInfo: intentional {:v 2}"
+               "clojure.lang.ExceptionInfo: intentional {:v 1}"]
+              (mapv h/first-line excs)))
       ))))
