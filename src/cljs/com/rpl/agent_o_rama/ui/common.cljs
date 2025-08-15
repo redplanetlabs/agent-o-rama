@@ -16,6 +16,21 @@
 
 (defn pp [x] (with-out-str (cljs.pprint/pprint x)))
 
+(defn format-timestamp [ms]
+  (if (number? ms)
+    (let [date (js/Date. ms)
+          formatter (js/Intl.DateTimeFormat.
+                     "en-US" ; Or use browser's locale
+                     #js {:year "numeric"
+                          :month "short"
+                          :day "numeric"
+                          :hour "2-digit"
+                          :minute "2-digit"
+                          :second "2-digit"
+                          :hour12 false})]
+      (.format formatter date))
+    ""))
+
 (defn use-local-storage
   "Hook for localStorage functionality
   

@@ -2,21 +2,20 @@
   (:require
    [com.rpl.agent-o-rama.ui.invocation-page :as invocation-page]
    [com.rpl.agent-o-rama.ui.agent-graph :as agent-graph]
-   
+
    [uix.core :as uix :refer [defui defhook $]]
    ["wouter" :as wouter :refer [useLocation]]
-   
+
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.queries :as queries]))
 
-
 (defui spinner [{:keys [size]}]
   (let [size-class (case size
-                      :small "h-3 w-3"
-                      :medium "h-4 w-4"
-                      "h-4 w-4")
+                     :small "h-3 w-3"
+                     :medium "h-4 w-4"
+                     "h-4 w-4")
         classes (str size-class " text-blue-600 animate-spin")]
     ($ :svg
        {:className classes
@@ -25,15 +24,15 @@
         :xmlns "http://www.w3.org/2000/svg"}
        ($ :circle
           {:className "opacity-25"
-           :cx "12" :cy "12" :r "10" 
+           :cx "12" :cy "12" :r "10"
            :stroke "currentColor" :strokeWidth "4"})
        ($ :path
           {:className "opacity-75"
-           :fill "currentColor" 
+           :fill "currentColor"
            :d "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"}))))
 
 (defui result-badge [{:keys [result human-request?]}]
-  (cond 
+  (cond
     human-request?
     ($ :span.px-2.py-1.bg-amber-100.text-amber-800.rounded-full.text-xs.font-medium.inline-flex.items-center.gap-1
        "🙋 Needs input")
@@ -49,6 +48,7 @@
 (defui invocation-row [{:keys [invoke module-id agent-name on-click]}]
   (let [task-id (:task-id invoke)
         agent-id (:agent-id invoke)
+        start-time (:start-time-millis invoke)
         url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" agent-id)]
     ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
        {:key url
@@ -57,81 +57,80 @@
                      (. e stopPropagation)
                      (on-click url)))}
        ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium (str task-id "-" agent-id))
+       ($ :td.px-4.py-3.text-sm.text-gray-600.font-mono (common/format-timestamp start-time))
        ($ :td.px-4.py-3.max-w-xs
           ($ :div.truncate.text-gray-900
              (common/pp (:invoke-args invoke))))
        ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
        ($ :td.px-4.py-3.text-sm
           ($ result-badge {:result (:result invoke)
-                          :human-request? (:human-request? invoke)})))))
+                           :human-request? (:human-request? invoke)})))))
 
 (defui index []
   ;; The entire complex useEffect is replaced by this single line!
-  (let [{:keys [data loading? error]} 
+  (let [{:keys [data loading? error]}
         (queries/use-sente-query {:query-key [:agents]
                                   :sente-event [:api/get-agents]})]
-    
-    
+
     (cond
       ;; Still loading initial data
       loading? ($ :div.flex.justify-center.items-center.py-8
-                     ($ :div.text-gray-500 "Loading agents via Sente..."))
+                  ($ :div.text-gray-500 "Loading agents via Sente..."))
       ;; Request errored
       error ($ :div.flex.justify-center.items-center.py-8
-                ($ :div.text-red-500 "Error loading agents: " error))
+               ($ :div.text-red-500 "Error loading agents: " error))
       ;; No agents returned from the API
       (empty? data) ($ :div.flex.justify-center.items-center.py-8
-                         ($ :div.text-gray-500 "No agents found"))
+                       ($ :div.text-gray-500 "No agents found"))
       :else ($ :div.p-4
-              (for [agent data
-                    :let [url (str "/agents/" (:module-id agent) "/" (:agent-name agent))]]
-                ($ :div.p-4.transition-colors.duration-150.hover:bg-gray-200.bg-gray-100.m-4  {:key url}
-                  ($ wouter/Link {:href url}
-                     ($ :div.flex.items-center.group 
-                      ($ :div.flex-1
-                          ($ :div.text-lg.font-medium.text-indigo-600.group-hover:text-indigo-800
-                            ($ :div (common/url-decode (:module-id agent)) ":" (common/url-decode (:agent-name agent))))
-                          ($ :div.mt-1.text-sm.text-gray-500.group-hover:text-gray-700
-                            "View agent details"))))))))))
-
+               (for [agent data
+                     :let [url (str "/agents/" (:module-id agent) "/" (:agent-name agent))]]
+                 ($ :div.p-4.transition-colors.duration-150.hover:bg-gray-200.bg-gray-100.m-4 {:key url}
+                    ($ wouter/Link {:href url}
+                       ($ :div.flex.items-center.group
+                          ($ :div.flex-1
+                             ($ :div.text-lg.font-medium.text-indigo-600.group-hover:text-indigo-800
+                                ($ :div (common/url-decode (:module-id agent)) ":" (common/url-decode (:agent-name agent))))
+                             ($ :div.mt-1.text-sm.text-gray-500.group-hover:text-gray-700
+                                "View agent details"))))))))))
 
 (defui invocations []
   (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
-        
+
         ;; Subscribe to invocations state from app-db
         all-invokes (state/use-sub [:invocations :all-invokes])
         pagination-params (state/use-sub [:invocations :pagination-params])
         has-more? (state/use-sub [:invocations :has-more?])
         loading? (state/use-sub [:invocations :loading?])
         connected? (state/use-sub [:sente :connected?])
-        
+
         [location navigate] (useLocation)
-        
+
         ;; Fetch function that handles the entire flow
         fetch-invocations (fn [pagination append?]
-                           (state/dispatch [:invocations/set-loading true])
-                           (sente/request! 
-                            [:api/get-invocations {:module-id module-id
-                                                  :agent-name agent-name
-                                                  :pagination pagination}]
-                            5000
-                            (fn [reply]
-                              (state/dispatch [:invocations/set-loading false])
-                              (when (:success reply)
-                                (let [data (:data reply)
-                                      new-invokes (:agent-invokes data)
-                                      new-pagination (:pagination-params data)
-                                      has-more? (and new-pagination 
-                                                    (not (empty? new-pagination))
-                                                    (some (fn [[_ item-id]] (not (nil? item-id))) 
-                                                          new-pagination))]
-                                  (if append?
-                                    (state/dispatch [:invocations/append new-invokes])
-                                    (state/dispatch [:db/set-value [:invocations :all-invokes] new-invokes]))
-                                  (state/dispatch [:invocations/set-pagination 
-                                                  {:pagination-params (when has-more? new-pagination)
-                                                   :has-more? has-more?}]))))))
-        
+                            (state/dispatch [:invocations/set-loading true])
+                            (sente/request!
+                             [:api/get-invocations {:module-id module-id
+                                                    :agent-name agent-name
+                                                    :pagination pagination}]
+                             5000
+                             (fn [reply]
+                               (state/dispatch [:invocations/set-loading false])
+                               (when (:success reply)
+                                 (let [data (:data reply)
+                                       new-invokes (:agent-invokes data)
+                                       new-pagination (:pagination-params data)
+                                       has-more? (and new-pagination
+                                                      (not (empty? new-pagination))
+                                                      (some (fn [[_ item-id]] (not (nil? item-id)))
+                                                            new-pagination))]
+                                   (if append?
+                                     (state/dispatch [:invocations/append new-invokes])
+                                     (state/dispatch [:db/set-value [:invocations :all-invokes] new-invokes]))
+                                   (state/dispatch [:invocations/set-pagination
+                                                    {:pagination-params (when has-more? new-pagination)
+                                                     :has-more? has-more?}]))))))
+
         ;; Initial load - fetch first page when connected
         _ (uix/use-effect
            (fn []
@@ -141,16 +140,16 @@
                (fetch-invocations {} false))
              (constantly nil))
            [module-id agent-name connected?])
-        
+
         load-more (fn []
                     (when (and has-more? (not loading?) pagination-params)
                       (println "🔄 Loading more with params:" pagination-params)
                       (fetch-invocations pagination-params true)))]
-    
+
     (cond
       ;; Still loading initial data
       (and loading? (empty? all-invokes)) ($ :div.flex.justify-center.items-center.py-8
-                                            ($ :div.text-gray-500 "Loading invocations via Sente..."))
+                                             ($ :div.text-gray-500 "Loading invocations via Sente..."))
       ;; No data returned
       (and (not loading?) (empty? all-invokes)) ($ :div.flex.justify-center.items-center.py-8
                                                    ($ :div.text-gray-500 "No invocations found"))
@@ -161,31 +160,31 @@
                ($ :thead.bg-gray-50.border-b.border-gray-200
                   ($ :tr
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Invoke ID")
+                     ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Start Time")
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Arguments")
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")))
                ($ :tbody.divide-y.divide-gray-200
                   (for [invoke all-invokes]
                     ($ invocation-row {:key (str (:task-id invoke) "-" (:agent-id invoke))
-                                      :invoke invoke
-                                      :module-id module-id
-                                      :agent-name agent-name
-                                      :on-click navigate})))
-            
-            ;; Load More button
-            (when has-more?
-              ($ :tfoot.bg-gray-50.border-t.border-gray-200
-                 ($ :tr.hover:bg-gray-100.transition-colors.duration-150
-                    {:onClick (when (not loading?) load-more)}
-                    ($ :td.px-4.py-3.cursor-pointer {:colSpan 4}
-                       ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
-                          ($ :span.mr-2.text-sm.font-medium (if loading? "Loading..." "Load More"))
-                          (when (not loading?)
-                            ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
-                               ($ :path {:fillRule "evenodd"
-                                         :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                         :clipRule "evenodd"}))))))))))))))
+                                       :invoke invoke
+                                       :module-id module-id
+                                       :agent-name agent-name
+                                       :on-click navigate})))
 
+            ;; Load More button
+               (when has-more?
+                 ($ :tfoot.bg-gray-50.border-t.border-gray-200
+                    ($ :tr.hover:bg-gray-100.transition-colors.duration-150
+                       {:onClick (when (not loading?) load-more)}
+                       ($ :td.px-4.py-3.cursor-pointer {:colSpan 5}
+                          ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
+                             ($ :span.mr-2.text-sm.font-medium (if loading? "Loading..." "Load More"))
+                             (when (not loading?)
+                               ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
+                                  ($ :path {:fillRule "evenodd"
+                                            :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                            :clipRule "evenodd"}))))))))))))))
 
 (defui mini-invocations []
   (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
@@ -198,31 +197,32 @@
         [location navigate] (useLocation)]
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
-                 ($ :div.text-gray-500 "Loading invocations via Sente..."))
+                  ($ :div.text-gray-500 "Loading invocations via Sente..."))
       error ($ :div.flex.justify-center.items-center.py-8
-              ($ :div.text-red-500 "Error loading invocations: " error))
+               ($ :div.text-red-500 "Error loading invocations: " error))
       (not data) ($ :div.flex.justify-center.items-center.py-8
-                   ($ :div.text-gray-500 "No invocations found"))
+                    ($ :div.text-gray-500 "No invocations found"))
       :else
       ($ :div.bg-white.rounded-md.border.border-gray-200.overflow-hidden.shadow-sm
          ($ :table.w-full.text-sm
             ($ :thead.bg-gray-50.border-b.border-gray-200
                ($ :tr
                   ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Invoke ID")
+                  ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Start Time")
                   ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Arguments")
                   ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
                   ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")))
             ($ :tbody.divide-y.divide-gray-200
                (for [invoke (:agent-invokes data)]
                  ($ invocation-row {:key (str (:task-id invoke) "-" (:agent-id invoke))
-                                   :invoke invoke
-                                   :module-id module-id
-                                   :agent-name agent-name
-                                   :on-click (fn [url] (navigate url))})))
+                                    :invoke invoke
+                                    :module-id module-id
+                                    :agent-name agent-name
+                                    :on-click (fn [url] (navigate url))})))
             ($ :tfoot.bg-gray-50.border-t.border-gray-200
                ($ :tr.hover:bg-gray-100.transition-colors.duration-150
                   {:onClick (fn [_] (navigate (str "/agents/" module-id "/" agent-name "/invocations")))}
-                  ($ :td.px-4.py-3.cursor-pointer {:colSpan 4}
+                  ($ :td.px-4.py-3.cursor-pointer {:colSpan 5}
                      ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
                         ($ :span.mr-2.text-sm.font-medium "View all invocations")
                         ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
@@ -244,9 +244,9 @@
                                                                 :agent-name agent-name}]})]
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
-                 ($ :div.text-gray-500 "Loading graph via Sente..."))
+                  ($ :div.text-gray-500 "Loading graph via Sente..."))
       error ($ :div.flex.justify-center.items-center.py-8
-              ($ :div.text-red-500 "Error loading graph: " error))
+               ($ :div.text-red-500 "Error loading graph: " error))
       :else ($ agent-graph/graph {:initial-data data
                                   :height "500px"
                                   :selected-node nil
@@ -305,36 +305,36 @@
         args (or (:args manual-run-state) "")
         loading? (or (:loading? manual-run-state) false)
         error-msg (:error-msg manual-run-state)
-        
+
         [location navigate] (useLocation)
-        
+
         ;; State update helper
         update-field (fn [field value]
                        (state/dispatch [:db/set-value [:ui :manual-run module-id agent-name field] value]))
-        
+
         handle-submit (fn [e]
                         (.preventDefault e)
                         (update-field :error-msg nil)
                         (update-field :loading? true)
-                        
+
                         ;; Parse JSON arguments
                         (let [parsed-args (try
-                                           (js->clj (js/JSON.parse args))
-                                           (catch js/Error e
-                                             nil))]
+                                            (js->clj (js/JSON.parse args))
+                                            (catch js/Error e
+                                              nil))]
                           (if parsed-args
                             ;; Make Sente request
-                            (sente/request! 
+                            (sente/request!
                              [:api/run-agent {:module-id module-id
-                                            :agent-name agent-name
-                                            :args parsed-args}]
+                                              :agent-name agent-name
+                                              :args parsed-args}]
                              5000
                              (fn [reply]
                                (update-field :loading? false)
                                (if (:success reply)
                                  (let [data (:data reply)
-                                       trace-url (str "/agents/" module-id "/" agent-name "/invocations/" 
-                                                     (:task-id data) "-" (:invoke-id data))]
+                                       trace-url (str "/agents/" module-id "/" agent-name "/invocations/"
+                                                      (:task-id data) "-" (:invoke-id data))]
                                    (update-field :args "") ;; Clear args on success
                                    (navigate trace-url))
                                  (update-field :error-msg (str "Error: " (or (:error reply) "Unknown error"))))))
@@ -342,7 +342,7 @@
                             (do
                               (update-field :loading? false)
                               (update-field :error-msg "Error: Invalid JSON format")))))]
-    
+
     ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6
        ($ :form {:onSubmit handle-submit}
           ($ :div.text-sm.font-medium.text-gray-600.mb-4 "Manually Run Agent")
@@ -360,7 +360,7 @@
                               "w-32 h-20 text-white px-4 rounded-md focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm font-semibold cursor-not-allowed transition-colors duration-150 bg-gray-400"
                               "w-32 h-20 text-white px-4 rounded-md focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm font-semibold cursor-pointer transition-colors duration-150 bg-blue-600 hover:bg-blue-700")}
                 (if loading? "Running..." "Submit"))))
-       
+
        ;; Show errors only (success navigates to trace)
        (when error-msg
          ($ :div.mt-4.p-3.rounded-md.bg-red-50.border.border-red-200
@@ -381,19 +381,19 @@
           ($ :div
              {:style {:flex-grow "1"}}
              ($ manual-run {:module-id module-id :agent-name agent-name})))
-       
+
        ($ :div.p-4
           ($ mini-invocations)))))
 
 (defui invoke []
   (let [{:strs [module-id agent-name invoke-id]} (js->clj (wouter/useParams))]
-    
+
     ($ :div
        ;; Sticky header with all controls
        ($ :div.sticky.top-0.z-50.bg-white.border-b.border-gray-200.shadow-sm.p-6
           ($ :div.flex.justify-between.items-center
              ($ :h2.text-2xl.font-semibold.text-gray-700 "Agent Invocation Graph")))
-       
+
        ;; Graph content
        ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
           ($ invocation-page/invocation-page)))))
