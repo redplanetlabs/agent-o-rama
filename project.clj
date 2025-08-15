@@ -28,13 +28,17 @@
     {:id  "maven-releases"
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
   :profiles {:dev      {:resource-paths    ["test/resources/"]
-                        :source-paths      ["src/clj" "src/cljs" "resource"
+                        :source-paths      ["src/clj"
+                                            "src/cljs"
+                                            "resource"
                                             "examples/clj/src"]
-                        :test-paths ["test/clj" "examples/clj/test"]
+                        :test-paths        ["test/clj" "examples/clj/test"]
                         :java-source-paths ["src/java" "test/java"]
                         :dependencies
                         [[meander/epsilon "0.0.650"]
-                         [dev.langchain4j/langchain4j-open-ai "1.2.0"]]}
+                         [dev.langchain4j/langchain4j-open-ai "1.2.0"]
+                         [dev.langchain4j/langchain4j-web-search-engine-tavily
+                          "1.2.0-beta8"]]}
              :provided {:dependencies
                         ;; TODO: fix Rama version
                         [[com.rpl/rama "0.0.6-SNAPSHOT"]

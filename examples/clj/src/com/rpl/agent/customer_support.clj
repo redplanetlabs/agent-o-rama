@@ -20,11 +20,17 @@
    [com.rpl.rama.test :as rtest]
    [jsonista.core :as j])
   (:import
+   [dev.langchain4j.data.document
+    Document]
    [dev.langchain4j.data.message
     SystemMessage
     UserMessage]
    [dev.langchain4j.model.openai
     OpenAiChatModel]
+   [dev.langchain4j.web.search
+    WebSearchRequest]
+   [dev.langchain4j.web.search.tavily
+    TavilyWebSearchEngine]
    [java.time
     LocalDateTime]
    [java.util
@@ -32,8 +38,9 @@
 
 (def CUSTOMER-SUPPORT-SYSTEM-MESSAGE
   "You are a helpful customer support assistant for Swiss Airlines.
-   You help customers with comprehensive travel planning including flight bookings,
-   changes, cancellations, and general travel assistance.
+
+   You help customers with comprehensive travel planning including flight
+   bookings, changes, cancellations, and general travel assistance.
 
    You have access to tools to:
    - Search and view flight information
@@ -463,20 +470,33 @@
        {:status  "not-found"
         :message (format "Car rental booking %s not found" booking-id)}))))
 
+(defn- tavily-web-search-engine
+  [api-key]
+  (-> (TavilyWebSearchEngine/builder)
+      (.apiKey api-key)
+      (.excludeDomains ["en.wikipedia.org"])
+      .build))
+
 (defn web-search
-  "Perform web search for travel-related information."
+  "Perform web search for travel-related information using Tavily."
   [agent-node config arguments]
-  (let [query (get arguments "query")]
+  (let [query          (get arguments "query")
+        ^TavilyWebSearchEngine tavily (aor/get-agent-object
+                                       agent-node
+                                       "tavily")
+        search-results (WebSearchRequest/from query 5)
+        results        (.search tavily search-results)
+        documents      (mapv (fn [^Document doc]
+                               {:title   (.metadata doc "title")
+                                :url     (.metadata doc "url")
+                                :snippet (.text doc)})
+                             (.toDocuments results))]
     (j/write-value-as-string
      {:status  "success"
-      :results
-      [{:title   "Travel Information"
-        :url     "https://example.com"
-        :snippet
-        (format
-         "Here are search results for: %s. Note: This is a mock implementation for demonstration purposes."
-         query)}]
-      :message (format "Found search results for '%s'" query)})))
+      :results documents
+      :message (format "Found %d search results for '%s'"
+                       (count documents)
+                       query)})))
 
 (defn lookup-policy
   "Look up company policy information."
@@ -689,9 +709,15 @@
   [topology]
 
   ;; Declare OpenAI model
-  (aor/declare-agent-object topology
-                            "openai-api-key"
-                            (System/getenv "OPENAI_API_KEY"))
+  (aor/declare-agent-object
+   topology
+   "openai-api-key"
+   (System/getenv "OPENAI_API_KEY"))
+
+  (aor/declare-agent-object
+   topology
+   "tavily-api-key"
+   (System/getenv "TAVILY_API_KEY"))
 
   (aor/declare-agent-object-builder
    topology
@@ -701,6 +727,12 @@
          (.apiKey (aor/get-agent-object setup "openai-api-key"))
          (.modelName "gpt-4o-mini")
          .build)))
+
+  (aor/declare-agent-object-builder
+   topology
+   "tavily"
+   (fn tavily [setup]
+     (tavily-web-search-engine (aor/get-agent-object setup "tavily-api-key"))))
 
   ;; Declare stores for persistent data
   (aor/declare-key-value-store topology "$$bookings" String Object)
