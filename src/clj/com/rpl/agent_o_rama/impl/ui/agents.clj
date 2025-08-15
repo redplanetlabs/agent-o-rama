@@ -9,25 +9,22 @@
    [clojure.walk :as walk]
    [jsonista.core :as j])
   (:import
-   [com.rpl.agentorama AgentInvoke]))
+   [com.rpl.agentorama AgentInvoke]
+   [java.net URLEncoder URLDecoder]))
 
-(defn replace-slash [s]
-  "because urlencoding causes jetty to 400 with Ambiguous URI path separator"
-  ;; TODO use proper urlencoding, fix jetty error
-  (clojure.string/replace s #"/" "::"))
+(defn url-encode [s]
+  "Encode string for safe use in URLs using standard URL encoding"
+  (java.net.URLEncoder/encode ^String s "UTF-8"))
 
-(defn unreplace-slash [s]
-  "reverse of above function"
-  (clojure.string/replace s #"::" "/"))
-
-(comment
-  (replace-slash "example.core/FlowModule")
-  (unreplace-slash "example.core::FlowModule"))
+(defn url-decode [s]
+  "Decode URL-encoded string using standard URL decoding"
+  (java.net.URLDecoder/decode ^String s "UTF-8"))
 
 (defn get-client [module-id agent-name]
-  (select-one [(unreplace-slash module-id)
+  ;; Expects already-decoded module-id and agent-name (API handlers decode them)
+  (select-one [module-id
                :clients
-               (unreplace-slash agent-name)]
+               agent-name]
               (ui/get-object :aor-cache)))
 
 (defn objects [module-id agent-name]
@@ -122,34 +119,42 @@
   [_ data uid]
   (for [[module-name agent-name]
         (select [ALL (collect-one FIRST) LAST :clients MAP-KEYS] (ui/get-object :aor-cache))]
-    {:module-id (replace-slash module-name)
-     :agent-name (replace-slash agent-name)}))
+    {:module-id (url-encode module-name) ; Use standard URL encoding
+     :agent-name (url-encode agent-name)}))
 
 (defmethod api-handler :api/get-invocations
   [_ {:keys [module-id agent-name pagination]} uid]
-  (let [pages (if (empty? pagination) nil pagination)]
+  (let [decoded-module-id (url-decode module-id)
+        decoded-agent-name (url-decode agent-name)
+        pages (if (empty? pagination) nil pagination)]
     (foreign-invoke-query
-     (:invokes-page-query (objects module-id agent-name))
+     (:invokes-page-query (objects decoded-module-id decoded-agent-name))
      10 pages)))
 
 (defmethod api-handler :api/get-graph
   [_ {:keys [module-id agent-name]} uid]
-  {:graph (foreign-invoke-query
-           (:current-graph-query
-            (objects module-id agent-name)))})
+  (let [decoded-module-id (url-decode module-id)
+        decoded-agent-name (url-decode agent-name)]
+    {:graph (foreign-invoke-query
+             (:current-graph-query
+              (objects decoded-module-id decoded-agent-name)))}))
 
 (defmethod api-handler :api/run-agent
   [_ {:keys [module-id agent-name args]} uid]
-  (when-not (vector? args)
-    (throw (ex-info "must be a json list of args" {:bad-args args})))
-  (let [^AgentInvoke inv (apply aor/agent-initiate (get-client module-id agent-name) args)]
-    {:task-id (.getTaskId inv)
-     :invoke-id (.getAgentInvokeId inv)}))
+  (let [decoded-module-id (url-decode module-id)
+        decoded-agent-name (url-decode agent-name)]
+    (when-not (vector? args)
+      (throw (ex-info "must be a json list of args" {:bad-args args})))
+    (let [^AgentInvoke inv (apply aor/agent-initiate (get-client decoded-module-id decoded-agent-name) args)]
+      {:task-id (.getTaskId inv)
+       :invoke-id (.getAgentInvokeId inv)})))
 
 ;; Unified graph page fetcher - replaces separate live/historical flows
 (defmethod api-handler :api/fetch-graph-page
   [_ {:keys [module-id agent-name invoke-id leaves initial?]} uid]
-  (let [client-objects (objects module-id agent-name)
+  (let [decoded-module-id (url-decode module-id)
+        decoded-agent-name (url-decode agent-name)
+        client-objects (objects decoded-module-id decoded-agent-name)
         tracing-query (:tracing-query client-objects)
         root-pstate (:root-pstate client-objects)
         history-pstate (:graph-history-pstate client-objects)
@@ -224,7 +229,9 @@
 
 (defmethod api-handler :api/execute-fork
   [_ {:keys [module-id agent-name invoke-id changed-nodes]} uid]
-  (let [[task-id agent-invoke-id] (parse-url-pair invoke-id)
+  (let [decoded-module-id (url-decode module-id)
+        decoded-agent-name (url-decode agent-name)
+        [task-id agent-invoke-id] (parse-url-pair invoke-id)
 
         ;; 1. Parse each node's input string from JSON into Clojure data structures.
         ;; We use string keys to preserve "_aor-type" for multimethod dispatch.
@@ -238,7 +245,7 @@
 
         ;; 3. Now pass the correctly-typed data to the agent framework.
         ^AgentInvoke result (aor/agent-initiate-fork
-                             (get-client module-id agent-name)
+                             (get-client decoded-module-id decoded-agent-name)
                              (aor-types/->AgentInvokeImpl task-id agent-invoke-id)
                              rehydrated-nodes)]
     {:agent-invoke-id (:agentInvokeId (bean result))
@@ -246,10 +253,12 @@
 
 (defmethod api-handler :api/provide-human-input
   [_ {:keys [module-id agent-name request response]} uid]
-  (let [{:keys [agent-task-id agent-id node node-task-id invoke-id uuid prompt]} request
+  (let [decoded-module-id (url-decode module-id)
+        decoded-agent-name (url-decode agent-name)
+        {:keys [agent-task-id agent-id node node-task-id invoke-id uuid prompt]} request
         ;; Rebuild a NodeHumanInputRequest record on the server side
         req (aor-types/->NodeHumanInputRequest
              agent-task-id agent-id node node-task-id invoke-id prompt uuid)]
-    (aor/provide-human-input (get-client module-id agent-name) req response)
+    (aor/provide-human-input (get-client decoded-module-id decoded-agent-name) req response)
     {:ok true}))
 

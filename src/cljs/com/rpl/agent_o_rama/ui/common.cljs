@@ -3,7 +3,13 @@
             [clojure.string :as str]
             [uix.core :as uix]))
 
-(defn url-decode [s] (str/replace s #"::" "/"))
+(defn url-decode [s]
+  "Decode URL-encoded string using standard browser decoding"
+  (try
+    (js/decodeURIComponent s)
+    (catch js/Error e
+      (js/console.error "Failed to decode URI component:" s e)
+      s))) ; Fallback to original string on error
 
 (def reader (t/reader :json))
 (def writer (t/writer :json))
@@ -25,7 +31,7 @@
                              (catch js/Error _
                                initial-value)))
         [stored-value set-stored-value] (uix/use-state get-stored-value)]
-    
+
     ;; Update localStorage when value changes
     (uix/use-effect
      (fn []
@@ -34,5 +40,5 @@
          (catch js/Error e
            (.error js/console "Error saving to localStorage:" e))))
      [stored-value key])
-    
+
     [stored-value set-stored-value]))
