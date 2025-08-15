@@ -9,22 +9,6 @@
   (:import
    [com.rpl.agentorama AgentInvoke]))
 
-(defn filter-encodable
-  "Filters data to ensure it can be serialized. 
-   For now, just converts anything that might cause issues to string representation."
-  [data]
-  (walk/postwalk
-   (fn [x]
-     (try
-       ;; Basic check - if it's a common serializable type, keep it
-       (if (or (nil? x) (string? x) (number? x) (boolean? x)
-               (keyword? x) (vector? x) (map? x) (list? x) (set? x))
-         x
-         (str x))
-       (catch Exception e
-         (str x))))
-   data))
-
 (defn replace-slash [s]
   "because urlencoding causes jetty to 400 with Ambiguous URI path separator"
   ;; TODO use proper urlencoding, fix jetty error
@@ -105,8 +89,7 @@
     (when dynamic-trace
       {:invokes-map (when-let [invokes-map (:invokes-map dynamic-trace)]
                       (-> invokes-map
-                          (remove-implicit-nodes)
-                          (filter-encodable)))
+                          (remove-implicit-nodes)))
        :next-task-invoke-pairs (:next-task-invoke-pairs dynamic-trace)})))
 
 ;; =============================================================================
@@ -128,9 +111,9 @@
 (defmethod api-handler :api/get-invocations
   [_ {:keys [module-id agent-name pagination]} uid]
   (let [pages (if (empty? pagination) nil pagination)]
-    (filter-encodable (foreign-invoke-query
-                       (:invokes-page-query (objects module-id agent-name))
-                       10 pages))))
+    (foreign-invoke-query
+     (:invokes-page-query (objects module-id agent-name))
+     10 pages)))
 
 (defmethod api-handler :api/get-graph
   [_ {:keys [module-id agent-name]} uid]
@@ -187,7 +170,7 @@
                                               start-pairs
                                               page-limit))
         cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
-                        (-> m remove-implicit-nodes filter-encodable))
+                        (-> m remove-implicit-nodes))
         next-leaves (:next-task-invoke-pairs dynamic-trace)]
 
     (let [;; Always fetch completion status directly - simple and consistent
@@ -211,8 +194,8 @@
       (cond-> {:is-complete agent-is-complete?}
         (seq cleaned-nodes) (assoc :nodes cleaned-nodes)
         (seq next-leaves) (assoc :next-leaves next-leaves)
-        is-initial-load? (assoc :summary (filter-encodable summary-info)
-                                :historical-graph (filter-encodable historical-graph)
+        is-initial-load? (assoc :summary summary-info
+                                :historical-graph historical-graph
                                 :root-invoke-id (when (seq start-pairs) (second (first start-pairs)))
                                 :task-id agent-task-id
                                 :agent-id agent-id)))))
