@@ -14,8 +14,6 @@
 ;; This matches the original dual handler setup
 (def file-handler
   (-> (fn [_] nil) ; A fallback handler that does nothing
-      ;; First try serving shadow/watch dev files from public/
-      (ring-file/wrap-file "public")
       ;; Then try serving files from resources/public (for production JAR)
       (resource/wrap-resource "public")))
 
