@@ -5,7 +5,9 @@
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui :as ui]
-   [clojure.walk :as walk])
+   [com.rpl.agent-o-rama.impl.json-serialize :as jser]
+   [clojure.walk :as walk]
+   [jsonista.core :as j])
   (:import
    [com.rpl.agentorama AgentInvoke]))
 
@@ -63,6 +65,21 @@
                      ALL
                      :invoke-id]
                     #(get implicit->real % %)))))
+
+(defn ->ui-serializable
+  [data]
+  (walk/postwalk
+   (fn [item]
+     (if (satisfies? jser/JSONFreeze item)
+       (jser/json-freeze*-with-type item)
+       item))
+   data))
+
+(defn from-ui-serializable
+  [data]
+  (walk/postwalk
+   jser/json-thaw*
+   data))
 
 (defn parse-url-pair [s]
   (let [[task-id agent-id] (clojure.string/split s #"-")]
@@ -171,7 +188,12 @@
                                               page-limit))
         cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
                         (-> m remove-implicit-nodes))
-        next-leaves (:next-task-invoke-pairs dynamic-trace)]
+        next-leaves (:next-task-invoke-pairs dynamic-trace)
+
+        ;; NEW: Apply UI serialization to make data safe for the UI
+        final-cleaned-nodes (->ui-serializable cleaned-nodes)
+        final-summary (->ui-serializable summary-info)
+        final-historical-graph (->ui-serializable historical-graph)]
 
     (let [;; Always fetch completion status directly - simple and consistent
           root-status (foreign-select-one [(keypath agent-id)
@@ -188,14 +210,14 @@
                 :is-initial-load? is-initial-load?
                 :agent-is-complete? agent-is-complete?
                 :has-more-leaves? (boolean has-more-leaves?)
-                :nodes (when cleaned-nodes (count cleaned-nodes))
+                :nodes (when final-cleaned-nodes (count final-cleaned-nodes))
                 :next-leaves (when next-leaves (count next-leaves))})
       ;; Construct simplified response. Only include keys that are present.
       (cond-> {:is-complete agent-is-complete?}
-        (seq cleaned-nodes) (assoc :nodes cleaned-nodes)
+        (seq final-cleaned-nodes) (assoc :nodes final-cleaned-nodes)
         (seq next-leaves) (assoc :next-leaves next-leaves)
-        is-initial-load? (assoc :summary summary-info
-                                :historical-graph historical-graph
+        is-initial-load? (assoc :summary final-summary
+                                :historical-graph final-historical-graph
                                 :root-invoke-id (when (seq start-pairs) (second (first start-pairs)))
                                 :task-id agent-task-id
                                 :agent-id agent-id)))))
@@ -203,10 +225,22 @@
 (defmethod api-handler :api/execute-fork
   [_ {:keys [module-id agent-name invoke-id changed-nodes]} uid]
   (let [[task-id agent-invoke-id] (parse-url-pair invoke-id)
+
+        ;; 1. Parse each node's input string from JSON into Clojure data structures.
+        ;; We use string keys to preserve "_aor-type" for multimethod dispatch.
+        json-parsed-nodes (transform [MAP-VALS]
+                                     #(j/read-value %)
+                                     changed-nodes)
+
+        ;; 2. Walk the resulting Clojure data and deserialize the special maps
+        ;;    (with _aor-type) back into their Java object instances.
+        rehydrated-nodes (from-ui-serializable json-parsed-nodes)
+
+        ;; 3. Now pass the correctly-typed data to the agent framework.
         ^AgentInvoke result (aor/agent-initiate-fork
                              (get-client module-id agent-name)
                              (aor-types/->AgentInvokeImpl task-id agent-invoke-id)
-                             (transform [MAP-VALS] read-string changed-nodes))]
+                             rehydrated-nodes)]
     {:agent-invoke-id (:agentInvokeId (bean result))
      :task-id (:taskId (bean result))}))
 

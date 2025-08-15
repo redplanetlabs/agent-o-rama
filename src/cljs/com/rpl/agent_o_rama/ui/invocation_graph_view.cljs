@@ -343,8 +343,17 @@
         node-id (:node-id data)
         node-name (:node data)
         original-input (:input data)
-        current-input (get changed-nodes node-id (str original-input))
+        
+        ;; Function to pretty-print ClojureScript data to a JSON string
+        to-pretty-json (fn [val] (js/JSON.stringify (clj->js val) nil 2))
+
+        ;; Initial text for the textarea
+        current-input (get changed-nodes node-id (to-pretty-json original-input))
         [input-text set-input-text] (uix/use-state current-input)
+        
+        ;; Check if the current input is valid JSON
+        is-valid-json? (try (js/JSON.parse input-text) true (catch :default _ false))
+        
         is-affected (contains? affected-nodes node-id)]
 
     ;; Update input text when selected node changes
@@ -354,7 +363,7 @@
          (let [data (js->clj (.-data selected-node) :keywordize-keys true)
                node-id (:node-id data)
                original-input (:input data)
-               current-input (get changed-nodes node-id (str original-input))]
+               current-input (get changed-nodes node-id (to-pretty-json original-input))]
            (set-input-text current-input))))
      [selected-node changed-nodes])
 
@@ -381,26 +390,32 @@
                                             :truncate-length 80
                                             :depth 0}))))
 
-              ;; Show normal editing interface for unaffected nodes
-            ($ :div {:className "space-y-4"}
-               ($ :div
-                  ($ :label {:className "block text-sm font-medium text-gray-700 mb-2"}
-                     "New Input:")
-                  ($ :textarea {:className "w-full h-32 p-3 border border-gray-300 rounded-md font-mono text-sm resize-y"
-                                :value input-text
-                                :onChange (fn [e]
-                                            (let [new-value (.-value (.-target e))]
-                                              (set-input-text new-value)
-                                              (when on-change-node-input
-                                                (on-change-node-input node-id new-value))))
-                                :placeholder "Enter new input value..."}))
-
-               ($ :div {:className "text-xs text-gray-500"}
-                  ($ :span {:className "font-medium"} "Original: ")
-                  ($ generic-data-viewer {:data original-input
-                                          :color "gray"
-                                          :truncate-length 80
-                                          :depth 0}))))))))
+              ;; Normal editing interface for unaffected nodes  
+              ($ :div {:className "space-y-4"}
+                 ($ :div
+                    ($ :div {:className "flex justify-between items-center mb-2"}
+                       ($ :label {:className "block text-sm font-medium text-gray-700"}
+                          "New Input (JSON format):")
+                       ;; Show validation status
+                       (if is-valid-json?
+                         ($ :span {:className "text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full"} "Valid JSON")
+                         ($ :span {:className "text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded-full"} "Invalid JSON")))
+                        
+                    ($ :textarea {:className (str "w-full h-32 p-3 border rounded-md font-mono text-sm resize-y transition-colors "
+                                                 (if is-valid-json?
+                                                   "border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                                                   "border-red-500 ring-2 ring-red-300 focus:ring-red-500 focus:border-red-500"))
+                                  :value input-text
+                                  :onChange (fn [e]
+                                              (let [new-value (.-value (.-target e))]
+                                                (set-input-text new-value)
+                                                (when on-change-node-input
+                                                  (on-change-node-input node-id new-value))))
+                                  :placeholder "Enter new input value as JSON..."})
+                 ($ :div {:className "text-xs text-gray-500"}
+                  ($ :span {:className "font-medium"} "Original (formatted as JSON): ")
+                  ($ :pre {:className "mt-1 p-2 bg-gray-100 rounded text-gray-700 whitespace-pre-wrap"}
+                     (to-pretty-json original-input))))))))))
 
 (defui info-panel [{:keys [graph-data summary-data]}]
   (let [result (:result summary-data)
