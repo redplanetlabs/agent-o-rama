@@ -22,12 +22,11 @@
                  [http-kit "2.8.0"]
                  [ring/ring-codec "1.2.0"]
 
-;; START: Add Sente and Ring Defaults
-                 [com.taoensso/sente "1.20.0"] ; A recent stable version
-                 [ring/ring-defaults "0.4.0"] ; Sente needs this for sessions
-                 [com.cognitect/transit-clj "1.0.333"] ; Transit for server-side
-                 [com.cognitect/transit-cljs "0.8.280"] ; Transit for client-side
-                 ;; END: Add Sente and Ring Defaults
+                 ;; things needed for sente
+                 [com.taoensso/sente "1.20.0"]
+                 [ring/ring-defaults "0.4.0"]
+                 [com.cognitect/transit-clj "1.0.333"]
+                 [com.cognitect/transit-cljs "0.8.280"]
                  ]
   :global-vars {*warn-on-reflection* true}
   :repositories
