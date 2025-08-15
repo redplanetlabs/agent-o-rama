@@ -21,7 +21,7 @@ target/
 scripts/code-format
 .on-save.json
 
-# frontend 
+# frontend
 .shadow-cljs/
 node_modules/
 public/
@@ -29,3 +29,10 @@ public/
 # compiled frontend output
 resource/main.js
 resource/manifest.edn
+
+# claude files
+CLAUDE.md
+.claude/settings.local.json
+
+# clojure-mcp
+.clojure-mcp/code_index.txt
