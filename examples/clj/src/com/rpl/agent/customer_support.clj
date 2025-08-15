@@ -109,14 +109,14 @@
 
 (def MOCK-EXCURSIONS
   [{:excursion-id "E001"
-    :name "Statue of Liberty Tour"
-    :location "New York"
-    :category "sightseeing"
-    :duration "4 hours"
-    :price 89
+    :name         "Statue of Liberty Tour"
+    :location     "New York"
+    :category     "sightseeing"
+    :duration     "4 hours"
+    :price        89
     :description
     "Visit the iconic Statue of Liberty and Ellis Island with guided tour"
-    :available true}
+    :available    true}
    {:excursion-id "E002"
     :name         "Central Park Walking Tour"
     :location     "New York"
@@ -468,10 +468,10 @@
   [agent-node config arguments]
   (let [query (get arguments "query")]
     (j/write-value-as-string
-     {:status "success"
+     {:status  "success"
       :results
-      [{:title "Travel Information"
-        :url "https://example.com"
+      [{:title   "Travel Information"
+        :url     "https://example.com"
         :snippet
         (format
          "Here are search results for: %s. Note: This is a mock implementation for demonstration purposes."
@@ -761,6 +761,13 @@
              (aor/get-store agent-node "$$car-rentals-by-location")
              car-rentals-by-id-store    (aor/get-store agent-node
                                                        "$$car-rentals-by-id")
+             excursion-bookings-store   (aor/get-store agent-node
+                                                       "$$excursion-bookings")
+             excursions-by-location-store (aor/get-store
+                                           agent-node
+                                           "$$excursions-by-location")
+             excursions-by-id-store     (aor/get-store agent-node
+                                                       "$$excursions-by-id")
              policies-store             (aor/get-store agent-node "$$policies")
              bookings-store             (aor/get-store agent-node "$$bookings")]
 
@@ -787,6 +794,16 @@
 
          (doseq [rental MOCK-CAR-RENTALS]
            (store/put! car-rentals-by-id-store (:rental-id rental) rental))
+
+         ;; Populate excursions stores - organize by location and by ID
+         (let [excursions-by-location (group-by :location MOCK-EXCURSIONS)]
+           (doseq [[location excursions] excursions-by-location]
+             (store/put! excursions-by-location-store location excursions)))
+
+         (doseq [excursion MOCK-EXCURSIONS]
+           (store/put! excursions-by-id-store
+                       (:excursion-id excursion)
+                       excursion))
 
          ;; Populate policies store - store all policies as a single map
          (store/put! policies-store "all-policies" POLICIES)
