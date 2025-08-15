@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "scripts/claude-java-formatter.sh"
+            "command": "scripts/java-formatter.sh"
           }
         ]
       }
