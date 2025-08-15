@@ -31,6 +31,28 @@
       (.format formatter date))
     ""))
 
+(defn format-relative-time [ms]
+  (if (number? ms)
+    (let [now (js/Date.now)
+          diff (- now ms)
+          seconds (js/Math.floor (/ diff 1000))
+          minutes (js/Math.floor (/ seconds 60))
+          hours (js/Math.floor (/ minutes 60))
+          days (js/Math.floor (/ hours 24))]
+      (cond
+        (< seconds 60) (str seconds " seconds ago")
+        (< minutes 60) (if (= minutes 1) "1 minute ago" (str minutes " minutes ago"))
+        (< hours 24) (if (= hours 1) "1 hour ago" (str hours " hours ago"))
+        (< days 7) (if (= days 1) "1 day ago" (str days " days ago"))
+        :else (let [date (js/Date. ms)
+                    formatter (js/Intl.DateTimeFormat.
+                               "en-US"
+                               #js {:year "numeric"
+                                    :month "short"
+                                    :day "numeric"})]
+                (.format formatter date))))
+    ""))
+
 (defn use-local-storage
   "Hook for localStorage functionality
   

@@ -57,7 +57,9 @@
                      (. e stopPropagation)
                      (on-click url)))}
        ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium (str task-id "-" agent-id))
-       ($ :td.px-4.py-3.text-sm.text-gray-600.font-mono (common/format-timestamp start-time))
+       ($ :td.px-4.py-3.text-sm.text-gray-600.font-mono
+          {:title (common/format-timestamp start-time)}
+          (common/format-relative-time start-time))
        ($ :td.px-4.py-3.max-w-xs
           ($ :div.truncate.text-gray-900
              (common/pp (:invoke-args invoke))))
