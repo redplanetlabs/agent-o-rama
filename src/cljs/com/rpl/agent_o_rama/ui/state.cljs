@@ -210,18 +210,31 @@
            (fn [db {:keys [query-key]}]
              (into (into [:queries] query-key)
                    [(s/terminal (fn [current-state]
-                                  (assoc current-state :status :loading :error nil)))])))
+                                  (let [has-data? (some? (:data current-state))]
+                                    (-> current-state
+                                        (assoc :error nil
+                                               :fetching? true)
+                                        (cond-> (not has-data?)
+                                          (assoc :status :loading))))))])))
 
 (reg-event :query/fetch-success
            (fn [db {:keys [query-key data]}]
              (into (into [:queries] query-key)
-                   [(s/terminal-val {:status :success :data data :error nil})])))
+                   [(s/terminal (fn [_]
+                                  {:status :success
+                                   :data data
+                                   :error nil
+                                   :fetching? false}))])))
 
 (reg-event :query/fetch-error
            (fn [db {:keys [query-key error]}]
              (into (into [:queries] query-key)
                    [(s/terminal (fn [current-state]
-                                  (assoc current-state :status :error :error error)))])))
+                                  (-> current-state
+                                      (assoc :error error
+                                             :fetching? false)
+                                      (cond-> (nil? (:data current-state))
+                                        (assoc :status :error)))))])))
 
 ;; =============================================================================
 ;; DEBUGGING HELPERS

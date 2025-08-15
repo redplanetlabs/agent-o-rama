@@ -66,10 +66,15 @@
      ;; Dependencies - removed fetch-data to prevent infinite loops
      [connected? query-key-str sente-event-str enabled? page-is-visible? refetch-interval-ms timeout-ms])
 
-    ;; Return the familiar data structure
-    (let [default-state {:data nil :loading? false :error nil}
-          current-state (or query-state default-state)]
-      {:data (:data current-state)
-       :loading? (= (:status current-state) :loading)
-       :error (:error current-state)})))
+    ;; Return the familiar data structure (stale-while-revalidate)
+    (let [default-state {:data nil :status nil :error nil :fetching? false}
+          current-state (or query-state default-state)
+          data (:data current-state)
+          loading? (= (:status current-state) :loading)
+          error (when (= (:status current-state) :error) (:error current-state))
+          fetching? (:fetching? current-state)]
+      {:data data
+       :loading? loading?
+       :fetching? fetching?
+       :error error})))
 
