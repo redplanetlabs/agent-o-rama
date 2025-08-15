@@ -31,16 +31,6 @@
 (defmethod -event-msg-handler :default [{:as ev-msg :keys [id ?data]}]
   (.log js/console (str "Unhandled Sente event: " id) ?data))
 
-;; Handle server responses and forward them to our event system
-(defmethod -event-msg-handler :example/hello-response [{:as ev-msg :keys [?data]}]
-  (.log js/console "Server replied to hello:" ?data))
-
-
-
-
-
-
-
 ;; Handler to log connection state changes
 (defmethod -event-msg-handler :chsk/state [{:as ev-msg :keys [?data]}]
   (let [[old-state new-state] ?data

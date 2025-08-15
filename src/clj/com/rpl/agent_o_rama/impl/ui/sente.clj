@@ -47,34 +47,20 @@
 ;; Default handler for events that don't have a specific implementation
 (defmethod -event-msg-handler :default
   [{:as ev-msg :keys [id ?data]}]
-  (log/debug (str "Unhandled Sente event: " id " with data: " (pr-str ?data))))
-
-;; Our "hello world" handler
-(defmethod -event-msg-handler :example/hello
-  [{:as ev-msg :keys [?data]}]
-  (println "[SERVER] Received :example/hello with data:" (pr-str ?data)))
+  :do-nothing)
 
 ;; =============================================================================
 ;; API HANDLERS - Clean abstraction for request/response pattern
 ;; =============================================================================
 
-;; Example of how to add more endpoints:
-;; (defmethod agents/api-handler :api/get-graph
-;;   [_ {:keys [module-id agent-name]} uid]
-;;   (:body (agents/get-graph {:path-params {:module-id module-id 
-;;                                           :agent-name agent-name}})))
-
 ;; Generic handler for all API events
 (defn handle-api-event
   [{:as ev-msg :keys [id ?data ?reply-fn uid]}]
-  (println "[SERVER] Received" id "request from uid:" uid "with data:" ?data)
   (when ?reply-fn
     (try
       (let [result (agents/api-handler id ?data uid)]
-        (println "[SERVER] Sending response for" id)
         (?reply-fn {:success true :data result}))
       (catch Exception e
-        (log/error e "Error handling API event" id)
         (?reply-fn {:success false 
                     :error (.getMessage e)})))))
 
@@ -95,8 +81,6 @@
   [ev-msg]
   (handle-api-event ev-msg))
 
-
-
 (defmethod -event-msg-handler :api/paginate-node
   [ev-msg]
   (handle-api-event ev-msg))
@@ -109,23 +93,19 @@
   [ev-msg]
   (handle-api-event ev-msg))
 
-
-
-;; New unified page fetch endpoint
 (defmethod -event-msg-handler :api/fetch-graph-page
   [ev-msg]
   (handle-api-event ev-msg))
 
 
-
 ;; Handler for client connecting/disconnecting
 (defmethod -event-msg-handler :chsk/uidport-open
   [{:as ev-msg :keys [uid]}]
-  (log/info (str "Sente client connected, uid: " uid)))
+  :do-nothing)
 
 (defmethod -event-msg-handler :chsk/uidport-close
   [{:as ev-msg :keys [uid]}]
-  (log/info (str "Sente client disconnected, uid: " uid)))
+  :do-nothing)
 
 ;; 4. Router lifecycle functions
 (defonce router_ (atom nil))
