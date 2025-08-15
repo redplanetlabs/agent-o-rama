@@ -54,9 +54,9 @@
         (setval [ATOM :aor-cache (keypath mod)] NONE ui/system)))))
 
 (defn start [ipc port]
-  (sente/start-sente!) ; <--- Start the Sente router
+  (sente/start-sente!)
   (swap! ui/system assoc :server (http-kit/run-server #'srv/handler
-                                                     {:port 1974 ;; TODO make configurable
+                                                     {:port port
                                                       :join? false}))
   (swap! ui/system assoc :rama-client ipc)
   (swap! ui/system assoc :background-exec (ScheduledThreadPoolExecutor. 1))
@@ -72,7 +72,7 @@
    TimeUnit/SECONDS))
 
 (defn stop-ui []
-  (sente/stop-sente!) ; <--- Stop the Sente router
+  (sente/stop-sente!)
   (transform [ATOM :aor-cache MAP-VALS :clients MAP-VALS] close! ui/system)
   (setval [ATOM :aor-cache MAP-VALS :clients MAP-VALS] NONE ui/system)
   ((:server @ui/system))

@@ -10,11 +10,8 @@
   (-> (resp/resource-response "index.html")
       (resp/content-type "text/html")))
 
-;; Combines static file serving for dev (public/) and prod (resources/public)
-;; This matches the original dual handler setup
 (def file-handler
-  (-> (fn [_] nil) ; A fallback handler that does nothing
-      ;; Then try serving files from resources/public (for production JAR)
+  (-> (fn [_] nil)
       (resource/wrap-resource "public")))
 
 (defn routes [request]
