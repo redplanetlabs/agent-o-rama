@@ -20,8 +20,11 @@ import java.util.Scanner;
  * <p>The agent uses: - OpenAI GPT-4o-mini for language processing - Tavily for web search
  * capabilities - ReAct pattern for alternating between reasoning and action
  *
- * <p>Required environment variables: - OPENAI_API_KEY: Your OpenAI API key - TAVILY_API_KEY: Your
- * Tavily search API key
+ * <p>Required environment variables:
+ * <ul>
+ *   <li>OPENAI_API_KEY: Your OpenAI API key</li>
+ *   <li>TAVILY_API_KEY: Your * Tavily search API key</li>
+ * </ul>
  */
 public class ReActExample {
 
