@@ -23,9 +23,10 @@
   "Test helper that sets up IPC environment for customer support tests."
   [test-fn]
   (with-open [ipc (rtest/create-ipc)]
-    (rtest/launch-module! ipc
-                          cs/CustomerSupportModule
-                          {:tasks 2 :threads 1})
+    (rtest/launch-module!
+     ipc
+     cs/CustomerSupportModule
+     {:tasks 2 :threads 1})
 
     (let [module-name   (get-module-name cs/CustomerSupportModule)
           agent-manager (aor/agent-manager ipc module-name)
@@ -35,7 +36,8 @@
       ;; Initialize reference data stores before running tests
       (aor/agent-invoke initializer)
 
-      (test-fn agent))))
+      (test-fn agent)
+      (rtest/destroy-module! ipc module-name))))
 
 (deftest customer-support-tools-test
   (testing "customer support tools are properly defined"

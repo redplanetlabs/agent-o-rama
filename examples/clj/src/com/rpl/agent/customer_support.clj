@@ -3,7 +3,11 @@
 
    Provides comprehensive travel support including flight search and booking,
    hotel reservations, car rentals, and policy information. Maintains customer
-   context and supports complex multi-step interactions."
+   context and supports complex multi-step interactions.
+
+   Based on functionality in:
+
+   https://github.com/langchain-ai/langgraph/blob/main/docs/docs/tutorials/customer-support/customer-support.ipynb"
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
@@ -525,7 +529,8 @@
              (aor/get-store agent-node "$$car-rentals-by-location")
              car-rentals-by-id-store    (aor/get-store agent-node
                                                        "$$car-rentals-by-id")
-             policies-store             (aor/get-store agent-node "$$policies")]
+             policies-store             (aor/get-store agent-node "$$policies")
+             bookings-store             (aor/get-store agent-node "$$bookings")]
 
          ;; Populate flights stores - organize by departure airport and by ID
          (let [flights-by-departure (group-by :departure-airport MOCK-FLIGHTS)]
@@ -553,6 +558,23 @@
 
          ;; Populate policies store - store all policies as a single map
          (store/put! policies-store "all-policies" POLICIES)
+
+         ;; Create sample tickets for testing
+         (store/put! bookings-store
+                     "T789"
+                     {:ticket-no    "T789"
+                      :passenger-id "TEST126"
+                      :flight-id    "LX101"
+                      :status       "confirmed"
+                      :booking-date "2024-01-15T10:30:00"})
+
+         (store/put! bookings-store
+                     "T456"
+                     {:ticket-no    "T456"
+                      :passenger-id "TEST125"
+                      :flight-id    "LX101"
+                      :status       "confirmed"
+                      :booking-date "2024-01-10T14:20:00"})
 
          (aor/result! agent-node
                       "Reference data stores initialized successfully")))))
