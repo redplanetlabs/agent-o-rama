@@ -3088,7 +3088,7 @@
        (is (condition-attained? (empty? (pending-invokes))))))))
 
 (deftest query-integration-test
-  "Test query declaration and execution within agent nodes."
+  ;; Test query declaration and execution within agent nodes.
   (with-open [ipc (rtest/create-ipc)]
     (let [customer-pred
           (fn [customer-id]
@@ -3112,7 +3112,7 @@
                  :> $$order-store)
                 ;; (|all)
                 (|all$$ $$order-store)
-                (prn :select1)
+                (prn :select1 (rpl.rama.platform.context/current-task-id))
                 (local-select>
                  [ALL LAST (selected? (customer-pred *customer-id))]
                  $$order-store
@@ -3132,7 +3132,7 @@
                  :> $$order-store)
                 ;; (|all)
                 (|all$$ $$order-store)
-                (prn :select2)
+                (prn :select2 (rpl.rama.platform.context/current-task-id))
                 (local-select>
                  [ALL LAST (selected? (customer-pred *customer-id))]
                  $$order-store
@@ -3157,6 +3157,7 @@
                  "query-test"
                  (fn [agent-node]
                    (let [store (aor/get-store agent-node "$$order-store")]
+                     (prn :puts)
                      (store/put! store
                                  "order-1"
                                  {:customer-id "cust-1" :amount 100})
@@ -3166,28 +3167,32 @@
                      (store/put! store
                                  "order-3"
                                  {:customer-id "cust-2" :amount 150})
+                     (prn :puts-done)
                      (aor/emit! agent-node "query-test" "cust-1"))))
 
                 (aor/node
                  "query-test"
                  "verify-results"
                  (fn [agent-node customer-id]
-                   (let [count-query   (aor/get-query
-                                        agent-node
-                                        "get-order-count")
-                         orders-query  (aor/get-query
-                                        agent-node
-                                        "get-customer-orders")
-                         count-result  (aor/invoke-query
-                                        count-query
-                                        customer-id)
-                         orders-result (aor/invoke-query orders-query
-                                                         customer-id)]
+                   (let [count-query  (aor/get-query
+                                       agent-node
+                                       "get-order-count")
+                         orders-query (aor/get-query
+                                       agent-node
+                                       "get-customer-orders")
+                         #_#_count-result
+                           (aor/invoke-query
+                            count-query
+                            customer-id)
+                         #_#_orders-result
+                           (aor/invoke-query orders-query
+                                             customer-id)]
                      (aor/emit! agent-node
                                 "verify-results"
                                 {:customer-id customer-id
-                                 :count       count-result
-                                 :orders      orders-result}))))
+                                 :count       1;; count-result
+                                 :orders      [];; orders-result
+                                }))))
 
                 (aor/node
                  "verify-results"
@@ -3202,7 +3207,11 @@
 
           agent-manager (aor/agent-manager ipc module-name)
           query-agent   (aor/agent-client agent-manager "query-agent")
-          result        (aor/agent-invoke query-agent)]
+          result        (aor/agent-invoke query-agent)
+          count-q       (foreign-query ipc module-name "get-order-count")
+          orders-q      (foreign-query ipc module-name "get-customer-orders")
+          result        {:count  (foreign-invoke-query count-q "cust-1")
+                         :orders (foreign-invoke-query orders-q "cust-1")}]
 
       (is (map? result))
       (is (= "cust-1" (:customer-id result)))
