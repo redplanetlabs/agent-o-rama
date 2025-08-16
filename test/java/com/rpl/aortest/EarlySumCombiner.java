@@ -7,7 +7,7 @@ public class EarlySumCombiner implements RamaCombinerAgg<Object> {
   @Override
   public Object combine(Object curr, Object arg) {
     Long ret = (Long) curr + (Long) arg;
-    if(ret > 5) return new FinishedAgg(ret);
+    if (ret > 5) return new FinishedAgg(ret);
     else return ret;
   }
 

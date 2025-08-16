@@ -21,9 +21,10 @@ import java.util.Scanner;
  * capabilities - ReAct pattern for alternating between reasoning and action
  *
  * <p>Required environment variables:
+ *
  * <ul>
- *   <li>OPENAI_API_KEY: Your OpenAI API key</li>
- *   <li>TAVILY_API_KEY: Your * Tavily search API key</li>
+ *   <li>OPENAI_API_KEY: Your OpenAI API key
+ *   <li>TAVILY_API_KEY: Your * Tavily search API key
  * </ul>
  */
 public class ReActExample {

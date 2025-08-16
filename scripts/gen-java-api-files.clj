@@ -25,7 +25,7 @@
 (defn mk-void-function-types [i]
   (if (= i 0)
     ""
-    (str "<" (str/join "," (conj (mk-type-strs i))) ">")))
+    (str "<" (str/join ", " (conj (mk-type-strs i))) ">")))
 
 (defn mk-full-type-decl
   ([i] (mk-full-type-decl [] i []))
@@ -33,19 +33,19 @@
    (if (and (empty? pre-type-strs) (= i 0) (empty? post-type-strs))
      ""
      (str "<"
-          (str/join "," (concat pre-type-strs (mk-type-strs i) post-type-strs))
+          (str/join ", " (concat pre-type-strs (mk-type-strs i) post-type-strs))
           ">"))))
 
 (defn mk-agg-node-on-type-decl
   [i]
   (str "<"
-       (str/join "," (concat ["S"] (mk-type-strs i)))
+       (str/join ", " (concat ["S"] (mk-type-strs i)))
        ">"))
 
 (defn mk-agg-node-on-type-arg-decl
   [i]
   (str "<"
-       (str/join "," (concat ["S"] (mk-type-strs i) ["Object"]))
+       (str/join ", " (concat ["S"] (mk-type-strs i) ["Object"]))
        ">"))
 
 (defn mk-type-args-decl

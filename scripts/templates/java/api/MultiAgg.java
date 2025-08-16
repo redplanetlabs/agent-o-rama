@@ -1,7 +1,7 @@
 package com.rpl.agentorama;
 
-import com.rpl.rama.ops.*;
 import com.rpl.agentorama.impl.AORHelpers;
+import com.rpl.rama.ops.*;
 
 public interface MultiAgg {
   public static MultiAgg.Impl create() {
@@ -11,14 +11,16 @@ public interface MultiAgg {
   public static <S> MultiAgg.Impl init(RamaFunction0<S> impl) {
     return create().init(impl);
   }
-  <% (dofor [i (range 0 (- MAX-ARITY 1))] (str %>
-  public static <%= (mk-agg-node-on-type-decl i) %> MultiAgg.Impl on(String name, RamaFunction<%= (+ i 1) %><%= (mk-agg-node-on-type-arg-decl i) %> impl) {
+
+  <% (dofor [i (range 0 (- MAX-ARITY 1))] (str %>public static <%= (mk-agg-node-on-type-decl i) %> MultiAgg.Impl on(
+      String name, RamaFunction<%= (+ i 1) %><%= (mk-agg-node-on-type-arg-decl i) %> impl) {
     return create().on(name, impl);
   }
-  <% )) %>
 
-  interface Impl {
+  <% )) %>interface Impl {
     <S> Impl init(RamaFunction0<S> impl);<% (dofor [i (range 0 (- MAX-ARITY 1))] (str %>
-    <%= (mk-agg-node-on-type-decl i) %> MultiAgg.Impl on(String name, RamaFunction<%= (+ i 1) %><%= (mk-agg-node-on-type-arg-decl i) %> impl);<% )) %>
+
+    <%= (mk-agg-node-on-type-decl i) %> MultiAgg.Impl on(
+        String name, RamaFunction<%= (+ i 1) %><%= (mk-agg-node-on-type-arg-decl i) %> impl);<% )) %>
   }
 }

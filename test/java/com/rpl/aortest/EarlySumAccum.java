@@ -12,8 +12,7 @@ public class EarlySumAccum implements RamaAccumulatorAgg1<Object, Long> {
   @Override
   public Object accumulate(Object curr, Long arg) {
     Long ret = (Long) curr + arg;
-    if(ret>10L) return new FinishedAgg(ret);
+    if (ret > 10L) return new FinishedAgg(ret);
     else return ret;
   }
-
 }

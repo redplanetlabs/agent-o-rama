@@ -14,17 +14,25 @@ public interface AgentsTopology {
   }
 
   AgentGraph newAgent(String name);
+
   AgentGraph newToolsAgent(String name, List<ToolInfo> tools);
+
   AgentGraph newToolsAgent(String name, List<ToolInfo> tools, ToolsAgentOptions options);
 
   void declareKeyValueStore(String name, Class keyClass, Class valClass);
+
   void declareDocumentStore(String name, Class keyClass, Object... keyAndValClasses);
+
   PState.Declaration declarePStateStore(String name, Class schema);
-  PState.Declaration declarePStateStore(String name,  PState.Schema schema);
+
+  PState.Declaration declarePStateStore(String name, PState.Schema schema);
 
   void declareAgentObject(String name, Object o);
+
   void declareAgentObjectBuilder(String name, RamaFunction1<AgentObjectSetup, Object> builder);
-  void declareAgentObjectBuilder(String name, RamaFunction1<AgentObjectSetup, Object> builder, AgentObjectOptions options);
+
+  void declareAgentObjectBuilder(
+      String name, RamaFunction1<AgentObjectSetup, Object> builder, AgentObjectOptions options);
 
   void declareClusterAgent(String localName, String moduleName, String agentName);
 

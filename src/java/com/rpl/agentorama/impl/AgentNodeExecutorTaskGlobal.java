@@ -1,13 +1,11 @@
 package com.rpl.agentorama.impl;
 
-import java.io.IOException;
-import java.util.concurrent.*;
-import java.util.*;
-
-import com.rpl.rama.integration.*;
-
 import clojure.lang.ILookup;
 import clojure.lang.Keyword;
+import com.rpl.rama.integration.*;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.*;
 
 public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
   private static final Keyword UUID_KW = Keyword.intern(null, "uuid");
@@ -22,16 +20,17 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
 
   public void submitTask(UUID invokeId, clojure.lang.AFn f) {
     _runningInvokeIds.put(invokeId, Arrays.asList());
-    Runnable wrappedTask = () -> {
-      try {
-	LOG_THROTTLER.set(_throttler);
-        f.run();
-	LOG_THROTTLER.remove();
-      } catch (Throwable t) {
-        _runningInvokeIds.remove(invokeId);
-        throw t;
-      }
-    };
+    Runnable wrappedTask =
+        () -> {
+          try {
+            LOG_THROTTLER.set(_throttler);
+            f.run();
+            LOG_THROTTLER.remove();
+          } catch (Throwable t) {
+            _runningInvokeIds.remove(invokeId);
+            throw t;
+          }
+        };
     _execServResource.getResource().submit(wrappedTask);
   }
 
@@ -41,7 +40,9 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
 
   @Override
   public void prepareForTask(int taskId, TaskGlobalContext context) {
-    _execServResource = new WorkerManagedResource("agentVirtualThreads", context, () -> Executors.newVirtualThreadPerTaskExecutor());
+    _execServResource =
+        new WorkerManagedResource(
+            "agentVirtualThreads", context, () -> Executors.newVirtualThreadPerTaskExecutor());
     _runningInvokeIds = new ConcurrentHashMap();
     _throttler = context.getLogThrottler();
   }
@@ -56,9 +57,9 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
 
   public CompletableFuture getHumanFuture(UUID invokeId, String uuid) {
     List tuple = _runningInvokeIds.get(invokeId);
-    if(tuple!=null && !tuple.isEmpty()) {
+    if (tuple != null && !tuple.isEmpty()) {
       ILookup m = (ILookup) tuple.get(0);
-      if(m.valAt(UUID_KW).equals(uuid)) {
+      if (m.valAt(UUID_KW).equals(uuid)) {
         return (CompletableFuture) tuple.get(1);
       }
     }
@@ -67,7 +68,7 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
 
   public Object getHumanRequest(UUID invokeId) {
     List tuple = _runningInvokeIds.get(invokeId);
-    if(tuple!=null && !tuple.isEmpty()) return tuple.get(0);
+    if (tuple != null && !tuple.isEmpty()) return tuple.get(0);
     return null;
   }
 
