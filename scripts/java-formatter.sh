@@ -94,9 +94,11 @@ get_java_files() {
                 return
             fi
         fi
+        # If JSON input exists but contains no Java files, return empty
+        return
     fi
 
-    # Fallback: find all Java files in current directory
+    # Only format all Java files when explicitly no arguments and no stdin
     find . -name "*.java" -type f 2>/dev/null
 }
 
