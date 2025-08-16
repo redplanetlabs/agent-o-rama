@@ -210,7 +210,7 @@
 
 (defn define-agents!
   [setup topologies stream-topology mb-topology agent-graphs mirror-agents
-   store-info declared-objects]
+   store-info declared-objects declared-queries]
   (declare-object* setup
                    (symbol (po/agents-store-info-name))
                    (aor-types/->valid-StoreInfo store-info {}))
@@ -229,7 +229,8 @@
                    (symbol (po/agent-declared-objects-name))
                    (AgentDeclaredObjectsTaskGlobal.
                     declared-objects
-                    (mk-agents-info agent-graphs mirror-agents)))
+                    (mk-agents-info agent-graphs mirror-agents)
+                    declared-queries))
 
   (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))

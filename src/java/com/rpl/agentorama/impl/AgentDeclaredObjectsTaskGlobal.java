@@ -13,16 +13,27 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
 
   Map<String, Map<String, Object>> _builders;
   Map<String, List<String>> _agentsInfo;
+  Map<String, Object> _queries;
 
   Map<String, WorkerManagedResource> _objects;
   String _thisModuleName;
   WorkerManagedResource<Map<String, AgentClient>> _agents;
-
+  WorkerManagedResource<Map<String, Object>> _queryClients;
 
   // agents is localName -> [moduleName, agentName] (nil for local module)
   public AgentDeclaredObjectsTaskGlobal(Map<String, Map<String, Object>> builders, Map<String, List<String>> agentsInfo) {
     _builders = builders;
     _agentsInfo = agentsInfo;
+    _queries = new HashMap<>();
+  }
+
+  public AgentDeclaredObjectsTaskGlobal(
+      Map<String, Map<String, Object>> builders,
+      Map<String, List<String>> agentsInfo,
+      Map<String, Object> queries) {
+    _builders = builders;
+    _agentsInfo = agentsInfo;
+    _queries = queries;
   }
 
   public Object getAgentObjectFromResource(String name) {
@@ -60,7 +71,14 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     }
   }
 
-  private static Object makeObject(String name, IFn afn, AgentObjectSetup setup, boolean autoTracing) {
+  public Object getQuery(String queryName) {
+    Object ret = _queryClients.getResource().get(queryName);
+    if (ret == null) throw new RuntimeException("Query does not exist: " + queryName);
+    return ret;
+  }
+
+  private static Object makeObject(
+      String name, IFn afn, AgentObjectSetup setup, boolean autoTracing) {
     Object o = afn.invoke(setup);
     return autoTracing ? AORHelpers.WRAP_AGENT_OBJECT.invoke(name, o) : o;
   }
@@ -113,6 +131,25 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
       }
       return m;
     });
+
+    _queryClients =
+        new WorkerManagedResource(
+            "__queryClients",
+            context,
+            () -> {
+              Map<String, Object> m = new CloseableMap();
+              for (String queryName : _queries.keySet()) {
+                try {
+                  Object query =
+                      AORHelpers.FOREIGN_QUERY.invoke(
+                          context.getClusterRetriever(), _thisModuleName, queryName);
+                  m.put(queryName, query);
+                } catch (Exception e) {
+                  throw new RuntimeException("Failed to create query client for: " + queryName, e);
+                }
+              }
+              return m;
+            });
   }
 
   @Override
@@ -121,5 +158,6 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
       resource.close();
     }
     _agents.close();
+    _queryClients.close();
   }
 }

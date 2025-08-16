@@ -30,6 +30,7 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
     public Map<String, Depot> streamingDepots;
     public Map<String, Depot> humanDepots;
     public ConcurrentHashMap<String, PState> localPStates;
+    public ConcurrentHashMap<String, QueryTopologyClient> localQueries;
     public Depot pstateWritesDepot;
     ClusterManagerBase manager;
 
@@ -41,6 +42,7 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
       this.humanDepots = humanDepots;
       this.pstateWritesDepot = pstateWritesDepot;
       this.localPStates = new ConcurrentHashMap();
+      this.localQueries = new ConcurrentHashMap();
       this.manager = manager;
     }
 
@@ -52,6 +54,20 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
           if(ret==null) {
             ret = manager.clusterPState(moduleName, pstateName);
             localPStates.put(pstateName, ret);
+          }
+        }
+      }
+      return ret;
+    }
+
+    public QueryTopologyClient getLocalQuery(String queryName) {
+      QueryTopologyClient ret = localQueries.get(queryName);
+      if (ret == null) {
+        synchronized (this) {
+          ret = localQueries.get(queryName);
+          if (ret == null) {
+            ret = manager.clusterQuery(moduleName, queryName);
+            localQueries.put(queryName, ret);
           }
         }
       }
@@ -97,6 +113,10 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
 
   public PState getLocalPState(String pstateName) {
     return _clientInfo.getResource().getLocalPState(pstateName);
+  }
+
+  public QueryTopologyClient getLocalQuery(String queryName) {
+    return _clientInfo.getResource().getLocalQuery(queryName);
   }
 
   public RamaClientsTaskGlobal(Collection<String> agentNames, List<List> mirrorTuples) {

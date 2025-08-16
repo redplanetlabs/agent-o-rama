@@ -12,26 +12,26 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.ops :as ops])
   (:import
+   [com.rpl.agent_o_rama.impl.types
+    Node]
    [com.rpl.agentorama
     AgentClient
     AgentNode
     HumanInputRequest
     IUnderlying
     NestedOpType
+    Query
     StreamingRecorder]
    [com.rpl.agentorama.impl
     AgentDeclaredObjectsTaskGlobal
     AgentNodeExecutorTaskGlobal
     RamaClientsTaskGlobal]
-   [com.rpl.agent_o_rama.impl.types
-    Node]
+   com.rpl.rama.QueryTopologyClient
+   [dev.langchain4j.data.embedding
+    Embedding]
    [dev.langchain4j.model.chat
     ChatModel
     StreamingChatModel]
-   [dev.langchain4j.data.embedding
-    Embedding]
-   [dev.langchain4j.data.message
-    ChatMessage]
    [dev.langchain4j.model.chat.request
     ChatRequest]
    [dev.langchain4j.model.chat.response
@@ -44,8 +44,6 @@
     Filter]
    [java.io
     Closeable]
-   [java.util
-    UUID]
    [java.util.concurrent
     CompletableFuture]))
 
@@ -190,6 +188,13 @@
      ~res-sym
    ))
 
+(defn reify-query
+  [^QueryTopologyClient query-topology-client]
+  (reify
+   Query
+   (execute [_ args]
+     (.invoke query-topology-client args))))
+
 (defn mk-agent-node
   [agent-name agent-graph agent-task-id agent-id curr-node invoke-id retry-num
    store-info ^RamaClientsTaskGlobal rama-clients]
@@ -290,6 +295,8 @@
                              {:name name
                               :type (get store-info name)}))
          )))
+     (getQuery [_this name]
+       (reify-query (.getLocalQuery rama-clients name)))
      (getAgentClient [agent-node name]
        (let [client (.getAgentClient declared-objects-tg name)
 

@@ -3085,5 +3085,127 @@
        (bind inv-car (aor/agent-initiate car))
        (is (condition-attained? (= 1 (count (pending-invokes)))))
        (h/release-semaphore SEM 1)
-       (is (condition-attained? (empty? (pending-invokes))))
-      ))))
+       (is (condition-attained? (empty? (pending-invokes))))))))
+
+(deftest query-integration-test
+  "Test query declaration and execution within agent nodes."
+  (with-open [ipc (rtest/create-ipc)]
+    (let [customer-pred
+          (fn [customer-id]
+            (fn [order]
+              (= customer-id (:customer-id order))))
+          module
+          (module
+            {:module-name "TestQueryModule"}
+            [setup topologies]
+
+            (let [topology (aor/agents-topology setup topologies)
+                  s        (aor/underlying-stream-topology topology)]
+
+              (<<query-topology topologies
+                "get-order-count"
+                [*customer-id :> *count]
+                (prn :get-order-count)
+                (pobject-task-global
+                 "com.rpl.agent-o-rama-test/TestQueryModule"
+                 "$$order-store"
+                 :> $$order-store)
+                ;; (|all)
+                (|all$$ $$order-store)
+                (prn :select1)
+                (local-select>
+                 [ALL LAST (selected? (customer-pred *customer-id))]
+                 $$order-store
+                 :> *order)
+                (prn :order *order)
+                (|origin)
+                (aggs/+count :> *count)
+                (prn :*count *count))
+
+              (<<query-topology topologies
+                "get-customer-orders"
+                [*customer-id :> *orders]
+                (prn :get-customer-orders)
+                (pobject-task-global
+                 "com.rpl.agent-o-rama-test/TestQueryModule"
+                 "$$order-store"
+                 :> $$order-store)
+                ;; (|all)
+                (|all$$ $$order-store)
+                (prn :select2)
+                (local-select>
+                 [ALL LAST (selected? (customer-pred *customer-id))]
+                 $$order-store
+                 :> *order)
+                (prn :order2 *order)
+                (|origin)
+                (aggs/+vec-agg *order :> *orders)
+                (prn :*orders *orders))
+
+              (aor/declare-query topology "get-order-count")
+              (aor/declare-query topology "get-customer-orders")
+              (aor/declare-key-value-store topology
+                                           "$$order-store"
+                                           String
+                                           Object)
+
+              (->
+                topology
+                (aor/new-agent "query-agent")
+                (aor/node
+                 "setup-data"
+                 "query-test"
+                 (fn [agent-node]
+                   (let [store (aor/get-store agent-node "$$order-store")]
+                     (store/put! store
+                                 "order-1"
+                                 {:customer-id "cust-1" :amount 100})
+                     (store/put! store
+                                 "order-2"
+                                 {:customer-id "cust-1" :amount 200})
+                     (store/put! store
+                                 "order-3"
+                                 {:customer-id "cust-2" :amount 150})
+                     (aor/emit! agent-node "query-test" "cust-1"))))
+
+                (aor/node
+                 "query-test"
+                 "verify-results"
+                 (fn [agent-node customer-id]
+                   (let [count-query   (aor/get-query
+                                        agent-node
+                                        "get-order-count")
+                         orders-query  (aor/get-query
+                                        agent-node
+                                        "get-customer-orders")
+                         count-result  (aor/invoke-query
+                                        count-query
+                                        customer-id)
+                         orders-result (aor/invoke-query orders-query
+                                                         customer-id)]
+                     (aor/emit! agent-node
+                                "verify-results"
+                                {:customer-id customer-id
+                                 :count       count-result
+                                 :orders      orders-result}))))
+
+                (aor/node
+                 "verify-results"
+                 nil
+                 (fn [agent-node results]
+                   (aor/result! agent-node results))))
+
+              (aor/define-agents! topology)))
+
+          _ (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+          module-name   (get-module-name module)
+
+          agent-manager (aor/agent-manager ipc module-name)
+          query-agent   (aor/agent-client agent-manager "query-agent")
+          result        (aor/agent-invoke query-agent)]
+
+      (is (map? result))
+      (is (= "cust-1" (:customer-id result)))
+      (is (= 2 (:count result)))
+      (is (= 2 (count (:orders result))))
+      (is (every? #(= "cust-1" (:customer-id %)) (:orders result))))))

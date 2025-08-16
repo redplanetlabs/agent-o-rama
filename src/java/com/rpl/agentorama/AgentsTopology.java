@@ -28,6 +28,8 @@ public interface AgentsTopology {
 
   void declareClusterAgent(String localName, String moduleName, String agentName);
 
+  void declareQuery(String queryName);
+
   StreamTopology getStreamTopology();
 
   void define();

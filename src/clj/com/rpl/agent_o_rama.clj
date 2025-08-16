@@ -29,6 +29,7 @@
     AgentStreamByInvoke
     HumanInputRequest
     MultiAgg$Impl
+    Query
     UpdateMode]
    [com.rpl.agentorama.impl
     IFetchAgentClient
@@ -64,7 +65,8 @@
         agents-vol           (volatile! {})
         mirror-agents-vol    (volatile! {})
         store-info-vol       (volatile! {})
-        declared-objects-vol (volatile! {})]
+        declared-objects-vol (volatile! {})
+        declared-queries-vol (volatile! {})]
     (reify
      AgentsTopology
      (newAgent [this name]
@@ -135,6 +137,11 @@
                       moduleName
                       (po/agent-depot-name agentName))
        (vswap! mirror-agents-vol assoc localName [moduleName agentName]))
+     (declareQuery [this queryName]
+       (when (contains? @declared-queries-vol queryName)
+         (throw (h/ex-info "Query already declared" {:name queryName})))
+       ;; Track the declared query
+       (vswap! declared-queries-vol assoc queryName {}))
      (define [this]
        (when @defined?-vol
          (throw (h/ex-info "Agents topology already defined" {})))
@@ -147,7 +154,8 @@
         @agents-vol
         @mirror-agents-vol
         @store-info-vol
-        @declared-objects-vol))
+        @declared-objects-vol
+        @declared-queries-vol))
      aor-types/AgentsTopologyInternal
      (declare-agent-object-builder-internal [this name afn options]
        (when-not (ifn? afn)
@@ -215,6 +223,28 @@
   [^AgentsTopology agents-topology local-name module-name agent-name]
   (.declareClusterAgent agents-topology local-name module-name agent-name))
 
+(defn declare-query
+  "Declare a query topology that can be invoked from agent nodes.
+
+   Parameters:
+     agents-topology - The AgentsTopology instance
+     name            - Unique name for the query"
+  [^AgentsTopology agents-topology name]
+  {:pre [(string? name)]}
+  (.declareQuery agents-topology name))
+
+(defn invoke-query
+  "Invoke a declared query from within an agent node.
+
+   Parameters:
+     query    - The query (returned by get-query)
+     args     - Arguments to pass to the query
+
+   Returns:
+     Query result"
+  [^Query query & args]
+  (.execute query (into-array Object args)))
+
 (defn setup-object-name
   [^AgentObjectSetup setup]
   (.getObjectName setup))
@@ -278,6 +308,10 @@
 (defn get-agent-object
   [^IFetchAgentObject fetch name]
   (.getAgentObject fetch name))
+
+(defn get-query
+  [^AgentNode agent-node name]
+  (.getQuery agent-node name))
 
 (defn stream-chunk!
   [^AgentNode agent-node chunk]
