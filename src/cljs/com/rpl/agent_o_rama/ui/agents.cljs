@@ -11,26 +11,6 @@
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.queries :as queries]))
 
-(defui spinner [{:keys [size]}]
-  (let [size-class (case size
-                     :small "h-3 w-3"
-                     :medium "h-4 w-4"
-                     "h-4 w-4")
-        classes (str size-class " text-blue-600 animate-spin")]
-    ($ :svg
-       {:className classes
-        :viewBox "0 0 24 24"
-        :fill "none"
-        :xmlns "http://www.w3.org/2000/svg"}
-       ($ :circle
-          {:className "opacity-25"
-           :cx "12" :cy "12" :r "10"
-           :stroke "currentColor" :strokeWidth "4"})
-       ($ :path
-          {:className "opacity-75"
-           :fill "currentColor"
-           :d "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"}))))
-
 (defui result-badge [{:keys [result human-request?]}]
   (cond
     human-request?
@@ -38,7 +18,7 @@
        "🙋 Needs input")
     (nil? result)
     ($ :span.px-2.py-1.bg-blue-100.text-blue-800.rounded-full.text-xs.font-medium.inline-flex.items-center.gap-1
-       ($ spinner {:size :small})
+       ($ common/spinner {:size :small})
        "Pending")
     (:failure? result)
     ($ :span.px-2.py-1.bg-red-100.text-red-800.rounded-full.text-xs.font-medium "Failed")

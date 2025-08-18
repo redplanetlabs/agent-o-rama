@@ -9,6 +9,7 @@
 
    [com.rpl.specter :as s]
    [com.rpl.agent-o-rama.ui.state :as state]
+   [com.rpl.agent-o-rama.ui.common :as common]
 
    ["react" :refer [useState useCallback useEffect]]
    ["react-dom" :refer [createPortal]]
@@ -717,6 +718,9 @@
                                                            selected (= (when selected-node (.-id selected-node)) id)
                                                            has-changes (contains? changed-nodes node-id)
                                                            is-affected (and forking-mode? (contains? affected-nodes node-id))
+                                                           ;; Check if node is in progress
+                                                           in-progress? (and (:start-time-millis data)
+                                                                             (not (:finish-time-millis data)))
                                                            base-classes (cond
                                                                           is-affected
                                                                           ["bg-gray-300" "text-gray-500" "border-2" "border-gray-400"]
@@ -742,6 +746,10 @@
                                                           ($ :div {:className node-className
                                                                    :style {:width "170px" :height "40px" :opacity (if is-affected "0.6" "1.0")}}
                                                              label)
+                                                          ;; Show spinner for in-progress nodes
+                                                          (when (and in-progress? (not is-affected))
+                                                            ($ :div {:className "absolute -top-1.5 -left-1.5 bg-white p-0.5 rounded-full shadow-sm flex items-center justify-center"}
+                                                               ($ common/spinner {:size :medium})))
                                                           (when (and (:result data) (not is-affected))
                                                             ($ :div {:className "absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"}))
                                                           (when has-changes
