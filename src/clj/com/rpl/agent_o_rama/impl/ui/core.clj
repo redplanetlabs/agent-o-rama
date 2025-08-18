@@ -79,16 +79,17 @@
   (.shutdownNow ^ScheduledThreadPoolExecutor (:background-exec @ui/system)))
 
 (defn start-ui
-  ^java.io.Closeable
+  ^AutoCloseable
   ([ipc] (start-ui ipc nil))
   ([ipc options]
    (let [options (merge {:port 1974} options)]
      (println "Starting Agent-o-rama UI on port" (:port options))
      (start ipc (:port options))
      (reify
-      java.io.Closeable
-      (close [this]
-        (println "press enter to close the ui, default port is 1974")
-        (read-line)
+      AutoCloseable
+      (close [_this]
+        (when-not (:no-input-before-close options)
+          (println "press enter to close the ui, default port is 1974")
+          (read-line))
         (stop-ui)
         :closed)))))

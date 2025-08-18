@@ -9,7 +9,9 @@
              "-XX:MetaspaceSize=500000000"
              ;; this gives us stack traces directly in output instead of an edn
              ;; file in tmp, which will be lost on CI
-             "-Dclojure.main.report=stderr"]
+             "-Dclojure.main.report=stderr"
+             ;; allow termination of threads
+             "-Djdk.attach.allowAttachSelf"]
   :dependencies [[org.clojure/clojure "1.12.0"]
                  [com.rpl/rama-helpers "0.10.0"]
                  [dev.langchain4j/langchain4j

@@ -41,6 +41,8 @@
    [com.rpl.rama.ops
     RamaAccumulatorAgg
     RamaCombinerAgg]
+   [java.lang
+    AutoCloseable]
    [java.util.concurrent
     CompletableFuture]
    [rpl.rama.generated
@@ -691,8 +693,8 @@
   (.provideHumanInputAsync client request response))
 
 (defn start-ui
-  (^java.io.Closeable [ipc] (start-ui ipc nil))
-  (^java.io.Closeable [ipc options]
+  (^AutoCloseable [ipc] (start-ui ipc nil))
+  (^AutoCloseable [ipc options]
    (let [start-fn (requiring-resolve
                    'com.rpl.agent-o-rama.impl.ui.core/start-ui)]
      (start-fn ipc options))))
