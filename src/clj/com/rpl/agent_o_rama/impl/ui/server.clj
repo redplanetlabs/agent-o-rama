@@ -12,6 +12,9 @@
 
 (def file-handler
   (-> (fn [_] nil)
+      ;; Fallback to serving source assets for development.
+      (resource/wrap-resource "assets")
+      ;; First, try to serve from "public" for compiled JS and other assets.
       (resource/wrap-resource "public")))
 
 (defn routes [request]

@@ -3,11 +3,11 @@
    [uix.core :as uix :refer [defui defhook $]]
    [uix.dom]
    [clojure.string :as str]
-   
+
    [com.rpl.agent-o-rama.ui.agents :as agents]
    ["wouter" :refer [Link Route Switch Router useLocation useRoute]]
    ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon ChevronLeftIcon ChevronRightIcon]]
-   
+
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.stats :as stats]
    [com.rpl.agent-o-rama.ui.sente :as sente]
@@ -23,9 +23,12 @@
     ($ :div {:className (str "h-screen flex flex-col bg-gray-100 transition-all duration-300 "
                              (if collapsed? "w-16" "w-64"))}
        ;; Header with toggle button
+       ;; Header with logo and toggle button
        ($ :div.flex.items-center.justify-between.p-4.border-b.border-gray-200.overflow-hidden
           (when-not collapsed?
-            ($ :h1.text-lg.font-semibold.text-gray-800.truncate.min-w-0 "Agent-O-Rama"))
+            ($ :img {:src "/logo-black.png"
+                     :alt "Agent-O-Rama"
+                     :className "h-8 max-w-48 object-contain"}))
           ($ :button
              {:onClick toggle-collapsed
               :className "p-2 rounded-md hover:bg-gray-200 transition-colors"
@@ -33,7 +36,7 @@
              (if collapsed?
                ($ ChevronRightIcon {:className "h-5 w-5"})
                ($ ChevronLeftIcon {:className "h-5 w-5"}))))
-       
+
        ;; Navigation
        ($ :nav.flex-1.p-3
           ($ :div.space-y-2
@@ -49,13 +52,13 @@
                 ($ HomeIcon {:className "h-5 w-5 flex-shrink-0"})
                 (when-not collapsed?
                   ($ :span.ml-3 "Overview")))
-             
+
              ;; Agents link
              ($ Link
                 {:href "/agents"
                  :className (str "flex items-center px-3 py-2 rounded-md transition-colors "
                                  (if collapsed? "justify-center" "")
-                                 (if (or (= location "/agents") 
+                                 (if (or (= location "/agents")
                                          (.startsWith location "/agents/"))
                                    "bg-gray-300 text-gray-900"
                                    "hover:bg-gray-200 text-gray-700"))
@@ -63,7 +66,7 @@
                 ($ CpuChipIcon {:className "h-5 w-5 flex-shrink-0"})
                 (when-not collapsed?
                   ($ :span.ml-3 "Agents")))
-             
+
              ;; Datasets link
              ($ Link
                 {:href "/datasets"
@@ -85,7 +88,7 @@
                      (str/replace #"^/" "")
                      (str/split #"/")
                      vec)
-        
+
         ;; Build breadcrumb items with proper merging for module/agent
         build-breadcrumbs (fn [segments]
                             (loop [remaining segments
@@ -112,15 +115,15 @@
                                   (recur (drop (:segments-consumed item) remaining)
                                          (conj result item)
                                          (:path item))))))
-        
+
         breadcrumb-items (when (seq segments)
                            (build-breadcrumbs segments))]
-    
+
     ($ :div.bg-gray-100.px-4.py-2.text-sm.text-gray-600
        ($ :div.flex.items-center.space-x-2
           ;; Home link (always present)
           ($ Link {:href "/" :className "text-blue-600 hover:text-blue-800"} "Home")
-          
+
           ;; Build breadcrumbs from segments
           (when breadcrumb-items
             (map-indexed
@@ -132,12 +135,12 @@
                   ;; Link or text
                   (if is-last?
                     ;; Current page - not clickable
-                    ($ :span {:key (str "crumb-" idx) :className "text-gray-500"} 
+                    ($ :span {:key (str "crumb-" idx) :className "text-gray-500"}
                        (common/url-decode (:label item)))
                     ;; Clickable link
                     ($ Link {:key (str "crumb-" idx)
-                            :href (:path item)
-                            :className "text-blue-600 hover:text-blue-800"}
+                             :href (:path item)
+                             :className "text-blue-600 hover:text-blue-800"}
                        (common/url-decode (:label item)))))))
              breadcrumb-items))))))
 
@@ -154,7 +157,7 @@
            ($ Route {:path "/agents/:module-id/:agent-name/stats" :component stats/stats})
            ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
            ($ Route {:path "/agents" :component agents/index})
-           
+
            ;; Home route
            ($ Route {:path "/" :component agents/index})))))
 
@@ -173,7 +176,7 @@
               ($ Route {:path "/agents/:module-id/:agent-name/stats" :component stats/stats})
               ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
               ($ Route {:path "/agents" :component agents/index})
-              
+
               ;; Home route
               ($ Route {:path "/" :component agents/index}))))))
 
