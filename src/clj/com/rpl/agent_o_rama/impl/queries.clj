@@ -307,3 +307,35 @@
       (|origin)
       (graph/graph->historical-graph-info agent-graph-sym :> *res)
     )))
+
+(defn get-dataset-properties
+  [datasets-pstate dataset-id]
+  (foreign-select-one
+   [(keypath *dataset-id) :props]
+   datasets-pstate
+  ))
+
+(defn get-dataset-snapshot-names
+  [datasets-pstate dataset-id]
+  (foreign-select
+   [(keypath *dataset-id) :snapshots MAP-KEYS some?]
+   datasets-pstate
+  ))
+
+(defn get-dataset-page
+  ([datasets-pstate dataset-id snapshot-name amt]
+   (get-dataset-page datasets-pstate dataset-id snapshot-name amt nil))
+  ([datasets-pstate dataset-id snapshot-name amt pagination-key]
+   (let [examples (foreign-select-one
+                   [(keypath dataset-id :snapshots snapshot-name)
+                    (sorted-map-range-from pagination-key
+                                           {:max-amt amt :inclusive? false})]
+                   datasets-pstate
+                  )]
+     {:examples       examples
+      :pagination-key (when-not (empty? examples)
+                        (-> examples
+                            rseq
+                            first
+                            first))}
+   )))
