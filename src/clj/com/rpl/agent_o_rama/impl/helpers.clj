@@ -5,6 +5,8 @@
    [clojure.string :as str]
    [com.rpl.rama.ops :as ops])
   (:import
+   [com.github.f4b6a3.uuid
+    UuidCreator]
    [com.rpl.agentorama.impl
     AORExceptionInfo]
    [com.rpl.rama.helpers
@@ -192,9 +194,13 @@
           NONE
           m))
 
+(defn random-uuid7
+  []
+  (UuidCreator/getTimeOrderedEpoch))
+
 (defn random-uuid-str
   []
-  (str (random-uuid)))
+  (str (random-uuid7)))
 
 (defn half-uuid
   [^UUID uuid]

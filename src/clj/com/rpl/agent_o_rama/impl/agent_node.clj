@@ -239,7 +239,7 @@
           emits-vol
           conj
           (aor-types/->valid-AgentNodeEmit
-           (random-uuid)
+           (h/random-uuid7)
            nil
            (if (selected-any? [:node-map (keypath node) :node
                                #(instance? Node %)]

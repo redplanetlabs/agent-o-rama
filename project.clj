@@ -12,8 +12,8 @@
              "-Dclojure.main.report=stderr"
              ;; allow termination of threads
              "-Djdk.attach.allowAttachSelf"]
-  :dependencies [[org.clojure/clojure "1.12.0"]
-                 [com.rpl/rama-helpers "0.10.0"]
+  :dependencies [[com.rpl/rama-helpers "0.10.0"]
+                 [com.github.f4b6a3/uuid-creator "6.1.1"]
                  [dev.langchain4j/langchain4j
                   "1.3.0"
                   :exclusions
@@ -40,7 +40,8 @@
                         :test-paths        ["test/clj" "examples/clj/test"]
                         :java-source-paths ["src/java" "test/java"]
                         :dependencies
-                        [[meander/epsilon "0.0.650"]
+                        [[org.clojure/clojure "1.12.0"]
+                         [meander/epsilon "0.0.650"]
                          [dev.langchain4j/langchain4j-open-ai "1.3.0"]
                          [dev.langchain4j/langchain4j-web-search-engine-tavily
                           "1.3.0-beta9"]]}
