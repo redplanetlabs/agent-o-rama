@@ -311,14 +311,14 @@
 (defn get-dataset-properties
   [datasets-pstate dataset-id]
   (foreign-select-one
-   [(keypath *dataset-id) :props]
+   [(keypath dataset-id) :props]
    datasets-pstate
   ))
 
 (defn get-dataset-snapshot-names
   [datasets-pstate dataset-id]
   (foreign-select
-   [(keypath *dataset-id) :snapshots MAP-KEYS some?]
+   [(keypath dataset-id) :snapshots MAP-KEYS some?]
    datasets-pstate
   ))
 
