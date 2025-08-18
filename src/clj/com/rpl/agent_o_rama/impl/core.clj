@@ -264,7 +264,7 @@
                                             {})}))
 
      (source> datasets-depot-sym :> *data)
-      (datasets/handle-dataset-op *data)
+      (datasets/handle-datasets-op *data)
     ))
   (queries/declare-agent-get-names-query-topology topologies
                                                   (-> agent-graphs
