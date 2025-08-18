@@ -22,7 +22,7 @@ public class UITest {
       ipc.launchModule(module, new LaunchConfig(1, 1));
 
       // Start UI with default settings
-      try (AutoCloseable uiCloseable = UI.withOptions().noInputBeforeClose().start(ipc)) {
+      try (AutoCloseable uiCloseable = UI.start(ipc, UI.Options.noInputBeforeClose())) {
         if (uiCloseable == null) {
           throw new AssertionError("UI should return a non-null AutoCloseable");
         }
@@ -48,7 +48,7 @@ public class UITest {
       ipc.launchModule(module, new LaunchConfig(1, 1));
 
       // Start UI with custom port
-      try (AutoCloseable uiCloseable = UI.withOptions().noInputBeforeClose().port(9876).start(ipc)) {
+      try (AutoCloseable uiCloseable = UI.start(ipc, UI.Options.noInputBeforeClose().port(9876))) {
         if (uiCloseable == null) {
           throw new AssertionError("UI should return a non-null AutoCloseable");
         }
@@ -74,7 +74,7 @@ public class UITest {
       ipc.launchModule(module, new LaunchConfig(1, 1));
 
       // Start UI
-      try (AutoCloseable uiCloseable = UI.withOptions().noInputBeforeClose().start(ipc)) {
+      try (AutoCloseable uiCloseable = UI.start(ipc, UI.Options.noInputBeforeClose())) {
 
         // Wait a moment for UI to start
         Thread.sleep(2000);

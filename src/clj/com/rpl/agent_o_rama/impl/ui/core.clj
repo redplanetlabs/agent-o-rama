@@ -10,7 +10,11 @@
    [clojure.tools.logging :as cljlogging]
    [org.httpkit.server :as http-kit])
   (:import
-   [java.util.concurrent ScheduledThreadPoolExecutor TimeUnit]))
+   [java.lang
+    AutoCloseable]
+   [java.util.concurrent
+    ScheduledThreadPoolExecutor
+    TimeUnit]))
 
 (defn refresh-agent-modules! []
   (let [rama-client (ui/get-object :rama-client)

@@ -16,33 +16,43 @@ import java.util.Map;
  */
 public class UI {
 
-  public static class WithOptions {
+  public interface Options {
+    static OptionsImpl create() {
+      return new OptionsImpl();
+    }
+
+    static OptionsImpl port(int portNumber) {
+      return create().port(portNumber);
+    }
+
+    static OptionsImpl noInputBeforeClose() {
+      return create().noInputBeforeClose();
+    }
+  }
+
+  public static class OptionsImpl implements Options {
     private Map<Keyword, Object> options = new HashMap<>();
 
-    public WithOptions noInputBeforeClose() {
+    public OptionsImpl noInputBeforeClose() {
       options.put(Keyword.intern("no-input-before-close"), true);
       return this;
     }
 
-    public WithOptions port(int portNumber) {
+    public OptionsImpl port(int portNumber) {
       options.put(Keyword.intern("port"), Long.valueOf(portNumber));
       return this;
     }
 
-    public AutoCloseable start(InProcessCluster ipc) {
-      return UI.start(ipc, options);
+    Map<Keyword, Object> getOptionsMap() {
+      return options;
     }
-  }
-
-  public static WithOptions withOptions() {
-    return new WithOptions();
   }
 
   /**
    * Start the Agent-o-rama web UI with default settings.
    *
    * @param ipc the InProcessCluster to monitor
-   * @return a Closeable that can be used to stop the UI
+   * @return an AutoCloseable that can be used to stop the UI
    */
   public static AutoCloseable start(InProcessCluster ipc) {
     return (AutoCloseable) AORHelpers.START_UI.invoke(ipc);
@@ -53,9 +63,9 @@ public class UI {
    *
    * @param ipc the InProcessCluster to monitor
    * @param options configuration options (e.g., {:port 8080})
-   * @return a Closeable that can be used to stop the UI
+   * @return an AutoCloseable that can be used to stop the UI
    */
-  public static AutoCloseable start(InProcessCluster ipc, Map<Keyword, Object> options) {
-    return (AutoCloseable) AORHelpers.START_UI.invoke(ipc, options);
+  public static AutoCloseable start(InProcessCluster ipc, Options options) {
+    return (AutoCloseable) AORHelpers.START_UI.invoke(ipc, ((OptionsImpl)options).getOptionsMap());
   }
 }
