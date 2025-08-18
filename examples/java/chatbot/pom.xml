@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.rpl.agent</groupId>
+    <artifactId>chatbot-example</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>Chatbot Agent Example</name>
+    <description>Java implementation of conversational chatbot with memory management using agent-o-rama framework</description>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>maven-releases</id>
+            <url>https://nexus.redplanetlabs.com/repository/maven-public-releases</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <!-- Agent-O-Rama Framework -->
+        <dependency>
+            <groupId>com.rpl</groupId>
+            <artifactId>agent-o-rama</artifactId>
+            <version>0.9.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Rama Framework -->
+        <dependency>
+            <groupId>com.rpl</groupId>
+            <artifactId>rama</artifactId>
+            <version>0.0.6-SNAPSHOT</version>
+        </dependency>
+
+        <!-- LangChain4j Dependencies -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j</artifactId>
+            <version>1.2.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-open-ai</artifactId>
+            <version>1.2.0</version>
+        </dependency>
+
+        <!-- Logging -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j18-impl</artifactId>
+            <version>2.16.0</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>21</source>
+                    <target>21</target>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>com.rpl.agent.chatbot.ChatbotExample</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
