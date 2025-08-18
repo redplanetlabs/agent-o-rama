@@ -3,6 +3,7 @@
         [com.rpl.rama path])
   (:require
    [clojure.set :as set]
+   [com.rpl.agent-o-rama.impl.datasets :as datasets]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.partitioner :as apart]
@@ -231,12 +232,20 @@
                     declared-objects
                     (mk-agents-info agent-graphs mirror-agents)))
 
-  (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))]
+  (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))
+        datasets-depot-sym     (symbol (po/datasets-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
-    (set-launch-depot-dynamic-option!* setup
-                                       pstate-write-depot-sym
-                                       "depot.max.entries.per.partition"
-                                       500)
+    (declare-depot* setup datasets-depot-sym (hash-by :dataset-id))
+    (declare-pstate*
+     stream-topology
+     (symbol (po/datasets-task-global-name))
+     po/DATASETS-PSTATE-SCHEMA)
+
+    (doseq [depot-sym [pstate-write-depot-sym datasets-depot-sym]]
+      (set-launch-depot-dynamic-option!* setup
+                                         depot-sym
+                                         "depot.max.entries.per.partition"
+                                         500))
     (<<sources stream-topology
      (source> pstate-write-depot-sym
                {:retry-mode :none}
@@ -252,8 +261,11 @@
        (else>)
         (ack-return> {:type      :failure
                       :exception (h/ex-info "Agent invoke has been retried"
-                                            {})})
-      )))
+                                            {})}))
+
+     (source> datasets-depot-sym :> *data)
+      (datasets/handle-dataset-op *data)
+    ))
   (queries/declare-agent-get-names-query-topology topologies
                                                   (-> agent-graphs
                                                       keys

@@ -71,6 +71,10 @@
   [name]
   (str "*_agent-gc-valid-invokes-depot-" name))
 
+(defn datasets-depot-name
+  []
+  "*_agents-datasets-depot")
+
 (defn agents-clients-name
   []
   "*_agents-clients")
@@ -208,6 +212,29 @@
 (def AGENT-CONFIG-PSTATE-SCHEMA
   java.util.Map)
 
+(defn datasets-task-global-name
+  []
+  "$$_aor-datasets")
+
+(def DATASETS-PSTATE-SCHEMA
+  {UUID ; dataset-id
+   (fixed-keys-schema
+    {:props     (fixed-keys-schema
+                 {:name        String
+                  :description String})
+     :snapshots
+     (map-schema
+      String ; nil for latest
+      (map-schema
+       UUID ; example ID
+       (fixed-keys-schema
+        {:input (vector-schema Object)
+         :reference-output Object
+         :tags  #{String}})
+       {:subindex? true})
+      {:subindex? true})}
+   )})
+
 ;; Task global fetch helpers
 
 (defn agent-node-executor-task-global
@@ -233,6 +260,10 @@
 (defn agent-gc-valid-invokes-depot-task-global
   [name]
   (this-module-pobject-task-global (agent-gc-valid-invokes-depot-name name)))
+
+(defn datasets-depot-task-global
+  [name]
+  (this-module-pobject-task-global (datasets-depot-name)))
 
 (defn agents-clients-task-global
   []
@@ -284,5 +315,10 @@
   [name]
   (this-module-pobject-task-global (agent-config-task-global-name name)))
 
-(defn log-throttler []
+(defn datasets-task-global
+  []
+  (this-module-pobject-task-global (datasets-task-global-name)))
+
+(defn log-throttler
+  []
   (AgentNodeExecutorTaskGlobal/getLogThrottler))
