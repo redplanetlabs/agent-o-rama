@@ -30,17 +30,6 @@
 (defn objects [module-id agent-name]
   (aor-types/underlying-objects (get-client module-id agent-name)))
 
-(defn manually-trigger-invoke [{{:keys [module-id agent-name]} :path-params
-                                {:keys [args]} :body-params
-                                :as req}]
-  (when-not (vector? args)
-    (throw (ex-info "must be a json list of args" {:bad-args args})))
-  (let [^AgentInvoke inv (apply aor/agent-initiate (get-client module-id agent-name) args)]
-    {:status 200
-     :body
-     {:task-id (.getTaskId inv)
-      :invoke-id (.getAgentInvokeId inv)}}))
-
 (defn remove-implicit-nodes
   "Preprocesses the invokes-map to remove implicit nodes and rewire edges to real nodes.
    Returns a new map without implicit nodes where all references are updated."
@@ -166,7 +155,7 @@
         ;; Get summary info on first request
         summary-info (when is-initial-load?
                        (foreign-select-one [(keypath agent-id)
-                                            (submap [:result :start-time-millis :finish-time-millis :graph-version])]
+                                            (submap [:result :start-time-millis :finish-time-millis :graph-version :retry-num])]
                                            root-pstate
                                            {:pkey agent-task-id}))
 

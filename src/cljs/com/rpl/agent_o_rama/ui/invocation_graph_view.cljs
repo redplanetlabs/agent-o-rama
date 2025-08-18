@@ -14,7 +14,8 @@
    ["react" :refer [useState useCallback useEffect]]
    ["react-dom" :refer [createPortal]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
-   ["@dagrejs/dagre" :as Dagre]))
+   ["@dagrejs/dagre" :as Dagre]
+   ["@heroicons/react/24/outline" :refer [ExclamationTriangleIcon ArrowPathIcon]]))
 
 (defn format-ms [ms]
   (let [date (js/Date. ms)
@@ -174,6 +175,7 @@
         node-id (:node-id data)
         node-name (:node data)
         input (:input data)
+        exceptions (:exceptions data)
         result (:result data)
         start-time (:start-time-millis data)
         finish-time (:finish-time-millis data)
@@ -239,6 +241,18 @@
                                          :color "blue"
                                          :truncate-length 100
                                          :depth 0})))
+
+            (when (seq exceptions)
+              ($ :div {:className "bg-red-50 p-3 rounded-md mt-4 border border-red-200"}
+                 ($ :div {:className "text-sm font-medium text-red-700 mb-2 flex items-center gap-2"}
+                    ($ ExclamationTriangleIcon {:className "w-5 h-5"})
+                    (str "Exceptions (" (count exceptions) ")"))
+                 ($ :div {:className "space-y-2"}
+                    (for [[idx exc-str] (map-indexed vector exceptions)]
+                      ($ :div {:key idx
+                               :className "bg-white p-2 rounded border border-red-100"}
+                         ($ :pre {:className "text-xs font-mono text-red-800 whitespace-pre-wrap break-all"}
+                            exc-str))))))
             (when (and start-time finish-time)
               ($ :div {:className "bg-yellow-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-yellow-700 mb-2"} "Timing")
@@ -701,6 +715,17 @@
       ($ :div.flex.justify-center.items-center.py-8
          ($ :div.text-gray-500 "No graph data available"))
       ($ :<>
+         ;; Header with retry count badge
+         ($ :div.sticky.top-0.z-50.bg-white.border-b.border-gray-200.shadow-sm.p-6
+            ($ :div.flex.justify-between.items-center
+               ($ :h2.text-2xl.font-semibold.text-gray-700 "Agent Invocation Graph")
+               (when-let [retries (:retry-num summary-data)]
+                 (when (> retries 0)
+                   ($ :div {:className "flex items-center gap-2 bg-yellow-100 text-yellow-800 text-sm font-medium px-3 py-1 rounded-full"
+                            :title (str "This agent invocation has been retried " retries " time(s).")}
+                      ($ ArrowPathIcon {:className "h-4 w-4"})
+                      ($ :span (str "Retries: " retries)))))))
+
          ;; Main content area with right margin for the stats panel
          ($ :div {:className "mr-80"}
             ($ :div {:style {:width "100%" :height "500px"}}
@@ -741,7 +766,8 @@
                                                                                ["shadow-lg"])
                                                            common-classes ["p-3" "rounded-md" "transition-all" "duration-200"]
                                                            node-className (str/join " " (concat base-classes selection-classes common-classes))
-                                                           has-human-request (:human-request data)]
+                                                           has-human-request (:human-request data)
+                                                           has-exceptions (seq (:exceptions data))]
                                                        ($ :div {:className "relative"}
                                                           ($ :div {:className node-className
                                                                    :style {:width "170px" :height "40px" :opacity (if is-affected "0.6" "1.0")}}
@@ -757,6 +783,9 @@
                                                           (when (and has-human-request (not is-affected))
                                                             ($ :div {:className "absolute -top-1 right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white shadow-sm"}
                                                                ($ :div {:className "absolute inset-0 bg-amber-500 rounded-full animate-pulse"})))
+                                                          (when (and has-exceptions (not is-affected))
+                                                            ($ :div {:className "absolute -bottom-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full border-2 border-white shadow-sm flex items-center justify-center"}
+                                                               ($ ExclamationTriangleIcon {:className "w-2.5 h-2.5 text-white"})))
                                                           ($ Handle {:type "target" :position "top"})
                                                           ($ Handle {:type "source" :position "bottom"})))))
 
