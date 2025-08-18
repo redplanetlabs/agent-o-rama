@@ -30,11 +30,16 @@
     EmbeddingModel]
    [dev.langchain4j.model.openai
     OpenAiChatModel
-    OpenAiEmbeddingModel]))
+    OpenAiEmbeddingModel]
+   [dev.langchain4j.store.embedding
+    EmbeddingMatch
+    EmbeddingSearchRequest
+    EmbeddingStore]
+   [dev.langchain4j.store.embedding.inmemory
+    InMemoryEmbeddingStore]))
 
 ;; Configuration
 (def ^:const DOCUMENTS-STORE "$$documents")
-(def ^:const EMBEDDINGS-STORE "$$embeddings")
 (def ^:const RESEARCH-STORE "$$research")
 
 ;; System messages for different agent roles
@@ -159,26 +164,20 @@ addresses all aspects of the question.")
 (defn store-document-chunks
   "Store document chunks with embeddings in pstate structure"
   [agent-node doc-id content]
-  (let [chunks           (split-document content)
-        docs-store       (aor/get-store agent-node DOCUMENTS-STORE)
-        embeddings-store (aor/get-store agent-node EMBEDDINGS-STORE)]
+  (let [chunks     (split-document content)
+        docs-store (aor/get-store agent-node DOCUMENTS-STORE)
+        ^EmbeddingStore embedding-store
+        (aor/get-agent-object agent-node "vector-store")]
     (doseq [[idx chunk] (map-indexed vector chunks)]
-      (let [chunk-id         (str doc-id "-" idx)
-            embedding        (create-embedding agent-node chunk)
-            embedding-vector (vec (.vector embedding))]
+      (let [chunk-id  (str doc-id "-" idx)
+            embedding (create-embedding agent-node chunk)]
         ;; Store document content
         (store/put!
          docs-store
          chunk-id
          {:content chunk :source doc-id :index idx})
         ;; Store embedding in pstate with chunk-id as key and vector as value
-        (store/pstate-transform!
-         [(path/keypath chunk-id)
-          (path/termval {:vector    embedding-vector
-                         :doc-id    doc-id
-                         :chunk-idx idx})]
-         embeddings-store
-         chunk-id)))))
+        (.add embedding-store embedding doc-id)))))
 
 ;; Similarity calculation (cosine similarity)
 (defn calculate-similarity-vectors
@@ -211,33 +210,29 @@ addresses all aspects of the question.")
 (defn search-documents-tool
   "Tool to search for relevant documents"
   [agent-node config arguments]
-  (let [query            (get arguments "query")
-        max-results      (get arguments "max_results" 5)
-        query-embedding  (create-embedding agent-node query)
-        embeddings-store (aor/get-store agent-node EMBEDDINGS-STORE)
-        docs-store       (aor/get-store agent-node DOCUMENTS-STORE)]
-
-    ;; Search using pstate embeddings
-    (let [query-vector   (vec (.vector query-embedding))
-          all-embeddings (store/pstate-select [path/ALL] embeddings-store)
-          similarities   (mapv
-                          (fn [[chunk-id embedding-data]]
-                            (let [stored-vector (:vector embedding-data)
-                                  similarity    (calculate-similarity-vectors
-                                                 query-vector
-                                                 stored-vector)]
-                              [chunk-id similarity embedding-data]))
-                          all-embeddings)
-          top-chunks     (->> similarities
-                              (sort-by second >)
-                              (take max-results))]
-      (mapv (fn [[chunk-id similarity embedding-data]]
-              (let [doc-data (store/get docs-store chunk-id)]
-                {:chunk_id        chunk-id
-                 :content         (:content doc-data)
-                 :source          (:source doc-data)
-                 :relevance_score similarity}))
-            top-chunks))))
+  (let [query           (get arguments "query")
+        max-results     (get arguments "max_results" 5)
+        query-embedding (create-embedding agent-node query)
+        ^EmbeddingStore embedding-store
+        (aor/get-agent-object agent-node "vector-store")
+        docs-store      (aor/get-store agent-node DOCUMENTS-STORE)
+        ;; Search using pstate embeddings
+        all-matches     (.matches
+                         (.search
+                          embedding-store
+                          (-> (EmbeddingSearchRequest/builder)
+                              (.maxResults max-results)
+                              (.queryEmbedding query-embedding)
+                              (.build))))]
+    (mapv (fn [^EmbeddingMatch match]
+            (let [doc-id   (.embedded match)
+                  score    (.score match)
+                  doc-data (store/get docs-store doc-id)]
+              {:doc-id          doc-id
+               :content         (:content doc-data)
+               :source          (:source doc-data)
+               :relevance-score score}))
+          all-matches)))
 
 ;; Helper functions
 (defn create-tool-execution-request
@@ -360,6 +355,13 @@ addresses all aspects of the question.")
 
   (aor/declare-agent-object-builder
    topology
+   "vector-store"
+   ;; NOTE InMemoryEmbeddingStore will only work for a single worker
+   (fn [_setup] (InMemoryEmbeddingStore.))
+   {:thread-safe? true})
+
+  (aor/declare-agent-object-builder
+   topology
    "chat-model"
    (fn [setup]
      (-> (OpenAiChatModel/builder)
@@ -379,7 +381,6 @@ addresses all aspects of the question.")
 
   ;; Declare stores
   (aor/declare-key-value-store topology DOCUMENTS-STORE String Object)
-  (aor/declare-pstate-store topology EMBEDDINGS-STORE {String Object})
   (aor/declare-key-value-store topology RESEARCH-STORE String Object)
 
   ;; Main research agent
