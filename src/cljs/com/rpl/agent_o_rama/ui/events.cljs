@@ -83,17 +83,16 @@
                                                              :module-id module-id
                                                              :agent-name agent-name}])
 
-                   (let [current-status (get-in db [:invocations-data invoke-id :status])]
-                     ;; Immediately set status to loading to prevent stale data display
-                     (when (not= current-status :success)
-                       (state/dispatch [:db/set-value [:invocations-data invoke-id :status] :loading])
-                       (state/dispatch [:invocation/fetch-graph-page
-                                        {:invoke-id invoke-id
-                                         :module-id module-id
-                                         :agent-name agent-name
-                                         :leaves []
-                                         :initial? true}]))
-                     nil)))
+                   ;; Always fetch data on navigation to ensure fresh data
+                   ;; Set status to loading immediately to prevent stale data display
+                   (state/dispatch [:db/set-value [:invocations-data invoke-id :status] :loading])
+                   (state/dispatch [:invocation/fetch-graph-page
+                                    {:invoke-id invoke-id
+                                     :module-id module-id
+                                     :agent-name agent-name
+                                     :leaves []
+                                     :initial? true}])
+                   nil))
 
 ;; =============================================================================
 ;; UNIFIED STREAMING LOOP
