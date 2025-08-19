@@ -15,14 +15,11 @@
 (defn refresh-agent-modules! []
   (let [rama-client (ui/get-object :rama-client)
         modules (deployed-module-names rama-client)]
-    (def rama-client rama-client)
-    (def modules modules)
     (when (empty? modules) (setval [ATOM :aor-cache] {} ui/system))
     (doseq [mod modules]
       (let [manager (try
                       (aor/agent-manager rama-client mod)
                       (catch Exception e ::no-aor))]
-        (def manager manager)
         (when-not (= ::no-aor manager)
           (setval [ATOM :aor-cache (keypath mod) :manager]
                   manager

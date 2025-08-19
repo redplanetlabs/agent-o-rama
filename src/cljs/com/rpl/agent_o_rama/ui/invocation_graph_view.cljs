@@ -456,6 +456,7 @@
 
        ;; Metrics grid
        (let [total-nodes (count graph-data)
+             retry-count (:retry-num summary-data)
              ;; Dummy values for now
              total-execution-time 2347
              total-tokens 45892
@@ -470,6 +471,16 @@
                      ($ :div {:className "text-sm font-medium text-gray-700"} "Execution Time"))
                   ($ :div {:className "text-right"}
                      ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-execution-time) "ms")))))
+
+            ;; Retry count
+            (when (and retry-count (> retry-count 0))
+              ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
+                 ($ :div {:className "flex justify-between items-center"}
+                    ($ :div {:className "flex items-center gap-2"}
+                       ($ ArrowPathIcon {:className "h-4 w-4 text-gray-600"})
+                       ($ :div {:className "text-sm font-medium text-gray-700"} "Retries"))
+                    ($ :div {:className "text-right"}
+                       ($ :div {:className "text-lg font-bold text-gray-800"} retry-count)))))
 
 ;; Store operations
             ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
@@ -715,17 +726,6 @@
       ($ :div.flex.justify-center.items-center.py-8
          ($ :div.text-gray-500 "No graph data available"))
       ($ :<>
-         ;; Header with retry count badge
-         ($ :div.sticky.top-0.z-50.bg-white.border-b.border-gray-200.shadow-sm.p-6
-            ($ :div.flex.justify-between.items-center
-               ($ :h2.text-2xl.font-semibold.text-gray-700 "Agent Invocation Graph")
-               (when-let [retries (:retry-num summary-data)]
-                 (when (> retries 0)
-                   ($ :div {:className "flex items-center gap-2 bg-yellow-100 text-yellow-800 text-sm font-medium px-3 py-1 rounded-full"
-                            :title (str "This agent invocation has been retried " retries " time(s).")}
-                      ($ ArrowPathIcon {:className "h-4 w-4"})
-                      ($ :span (str "Retries: " retries)))))))
-
          ;; Main content area with right margin for the stats panel
          ($ :div {:className "mr-80"}
             ($ :div {:style {:width "100%" :height "500px"}}
