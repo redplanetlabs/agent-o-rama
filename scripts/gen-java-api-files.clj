@@ -6,6 +6,13 @@
 
 (def MAX-ARITY 9)
 
+(defn- path
+  ^java.nio.file.Path [s]
+  (.getPath
+   (java.nio.file.FileSystems/getDefault)
+   (str s)
+   (into-array String [])))
+
 (defmacro dofor
   [& body]
   `(doall (for ~@body)))
@@ -13,6 +20,14 @@
 (defn capitalize-first
   [s]
   (apply str (str/capitalize (nth s 0)) (rest s)))
+
+(defn camel->kebab
+  [camel-name]
+  (-> camel-name
+      str/trim
+      (str/replace #"([a-z])([A-Z])" "$1-$2")
+      (str/replace #"([A-Z])([A-Z][a-z])" "$1-$2")
+      str/lower-case))
 
 (defn- spaces
   [amt]
@@ -22,7 +37,8 @@
   [i]
   (vec (for [j (range i)] (str "T" j))))
 
-(defn mk-void-function-types [i]
+(defn mk-void-function-types
+  [i]
   (if (= i 0)
     ""
     (str "<" (str/join "," (conj (mk-type-strs i))) ">")))
@@ -60,11 +76,13 @@
       )))))
 
 
+(def template-base (io/file "scripts/templates/java/api"))
+
 (defn template-api-files
   []
-  (let [fs (file-seq (io/file "scripts/templates/java/api"))]
+  (let [fs (file-seq template-base)]
     (filter
-     (fn [f]
+     (fn [^java.io.File f]
        (.endsWith (.getName f) ".java"))
      fs)))
 
@@ -79,6 +97,12 @@
   [args]
   (str/join ", " (mapv second args)))
 
+(defn args-vars-str-or-true
+  [args]
+  (if (seq args)
+    (str/join ", " (mapv second args))
+    "true"))
+
 (def TOOLS-AGENT-OPTIONS-METHODS
   [["errorHandlerDefault" "ToolsAgentOptions.Impl" []]
    ["errorHandlerStaticString" "ToolsAgentOptions.Impl" [["String" "message"]]]
@@ -87,6 +111,11 @@
     [["StaticStringHandler..." "handlers"]]]
    ["errorHandlerByType" "ToolsAgentOptions.Impl"
     [["FunctionHandler..." "handlers"]]]
+  ])
+
+(def UI-OPTIONS-METHODS
+  [["port" "UIOptions" [["int" "portNumber"]]]
+   ["noInputBeforeClose" "UIOptions" []]
   ])
 
 
@@ -102,7 +131,8 @@
               (io/file
                "scripts/templates/java/reusable/RamaVoidFunctionN.java"))))))
   (doseq [f (template-api-files)]
-    (spit (str "src/java/com/rpl/agentorama/" (.getName f))
+    (spit (str "src/java/com/rpl/agentorama/"
+               (.relativize (path template-base) (path f)))
           (str
            "// this file is auto-generated\n"
            (template/eval f))))
