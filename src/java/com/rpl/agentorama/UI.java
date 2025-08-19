@@ -1,7 +1,6 @@
 package com.rpl.agentorama;
 
 import com.rpl.agentorama.impl.AORHelpers;
-import com.rpl.agentorama.impl.UIOptionsIface;
 import com.rpl.agentorama.impl.UIOptionsImpl;
 import com.rpl.rama.test.InProcessCluster;
 
@@ -14,14 +13,11 @@ import com.rpl.rama.test.InProcessCluster;
 public class UI {
 
   public interface Options {
-    // NOTE the interface can not have static and a non-static methods of the
-    // same name.
-
-    static UIOptionsIface port(int portNumber) {
+    static UIOptions port(int portNumber) {
       return UIOptionsImpl.create().port(portNumber);
     }
 
-    static UIOptionsIface noInputBeforeClose() {
+    static UIOptions noInputBeforeClose() {
       return UIOptionsImpl.create().noInputBeforeClose();
     }
   }
@@ -43,7 +39,7 @@ public class UI {
    * @param options configuration options (Ui.Options)
    * @return an AutoCloseable that can be used to stop the UI
    */
-  public static AutoCloseable start(InProcessCluster ipc, UIOptionsIface options) {
+  public static AutoCloseable start(InProcessCluster ipc, UIOptions options) {
     return (AutoCloseable)
         AORHelpers.START_UI.invoke(ipc, ((UIOptionsImpl) options).getOptionsMap());
   }
