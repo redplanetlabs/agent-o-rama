@@ -145,6 +145,148 @@
     (is (= ["$: required property 'xs' not found"]
            (msgs (datasets/validate S {}))))))
 
+(deftest json-schema-mixed
+  (let [schema
+        {"$schema"    datasets/META
+         "$defs"
+         {"address" {"type"       "object"
+                     "properties" {"street" {"type" "string" "minLength" 1}
+                                   "zip"    {"type"    "string"
+                                             "pattern" "^[0-9]{5}$"}}
+                     "required"   ["street" "zip"]
+                     "additionalProperties" false}}
+         "type"       "object"
+         "properties"
+         {"id"      {"x-javaType" "java.util.UUID"}
+          "name"    {"type" "string" "minLength" 1}
+          "age"     {"type" "integer" "minimum" 0 "maximum" 130}
+          "tags"    {"type"        "array"
+                     "items"       {"type" "string"}
+                     "minItems"    1
+                     "uniqueItems" true}
+          "contact" {"anyOf" [{"$ref" "#/$defs/address"} {"type" "null"}]}
+          ;; 2020-12 tuple form:
+          "scores"  {"type"        "array"
+                     "prefixItems" [{"type" "number"}
+                                    {"x-javaType" "java.lang.Double"}]
+                     "items"       false}
+          "prefs"   {"type" "object"
+                     "patternProperties" {"^feature_[a-z]+$" {"type" "boolean"}}
+                     "additionalProperties" false}}
+         "required"   ["id" "name" "age" "contact"]
+         "additionalProperties" false}
+        S      (datasets/build-schema schema)]
+
+    ;; -------- VALID CASE --------
+    (testing "valid instance passes"
+      (is (empty?
+           (datasets/validate
+            S
+            {"id"      (h/random-uuid7)
+             "name"    "Alice"
+             "age"     (int 30)
+             "tags"    ["a" "b"]
+             "contact" {"street" "Main" "zip" "12345"}
+             "scores"  [1.25 (double 3.5)]
+             "prefs"   {"feature_dark" true "feature_beta" false}}))))
+
+    ;; -------- INVALIDS (regular JSON Schema) --------
+    (testing "required property"
+      (let [errs (msgs (datasets/validate
+                        S
+                        {"id"      (h/random-uuid7)
+                         "age"     (int 20)
+                         "contact" nil}))] ; name missing
+        (is (some #(re-find #"required property 'name' not found" %) errs))))
+
+    (testing "minimum / maximum on integer"
+      (let [errs (msgs (datasets/validate
+                        S
+                        {"id"      (h/random-uuid7)
+                         "name"    "A"
+                         "age"     (int -1)
+                         "contact" nil}))]
+        (is (some #(re-find #"minimum" %) errs))))
+
+    (testing "uniqueItems on array"
+      (let [errs (msgs (datasets/validate
+                        S
+                        {"id"      (h/random-uuid7)
+                         "name"    "A"
+                         "age"     (int 20)
+                         "tags"    ["dup" "dup"]
+                         "contact" nil}))]
+        (is (some #(re-find #"unique" %) errs))))
+
+    (testing "pattern on ZIP"
+      (let [errs (msgs (datasets/validate
+                        S
+                        {"id"      (h/random-uuid7)
+                         "name"    "A"
+                         "age"     (int 20)
+                         "tags"    ["x"]
+                         "contact" {"street" "Main"
+                                    "zip"    "12A45"}}))]
+        (is (some #(re-find #"pattern" %) errs))))
+
+    (testing "tuple arity (additionalItems: false)"
+      (let [errs (msgs (datasets/validate
+                        S
+                        {"id"      (h/random-uuid7)
+                         "name"    "A"
+                         "age"     (int 20)
+                         "tags"    ["x"]
+                         "contact" nil
+                         "scores"  [1.0 (double 2.0) 99]}))] ; too many  items
+        (is (not (empty? errs))))) ; don't depend on exact text
+
+    (testing "patternProperties + additionalProperties=false"
+      (let [errs (msgs (datasets/validate S
+                                          {"id"      (h/random-uuid7)
+                                           "name"    "A"
+                                           "age"     (int 20)
+                                           "tags"    ["x"]
+                                           "contact" nil
+                                           "prefs"   {"feature_dark" true
+                                                      "dark"         false}}))] ; "dark"
+                                                                                ; not
+                                                                                ; allowed
+        (is (not (empty? errs)))))
+
+    ;; -------- INVALIDS (x-javaType interaction) --------
+    (testing "x-javaType(UUID) failure"
+      (let [errs (msgs (datasets/validate S
+                                          {"id"      "not-a-uuid"
+                                           "name"    "A"
+                                           "age"     (int 20)
+                                           "tags"    ["x"]
+                                           "contact" nil}))]
+        (is (some #{"x-javaType: $.id — expected java.util.UUID"} errs))))
+
+    (testing "x-javaType in tuple items"
+      (let [errs (msgs (datasets/validate S
+                                          {"id"      (h/random-uuid7)
+                                           "name"    "A"
+                                           "age"     (int 20)
+                                           "tags"    ["x"]
+                                           "contact" nil
+                                           "scores"  [1.0 2.0]}))] ; second must
+                                                                   ; be
+                                                                   ; java.lang.Double;
+                                                                   ; 2.0 is
+                                                                   ; fine, try
+                                                                   ; bad
+        ;; Force a bad second element: a string
+        (let [errs2 (msgs (datasets/validate S
+                                             {"id"      (h/random-uuid7)
+                                              "name"    "A"
+                                              "age"     (int 20)
+                                              "tags"    ["x"]
+                                              "contact" nil
+                                              "scores"  [1.0 "NaN"]}))]
+          (is (some #{"x-javaType: $.scores[1] — expected java.lang.Double"}
+                    errs2)))))))
+
 (deftest dataset-operations-test
   (with-redefs [queries/search-pagination-size (constantly 2)]
     (with-open [ipc (rtest/create-ipc)]
