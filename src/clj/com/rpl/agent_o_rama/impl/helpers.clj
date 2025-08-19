@@ -261,3 +261,7 @@
     "value must be a string"))
 
 (defn last-key [^java.util.SortedMap m] (.lastKey m))
+
+(defn contains-string?
+  [^String s substring]
+  (.contains s substring))

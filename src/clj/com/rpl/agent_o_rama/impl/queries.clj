@@ -370,14 +370,14 @@
 (def +concat
   (accumulator
    (fn [v]
-     [END (termval v)])
+     (path END (termval v)))
    :init-fn
    (constantly [])))
 
-(defn matches-prefix?-pred
-  [prefix]
+(defn contains-string?-pred
+  [substring]
   (fn [s]
-    (str/starts-with? (str/lower-case s) prefix)))
+    (h/contains-string? (str/lower-case s) substring)))
 
 (defn declare-search-datasets-topology
   [topologies]
@@ -399,12 +399,12 @@
         (select> (subselect ALL
                             (transformed LAST fetch-name)
                             (selected? LAST
-                                       (pred (matches-prefix?-pred *prefix))))
+                                       (pred (contains-string?-pred *prefix))))
           *m
           :> *matches)
         (concat *results *matches :> *new-results)
         (<<if (or> (< (count *m) *page-size) (> (count *new-results) *limit))
-          (:> *results)
+          (:> *new-results)
          (else>)
           (continue> (h/last-key *m) *new-results)
         ))

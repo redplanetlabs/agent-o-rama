@@ -34,6 +34,14 @@
      (bind depot (foreign-depot ipc module-name (po/datasets-depot-name)))
      (bind pstate
        (foreign-pstate ipc module-name (po/datasets-task-global-name)))
+     (bind page-query
+       (foreign-query ipc
+                      module-name
+                      (queries/get-datasets-page-query-name)))
+     (bind search-query
+       (foreign-query ipc
+                      module-name
+                      (queries/search-datasets-name)))
 
      (bind ds-id1 (h/random-uuid7))
      (bind ds-id2 (h/random-uuid7))
@@ -44,6 +52,8 @@
      (foreign-append!
       depot
       (aor-types/->valid-CreateDataset ds-id2 "Dataset 2" nil))
+
+     (println "RES" (foreign-invoke-query search-query "dataset" 3))
 
 
      ;; TODO: <<<<>>>>
