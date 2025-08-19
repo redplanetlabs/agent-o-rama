@@ -1,3 +1,4 @@
+// this file is auto-generated
 package com.rpl.agentorama.impl;
 
 import clojure.lang.Keyword;
@@ -13,15 +14,15 @@ public class UIOptionsImpl implements UIOptions {
     return new UIOptionsImpl();
   }
 
+  public UIOptions port(int portNumber) {
+    options.put(Keyword.intern("port"), portNumber);
+    return this;
+  }
   public UIOptions noInputBeforeClose() {
     options.put(Keyword.intern("no-input-before-close"), true);
     return this;
   }
-
-  public UIOptions port(int portNumber) {
-    options.put(Keyword.intern("port"), Long.valueOf(portNumber));
-    return this;
-  }
+  
 
   public Map<Keyword, Object> getOptionsMap() {
     return options;

@@ -13,10 +13,10 @@ import com.rpl.rama.test.InProcessCluster;
 public class UI {
 
   public interface Options {
-    <%(dofor[[name ret args]UI-OPTIONS-METHODS](str%>static<%=ret%><%=name%>(<%=(args-declaration-str args)%>)
-    {
+    <%(dofor[[name ret args]UI-OPTIONS-METHODS](str%>static <%=ret%> <%=name%>(<%=(args-declaration-str args)%>) {
       return UIOptionsImpl.create().<%=name%>(<%=(args-vars-str args)%>);
-    }<% )) %>
+    }
+    <% )) %>
   }
 
   /**

@@ -13,10 +13,11 @@ public class UIOptionsImpl implements UIOptions {
     return new UIOptionsImpl();
   }
 
-  <%(dofor[[name ret args]UI-OPTIONS-METHODS](str%>public<%=ret%><%=name%>(<%=(args-declaration-str args)%>)
-  {
-    options.put(Keyword.intern(<%=(camel->kebab name)%>), <%=(args-vars-str-or-true args)%>);
-  }<% )) %>
+  <%(dofor[[name ret args]UI-OPTIONS-METHODS](str%>public <%=ret%> <%=name%>(<%=(args-declaration-str args)%>) {
+    options.put(Keyword.intern("<%=(camel->kebab name)%>"), <%=(args-vars-str-or-true args)%>);
+    return this;
+  }
+  <% )) %>
 
   public Map<Keyword, Object> getOptionsMap() {
     return options;

@@ -1,3 +1,4 @@
+// this file is auto-generated
 package com.rpl.agentorama;
 
 import com.rpl.agentorama.impl.AORHelpers;
@@ -16,10 +17,10 @@ public class UI {
     static UIOptions port(int portNumber) {
       return UIOptionsImpl.create().port(portNumber);
     }
-
     static UIOptions noInputBeforeClose() {
       return UIOptionsImpl.create().noInputBeforeClose();
     }
+    
   }
 
   /**
