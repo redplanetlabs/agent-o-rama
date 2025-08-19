@@ -247,7 +247,9 @@
 (drp/defrecord+ CreateDataset
   [dataset-id :- UUID
    name :- String
-   description :- (s/maybe String)])
+   description :- (s/maybe String)
+   ;; TODO: <<<<>>>> add input/output schemas
+  ])
 
 (drp/defrecord+ UpdateDatasetProperty
   [dataset-id :- UUID
@@ -261,7 +263,7 @@
   [dataset-id :- UUID
    snapshot-name :- (s/maybe String)
    example-id :- UUID
-   input :- [Object]
+   input :- Object
    reference-output :- Object
    tags :- (s/maybe #{String})
   ])

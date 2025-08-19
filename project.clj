@@ -18,6 +18,13 @@
                   "1.3.0"
                   :exclusions
                   [org.slf4j/slf4j-api]]
+                 [com.networknt/json-schema-validator
+                  "1.5.8"
+                  :exclusions
+                  [org.slf4j/slf4j-api
+                   com.fasterxml.jackson.core/jackson-databind
+                   com.fasterxml.jackson.dataformat/jackson-dataformat-yaml
+                   com.ethlo.time/itu]]
 
                  ;; ui dependencies
                  [ring/ring-core "1.9.5"]

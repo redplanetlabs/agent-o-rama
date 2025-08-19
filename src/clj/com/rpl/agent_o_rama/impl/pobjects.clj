@@ -228,7 +228,7 @@
       (map-schema
        UUID ; example ID
        (fixed-keys-schema
-        {:input (vector-schema Object)
+        {:input Object
          :reference-output Object
          :tags  #{String}})
        {:subindex? true})

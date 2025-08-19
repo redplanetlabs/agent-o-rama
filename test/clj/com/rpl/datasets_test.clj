@@ -6,6 +6,7 @@
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.datasets :as datasets]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.queries :as queries]
@@ -13,7 +14,136 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.test-common :as tc]))
+   [com.rpl.test-common :as tc])
+  (:import
+   (com.networknt.schema ValidationMessage)))
+
+
+(defrecord Person [name age])
+
+(defn msgs
+  [errs]
+  (mapv #(.getMessage ^ValidationMessage %) errs))
+
+(deftest x-javaType-basic-pojo
+  (let [S (datasets/build-schema
+           {"$schema"    datasets/META
+            "type"       "object"
+            "properties" {"p" {"x-javaType" "com.rpl.datasets_test.Person"}}
+            "required"   ["p"]})]
+    (is (empty? (datasets/validate S {"p" (->Person "Alice" 30)})))
+    (is (= ["x-javaType: $.p — expected com.rpl.datasets_test.Person"]
+           (msgs (datasets/validate S {"p" {"name" "Bob" "age" 40}}))))
+    (is (= ["x-javaType: $.p — expected com.rpl.datasets_test.Person"]
+           (msgs (datasets/validate S {"p" "not a person"}))))
+    (is (= ["$: required property 'p' not found"]
+           (msgs (datasets/validate S {}))))))
+
+(deftest x-javaType-scalars
+  (let [S (datasets/build-schema
+           {"$schema"    datasets/META
+            "type"       "object"
+            "properties" {"s"  {"x-javaType" "java.lang.String"}
+                          "i"  {"x-javaType" "java.lang.Integer"}
+                          "l"  {"x-javaType" "java.lang.Long"}
+                          "d"  {"x-javaType" "java.lang.Double"}
+                          "bd" {"x-javaType" "java.math.BigDecimal"}
+                          "b"  {"x-javaType" "java.lang.Boolean"}}
+            "required"   ["s" "i" "l" "d" "bd" "b"]})]
+    ;; happy path (note: (int 3) for Integer, (long 3) for Long)
+    (is (empty? (datasets/validate S
+                                   {"s"  "ok"
+                                    "i"  (int 3)
+                                    "l"  (long 3)
+                                    "d"  (double 1.5)
+                                    "bd" (bigdec "2.50")
+                                    "b"  false})))
+    ;; mismatch examples
+    (is (= ["x-javaType: $.i — expected java.lang.Integer"]
+           (msgs (datasets/validate S
+                                    {"s"  "ok"
+                                     "i"  3
+                                     "l"  (long 3)
+                                     "d"  (double 1.5)
+                                     "bd" (bigdec "2.50")
+                                     "b"  false}))))
+    (is (= ["x-javaType: $.s — expected java.lang.String"]
+           (msgs (datasets/validate S
+                                    {"s"  100
+                                     "i"  (int 1)
+                                     "l"  (long 1)
+                                     "d"  (double 1.0)
+                                     "bd" (bigdec "1.0")
+                                     "b"  true}))))))
+
+
+(deftest x-javaType-collections
+  (let [S (datasets/build-schema
+           {"$schema"    datasets/META
+            "type"       "object"
+            "properties" {"m"  {"x-javaType" "java.util.Map"}
+                          "xs" {"x-javaType" "java.util.List"}}
+            "required"   ["m" "xs"]})]
+    (is (empty? (datasets/validate S {"m" {"k" "v"} "xs" ["a" "b" "c"]})))
+    (is (= ["x-javaType: $.m — expected java.util.Map"]
+           (msgs (datasets/validate S {"m" "not-a-map" "xs" []}))))
+    (is (= ["x-javaType: $.xs — expected java.util.List"]
+           (msgs (datasets/validate S {"m" {} "xs" "not-a-list"}))))))
+
+(deftest x-javaType-nested-and-items
+  (let [S (datasets/build-schema
+           {"$schema"    datasets/META
+            "type"       "object"
+            "properties"
+            {"tags" {"type"  "array"
+                     "items" {"x-javaType" "java.lang.String"}}
+             "meta" {"type"       "object"
+                     "properties" {"count" {"x-javaType" "java.lang.Integer"}
+                                   "owner" {"x-javaType"
+                                            "com.rpl.datasets_test.Person"}}
+                     "required"   ["count" "owner"]}}
+            "required"   ["tags" "meta"]})]
+    (is (empty? (datasets/validate S
+                                   {"tags" ["a" "b"]
+                                    "meta" {"count" (int 5)
+                                            "owner" (->Person "Zed" 41)}})))
+    (is (= ["x-javaType: $.tags[0] — expected java.lang.String"]
+           (msgs (datasets/validate S
+                                    {"tags" [42]
+                                     "meta" {"count" (int 1)
+                                             "owner" (->Person "ok" 1)}}))))
+    (is (= ["x-javaType: $.meta.owner — expected com.rpl.datasets_test.Person"]
+           (msgs (datasets/validate S
+                                    {"tags" []
+                                     "meta" {"count" (int 2)
+                                             "owner" {"name"
+                                                      "map-not-person"}}}))))))
+
+(deftest accepts-json-null
+  (let [S (datasets/build-schema
+           {"$schema"    datasets/META
+            "type"       "object"
+            "properties" {"n" {"anyOf" [{"x-javaType" "java.lang.String"}
+                                        {"type" "null"}]}}
+            "required"   ["n"]})]
+    (is (empty? (datasets/validate S {"n" nil})))     ;; null is allowed
+    (let [errs (msgs (datasets/validate S {"n" 42}))] ;; neither string nor null
+      (is (some #{"x-javaType: $.n — expected java.lang.String"} errs))
+      (is (some #(re-find #"null expected" %) errs)))))
+
+(deftest x-javaType-items-and-required-propagation
+  ;; array items checked; missing required still from base validator
+  (let [S (datasets/build-schema
+           {"$schema"    datasets/META
+            "type"       "object"
+            "properties" {"xs" {"type"  "array"
+                                "items" {"x-javaType" "java.lang.Integer"}}}
+            "required"   ["xs"]})]
+    (is (empty? (datasets/validate S {"xs" [(int 1) (int 2)]})))
+    (is (= ["x-javaType: $.xs[1] — expected java.lang.Integer"]
+           (msgs (datasets/validate S {"xs" [(int 1) 2]}))))
+    (is (= ["$: required property 'xs' not found"]
+           (msgs (datasets/validate S {}))))))
 
 (deftest dataset-operations-test
   (with-redefs [queries/search-pagination-size (constantly 2)]
@@ -153,6 +283,10 @@
 
 
        ;; TODO: <<<<>>>>
+       ;; (defn get-dataset-properties [datasets-pstate dataset-id]
+       ;; (defn get-dataset-snapshot-names [datasets-pstate dataset-id]
+       ;; (defn get-dataset-examples-page
+       ;;   [datasets-pstate dataset-id snapshot-name amt pagination-params]
        ;; - UpdateDatasetProperty
        ;; - DestroyDataset
        ;; - AddDatasetExample
