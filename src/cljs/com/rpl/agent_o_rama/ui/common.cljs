@@ -16,6 +16,10 @@
 
 (defn pp [x] (with-out-str (cljs.pprint/pprint x)))
 
+(defn to-json [x]
+  "Converts a ClojureScript data structure to a JSON string."
+  (js/JSON.stringify (clj->js x)))
+
 (defn format-timestamp [ms]
   (if (number? ms)
     (let [date (js/Date. ms)

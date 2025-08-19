@@ -41,8 +41,8 @@
           {:title (common/format-timestamp start-time)}
           (common/format-relative-time start-time))
        ($ :td.px-4.py-3.max-w-xs
-          ($ :div.truncate.text-gray-900
-             (common/pp (:invoke-args invoke))))
+          ($ :div.truncate.text-gray-900.font-mono
+             (common/to-json (:invoke-args invoke))))
        ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
        ($ :td.px-4.py-3.text-sm
           ($ result-badge {:result (:result invoke)
