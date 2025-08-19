@@ -21,6 +21,8 @@
         implicit-edges (state/use-sub [:invocations-data invoke-id :implicit-edges])
         root-invoke-id (state/use-sub [:invocations-data invoke-id :root-invoke-id])
         task-id (state/use-sub [:invocations-data invoke-id :task-id])
+        forks (state/use-sub [:invocations-data invoke-id :forks])
+        fork-of (state/use-sub [:invocations-data invoke-id :fork-of])
 
         ;; UI state subscriptions
         selected-node-id (state/use-sub [:ui :selected-node-id])
@@ -107,6 +109,9 @@
         view-props {:module-id module-id
                     :agent-name agent-name
                     :invoke-id invoke-id
+                    :task-id task-id
+                    :forks forks
+                    :fork-of fork-of
                     :graph-data graph-data
                     :real-edges (or real-edges []) ; NEW: Pass pre-processed real edges
                     :summary-data summary-data

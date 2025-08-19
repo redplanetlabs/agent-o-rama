@@ -155,7 +155,8 @@
         ;; Get summary info on first request
         summary-info (when is-initial-load?
                        (foreign-select-one [(keypath agent-id)
-                                            (submap [:result :start-time-millis :finish-time-millis :graph-version :retry-num])]
+                                            (submap [:result :start-time-millis :finish-time-millis :graph-version :retry-num
+                                                     :forks :fork-of])]
                                            root-pstate
                                            {:pkey agent-task-id}))
 

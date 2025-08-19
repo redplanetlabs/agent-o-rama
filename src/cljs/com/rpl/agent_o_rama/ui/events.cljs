@@ -123,11 +123,14 @@
                          was-incomplete? (not (get-in db [:invocations-data invoke-id :is-complete]))]
 
                      (when summary
-                       (state/dispatch [:db/set-values
-                                        [[:invocations-data invoke-id :summary] summary]
-                                        [[:invocations-data invoke-id :historical-graph] historical-graph]
-                                        [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]
-                                        [[:invocations-data invoke-id :task-id] task-id]]))
+                       (let [{:keys [forks fork-of]} summary]
+                         (state/dispatch [:db/set-values
+                                          [[:invocations-data invoke-id :summary] summary]
+                                          [[:invocations-data invoke-id :historical-graph] historical-graph]
+                                          [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]
+                                          [[:invocations-data invoke-id :task-id] task-id]
+                                          [[:invocations-data invoke-id :forks] forks]
+                                          [[:invocations-data invoke-id :fork-of] fork-of]])))
 
                      (when (contains? page-data :is-complete)
                        (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] is-complete]))

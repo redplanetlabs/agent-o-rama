@@ -15,7 +15,8 @@
    ["react-dom" :refer [createPortal]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
    ["@dagrejs/dagre" :as Dagre]
-   ["@heroicons/react/24/outline" :refer [ExclamationTriangleIcon ArrowPathIcon]]))
+   ["@heroicons/react/24/outline" :refer [ExclamationTriangleIcon ArrowPathIcon]]
+   ["wouter" :as wouter]))
 
 (defn format-ms [ms]
   (let [date (js/Date. ms)
@@ -441,12 +442,19 @@
                      ($ :pre {:className "mt-1 p-2 bg-gray-100 rounded text-gray-700 whitespace-pre-wrap"}
                         (to-pretty-json original-input))))))))))
 
-(defui info-panel [{:keys [graph-data summary-data]}]
+(defui info-panel [{:keys [graph-data summary-data module-id agent-name task-id forks fork-of]}]
   (let [result (:result summary-data)
         failure? (:failure? result)
         result-val (:val result)]
 
     ($ :div {:className "space-y-4"}
+
+       ;; Lineage Panel
+       ($ lineage-panel {:module-id module-id
+                         :agent-name agent-name
+                         :task-id task-id
+                         :forks forks
+                         :fork-of fork-of})
 
        ;; NEW: Final Result Panel
        (when result
@@ -519,7 +527,37 @@
                   ($ :div {:className "text-right"}
                      ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens)))))))))))
 
-(defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live]}]
+(defui lineage-panel [{:keys [module-id agent-name task-id forks fork-of]}]
+  (let [has-lineage? (or (seq forks) (some? fork-of))]
+    (when has-lineage?
+      ($ :div {:className "bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4"}
+         ($ :h4 {:className "text-md font-semibold text-gray-700 mb-2"} "Lineage")
+         ($ :div {:className "space-y-2"}
+
+            ;; Parent Link
+            (when fork-of
+              ($ :div {:className "flex items-center gap-2"}
+                 ($ :span {:className "text-sm font-medium text-gray-600"} "Fork of:")
+                 (let [parent-id (get fork-of :parent-agent-id)
+                       url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" parent-id)]
+                   ($ wouter/Link {:href url
+                                   :className "font-mono text-sm text-blue-600 hover:underline"}
+                      (str task-id "-" parent-id)))))
+
+            ;; Children Links
+            (when (seq forks)
+              ($ :div {:className "flex flex-col items-start gap-1"}
+                 ($ :span {:className "text-sm font-medium text-gray-600 mb-1"} "Forks:")
+                 ($ :ul {:className "list-disc list-inside pl-4"}
+                    (for [fork-id (sort forks)]
+                      ($ :li {:key fork-id}
+                         (let [url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" fork-id)]
+                           ($ wouter/Link {:href url
+                                           :className "font-mono text-sm text-blue-600 hover:underline"}
+                              (str task-id "-" fork-id)))))))))))))
+
+(defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live
+                            module-id agent-name task-id forks fork-of]}]
   (let [active-tab (state/use-sub [:ui :active-tab])]
 
     ;; Update forking mode when tab changes
@@ -561,7 +599,13 @@
        ;; Tab content
        ($ :div {:className "p-4 h-full overflow-y-auto"}
           (case active-tab
-            :info ($ info-panel {:graph-data graph-data :summary-data summary-data})
+            :info ($ info-panel {:graph-data graph-data
+                                 :summary-data summary-data
+                                 :module-id module-id
+                                 :agent-name agent-name
+                                 :task-id task-id
+                                 :forks forks
+                                 :fork-of fork-of})
 
             :fork (if (empty? changed-nodes)
                     ($ :div {:className "text-gray-500 text-center py-8"}
@@ -682,7 +726,8 @@
             #{}
             modified-node-ids)))
 
-(defui graph-view [{:keys [module-id agent-name invoke-id
+(defui graph-view [{:keys [module-id agent-name invoke-id task-id
+                           forks fork-of
                            graph-data real-edges summary-data implicit-edges
                            is-complete is-live connected?
                            selected-node-id forking-mode? changed-nodes
@@ -846,4 +891,9 @@
                          :on-clear-fork on-clear-fork
                          :forking-mode? forking-mode?
                          :on-toggle-forking-mode on-toggle-forking-mode
-                         :is-live is-live})))))
+                         :is-live is-live
+                         :module-id module-id
+                         :agent-name agent-name
+                         :task-id task-id
+                         :forks forks
+                         :fork-of fork-of})))))
