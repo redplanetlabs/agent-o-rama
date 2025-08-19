@@ -2,7 +2,9 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.graph :as graph]
+   [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops])
@@ -39,6 +41,14 @@
 (defn agent-get-current-graph-name
   [agent-name]
   (str "_agent-get-current-graph-" agent-name))
+
+(defn get-datasets-page-query-name
+  []
+  "_aor-get-datasets")
+
+(defn search-datasets-name
+  []
+  "_aor-search-datasets")
 
 (defn- to-pqueue
   [coll]
@@ -97,8 +107,10 @@
          (else>)
           (peek *task-invoke-pairs :> [*task-id *invoke-id])
           (pop *task-invoke-pairs :> *next-task-invoke-pairs)
-          ;; - do it this way so that agg-invokes-map and task-invoke-pairs
-          ;; don't have to be potentially copied around the cluster for every
+          ;; - do it this way so that agg-invokes-map and
+          ;; task-invoke-pairs
+          ;; don't have to be potentially copied around the cluster for
+          ;; every
           ;; fetch
           ;; - only *invoke-id, *agent-task-id, and *invoke-info cross
           ;; partitioner boundaries
@@ -185,8 +197,8 @@
     (compare [_ {a-millis :start-time-millis} {b-millis :start-time-millis}]
       (compare b-millis a-millis)))))
 
-(defn to-invokes-page-result
-  [pages-map page-size]
+(defn to-page-result
+  [pages-map page-size entity-id-key result-key]
   (let [pqueue       (invokes-pqueue)
         end-task-ids (volatile! #{})
 
@@ -201,7 +213,7 @@
                (.add ret
                      (assoc info
                       :task-id task-id
-                      :agent-id id)))
+                      entity-id-key id)))
              ret
            ))
          pages-map)]
@@ -233,13 +245,17 @@
         (let [{:keys [task-id] :as item} (.poll pqueue)
               ^PriorityQueue q (get task-queues task-id)]
           (.add q item)))
-      {:agent-invokes     ret
+      {result-key         ret
        :pagination-params (transform MAP-VALS
                                      (fn [^PriorityQueue q]
                                        (if-let [{:keys [agent-id]} (.poll q)]
                                          agent-id))
                                      task-queues)}
     )))
+
+(defn to-invokes-page-result
+  [pages-map page-size]
+  (to-page-result pages-map page-size :agent-id :agent-invokes))
 
 (defn adjust-page-size
   [i]
@@ -264,11 +280,11 @@
 ;;     :graph-version ...}
 ;;    ...]
 ;;  :pagination-params {task-id end-id}}
-(defn declare-get-invokes-page-topology
-  [topologies agent-name]
-  (let [root-sym (symbol (po/agent-root-task-global-name agent-name))]
+(defn declare-get-distributed-page-topology
+  [topologies query-name pstate-name info-transformer page-result-fn]
+  (let [pstate-sym (symbol pstate-name)]
     (<<query-topology topologies
-      (agent-get-invokes-page-query-name agent-name)
+      query-name
       [*page-size *pagination-params :> *res]
       (|all)
       (ops/current-task-id :> *task-id)
@@ -280,15 +296,24 @@
          [(sorted-map-range-to *end-id
                                {:inclusive? true
                                 :max-amt    (adjust-page-size *page-size)})
-          (transformed MAP-VALS relevant-invoke-submap)]
-         root-sym
+          (transformed MAP-VALS info-transformer)]
+         pstate-sym
          :> *task-page))
       (|origin)
       (aggs/+map-agg *task-id *task-page :> *pages-map)
-      (to-invokes-page-result *pages-map
-                              (adjust-page-size *page-size)
-                              :> *res)
+      (page-result-fn *pages-map
+                      (adjust-page-size *page-size)
+                      :> *res)
     )))
+
+(defn declare-get-invokes-page-topology
+  [topologies agent-name]
+  (declare-get-distributed-page-topology
+   topologies
+   (agent-get-invokes-page-query-name agent-name)
+   (po/agent-root-task-global-name agent-name)
+   relevant-invoke-submap
+   to-invokes-page-result))
 
 (defn declare-agent-get-names-query-topology
   [topologies agent-names]
@@ -308,6 +333,87 @@
       (graph/graph->historical-graph-info agent-graph-sym :> *res)
     )))
 
+;; Datasets
+
+(defn dataset-info
+  [m]
+  (into {} (:props m)))
+
+(defn to-dataset-page-result
+  [pages-map page-size]
+  (to-page-result pages-map page-size :dataset-id :datasets))
+
+;; returns map of form:
+;; {:datasets
+;;   [{:task-id ... :dataset-id ... :name ... :description ...}
+;;    ...]
+;;  :pagination-params {task-id end-id}}
+(defn declare-get-datasets-page-topology
+  [topologies]
+  (declare-get-distributed-page-topology
+   topologies
+   (get-datasets-page-query-name)
+   (po/datasets-task-global-name)
+   dataset-info
+   to-dataset-page-result))
+
+(defn search-pagination-size
+  []
+  1000)
+
+(defn fetch-name
+  [m]
+  (-> m
+      :props
+      :name))
+
+(def +concat
+  (accumulator
+   (fn [v]
+     [END (termval v)])
+   :init-fn
+   (constantly [])))
+
+(defn matches-prefix?-pred
+  [prefix]
+  (fn [s]
+    (str/starts-with? (str/lower-case s) prefix)))
+
+(defn declare-search-datasets-topology
+  [topologies]
+  (let [datasets-sym (symbol (po/datasets-task-global-name))]
+    (<<query-topology topologies
+      (search-datasets-name)
+      [*prefix-input *limit :> *res]
+      (str/lower-case *prefix-input :> *prefix)
+      (|all)
+      (loop<- [*k nil
+               *results []
+               :> *l]
+        (yield-if-overtime)
+        (search-pagination-size :> *page-size)
+        (local-select>
+         (sorted-map-range-from *k {:max-amt *page-size :inclusive? false})
+         datasets-sym
+         :> *m)
+        (select> (subselect ALL
+                            (transformed LAST fetch-name)
+                            (selected? LAST
+                                       (pred (matches-prefix?-pred *prefix))))
+          *m
+          :> *matches)
+        (concat *results *matches :> *new-results)
+        (<<if (or> (< (count *m) *page-size) (> (count *new-results) *limit))
+          (:> *results)
+         (else>)
+          (continue> (h/last-key *m) *new-results)
+        ))
+      (|origin)
+      (+concat *l :> *items)
+      (into {} (take *limit *items) :> *res)
+    )))
+
+
 (defn get-dataset-properties
   [datasets-pstate dataset-id]
   (foreign-select-one
@@ -322,20 +428,20 @@
    datasets-pstate
   ))
 
-(defn get-dataset-page
+(defn get-dataset-examples-page
   ([datasets-pstate dataset-id snapshot-name amt]
-   (get-dataset-page datasets-pstate dataset-id snapshot-name amt nil))
-  ([datasets-pstate dataset-id snapshot-name amt pagination-key]
+   (get-dataset-examples-page datasets-pstate dataset-id snapshot-name amt nil))
+  ([datasets-pstate dataset-id snapshot-name amt pagination-params]
    (let [examples (foreign-select-one
                    [(keypath dataset-id :snapshots snapshot-name)
-                    (sorted-map-range-from pagination-key
+                    (sorted-map-range-from pagination-params
                                            {:max-amt amt :inclusive? false})]
                    datasets-pstate
                   )]
-     {:examples       examples
-      :pagination-key (when-not (empty? examples)
-                        (-> examples
-                            rseq
-                            first
-                            first))}
+     {:examples examples
+      :pagination-params (when-not (empty? examples)
+                           (-> examples
+                               rseq
+                               first
+                               first))}
    )))

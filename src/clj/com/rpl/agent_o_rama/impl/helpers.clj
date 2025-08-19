@@ -259,3 +259,5 @@
   [v]
   (when-not (string? v)
     "value must be a string"))
+
+(defn last-key [^java.util.SortedMap m] (.lastKey m))

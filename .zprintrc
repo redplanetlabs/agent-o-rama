@@ -117,6 +117,9 @@
    {:list       {:indent-arg 2}
     :next-inner {:list {:indent-arg 1}}}]
   "loop" :binding
+  "loop<-" [:arg1-body
+            {:list       {:indent-arg 2}
+             :next-inner {:list {:indent-arg 1}}}]
   "map" :none
   "mapv" :none
   "module"

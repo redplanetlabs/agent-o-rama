@@ -270,6 +270,8 @@
                                                   (-> agent-graphs
                                                       keys
                                                       set))
+  (queries/declare-get-datasets-page-topology topologies)
+  (queries/declare-search-datasets-topology topologies)
   (doseq [[agent-name agent-graph] agent-graphs]
     (define-agent! agent-name
                    setup
