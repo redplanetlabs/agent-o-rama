@@ -248,7 +248,8 @@
   [dataset-id :- UUID
    name :- String
    description :- (s/maybe String)
-   ;; TODO: <<<<>>>> add input/output schemas
+   input-json-schema :- (s/maybe String)
+   output-json-schema :- (s/maybe String)
   ])
 
 (drp/defrecord+ UpdateDatasetProperty

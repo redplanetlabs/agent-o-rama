@@ -186,23 +186,68 @@
 
 ;; TODO: <<<<>>>> need first class API with agent-manager, which UI will use
 
-;; TODO: <<<<>>>>
-;;   - how to define schemas?
-;;      {"a" String
-;;       "b" Long}
-;;    - keep it just as map like this for now? key -> class?
-;;    - could make my own thing that's equivalent to JSON schema, with a nice
-;;    API for Clojure, but also support arbitrary classes
+(defn normalize-json-schema*
+  [json-schema]
+  (try
+    (let [^JsonNode root (.readTree ^ObjectMapper MAPPER ^String json-schema)]
+      (cond
+        (nil? root)
+        {:error "Invalid JSON schema: empty input."}
 
+        (not (.isObject root))
+        {:error "Invalid JSON schema: root must be a JSON object."}
+
+        :else
+        (let [^com.fasterxml.jackson.databind.node.ObjectNode o
+              (.deepCopy ^com.fasterxml.jackson.databind.node.ObjectNode root)]
+          (cond
+            (.has o "$schema")
+            {:error "User-specified $schema is not allowed."}
+
+            (.has o "$vocabulary")
+            {:error "User-specified $vocabulary is not allowed."}
+
+            :else
+            (do
+              (.put o "$schema" ^String META)
+              (try
+                ;; compile to verify it’s a valid JSON schema
+                (.getSchema ^JsonSchemaFactory FACTORY o)
+                (.writeValueAsString ^ObjectMapper MAPPER o)
+                (catch Exception e
+                  {:error (str "Invalid JSON schema:\n\n"
+                               (h/throwable->str e))})))))))
+    (catch com.fasterxml.jackson.core.JsonProcessingException e
+      {:error (str "Invalid JSON:\n\n" (h/throwable->str e))})
+    (catch Exception e
+      {:error (str "Failed to normalize schema:\n\n" (h/throwable->str e))})))
+
+(deframaop normalize-json-schema>
+  [*json-schema]
+  (<<if (some? *json-schema)
+    (normalize-json-schema* *json-schema :> *res)
+    (<<if (map? *res)
+      (ack-return> (get *res :error))
+     (else>)
+      (:> *res))
+   (else>)
+    (:>)))
 
 (deframaop handle-datasets-op
   [{:keys [*dataset-id] :as *data}]
   (<<with-substitutions
    [$$datasets (po/datasets-task-global)]
    (<<subsource *data
-    (case> CreateDataset :> {:keys [*name *description]})
+    (case> CreateDataset
+           :> {:keys [*name *description *input-json-schema
+                       *output-json-schema]})
+     (normalize-json-schema> *input-json-schema :> *isnorm)
+     (normalize-json-schema> *output-json-schema :> *osnorm)
      (local-transform> [(keypath *dataset-id) :props
-                        (termval {:name *name :description *description})]
+                        (termval {:name *name
+                                  :description *description
+                                  :input-json-schema *isnorm
+                                  :output-json-schema *osnorm})]
                        $$datasets)
 
     (case> UpdateDatasetProperty :> {:keys [*key *value]})
@@ -219,7 +264,8 @@
     (case> AddDatasetExample
            :> {:keys [*snapshot-name *example-id *input *reference-output
                        *tags]})
-     ;; TODO: <<<<>>>> check schema
+     ;; TODO: <<<<>>>> check schema for both input and reference-output (if it
+     ;; exists)
      (local-transform>
       [(keypath *dataset-id :snapshots *snapshot-name *example-id)
        (termval

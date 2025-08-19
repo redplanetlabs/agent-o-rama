@@ -16,7 +16,12 @@
    [com.rpl.rama.test :as rtest]
    [com.rpl.test-common :as tc])
   (:import
-   (com.networknt.schema ValidationMessage)))
+   [com.fasterxml.jackson.databind
+    ObjectMapper
+    JsonNode]
+   [com.networknt.schema
+    JsonSchema
+    ValidationMessage]))
 
 
 (defrecord Person [name age])
@@ -286,6 +291,123 @@
                                               "scores"  [1.0 "NaN"]}))]
           (is (some #{"x-javaType: $.scores[1] — expected java.lang.Double"}
                     errs2)))))))
+
+(def ^ObjectMapper OM datasets/MAPPER)
+
+(defn ok? [x] (string? x))
+(defn err? [x] (and (map? x) (contains? x :error)))
+(defn ->json ^JsonNode [^String s] (.readTree OM s))
+
+(deftest normalize-json-schema*-invalid-json
+  (testing "empty / malformed JSON"
+    (is (err? (datasets/normalize-json-schema* "")))
+    (is (err? (datasets/normalize-json-schema* "{")))
+    (is (err? (datasets/normalize-json-schema* "null")))
+    (is (err? (datasets/normalize-json-schema* "[]")))) ; non-object root
+  (testing "error messages are present"
+    (let [res (datasets/normalize-json-schema* "{")]
+      (is (re-find #"Invalid JSON" (:error res))))))
+
+(deftest normalize-json-schema*-forbidden-meta-keys
+  (testing "reject user $schema"
+    (let [res (datasets/normalize-json-schema*
+               "{\"$schema\":\"https://wrong\",\"type\":\"object\"}")]
+      (is (err? res))
+      (is (re-find #"\$schema" (:error res)))))
+  (testing "reject user $vocabulary"
+    (let [res (datasets/normalize-json-schema*
+               "{\"$vocabulary\":{\"x\":true},\"type\":\"object\"}")]
+      (is (err? res))
+      (is (re-find #"\$vocabulary" (:error res))))))
+
+(deftest normalize-json-schema*-invalid-json-schema
+  (testing "draft 2020-12: tuple via items[] is invalid"
+    (let
+      [s
+       "{\"type\":\"array\",\"items\":[{\"type\":\"string\"},{\"type\":\"number\"}]}"
+       res (datasets/normalize-json-schema* s)]
+      (is (err? res))
+      (is (re-find #"Invalid JSON schema" (:error res))))))
+
+(deftest normalize-json-schema*-basic-success
+  (let
+    [input
+     "{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"additionalProperties\":false}"
+     norm  (datasets/normalize-json-schema* input)]
+    (is (ok? norm))
+    (let [jn (->json norm)]
+      ;; $schema injected and equals our metaschema IRI
+      (is (= datasets/META (.asText (.get jn "$schema"))))
+      ;; still a valid JSON object with our original content
+      (is (= "object" (.asText (.get jn "type"))))
+      ;; round-trip: compile with our factory to ensure it’s truly valid
+      (is (instance? JsonSchema (datasets/build-schema jn))))))
+
+(deftest normalize-json-schema*-with-extension-and-standard
+  (testing "mix of x-javaType and standard keywords"
+    (let
+      [input
+       (str
+        "{"
+        "\"type\":\"object\","
+        "\"properties\":{"
+        "  \"id\":{\"x-javaType\":\"java.util.UUID\"},"
+        "  \"name\":{\"type\":\"string\",\"minLength\":1},"
+        "  \"tags\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"uniqueItems\":true},"
+        "  \"contact\":{\"anyOf\":["
+        "    {\"type\":\"object\",\"properties\":{\"zip\":{\"pattern\":\"^[0-9]{5}$\"}},\"additionalProperties\":true},"
+        "    {\"type\":\"null\"}"
+        "  ]},"
+        "  \"scores\":{\"type\":\"array\",\"prefixItems\":[{\"type\":\"number\"},{\"x-javaType\":\"java.lang.Double\"}],\"items\":false}"
+        "},"
+        "\"required\":[\"id\",\"name\",\"contact\"],"
+        "\"additionalProperties\":false"
+        "}")]
+      (let [norm (datasets/normalize-json-schema* input)]
+        (is (ok? norm))
+        ;; ensure it compiles
+        (let [S (datasets/build-schema (->json norm))]
+          ;; a valid instance should pass
+          (is (empty?
+               (datasets/validate S
+                                  {"id"      (java.util.UUID/randomUUID)
+                                   "name"    "Alice"
+                                   "contact" nil
+                                   "tags"    ["a" "b"]
+                                   "scores"  [1.0 (double 2.5)]})))
+          ;; a few failure modes should yield non-empty errors
+          (is (not (empty?
+                    (datasets/validate S
+                                       {"id"      "not-a-uuid"
+                                        "name"    "A"
+                                        "contact" nil
+                                        "tags"    []
+                                        "scores"  [1.0 "NaN"]}))))
+          (is (not (empty?
+                    (datasets/validate S
+                                       {"name" "A" "contact" nil})))))))))
+
+(deftest normalize-json-schema*-preserves-user-structure-except-meta
+  (let
+    [input
+     "{\"$id\":\"https://example.com/s\",\"type\":\"object\",\"properties\":{\"n\":{\"type\":\"integer\"}}}"
+     norm  (datasets/normalize-json-schema* input)]
+    (is (ok? norm))
+    (let [jn (->json norm)]
+      ;; user $id is untouched
+      (is (= "https://example.com/s" (.asText (.get jn "$id"))))
+      ;; our $schema is present
+      (is (= datasets/META (.asText (.get jn "$schema")))))))
+
+(deftest normalize-json-schema*-clear-error-boundaries
+  (testing "differentiate JSON parse error vs schema compile error"
+    (let [bad-json (datasets/normalize-json-schema* "{")]
+      (is (err? bad-json))
+      (is (re-find #"Invalid JSON" (:error bad-json))))
+    (let [bad-schema (datasets/normalize-json-schema*
+                      "{\"type\":\"array\",\"items\":[{\"type\":\"string\"}]}")]
+      (is (err? bad-schema))
+      (is (re-find #"Invalid JSON schema" (:error bad-schema))))))
 
 (deftest dataset-operations-test
   (with-redefs [queries/search-pagination-size (constantly 2)]
