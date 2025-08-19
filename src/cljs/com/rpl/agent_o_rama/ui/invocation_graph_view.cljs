@@ -583,7 +583,13 @@
                      ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens)))))))))))
 
 (defui lineage-panel [{:keys [module-id agent-name task-id forks fork-of]}]
-  (let [has-lineage? (or (seq forks) (some? fork-of))]
+  (let [has-lineage? (or (seq forks) (some? fork-of))
+        [show-all-forks set-show-all-forks] (useState false)
+        sorted-forks (sort forks)
+        has-many-forks? (> (count sorted-forks) 5)
+        displayed-forks (if (or show-all-forks (not has-many-forks?))
+                          sorted-forks
+                          (take 5 sorted-forks))]
     (when has-lineage?
       ($ :div {:className "bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4"}
          ($ :h4 {:className "text-md font-semibold text-gray-700 mb-2"} "Lineage")
@@ -602,14 +608,23 @@
             ;; Children Links
             (when (seq forks)
               ($ :div {:className "flex flex-col items-start gap-1"}
-                 ($ :span {:className "text-sm font-medium text-gray-600 mb-1"} "Forks:")
+                 ($ :span {:className "text-sm font-medium text-gray-600 mb-1"}
+                    (str "Forks (" (count forks) "):"))
                  ($ :ul {:className "list-disc list-inside pl-4"}
-                    (for [fork-id (sort forks)]
+                    (for [fork-id displayed-forks]
                       ($ :li {:key fork-id}
                          (let [url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" fork-id)]
                            ($ wouter/Link {:href url
                                            :className "font-mono text-sm text-blue-600 hover:underline"}
-                              (str task-id "-" fork-id)))))))))))))
+                              (str task-id "-" fork-id))))))
+                 ;; Show all/less button at the bottom
+                 (when has-many-forks?
+                   ($ :div {:className "pl-4 mt-1"}
+                      ($ :button {:className "text-xs text-blue-600 hover:underline cursor-pointer"
+                                  :onClick #(set-show-all-forks (not show-all-forks))}
+                         (if show-all-forks
+                           "Show less"
+                           (str "... show all (" (count forks) ")"))))))))))))
 
 (defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live
                             module-id agent-name task-id forks fork-of]}]
