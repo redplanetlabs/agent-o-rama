@@ -188,18 +188,18 @@
       (aggs/+set-agg *invoke-id :> *res)
     )))
 
-(defn- invokes-pqueue
-  ^PriorityQueue []
+(defn- items-pqueue
+  ^PriorityQueue [item-compare-extractor]
   (PriorityQueue.
    20
    (reify
     Comparator
-    (compare [_ {a-millis :start-time-millis} {b-millis :start-time-millis}]
-      (compare b-millis a-millis)))))
+    (compare [_ m1 m2]
+      (compare (item-compare-extractor m2) (item-compare-extractor m1))))))
 
 (defn to-page-result
-  [pages-map page-size entity-id-key result-key]
-  (let [pqueue       (invokes-pqueue)
+  [pages-map page-size entity-id-key result-key item-compare-extractor]
+  (let [pqueue       (items-pqueue item-compare-extractor)
         end-task-ids (volatile! #{})
 
         task-queues
@@ -208,7 +208,7 @@
          (fn [task-id id->info]
            (when (< (count id->info) page-size)
              (vswap! end-task-ids conj task-id))
-           (let [ret (invokes-pqueue)]
+           (let [ret (items-pqueue item-compare-extractor)]
              (doseq [[id info] id->info]
                (.add ret
                      (assoc info
@@ -255,7 +255,11 @@
 
 (defn to-invokes-page-result
   [pages-map page-size]
-  (to-page-result pages-map page-size :agent-id :agent-invokes))
+  (to-page-result pages-map
+                  page-size
+                  :agent-id
+                  :agent-invokes
+                  :start-time-millis))
 
 (defn adjust-page-size
   [i]
@@ -341,7 +345,7 @@
 
 (defn to-dataset-page-result
   [pages-map page-size]
-  (to-page-result pages-map page-size :dataset-id :datasets))
+  (to-page-result pages-map page-size :dataset-id :datasets :dataset-id))
 
 ;; returns map of form:
 ;; {:datasets
