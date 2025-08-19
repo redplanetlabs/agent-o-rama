@@ -248,8 +248,8 @@
       {result-key         ret
        :pagination-params (transform MAP-VALS
                                      (fn [^PriorityQueue q]
-                                       (if-let [{:keys [agent-id]} (.poll q)]
-                                         agent-id))
+                                       (if-let [m (.poll q)]
+                                         (get m entity-id-key)))
                                      task-queues)}
     )))
 
@@ -285,14 +285,14 @@
 ;;    ...]
 ;;  :pagination-params {task-id end-id}}
 (defn declare-get-distributed-page-topology
-  [topologies query-name pstate-name info-transformer page-result-fn]
+  [topologies query-name pstate-name info-transformer page-result-fn max-key-fn]
   (let [pstate-sym (symbol pstate-name)]
     (<<query-topology topologies
       query-name
       [*page-size *pagination-params :> *res]
       (|all)
       (ops/current-task-id :> *task-id)
-      (get *pagination-params *task-id Long/MAX_VALUE :> *end-id)
+      (get *pagination-params *task-id (max-key-fn) :> *end-id)
       (<<if (nil? *end-id)
         (identity [] :> *task-page)
        (else>)
@@ -310,6 +310,10 @@
                       :> *res)
     )))
 
+(defn max-invoke-id
+  []
+  Long/MAX_VALUE)
+
 (defn declare-get-invokes-page-topology
   [topologies agent-name]
   (declare-get-distributed-page-topology
@@ -317,7 +321,8 @@
    (agent-get-invokes-page-query-name agent-name)
    (po/agent-root-task-global-name agent-name)
    relevant-invoke-submap
-   to-invokes-page-result))
+   to-invokes-page-result
+   max-invoke-id))
 
 (defn declare-agent-get-names-query-topology
   [topologies agent-names]
@@ -347,6 +352,11 @@
   [pages-map page-size]
   (to-page-result pages-map page-size :dataset-id :datasets :dataset-id))
 
+(defn max-dataset-id
+  []
+  (java.util.UUID. -1 -1))
+
+
 ;; returns map of form:
 ;; {:datasets
 ;;   [{:task-id ... :dataset-id ... :name ... :description ...}
@@ -359,7 +369,8 @@
    (get-datasets-page-query-name)
    (po/datasets-task-global-name)
    dataset-info
-   to-dataset-page-result))
+   to-dataset-page-result
+   max-dataset-id))
 
 (defn search-pagination-size
   []
@@ -388,8 +399,8 @@
   (let [datasets-sym (symbol (po/datasets-task-global-name))]
     (<<query-topology topologies
       (search-datasets-name)
-      [*prefix-input *limit :> *res]
-      (str/lower-case *prefix-input :> *prefix)
+      [*search-input *limit :> *res]
+      (str/lower-case *search-input :> *search)
       (|all)
       (loop<- [*k nil
                *results []
@@ -403,7 +414,7 @@
         (select> (subselect ALL
                             (transformed LAST fetch-name)
                             (selected? LAST
-                                       (pred (contains-string?-pred *prefix))))
+                                       (pred (contains-string?-pred *search))))
           *m
           :> *matches)
         (concat *results *matches :> *new-results)
