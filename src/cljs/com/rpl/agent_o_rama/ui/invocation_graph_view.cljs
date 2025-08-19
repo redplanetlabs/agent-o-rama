@@ -39,6 +39,66 @@
 (defn agg-node? [node]
   (not (nil? (:agg-state node))))
 
+(defui node-status-bar
+  "Renders a horizontal status bar showing all active node states.
+   Props:
+   - :in-progress? - Node is currently processing
+   - :is-stuck? - Node terminated due to max retries
+   - :has-changes - Node has been modified for forking
+   - :has-human-request - Node is waiting for human input
+   - :has-exceptions - Node has exceptions
+   - :has-result - Node completed successfully"
+  [{:keys [in-progress? is-stuck? has-changes has-human-request has-exceptions has-result]}]
+  (let [;; Collect all active status indicators
+        indicators (cond-> []
+                     ;; In-progress or stuck
+                     (and in-progress? (not is-stuck?))
+                     (conj {:type :spinner
+                            :title "Processing..."})
+
+                     is-stuck?
+                     (conj {:type :stuck
+                            :title "Node terminated due to max retries"})
+
+                     ;; Has changes (forking mode)
+                     has-changes
+                     (conj {:type :changed
+                            :title "Modified for fork"})
+
+                     ;; Human request
+                     has-human-request
+                     (conj {:type :human
+                            :title "Awaiting human input"})
+
+                     ;; Exceptions (only if not stuck)
+                     (and has-exceptions (not is-stuck?))
+                     (conj {:type :exception
+                            :title "Has exceptions"})
+
+                     ;; Successful result
+                     has-result
+                     (conj {:type :success
+                            :title "Completed successfully"}))]
+
+    ;; Render the status bar if there are any indicators
+    (when (seq indicators)
+      ($ :div {:className "absolute -top-1 -right-1 flex items-center gap-0.5 rounded-full px-0.5 py-0.5 bg-white border border-gray-200"}
+         (for [{:keys [type title]} indicators]
+           ($ :div {:key type
+                    :className "w-3 h-3 flex items-center justify-center"
+                    :title title}
+              (case type
+                :spinner ($ common/spinner {:size :small})
+                :stuck ($ :div {:className "w-3 h-3 bg-red-500 rounded-full flex items-center justify-center"}
+                          ($ :svg {:className "w-2 h-2 text-white" :fill "none" :viewBox "0 0 24 24" :stroke "currentColor"}
+                             ($ :path {:strokeLinecap "round" :strokeLinejoin "round" :strokeWidth 3 :d "M6 18L18 6M6 6l12 12"})))
+                :changed ($ :div {:className "w-3 h-3 bg-orange-400 rounded-full"})
+                :human ($ :div {:className "w-3 h-3 bg-amber-500 rounded-full animate-pulse"})
+                :exception ($ :div {:className "w-3 h-3 bg-yellow-500 rounded-full flex items-center justify-center"}
+                              ($ ExclamationTriangleIcon {:className "w-2 h-2 text-white"}))
+                :success ($ :div {:className "w-3 h-3 bg-green-500 rounded-full"})
+                nil)))))))
+
 (defui global-modal-component []
   (let [modal-state (state/use-sub [:ui :modal])
         {:keys [active data]} modal-state]
@@ -823,26 +883,13 @@
                                                           ($ :div {:className node-className
                                                                    :style {:width "170px" :height "40px" :opacity (if is-affected "0.6" "1.0")}}
                                                              label)
-                                                          ;; Show spinner for genuinely in-progress nodes (not stuck)
-                                                          (when (and in-progress? (not is-affected) (not is-stuck?))
-                                                            ($ :div {:className "absolute -top-1.5 -left-1.5 bg-white p-0.5 rounded-full shadow-sm flex items-center justify-center"}
-                                                               ($ common/spinner {:size :medium})))
-                                                          (when (and (:result data) (not is-affected))
-                                                            ($ :div {:className "absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"}))
-                                                          (when has-changes
-                                                            ($ :div {:className "absolute -top-1 -left-1 w-3 h-3 bg-orange-400 rounded-full border-2 border-white shadow-sm"}))
-                                                          (when (and has-human-request (not is-affected))
-                                                            ($ :div {:className "absolute -top-1 right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white shadow-sm"}
-                                                               ($ :div {:className "absolute inset-0 bg-amber-500 rounded-full animate-pulse"})))
-                                                          (when (and has-exceptions (not is-affected) (not is-stuck?))
-                                                            ($ :div {:className "absolute -bottom-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full border-2 border-white shadow-sm flex items-center justify-center"}
-                                                               ($ ExclamationTriangleIcon {:className "w-2.5 h-2.5 text-white"})))
-                                                          ;; NEW: Show stuck icon (overrides exception icon)
-                                                          (when (and is-stuck? (not is-affected))
-                                                            ($ :div {:className "absolute -bottom-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow-sm flex items-center justify-center"
-                                                                     :title "Node terminated due to max retries"}
-                                                               ($ :svg {:className "w-2.5 h-2.5 text-white" :fill "none" :viewBox "0 0 24 24" :stroke "currentColor"}
-                                                                  ($ :path {:strokeLinecap "round" :strokeLinejoin "round" :strokeWidth 3 :d "M6 18L18 6M6 6l12 12"}))))
+                                                          ;; Consolidated status indicator bar in top-right corner
+                                                          ($ node-status-bar {:in-progress? in-progress?
+                                                                              :is-stuck? is-stuck?
+                                                                              :has-changes has-changes
+                                                                              :has-human-request has-human-request
+                                                                              :has-exceptions has-exceptions
+                                                                              :has-result (:result data)})
                                                           ($ Handle {:type "target" :position "top"})
                                                           ($ Handle {:type "source" :position "bottom"})))))
 
