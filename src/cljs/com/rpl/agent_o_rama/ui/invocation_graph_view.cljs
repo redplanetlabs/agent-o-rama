@@ -74,7 +74,6 @@
     item
     (with-out-str (clojure.pprint/pprint item))))
 
-
 (defui expandable-item-component [{:keys [item color title truncate-length]
                                    :or {truncate-length 50}}]
   (let [item-str (if (string? item) item (pr-str item))
@@ -796,6 +795,8 @@
                                                            ;; Check if node is in progress
                                                            in-progress? (and (:start-time-millis data)
                                                                              (not (:finish-time-millis data)))
+                                                           ;; NEW: Check if the node is stuck (in-progress but the whole agent has finished)
+                                                           is-stuck? (and in-progress? is-complete)
                                                            base-classes (cond
                                                                           is-affected
                                                                           ["bg-gray-300" "text-gray-500" "border-2" "border-gray-400"]
@@ -822,8 +823,8 @@
                                                           ($ :div {:className node-className
                                                                    :style {:width "170px" :height "40px" :opacity (if is-affected "0.6" "1.0")}}
                                                              label)
-                                                          ;; Show spinner for in-progress nodes
-                                                          (when (and in-progress? (not is-affected))
+                                                          ;; Show spinner for genuinely in-progress nodes (not stuck)
+                                                          (when (and in-progress? (not is-affected) (not is-stuck?))
                                                             ($ :div {:className "absolute -top-1.5 -left-1.5 bg-white p-0.5 rounded-full shadow-sm flex items-center justify-center"}
                                                                ($ common/spinner {:size :medium})))
                                                           (when (and (:result data) (not is-affected))
@@ -833,9 +834,15 @@
                                                           (when (and has-human-request (not is-affected))
                                                             ($ :div {:className "absolute -top-1 right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white shadow-sm"}
                                                                ($ :div {:className "absolute inset-0 bg-amber-500 rounded-full animate-pulse"})))
-                                                          (when (and has-exceptions (not is-affected))
+                                                          (when (and has-exceptions (not is-affected) (not is-stuck?))
                                                             ($ :div {:className "absolute -bottom-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full border-2 border-white shadow-sm flex items-center justify-center"}
                                                                ($ ExclamationTriangleIcon {:className "w-2.5 h-2.5 text-white"})))
+                                                          ;; NEW: Show stuck icon (overrides exception icon)
+                                                          (when (and is-stuck? (not is-affected))
+                                                            ($ :div {:className "absolute -bottom-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow-sm flex items-center justify-center"
+                                                                     :title "Node terminated due to max retries"}
+                                                               ($ :svg {:className "w-2.5 h-2.5 text-white" :fill "none" :viewBox "0 0 24 24" :stroke "currentColor"}
+                                                                  ($ :path {:strokeLinecap "round" :strokeLinejoin "round" :strokeWidth 3 :d "M6 18L18 6M6 6l12 12"}))))
                                                           ($ Handle {:type "target" :position "top"})
                                                           ($ Handle {:type "source" :position "bottom"})))))
 
