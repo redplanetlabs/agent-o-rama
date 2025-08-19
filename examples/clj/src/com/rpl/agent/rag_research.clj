@@ -152,11 +152,11 @@ addresses all aspects of the question.")
   "Split a document into chunks for embedding"
   [text]
   (let [splitter (DocumentSplitters/recursive 500 50)]
-    (mapv #(.text %) (.split splitter (Document/from text)))))
+    (mapv #(.text ^Document %) (.split splitter (Document/from text)))))
 
 (defn create-embedding
   "Create an embedding for the given text"
-  ^Embedding [agent-node text]
+  ^Embedding [agent-node ^String text]
   (let [embedding-model (aor/get-agent-object agent-node "embedding-model")
         response        (.embed ^EmbeddingModel embedding-model text)]
     (.content response)))
