@@ -249,10 +249,19 @@
                     (str "Exceptions (" (count exceptions) ")"))
                  ($ :div {:className "space-y-2"}
                     (for [[idx exc-str] (map-indexed vector exceptions)]
-                      ($ :div {:key idx
-                               :className "bg-white p-2 rounded border border-red-100"}
-                         ($ :pre {:className "text-xs font-mono text-red-800 whitespace-pre-wrap break-all"}
-                            exc-str))))))
+                      (let [[show-modal set-show-modal] (uix/use-state false)
+                            first-line (first (str/split-lines exc-str))]
+                        ($ :<> {:key idx}
+                           ($ :div {:className "bg-white p-2 rounded border border-red-100 cursor-pointer hover:bg-red-50 transition-colors"
+                                    :onClick #(set-show-modal true)
+                                    :title "Click to view full exception"}
+                              ($ :div {:className "text-xs font-mono text-red-800"}
+                                 first-line))
+
+                           (when show-modal
+                             ($ expandable-popup-modal {:content exc-str
+                                                        :title (str "Exception " (inc idx))
+                                                        :on-close #(set-show-modal false)}))))))))
             (when (and start-time finish-time)
               ($ :div {:className "bg-yellow-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-yellow-700 mb-2"} "Timing")
