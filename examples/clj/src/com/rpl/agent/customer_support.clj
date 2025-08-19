@@ -487,8 +487,8 @@
         search-results (WebSearchRequest/from query 5)
         results        (.search tavily search-results)
         documents      (mapv (fn [^Document doc]
-                               {:title   (.metadata doc "title")
-                                :url     (.metadata doc "url")
+                               {:title   (.getString (.metadata doc) "title")
+                                :url     (.getString (.metadata doc) "url")
                                 :snippet (.text doc)})
                              (.toDocuments results))]
     (j/write-value-as-string
