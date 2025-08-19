@@ -195,6 +195,7 @@
   [spec]
   (cond (string? spec) [spec]
         (coll? spec) (set spec)
+        (instance? java.util.List spec) (set spec)
         (nil? spec) #{}
         :else (throw (h/ex-info "Invalid output nodes spec"
                                 {:spec spec :class (class spec)}))))
