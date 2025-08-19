@@ -377,45 +377,44 @@
 
                            ;; 2. The Body: Replace all specific logic with the generic viewer
                            ($ :div {:className "text-xs text-sky-600 mt-1"}
-                              ($ generic-data-viewer {:data info :color "sky" :depth 0})))))))))
-
-               ;; Emits Section (full width)
-         (when (and emits (> (count emits) 0))
-           ($ :div {:className "mt-4 bg-purple-50 p-3 rounded-md"}
-              ($ :div {:className "text-sm font-medium text-purple-700 mb-2"}
-                 (str "Emits (" (count emits) ")"))
-              ($ :div {:className "space-y-2"}
-                 (for [[idx emit] (map-indexed vector (js->clj emits :keywordize-keys true))]
-                   (let [emit-id (str (:invoke-id emit))
-                         is-loaded (contains? graph-data (:invoke-id emit))
+                              ($ generic-data-viewer {:data info :color "sky" :depth 0}))))))))
+            
+            (when (and emits (> (count emits) 0))
+              ($ :div {:className "mt-4 bg-purple-50 p-3 rounded-md"}
+                 ($ :div {:className "text-sm font-medium text-purple-700 mb-2"}
+                    (str "Emits (" (count emits) ")"))
+                 ($ :div {:className "space-y-2"}
+                    (for [[idx emit] (map-indexed vector (js->clj emits :keywordize-keys true))]
+                      (let [emit-id (str (:invoke-id emit))
+                            is-loaded (contains? graph-data (:invoke-id emit))
                             ;; We no longer track loading state locally
-                         border-class (if is-loaded "border-purple-200" "border-dashed border-purple-300")
-                         cursor-class "cursor-pointer"
-                         bg-class (if is-loaded "bg-gray-50" "bg-white hover:bg-purple-50")]
-                     ($ :div {:key (str "emit-" idx)
-                              :className (str bg-class " p-2 rounded border " border-class " " cursor-class " transition-colors")
-                              :onClick (fn [e]
-                                         (.stopPropagation e)
-                                         (if is-loaded
-                                                ;; Find and select the loaded node
-                                           (let [nodes (js->clj flow-nodes :keywordize-keys true)
-                                                 target-node (->> nodes
-                                                                  (filter #(= (-> % :data :node-id) (:invoke-id emit)))
-                                                                  first)]
-                                             (when (and target-node on-select-node)
-                                               (on-select-node (:invoke-id emit))))
+                            border-class (if is-loaded "border-purple-200" "border-dashed border-purple-300")
+                            cursor-class "cursor-pointer"
+                            bg-class (if is-loaded "bg-gray-50" "bg-white hover:bg-purple-50")]
+                        ($ :div {:key (str "emit-" idx)
+                                 :className (str bg-class " p-2 rounded border " border-class " " cursor-class " transition-colors")
+                                 :onClick (fn [e]
+                                            (.stopPropagation e)
+                                            (if is-loaded
+                                              ;; Find and select the loaded node
+                                              (let [nodes (js->clj flow-nodes :keywordize-keys true)
+                                                    target-node (->> nodes
+                                                                     (filter #(= (-> % :data :node-id) (:invoke-id emit)))
+                                                                     first)]
+                                                (when (and target-node on-select-node)
+                                                  (on-select-node (:invoke-id emit))))
                                               ;; Load the unloaded node
-                                           (when on-paginate-node
-                                             (on-paginate-node emit-id))))}
-                        ($ :div {:className "text-xs text-purple-600"}
-                           ($ :div (str "→ " (:node-name emit)))
-                           (when (:args emit)
-                             ($ generic-data-viewer {:data (:args emit)
-                                                     :color "purple"
-                                                     :truncate-length 60
-                                                     :depth 0}))
-                           ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
-                              (str "ID: " emit-id)))))))))))))
+                                              (when on-paginate-node
+                                                (on-paginate-node emit-id))))}
+                           ($ :div {:className "text-xs text-purple-600"}
+                              ($ :div (str "→ " (:node-name emit)))
+                              (when (:args emit)
+                                ($ generic-data-viewer {:data (:args emit)
+                                                        :color "purple"
+                                                        :truncate-length 60
+                                                        :depth 0}))
+                              ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
+                                 (str "ID: " emit-id))))))))))))))
 
 (defui forking-input-component [{:keys [selected-node changed-nodes on-change-node-input affected-nodes]}]
   (let [data (when selected-node
