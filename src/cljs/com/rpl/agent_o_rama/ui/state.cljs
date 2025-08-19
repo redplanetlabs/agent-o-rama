@@ -23,6 +23,8 @@
         :active-tab :info
         :current-route "/"
         :breadcrumbs []
+        :modal {:active nil ;; nil or modal type keyword
+                :data {}} ;; modal-specific data
         :hitl {:responses {} ;; Keyed by invoke-id -> response text
                :submitting {}}}
    :sente {:connected? false
@@ -235,6 +237,20 @@
                                              :fetching? false)
                                       (cond-> (nil? (:data current-state))
                                         (assoc :status :error)))))])))
+
+ ;; =============================================================================
+;; MODAL EVENTS
+;; =============================================================================
+
+(reg-event :modal/show
+           (fn [db modal-type modal-data]
+             [:ui :modal (s/terminal-val {:active modal-type
+                                          :data modal-data})]))
+
+(reg-event :modal/hide
+           (fn [db]
+             [:ui :modal (s/terminal-val {:active nil
+                                          :data {}})]))
 
 ;; =============================================================================
 ;; DEBUGGING HELPERS

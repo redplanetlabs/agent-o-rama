@@ -39,31 +39,34 @@
 (defn agg-node? [node]
   (not (nil? (:agg-state node))))
 
-(defui expandable-popup-modal [{:keys [content content-index title on-close]}]
-  (createPortal
-   ($ :div {:className "fixed inset-0 flex items-center justify-center z-50"
-            :style {:backgroundColor "rgba(0, 0, 0, 0.5)"}
-            :onClick (fn [e]
-                       (.preventDefault e)
-                       (.stopPropagation e)
-                       (on-close))}
-      ($ :div {:className "bg-white rounded-lg shadow-xl max-w-4xl max-h-[80vh] overflow-hidden"
-               :onClick (fn [e]
-                          (.preventDefault e)
-                          (.stopPropagation e))}
-         ($ :div {:className "p-4 border-b border-gray-200 flex justify-between items-center"}
-            ($ :h3 {:className "text-lg font-medium text-gray-800"}
-               title)
-            ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer"
-                        :onClick (fn [e]
-                                   (.preventDefault e)
-                                   (.stopPropagation e)
-                                   (on-close))}
-               "×"))
-         ($ :div {:className "p-4 overflow-auto max-h-96"}
-            ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
-               content))))
-   (.-body js/document)))
+(defui global-modal-component []
+  (let [modal-state (state/use-sub [:ui :modal])
+        {:keys [active data]} modal-state]
+    (when active
+      (createPortal
+       ($ :div {:className "fixed inset-0 flex items-center justify-center z-50"
+                :style {:backgroundColor "rgba(0, 0, 0, 0.5)"}
+                :onClick (fn [e]
+                           (.preventDefault e)
+                           (.stopPropagation e)
+                           (state/dispatch [:modal/hide]))}
+          ($ :div {:className "bg-white rounded-lg shadow-xl max-w-4xl max-h-[80vh] overflow-hidden"
+                   :onClick (fn [e]
+                              (.preventDefault e)
+                              (.stopPropagation e))}
+             ($ :div {:className "p-4 border-b border-gray-200 flex justify-between items-center"}
+                ($ :h3 {:className "text-lg font-medium text-gray-800"}
+                   (:title data))
+                ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer"
+                            :onClick (fn [e]
+                                       (.preventDefault e)
+                                       (.stopPropagation e)
+                                       (state/dispatch [:modal/hide]))}
+                   "×"))
+             ($ :div {:className "p-4 overflow-auto max-h-96"}
+                ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
+                   (:content data)))))
+       (.-body js/document)))))
 
 (defn pretty-format [item]
   "Format data structure with proper indentation and formatting using pprint"
@@ -71,29 +74,24 @@
     item
     (with-out-str (clojure.pprint/pprint item))))
 
+
 (defui expandable-item-component [{:keys [item color title truncate-length]
                                    :or {truncate-length 50}}]
-  (let [[show-modal set-show-modal] (uix/use-state false)
-        item-str (if (string? item) item (pr-str item))
+  (let [item-str (if (string? item) item (pr-str item))
         pretty-str (pretty-format item)
         is-long? (> (count item-str) truncate-length)
         truncated-str (if is-long?
                         (str (subs item-str 0 (- truncate-length 3)) "...")
                         item-str)]
-    ($ :<>
-       ($ :div {:className (str "text-" color "-500")}
-          ($ :span {:className (str "break-words cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded")
-                    :onClick (fn [e]
-                               (.stopPropagation e)
-                               (set-show-modal true))
-                    :title "Click to expand"}
-             truncated-str))
-
-       ;; Popup modal with pretty formatting
-       (when show-modal
-         ($ expandable-popup-modal {:content pretty-str
-                                    :title title
-                                    :on-close #(set-show-modal false)})))))
+    ($ :div {:className (str "text-" color "-500")}
+       ($ :span {:className (str "break-words cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded")
+                 :onClick (fn [e]
+                            (.stopPropagation e)
+                            (state/dispatch [:modal/show :expandable-content
+                                             {:title title
+                                              :content pretty-str}]))
+                 :title "Click to expand"}
+          truncated-str))))
 
 ;; Declare generic-data-viewer first to avoid circular dependency
 (declare generic-data-viewer)
@@ -250,19 +248,17 @@
                     (str "Exceptions (" (count exceptions) ")"))
                  ($ :div {:className "space-y-2"}
                     (for [[idx exc-str] (map-indexed vector exceptions)]
-                      (let [[show-modal set-show-modal] (uix/use-state false)
-                            first-line (first (str/split-lines exc-str))]
-                        ($ :<> {:key idx}
-                           ($ :div {:className "bg-white p-2 rounded border border-red-100 cursor-pointer hover:bg-red-50 transition-colors"
-                                    :onClick #(set-show-modal true)
-                                    :title "Click to view full exception"}
-                              ($ :div {:className "text-xs font-mono text-red-800"}
-                                 first-line))
-
-                           (when show-modal
-                             ($ expandable-popup-modal {:content exc-str
-                                                        :title (str "Exception " (inc idx))
-                                                        :on-close #(set-show-modal false)}))))))))
+                      (let [first-line (first (str/split-lines exc-str))]
+                        ($ :div {:key idx
+                                 :className "bg-white p-2 rounded border border-red-100 cursor-pointer hover:bg-red-50 transition-colors"
+                                 :onClick (fn [e]
+                                            (.stopPropagation e)
+                                            (state/dispatch [:modal/show :exception-detail
+                                                             {:title (str "Exception " (inc idx))
+                                                              :content exc-str}]))
+                                 :title "Click to view full exception"}
+                           ($ :div {:className "text-xs font-mono text-red-800"}
+                              first-line)))))))
             (when (and start-time finish-time)
               ($ :div {:className "bg-yellow-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-yellow-700 mb-2"} "Timing")

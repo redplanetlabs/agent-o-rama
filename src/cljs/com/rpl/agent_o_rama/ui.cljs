@@ -12,6 +12,7 @@
    [com.rpl.agent-o-rama.ui.stats :as stats]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.state :as state]
+   [com.rpl.agent-o-rama.ui.invocation-graph-view :refer [global-modal-component]]
    [com.rpl.agent-o-rama.ui.events])) ;; Ensure event handlers are registered at app startup
 
 ;; Sidebar navigation component
@@ -162,23 +163,27 @@
            ($ Route {:path "/" :component agents/index})))))
 
 ;; Main app component
+ ;; Main app component
 (defui app []
-  ($ :div.flex.h-screen.bg-gray-50
-     ($ sidebar-nav)
-     ($ :div.flex-1.flex.flex-col.min-h-0
-        ($ breadcrumb)
-        ($ :div.flex-1.overflow-auto
-           ($ Router
-              ;; Agent routes
-              ($ Route {:path "/agents/:module-id/:agent-name/invocations" :component agents/invocations})
-              ($ Route {:path "/agents/:module-id/:agent-name/invocations/:invoke-id" :component agents/invoke})
-              ($ Route {:path "/agents/:module-id/:agent-name/evaluations" :component agents/evaluations})
-              ($ Route {:path "/agents/:module-id/:agent-name/stats" :component stats/stats})
-              ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
-              ($ Route {:path "/agents" :component agents/index})
+  ($ :<>
+     ($ :div.flex.h-screen.bg-gray-50
+        ($ sidebar-nav)
+        ($ :div.flex-1.flex.flex-col.min-h-0
+           ($ breadcrumb)
+           ($ :div.flex-1.overflow-auto
+              ($ Router
+                 ;; Agent routes
+                 ($ Route {:path "/agents/:module-id/:agent-name/invocations" :component agents/invocations})
+                 ($ Route {:path "/agents/:module-id/:agent-name/invocations/:invoke-id" :component agents/invoke})
+                 ($ Route {:path "/agents/:module-id/:agent-name/evaluations" :component agents/evaluations})
+                 ($ Route {:path "/agents/:module-id/:agent-name/stats" :component stats/stats})
+                 ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
+                 ($ Route {:path "/agents" :component agents/index})
 
-              ;; Home route
-              ($ Route {:path "/" :component agents/index}))))))
+                 ;; Home route
+                 ($ Route {:path "/" :component agents/index})))))
+     ;; Global modal component
+     ($ global-modal-component)))
 
 (defn init []
   (sente/init!)
