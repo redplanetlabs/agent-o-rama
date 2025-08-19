@@ -5,6 +5,7 @@
    [com.rpl.agent-o-rama.ui.events] ;; Load event handlers
    [com.rpl.agent-o-rama.ui.invocation-graph-view :as view]
    [com.rpl.agent-o-rama.ui.sente :as sente]
+   [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.specter :as s]
    ["wouter" :refer [useParams useLocation]]))
 
@@ -13,16 +14,18 @@
         [location set-location] (useLocation)
 
         ;; 1. Subscribe to all necessary state from app-db
-        nodes (state/use-sub [:invocations-data invoke-id :graph :nodes])
-        real-edges (state/use-sub [:invocations-data invoke-id :graph :edges])
-        summary-data (state/use-sub [:invocations-data invoke-id :summary])
-        next-leaves (state/use-sub [:invocations-data invoke-id :next-leaves])
-        is-complete (state/use-sub [:invocations-data invoke-id :is-complete])
-        implicit-edges (state/use-sub [:invocations-data invoke-id :implicit-edges])
-        root-invoke-id (state/use-sub [:invocations-data invoke-id :root-invoke-id])
-        task-id (state/use-sub [:invocations-data invoke-id :task-id])
-        forks (state/use-sub [:invocations-data invoke-id :forks])
-        fork-of (state/use-sub [:invocations-data invoke-id :fork-of])
+                ;; 1. Subscribe to the entire invocation state object
+        invocation-state (state/use-sub [:invocations-data invoke-id])
+
+        ;; 2. Destructure the state with defaults
+        {:keys [status graph summary next-leaves is-complete implicit-edges
+                root-invoke-id task-id forks fork-of error]}
+        (or invocation-state {:status :loading})
+
+        ;; Extract nested data
+        nodes (:nodes graph)
+        real-edges (:edges graph)
+        summary-data summary
 
         ;; UI state subscriptions
         selected-node-id (state/use-sub [:ui :selected-node-id])
@@ -130,15 +133,29 @@
                     :on-toggle-forking-mode handle-toggle-forking-mode
                     :on-paginate-node handle-paginate-node}]
 
-    ;; 5. Render based on connection and data state
+    ;; 5. Render based on explicit status and connection state
     (cond
       (not connected?)
       ($ :div.flex.items-center.justify-center.p-8
-         ($ :div.text-gray-500 "Connecting to server..."))
+         ($ common/spinner {:size :medium})
+         ($ :div.text-gray-500.ml-2 "Connecting to server..."))
 
-      (and (not graph-data) (not is-complete))
+      ;; Explicit loading state
+      (= status :loading)
       ($ :div.flex.items-center.justify-center.p-8
-         ($ :div.text-gray-500 "Loading invocation..."))
+         ($ common/spinner {:size :medium})
+         ($ :div.text-gray-500.ml-2 "Loading invocation data..."))
+
+      ;; Explicit error state
+      (= status :error)
+      ($ :div.flex.items-center.justify-center.p-8
+         ($ :div.text-red-500 "Failed to load invocation: " (str error)))
+
+      ;; Success state but no graph data yet (still loading graph)
+      (and (= status :success) (not graph-data))
+      ($ :div.flex.items-center.justify-center.p-8
+         ($ common/spinner {:size :medium})
+         ($ :div.text-gray-500.ml-2 "Loading graph data..."))
 
       :else
       ($ view/graph-view view-props))))

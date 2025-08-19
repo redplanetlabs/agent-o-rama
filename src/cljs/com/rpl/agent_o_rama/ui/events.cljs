@@ -83,9 +83,10 @@
                                                              :module-id module-id
                                                              :agent-name agent-name}])
 
-                   (let [is-complete? (get-in db [:invocations-data invoke-id :is-complete])]
-
-                     (when-not is-complete?
+                   (let [current-status (get-in db [:invocations-data invoke-id :status])]
+                     ;; Immediately set status to loading to prevent stale data display
+                     (when (not= current-status :success)
+                       (state/dispatch [:db/set-value [:invocations-data invoke-id :status] :loading])
                        (state/dispatch [:invocation/fetch-graph-page
                                         {:invoke-id invoke-id
                                          :module-id module-id
@@ -112,8 +113,14 @@
                     (fn [reply]
                       (if (:success reply)
                         (state/dispatch [:invocation/process-graph-page invoke-id (:data reply)])
-                        nil)))
+                        (state/dispatch [:invocation/fetch-graph-error invoke-id (:error reply)]))))
                    nil))
+
+(state/reg-event :invocation/fetch-graph-error
+                 (fn [db invoke-id error-info]
+                   [:invocations-data invoke-id (s/multi-path
+                                                 [:status (s/terminal-val :error)]
+                                                 [:error (s/terminal-val error-info)])]))
 
 (state/reg-event :invocation/process-graph-page
                  (fn [db invoke-id page-data]
@@ -130,7 +137,8 @@
                                           [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]
                                           [[:invocations-data invoke-id :task-id] task-id]
                                           [[:invocations-data invoke-id :forks] forks]
-                                          [[:invocations-data invoke-id :fork-of] fork-of]])))
+                                          [[:invocations-data invoke-id :fork-of] fork-of]
+                                          [[:invocations-data invoke-id :status] :success]])))
 
                      (when (contains? page-data :is-complete)
                        (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] is-complete]))
