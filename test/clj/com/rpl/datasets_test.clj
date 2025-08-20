@@ -529,58 +529,72 @@
                         module-name
                         (queries/search-datasets-name)))
 
-       ;; so the UUID7s have separate timestamps
-       (bind append-and-wait!
-         (fn [depot record]
-           (foreign-append! depot record)
-           (Thread/sleep 2)))
+       ;; so they have separate timestamps
+       (bind gen-uuid-and-wait
+         (fn []
+           (Thread/sleep 2)
+           (h/random-uuid7)))
 
-       (bind ds-id1 (h/random-uuid7))
-       (bind ds-id2 (h/random-uuid7))
-       (bind ds-id3 (h/random-uuid7))
-       (bind ds-id4 (h/random-uuid7))
-       (bind ds-id5 (h/random-uuid7))
-       (bind ds-id6 (h/random-uuid7))
-       (bind ds-id7 (h/random-uuid7))
-       (bind ds-id8 (h/random-uuid7))
+       (bind ds-id1 (gen-uuid-and-wait))
+       (bind ds-id2 (gen-uuid-and-wait))
+       (bind ds-id3 (gen-uuid-and-wait))
+       (bind ds-id4 (gen-uuid-and-wait))
+       (bind ds-id5 (gen-uuid-and-wait))
+       (bind ds-id6 (gen-uuid-and-wait))
+       (bind ds-id7 (gen-uuid-and-wait))
+       (bind ds-id8 (gen-uuid-and-wait))
 
-       (append-and-wait!
+       (foreign-append!
         depot
         (aor-types/->valid-CreateDataset ds-id1
                                          "Dataset 1 is a dataset"
-                                         "this is a dataset"))
-       (append-and-wait!
+                                         "this is a dataset"
+                                         nil
+                                         nil))
+       (foreign-append!
         depot
-        (aor-types/->valid-CreateDataset ds-id2 "Dataset sample 2" nil))
-       (append-and-wait!
+        (aor-types/->valid-CreateDataset ds-id2 "Dataset sample 2" nil nil nil))
+       (foreign-append!
         depot
         (aor-types/->valid-CreateDataset ds-id3
                                          "Dataset 3 – sample of inputs"
-                                         "this is a description"))
-       (append-and-wait!
+                                         "this is a description"
+                                         nil
+                                         nil))
+       (foreign-append!
         depot
         (aor-types/->valid-CreateDataset ds-id4
                                          "Dataset 4 sample of movies"
-                                         "a description"))
-       (append-and-wait!
+                                         "a description"
+                                         nil
+                                         nil))
+       (foreign-append!
         depot
         (aor-types/->valid-CreateDataset ds-id5
                                          "Dataset 5 sample of books"
+                                         nil
+                                         nil
                                          nil))
-       (append-and-wait!
+       (foreign-append!
         depot
         (aor-types/->valid-CreateDataset ds-id6
                                          "Dataset 6 sampleof vaudeville"
-                                         "a description 6"))
-       (append-and-wait!
+                                         "a description 6"
+                                         nil
+                                         nil))
+       (foreign-append!
         depot
         (aor-types/->valid-CreateDataset ds-id7
                                          "Dataset 7 is another dataset"
-                                         "a description"))
-       (append-and-wait!
+                                         "a description"
+                                         nil
+                                         nil))
+       (foreign-append!
         depot
         (aor-types/->valid-CreateDataset ds-id8
                                          "Dataset 8"
+                                         nil
+                                         nil
                                          nil))
 
        (doseq [[s query-amt amt] [["dataset" 3 3]
@@ -607,36 +621,41 @@
 
        (is (> (count pages) 1))
        (bind items (vec (apply concat pages)))
-       (is (= (setval [ALL :task-id] NONE items)
-              [{:dataset-id  ds-id8
-                :name        "Dataset 8"
-                :description nil}
-               {:dataset-id  ds-id7
-                :name        "Dataset 7 is another dataset"
-                :description "a description"}
-               {:dataset-id  ds-id6
-                :name        "Dataset 6 sampleof vaudeville"
-                :description "a description 6"}
-               {:dataset-id  ds-id5
-                :name        "Dataset 5 sample of books"
-                :description nil}
-               {:dataset-id  ds-id4
-                :name        "Dataset 4 sample of movies"
-                :description "a description"}
-               {:dataset-id  ds-id3
-                :name        "Dataset 3 – sample of inputs"
-                :description "this is a description"}
-               {:dataset-id  ds-id2
-                :name        "Dataset sample 2"
-                :description nil}
-               {:dataset-id  ds-id1
-                :name        "Dataset 1 is a dataset"
-                :description "this is a dataset"}
-              ]))
+       (is
+        (= (setval
+            [ALL (multi-path :task-id :input-json-schema :output-json-schema)]
+            NONE
+            items)
+           [{:dataset-id  ds-id8
+             :name        "Dataset 8"
+             :description nil}
+            {:dataset-id  ds-id7
+             :name        "Dataset 7 is another dataset"
+             :description "a description"}
+            {:dataset-id  ds-id6
+             :name        "Dataset 6 sampleof vaudeville"
+             :description "a description 6"}
+            {:dataset-id  ds-id5
+             :name        "Dataset 5 sample of books"
+             :description nil}
+            {:dataset-id  ds-id4
+             :name        "Dataset 4 sample of movies"
+             :description "a description"}
+            {:dataset-id  ds-id3
+             :name        "Dataset 3 – sample of inputs"
+             :description "this is a description"}
+            {:dataset-id  ds-id2
+             :name        "Dataset sample 2"
+             :description nil}
+            {:dataset-id  ds-id1
+             :name        "Dataset 1 is a dataset"
+             :description "this is a dataset"}
+           ]))
 
 
 
        ;; TODO: <<<<>>>>
+       ;;  - all this should be through the client API
        ;; (defn get-dataset-properties [datasets-pstate dataset-id]
        ;; (defn get-dataset-snapshot-names [datasets-pstate dataset-id]
        ;; (defn get-dataset-examples-page

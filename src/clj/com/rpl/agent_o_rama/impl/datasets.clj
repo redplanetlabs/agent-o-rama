@@ -230,7 +230,7 @@
      (else>)
       (:> *res))
    (else>)
-    (:>)))
+    (:> nil)))
 
 (defn validate-with-schema*
   [^String json-schema value]
