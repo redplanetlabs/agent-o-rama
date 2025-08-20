@@ -808,13 +808,51 @@
   (.provideHumanInputAsync client request response))
 
 
+(defn create-dataset!
+  ([manager name] (create-dataset! manager name nil))
+  ([^AgentManager manager name options]
+   ;; types are validated by Java API
+   (h/validate-options! name
+                        options
+                        {:description        h/any-spec
+                         :input-json-schema  h/any-spec
+                         :output-json-schema h/any-spec})
+   (.createDataset manager
+                   name
+                   (:description options)
+                   (:input-json-schema options)
+                   (:output-json-schema options))))
+
+(defn set-dataset-name!
+  [^AgentManager manager dataset-id name]
+  (.setDatasetName manager dataset-id name))
+
+(defn set-dataset-description!
+  [^AgentManager manager dataset-id description]
+  (.setDatasetDescription manager dataset-id description))
+
+(defn destroy-dataset!
+  [^AgentManager manager dataset-id]
+  (.destroyDataset manager dataset-id))
+
+(defn add-dataset-example!
+  ([^AgentManager manager dataset-id input]
+   (add-dataset-example! manager dataset-id input nil))
+  ([^AgentManager manager dataset-id input options]
+   ;; types are validated by Java API
+   (h/validate-options! name
+                        options
+                        {:snapshot h/any-spec
+                         :reference-output h/any-spec
+                         :tags     h/any-spec})
+   (.addDatasetExample manager
+                       dataset-id
+                       (:snapshot options)
+                       input
+                       (:reference-output options)
+                       (:tags options))))
 
 ;; TODO: <<<<>>>>> clojure API versions
-; (createDataset [this name description inputJsonSchemaoutputJsonSchema]
-; (setDatasetName [this datasetId name]
-; (setDatasetDescription [this datasetId description]
-; (destroyDataset [this datasetId]
-; (addDatasetExample [this datasetId snapshotName input referenceOutput tags]
 ; (setDatasetExampleInput [this datasetId snapshotName exampleId input]
 ; (setDatasetExampleReferenceOutput [this datasetId snapshotName exampleId referenceOutput]
 ; (removeDatasetExample [this datasetId snapshotName exampleId]

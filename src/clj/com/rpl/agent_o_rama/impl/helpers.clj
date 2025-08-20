@@ -250,6 +250,9 @@
   (when-not (instance? java.util.List v)
     "value must be a list"))
 
+(defn any-spec
+  [v])
+
 (defn map-spec
   [v]
   (when-not (map? v)
