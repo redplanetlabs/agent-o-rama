@@ -228,49 +228,8 @@
                                     :truncate-length truncate-length}))))
 
 (defui agent-call-op-component [{:keys [info]}]
-  (let [[location navigate] (wouter/useLocation)
-        ;; The invocation data location depends on the operation type
-        invoke-data (if (= (str (:op info)) "initiate")
-                      (:result info)
-                      (:agent-invoke info))
-        task-id (:task-id invoke-data)
-        agent-invoke-id (:agent-invoke-id invoke-data)
-        module-id (:agent-module-name info)
-        agent-name (:agent-name info)
-
-        ;; Check if we have all the data needed to construct a valid URL
-        ;; Note: Use (not (nil? ...)) instead of (some? ...) because 0 is falsy but valid
-        can-navigate? (and (not (nil? task-id)) (not (nil? agent-invoke-id)) module-id agent-name)
-
-        target-url (when can-navigate?
-                     (str "/agents/" (common/url-encode module-id)
-                          "/" (common/url-encode agent-name)
-                          "/invocations/" task-id "-" agent-invoke-id))]
-
-    (println "DEBUG agent-call-op-component:"
-             "op:" (:op info)
-             "info:" info
-             "invoke-data:" invoke-data
-             ":result" (:result info)
-             ":agent-invoke" (:agent-invoke info)
-             "task-id:" task-id
-             "agent-invoke-id:" agent-invoke-id
-             "module-id:" module-id
-             "agent-name:" agent-name
-             "can-navigate?:" can-navigate?
-             "target-url:" target-url)
-
-    ($ :div
-       ;; First, render the generic details of the operation so no information is lost
-       ($ generic-data-viewer {:data info :color "sky" :depth 0})
-
-       ;; Then, add the navigation button if a valid URL can be constructed
-       (when target-url
-         ($ :div {:className "mt-2"}
-            ($ :button {:onClick (fn [] (js/window.open target-url "_blank"))
-                        :className "inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors cursor-pointer shadow-sm"}
-               "View Sub-Invocation"
-               ($ ArrowTopRightOnSquareIcon {:className "h-4 w-4"})))))))
+  ;; Just render the generic details of the operation
+  ($ generic-data-viewer {:data info :color "sky" :depth 0}))
 
 (defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes module-id agent-name invoke-id]}]
   (let [data (when selected-node
@@ -415,10 +374,31 @@
                                       ($ :span {:className "text-sm font-mono text-sky-700"}
                                          (:objectName info)))))
                               ;; Always display the duration
-                              (when duration
-                                ($ :div {:className "text-xs text-sky-500 font-mono"
-                                         :title (str "Started: " (format-ms start-time) "\nFinished: " (format-ms finish-time))}
-                                   (str duration "ms"))))
+                              ($ :div {:className "flex items-center gap-2"}
+                                 ;; Always display the duration
+                                 (when duration
+                                   ($ :div {:className "text-xs text-sky-500 font-mono"
+                                            :title (str "Started: " (format-ms start-time) "\nFinished: " (format-ms finish-time))}
+                                      (str duration "ms")))
+                                 ;; Add navigation button for agent-call operations
+                                 (when (= (keyword op-type) :agent-call)
+                                   (let [invoke-data (if (= (str (:op info)) "initiate")
+                                                       (:result info)
+                                                       (:agent-invoke info))
+                                         task-id (:task-id invoke-data)
+                                         agent-invoke-id (:agent-invoke-id invoke-data)
+                                         module-id (:agent-module-name info)
+                                         agent-name (:agent-name info)
+                                         can-navigate? (and (not (nil? task-id)) (not (nil? agent-invoke-id)) module-id agent-name)
+                                         target-url (when can-navigate?
+                                                      (str "/agents/" (common/url-encode module-id)
+                                                           "/" (common/url-encode agent-name)
+                                                           "/invocations/" task-id "-" agent-invoke-id))]
+                                     (when target-url
+                                       ($ :button {:onClick (fn [] (js/window.open target-url "_blank"))
+                                                   :className "inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-colors cursor-pointer shadow-sm"}
+                                          "View"
+                                          ($ ArrowTopRightOnSquareIcon {:className "h-3 w-3"})))))))
 
                            ;; 2. The Body: Replace all specific logic with the generic viewer
                            ($ :div {:className "text-xs text-sky-600 mt-1"}
