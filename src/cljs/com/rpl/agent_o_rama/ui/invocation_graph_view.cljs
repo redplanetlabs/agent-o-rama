@@ -157,7 +157,8 @@
 
 (defui expandable-list-component [{:keys [items color title-singular truncate-length depth]
                                    :or {truncate-length 50 depth 0}}]
-  ($ :div {:className (str "text-" color "-500 space-y-1")}
+  ($ :div {:className (str "text-" color "-500 space-y-1 rounded-sm")
+           :style {:background-color "rgba(0, 0, 0, 0.01)"}}
      (for [[idx item] (map-indexed vector items)]
        ($ :div {:key idx
                 :className "flex items-start gap-2"}
@@ -206,7 +207,8 @@
 
       ;; Case 1: The data is a map. Render its key-value pairs.
       (map? data)
-      ($ :div {:className "mt-1 space-y-1 pl-2 border-l border-gray-200"}
+      ($ :div {:className "mt-1 space-y-1 pl-2 border-l border-gray-200 rounded-sm"
+               :style {:background-color "rgba(0, 0, 0, 0.01)"}}
          (for [[k v] (sort-by key data)]
            ($ :div {:key (str k)}
               ($ :div {:className "flex items-start gap-1"}
@@ -249,7 +251,7 @@
         has-paginated (:has-paginated-children data)
 
         hr (:human-request data)
-        
+
         hr-invoke-id (when hr (:invoke-id hr))
         hitl-response (state/use-sub (if hr-invoke-id
                                        [:ui :hitl :responses (s/keypath hr-invoke-id)]
@@ -307,7 +309,6 @@
                                          :color "blue"
                                          :truncate-length 100
                                          :depth 0})))
-
 
             (when (seq exceptions)
               ($ :div {:className "bg-red-50 p-3 rounded-md mt-4 border border-red-200"}
