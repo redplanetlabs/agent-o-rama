@@ -157,11 +157,11 @@
 
 (defui expandable-list-component [{:keys [items color title-singular truncate-length depth]
                                    :or {truncate-length 50 depth 0}}]
-  ($ :div {:className (str "text-" color "-500 mt-1 space-y-1")}
+  ($ :div {:className (str "text-" color "-500 space-y-1")}
      (for [[idx item] (map-indexed vector items)]
        ($ :div {:key idx
                 :className "flex items-start gap-2"}
-          ($ :span {:className (str "text-" color "-400 text-xs flex-shrink-0 mt-0.5")}
+          ($ :span {:className (str "text-" color "-400 text-xs flex-shrink-0")}
              (str (inc idx) "."))
           ;; Recursively render each item using the generic viewer
           ($ :div {:className "flex-1"}
