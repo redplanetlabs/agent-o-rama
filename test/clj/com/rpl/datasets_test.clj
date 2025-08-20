@@ -563,6 +563,7 @@
          (create-and-wait! manager
                            "Dataset 8"))
 
+       (is (not= ds-id1 ds-id2 ds-id3 ds-id4 ds-id5 ds-id6 ds-id7 ds-id8))
 
        (doseq [[s query-amt amt] [["dataset" 3 3]
                                   ["is a" 3 2]
