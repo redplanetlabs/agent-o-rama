@@ -227,10 +227,6 @@
                                     :title "Value Details"
                                     :truncate-length truncate-length}))))
 
-(defui agent-call-op-component [{:keys [info]}]
-  ;; Just render the generic details of the operation
-  ($ generic-data-viewer {:data info :color "sky" :depth 0}))
-
 (defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes module-id agent-name invoke-id]}]
   (let [data (when selected-node
                (js->clj (.-data selected-node) :keywordize-keys true))
@@ -402,12 +398,7 @@
 
                            ;; 2. The Body: Replace all specific logic with the generic viewer
                            ($ :div {:className "text-xs text-sky-600 mt-1"}
-                              (do
-                                (println "DEBUG: op-type is" op-type "type:" (type op-type))
-                                (case (keyword op-type)
-                                  :agent-call ($ agent-call-op-component {:info info})
-                                  ;; Default case for all other operations
-                                  ($ generic-data-viewer {:data info :color "sky" :depth 0}))))))))))
+                              ($ generic-data-viewer {:data info :color "sky" :depth 0}))))))))
 
             (when (and emits (> (count emits) 0))
               ($ :div {:className "mt-4 bg-purple-50 p-3 rounded-md"}
