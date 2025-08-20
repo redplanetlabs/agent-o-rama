@@ -91,7 +91,7 @@ public class TestModules {
                 })
               .node(
                 "model",
-                "agg",
+                List.of("agg"),
                 BasicToolsOpenAIAgent::doModelCall)
               .aggNode(
                 "agg",

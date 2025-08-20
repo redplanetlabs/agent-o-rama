@@ -5,7 +5,7 @@
                  [com.rpl/agent-o-rama "0.9.0-SNAPSHOT"]
                  [dev.langchain4j/langchain4j-open-ai "1.2.0"]
                  [dev.langchain4j/langchain4j-web-search-engine-tavily
-                  "1.2.0-beta8"]
+                  "1.3.0-beta9"]
                  [http-kit "2.8.0"]]
   :test-paths ["test" "../../test/clj"]
   :global-vars {*warn-on-reflection* true}
@@ -35,4 +35,4 @@
                         [[com.rpl/rama "0.0.6-SNAPSHOT"]
                          [org.apache.logging.log4j/log4j-slf4j18-impl
                           "2.16.0"]]}}
-  )
+)

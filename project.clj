@@ -9,11 +9,13 @@
              "-XX:MetaspaceSize=500000000"
              ;; this gives us stack traces directly in output instead of an edn
              ;; file in tmp, which will be lost on CI
-             "-Dclojure.main.report=stderr"]
+             "-Dclojure.main.report=stderr"
+             ;; allow termination of threads
+             "-Djdk.attach.allowAttachSelf"]
   :dependencies [[org.clojure/clojure "1.12.0"]
                  [com.rpl/rama-helpers "0.10.0"]
                  [dev.langchain4j/langchain4j
-                  "1.2.0"
+                  "1.3.0"
                   :exclusions
                   [org.slf4j/slf4j-api]]
 
@@ -39,9 +41,9 @@
                         :java-source-paths ["src/java" "test/java"]
                         :dependencies
                         [[meander/epsilon "0.0.650"]
-                         [dev.langchain4j/langchain4j-open-ai "1.2.0"]
+                         [dev.langchain4j/langchain4j-open-ai "1.3.0"]
                          [dev.langchain4j/langchain4j-web-search-engine-tavily
-                          "1.2.0-beta8"]]}
+                          "1.3.0-beta9"]]}
              :provided {:dependencies
                         ;; TODO: fix Rama version
                         [[com.rpl/rama "0.0.6-SNAPSHOT"]
