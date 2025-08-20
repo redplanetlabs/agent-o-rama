@@ -623,69 +623,41 @@
 
 
        ;; TODO: <<<<>>>>
-       ;;  - all this should be through the client API
        ;; (defn get-dataset-properties [datasets-pstate dataset-id]
        ;; (defn get-dataset-snapshot-names [datasets-pstate dataset-id]
        ;; (defn get-dataset-examples-page
        ;;   [datasets-pstate dataset-id snapshot-name amt pagination-params]
-       ;; - UpdateDatasetProperty
-       ;; - DestroyDataset
-       ;; - AddDatasetExample
-       ;; - UpdateDatasetExample
-       ;; - RemoveDatasetExample
-       ;; - AddDatasetExampleTag
-       ;; - RemoveDatasetExampleTag
-       ;; - DatasetSnapshot
-       ;; - RemoveDatasetSnapshot
-       ;; - declare-get-datasets-page-topology
       ))))
-
-; (drp/defrecord+ UpdateDatasetProperty
-;   [dataset-id :- UUID
-;    key :- clojure.lang.Keyword
-;    value :- Object])
-;
-; (drp/defrecord+ DestroyDataset
-;   [dataset-id :- UUID])
-;
-; (drp/defrecord+ AddDatasetExample
-;   [dataset-id :- UUID
-;    snapshot-name :- (s/maybe String)
-;    example-id :- UUID
-;    input :- [Object]
-;    reference-output :- Object
-;    tags :- (s/maybe #{String})
-;   ])
-;
-; (drp/defrecord+ UpdateDatasetExample
-;   [dataset-id :- UUID
-;    snapshot-name :- (s/maybe String)
-;    example-id :- UUID
-;    key :- clojure.lang.Keyword
-;    value :- Object])
-;
-; (drp/defrecord+ RemoveDatasetExample
-;   [dataset-id :- UUID
-;    snapshot-name :- (s/maybe String)
-;    example-id :- UUID])
-;
-; (drp/defrecord+ AddDatasetExampleTag
-;   [dataset-id :- UUID
-;    snapshot-name :- (s/maybe String)
-;    example-id :- UUID
-;    tag :- String])
-;
-; (drp/defrecord+ RemoveDatasetExampleTag
-;   [dataset-id :- UUID
-;    snapshot-name :- (s/maybe String)
-;    example-id :- UUID
-;    tag :- String])
-;
-; (drp/defrecord+ DatasetSnapshot
-;   [dataset-id :- UUID
-;    from-snapshot-name :- (s/maybe String)
-;    to-snapshot-name :- String])
-;
-; (drp/defrecord+ RemoveDatasetSnapshot
-;   [dataset-id :- UUID
-;    snapshot-name :- String])
+; (defn create-dataset!
+;   ([manager name
+;   ([^AgentManager manager name options]
+; (defn set-dataset-name!
+;   [^AgentManager manager dataset-id name]
+; (defn set-dataset-description!
+;   [^AgentManager manager dataset-id description]
+; (defn destroy-dataset!
+;   [^AgentManager manager dataset-id]
+; (defn add-dataset-example!
+;   ([manager dataset-id input]
+;   ([^AgentManager manager dataset-id input options]
+; (defn set-dataset-example-input!
+;   ([manager dataset-id example-id input]
+;   ([^AgentManager manager dataset-id example-id input options]
+; (defn set-dataset-example-reference-output!
+;   ([manager dataset-id example-id reference-output]
+;   ([^AgentManager manager dataset-id example-id reference-output options]
+; (defn remove-dataset-example!
+;   ([manager dataset-id example-id]
+;   ([^AgentManager manager dataset-id example-id options]
+; (defn add-dataset-example-tag!
+;   ([manager dataset-id example-id tag]
+;   ([^AgentManager manager dataset-id example-id tag options]
+; (defn remove-dataset-example-tag!
+;   ([manager dataset-id example-id tag]
+;   ([^AgentManager manager dataset-id example-id tag options]
+; (defn snapshot-dataset!
+;   [^AgentManager manager dataset-id from-snapshot to-snapshot]
+; (defn remove-dataset-snapshot!
+;   [^AgentManager manager dataset-id snapshot-name]
+; (defn search-datasets
+;   [^AgentManager manager search-string limit]
