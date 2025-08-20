@@ -526,91 +526,6 @@
                      ($ :pre {:className "mt-1 p-2 bg-gray-100 rounded text-gray-700 whitespace-pre-wrap"}
                         (to-pretty-json original-input))))))))))
 
-(defui info-panel [{:keys [graph-data summary-data module-id agent-name task-id forks fork-of]}]
-  (let [result (:result summary-data)
-        failure? (:failure? result)
-        result-val (:val result)]
-
-    ($ :div {:className "space-y-4"}
-
-       ;; Lineage Panel
-       ($ lineage-panel {:module-id module-id
-                         :agent-name agent-name
-                         :task-id task-id
-                         :forks forks
-                         :fork-of fork-of})
-
-       ;; NEW: Final Result Panel
-       (when result
-         ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
-            ($ :div {:className "flex justify-between items-center mb-2"}
-               ($ :div {:className "text-sm font-medium text-gray-700"} "Final Result")
-               (if failure?
-                 ($ :span {:className "px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium"} "Failed")
-                 ($ :span {:className "px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium"} "Success")))
-            ($ generic-data-viewer {:data result-val
-                                    :color (if failure? "red" "green")
-                                    :truncate-length 100
-                                    :depth 0})))
-
-       ($ :div {:className "text-sm font-medium text-gray-700 pt-2 border-t border-gray-200"} "Overall Stats")
-
-       ;; Metrics grid
-       (let [total-nodes (count graph-data)
-             retry-count (:retry-num summary-data)
-             ;; Dummy values for now
-             total-execution-time 2347
-             total-tokens 45892
-             store-reads 127
-             store-writes 23
-             model-calls 156]
-         ($ :div {:className "grid grid-cols-1 gap-3"}
-          ;; Execution time
-            ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
-               ($ :div {:className "flex justify-between items-center"}
-                  ($ :div
-                     ($ :div {:className "text-sm font-medium text-gray-700"} "Execution Time"))
-                  ($ :div {:className "text-right"}
-                     ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-execution-time) "ms")))))
-
-            ;; Retry count
-            (when (and retry-count (> retry-count 0))
-              ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
-                 ($ :div {:className "flex justify-between items-center"}
-                    ($ :div {:className "flex items-center gap-2"}
-                       ($ ArrowPathIcon {:className "h-4 w-4 text-gray-600"})
-                       ($ :div {:className "text-sm font-medium text-gray-700"} "Retries"))
-                    ($ :div {:className "text-right"}
-                       ($ :div {:className "text-lg font-bold text-gray-800"} retry-count)))))
-
-;; Store operations
-            ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
-               ($ :div
-                  ($ :div {:className "text-sm font-medium text-gray-700 mb-2"} "Store Operations")
-                  ($ :div {:className "flex justify-between items-center"}
-                     ($ :div
-                        ($ :div {:className "text-xs text-gray-600"} "Reads")
-                        ($ :div {:className "text-lg font-bold text-gray-800"} store-reads))
-                     ($ :div
-                        ($ :div {:className "text-xs text-gray-600"} "Writes")
-                        ($ :div {:className "text-lg font-bold text-gray-800"} store-writes)))))
-
-          ;; Model calls
-            ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
-               ($ :div {:className "flex justify-between items-center"}
-                  ($ :div
-                     ($ :div {:className "text-sm font-medium text-gray-700"} "Model Calls"))
-                  ($ :div {:className "text-right"}
-                     ($ :div {:className "text-lg font-bold text-gray-800"} model-calls))))
-
-          ;; Tokens
-            ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
-               ($ :div {:className "flex justify-between items-center"}
-                  ($ :div
-                     ($ :div {:className "text-sm font-medium text-gray-700"} "Tokens"))
-                  ($ :div {:className "text-right"}
-                     ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens)))))))))))
-
 (defui lineage-panel [{:keys [module-id agent-name task-id forks fork-of]}]
   (let [has-lineage? (or (seq forks) (some? fork-of))
         [show-all-forks set-show-all-forks] (useState false)
@@ -654,6 +569,91 @@
                          (if show-all-forks
                            "Show less"
                            (str "... show all (" (count forks) ")"))))))))))))
+
+(defui info-panel [{:keys [graph-data summary-data module-id agent-name task-id forks fork-of]}]
+  (let [result (:result summary-data)
+        failure? (:failure? result)
+        result-val (:val result)]
+
+    ($ :div {:className "space-y-4"}
+
+       ;; Lineage Panel
+       ($ lineage-panel {:module-id module-id
+                         :agent-name agent-name
+                         :task-id task-id
+                         :forks forks
+                         :fork-of fork-of})
+
+       ;; NEW: Final Result Panel
+       (when result
+         ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
+            ($ :div {:className "flex justify-between items-center mb-2"}
+               ($ :div {:className "text-sm font-medium text-gray-700"} "Final Result")
+               (if failure?
+                 ($ :span {:className "px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium"} "Failed")
+                 ($ :span {:className "px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium"} "Success")))
+            ($ generic-data-viewer {:data result-val
+                                    :color (if failure? "red" "green")
+                                    :truncate-length 100
+                                    :depth 0})))
+
+       ($ :div {:className "text-sm font-medium text-gray-700 pt-2 border-t border-gray-200"} "Overall Stats")
+
+       ;; Metrics grid
+       (let [total-nodes (count graph-data)
+             retry-count (:retry-num summary-data)
+             ;; Dummy values for now
+             total-execution-time 2347
+             total-tokens 45892
+             store-reads 127
+             store-writes 23
+             model-calls 156]
+         ($ :div {:className "grid grid-cols-1 gap-3"}
+            ;; Execution time
+            ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
+               ($ :div {:className "flex justify-between items-center"}
+                  ($ :div
+                     ($ :div {:className "text-sm font-medium text-gray-700"} "Execution Time"))
+                  ($ :div {:className "text-right"}
+                     ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-execution-time) "ms")))))
+
+            ;; Retry count
+            (when (and retry-count (> retry-count 0))
+              ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
+                 ($ :div {:className "flex justify-between items-center"}
+                    ($ :div {:className "flex items-center gap-2"}
+                       ($ ArrowPathIcon {:className "h-4 w-4 text-gray-600"})
+                       ($ :div {:className "text-sm font-medium text-gray-700"} "Retries"))
+                    ($ :div {:className "text-right"}
+                       ($ :div {:className "text-lg font-bold text-gray-800"} retry-count)))))
+
+            ;; Store operations
+            ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
+               ($ :div
+                  ($ :div {:className "text-sm font-medium text-gray-700 mb-2"} "Store Operations")
+                  ($ :div {:className "flex justify-between items-center"}
+                     ($ :div
+                        ($ :div {:className "text-xs text-gray-600"} "Reads")
+                        ($ :div {:className "text-lg font-bold text-gray-800"} store-reads))
+                     ($ :div
+                        ($ :div {:className "text-xs text-gray-600"} "Writes")
+                        ($ :div {:className "text-lg font-bold text-gray-800"} store-writes)))))
+
+            ;; Model calls
+            ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
+               ($ :div {:className "flex justify-between items-center"}
+                  ($ :div
+                     ($ :div {:className "text-sm font-medium text-gray-700"} "Model Calls"))
+                  ($ :div {:className "text-right"}
+                     ($ :div {:className "text-lg font-bold text-gray-800"} model-calls))))
+
+            ;; Tokens
+            ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
+               ($ :div {:className "flex justify-between items-center"}
+                  ($ :div
+                     ($ :div {:className "text-sm font-medium text-gray-700"} "Tokens"))
+                  ($ :div {:className "text-right"}
+                     ($ :div {:className "text-lg font-bold text-gray-800"} (str (.toLocaleString total-tokens)))))))))))
 
 (defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live
                             module-id agent-name task-id forks fork-of]}]
