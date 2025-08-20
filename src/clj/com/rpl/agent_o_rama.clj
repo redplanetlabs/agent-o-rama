@@ -335,57 +335,75 @@
      (getAgentNames [this]
        (foreign-invoke-query agent-names-query))
      (getAgentClient [this agentName]
-       (let [agents-set           (foreign-invoke-query agent-names-query)
+       (let [agents-set            (foreign-invoke-query agent-names-query)
              _ (when-not (contains? agents-set agentName)
                  (throw (h/ex-info "Agent does not exist"
                                    {:available  agents-set
                                     :agent-name agentName})))
-             agent-depot          (foreign-depot cluster
-                                                 module-name
-                                                 (po/agent-depot-name
-                                                  agentName))
-             human-depot          (foreign-depot cluster
-                                                 module-name
-                                                 (po/agent-human-depot-name
-                                                  agentName))
-             agent-config-depot   (foreign-depot cluster
-                                                 module-name
-                                                 (po/agent-config-depot-name
-                                                  agentName))
-             config-pstate        (foreign-pstate
-                                   cluster
-                                   module-name
-                                   (po/agent-config-task-global-name agentName))
-             root-pstate          (foreign-pstate
-                                   cluster
-                                   module-name
-                                   (po/agent-root-task-global-name agentName))
-             streaming-pstate     (foreign-pstate
-                                   cluster
-                                   module-name
-                                   (po/agent-streaming-results-task-global-name
-                                    agentName))
-             graph-history-pstate (foreign-pstate
-                                   cluster
-                                   module-name
-                                   (po/graph-history-task-global-name
-                                    agentName))
-             tracing-query        (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/tracing-query-name
-                                    agentName))
-             invokes-page-query   (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/agent-get-invokes-page-query-name
-                                    agentName))
+             agent-depot           (foreign-depot cluster
+                                                  module-name
+                                                  (po/agent-depot-name
+                                                   agentName))
+             human-depot           (foreign-depot cluster
+                                                  module-name
+                                                  (po/agent-human-depot-name
+                                                   agentName))
+             agent-config-depot    (foreign-depot cluster
+                                                  module-name
+                                                  (po/agent-config-depot-name
+                                                   agentName))
 
-             current-graph-query  (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/agent-get-current-graph-name
-                                    agentName))]
+             datasets-depot        (foreign-depot cluster
+                                                  module-name
+                                                  (po/datasets-depot-name))
+             config-pstate         (foreign-pstate
+                                    cluster
+                                    module-name
+                                    (po/agent-config-task-global-name
+                                     agentName))
+             root-pstate           (foreign-pstate
+                                    cluster
+                                    module-name
+                                    (po/agent-root-task-global-name agentName))
+             streaming-pstate      (foreign-pstate
+                                    cluster
+                                    module-name
+                                    (po/agent-streaming-results-task-global-name
+                                     agentName))
+             graph-history-pstate  (foreign-pstate
+                                    cluster
+                                    module-name
+                                    (po/graph-history-task-global-name
+                                     agentName))
+             datasets-pstate       (foreign-pstate
+                                    cluster
+                                    module-name
+                                    (po/datasets-task-global-name))
+             tracing-query         (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/tracing-query-name
+                                     agentName))
+             invokes-page-query    (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/agent-get-invokes-page-query-name
+                                     agentName))
+
+             current-graph-query   (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/agent-get-current-graph-name
+                                     agentName))
+
+             datasets-page-query   (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/get-datasets-page-query-name))
+             datasets-search-query (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/search-datasets-name))]
          (reify
           AgentClient
           (invoke [this args]
@@ -563,15 +581,18 @@
              node
              callback-fn))
           (underlying-objects [this]
-            {:agent-depot          agent-depot
-             :agent-config-depot   agent-config-depot
-             :config-pstate        config-pstate
-             :root-pstate          root-pstate
-             :streaming-pstate     streaming-pstate
-             :graph-history-pstate graph-history-pstate
-             :tracing-query        tracing-query
-             :invokes-page-query   invokes-page-query
-             :current-graph-query  current-graph-query
+            {:agent-depot           agent-depot
+             :agent-config-depot    agent-config-depot
+             :config-pstate         config-pstate
+             :root-pstate           root-pstate
+             :streaming-pstate      streaming-pstate
+             :graph-history-pstate  graph-history-pstate
+             :datasets-pstate       datasets-pstate
+             :tracing-query         tracing-query
+             :invokes-page-query    invokes-page-query
+             :current-graph-query   current-graph-query
+             :datasets-page-query   datasets-page-query
+             :datasets-search-query datasets-search-query
             })
          ))))))
 
