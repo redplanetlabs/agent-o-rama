@@ -329,81 +329,80 @@
             (throw (h/ex-info e
                               "Module does not host agents"
                               {:module-name module-name}))
-          ))]
+          ))
+
+        datasets-depot        (foreign-depot cluster
+                                             module-name
+                                             (po/datasets-depot-name))
+        datasets-pstate       (foreign-pstate
+                               cluster
+                               module-name
+                               (po/datasets-task-global-name))
+        datasets-page-query   (foreign-query
+                               cluster
+                               module-name
+                               (queries/get-datasets-page-query-name))
+        datasets-search-query (foreign-query
+                               cluster
+                               module-name
+                               (queries/search-datasets-name))]
     (reify
      AgentManager
      (getAgentNames [this]
        (foreign-invoke-query agent-names-query))
      (getAgentClient [this agentName]
-       (let [agents-set            (foreign-invoke-query agent-names-query)
+       (let [agents-set           (foreign-invoke-query agent-names-query)
              _ (when-not (contains? agents-set agentName)
                  (throw (h/ex-info "Agent does not exist"
                                    {:available  agents-set
                                     :agent-name agentName})))
-             agent-depot           (foreign-depot cluster
-                                                  module-name
-                                                  (po/agent-depot-name
-                                                   agentName))
-             human-depot           (foreign-depot cluster
-                                                  module-name
-                                                  (po/agent-human-depot-name
-                                                   agentName))
-             agent-config-depot    (foreign-depot cluster
-                                                  module-name
-                                                  (po/agent-config-depot-name
-                                                   agentName))
+             agent-depot          (foreign-depot cluster
+                                                 module-name
+                                                 (po/agent-depot-name
+                                                  agentName))
+             human-depot          (foreign-depot cluster
+                                                 module-name
+                                                 (po/agent-human-depot-name
+                                                  agentName))
+             agent-config-depot   (foreign-depot cluster
+                                                 module-name
+                                                 (po/agent-config-depot-name
+                                                  agentName))
+             config-pstate        (foreign-pstate
+                                   cluster
+                                   module-name
+                                   (po/agent-config-task-global-name
+                                    agentName))
+             root-pstate          (foreign-pstate
+                                   cluster
+                                   module-name
+                                   (po/agent-root-task-global-name agentName))
+             streaming-pstate     (foreign-pstate
+                                   cluster
+                                   module-name
+                                   (po/agent-streaming-results-task-global-name
+                                    agentName))
+             graph-history-pstate (foreign-pstate
+                                   cluster
+                                   module-name
+                                   (po/graph-history-task-global-name
+                                    agentName))
+             tracing-query        (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/tracing-query-name
+                                    agentName))
+             invokes-page-query   (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/agent-get-invokes-page-query-name
+                                    agentName))
 
-             datasets-depot        (foreign-depot cluster
-                                                  module-name
-                                                  (po/datasets-depot-name))
-             config-pstate         (foreign-pstate
-                                    cluster
-                                    module-name
-                                    (po/agent-config-task-global-name
-                                     agentName))
-             root-pstate           (foreign-pstate
-                                    cluster
-                                    module-name
-                                    (po/agent-root-task-global-name agentName))
-             streaming-pstate      (foreign-pstate
-                                    cluster
-                                    module-name
-                                    (po/agent-streaming-results-task-global-name
-                                     agentName))
-             graph-history-pstate  (foreign-pstate
-                                    cluster
-                                    module-name
-                                    (po/graph-history-task-global-name
-                                     agentName))
-             datasets-pstate       (foreign-pstate
-                                    cluster
-                                    module-name
-                                    (po/datasets-task-global-name))
-             tracing-query         (foreign-query
-                                    cluster
-                                    module-name
-                                    (queries/tracing-query-name
-                                     agentName))
-             invokes-page-query    (foreign-query
-                                    cluster
-                                    module-name
-                                    (queries/agent-get-invokes-page-query-name
-                                     agentName))
-
-             current-graph-query   (foreign-query
-                                    cluster
-                                    module-name
-                                    (queries/agent-get-current-graph-name
-                                     agentName))
-
-             datasets-page-query   (foreign-query
-                                    cluster
-                                    module-name
-                                    (queries/get-datasets-page-query-name))
-             datasets-search-query (foreign-query
-                                    cluster
-                                    module-name
-                                    (queries/search-datasets-name))]
+             current-graph-query  (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/agent-get-current-graph-name
+                                    agentName))]
          (reify
           AgentClient
           (invoke [this args]
@@ -448,7 +447,6 @@
                               aor-types/AGENTS-TOPOLOGY-NAME}]
                (aor-types/->AgentInvokeImpl agent-task-id agent-id)
              )))
-
 
           (nextStep [this agent-invoke]
             (.get (.nextStepAsync this agent-invoke)))
@@ -519,8 +517,6 @@
                             new-chunks
                             reset?
                             complete?)))))
-
-
           (streamAll [this agent-invoke node]
             (.streamAll this agent-invoke node nil))
           (streamAll [this agent-invoke node stream-all-callback]
@@ -580,21 +576,119 @@
              agent-invoke
              node
              callback-fn))
+          aor-types/UnderlyingObjects
           (underlying-objects [this]
-            {:agent-depot           agent-depot
-             :agent-config-depot    agent-config-depot
-             :config-pstate         config-pstate
-             :root-pstate           root-pstate
-             :streaming-pstate      streaming-pstate
-             :graph-history-pstate  graph-history-pstate
-             :datasets-pstate       datasets-pstate
-             :tracing-query         tracing-query
-             :invokes-page-query    invokes-page-query
-             :current-graph-query   current-graph-query
-             :datasets-page-query   datasets-page-query
-             :datasets-search-query datasets-search-query
+            {:agent-depot          agent-depot
+             :agent-config-depot   agent-config-depot
+             :config-pstate        config-pstate
+             :root-pstate          root-pstate
+             :streaming-pstate     streaming-pstate
+             :graph-history-pstate graph-history-pstate
+             :tracing-query        tracing-query
+             :invokes-page-query   invokes-page-query
+             :current-graph-query  current-graph-query
             })
-         ))))))
+         )))
+     (createDataset [this name description inputJsonSchema outputJsonSchema]
+       (let [uuid (h/random-uuid7)
+
+             {error aor-types/AGENTS-TOPOLOGY-NAME}
+             (foreign-append!
+              datasets-depot
+              (aor-types/->valid-CreateDataset uuid
+                                               name
+                                               description
+                                               inputJsonSchema
+                                               outputJsonSchema))]
+         (when error
+           (throw (h/ex-info "Error creating dataset" {:info error})))
+         uuid))
+     (setDatasetName [this datasetId name]
+       (foreign-append!
+        datasets-depot
+        (aor-types/->valid-UpdateDatasetProperty datasetId :name name)))
+     (setDatasetDescription [this datasetId description]
+       (foreign-append!
+        datasets-depot
+        (aor-types/->valid-UpdateDatasetProperty datasetId
+                                                 :description
+                                                 description)))
+     (destroyDataset [this datasetId]
+       (foreign-append!
+        datasets-depot
+        (aor-types/->valid-DestroyDataset datasetId)))
+     (addDatasetExample [this datasetId snapshotName input referenceOutput tags]
+       (let [uuid (h/random-uuid7)
+             {error aor-types/AGENTS-TOPOLOGY-NAME}
+             (foreign-append!
+              datasets-depot
+              (aor-types/->valid-AddDatasetExample datasetId
+                                                   snapshotName
+                                                   uuid
+                                                   input
+                                                   referenceOutput
+                                                   (into #{} tags)))]
+         (when error
+           (throw (h/ex-info "Error adding example" {:info error})))
+         uuid))
+     (setDatasetExampleInput [this datasetId snapshotName exampleId input]
+       (foreign-append!
+        datasets-depot
+        (aor-types/->valid-UpdateDatasetExample datasetId
+                                                snapshotName
+                                                exampleId
+                                                :input
+                                                input)))
+     (setDatasetExampleReferenceOutput
+       [this datasetId snapshotName exampleId referenceOutput]
+       (foreign-append!
+        datasets-depot
+        (aor-types/->valid-UpdateDatasetExample datasetId
+                                                snapshotName
+                                                exampleId
+                                                :reference-output
+                                                referenceOutput)))
+     (removeDatasetExample [this datasetId snapshotName exampleId]
+       (foreign-append!
+        datasets-depot
+        (aor-types/->valid-RemoveDatasetExample datasetId
+                                                snapshotName
+                                                exampleId)))
+     (addDatasetExampleTag [this datasetId snapshotName exampleId tag]
+       (foreign-append!
+        datasets-depot
+        (aor-types/->valid-AddDatasetExampleTag datasetId
+                                                snapshotName
+                                                exampleId
+                                                tag)))
+     (removeDatasetExampleTag [this datasetId snapshotName exampleId tag]
+       (foreign-append!
+        datasets-depot
+        (aor-types/->valid-RemoveDatasetExampleTag datasetId
+                                                   snapshotName
+                                                   exampleId
+                                                   tag)))
+     (snapshotDataset [this datasetId fromSnapshotName toSnapshotName]
+       (foreign-append!
+        datasets-depot
+        (aor-types/->valid-DatasetSnapshot datasetId
+                                           fromSnapshotName
+                                           toSnapshotName)))
+     (removeDatasetSnapshot [this datasetId snapshotName]
+       (foreign-append!
+        datasets-depot
+        (aor-types/->valid-RemoveDatasetSnapshot datasetId
+                                                 snapshotName)))
+     (searchDatasets [this searchString limit]
+       (foreign-invoke-query datasets-search-query searchString limit))
+     (close [this]
+       (close! datasets-depot))
+     aor-types/UnderlyingObjects
+     (underlying-objects [this]
+       {:datasets-pstate       datasets-pstate
+        :datasets-page-query   datasets-page-query
+        :datasets-search-query datasets-search-query
+       }))))
 
 (defn agent-client
   ^AgentClient [^IFetchAgentClient agent-client-fetcher agent-name]
@@ -712,6 +806,24 @@
   ^CompletableFuture
   [^AgentClient client request response]
   (.provideHumanInputAsync client request response))
+
+
+
+;; TODO: <<<<>>>>> clojure API versions
+; (createDataset [this name description inputJsonSchemaoutputJsonSchema]
+; (setDatasetName [this datasetId name]
+; (setDatasetDescription [this datasetId description]
+; (destroyDataset [this datasetId]
+; (addDatasetExample [this datasetId snapshotName input referenceOutput tags]
+; (setDatasetExampleInput [this datasetId snapshotName exampleId input]
+; (setDatasetExampleReferenceOutput [this datasetId snapshotName exampleId referenceOutput]
+; (removeDatasetExample [this datasetId snapshotName exampleId]
+; (addDatasetExampleTag [this datasetId snapshotName exampleId tag]
+; (removeDatasetExampleTag [this datasetId snapshotName exampleId tag]
+; (snapshotDataset [this datasetId fromSnapshotName toSnapshotName]
+; (removeDatasetSnapshot [this datasetId snapshotName]
+; (searchDatasets [this searchString limit]
+
 
 (defn start-ui
   (^AutoCloseable [ipc] (start-ui ipc nil))

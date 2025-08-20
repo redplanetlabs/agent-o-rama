@@ -305,14 +305,16 @@
 
 ;; Internal protocols
 
+(defprotocol UnderlyingObjects
+  (underlying-objects [this]))
+
 (defprotocol AgentsTopologyInternal
   (declare-agent-object-builder-internal [this name afn options]))
 
 (defprotocol AgentClientInternal
   (stream-internal [this agent-invoke node callback-fn])
   (stream-specific-internal [this agent-invoke node node-invoke-id callback-fn])
-  (stream-all-internal [this agent-invoke node callback-fn])
-  (underlying-objects [this]))
+  (stream-all-internal [this agent-invoke node callback-fn]))
 
 
 ;; Configs

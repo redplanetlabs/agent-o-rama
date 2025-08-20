@@ -6,10 +6,28 @@ import com.rpl.agentorama.impl.AORHelpers;
 import com.rpl.agentorama.impl.IFetchAgentClient;
 import com.rpl.rama.cluster.ClusterManagerBase;
 
-public interface AgentManager extends IFetchAgentClient {
+import java.io.Closeable;
+import java.util.*;
+
+public interface AgentManager extends IFetchAgentClient, Closeable {
   public static AgentManager create(ClusterManagerBase cluster, String moduleName) {
     return (AgentManager) AORHelpers.CREATE_AGENT_MANAGER.invoke(cluster, moduleName);
   }
 
   Set<String> getAgentNames();
+
+  // datasets
+  UUID createDataset(String name, String description, String inputJsonSchema, String outputJsonSchema);
+  void setDatasetName(UUID datasetId, String name);
+  void setDatasetDescription(UUID datasetId, String description);
+  void destroyDataset(UUID datasetId);
+  UUID addDatasetExample(UUID datasetId, String snapshotName, Object input, Object referenceOutput, Set<String> tags);
+  void setDatasetExampleInput(UUID datasetId, String snapshotName, UUID exampleId, Object input);
+  void setDatasetExampleReferenceOutput(UUID datasetId, String snapshotName, UUID exampleId, Object referenceOutput);
+  void removeDatasetExample(UUID datasetId, String snapshotName, UUID exampleId);
+  void addDatasetExampleTag(UUID datasetId, String snapshotName, UUID exampleId, String tag);
+  void removeDatasetExampleTag(UUID datasetId, String snapshotName, UUID exampleId, String tag);
+  void snapshotDataset(UUID datasetId, String fromSnapshotName, String toSnapshotName);
+  void removeDatasetSnapshot(UUID datasetId, String snapshotName);
+  Map<UUID, String> searchDatasets(String searchString, int limit);
 }
