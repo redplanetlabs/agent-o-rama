@@ -230,7 +230,7 @@
 (defui agent-call-op-component [{:keys [info]}]
   (let [[location navigate] (wouter/useLocation)
         ;; The invocation data location depends on the operation type
-        invoke-data (if (= (:op info) :initiate)
+        invoke-data (if (= (str (:op info)) "initiate")
                       (:result info)
                       (:agent-invoke info))
         task-id (:task-id invoke-data)
@@ -248,6 +248,7 @@
                           "/invocations/" task-id "-" agent-invoke-id))]
 
     (println "DEBUG agent-call-op-component:"
+             "op:" (:op info)
              "info:" info
              "invoke-data:" invoke-data
              ":result" (:result info)
@@ -266,9 +267,8 @@
        ;; Then, add the navigation button if a valid URL can be constructed
        (when target-url
          ($ :div {:className "mt-2"}
-            ($ wouter/Link {:href target-url
-                            :target "_blank"
-                            :className "inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors cursor-pointer shadow-sm"}
+            ($ :button {:onClick (fn [] (js/window.open target-url "_blank"))
+                        :className "inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors cursor-pointer shadow-sm"}
                "View Sub-Invocation"
                ($ ArrowTopRightOnSquareIcon {:className "h-4 w-4"})))))))
 
