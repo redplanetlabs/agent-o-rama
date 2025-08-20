@@ -370,7 +370,7 @@
           ;; a valid instance should pass
           (is (empty?
                (datasets/validate S
-                                  {"id"      (java.util.UUID/randomUUID)
+                                  {"id"      (h/random-uuid7)
                                    "name"    "Alice"
                                    "contact" nil
                                    "tags"    ["a" "b"]
@@ -408,6 +408,96 @@
                       "{\"type\":\"array\",\"items\":[{\"type\":\"string\"}]}")]
       (is (err? bad-schema))
       (is (re-find #"Invalid JSON schema" (:error bad-schema))))))
+
+
+(deftest validate-with-schema*-happy-path
+  (let [schema (datasets/normalize-json-schema*
+                (str
+                 "{"
+                 "\"type\":\"object\","
+                 "\"properties\":{"
+                 "  \"id\":{\"x-javaType\":\"java.util.UUID\"},"
+                 "  \"name\":{\"type\":\"string\"},"
+                 "  \"owner\":{\"x-javaType\":\"com.rpl.datasets_test.Person\"}"
+                 "},"
+                 "\"required\":[\"id\",\"name\",\"owner\"]"
+                 "}"))
+        ; normalize returns a JSON string; ensure it is so
+        _ (is (string? schema))
+        result (datasets/validate-with-schema*
+                schema
+                {"id"    (h/random-uuid7)
+                 "name"  "ok"
+                 "owner" (->Person "A" 1)})]
+    (is (nil? result))))
+
+(deftest validate-with-schema*-invalid-json-schema_string
+  (let [err (datasets/validate-with-schema* "{" {"x" 1})]
+    (is (string? err))
+    (is (h/contains-string? err "Invalid JSON schema"))))
+
+(deftest validate-with-schema*-compile-error
+  ;; 2020-12: tuple via items[] is invalid → compile-time schema error
+  (let
+    [bad
+     (datasets/normalize-json-schema*
+      "{\"type\":\"array\",\"items\":[{\"type\":\"string\"},{\"type\":\"number\"}]}")]
+    (is (map? bad)) ; normalize should already reject, but if it slipped
+                    ; through:
+    (let [err (datasets/validate-with-schema*
+               "{\"type\":\"array\",\"items\":[{\"type\":\"string\"}]}"
+               ["a" "b"])]
+      (is (string? err))
+      (is (h/contains-string? err "Failed to compile or apply schema")))))
+
+(deftest validate-with-schema*-validation-errors
+  ;; mix regular JSON Schema + x-javaType errors; expect non-nil error string
+  (let
+    [schema
+     (datasets/normalize-json-schema*
+      (str
+       "{"
+       "\"type\":\"object\","
+       "\"properties\":{"
+       "  \"id\":{\"x-javaType\":\"java.util.UUID\"},"
+       "  \"age\":{\"type\":\"integer\",\"minimum\":0},"
+       "  \"tags\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"uniqueItems\":true}"
+       "},"
+       "\"required\":[\"id\",\"age\"]"
+       "}"))
+     err    (datasets/validate-with-schema*
+             schema
+             {"id"   "not-a-uuid"
+              "age"  (int -1)
+              "tags" ["dup" "dup"]})]
+    (is (string? err))
+    (is (h/contains-string? err "x-javaType: $.id"))
+    (is (h/contains-string? err "minimum"))
+    (is (h/contains-string? err "unique"))))
+
+(deftest validate-with-schema*-pojo-vs-json
+  ;; Ensure POJO leaf is validated via x-javaType, while JSON types still work
+  (let [schema
+        (datasets/normalize-json-schema*
+         (str
+          "{"
+          "\"type\":\"object\","
+          "\"properties\":{"
+          "  \"owner\":{\"x-javaType\":\"com.rpl.datasets_test.Person\"},"
+          "  \"name\":{\"type\":\"string\"}"
+          "},"
+          "\"required\":[\"owner\",\"name\"]"
+          "}"))]
+    (is (nil? (datasets/validate-with-schema*
+               schema
+               {"owner" (->Person "Zed" 42)
+                "name"  "ok"})))
+    (let [err (datasets/validate-with-schema*
+               schema
+               {"owner" {"name" "map-not-person"}
+                "name"  "ok"})]
+      (is (string? err))
+      (is (h/contains-string? err "x-javaType: $.owner")))))
 
 (deftest dataset-operations-test
   (with-redefs [queries/search-pagination-size (constantly 2)]

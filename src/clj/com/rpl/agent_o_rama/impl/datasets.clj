@@ -2,6 +2,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama path])
   (:require
+   [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
@@ -184,8 +185,6 @@
   [^JsonSchema s data]
   (.validate s (wrap-pojos data)))
 
-;; TODO: <<<<>>>> need first class API with agent-manager, which UI will use
-
 (defn normalize-json-schema*
   [json-schema]
   (try
@@ -233,10 +232,38 @@
    (else>)
     (:>)))
 
+(defn validate-with-schema*
+  [^String json-schema value]
+  (try
+    (let [^JsonNode schema-node (.readTree ^ObjectMapper MAPPER json-schema)
+          ^JsonSchema schema (.getSchema ^JsonSchemaFactory FACTORY schema-node)
+          errs (.validate schema (wrap-pojos value))]
+      (when (seq errs)
+        (str/join
+         "\n"
+         (mapv #(.getMessage ^ValidationMessage %) errs))))
+    (catch com.fasterxml.jackson.core.JsonProcessingException e
+      (str "Invalid JSON schema: " (h/throwable->str e)))
+    (catch Exception e
+      (str "Failed to compile or apply schema: " (h/throwable->str e)))))
+
+(deframaop validate-with-schema>
+  [*json-schema *value]
+  (<<if (some? *json-schema)
+    (validate-with-schema* *json-schema *value :> *res)
+    (<<if (some? *res)
+      (ack-return> *res)
+     (else>)
+      (:>))
+   (else>)
+    (:>)))
+
 (deframaop handle-datasets-op
   [{:keys [*dataset-id] :as *data}]
   (<<with-substitutions
    [$$datasets (po/datasets-task-global)]
+   (local-select> [(keypath *dataset-id) :props] $$datasets :> *props)
+   (filter> (or> (instance? CreateDataset *data) (some? *props)))
    (<<subsource *data
     (case> CreateDataset
            :> {:keys [*name *description *input-json-schema
@@ -264,8 +291,11 @@
     (case> AddDatasetExample
            :> {:keys [*snapshot-name *example-id *input *reference-output
                        *tags]})
-     ;; TODO: <<<<>>>> check schema for both input and reference-output (if it
-     ;; exists)
+     (get *props :input-json-schema :> *input-json-schema)
+     (get *props :output-json-schema :> *output-json-schema)
+     (validate-with-schema> *input-json-schema *input)
+     (<<if (some? *reference-output)
+       (validate-with-schema> *output-json-schema *reference-output))
      (local-transform>
       [(keypath *dataset-id :snapshots *snapshot-name *example-id)
        (termval
@@ -274,7 +304,16 @@
 
     (case> UpdateDatasetExample
            :> {:keys [*snapshot-name *example-id *key *value]})
-     ;; TODO: <<<<>>>> check schema if updating input/output
+     (<<cond
+      (case> (= *key :input))
+       (get *props :input-json-schema :> *input-json-schema)
+       (validate-with-schema> *input-json-schema *value)
+
+      (case> (= *key :reference-output))
+       (get *props :output-json-schema :> *output-json-schema)
+       (validate-with-schema> *output-json-schema *value)
+
+      (default>))
      (local-transform>
       [(keypath *dataset-id :snapshots *snapshot-name *example-id *key)
        (termval *value)]
