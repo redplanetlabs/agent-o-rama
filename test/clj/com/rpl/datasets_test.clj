@@ -591,7 +591,10 @@
        (bind items (vec (apply concat pages)))
        (is
         (= (setval
-            [ALL (multi-path :task-id :input-json-schema :output-json-schema)]
+            [ALL
+             (multi-path :task-id
+                         [:input-json-schema nil?]
+                         [:output-json-schema nil?])]
             NONE
             items)
            [{:dataset-id  ds-id8
@@ -622,42 +625,43 @@
 
 
 
-       ;; TODO: <<<<>>>>
-       ;; (defn get-dataset-properties [datasets-pstate dataset-id]
-       ;; (defn get-dataset-snapshot-names [datasets-pstate dataset-id]
-       ;; (defn get-dataset-examples-page
-       ;;   [datasets-pstate dataset-id snapshot-name amt pagination-params]
+       ; TODO: <<<<>>>>
+       ; (defn get-dataset-properties [datasets-pstate dataset-id]
+       ; (defn get-dataset-snapshot-names [datasets-pstate dataset-id]
+       ; (defn get-dataset-examples-page
+       ;   [datasets-pstate dataset-id snapshot-name amt pagination-params]
+       ; (defn create-dataset!
+       ;   ([manager name
+       ;   ([^AgentManager manager name options]
+       ; (defn set-dataset-name!
+       ;   [^AgentManager manager dataset-id name]
+       ; (defn set-dataset-description!
+       ;   [^AgentManager manager dataset-id description]
+       ; (defn destroy-dataset!
+       ;   [^AgentManager manager dataset-id]
+       ; (defn add-dataset-example!
+       ;   ([manager dataset-id input]
+       ;   ([^AgentManager manager dataset-id input options]
+       ; (defn set-dataset-example-input!
+       ;   ([manager dataset-id example-id input]
+       ;   ([^AgentManager manager dataset-id example-id input options]
+       ; (defn set-dataset-example-reference-output!
+       ;   ([manager dataset-id example-id reference-output]
+       ;   ([^AgentManager manager dataset-id example-id reference-output
+       ;   options]
+       ; (defn remove-dataset-example!
+       ;   ([manager dataset-id example-id]
+       ;   ([^AgentManager manager dataset-id example-id options]
+       ; (defn add-dataset-example-tag!
+       ;   ([manager dataset-id example-id tag]
+       ;   ([^AgentManager manager dataset-id example-id tag options]
+       ; (defn remove-dataset-example-tag!
+       ;   ([manager dataset-id example-id tag]
+       ;   ([^AgentManager manager dataset-id example-id tag options]
+       ; (defn snapshot-dataset!
+       ;   [^AgentManager manager dataset-id from-snapshot to-snapshot]
+       ; (defn remove-dataset-snapshot!
+       ;   [^AgentManager manager dataset-id snapshot-name]
+       ; (defn search-datasets
+       ;   [^AgentManager manager search-string limit]
       ))))
-; (defn create-dataset!
-;   ([manager name
-;   ([^AgentManager manager name options]
-; (defn set-dataset-name!
-;   [^AgentManager manager dataset-id name]
-; (defn set-dataset-description!
-;   [^AgentManager manager dataset-id description]
-; (defn destroy-dataset!
-;   [^AgentManager manager dataset-id]
-; (defn add-dataset-example!
-;   ([manager dataset-id input]
-;   ([^AgentManager manager dataset-id input options]
-; (defn set-dataset-example-input!
-;   ([manager dataset-id example-id input]
-;   ([^AgentManager manager dataset-id example-id input options]
-; (defn set-dataset-example-reference-output!
-;   ([manager dataset-id example-id reference-output]
-;   ([^AgentManager manager dataset-id example-id reference-output options]
-; (defn remove-dataset-example!
-;   ([manager dataset-id example-id]
-;   ([^AgentManager manager dataset-id example-id options]
-; (defn add-dataset-example-tag!
-;   ([manager dataset-id example-id tag]
-;   ([^AgentManager manager dataset-id example-id tag options]
-; (defn remove-dataset-example-tag!
-;   ([manager dataset-id example-id tag]
-;   ([^AgentManager manager dataset-id example-id tag options]
-; (defn snapshot-dataset!
-;   [^AgentManager manager dataset-id from-snapshot to-snapshot]
-; (defn remove-dataset-snapshot!
-;   [^AgentManager manager dataset-id snapshot-name]
-; (defn search-datasets
-;   [^AgentManager manager search-string limit]
