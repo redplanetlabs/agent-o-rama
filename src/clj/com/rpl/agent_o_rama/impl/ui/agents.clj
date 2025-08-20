@@ -189,12 +189,7 @@
                                               page-limit))
         cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
                         (-> m remove-implicit-nodes))
-        next-leaves (:next-task-invoke-pairs dynamic-trace)
-
-        ;; NEW: Apply UI serialization to make data safe for the UI
-        final-cleaned-nodes (->ui-serializable cleaned-nodes)
-        final-summary (->ui-serializable summary-info)
-        final-historical-graph (->ui-serializable historical-graph)]
+        next-leaves (:next-task-invoke-pairs dynamic-trace)]
 
     (let [;; Always fetch completion status directly - simple and consistent
           root-status (foreign-select-one [(keypath agent-id)
@@ -206,11 +201,12 @@
           ;; Keep legacy variable for logging only; client no longer depends on it
           has-more-leaves? (and (not agent-is-complete?) (seq next-leaves))]
       ;; Construct simplified response. Only include keys that are present.
+      ;; Serialization now handled centrally in Sente handler
       (cond-> {:is-complete agent-is-complete?}
-        (seq final-cleaned-nodes) (assoc :nodes final-cleaned-nodes)
+        (seq cleaned-nodes) (assoc :nodes cleaned-nodes)
         (seq next-leaves) (assoc :next-leaves next-leaves)
-        is-initial-load? (assoc :summary final-summary
-                                :historical-graph final-historical-graph
+        is-initial-load? (assoc :summary summary-info
+                                :historical-graph historical-graph
                                 :root-invoke-id (when (seq start-pairs) (second (first start-pairs)))
                                 :task-id agent-task-id
                                 :agent-id agent-id)))))

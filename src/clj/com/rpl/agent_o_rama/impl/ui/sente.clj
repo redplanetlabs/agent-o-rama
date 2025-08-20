@@ -48,8 +48,10 @@
 (defmethod -event-msg-handler :default
   [{:as ev-msg :keys [id ?data ?reply-fn uid]}]
   (try
-    (let [result (agents/api-handler id ?data uid)]
-      (?reply-fn {:success true :data result}))
+    (let [result (agents/api-handler id ?data uid)
+          ;; Apply UI serialization to make all API responses safe for transit/JSON
+          serializable-result (agents/->ui-serializable result)]
+      (?reply-fn {:success true :data serializable-result}))
     (catch Exception e
       (?reply-fn {:success false
                   :error (.getMessage e)}))))
