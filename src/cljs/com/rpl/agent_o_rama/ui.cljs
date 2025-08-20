@@ -23,8 +23,7 @@
         toggle-collapsed #(set-collapsed (not collapsed?))]
     ($ :div {:className (str "h-screen flex flex-col bg-gray-100 transition-all duration-300 "
                              (if collapsed? "w-16" "w-64"))}
-       ;; Header with toggle button
-       ;; Header with logo and toggle button
+       ;; Header
        ($ :div.flex.items-center.justify-between.p-4.border-b.border-gray-200.overflow-hidden
           (when-not collapsed?
             ($ :img {:src "/logo-black.png"
