@@ -836,7 +836,7 @@
   (.destroyDataset manager dataset-id))
 
 (defn add-dataset-example!
-  ([^AgentManager manager dataset-id input]
+  ([manager dataset-id input]
    (add-dataset-example! manager dataset-id input nil))
   ([^AgentManager manager dataset-id input options]
    ;; types are validated by Java API
@@ -852,16 +852,90 @@
                        (:reference-output options)
                        (:tags options))))
 
-;; TODO: <<<<>>>>> clojure API versions
-; (setDatasetExampleInput [this datasetId snapshotName exampleId input]
-; (setDatasetExampleReferenceOutput [this datasetId snapshotName exampleId referenceOutput]
-; (removeDatasetExample [this datasetId snapshotName exampleId]
-; (addDatasetExampleTag [this datasetId snapshotName exampleId tag]
-; (removeDatasetExampleTag [this datasetId snapshotName exampleId tag]
-; (snapshotDataset [this datasetId fromSnapshotName toSnapshotName]
-; (removeDatasetSnapshot [this datasetId snapshotName]
-; (searchDatasets [this searchString limit]
+(defn set-dataset-example-input!
+  ([manager dataset-id example-id input]
+   (set-dataset-example-input! manager dataset-id example-id input nil))
+  ([^AgentManager manager dataset-id example-id input options]
+   ;; types are validated by Java API
+   (h/validate-options! name
+                        options
+                        {:snapshot h/any-spec})
+   (.setDatasetExampleInput manager
+                            dataset-id
+                            (:snapshot options)
+                            example-id
+                            input)))
 
+(defn set-dataset-example-reference-output!
+  ([manager dataset-id example-id reference-output]
+   (set-dataset-example-reference-output! manager
+                                          dataset-id
+                                          example-id
+                                          reference-output
+                                          nil))
+  ([^AgentManager manager dataset-id example-id reference-output options]
+   ;; types are validated by Java API
+   (h/validate-options! name
+                        options
+                        {:snapshot h/any-spec})
+   (.setDatasetExampleReferenceOutput manager
+                                      dataset-id
+                                      (:snapshot options)
+                                      example-id
+                                      reference-output)))
+
+(defn remove-dataset-example!
+  ([manager dataset-id example-id]
+   (remove-dataset-example! manager dataset-id example-id nil))
+  ([^AgentManager manager dataset-id example-id options]
+   ;; types are validated by Java API
+   (h/validate-options! name
+                        options
+                        {:snapshot h/any-spec})
+   (.removeDatasetExample manager
+                          dataset-id
+                          (:snapshot options)
+                          example-id)))
+
+(defn add-dataset-example-tag!
+  ([manager dataset-id example-id tag]
+   (add-dataset-example-tag! manager dataset-id example-id tag nil))
+  ([^AgentManager manager dataset-id example-id tag options]
+   ;; types are validated by Java API
+   (h/validate-options! name
+                        options
+                        {:snapshot h/any-spec})
+   (.addDatasetExampleTag manager
+                          dataset-id
+                          (:snapshot options)
+                          example-id
+                          tag)))
+
+(defn remove-dataset-example-tag!
+  ([manager dataset-id example-id tag]
+   (remove-dataset-example-tag! manager dataset-id example-id tag nil))
+  ([^AgentManager manager dataset-id example-id tag options]
+   ;; types are validated by Java API
+   (h/validate-options! name
+                        options
+                        {:snapshot h/any-spec})
+   (.removeDatasetExampleTag manager
+                             dataset-id
+                             (:snapshot options)
+                             example-id
+                             tag)))
+
+(defn snapshot-dataset!
+  [^AgentManager manager dataset-id from-snapshot to-snapshot]
+  (.snapshotDataset manager dataset-id from-snapshot to-snapshot))
+
+(defn remove-dataset-snapshot!
+  [^AgentManager manager dataset-id snapshot-name]
+  (.removeDatasetSnapshot manager dataset-id snapshot-name))
+
+(defn search-datasets
+  [^AgentManager manager search-string limit]
+  (.searchDatasets manager search-string limit))
 
 (defn start-ui
   (^AutoCloseable [ipc] (start-ui ipc nil))
