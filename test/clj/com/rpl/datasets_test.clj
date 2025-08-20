@@ -517,91 +517,58 @@
          ))
        (rtest/launch-module! ipc module {:tasks 2 :threads 2})
        (bind module-name (get-module-name module))
-       (bind depot (foreign-depot ipc module-name (po/datasets-depot-name)))
+       (bind manager (aor/agent-manager ipc module-name))
        (bind pstate
          (foreign-pstate ipc module-name (po/datasets-task-global-name)))
        (bind page-query
          (foreign-query ipc
                         module-name
                         (queries/get-datasets-page-query-name)))
-       (bind search-query
-         (foreign-query ipc
-                        module-name
-                        (queries/search-datasets-name)))
+
+
 
        ;; so they have separate timestamps
-       (bind gen-uuid-and-wait
-         (fn []
+       (bind create-and-wait!
+         (fn [& args]
            (Thread/sleep 2)
-           (h/random-uuid7)))
+           (apply aor/create-dataset! args)))
 
-       (bind ds-id1 (gen-uuid-and-wait))
-       (bind ds-id2 (gen-uuid-and-wait))
-       (bind ds-id3 (gen-uuid-and-wait))
-       (bind ds-id4 (gen-uuid-and-wait))
-       (bind ds-id5 (gen-uuid-and-wait))
-       (bind ds-id6 (gen-uuid-and-wait))
-       (bind ds-id7 (gen-uuid-and-wait))
-       (bind ds-id8 (gen-uuid-and-wait))
+       (bind ds-id1
+         (create-and-wait! manager
+                           "Dataset 1 is a dataset"
+                           {:description "this is a dataset"}))
+       (bind ds-id2
+         (create-and-wait! manager
+                           "Dataset sample 2"))
+       (bind ds-id3
+         (create-and-wait! manager
+                           "Dataset 3 – sample of inputs"
+                           {:description "this is a description"}))
+       (bind ds-id4
+         (create-and-wait! manager
+                           "Dataset 4 sample of movies"
+                           {:description "a description"}))
+       (bind ds-id5
+         (create-and-wait! manager
+                           "Dataset 5 sample of books"))
+       (bind ds-id6
+         (create-and-wait! manager
+                           "Dataset 6 sampleof vaudeville"
+                           {:description "a description 6"}))
+       (bind ds-id7
+         (create-and-wait! manager
+                           "Dataset 7 is another dataset"
+                           {:description "a description"}))
+       (bind ds-id8
+         (create-and-wait! manager
+                           "Dataset 8"))
 
-       (foreign-append!
-        depot
-        (aor-types/->valid-CreateDataset ds-id1
-                                         "Dataset 1 is a dataset"
-                                         "this is a dataset"
-                                         nil
-                                         nil))
-       (foreign-append!
-        depot
-        (aor-types/->valid-CreateDataset ds-id2 "Dataset sample 2" nil nil nil))
-       (foreign-append!
-        depot
-        (aor-types/->valid-CreateDataset ds-id3
-                                         "Dataset 3 – sample of inputs"
-                                         "this is a description"
-                                         nil
-                                         nil))
-       (foreign-append!
-        depot
-        (aor-types/->valid-CreateDataset ds-id4
-                                         "Dataset 4 sample of movies"
-                                         "a description"
-                                         nil
-                                         nil))
-       (foreign-append!
-        depot
-        (aor-types/->valid-CreateDataset ds-id5
-                                         "Dataset 5 sample of books"
-                                         nil
-                                         nil
-                                         nil))
-       (foreign-append!
-        depot
-        (aor-types/->valid-CreateDataset ds-id6
-                                         "Dataset 6 sampleof vaudeville"
-                                         "a description 6"
-                                         nil
-                                         nil))
-       (foreign-append!
-        depot
-        (aor-types/->valid-CreateDataset ds-id7
-                                         "Dataset 7 is another dataset"
-                                         "a description"
-                                         nil
-                                         nil))
-       (foreign-append!
-        depot
-        (aor-types/->valid-CreateDataset ds-id8
-                                         "Dataset 8"
-                                         nil
-                                         nil
-                                         nil))
 
        (doseq [[s query-amt amt] [["dataset" 3 3]
                                   ["is a" 3 2]
                                   ["SAMPLEof" 1000 1]
                                   ["sample" 6 5]]]
-         (let [res (foreign-invoke-query search-query s query-amt)]
+         (let [res (aor/search-datasets manager s query-amt)]
            (is (= (count res) amt))
            (doseq [v (vals res)]
              (is (h/contains-string? (str/lower-case v) (str/lower-case s))))
