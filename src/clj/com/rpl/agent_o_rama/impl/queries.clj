@@ -359,7 +359,8 @@
 
 ;; returns map of form:
 ;; {:datasets
-;;   [{:task-id ... :dataset-id ... :name ... :description ...}
+;;   [{:task-id ... :dataset-id ... :name ... :description ...
+;;     :input-json-schema ... :output-json-schema ...}
 ;;    ...]
 ;;  :pagination-params {task-id end-id}}
 (defn declare-get-datasets-page-topology

@@ -685,9 +685,8 @@
        (close! datasets-depot))
      aor-types/UnderlyingObjects
      (underlying-objects [this]
-       {:datasets-pstate       datasets-pstate
-        :datasets-page-query   datasets-page-query
-        :datasets-search-query datasets-search-query
+       {:datasets-pstate     datasets-pstate
+        :datasets-page-query datasets-page-query
        }))))
 
 (defn agent-client
