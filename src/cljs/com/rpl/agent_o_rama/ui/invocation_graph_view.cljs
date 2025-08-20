@@ -179,6 +179,17 @@
       (nil? data)
       ($ :span {:className (str "text-" color "-500 italic")} "nil")
 
+      ;; Handle empty string
+      (and (string? data) (empty? data))
+      ($ :span {:className (str "text-" color "-500 italic")} "(empty string)")
+
+      ;; Handle empty collections
+      (and (map? data) (empty? data))
+      ($ :span {:className (str "text-" color "-500 italic")} "(empty map)")
+
+      (and (sequential? data) (empty? data))
+      ($ :span {:className (str "text-" color "-500 italic")} "(empty list)")
+
       ;; If we've hit max depth, fall back to expandable components
       (>= depth max-depth)
       (cond
