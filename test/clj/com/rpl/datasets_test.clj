@@ -297,6 +297,9 @@
 (defn ok? [x] (string? x))
 (defn err? [x] (and (map? x) (contains? x :error)))
 (defn ->json ^JsonNode [^String s] (.readTree OM s))
+(defn to-json
+  [o]
+  (.writeValueAsString OM o))
 
 (deftest normalize-json-schema*-invalid-json
   (testing "empty / malformed JSON"
@@ -526,6 +529,16 @@
                         (queries/get-datasets-page-query-name)))
 
 
+       (bind schema1
+         {"type"       "object"
+          "properties"
+          {"p1" {"x-javaType" "java.util.List"}
+           "p2" {"type" "string"}}
+          "required"   ["p1"]})
+       (bind schema-str {"type" "string"})
+       (bind to-internal-json
+         (fn [s]
+           (to-json (assoc s "$schema" datasets/META))))
 
        ;; so they have separate timestamps
        (bind create-and-wait!
@@ -543,7 +556,9 @@
        (bind ds-id3
          (create-and-wait! manager
                            "Dataset 3 – sample of inputs"
-                           {:description "this is a description"}))
+                           {:description        "this is a description"
+                            :input-json-schema  (to-json schema1)
+                            :output-json-schema (to-json schema-str)}))
        (bind ds-id4
          (create-and-wait! manager
                            "Dataset 4 sample of movies"
@@ -554,7 +569,8 @@
        (bind ds-id6
          (create-and-wait! manager
                            "Dataset 6 sampleof vaudeville"
-                           {:description "a description 6"}))
+                           {:description       "a description 6"
+                            :input-json-schema (to-json schema-str)}))
        (bind ds-id7
          (create-and-wait! manager
                            "Dataset 7 is another dataset"
@@ -605,7 +621,8 @@
              :description "a description"}
             {:dataset-id  ds-id6
              :name        "Dataset 6 sampleof vaudeville"
-             :description "a description 6"}
+             :description "a description 6"
+             :input-json-schema (to-internal-json schema-str)}
             {:dataset-id  ds-id5
              :name        "Dataset 5 sample of books"
              :description nil}
@@ -614,7 +631,9 @@
              :description "a description"}
             {:dataset-id  ds-id3
              :name        "Dataset 3 – sample of inputs"
-             :description "this is a description"}
+             :description "this is a description"
+             :input-json-schema (to-internal-json schema1)
+             :output-json-schema (to-internal-json schema-str)}
             {:dataset-id  ds-id2
              :name        "Dataset sample 2"
              :description nil}
@@ -623,10 +642,16 @@
              :description "this is a dataset"}
            ]))
 
+       (bind res (queries/get-dataset-properties pstate ds-id3))
+       (is (= res
+              {:name "Dataset 3 – sample of inputs"
+               :description "this is a description"
+               :input-json-schema (to-internal-json schema1)
+               :output-json-schema (to-internal-json schema-str)}))
+
 
 
        ; TODO: <<<<>>>>
-       ; (defn get-dataset-properties [datasets-pstate dataset-id]
        ; (defn get-dataset-snapshot-names [datasets-pstate dataset-id]
        ; (defn get-dataset-examples-page
        ;   [datasets-pstate dataset-id snapshot-name amt pagination-params]
