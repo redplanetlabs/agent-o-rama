@@ -9,7 +9,10 @@
     (js/decodeURIComponent s)
     (catch js/Error e
       (js/console.error "Failed to decode URI component:" s e)
-      s))) ; Fallback to original string on error
+      s)))
+
+(defn url-encode [s]
+  (js/encodeURIComponent s)) ; Fallback to original string on error
 
 (def reader (t/reader :json))
 (def writer (t/writer :json))

@@ -15,7 +15,7 @@
    ["react-dom" :refer [createPortal]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
    ["@dagrejs/dagre" :as Dagre]
-   ["@heroicons/react/24/outline" :refer [ExclamationTriangleIcon ArrowPathIcon]]
+   ["@heroicons/react/24/outline" :refer [ExclamationTriangleIcon ArrowPathIcon ArrowTopRightOnSquareIcon]]
    ["wouter" :as wouter]))
 
 (defn format-ms [ms]
@@ -227,6 +227,51 @@
                                     :title "Value Details"
                                     :truncate-length truncate-length}))))
 
+(defui agent-call-op-component [{:keys [info]}]
+  (let [[location navigate] (wouter/useLocation)
+        ;; The invocation data location depends on the operation type
+        invoke-data (if (= (:op info) :initiate)
+                      (:result info)
+                      (:agent-invoke info))
+        task-id (:task-id invoke-data)
+        agent-invoke-id (:agent-invoke-id invoke-data)
+        module-id (:agent-module-name info)
+        agent-name (:agent-name info)
+
+        ;; Check if we have all the data needed to construct a valid URL
+        ;; Note: Use (not (nil? ...)) instead of (some? ...) because 0 is falsy but valid
+        can-navigate? (and (not (nil? task-id)) (not (nil? agent-invoke-id)) module-id agent-name)
+
+        target-url (when can-navigate?
+                     (str "/agents/" (common/url-encode module-id)
+                          "/" (common/url-encode agent-name)
+                          "/invocations/" task-id "-" agent-invoke-id))]
+
+    (println "DEBUG agent-call-op-component:"
+             "info:" info
+             "invoke-data:" invoke-data
+             ":result" (:result info)
+             ":agent-invoke" (:agent-invoke info)
+             "task-id:" task-id
+             "agent-invoke-id:" agent-invoke-id
+             "module-id:" module-id
+             "agent-name:" agent-name
+             "can-navigate?:" can-navigate?
+             "target-url:" target-url)
+
+    ($ :div
+       ;; First, render the generic details of the operation so no information is lost
+       ($ generic-data-viewer {:data info :color "sky" :depth 0})
+
+       ;; Then, add the navigation button if a valid URL can be constructed
+       (when target-url
+         ($ :div {:className "mt-2"}
+            ($ wouter/Link {:href target-url
+                            :target "_blank"
+                            :className "inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors cursor-pointer shadow-sm"}
+               "View Sub-Invocation"
+               ($ ArrowTopRightOnSquareIcon {:className "h-4 w-4"})))))))
+
 (defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes module-id agent-name invoke-id]}]
   (let [data (when selected-node
                (js->clj (.-data selected-node) :keywordize-keys true))
@@ -377,8 +422,13 @@
 
                            ;; 2. The Body: Replace all specific logic with the generic viewer
                            ($ :div {:className "text-xs text-sky-600 mt-1"}
-                              ($ generic-data-viewer {:data info :color "sky" :depth 0}))))))))
-            
+                              (do
+                                (println "DEBUG: op-type is" op-type "type:" (type op-type))
+                                (case (keyword op-type)
+                                  :agent-call ($ agent-call-op-component {:info info})
+                                  ;; Default case for all other operations
+                                  ($ generic-data-viewer {:data info :color "sky" :depth 0}))))))))))
+
             (when (and emits (> (count emits) 0))
               ($ :div {:className "mt-4 bg-purple-50 p-3 rounded-md"}
                  ($ :div {:className "text-sm font-medium text-purple-700 mb-2"}
