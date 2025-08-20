@@ -1,2 +1,3 @@
-{:lint-as
+{:config-paths ["../resource/clj-kondo.exports/com.rpl/agent-o-rama"]
+ :lint-as
  {com.rpl.agent-o-rama/defagentmodule clojure.core/defn}}
