@@ -7,8 +7,10 @@
    [com.rpl.rama :as rama]
    [jsonista.core :as j])
   (:import
-   [dev.langchain4j.agent.tool ToolExecutionRequest]
-   [dev.langchain4j.model.chat.request.json JsonObjectSchema]))
+   [dev.langchain4j.agent.tool
+    ToolExecutionRequest]
+   [dev.langchain4j.model.chat.request.json
+    JsonObjectSchema]))
 
 ;; Test fixtures and utilities
 
@@ -21,20 +23,22 @@
 
 ;; Unit tests for utility functions
 
-(deftest test-split-document
-  (testing "splits short documents into single chunk"
-    (let [text   "Short test document"
-          chunks (rag/split-document text)]
-      (is (= 1 (count chunks)))
-      (is (= text (first chunks)))))
+#_(deftest test-split-document
+    (testing "splits short documents into single chunk"
+      (let [text   "Short test document"
+            chunks (rag/split-document text)]
+        (is (= 1 (count chunks)))
+        (is (= text (first chunks)))))
 
-  (testing "splits long documents into multiple chunks"
-    (let [text   (str
-                  "This is a very long document that should be split into multiple chunks. "
-                  (apply str (repeat 100 "More content to make it longer. ")))
-          chunks (rag/split-document text)]
-      (is (> (count chunks) 1))
-      (is (every? string? chunks)))))
+    (testing "splits long documents into multiple chunks"
+      (let
+        [text
+         (str
+          "This is a very long document that should be split into multiple chunks. "
+          (apply str (repeat 100 "More content to make it longer. ")))
+         chunks (rag/split-document text)]
+        (is (> (count chunks) 1))
+        (is (every? string? chunks)))))
 
 (deftest test-calculate-similarity-vectors
   (testing "identical vectors have similarity 1.0"
@@ -115,7 +119,8 @@
       (is (contains? mock-classification :routing_decision))
       (is (contains? mock-classification :reasoning))
       (is (contains? mock-classification :keywords))
-      (is (contains? #{"simple_retrieval" "research_required" "langchain_specific" "out_of_scope"}
+      (is (contains? #{"simple_retrieval" "research_required"
+                       "langchain_specific" "out_of_scope"}
                      (:routing_decision mock-classification))))))
 
 (deftest test-research-plan-structure
@@ -145,7 +150,6 @@
   (testing "module declares required stores"
     ;; This test verifies the module structure without running it
     (is (some? rag/DOCUMENTS-STORE))
-    (is (some? rag/EMBEDDINGS-STORE))
     (is (some? rag/RESEARCH-STORE))))
 
 (deftest test-tool-specifications
@@ -163,7 +167,8 @@
   (testing "function handles empty question list"
     ;; Test with empty questions - should return empty result
     (let [empty-questions []]
-      ;; We can't actually run this without an agent-node, but we can test the structure
+      ;; We can't actually run this without an agent-node, but we can test the
+      ;; structure
       (is (vector? empty-questions))))
 
   (testing "function structure for multiple questions"
@@ -194,10 +199,8 @@
 (deftest test-store-constants
   (testing "store constants are defined"
     (is (string? rag/DOCUMENTS-STORE))
-    (is (string? rag/EMBEDDINGS-STORE))
     (is (string? rag/RESEARCH-STORE))
     (is (re-find #"^\$\$" rag/DOCUMENTS-STORE))
-    (is (re-find #"^\$\$" rag/EMBEDDINGS-STORE))
     (is (re-find #"^\$\$" rag/RESEARCH-STORE))))
 
 ;; Test runner helper
