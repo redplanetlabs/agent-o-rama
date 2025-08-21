@@ -708,14 +708,66 @@
             NONE
             (vals examples))))
 
-       (aor/set-dataset-name! manager ds-id8 "8 set data")
+       (bind check-times!
+         (fn [created-at created-at2 modified-at modified-at2]
+           (when-not (= created-at created-at2)
+             (throw (ex-info "created-at mismatch"
+                             {:time1 created-at :time2 created-at2})))
+           (when-not (> modified-at2 modified-at)
+             (throw (ex-info "modified-at mismatch"
+                             {:time1 modified-at :time2 modified-at2})))))
+
+       (bind verified-dataset-times
+         (fn [dataset-id afn]
+           (letlocals
+            (bind {:keys [created-at modified-at]}
+              (queries/get-dataset-properties pstate dataset-id))
+            (Thread/sleep 2)
+            (afn)
+            (bind {created-at2 :created-at modified-at2 :modified-at}
+              (queries/get-dataset-properties pstate dataset-id))
+            (check-times! created-at created-at2 modified-at modified-at2)
+           )))
+
+       (bind verified-example-times
+         (fn [dataset-id snapshot-name example-id afn]
+           (letlocals
+            (bind {:keys [created-at modified-at]}
+              (foreign-select-one
+               [(keypath dataset-id :snapshots snapshot-name example-id)]
+               pstate))
+            (verified-dataset-times
+             dataset-id
+             afn)
+            (bind {created-at2 :created-at modified-at2 :modified-at}
+              (foreign-select-one
+               [(keypath dataset-id :snapshots snapshot-name example-id)]
+               pstate))
+            (check-times! created-at created-at2 modified-at modified-at2)
+           )))
+
+
+       (verified-dataset-times
+        ds-id8
+        #(aor/set-dataset-name! manager ds-id8 "8 set data"))
        (is (= "8 set data"
               (:name (queries/get-dataset-properties pstate ds-id8))))
-       (aor/set-dataset-description! manager ds-id8 "88812")
+       (verified-dataset-times
+        ds-id8
+        #(aor/set-dataset-description! manager ds-id8 "88812"))
        (is (= "88812"
               (:description (queries/get-dataset-properties pstate ds-id8))))
 
-       (add-example-and-wait! manager ds-id1 "example1-1")
+       (verified-dataset-times
+        ds-id1
+        #(add-example-and-wait! manager ds-id1 "example1-1"))
+       (bind {:keys [created-at modified-at]}
+         (foreign-select-one
+          [(keypath ds-id1 :snapshots nil)
+           MAP-VALS]
+          pstate))
+       (is (some? created-at))
+       (is (= created-at modified-at))
        (add-example-and-wait! manager
                               ds-id1
                               "example1-2"
@@ -730,8 +782,9 @@
                {:input "example1-2"
                 :reference-output "output1-2"
                 :tags  #{"tag1" "tag2"}}]))
-
-       (aor/snapshot-dataset! manager ds-id1 nil "snapshot1")
+       (verified-dataset-times
+        ds-id1
+        #(aor/snapshot-dataset! manager ds-id1 nil "snapshot1"))
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
        (is (nil? pagination-params))
@@ -779,21 +832,38 @@
 
 
        (bind [id1 id2 id3] (keys examples))
-       (aor/set-dataset-example-input! manager ds-id1 id1 "!!example-1")
+       (verified-example-times
+        ds-id1
+        nil
+        id1
+        #(aor/set-dataset-example-input! manager ds-id1 id1 "!!example-1"))
        (aor/set-dataset-example-input! manager
                                        ds-id1
                                        id1
                                        "snapshot-example-1"
                                        {:snapshot "snapshot1"})
        (aor/set-dataset-example-reference-output! manager ds-id1 id1 "out1")
-       (aor/set-dataset-example-reference-output! manager
-                                                  ds-id1
-                                                  id1
-                                                  "snap-out-1"
-                                                  {:snapshot "snapshot1"})
-       (aor/add-dataset-example-tag! manager ds-id1 id1 "foo")
+
+       (verified-example-times
+        ds-id1
+        "snapshot1"
+        id1
+        #(aor/set-dataset-example-reference-output! manager
+                                                    ds-id1
+                                                    id1
+                                                    "snap-out-1"
+                                                    {:snapshot "snapshot1"}))
+       (verified-example-times
+        ds-id1
+        nil
+        id1
+        #(aor/add-dataset-example-tag! manager ds-id1 id1 "foo"))
        (aor/add-dataset-example-tag! manager ds-id1 id1 "bar")
-       (aor/remove-dataset-example-tag! manager ds-id1 id1 "foo")
+       (verified-example-times
+        ds-id1
+        nil
+        id1
+        #(aor/remove-dataset-example-tag! manager ds-id1 id1 "foo"))
        (aor/add-dataset-example-tag! manager
                                      ds-id1
                                      id1
@@ -819,7 +889,9 @@
                                         id1
                                         "notatag"
                                         {:snapshot "snapshot1"})
-       (aor/remove-dataset-example! manager ds-id1 id2)
+       (verified-dataset-times
+        ds-id1
+        #(aor/remove-dataset-example! manager ds-id1 id2))
        (aor/remove-dataset-example! manager ds-id1 id3 {:snapshot "snapshot1"})
 
        (bind {:keys [examples pagination-params]}
@@ -846,7 +918,9 @@
        (is (= #{}
               (queries/get-dataset-snapshot-names pstate ds-id2)))
 
-       (aor/remove-dataset-snapshot! manager ds-id1 "snapshot1")
+       (verified-dataset-times
+        ds-id1
+        #(aor/remove-dataset-snapshot! manager ds-id1 "snapshot1"))
        (is (= #{"snapshot2"}
               (queries/get-dataset-snapshot-names pstate ds-id1)))
        (bind {:keys [examples pagination-params]}
