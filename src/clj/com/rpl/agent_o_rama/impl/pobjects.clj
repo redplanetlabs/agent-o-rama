@@ -220,10 +220,12 @@
   {UUID ; dataset-id
    (fixed-keys-schema
     {:props     (fixed-keys-schema
-                 {:name String
-                  :description String
+                 {:name              String
+                  :description       String
                   :input-json-schema String
-                  :output-json-schema String})
+                  :output-json-schema String
+                  :created-at        Long
+                  :modified-at       Long})
      :snapshots
      (map-schema
       String ; nil for latest

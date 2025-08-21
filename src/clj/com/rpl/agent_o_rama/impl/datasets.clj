@@ -273,6 +273,17 @@
    (else>)
     (:>)))
 
+(defbasicblocksegmacro update-dataset!
+  [pstate dataset-id apath]
+  (let [time-millis (gen-anyvar "time-millis")]
+    [[h/current-time-millis :> time-millis]
+     [local-transform>
+       [(seg# keypath dataset-id)
+        (seg# multi-path
+             [:props :modified-at (seg# termval time-millis)]
+             apath)]
+       pstate]]))
+
 (deframaop handle-datasets-op
   [{:keys [*dataset-id] :as *data}]
   (<<with-substitutions
@@ -285,20 +296,20 @@
                        *output-json-schema]})
      (normalize-json-schema> *input-json-schema :> *isnorm)
      (normalize-json-schema> *output-json-schema :> *osnorm)
+     (h/current-time-millis :> *current-time-millis)
      (local-transform> [(keypath *dataset-id) :props
-                        (termval {:name *name
-                                  :description *description
+                        (termval {:name              *name
+                                  :description       *description
                                   :input-json-schema *isnorm
-                                  :output-json-schema *osnorm})]
+                                  :output-json-schema *osnorm
+                                  :created-at        *current-time-millis
+                                  :modified-at       *current-time-millis})]
                        $$datasets)
 
     (case> UpdateDatasetProperty :> {:keys [*key *value]})
-     (local-transform> [(keypath *dataset-id)
-                        some?
-                        :props
-                        (keypath *key)
-                        (termval *value)]
-                       $$datasets)
+     (update-dataset! $$datasets
+                      *dataset-id
+                      [:props (keypath *key) (termval *value)])
 
     (case> DestroyDataset)
      (local-transform> [(keypath *dataset-id :snapshots MAP-VALS) NONE>]
@@ -315,11 +326,17 @@
      (validate-with-schema> *input-json-schema *input)
      (<<if (some? *reference-output)
        (validate-with-schema> *output-json-schema *reference-output))
-     (local-transform>
-      [(keypath *dataset-id :snapshots *snapshot-name *example-id)
-       (termval
-        {:input *input :reference-output *reference-output :tags *tags})]
-      $$datasets)
+     (h/current-time-millis :> *current-time-millis)
+     (update-dataset! $$datasets
+                      *dataset-id
+                      [(keypath :snapshots *snapshot-name *example-id)
+                       (termval
+                        {:input            *input
+                         :reference-output *reference-output
+                         :tags             *tags
+                         :created-at       *current-time-millis
+                         :modified-at      *current-time-millis})])
+
 
     (case> UpdateDatasetExample
            :> {:keys [*snapshot-name *example-id *key *value]})
@@ -333,35 +350,41 @@
        (validate-with-schema> *output-json-schema *value)
 
       (default>))
-     (local-transform>
-      [(keypath *dataset-id :snapshots *snapshot-name *example-id)
+     (update-dataset!
+      $$datasets
+      *dataset-id
+      [(keypath :snapshots *snapshot-name *example-id)
        some?
        (keypath *key)
-       (termval *value)]
-      $$datasets)
+       (termval *value)])
 
     (case> RemoveDatasetExample :> {:keys [*snapshot-name *example-id]})
-     (local-transform>
-      [(keypath *dataset-id :snapshots *snapshot-name *example-id) NONE>]
-      $$datasets)
+     (update-dataset!
+      $$datasets
+      *dataset-id
+      [(keypath :snapshots *snapshot-name *example-id) NONE>])
 
     (case> AddDatasetExampleTag :> {:keys [*snapshot-name *example-id *tag]})
-     (local-transform>
-      [(keypath *dataset-id :snapshots *snapshot-name *example-id :tags)
+     (update-dataset!
+      $$datasets
+      *dataset-id
+      [(keypath :snapshots *snapshot-name *example-id :tags)
        NONE-ELEM
-       (termval *tag)]
-      $$datasets)
+       (termval *tag)])
 
     (case> RemoveDatasetExampleTag
            :> {:keys [*snapshot-name *example-id *tag]})
-     (local-transform>
-      [(keypath *dataset-id :snapshots *snapshot-name *example-id :tags)
+     (update-dataset!
+      $$datasets
+      *dataset-id
+      [(keypath :snapshots *snapshot-name *example-id :tags)
        (set-elem *tag)
-       NONE>]
-      $$datasets)
+       NONE>])
 
     (case> DatasetSnapshot
            :> {:keys [*from-snapshot-name *to-snapshot-name]})
+     ;; to update modified-at
+     (update-dataset! $$datasets *dataset-id STOP)
      (local-select> [(keypath *dataset-id :snapshots *from-snapshot-name)
                      ALL]
                     $$datasets
@@ -373,7 +396,8 @@
       $$datasets)
 
     (case> RemoveDatasetSnapshot :> {:keys [*snapshot-name]})
-     (local-transform>
-      [(keypath *dataset-id :snapshots *snapshot-name) NONE>]
-      $$datasets)
+     (update-dataset!
+      $$datasets
+      *dataset-id
+      [(keypath :snapshots *snapshot-name) NONE>])
    )))
