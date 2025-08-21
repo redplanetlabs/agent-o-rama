@@ -284,6 +284,22 @@
              apath)]
        pstate]]))
 
+
+(defbasicblocksegmacro update-dataset-example!
+  [pstate dataset-id snapshot-name example-id apath]
+  (let [time-millis (gen-anyvar "time-millis")]
+    [[h/current-time-millis :> time-millis]
+     [update-dataset!
+       pstate
+       dataset-id
+       [:snapshots
+        (seg# keypath snapshot-name example-id)
+        some?
+        (seg# multi-path
+          [:modified-at (seg# termval time-millis)]
+          apath
+          )]]]))
+
 (deframaop handle-datasets-op
   [{:keys [*dataset-id] :as *data}]
   (<<with-substitutions
@@ -350,13 +366,12 @@
        (validate-with-schema> *output-json-schema *value)
 
       (default>))
-     (update-dataset!
+     (update-dataset-example!
       $$datasets
       *dataset-id
-      [(keypath :snapshots *snapshot-name *example-id)
-       some?
-       (keypath *key)
-       (termval *value)])
+      *snapshot-name
+      *example-id
+      [(keypath *key) (termval *value)])
 
     (case> RemoveDatasetExample :> {:keys [*snapshot-name *example-id]})
      (update-dataset!
@@ -365,21 +380,21 @@
       [(keypath :snapshots *snapshot-name *example-id) NONE>])
 
     (case> AddDatasetExampleTag :> {:keys [*snapshot-name *example-id *tag]})
-     (update-dataset!
+     (update-dataset-example!
       $$datasets
       *dataset-id
-      [(keypath :snapshots *snapshot-name *example-id :tags)
-       NONE-ELEM
-       (termval *tag)])
+      *snapshot-name
+      *example-id
+      [:tags NONE-ELEM (termval *tag)])
 
     (case> RemoveDatasetExampleTag
            :> {:keys [*snapshot-name *example-id *tag]})
-     (update-dataset!
+     (update-dataset-example!
       $$datasets
       *dataset-id
-      [(keypath :snapshots *snapshot-name *example-id :tags)
-       (set-elem *tag)
-       NONE>])
+      *snapshot-name
+      *example-id
+      [:tags (set-elem *tag) NONE>])
 
     (case> DatasetSnapshot
            :> {:keys [*from-snapshot-name *to-snapshot-name]})
