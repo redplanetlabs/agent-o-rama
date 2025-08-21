@@ -675,6 +675,10 @@
                :input-json-schema (to-internal-json schema1)
                :output-json-schema (to-internal-json schema-str)}))
 
+       (bind add-example-and-wait!
+         (fn [& args]
+           (Thread/sleep 2)
+           (apply aor/add-dataset-example! args)))
 
        (aor/set-dataset-name! manager ds-id8 "8 set data")
        (is (= "8 set data"
@@ -683,12 +687,12 @@
        (is (= "88812"
               (:description (queries/get-dataset-properties pstate ds-id8))))
 
-       (aor/add-dataset-example! manager ds-id1 "example1-1")
-       (aor/add-dataset-example! manager
-                                 ds-id1
-                                 "example1-2"
-                                 {:reference-output "output1-2"
-                                  :tags #{"tag1" "tag2"}})
+       (add-example-and-wait! manager ds-id1 "example1-1")
+       (add-example-and-wait! manager
+                              ds-id1
+                              "example1-2"
+                              {:reference-output "output1-2"
+                               :tags #{"tag1" "tag2"}})
 
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id1 nil 10 nil))
@@ -708,10 +712,10 @@
                {:input "example1-2"
                 :reference-output "output1-2"
                 :tags  #{"tag1" "tag2"}}]))
-       (aor/add-dataset-example! manager
-                                 ds-id1
-                                 "examples1-1"
-                                 {:snapshot "snapshot1"})
+       (add-example-and-wait! manager
+                              ds-id1
+                              "examples1-1"
+                              {:snapshot "snapshot1"})
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
        (is (nil? pagination-params))
@@ -744,57 +748,95 @@
                {:input "examples1-1" :reference-output nil :tags #{}}]))
 
 
-       ;; TODO: <<<<>>>> do removr from nil and from snapshot1
-       ;;  - do update to snapshot1 and to nil
-       ;;  - add tags to each, do tag remove
+       (bind [id1 id2 id3] (keys examples))
+       (aor/set-dataset-example-input! manager ds-id1 id1 "!!example-1")
+       (aor/set-dataset-example-input! manager
+                                       ds-id1
+                                       id1
+                                       "snapshot-example-1"
+                                       {:snapshot "snapshot1"})
+       (aor/set-dataset-example-reference-output! manager ds-id1 id1 "out1")
+       (aor/set-dataset-example-reference-output! manager
+                                                  ds-id1
+                                                  id1
+                                                  "snap-out-1"
+                                                  {:snapshot "snapshot1"})
+       (aor/add-dataset-example-tag! manager ds-id1 id1 "foo")
+       (aor/add-dataset-example-tag! manager ds-id1 id1 "bar")
+       (aor/remove-dataset-example-tag! manager ds-id1 id1 "foo")
+       (aor/add-dataset-example-tag! manager
+                                     ds-id1
+                                     id1
+                                     "a"
+                                     {:snapshot "snapshot1"})
+       (aor/add-dataset-example-tag! manager
+                                     ds-id1
+                                     id1
+                                     "b"
+                                     {:snapshot "snapshot1"})
+       (aor/add-dataset-example-tag! manager
+                                     ds-id1
+                                     id1
+                                     "c"
+                                     {:snapshot "snapshot1"})
+       (aor/remove-dataset-example-tag! manager
+                                        ds-id1
+                                        id1
+                                        "b"
+                                        {:snapshot "snapshot1"})
+       (aor/remove-dataset-example-tag! manager
+                                        ds-id1
+                                        id1
+                                        "notatag"
+                                        {:snapshot "snapshot1"})
+       (aor/remove-dataset-example! manager ds-id1 id2)
+       (aor/remove-dataset-example! manager ds-id1 id3 {:snapshot "snapshot1"})
 
+       (bind {:keys [examples pagination-params]}
+         (queries/get-dataset-examples-page pstate ds-id1 nil 10 nil))
+       (is (nil? pagination-params))
+       (is (= (vals examples)
+              [{:input "!!example-1"
+                :reference-output "out1"
+                :tags  #{"bar"}}]))
 
-       ;; TODO: <<<<>>>
-       ;;  - verify schema errors and also correct adds to ds-id3
-
-
-
+       (bind {:keys [examples pagination-params]}
+         (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
+       (is (nil? pagination-params))
+       (is (= (vals examples)
+              [{:input "snapshot-example-1"
+                :reference-output "snap-out-1"
+                :tags  #{"a" "c"}}
+               {:input "example1-2"
+                :reference-output "output1-2"
+                :tags  #{"tag1" "tag2"}}]))
 
        (is (= #{"snapshot1" "snapshot2"}
               (queries/get-dataset-snapshot-names pstate ds-id1)))
        (is (= #{}
               (queries/get-dataset-snapshot-names pstate ds-id2)))
 
+       (aor/remove-dataset-snapshot! manager ds-id1 "snapshot1")
+       (is (= #{"snapshot2"}
+              (queries/get-dataset-snapshot-names pstate ds-id1)))
+       (bind {:keys [examples pagination-params]}
+         (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
+       (is (nil? pagination-params))
+       (is (empty? examples))
 
+
+       ;; TODO: <<<<>>>
+       ;;  - verify schema errors and also correct adds to ds-id3
 
        ;; TODO: <<<<>>>>
        ;;  - creating example with invalid input or output
        ;;  - updating example with invalid input or output
-       ;;  - adding / removing / updating in a snapshot
 
 
        ; TODO: <<<<>>>>
-       ; (defn get-dataset-snapshot-names [datasets-pstate dataset-id]
        ; (defn get-dataset-examples-page
        ;   [datasets-pstate dataset-id snapshot-name amt pagination-params]
        ;   - verify pagination part
        ; (defn destroy-dataset!
        ;   [^AgentManager manager dataset-id]
-       ; (defn set-dataset-example-input!
-       ;   ([manager dataset-id example-id input]
-       ;   ([^AgentManager manager dataset-id example-id input options]
-       ; (defn set-dataset-example-reference-output!
-       ;   ([manager dataset-id example-id reference-output]
-       ;   ([^AgentManager manager dataset-id example-id reference-output
-       ;   options]
-       ; (defn remove-dataset-example!
-       ;   ([manager dataset-id example-id]
-       ;   ([^AgentManager manager dataset-id example-id options]
-       ; (defn add-dataset-example-tag!
-       ;   ([manager dataset-id example-id tag]
-       ;   ([^AgentManager manager dataset-id example-id tag options]
-       ; (defn remove-dataset-example-tag!
-       ;   ([manager dataset-id example-id tag]
-       ;   ([^AgentManager manager dataset-id example-id tag options]
-       ; (defn snapshot-dataset!
-       ;   [^AgentManager manager dataset-id from-snapshot to-snapshot]
-       ; (defn remove-dataset-snapshot!
-       ;   [^AgentManager manager dataset-id snapshot-name]
-       ; (defn search-datasets
-       ;   [^AgentManager manager search-string limit]
       ))))
