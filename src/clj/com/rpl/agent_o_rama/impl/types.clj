@@ -265,7 +265,7 @@
    snapshot-name :- (s/maybe String)
    example-id :- UUID
    input :- Object
-   reference-output :- Object
+   reference-output :- (s/maybe Object)
    tags :- (s/maybe #{String})
   ])
 

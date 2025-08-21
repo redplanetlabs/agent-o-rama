@@ -683,20 +683,98 @@
        (is (= "88812"
               (:description (queries/get-dataset-properties pstate ds-id8))))
 
+       (aor/add-dataset-example! manager ds-id1 "example1-1")
+       (aor/add-dataset-example! manager
+                                 ds-id1
+                                 "example1-2"
+                                 {:reference-output "output1-2"
+                                  :tags #{"tag1" "tag2"}})
+
+       (bind {:keys [examples pagination-params]}
+         (queries/get-dataset-examples-page pstate ds-id1 nil 10 nil))
+       (is (nil? pagination-params))
+       (is (= (vals examples)
+              [{:input "example1-1" :reference-output nil :tags #{}}
+               {:input "example1-2"
+                :reference-output "output1-2"
+                :tags  #{"tag1" "tag2"}}]))
+
+       (aor/snapshot-dataset! manager ds-id1 nil "snapshot1")
+       (bind {:keys [examples pagination-params]}
+         (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
+       (is (nil? pagination-params))
+       (is (= (vals examples)
+              [{:input "example1-1" :reference-output nil :tags #{}}
+               {:input "example1-2"
+                :reference-output "output1-2"
+                :tags  #{"tag1" "tag2"}}]))
+       (aor/add-dataset-example! manager
+                                 ds-id1
+                                 "examples1-1"
+                                 {:snapshot "snapshot1"})
+       (bind {:keys [examples pagination-params]}
+         (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
+       (is (nil? pagination-params))
+       (is (= (vals examples)
+              [{:input "example1-1" :reference-output nil :tags #{}}
+               {:input "example1-2"
+                :reference-output "output1-2"
+                :tags  #{"tag1" "tag2"}}
+               {:input "examples1-1" :reference-output nil :tags #{}}]))
+
+       ;; verify original isn't affected
+       (bind {:keys [examples pagination-params]}
+         (queries/get-dataset-examples-page pstate ds-id1 nil 10 nil))
+       (is (nil? pagination-params))
+       (is (= (vals examples)
+              [{:input "example1-1" :reference-output nil :tags #{}}
+               {:input "example1-2"
+                :reference-output "output1-2"
+                :tags  #{"tag1" "tag2"}}]))
+
+       (aor/snapshot-dataset! manager ds-id1 "snapshot1" "snapshot2")
+       (bind {:keys [examples pagination-params]}
+         (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
+       (is (nil? pagination-params))
+       (is (= (vals examples)
+              [{:input "example1-1" :reference-output nil :tags #{}}
+               {:input "example1-2"
+                :reference-output "output1-2"
+                :tags  #{"tag1" "tag2"}}
+               {:input "examples1-1" :reference-output nil :tags #{}}]))
+
+
+       ;; TODO: <<<<>>>> do removr from nil and from snapshot1
+       ;;  - do update to snapshot1 and to nil
+       ;;  - add tags to each, do tag remove
+
+
+       ;; TODO: <<<<>>>
+       ;;  - verify schema errors and also correct adds to ds-id3
+
+
+
+
+       (is (= #{"snapshot1" "snapshot2"}
+              (queries/get-dataset-snapshot-names pstate ds-id1)))
+       (is (= #{}
+              (queries/get-dataset-snapshot-names pstate ds-id2)))
+
+
+
        ;; TODO: <<<<>>>>
        ;;  - creating example with invalid input or output
        ;;  - updating example with invalid input or output
+       ;;  - adding / removing / updating in a snapshot
 
 
        ; TODO: <<<<>>>>
        ; (defn get-dataset-snapshot-names [datasets-pstate dataset-id]
        ; (defn get-dataset-examples-page
        ;   [datasets-pstate dataset-id snapshot-name amt pagination-params]
+       ;   - verify pagination part
        ; (defn destroy-dataset!
        ;   [^AgentManager manager dataset-id]
-       ; (defn add-dataset-example!
-       ;   ([manager dataset-id input]
-       ;   ([^AgentManager manager dataset-id input options]
        ; (defn set-dataset-example-input!
        ;   ([manager dataset-id example-id input]
        ;   ([^AgentManager manager dataset-id example-id input options]

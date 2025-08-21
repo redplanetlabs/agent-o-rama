@@ -439,10 +439,11 @@
 
 (defn get-dataset-snapshot-names
   [datasets-pstate dataset-id]
-  (foreign-select
-   [(keypath dataset-id) :snapshots MAP-KEYS some?]
-   datasets-pstate
-  ))
+  (set
+   (foreign-select
+    [(keypath dataset-id) :snapshots MAP-KEYS some?]
+    datasets-pstate
+   )))
 
 (defn get-dataset-examples-page
   ([datasets-pstate dataset-id snapshot-name amt]
@@ -455,9 +456,6 @@
                    datasets-pstate
                   )]
      {:examples examples
-      :pagination-params (when-not (empty? examples)
-                           (-> examples
-                               rseq
-                               first
-                               first))}
+      :pagination-params (when (= (count examples) amt)
+                           (h/last-key examples))}
    )))
