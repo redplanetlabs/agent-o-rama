@@ -571,7 +571,50 @@
                            "Show less"
                            (str "... show all (" (count forks) ")"))))))))))))
 
-(defui info-panel [{:keys [graph-data summary-data module-id agent-name task-id forks fork-of]}]
+(defui exceptions-panel [{:keys [summary-data graph-data on-select-node]}]
+  (let [exceptions (get-in summary-data [:exception-summaries])]
+    (when (seq exceptions)
+      ($ :div {:className "bg-red-50 p-3 rounded-lg border border-red-200"}
+         ($ :div {:className "text-sm font-medium text-red-700 mb-2 flex items-center gap-2"}
+            ($ ExclamationTriangleIcon {:className "w-5 h-5"})
+            (str "Exceptions (" (count exceptions) ")"))
+         ($ :div {:className "space-y-2"}
+            (for [[idx exc] (map-indexed vector exceptions)]
+              (let [invoke-id (:invoke-id exc)
+                    node-name (:node exc)
+                    throwable-str (:throwable-str exc)
+                    first-line (first (str/split-lines throwable-str))
+                    is-loaded? (contains? graph-data invoke-id)]
+                ($ :div {:key idx
+                         :className "bg-white p-2 rounded border border-red-100"}
+                   ($ :div {:className "flex justify-between items-start"}
+                      ($ :div {:className "flex-1"}
+                         ($ :div {:className "font-semibold text-red-800 text-sm"} node-name)
+                         ($ :div {:className "text-xs font-mono text-red-600 mt-1 truncate"} first-line))
+                      ($ :div {:className "flex items-center gap-1 ml-2"}
+                         ;; Button to view full exception details in a modal
+                         ($ :button {:className "text-xs text-blue-600 hover:underline cursor-pointer"
+                                     :onClick (fn [e]
+                                                (.stopPropagation e)
+                                                (state/dispatch [:modal/show :exception-detail
+                                                                 {:title (str "Exception in " node-name)
+                                                                  :content throwable-str}]))}
+                            "Details")
+                         ;; Button to navigate to the node in the graph
+                         ($ :button {:className (str "text-xs font-medium px-2 py-1 rounded "
+                                                     (if is-loaded?
+                                                       "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                                       "bg-gray-200 text-gray-500 cursor-not-allowed"))
+                                     :onClick (fn [e]
+                                                (.stopPropagation e)
+                                                (when is-loaded? (on-select-node invoke-id)))
+                                     :disabled (not is-loaded?)
+                                     :title (if is-loaded?
+                                              "Go to node"
+                                              "Node not loaded (pagination)")}
+                            "Go to Node")))))))))))
+
+(defui info-panel [{:keys [graph-data summary-data on-select-node module-id agent-name task-id forks fork-of]}]
   (let [result (:result summary-data)
         failure? (:failure? result)
         result-val (:val result)]
@@ -584,6 +627,11 @@
                          :task-id task-id
                          :forks forks
                          :fork-of fork-of})
+
+       ;; NEW: Exceptions Panel - Add this right after the lineage panel
+       ($ exceptions-panel {:summary-data summary-data
+                            :graph-data graph-data
+                            :on-select-node on-select-node})
 
        ;; NEW: Final Result Panel
        (when result
@@ -701,6 +749,7 @@
           (case active-tab
             :info ($ info-panel {:graph-data graph-data
                                  :summary-data summary-data
+                                 :on-select-node on-select-node
                                  :module-id module-id
                                  :agent-name agent-name
                                  :task-id task-id

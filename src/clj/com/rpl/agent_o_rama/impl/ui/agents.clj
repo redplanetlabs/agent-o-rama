@@ -162,7 +162,7 @@
                                                     {:pkey agent-task-id})}
                         (foreign-select-one [(keypath agent-id)
                                              (submap [:result :start-time-millis :finish-time-millis :graph-version :retry-num
-                                                      :fork-of])]
+                                                      :fork-of :exception-summaries])]
                                             root-pstate
                                             {:pkey agent-task-id})))
 
