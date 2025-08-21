@@ -825,11 +825,66 @@
        (is (empty? examples))
 
 
-       ;; TODO: <<<<>>>
-       ;;  - verify schema errors and also correct adds to ds-id3
+       ;; now verify schema checking
+       (add-example-and-wait! manager
+                              ds-id3
+                              {"p1" [1 2 3]}
+                              {:reference-output "xyz"})
+       (add-example-and-wait! manager
+                              ds-id3
+                              {"p1" []
+                               "p2" "abc"})
+
+
+       (try
+         (add-example-and-wait! manager ds-id3 {"p1" #{1 2 3}})
+         (is false)
+         (catch clojure.lang.ExceptionInfo e
+           (is
+            (h/contains-string? (-> e
+                                    ex-data
+                                    :info)
+                                "x-javaType: $.p1 — expected java.util.List"))))
+
+       (try
+         (add-example-and-wait! manager ds-id3 {"p1" [] "p2" 3})
+         (is false)
+         (catch clojure.lang.ExceptionInfo e
+           (is
+            (h/contains-string? (-> e
+                                    ex-data
+                                    :info)
+                                "$.p2: integer found, string expected"))))
+
+       (try
+         (add-example-and-wait! manager
+                                ds-id3
+                                {"p1" []}
+                                {:reference-output 3})
+         (is false)
+         (catch clojure.lang.ExceptionInfo e
+           (is
+            (h/contains-string? (-> e
+                                    ex-data
+                                    :info)
+                                "$: integer found, string expected"))))
+
+
+       (bind {:keys [examples pagination-params]}
+         (queries/get-dataset-examples-page pstate ds-id3 nil 10 nil))
+       (is (nil? pagination-params))
+       (is (= (vals examples)
+              [{:input {"p1" [1 2 3]}
+                :reference-output "xyz"
+                :tags  #{}}
+               {:input {"p1" []
+                        "p2" "abc"}
+                :reference-output nil
+                :tags  #{}}]))
+
+
 
        ;; TODO: <<<<>>>>
-       ;;  - creating example with invalid input or output
        ;;  - updating example with invalid input or output
 
 
