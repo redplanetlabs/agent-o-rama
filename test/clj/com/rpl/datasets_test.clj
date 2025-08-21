@@ -579,6 +579,32 @@
          (create-and-wait! manager
                            "Dataset 8"))
 
+       (try
+         (aor/create-dataset! manager "bad schema" {:input-json-schema "><"})
+         (is false)
+         (catch clojure.lang.ExceptionInfo e
+           (is (h/contains-string? (ex-message e) "Error creating dataset"))
+           (is (h/contains-string? (-> e
+                                       ex-data
+                                       :info)
+                                   "Invalid JSON"))))
+       (try
+         (aor/create-dataset! manager
+                              "bad schema"
+                              {:output-json-schema (to-json {"type" "blah"})})
+         (is false)
+         (catch clojure.lang.ExceptionInfo e
+           (is (h/contains-string? (ex-message e) "Error creating dataset"))
+           (is (h/contains-string? (-> e
+                                       ex-data
+                                       :info)
+                                   "Invalid JSON"))
+           (is (h/contains-string?
+                (-> e
+                    ex-data
+                    :info)
+                "$.type: does not have a value in the enumeration"))))
+
        (is (not= ds-id1 ds-id2 ds-id3 ds-id4 ds-id5 ds-id6 ds-id7 ds-id8))
 
        (doseq [[s query-amt amt] [["dataset" 3 3]
@@ -649,6 +675,11 @@
                :input-json-schema (to-internal-json schema1)
                :output-json-schema (to-internal-json schema-str)}))
 
+       ;; TODO: <<<<>>>>
+       ;;  - creating dataset with invalid input or output schema
+       ;;    - verify key doesn't exist
+       ;;  - creating example with invalid input or output
+       ;;  - updating example with invalid input or output
 
 
        ; TODO: <<<<>>>>

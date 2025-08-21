@@ -185,13 +185,28 @@
   [^JsonSchema s data]
   (.validate s (wrap-pojos data)))
 
+(defn schema-validation-errors
+  [^JsonNode root]
+  (let [^JsonSchemaFactory f ^JsonSchemaFactory FACTORY
+        meta-uri   (java.net.URI/create (.getIri (JsonMetaSchema/getV202012)))
+        meta       (.getSchema f meta-uri)
+        violations (.validate meta root)]
+    (into #{} (map #(.getMessage ^ValidationMessage %)) violations)))
+
+
 (defn normalize-json-schema*
   [json-schema]
   (try
-    (let [^JsonNode root (.readTree ^ObjectMapper MAPPER ^String json-schema)]
+    (let [^JsonNode root (.readTree ^ObjectMapper MAPPER ^String json-schema)
+          errors         (when (some? root) (schema-validation-errors root))]
       (cond
         (nil? root)
         {:error "Invalid JSON schema: empty input."}
+
+        (-> errors
+            empty?
+            not)
+        {:error (str "Invalid JSON schema:\n\n" (str/join "\n" errors))}
 
         (not (.isObject root))
         {:error "Invalid JSON schema: root must be a JSON object."}
