@@ -93,7 +93,7 @@
                           ($ :svg {:className "w-2 h-2 text-white" :fill "none" :viewBox "0 0 24 24" :stroke "currentColor"}
                              ($ :path {:strokeLinecap "round" :strokeLinejoin "round" :strokeWidth 3 :d "M6 18L18 6M6 6l12 12"})))
                 :changed ($ :div {:className "w-3 h-3 bg-orange-400 rounded-full"})
-                :human ($ :div {:className "w-3 h-3 bg-amber-500 rounded-full animate-pulse"})
+                :human ($ :div {:className "w-3 h-3 flex items-center justify-center text-xs"} "🙋")
                 :exception ($ :div {:className "w-3 h-3 bg-yellow-500 rounded-full flex items-center justify-center"}
                               ($ ExclamationTriangleIcon {:className "w-2 h-2 text-white"}))
                 :success ($ :div {:className "w-3 h-3 bg-green-500 rounded-full"})
