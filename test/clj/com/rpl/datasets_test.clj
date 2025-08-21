@@ -635,6 +635,8 @@
         (= (setval
             [ALL
              (multi-path :task-id
+                         :created-at
+                         :modified-at
                          [:input-json-schema nil?]
                          [:output-json-schema nil?])]
             NONE
@@ -669,11 +671,13 @@
            ]))
 
        (bind res (queries/get-dataset-properties pstate ds-id3))
-       (is (= res
+       (is (= (dissoc res :created-at :modified-at)
               {:name "Dataset 3 – sample of inputs"
                :description "this is a description"
                :input-json-schema (to-internal-json schema1)
                :output-json-schema (to-internal-json schema-str)}))
+       (is (some? (:created-at res)))
+       (is (= (:created-at res) (:modified-at res)))
 
        (bind add-example-and-wait!
          (fn [& args]
@@ -697,6 +701,13 @@
            (.get ^java.util.concurrent.CompletableFuture
                  (apply aor/add-dataset-example-async! args))))
 
+       (bind examples-no-timestamps
+         (fn [examples]
+           (setval
+            [ALL (multi-path :created-at :modified-at)]
+            NONE
+            (vals examples))))
+
        (aor/set-dataset-name! manager ds-id8 "8 set data")
        (is (= "8 set data"
               (:name (queries/get-dataset-properties pstate ds-id8))))
@@ -714,7 +725,7 @@
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id1 nil 10 nil))
        (is (nil? pagination-params))
-       (is (= (vals examples)
+       (is (= (examples-no-timestamps examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
                {:input "example1-2"
                 :reference-output "output1-2"
@@ -724,7 +735,7 @@
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
        (is (nil? pagination-params))
-       (is (= (vals examples)
+       (is (= (examples-no-timestamps examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
                {:input "example1-2"
                 :reference-output "output1-2"
@@ -738,7 +749,7 @@
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
        (is (nil? pagination-params))
-       (is (= (vals examples)
+       (is (= (examples-no-timestamps examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
                {:input "example1-2"
                 :reference-output "output1-2"
@@ -749,7 +760,7 @@
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id1 nil 10 nil))
        (is (nil? pagination-params))
-       (is (= (vals examples)
+       (is (= (examples-no-timestamps examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
                {:input "example1-2"
                 :reference-output "output1-2"
@@ -759,7 +770,7 @@
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
        (is (nil? pagination-params))
-       (is (= (vals examples)
+       (is (= (examples-no-timestamps examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
                {:input "example1-2"
                 :reference-output "output1-2"
@@ -814,7 +825,7 @@
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id1 nil 10 nil))
        (is (nil? pagination-params))
-       (is (= (vals examples)
+       (is (= (examples-no-timestamps examples)
               [{:input "!!example-1"
                 :reference-output "out1"
                 :tags  #{"bar"}}]))
@@ -822,7 +833,7 @@
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
        (is (nil? pagination-params))
-       (is (= (vals examples)
+       (is (= (examples-no-timestamps examples)
               [{:input "snapshot-example-1"
                 :reference-output "snap-out-1"
                 :tags  #{"a" "c"}}
@@ -895,7 +906,7 @@
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id3 nil 10 nil))
        (is (nil? pagination-params))
-       (is (= (vals examples)
+       (is (= (examples-no-timestamps examples)
               [{:input {"p1" [1 2 3]}
                 :reference-output "xyz"
                 :tags  #{}}
@@ -932,7 +943,7 @@
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id3 nil 10 nil))
        (is (nil? pagination-params))
-       (is (= (vals examples)
+       (is (= (examples-no-timestamps examples)
               [{:input {"p1" [10]}
                 :reference-output "ww"
                 :tags  #{}}
@@ -955,7 +966,7 @@
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id3 nil 3 nil))
        (is (some? pagination-params))
-       (is (= (vals examples)
+       (is (= (examples-no-timestamps examples)
               [{:input {"p1" [10]}
                 :reference-output "ww"
                 :tags  #{}}
@@ -975,7 +986,7 @@
                                             3
                                             pagination-params))
        (is (nil? pagination-params))
-       (is (= (vals examples)
+       (is (= (examples-no-timestamps examples)
               [{:input {"p1" [8]}
                 :reference-output nil
                 :tags  #{}}
