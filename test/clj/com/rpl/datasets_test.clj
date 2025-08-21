@@ -907,7 +907,6 @@
                                     :info)
                                 "$: integer found, string expected"))))
 
-
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id3 nil 10 nil))
        (is (nil? pagination-params))
@@ -921,10 +920,50 @@
                 :tags  #{}}]))
 
 
+       (add-example-and-wait! manager
+                              ds-id3
+                              {"p1" [7]})
+       (add-example-and-wait! manager
+                              ds-id3
+                              {"p1" [8]})
+       (add-example-and-wait! manager
+                              ds-id3
+                              {"p1" [9]})
+
+       (bind {:keys [examples pagination-params]}
+         (queries/get-dataset-examples-page pstate ds-id3 nil 3 nil))
+       (is (some? pagination-params))
+       (is (= (vals examples)
+              [{:input {"p1" [10]}
+                :reference-output "ww"
+                :tags  #{}}
+               {:input {"p1" []
+                        "p2" "abc"}
+                :reference-output nil
+                :tags  #{}}
+               {:input {"p1" [7]}
+                :reference-output nil
+                :tags  #{}}
+              ]))
+
+       (bind {:keys [examples pagination-params]}
+         (queries/get-dataset-examples-page pstate
+                                            ds-id3
+                                            nil
+                                            3
+                                            pagination-params))
+       (is (nil? pagination-params))
+       (is (= (vals examples)
+              [{:input {"p1" [8]}
+                :reference-output nil
+                :tags  #{}}
+               {:input {"p1" [9]}
+                :reference-output nil
+                :tags  #{}}
+              ]))
+
+
        ; TODO: <<<<>>>>
-       ; (defn get-dataset-examples-page
-       ;   [datasets-pstate dataset-id snapshot-name amt pagination-params]
-       ;   - verify pagination part
        ; (defn destroy-dataset!
        ;   [^AgentManager manager dataset-id]
       ))))
