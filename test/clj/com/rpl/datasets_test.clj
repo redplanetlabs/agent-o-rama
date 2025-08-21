@@ -675,9 +675,15 @@
                :input-json-schema (to-internal-json schema1)
                :output-json-schema (to-internal-json schema-str)}))
 
+
+       (aor/set-dataset-name! manager ds-id8 "8 set data")
+       (is (= "8 set data"
+              (:name (queries/get-dataset-properties pstate ds-id8))))
+       (aor/set-dataset-description! manager ds-id8 "88812")
+       (is (= "88812"
+              (:description (queries/get-dataset-properties pstate ds-id8))))
+
        ;; TODO: <<<<>>>>
-       ;;  - creating dataset with invalid input or output schema
-       ;;    - verify key doesn't exist
        ;;  - creating example with invalid input or output
        ;;  - updating example with invalid input or output
 
@@ -686,13 +692,6 @@
        ; (defn get-dataset-snapshot-names [datasets-pstate dataset-id]
        ; (defn get-dataset-examples-page
        ;   [datasets-pstate dataset-id snapshot-name amt pagination-params]
-       ; (defn create-dataset!
-       ;   ([manager name
-       ;   ([^AgentManager manager name options]
-       ; (defn set-dataset-name!
-       ;   [^AgentManager manager dataset-id name]
-       ; (defn set-dataset-description!
-       ;   [^AgentManager manager dataset-id description]
        ; (defn destroy-dataset!
        ;   [^AgentManager manager dataset-id]
        ; (defn add-dataset-example!
