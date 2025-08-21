@@ -293,7 +293,11 @@
                        $$datasets)
 
     (case> UpdateDatasetProperty :> {:keys [*key *value]})
-     (local-transform> [(keypath *dataset-id :props *key) (termval *value)]
+     (local-transform> [(keypath *dataset-id)
+                        some?
+                        :props
+                        (keypath *key)
+                        (termval *value)]
                        $$datasets)
 
     (case> DestroyDataset)
@@ -330,7 +334,9 @@
 
       (default>))
      (local-transform>
-      [(keypath *dataset-id :snapshots *snapshot-name *example-id *key)
+      [(keypath *dataset-id :snapshots *snapshot-name *example-id)
+       some?
+       (keypath *key)
        (termval *value)]
       $$datasets)
 

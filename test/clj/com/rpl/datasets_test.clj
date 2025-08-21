@@ -882,10 +882,43 @@
                 :reference-output nil
                 :tags  #{}}]))
 
+       (bind [id1 id2] (keys examples))
+
+       (aor/set-dataset-example-input! manager ds-id3 id1 {"p1" [10]})
+       (aor/set-dataset-example-reference-output! manager ds-id3 id1 "ww")
+
+       (try
+         (aor/set-dataset-example-input! manager ds-id3 id2 [1 2 3])
+         (is false)
+         (catch clojure.lang.ExceptionInfo e
+           (is
+            (h/contains-string? (-> e
+                                    ex-data
+                                    :info)
+                                "$: array found, object expected"))))
+
+       (try
+         (aor/set-dataset-example-reference-output! manager ds-id3 id2 1)
+         (is false)
+         (catch clojure.lang.ExceptionInfo e
+           (is
+            (h/contains-string? (-> e
+                                    ex-data
+                                    :info)
+                                "$: integer found, string expected"))))
 
 
-       ;; TODO: <<<<>>>>
-       ;;  - updating example with invalid input or output
+       (bind {:keys [examples pagination-params]}
+         (queries/get-dataset-examples-page pstate ds-id3 nil 10 nil))
+       (is (nil? pagination-params))
+       (is (= (vals examples)
+              [{:input {"p1" [10]}
+                :reference-output "ww"
+                :tags  #{}}
+               {:input {"p1" []
+                        "p2" "abc"}
+                :reference-output nil
+                :tags  #{}}]))
 
 
        ; TODO: <<<<>>>>

@@ -632,22 +632,30 @@
            (throw (h/ex-info "Error adding example" {:info error})))
          uuid))
      (setDatasetExampleInput [this datasetId snapshotName exampleId input]
-       (foreign-append!
-        datasets-depot
-        (aor-types/->valid-UpdateDatasetExample datasetId
-                                                snapshotName
-                                                exampleId
-                                                :input
-                                                input)))
+       (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
+             (foreign-append!
+              datasets-depot
+              (aor-types/->valid-UpdateDatasetExample datasetId
+                                                      snapshotName
+                                                      exampleId
+                                                      :input
+                                                      input))]
+         (when error
+           (throw (h/ex-info "Error updating example" {:info error})))
+       ))
      (setDatasetExampleReferenceOutput
        [this datasetId snapshotName exampleId referenceOutput]
-       (foreign-append!
-        datasets-depot
-        (aor-types/->valid-UpdateDatasetExample datasetId
-                                                snapshotName
-                                                exampleId
-                                                :reference-output
-                                                referenceOutput)))
+       (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
+             (foreign-append!
+              datasets-depot
+              (aor-types/->valid-UpdateDatasetExample datasetId
+                                                      snapshotName
+                                                      exampleId
+                                                      :reference-output
+                                                      referenceOutput))]
+         (when error
+           (throw (h/ex-info "Error updating example" {:info error})))
+       ))
      (removeDatasetExample [this datasetId snapshotName exampleId]
        (foreign-append!
         datasets-depot
