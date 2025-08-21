@@ -432,8 +432,8 @@
    Lines look like:
      {\"input\": <json>, \"output\": <json optional>, \"tags\": [\"...\"] optional }"
   [^AgentManager manager dataset-id snapshot-name path failure-callback]
-  (let [^Semaphore sem (Semaphore. 100)
-        mapper         (j/object-mapper)]
+  (let [sem    (Semaphore. 100)
+        mapper (j/object-mapper)]
     (with-open [r (io/reader path)]
       (doseq [line (line-seq r)]
         (when-not (str/blank? line)
