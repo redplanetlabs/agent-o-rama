@@ -4,6 +4,7 @@
         [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.datasets :as datasets]
@@ -562,7 +563,8 @@
        (bind ds-id4
          (create-and-wait! manager
                            "Dataset 4 sample of movies"
-                           {:description "a description"}))
+                           {:description       "a description"
+                            :input-json-schema (to-json schema-str)}))
        (bind ds-id5
          (create-and-wait! manager
                            "Dataset 5 sample of books"))
@@ -656,7 +658,8 @@
              :description nil}
             {:dataset-id  ds-id4
              :name        "Dataset 4 sample of movies"
-             :description "a description"}
+             :description "a description"
+             :input-json-schema (to-internal-json schema-str)}
             {:dataset-id  ds-id3
              :name        "Dataset 3 – sample of inputs"
              :description "this is a description"
@@ -1078,4 +1081,60 @@
                   :datasets
                   last
                   :name)))
+
+
+       ;; now test bulk upload
+       (bind tmpdir
+         (java.nio.file.Files/createTempDirectory
+          "aor-jsonl-test"
+          (make-array java.nio.file.attribute.FileAttribute 0)))
+       (.deleteOnExit (.toFile tmpdir))
+       (bind jsonl-path (.resolve tmpdir "examples.jsonl"))
+       (bind jsonl-file (.toFile jsonl-path))
+       (.deleteOnExit jsonl-file)
+
+       (bind l1 "{\"input\":\"a\",\"output\":\"x\",\"tags\":[\"t1\",\"t2\"]}")
+       (bind l3 "{\"input\":\"bad\"") ; malformed JSON
+       (bind l4 "{\"input\":\"c\",\"output\":\"z\",\"tags\":5}") ; invalid tags
+       (bind l5 "{\"input\":\"d\",\"output\":\"w\",\"tags\":[\"ok\",7]}") ; invalid
+       (bind l6 "{\"input\":4,\"output\":\"w\",\"tags\":[\"ok\",7]}") ; invalid
+       (bind l2 "{\"input\":\"b\"}")
+       (bind lines [l1 l3 l4 l5 l6 l2])
+
+       (with-open [w (io/writer jsonl-file :encoding "UTF-8")]
+         (doseq [l lines]
+           (.write w ^String l)
+           (.write w "\n")))
+
+       (bind failures* (atom []))
+       (datasets/upload-jsonl-examples!
+        manager
+        ds-id4
+        nil
+        (.toString jsonl-path)
+        (fn [line ex]
+          (swap! failures* conj [line ex])))
+       (is (= 4 (count @failures*))
+           "Should record exactly 3 per-line failures")
+
+       (is (= #{l3 l4 l5 l6} (set (map first @failures*))))
+       (doseq [[line ex] @failures*]
+         (is (string? line))
+         (is (instance? Throwable ex)))
+
+       (bind {:keys [examples pagination-params]}
+         (queries/get-dataset-examples-page pstate
+                                            ds-id4
+                                            nil
+                                            100
+                                            pagination-params))
+       (is (nil? pagination-params))
+       (is (= (examples-no-timestamps examples)
+              [{:input "a"
+                :reference-output "x"
+                :tags  #{"t1" "t2"}}
+               {:input "b"
+                :reference-output nil
+                :tags  #{}}
+              ]))
       ))))
