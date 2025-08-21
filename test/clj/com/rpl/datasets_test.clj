@@ -962,8 +962,13 @@
                 :tags  #{}}
               ]))
 
+       (aor/destroy-dataset! manager ds-id1)
+       (is (nil? (queries/get-dataset-properties pstate ds-id1)))
 
-       ; TODO: <<<<>>>>
-       ; (defn destroy-dataset!
-       ;   [^AgentManager manager dataset-id]
+       (bind page (foreign-invoke-query page-query 1000 nil))
+       (is (= "Dataset sample 2"
+              (-> page
+                  :datasets
+                  last
+                  :name)))
       ))))
