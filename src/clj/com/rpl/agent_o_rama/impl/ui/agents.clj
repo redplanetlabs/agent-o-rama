@@ -152,19 +152,18 @@
         ;; Explicit initial flag from client; fallback to leaves-empty for backward compat
         is-initial-load? (boolean initial?)
 
-        ;; Get summary info on first request
-        summary-info (when is-initial-load?
-                       (merge
-                        {:forks (foreign-select-one [(keypath agent-id)
-                                                     :forks
-                                                     (sorted-set-range-to-end 100)]
-                                                    root-pstate
-                                                    {:pkey agent-task-id})}
-                        (foreign-select-one [(keypath agent-id)
-                                             (submap [:result :start-time-millis :finish-time-millis :graph-version :retry-num
-                                                      :fork-of :exception-summaries])]
-                                            root-pstate
-                                            {:pkey agent-task-id})))
+        ;; ALWAYS get summary info on EVERY request now
+        summary-info (merge
+                      {:forks (foreign-select-one [(keypath agent-id)
+                                                   :forks
+                                                   (sorted-set-range-to-end 100)]
+                                                  root-pstate
+                                                  {:pkey agent-task-id})}
+                      (foreign-select-one [(keypath agent-id)
+                                           (submap [:result :start-time-millis :finish-time-millis :graph-version :retry-num
+                                                    :fork-of :exception-summaries])]
+                                          root-pstate
+                                          {:pkey agent-task-id}))
 
         ;; Get historical graph on first request for implicit edge calculation
         historical-graph (when is-initial-load?
@@ -205,11 +204,11 @@
       (cond-> {:is-complete agent-is-complete?}
         (seq cleaned-nodes) (assoc :nodes cleaned-nodes)
         (seq next-leaves) (assoc :next-leaves next-leaves)
-        is-initial-load? (assoc :summary summary-info
-                                :historical-graph historical-graph
-                                :root-invoke-id (when (seq start-pairs) (second (first start-pairs)))
-                                :task-id agent-task-id
-                                :agent-id agent-id)))))
+        true (assoc :summary summary-info
+                    :root-invoke-id (when (seq start-pairs) (second (first start-pairs)))
+                    :task-id agent-task-id
+                    :agent-id agent-id)
+        is-initial-load? (assoc :historical-graph historical-graph)))))
 
 (defmethod api-handler :api/execute-fork
   [_ {:keys [module-id agent-name invoke-id changed-nodes]} uid]
