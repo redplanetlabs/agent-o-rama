@@ -680,6 +680,17 @@
            (Thread/sleep 2)
            (apply aor/add-dataset-example! args)))
 
+       (bind add-example-and-wait-java!
+         (fn [^com.rpl.agentorama.AgentManager manager dataset-id snapshot-bame
+              input reference-output tags]
+           (Thread/sleep 2)
+           (.addDatasetExample manager
+                               dataset-id
+                               snapshot-bame
+                               input
+                               reference-output
+                               tags)))
+
        (bind add-example-and-wait-async!
          (fn [& args]
            (Thread/sleep 2)
@@ -718,10 +729,12 @@
                {:input "example1-2"
                 :reference-output "output1-2"
                 :tags  #{"tag1" "tag2"}}]))
-       (add-example-and-wait! manager
-                              ds-id1
-                              "examples1-1"
-                              {:snapshot "snapshot1"})
+       (add-example-and-wait-java! manager
+                                   ds-id1
+                                   "snapshot1"
+                                   "examples1-1"
+                                   nil
+                                   nil)
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
        (is (nil? pagination-params))
