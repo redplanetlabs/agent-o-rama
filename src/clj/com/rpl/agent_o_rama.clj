@@ -617,20 +617,31 @@
        (foreign-append!
         datasets-depot
         (aor-types/->valid-DestroyDataset datasetId)))
-     (addDatasetExample [this datasetId snapshotName input referenceOutput tags]
-       (let [uuid (h/random-uuid7)
-             {error aor-types/AGENTS-TOPOLOGY-NAME}
-             (foreign-append!
+     (addDatasetExampleAsync
+       [this datasetId snapshotName input referenceOutput tags]
+       (let [uuid (h/random-uuid7)]
+         (-> (foreign-append-async!
               datasets-depot
-              (aor-types/->valid-AddDatasetExample datasetId
-                                                   snapshotName
-                                                   uuid
-                                                   input
-                                                   referenceOutput
-                                                   (into #{} tags)))]
-         (when error
-           (throw (h/ex-info "Error adding example" {:info error})))
-         uuid))
+              (aor-types/->valid-AddDatasetExample
+               datasetId
+               snapshotName
+               uuid
+               input
+               referenceOutput
+               (into #{} tags)))
+             (.thenApply
+              (h/cf-function [{error aor-types/AGENTS-TOPOLOGY-NAME}]
+                (when error
+                  (throw (h/ex-info "Error adding example" {:info error})))
+                uuid
+              )))))
+     (addDatasetExample [this datasetId snapshotName input referenceOutput tags]
+       (.get (.addDatasetExampleAsync this
+                                      datasetId
+                                      snapshotName
+                                      input
+                                      referenceOutput
+                                      tags)))
      (setDatasetExampleInput [this datasetId snapshotName exampleId input]
        (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
              (foreign-append!
@@ -842,22 +853,28 @@
   [^AgentManager manager dataset-id]
   (.destroyDataset manager dataset-id))
 
-(defn add-dataset-example!
-  ([manager dataset-id input]
-   (add-dataset-example! manager dataset-id input nil))
-  ([^AgentManager manager dataset-id input options]
+(defn add-dataset-example-async!
+  (^CompletableFuture [manager dataset-id input]
+   (add-dataset-example-async! manager dataset-id input nil))
+  (^CompletableFuture [^AgentManager manager dataset-id input options]
    ;; types are validated by Java API
    (h/validate-options! name
                         options
                         {:snapshot h/any-spec
                          :reference-output h/any-spec
                          :tags     h/any-spec})
-   (.addDatasetExample manager
-                       dataset-id
-                       (:snapshot options)
-                       input
-                       (:reference-output options)
-                       (:tags options))))
+   (.addDatasetExampleAsync manager
+                            dataset-id
+                            (:snapshot options)
+                            input
+                            (:reference-output options)
+                            (:tags options))))
+
+(defn add-dataset-example!
+  ([manager dataset-id input]
+   (.get (add-dataset-example-async! manager dataset-id input)))
+  ([^AgentManager manager dataset-id input options]
+   (.get (add-dataset-example-async! manager dataset-id input options))))
 
 (defn set-dataset-example-input!
   ([manager dataset-id example-id input]

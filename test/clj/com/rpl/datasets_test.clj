@@ -680,6 +680,12 @@
            (Thread/sleep 2)
            (apply aor/add-dataset-example! args)))
 
+       (bind add-example-and-wait-async!
+         (fn [& args]
+           (Thread/sleep 2)
+           (.get ^java.util.concurrent.CompletableFuture
+                 (apply aor/add-dataset-example-async! args))))
+
        (aor/set-dataset-name! manager ds-id8 "8 set data")
        (is (= "8 set data"
               (:name (queries/get-dataset-properties pstate ds-id8))))
@@ -826,22 +832,23 @@
 
 
        ;; now verify schema checking
-       (add-example-and-wait! manager
-                              ds-id3
-                              {"p1" [1 2 3]}
-                              {:reference-output "xyz"})
-       (add-example-and-wait! manager
-                              ds-id3
-                              {"p1" []
-                               "p2" "abc"})
+       (add-example-and-wait-async! manager
+                                    ds-id3
+                                    {"p1" [1 2 3]}
+                                    {:reference-output "xyz"})
+       (add-example-and-wait-async! manager
+                                    ds-id3
+                                    {"p1" []
+                                     "p2" "abc"})
 
 
        (try
          (add-example-and-wait! manager ds-id3 {"p1" #{1 2 3}})
          (is false)
-         (catch clojure.lang.ExceptionInfo e
+         (catch Exception e
            (is
             (h/contains-string? (-> e
+                                    .getCause
                                     ex-data
                                     :info)
                                 "x-javaType: $.p1 — expected java.util.List"))))
@@ -849,9 +856,10 @@
        (try
          (add-example-and-wait! manager ds-id3 {"p1" [] "p2" 3})
          (is false)
-         (catch clojure.lang.ExceptionInfo e
+         (catch Exception e
            (is
             (h/contains-string? (-> e
+                                    .getCause
                                     ex-data
                                     :info)
                                 "$.p2: integer found, string expected"))))
@@ -862,9 +870,10 @@
                                 {"p1" []}
                                 {:reference-output 3})
          (is false)
-         (catch clojure.lang.ExceptionInfo e
+         (catch Exception e
            (is
             (h/contains-string? (-> e
+                                    .getCause
                                     ex-data
                                     :info)
                                 "$: integer found, string expected"))))

@@ -230,9 +230,13 @@
       (map-schema
        UUID ; example ID
        (fixed-keys-schema
-        {:input Object
+        {:input            Object
          :reference-output Object
-         :tags  #{String}})
+         :tags             #{String}
+         :source           String
+         :created-at       Long
+         :modified-at      Long
+        })
        {:subindex? true})
       {:subindex? true})}
    )})

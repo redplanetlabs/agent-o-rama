@@ -8,6 +8,7 @@ import com.rpl.rama.cluster.ClusterManagerBase;
 
 import java.io.Closeable;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 public interface AgentManager extends IFetchAgentClient, Closeable {
   public static AgentManager create(ClusterManagerBase cluster, String moduleName) {
@@ -21,6 +22,7 @@ public interface AgentManager extends IFetchAgentClient, Closeable {
   void setDatasetName(UUID datasetId, String name);
   void setDatasetDescription(UUID datasetId, String description);
   void destroyDataset(UUID datasetId);
+  CompletableFuture<Void> addDatasetExampleAsync(UUID datasetId, String snapshotName, Object input, Object referenceOutput, Set<String> tags);
   UUID addDatasetExample(UUID datasetId, String snapshotName, Object input, Object referenceOutput, Set<String> tags);
   void setDatasetExampleInput(UUID datasetId, String snapshotName, UUID exampleId, Object input);
   void setDatasetExampleReferenceOutput(UUID datasetId, String snapshotName, UUID exampleId, Object referenceOutput);
