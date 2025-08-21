@@ -587,19 +587,20 @@
                     is-loaded? (contains? graph-data invoke-id)]
                 ($ :div {:key idx
                          :className "bg-white p-2 rounded border border-red-100"}
-                   ($ :div {:className "flex justify-between items-start"}
-                      ($ :div {:className "flex-1"}
+                   ;; Stack vertically instead of horizontal flex to prevent overflow
+                   ($ :div {:className "space-y-2"}
+                      ($ :div
                          ($ :div {:className "font-semibold text-red-800 text-sm"} node-name)
-                         ($ :div {:className "text-xs font-mono text-red-600 mt-1 truncate"} first-line))
-                      ($ :div {:className "flex items-center gap-1 ml-2"}
-                         ;; Button to view full exception details in a modal
-                         ($ :button {:className "text-xs text-blue-600 hover:underline cursor-pointer"
-                                     :onClick (fn [e]
-                                                (.stopPropagation e)
-                                                (state/dispatch [:modal/show :exception-detail
-                                                                 {:title (str "Exception in " node-name)
-                                                                  :content throwable-str}]))}
-                            "Details")
+                         ;; Make the exception text clickable with hover effect
+                         ($ :div {:className "text-xs font-mono text-red-600 mt-1 break-words cursor-pointer hover:bg-red-100 px-1 py-0.5 rounded transition-colors"
+                                  :onClick (fn [e]
+                                             (.stopPropagation e)
+                                             (state/dispatch [:modal/show :exception-detail
+                                                              {:title (str "Exception in " node-name)
+                                                               :content throwable-str}]))
+                                  :title "Click to view full exception"}
+                              first-line))
+                      ($ :div {:className "flex items-center gap-2 justify-end"}
                          ;; Button to navigate to the node in the graph
                          ($ :button {:className (str "text-xs font-medium px-2 py-1 rounded "
                                                      (if is-loaded?
@@ -621,19 +622,12 @@
 
     ($ :div {:className "space-y-4"}
 
-       ;; Lineage Panel
        ($ lineage-panel {:module-id module-id
                          :agent-name agent-name
                          :task-id task-id
                          :forks forks
                          :fork-of fork-of})
 
-       ;; NEW: Exceptions Panel - Add this right after the lineage panel
-       ($ exceptions-panel {:summary-data summary-data
-                            :graph-data graph-data
-                            :on-select-node on-select-node})
-
-       ;; NEW: Final Result Panel
        (when result
          ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
             ($ :div {:className "flex justify-between items-center mb-2"}
@@ -645,6 +639,10 @@
                                     :color (if failure? "red" "green")
                                     :truncate-length 100
                                     :depth 0})))
+
+       ($ exceptions-panel {:summary-data summary-data
+                            :graph-data graph-data
+                            :on-select-node on-select-node})
 
        ($ :div {:className "text-sm font-medium text-gray-700 pt-2 border-t border-gray-200"} "Overall Stats")
 
