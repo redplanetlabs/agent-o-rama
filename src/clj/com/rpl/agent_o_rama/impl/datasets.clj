@@ -2,11 +2,13 @@
   (:use [com.rpl.rama]
         [com.rpl.rama path])
   (:require
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.rama.ops :as ops])
+   [com.rpl.rama.ops :as ops]
+   [jsonista.core :as j])
   (:import
    [com.fasterxml.jackson.databind
     ObjectMapper
@@ -26,6 +28,8 @@
     JsonNodePath
     ValidationContext
     SpecVersion$VersionFlag]
+   [com.rpl.agentorama
+    AgentManager]
    [com.rpl.agent_o_rama.impl.types
     AddDatasetExample
     AddDatasetExampleTag
@@ -42,9 +46,11 @@
     LinkedHashSet
     List
     Map]
+   [java.util.concurrent
+    Semaphore]
    [java.util.function
+    BiConsumer
     Consumer]))
-
 
 (def ^ObjectMapper MAPPER (ObjectMapper.))
 (def META "urn:agent-o-rama:meta:java-types-2020-12")
@@ -416,3 +422,57 @@
       *dataset-id
       [(keypath :snapshots *snapshot-name) NONE>])
    )))
+
+(defn upload-jsonl-examples!
+  "Best-effort JSONL uploader.
+
+     path is String path to UTF-8 JSONL file
+     failure-callback is (fn [line ex]) for any per-line failure
+
+   Lines look like:
+     {\"input\": <json>, \"output\": <json optional>, \"tags\": [\"...\"] optional }"
+  [^AgentManager manager dataset-id snapshot-name path failure-callback]
+  (let [^Semaphore sem (Semaphore. 100)
+        mapper         (j/object-mapper)]
+    (with-open [r (io/reader path)]
+      (doseq [line (line-seq r)]
+        (when-not (str/blank? line)
+          (let [m (try
+                    (j/read-value line mapper)
+                    (catch Exception ex
+                      (failure-callback line ex)
+                      ::parse-failed))]
+            (when-not (identical? ::parse-failed m)
+              (let [input  (get m "input")
+                    output (get m "output")
+                    tags-v (get m "tags")]
+                (if-not (or (nil? tags-v)
+                            (and (sequential? tags-v) (every? string? tags-v)))
+                  (failure-callback
+                   line
+                   (ex-info
+                    "Tags must be an array of strings or omitted"
+                    {:tags tags-v}))
+                  (let [tags (if (nil? tags-v) #{} (set tags-v))]
+                    (.acquire sem)
+                    (try
+                      (let [cf
+                            (.addDatasetExampleAsync manager
+                                                     dataset-id
+                                                     snapshot-name
+                                                     input
+                                                     output
+                                                     tags)]
+                        (.whenComplete cf
+                                       (reify
+                                        BiConsumer
+                                        (accept [_ _ ex]
+                                          (.release sem)
+                                          (when ex
+                                            (failure-callback line ex))))))
+                      (catch Throwable t
+                        (.release sem)
+                        (failure-callback line t))))
+                ))))))
+      (.acquire sem 100)
+      nil)))
