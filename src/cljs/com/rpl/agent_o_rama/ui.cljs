@@ -62,7 +62,9 @@
   (let [[location _] (useLocation)
         ;; Derive params from the current route using a matcher
         [match params] (useRoute "/agents/:module-id/:agent-name*")
-        {:keys [module-id agent-name]} (js->clj params :keywordize-keys true)
+        params-clj (js->clj params :keywordize-keys true)
+        module-id (:module-id params-clj)
+        agent-name (get params-clj :agent-name*)
         [collapsed? set-collapsed] (common/use-local-storage "sidebar-collapsed?" false)
         toggle-collapsed #(set-collapsed (not collapsed?))]
 
