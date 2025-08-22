@@ -13,6 +13,7 @@
     AggInput
     ExceptionSummary
     ForkContext
+    LinkedTrace
     NestedOpInfo
     NodeHumanInputRequest
     HistoricalAgentGraphInfo
@@ -236,6 +237,7 @@
          :reference-output Object
          :tags             #{String}
          :source           String
+         :linked-trace     LinkedTrace
          :created-at       Long
          :modified-at      Long
         })

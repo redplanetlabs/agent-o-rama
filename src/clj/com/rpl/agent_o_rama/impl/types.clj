@@ -260,6 +260,11 @@
 (drp/defrecord+ DestroyDataset
   [dataset-id :- UUID])
 
+(drp/defrecord+ LinkedTrace
+  [module-name :- String
+   agent-name :- String
+   agent-invoke :- AgentInvokeImpl])
+
 (drp/defrecord+ AddDatasetExample
   [dataset-id :- UUID
    snapshot-name :- (s/maybe String)
@@ -267,6 +272,8 @@
    input :- Object
    reference-output :- (s/maybe Object)
    tags :- (s/maybe #{String})
+   source :- (s/maybe String)
+   linked-trace :- (s/maybe LinkedTrace)
   ])
 
 (drp/defrecord+ UpdateDatasetExample

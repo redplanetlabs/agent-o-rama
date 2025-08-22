@@ -343,7 +343,7 @@
 
     (case> AddDatasetExample
            :> {:keys [*snapshot-name *example-id *input *reference-output
-                       *tags]})
+                       *tags *source *linked-trace]})
      (get *props :input-json-schema :> *input-json-schema)
      (get *props :output-json-schema :> *output-json-schema)
      (validate-with-schema> *input-json-schema *input)
@@ -357,6 +357,8 @@
                         {:input            *input
                          :reference-output *reference-output
                          :tags             *tags
+                         :source           *source
+                         :linked-trace     *linked-trace
                          :created-at       *current-time-millis
                          :modified-at      *current-time-millis})])
 
@@ -459,6 +461,7 @@
                     (set! (.snapshotName options) snapshot-name)
                     (set! (.tags options) tags)
                     (set! (.referenceOutput options) output)
+                    (set! (.source options) "bulkUpload")
                     (.acquire sem)
                     (try
                       (let [cf

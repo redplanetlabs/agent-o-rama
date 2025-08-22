@@ -630,7 +630,10 @@
                uuid
                input
                (.referenceOutput options)
-               (into #{} (.tags options))))
+               (into #{} (.tags options))
+               (.source options)
+               (.linkedTrace options)
+              ))
              (.thenApply
               (h/cf-function [{error aor-types/AGENTS-TOPOLOGY-NAME}]
                 (when error
@@ -860,13 +863,17 @@
    ;; types are validated by Java API
    (h/validate-options! name
                         options
-                        {:snapshot h/any-spec
+                        {:snapshot         h/any-spec
                          :reference-output h/any-spec
-                         :tags     h/any-spec})
+                         :tags             h/any-spec
+                         :source           h/any-spec
+                         :linked-trace     h/any-spec})
    (let [joptions (AddDatasetExampleOptions.)]
      (set! (.snapshotName joptions) (:snapshot options))
      (set! (.referenceOutput joptions) (:reference-output options))
      (set! (.tags joptions) (:tags options))
+     (set! (.source joptions) (:source options))
+     (set! (.linkedTrace joptions) (:linked-trace options))
      (.addDatasetExampleAsync manager
                               dataset-id
                               input
