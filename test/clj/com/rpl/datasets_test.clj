@@ -922,28 +922,42 @@
         #(aor/remove-dataset-example! manager ds-id1 id2))
        (aor/remove-dataset-example! manager ds-id1 id3 {:snapshot "snapshot1"})
 
+
+       (verified-example-times
+        ds-id1
+        nil
+        id1
+        #(aor/set-dataset-example-source! manager ds-id1 id1 "manual"))
+
+
+       (aor/set-dataset-example-source! manager
+                                        ds-id1
+                                        id1
+                                        "manual2"
+                                        {:snapshot "snapshot1"})
+
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id1 nil 10 nil))
        (is (nil? pagination-params))
        (is (= (examples-cleaned examples)
-              [{:input "!!example-1"
+              [{:input  "!!example-1"
                 :reference-output "out1"
-                :tags  #{"bar"}}]))
+                :tags   #{"bar"}
+                :source "manual"}]))
 
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
        (is (nil? pagination-params))
        (is (= (examples-cleaned examples)
-              [{:input "snapshot-example-1"
+              [{:input  "snapshot-example-1"
                 :reference-output "snap-out-1"
-                :tags  #{"a" "c"}}
-               {:input "example1-2"
+                :tags   #{"a" "c"}
+                :source "manual2"}
+               {:input        "example1-2"
                 :reference-output "output1-2"
-                :tags  #{"tag1" "tag2"}}]))
-       :source
-       "ai"
-       :linked-trace
-       li
+                :tags         #{"tag1" "tag2"}
+                :source       "ai"
+                :linked-trace li}]))
 
        (is (= #{"snapshot1" "snapshot2"}
               (queries/get-dataset-snapshot-names pstate ds-id1)))
