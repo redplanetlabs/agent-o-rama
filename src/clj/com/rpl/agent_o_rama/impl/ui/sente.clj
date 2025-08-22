@@ -57,8 +57,8 @@
                   :error (.getMessage e)}))))
 
 ;; do nothing
-(defmethod -event-msg-handler :chsk/ws-ping [ev-msg] (comment "Ping received, no action needed."))
-(defmethod -event-msg-handler :chsk/ws-pong [ev-msg] (comment "Pong received, no action needed."))
+(defmethod -event-msg-handler :chsk/ws-ping [ev-msg])
+(defmethod -event-msg-handler :chsk/ws-pong [ev-msg])
 (defmethod -event-msg-handler :chsk/uidport-open [{:as ev-msg :keys [uid]}])
 (defmethod -event-msg-handler :chsk/uidport-close [{:as ev-msg :keys [uid]}])
 
