@@ -144,7 +144,7 @@
                      
                      ;; Then merge the new nodes into the existing graph.
                      (when (and nodes (seq nodes))
-                       (state/dispatch [:invocation/merge-nodes invoke-id nodes]))
+                       (state/dispatch [:invocation/merge-nodes invoke-id nodes root-invoke-id]))
 
                      ;; Now, decide on the next action based on the server response.
                      (cond
@@ -183,13 +183,15 @@
 
 
 (state/reg-event :invocation/merge-nodes
-                 (fn [db invoke-id new-nodes-map]
+                 (fn [db invoke-id new-nodes-map root-invoke-id-from-payload]
                    (let [historical-graph (get-in db [:invocations-data invoke-id :historical-graph])
                          current-raw-nodes (get-in db [:invocations-data invoke-id :graph :raw-nodes])
                          merged-raw-nodes (merge current-raw-nodes new-nodes-map)
-
-                         root-invoke-id (get-in db [:invocations-data invoke-id :root-invoke-id])
-
+                         
+                         ;; Prioritize the ID from the payload, fallback to the one in db.
+                         root-invoke-id (or root-invoke-id-from-payload
+                                            (get-in db [:invocations-data invoke-id :root-invoke-id]))
+                         
                          {:keys [nodes edges implicit-edges]}
                          (build-drawable-graph merged-raw-nodes root-invoke-id historical-graph)]
 
