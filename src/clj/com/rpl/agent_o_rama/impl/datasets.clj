@@ -29,6 +29,7 @@
     ValidationContext
     SpecVersion$VersionFlag]
    [com.rpl.agentorama
+    AddDatasetExampleOptions
     AgentManager]
    [com.rpl.agent_o_rama.impl.types
     AddDatasetExample
@@ -453,16 +454,18 @@
                    (ex-info
                     "Tags must be an array of strings or omitted"
                     {:tags tags-v}))
-                  (let [tags (if (nil? tags-v) #{} (set tags-v))]
+                  (let [tags    (if (nil? tags-v) #{} (set tags-v))
+                        options (AddDatasetExampleOptions.)]
+                    (set! (.snapshotName options) snapshot-name)
+                    (set! (.tags options) tags)
+                    (set! (.referenceOutput options) output)
                     (.acquire sem)
                     (try
                       (let [cf
                             (.addDatasetExampleAsync manager
                                                      dataset-id
-                                                     snapshot-name
                                                      input
-                                                     output
-                                                     tags)]
+                                                     options)]
                         (.whenComplete cf
                                        (reify
                                         BiConsumer

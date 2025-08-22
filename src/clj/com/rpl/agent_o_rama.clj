@@ -16,6 +16,7 @@
    [com.rpl.rama.aggs :as aggs])
   (:import
    [com.rpl.agentorama
+    AddDatasetExampleOptions
     AgentClient
     AgentClient$StreamAllCallback
     AgentClient$StreamCallback
@@ -618,30 +619,29 @@
         datasets-depot
         (aor-types/->valid-DestroyDataset datasetId)))
      (addDatasetExampleAsync
-       [this datasetId snapshotName input referenceOutput tags]
-       (let [uuid (h/random-uuid7)]
+       [this datasetId input options]
+       (let [options (or options (AddDatasetExampleOptions.))
+             uuid    (h/random-uuid7)]
          (-> (foreign-append-async!
               datasets-depot
               (aor-types/->valid-AddDatasetExample
                datasetId
-               snapshotName
+               (.snapshotName options)
                uuid
                input
-               referenceOutput
-               (into #{} tags)))
+               (.referenceOutput options)
+               (into #{} (.tags options))))
              (.thenApply
               (h/cf-function [{error aor-types/AGENTS-TOPOLOGY-NAME}]
                 (when error
                   (throw (h/ex-info "Error adding example" {:info error})))
                 uuid
               )))))
-     (addDatasetExample [this datasetId snapshotName input referenceOutput tags]
+     (addDatasetExample [this datasetId input options]
        (.get (.addDatasetExampleAsync this
                                       datasetId
-                                      snapshotName
                                       input
-                                      referenceOutput
-                                      tags)))
+                                      options)))
      (setDatasetExampleInput [this datasetId snapshotName exampleId input]
        (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
              (foreign-append!
@@ -863,12 +863,14 @@
                         {:snapshot h/any-spec
                          :reference-output h/any-spec
                          :tags     h/any-spec})
-   (.addDatasetExampleAsync manager
-                            dataset-id
-                            (:snapshot options)
-                            input
-                            (:reference-output options)
-                            (:tags options))))
+   (let [joptions (AddDatasetExampleOptions.)]
+     (set! (.snapshotName joptions) (:snapshot options))
+     (set! (.referenceOutput joptions) (:reference-output options))
+     (set! (.tags joptions) (:tags options))
+     (.addDatasetExampleAsync manager
+                              dataset-id
+                              input
+                              joptions))))
 
 (defn add-dataset-example!
   ([manager dataset-id input]

@@ -22,7 +22,9 @@
     JsonNode]
    [com.networknt.schema
     JsonSchema
-    ValidationMessage]))
+    ValidationMessage]
+   [com.rpl.agentorama
+    AddDatasetExampleOptions]))
 
 
 (defrecord Person [name age])
@@ -688,15 +690,17 @@
            (apply aor/add-dataset-example! args)))
 
        (bind add-example-and-wait-java!
-         (fn [^com.rpl.agentorama.AgentManager manager dataset-id snapshot-bame
+         (fn [^com.rpl.agentorama.AgentManager manager dataset-id snapshot-name
               input reference-output tags]
            (Thread/sleep 2)
-           (.addDatasetExample manager
-                               dataset-id
-                               snapshot-bame
-                               input
-                               reference-output
-                               tags)))
+           (let [options (AddDatasetExampleOptions.)]
+             (set! (.snapshotName options) snapshot-name)
+             (set! (.referenceOutput options) reference-output)
+             (set! (.tags options) tags)
+             (.addDatasetExample manager
+                                 dataset-id
+                                 input
+                                 options))))
 
        (bind add-example-and-wait-async!
          (fn [& args]
