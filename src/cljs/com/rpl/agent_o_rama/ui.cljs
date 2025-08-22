@@ -43,11 +43,11 @@
           ($ RectangleStackIcon {:className "h-5 w-5 flex-shrink-0"})
           (when-not collapsed? ($ :span.ml-3 "Invocations")))
 
-       ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/stats")
-                    :location location :collapsed? collapsed? :title "Stats"}
+       ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/datsets")
+                    :location location :collapsed? collapsed? :title "Datasets"}
           ($ ChartBarIcon {:className "h-5 w-5 flex-shrink-0"})
-          (when-not collapsed? ($ :span.ml-3 "Stats")))
-
+          (when-not collapsed? ($ :span.ml-3 "Evaluations")))
+       
        ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/evaluations")
                     :location location :collapsed? collapsed? :title "Evaluations"}
           ($ BeakerIcon {:className "h-5 w-5 flex-shrink-0"})
@@ -93,15 +93,7 @@
           ($ :div.space-y-2
              ($ nav-link {:href "/" :location location :collapsed? collapsed? :title "Overview"}
                 ($ HomeIcon {:className "h-5 w-5 flex-shrink-0"})
-                (when-not collapsed? ($ :span.ml-3 "Overview")))
-
-             ($ nav-link {:href "/agents" :location location :collapsed? collapsed? :title "Agents"}
-                ($ CpuChipIcon {:className "h-5 w-5 flex-shrink-0"})
-                (when-not collapsed? ($ :span.ml-3 "Agents")))
-
-             ($ nav-link {:href "/datasets" :location location :collapsed? collapsed? :title "Datasets"}
-                ($ CircleStackIcon {:className "h-5 w-5 flex-shrink-0"})
-                (when-not collapsed? ($ :span.ml-3 "Datasets"))))
+                (when-not collapsed? ($ :span.ml-3 "Overview"))))
 
           (when is-agent-context?
             ($ agent-context-nav {:module-id module-id
