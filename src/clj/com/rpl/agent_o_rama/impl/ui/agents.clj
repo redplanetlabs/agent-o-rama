@@ -291,9 +291,8 @@
       (let [parsed-value (case (schema-fn->input-type (:schema-fn config-def))
                            :number (Long/parseLong value)
                            value)
-            ;; Dynamically find the correct change-* function, e.g., 'change-max-retries'
-            change-fn-name (str "change-" (str/replace key #"\." "-"))
-            change-fn (ns-resolve 'com.rpl.agent-o-rama.impl.types (symbol change-fn-name))
+            ;; Get the change function directly from the config definition
+            change-fn (:change-fn config-def)
             change-record (change-fn parsed-value)]
         (foreign-append! agent-config-depot change-record)
         {:success true})
