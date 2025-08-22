@@ -131,11 +131,11 @@
                      (when summary
                        (let [{:keys [forks fork-of]} summary
                              ;; Build key-value pairs conditionally
-                             kvps (cond-> [[[:invocations-data invoke-id :summary] summary]]
-                                    [[:invocations-data invoke-id :task-id] task-id]
-                                    [[:invocations-data invoke-id :forks] forks]
-                                    [[:invocations-data invoke-id :fork-of] fork-of]
-                                    [[:invocations-data invoke-id :status] :success]
+                             kvps (cond-> [[[:invocations-data invoke-id :summary] summary]
+                                           [[:invocations-data invoke-id :task-id] task-id]
+                                           [[:invocations-data invoke-id :forks] forks]
+                                           [[:invocations-data invoke-id :fork-of] fork-of]
+                                           [[:invocations-data invoke-id :status] :success]]
                                     (some? historical-graph)
                                     (conj [[:invocations-data invoke-id :historical-graph] historical-graph])
 
