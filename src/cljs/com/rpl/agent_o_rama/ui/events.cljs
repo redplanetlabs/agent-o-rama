@@ -126,27 +126,26 @@
                    (let [{:keys [nodes next-leaves summary historical-graph root-invoke-id
                                  task-id is-complete]} page-data
                          current-invocation (get-in db [:current-invocation])]
-                     
+
                      ;; Always update the summary and completion status first.
                      (when summary
                        (let [{:keys [forks fork-of]} summary
                              ;; Build key-value pairs conditionally
-                             kvps (cond-> [[[:invocations-data invoke-id :summary] summary]
-                                          [[:invocations-data invoke-id :task-id] task-id]
-                                          [[:invocations-data invoke-id :forks] forks]
-                                          [[:invocations-data invoke-id :fork-of] fork-of]
-                                          [[:invocations-data invoke-id :status] :success]]
+                             kvps (cond-> [[[:invocations-data invoke-id :summary] summary]]
+                                    [[:invocations-data invoke-id :task-id] task-id]
+                                    [[:invocations-data invoke-id :forks] forks]
+                                    [[:invocations-data invoke-id :fork-of] fork-of]
+                                    [[:invocations-data invoke-id :status] :success]
                                     (some? historical-graph)
                                     (conj [[:invocations-data invoke-id :historical-graph] historical-graph])
-                                    
+
                                     (some? root-invoke-id)
                                     (conj [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]))]
                          (state/dispatch (into [:db/set-values] kvps))))
 
-                     
                      (when (contains? page-data :is-complete)
                        (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] is-complete]))
-                     
+
                      ;; Then merge the new nodes into the existing graph.
                      (when (and nodes (seq nodes))
                        (state/dispatch [:invocation/merge-nodes invoke-id nodes root-invoke-id]))
@@ -163,7 +162,7 @@
                          (println "[POLLING-STATELESS] Fast pagination: continuing...")
                          (state/dispatch [:invocation/fetch-graph-page
                                           (assoc current-invocation :leaves (vec next-leaves) :initial? false)]))
-                       
+
                        ;; Otherwise, schedule a slow poll.
                        :else
                        (do
@@ -182,10 +181,8 @@
                                   (state/dispatch [:invocation/fetch-graph-page
                                                    (assoc current-invocation :leaves current-leaves :initial? false)])))))
                           2000)))
-                     )
-                     nil))
 
-
+                     nil)))
 
 (state/reg-event :invocation/merge-nodes
                  (fn [db invoke-id new-nodes-map root-invoke-id-from-payload]
@@ -195,7 +192,7 @@
                          ;; Prioritize the ID from the payload, fallback to the one in db.
                          root-invoke-id (or root-invoke-id-from-payload
                                             (get-in db [:invocations-data invoke-id :root-invoke-id]))
-                         
+
                          {:keys [nodes edges implicit-edges]}
                          (build-drawable-graph merged-raw-nodes root-invoke-id historical-graph)]
 
@@ -242,3 +239,28 @@
                         (println "HITL response submitted successfully. Polling loop will automatically pick up new nodes.")
                         (js/console.error "HITL submit failed" (:error reply)))))
                    nil))
+
+;; =============================================================================
+;; CONFIGURATION EVENTS
+;; =============================================================================
+
+(state/reg-event :config/submit-change
+                 (fn [db {:keys [module-id agent-name key value on-success on-error]}]
+                   (let [state-path [:ui :config-page (keyword key)]]
+                     ;; Set loading state for this specific config item
+                     (state/dispatch [:db/set-value state-path {:submitting? true :error nil}])
+
+                     (sente/request!
+                      [:api/set-agent-config {:module-id module-id :agent-name agent-name :key key :value value}]
+                      10000 ;; 10 second timeout
+                      (fn [reply]
+                        (if (:success reply)
+                          (do
+                            (println "Config update success for" key)
+                            (state/dispatch [:db/set-value state-path {:submitting? false :error nil}])
+                            (when on-success (on-success)))
+                          (do
+                            (js/console.error "Config update failed:" (:error reply))
+                            (state/dispatch [:db/set-value state-path {:submitting? false :error (:error reply)}])
+                            (when on-error (on-error (:error reply))))))))
+                   nil)) ; No immediate state change

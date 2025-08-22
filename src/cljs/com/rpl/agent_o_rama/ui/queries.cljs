@@ -14,13 +14,15 @@
    - :enabled? - Boolean to control if query should run (default: true)
    - :refetch-interval-ms - If set, will refetch data at this interval (in ms)
                             but only when the browser tab is visible.
+   - :refetch-on-mount - Boolean to control initial fetch (default: true)
 
    Returns:
    - :data - The fetched data
    - :loading? - Boolean indicating if request is in progress
-   - :error - Error message if request failed"
-  [{:keys [query-key sente-event timeout-ms enabled? refetch-interval-ms]
-    :or {timeout-ms 10000 enabled? true}}]
+   - :error - Error message if request failed
+   - :refetch - Function to manually trigger a refetch"
+  [{:keys [query-key sente-event timeout-ms enabled? refetch-interval-ms refetch-on-mount]
+    :or {timeout-ms 10000 enabled? true refetch-on-mount true}}]
   (let [state-path (into [:queries] query-key)
         query-state (state/use-sub state-path)
         connected? (state/use-sub [:sente :connected?])
@@ -28,43 +30,40 @@
         sente-event-str (str sente-event)
 
         ;; Use the page visibility hook
-        page-is-visible? (common/use-page-visibility)]
+        page-is-visible? (common/use-page-visibility)
+
+        ;; Define the fetch function inside the hook so it has access to the closure
+        fetch-data (uix/use-callback
+                    (fn []
+                      (state/dispatch [:query/fetch-start {:query-key query-key}])
+                      (sente/request! sente-event timeout-ms
+                                      (fn [reply]
+                                        (if (:success reply)
+                                          (state/dispatch [:query/fetch-success {:query-key query-key :data (:data reply)}])
+                                          (state/dispatch [:query/fetch-error {:query-key query-key
+                                                                               :error (or (:error reply)
+                                                                                          (when (= reply :chsk/closed) "Connection closed")
+                                                                                          "Request failed")}])))))
+                    [query-key-str sente-event-str timeout-ms])]
 
     ;; Effect for initial fetch and polling setup
     (uix/use-effect
      (fn []
-       (let [fetch-data
-             (fn []
-               (state/dispatch [:query/fetch-start {:query-key query-key}])
-               (sente/request! sente-event timeout-ms
-                               (fn [reply]
-                                 (if (:success reply)
-                                   (state/dispatch [:query/fetch-success {:query-key query-key :data (:data reply)}])
-                                   (state/dispatch [:query/fetch-error {:query-key query-key
-                                                                        :error (or (:error reply)
-                                                                                   (when (= reply :chsk/closed) "Connection closed")
-                                                                                   "Request failed")}])))))
-             interval-id (atom nil)]
-
-         ;; Only proceed if all conditions are met
+       (let [interval-id (atom nil)]
          (when (and connected? enabled? page-is-visible?)
-           ;; Initial fetch
-           (fetch-data)
+           ;; Control initial fetch with new option
+           (when refetch-on-mount (fetch-data))
 
-           ;; Set up polling if interval is specified
            (when refetch-interval-ms
              (reset! interval-id (js/setInterval fetch-data refetch-interval-ms))))
-
-         ;; Always return a cleanup function
          (fn []
            (when @interval-id
              (js/clearInterval @interval-id)
              (reset! interval-id nil)))))
+     ;; Re-run effect if `fetch-data` identity changes
+     [connected? enabled? page-is-visible? refetch-interval-ms fetch-data refetch-on-mount])
 
-     ;; Dependencies - removed fetch-data to prevent infinite loops
-     [connected? query-key-str sente-event-str enabled? page-is-visible? refetch-interval-ms timeout-ms])
-
-    ;; Return the familiar data structure (stale-while-revalidate)
+    ;; Return the result map including the refetch function
     (let [default-state {:data nil :status nil :error nil :fetching? false}
           current-state (or query-state default-state)
           data (:data current-state)
@@ -74,5 +73,6 @@
       {:data data
        :loading? loading?
        :fetching? fetching?
-       :error error})))
+       :error error
+       :refetch fetch-data}))) ; <--- EXPOSE REFETCH FUNCTION
 

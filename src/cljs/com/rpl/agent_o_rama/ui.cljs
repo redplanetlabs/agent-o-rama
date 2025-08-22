@@ -5,6 +5,7 @@
    [clojure.string :as str]
 
    [com.rpl.agent-o-rama.ui.agents :as agents]
+   [com.rpl.agent-o-rama.ui.config-page :as config-page]
    ["wouter" :refer [Link Route Switch Router useLocation]]
    ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon ChevronLeftIcon ChevronRightIcon
                                           RectangleStackIcon ChartBarIcon BeakerIcon Cog6ToothIcon]]
@@ -50,7 +51,7 @@
                        :location location :collapsed? collapsed? :title "Evaluations"}
              ($ BeakerIcon {:className "h-5 w-5 flex-shrink-0"})
              (when-not collapsed? ($ :span.ml-3 "Evaluations"))))
-       
+
        ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2
           (when-not collapsed?
             ($ :div.px-3.text-xs.font-semibold.text-gray-500 "AGENT"))
@@ -61,7 +62,7 @@
              (when-not collapsed? ($ :span.ml-3 "Invocations")))
 
           ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/config")
-                       :location location :collapsed? collapsed? :title "Config (soon)"}
+                       :location location :collapsed? collapsed? :title "Config"}
              ($ Cog6ToothIcon {:className "h-5 w-5 flex-shrink-0"})
              (when-not collapsed? ($ :span.ml-3 "Config")))))))
 
@@ -187,6 +188,7 @@
               ($ Route {:path "/agents/:module-id/:agent-name/invocations" :component agents/invocations})
               ($ Route {:path "/agents/:module-id/:agent-name/invocations/:invoke-id" :component agents/invoke})
               ($ Route {:path "/agents/:module-id/:agent-name/evaluations" :component agents/evaluations})
+              ($ Route {:path "/agents/:module-id/:agent-name/config" :component config-page/config-page})
               ($ Route {:path "/agents/:module-id/:agent-name/stats" :component stats/stats})
               ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
               ($ Route {:path "/agents" :component agents/index})

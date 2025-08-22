@@ -6,7 +6,9 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui :as ui]
    [com.rpl.agent-o-rama.impl.json-serialize :as jser]
+   [com.rpl.agent-o-rama.impl.helpers :as h]
    [clojure.walk :as walk]
+   [clojure.string :as str]
    [jsonista.core :as j])
   (:import
    [com.rpl.agentorama AgentInvoke]
@@ -166,10 +168,10 @@
                                           {:pkey agent-task-id}))
 
         ;; Only fetch root-invoke-id on the initial load
-        root-invoke-id (when is-initial-load? 
-                         (foreign-select-one [(keypath agent-id) :root-invoke-id] 
+        root-invoke-id (when is-initial-load?
+                         (foreign-select-one [(keypath agent-id) :root-invoke-id]
                                              root-pstate {:pkey agent-task-id}))
-        
+
         ;; Get historical graph on first request for implicit edge calculation
         historical-graph (when is-initial-load?
                            (when-let [graph-version (:graph-version summary-info)]
@@ -179,7 +181,7 @@
 
         start-pairs (if is-initial-load?
                       [[agent-task-id root-invoke-id]] ; bootstrap from the fetched root
-                      leaves)           ; use client-provided leaves
+                      leaves) ; use client-provided leaves
 
         ;; Use larger page size on first fetch to fast-path historical data
         page-limit (if is-initial-load? 1000 100)
@@ -247,4 +249,55 @@
              agent-task-id agent-id node node-task-id invoke-id prompt uuid)]
     (aor/provide-human-input (get-client decoded-module-id decoded-agent-name) req response)
     {:ok true}))
+
+;; Helper to determine UI input type from config's validation function
+(defn- schema-fn->input-type [schema-fn]
+  (cond
+    (or (= schema-fn aor-types/natural-long?)
+        (= schema-fn aor-types/positive-long?)) :number
+    (= schema-fn h/boolean-spec) :boolean
+    :else :text))
+
+;; Get the available configs and their current values
+(defmethod api-handler :api/get-agent-config
+  [_ {:keys [module-id agent-name]} uid]
+  (let [decoded-module-id (url-decode module-id)
+        decoded-agent-name (url-decode agent-name)
+        client-objects (objects decoded-module-id decoded-agent-name)
+        config-pstate (:config-pstate client-objects)
+        current-config-map (foreign-select-one STAY config-pstate)]
+    ;; Iterate through all defined configs, get their current value, and add metadata
+    (for [[key config-def] aor-types/ALL-CONFIGS]
+      (let [current-value (get current-config-map key (:default config-def))]
+        {:key key
+         :doc (:doc config-def)
+         :current-value (str current-value) ;; Send as string to UI
+         :default-value (str (:default config-def))
+         :input-type (schema-fn->input-type (:schema-fn config-def))}))))
+
+;; Set a new config value
+(defmethod api-handler :api/set-agent-config
+  [_ {:keys [module-id agent-name key value]} uid]
+  (let [decoded-module-id (url-decode module-id)
+        decoded-agent-name (url-decode agent-name)
+        client-objects (objects decoded-module-id decoded-agent-name)
+        agent-config-depot (:agent-config-depot client-objects)
+        config-def (get aor-types/ALL-CONFIGS key)]
+    (when-not config-def
+      (throw (ex-info "Unknown configuration key" {:key key})))
+
+    ;; Parse the value from the UI and create the change message
+    (try
+      (let [parsed-value (case (schema-fn->input-type (:schema-fn config-def))
+                           :number (Long/parseLong value)
+                           value)
+            ;; Dynamically find the correct change-* function, e.g., 'change-max-retries'
+            change-fn-name (str "change-" (str/replace key #"\." "-"))
+            change-fn (ns-resolve 'com.rpl.agent-o-rama.impl.types (symbol change-fn-name))
+            change-record (change-fn parsed-value)]
+        (foreign-append! agent-config-depot change-record)
+        {:success true})
+      (catch Exception e
+        (throw (ex-info (str "Failed to set config: " (.getMessage e))
+                        {:key key :value value}))))))
 
