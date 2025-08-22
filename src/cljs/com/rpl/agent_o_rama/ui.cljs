@@ -61,10 +61,11 @@
 (defui sidebar-nav []
   (let [[location _] (useLocation)
         ;; Derive params from the current route using a matcher
-        [match params] (useRoute "/agents/:module-id/:agent-name*")
+                ;; Derive params from the current route using a matcher
+        [match params] (useRoute "/agents/:module-id/:agent-name")
         params-clj (js->clj params :keywordize-keys true)
         module-id (:module-id params-clj)
-        agent-name (get params-clj :agent-name*)
+        agent-name (:agent-name params-clj)
         [collapsed? set-collapsed] (common/use-local-storage "sidebar-collapsed?" false)
         toggle-collapsed #(set-collapsed (not collapsed?))]
 
@@ -173,24 +174,6 @@
                        (common/url-decode (:label item)))))))
              breadcrumb-items))))))
 
-;; Main content area wrapper
-(defui main-content []
-  ($ :div.flex-1.flex.flex-col.min-h-0
-     ($ breadcrumb)
-     ($ :div.flex-1.overflow-auto
-        ($ Router
-           ;; Agent routes
-           ($ Route {:path "/agents/:module-id/:agent-name/invocations" :component agents/invocations})
-           ($ Route {:path "/agents/:module-id/:agent-name/invocations/:invoke-id" :component agents/invoke})
-           ($ Route {:path "/agents/:module-id/:agent-name/evaluations" :component agents/evaluations})
-           ($ Route {:path "/agents/:module-id/:agent-name/stats" :component stats/stats})
-           ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
-           ($ Route {:path "/agents" :component agents/index})
-
-           ;; Home route
-           ($ Route {:path "/" :component agents/index})))))
-
-;; Main app component
  ;; Main app component
 (defui app []
   ($ Router
