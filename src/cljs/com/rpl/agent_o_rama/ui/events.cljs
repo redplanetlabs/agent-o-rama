@@ -125,9 +125,9 @@
                  (fn [db invoke-id page-data]
                    (let [{:keys [nodes next-leaves summary historical-graph root-invoke-id
                                  task-id is-complete]} page-data
-                         current-invocation (get-in db [:current-invocation])
-                         was-incomplete? (not (get-in db [:invocations-data invoke-id :is-complete]))]
-
+                         current-invocation (get-in db [:current-invocation])]
+                     
+                     ;; Always update the summary and completion status first.
                      (when summary
                        (let [{:keys [forks fork-of]} summary]
                          (state/dispatch [:db/set-values
@@ -138,47 +138,50 @@
                                           [[:invocations-data invoke-id :forks] forks]
                                           [[:invocations-data invoke-id :fork-of] fork-of]
                                           [[:invocations-data invoke-id :status] :success]])))
-
+                     
                      (when (contains? page-data :is-complete)
                        (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] is-complete]))
-
+                     
+                     ;; Then merge the new nodes into the existing graph.
                      (when (and nodes (seq nodes))
                        (state/dispatch [:invocation/merge-nodes invoke-id nodes]))
 
-                     (cond
-                       (and is-complete was-incomplete?)
-                       (do
-                         (println "[POLLING-STATELESS] Agent is complete. Fetching final summary for" invoke-id)
-                         (state/dispatch [:invocation/fetch-graph-page
-                                          (assoc current-invocation :leaves [] :initial? true)]))
+                     ;; Now, decide on the next action with the updated state.
+                     (let [updated-db @state/app-db
+                           agent-is-now-complete? (get-in updated-db [:invocations-data invoke-id :is-complete])]
+                       
+                       (cond
+                         ;; If the agent is complete, simply stop.
+                         agent-is-now-complete?
+                         (do (println "[POLLING-STATELESS] Loop ended.") nil)
 
-                       is-complete
-                       (do (println "[POLLING-STATELESS] Loop ended.") nil)
+                         ;; If there are immediate next leaves, fast-poll.
+                         (seq next-leaves)
+                         (do
+                           (println "[POLLING-STATELESS] Fast pagination: continuing...")
+                           (state/dispatch [:invocation/fetch-graph-page
+                                            (assoc current-invocation :leaves (vec next-leaves) :initial? false)]))
+                         
+                         ;; Otherwise, schedule a slow poll.
+                         :else
+                         (do
+                           (println "[POLLING-STATELESS] Scheduling delayed re-poll...")
+                           (js/setTimeout
+                            (fn []
+                              (let [current-db @state/app-db
+                                    is-still-incomplete? (not (get-in current-db [:invocations-data invoke-id :is-complete]))
+                                    current-leaves (state/get-unfinished-leaves current-db invoke-id)]
 
-                       (seq next-leaves)
-                       (do
-                         (println "[POLLING-STATELESS] Fast pagination: continuing...")
-                         (state/dispatch [:invocation/fetch-graph-page
-                                          (assoc current-invocation :leaves (vec next-leaves) :initial? false)]))
-
-                       :else
-                       (do
-                         (println "[POLLING-STATELESS] Scheduling delayed re-poll...")
-                         (js/setTimeout
-                          (fn []
-                            (let [current-db @state/app-db
-                                  is-still-incomplete? (not (get-in current-db [:invocations-data invoke-id :is-complete]))
-                                  current-leaves (state/get-unfinished-leaves current-db invoke-id)]
-
-                              (if-not is-still-incomplete?
-                                (println "[POLLING-STATELESS] Delayed re-poll cancelled.")
-                                (do
-                                  (state/dispatch [:db/update-value [:invocations-data invoke-id :idle-polls] (fnil inc 0)])
-                                  (println "[POLLING-STATELESS] Delayed re-poll executing.")
-                                  (state/dispatch [:invocation/fetch-graph-page
-                                                   (assoc current-invocation :leaves current-leaves :initial? false)])))))
-                          2000)))
+                                (if-not is-still-incomplete?
+                                  (println "[POLLING-STATELESS] Delayed re-poll cancelled (agent completed).")
+                                  (do
+                                    (state/dispatch [:db/update-value [:invocations-data invoke-id :idle-polls] (fnil inc 0)])
+                                    (println "[POLLING-STATELESS] Delayed re-poll executing.")
+                                    (state/dispatch [:invocation/fetch-graph-page
+                                                     (assoc current-invocation :leaves current-leaves :initial? false)])))))
+                            2000))))
                      nil)))
+
 
 (state/reg-event :invocation/merge-nodes
                  (fn [db invoke-id new-nodes-map]
