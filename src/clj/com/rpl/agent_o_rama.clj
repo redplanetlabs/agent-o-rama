@@ -670,6 +670,14 @@
          (when error
            (throw (h/ex-info "Error updating example" {:info error})))
        ))
+     (setDatasetExampleSource [this datasetId snapshotName exampleId source]
+       (foreign-append!
+        datasets-depot
+        (aor-types/->valid-UpdateDatasetExample datasetId
+                                                snapshotName
+                                                exampleId
+                                                :source
+                                                source)))
      (removeDatasetExample [this datasetId snapshotName exampleId]
        (foreign-append!
         datasets-depot
@@ -916,6 +924,24 @@
                                       (:snapshot options)
                                       example-id
                                       reference-output)))
+
+(defn set-dataset-example-source!
+  ([manager dataset-id example-id source]
+   (set-dataset-example-source! manager
+                                dataset-id
+                                example-id
+                                source
+                                nil))
+  ([^AgentManager manager dataset-id example-id source options]
+   ;; types are validated by Java API
+   (h/validate-options! name
+                        options
+                        {:snapshot h/any-spec})
+   (.setDatasetExampleSource manager
+                             dataset-id
+                             (:snapshot options)
+                             example-id
+                             source)))
 
 (defn remove-dataset-example!
   ([manager dataset-id example-id]

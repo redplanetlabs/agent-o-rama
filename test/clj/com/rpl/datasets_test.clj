@@ -779,20 +779,29 @@
           pstate))
        (is (some? created-at))
        (is (= created-at modified-at))
-       (add-example-and-wait! manager
-                              ds-id1
-                              "example1-2"
-                              {:reference-output "output1-2"
-                               :tags #{"tag1" "tag2"}})
+       (bind li
+         (aor-types/->LinkedTrace "foo.Module"
+                                  "agent1"
+                                  (aor-types/->AgentInvokeImpl 1 2)))
+       (add-example-and-wait!
+        manager
+        ds-id1
+        "example1-2"
+        {:reference-output "output1-2"
+         :tags         #{"tag1" "tag2"}
+         :source       "ai"
+         :linked-trace li})
 
        (bind {:keys [examples pagination-params]}
          (queries/get-dataset-examples-page pstate ds-id1 nil 10 nil))
        (is (nil? pagination-params))
        (is (= (examples-cleaned examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
-               {:input "example1-2"
+               {:input        "example1-2"
                 :reference-output "output1-2"
-                :tags  #{"tag1" "tag2"}}]))
+                :tags         #{"tag1" "tag2"}
+                :source       "ai"
+                :linked-trace li}]))
        (verified-dataset-times
         ds-id1
         #(aor/snapshot-dataset! manager ds-id1 nil "snapshot1"))
@@ -801,9 +810,11 @@
        (is (nil? pagination-params))
        (is (= (examples-cleaned examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
-               {:input "example1-2"
+               {:input        "example1-2"
                 :reference-output "output1-2"
-                :tags  #{"tag1" "tag2"}}]))
+                :tags         #{"tag1" "tag2"}
+                :source       "ai"
+                :linked-trace li}]))
        (add-example-and-wait-java! manager
                                    ds-id1
                                    "snapshot1"
@@ -815,9 +826,11 @@
        (is (nil? pagination-params))
        (is (= (examples-cleaned examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
-               {:input "example1-2"
+               {:input        "example1-2"
                 :reference-output "output1-2"
-                :tags  #{"tag1" "tag2"}}
+                :tags         #{"tag1" "tag2"}
+                :source       "ai"
+                :linked-trace li}
                {:input "examples1-1" :reference-output nil :tags #{}}]))
 
        ;; verify original isn't affected
@@ -826,9 +839,11 @@
        (is (nil? pagination-params))
        (is (= (examples-cleaned examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
-               {:input "example1-2"
+               {:input        "example1-2"
                 :reference-output "output1-2"
-                :tags  #{"tag1" "tag2"}}]))
+                :tags         #{"tag1" "tag2"}
+                :source       "ai"
+                :linked-trace li}]))
 
        (aor/snapshot-dataset! manager ds-id1 "snapshot1" "snapshot2")
        (bind {:keys [examples pagination-params]}
@@ -836,9 +851,11 @@
        (is (nil? pagination-params))
        (is (= (examples-cleaned examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
-               {:input "example1-2"
+               {:input        "example1-2"
                 :reference-output "output1-2"
-                :tags  #{"tag1" "tag2"}}
+                :tags         #{"tag1" "tag2"}
+                :source       "ai"
+                :linked-trace li}
                {:input "examples1-1" :reference-output nil :tags #{}}]))
 
 
@@ -923,6 +940,10 @@
                {:input "example1-2"
                 :reference-output "output1-2"
                 :tags  #{"tag1" "tag2"}}]))
+       :source
+       "ai"
+       :linked-trace
+       li
 
        (is (= #{"snapshot1" "snapshot2"}
               (queries/get-dataset-snapshot-names pstate ds-id1)))
