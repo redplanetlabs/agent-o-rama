@@ -33,18 +33,17 @@
     ;; Effect for initial fetch and polling setup
     (uix/use-effect
      (fn []
-       (let [fetch-data (fn []
-                          (println "🔄 use-sente-query: Fetching" query-key "via" sente-event "connected?" connected? "enabled?" enabled? "visible?" page-is-visible?)
-                          (state/dispatch [:query/fetch-start {:query-key query-key}])
-                          (sente/request! sente-event timeout-ms
-                                          (fn [reply]
-                                            (println "📡 use-sente-query: Got reply for" query-key ":" reply)
-                                            (if (:success reply)
-                                              (state/dispatch [:query/fetch-success {:query-key query-key :data (:data reply)}])
-                                              (state/dispatch [:query/fetch-error {:query-key query-key
-                                                                                   :error (or (:error reply)
-                                                                                              (when (= reply :chsk/closed) "Connection closed")
-                                                                                              "Request failed")}])))))
+       (let [fetch-data
+             (fn []
+               (state/dispatch [:query/fetch-start {:query-key query-key}])
+               (sente/request! sente-event timeout-ms
+                               (fn [reply]
+                                 (if (:success reply)
+                                   (state/dispatch [:query/fetch-success {:query-key query-key :data (:data reply)}])
+                                   (state/dispatch [:query/fetch-error {:query-key query-key
+                                                                        :error (or (:error reply)
+                                                                                   (when (= reply :chsk/closed) "Connection closed")
+                                                                                   "Request failed")}])))))
              interval-id (atom nil)]
 
          ;; Only proceed if all conditions are met
@@ -59,7 +58,6 @@
          ;; Always return a cleanup function
          (fn []
            (when @interval-id
-             (println "🧹 Cleaning up interval for" query-key)
              (js/clearInterval @interval-id)
              (reset! interval-id nil)))))
 

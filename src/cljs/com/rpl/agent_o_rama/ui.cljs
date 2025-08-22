@@ -5,8 +5,9 @@
    [clojure.string :as str]
 
    [com.rpl.agent-o-rama.ui.agents :as agents]
-   ["wouter" :refer [Link Route Switch Router useLocation useRoute]]
-   ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon ChevronLeftIcon ChevronRightIcon]]
+   ["wouter" :refer [Link Route Switch Router useLocation useRoute useParams]]
+   ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon ChevronLeftIcon ChevronRightIcon
+                                          RectangleStackIcon ChartBarIcon BeakerIcon Cog6ToothIcon]]
 
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.stats :as stats]
@@ -16,70 +17,97 @@
    [com.rpl.agent-o-rama.ui.events])) ;; Ensure event handlers are registered at app startup
 
 ;; Sidebar navigation component
+ ;; Reusable nav-link component
+(defui nav-link [{:keys [href location collapsed? title children]}]
+  (let [is-active? (or (= location href)
+                       (and (not= href "/") (.startsWith location href)))
+        link-classes (str "flex items-center px-3 py-2 rounded-md transition-colors text-sm font-medium "
+                          (if collapsed? "justify-center" "")
+                          (if is-active?
+                            "bg-gray-300 text-gray-900"
+                            "hover:bg-gray-200 text-gray-700"))]
+    ($ Link {:href href :className link-classes :title (when collapsed? title)}
+       (if collapsed?
+         (first children) ; Only show the icon when collapsed
+         children)))) ; Show icon and label ; Show icon and label ; Show icon and label 
+
+;; Agent-specific navigation component
+(defui agent-context-nav [{:keys [module-id agent-name collapsed?]}]
+  (let [[location _] (useLocation)]
+    ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2
+       (when-not collapsed?
+         ($ :div.px-3.text-xs.font-semibold.text-gray-500 "AGENT"))
+
+       ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/invocations")
+                    :location location :collapsed? collapsed? :title "Invocations"}
+          ($ RectangleStackIcon {:className "h-5 w-5 flex-shrink-0"})
+          (when-not collapsed? ($ :span.ml-3 "Invocations")))
+
+       ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/stats")
+                    :location location :collapsed? collapsed? :title "Stats"}
+          ($ ChartBarIcon {:className "h-5 w-5 flex-shrink-0"})
+          (when-not collapsed? ($ :span.ml-3 "Stats")))
+
+       ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/evaluations")
+                    :location location :collapsed? collapsed? :title "Evaluations"}
+          ($ BeakerIcon {:className "h-5 w-5 flex-shrink-0"})
+          (when-not collapsed? ($ :span.ml-3 "Evaluations")))
+
+       ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/config")
+                    :location location :collapsed? collapsed? :title "Config (soon)"}
+          ($ Cog6ToothIcon {:className "h-5 w-5 flex-shrink-0"})
+          (when-not collapsed? ($ :span.ml-3 "Config"))))))
+
 (defui sidebar-nav []
   (let [[location _] (useLocation)
-        ;; NEW: Use the hook from common.cljs
+        ;; The KEY CHANGE: Read route params to get context
+        params (js->clj (useParams) :keywordize-keys true)
+        {:keys [module-id agent-name]} params
         [collapsed? set-collapsed] (common/use-local-storage "sidebar-collapsed?" false)
         toggle-collapsed #(set-collapsed (not collapsed?))]
+
+    (println "PARAMS" params)
     ($ :div {:className (str "h-screen flex flex-col bg-gray-100 transition-all duration-300 "
                              (if collapsed? "w-16" "w-64"))}
-       ;; Header
+       ;; Header (no changes here)
        ($ :div.flex.items-center.justify-between.p-4.border-b.border-gray-200.overflow-hidden
           (when-not collapsed?
             ($ :img {:src "/logo-black.png"
                      :alt "Agent-O-Rama"
                      :className "h-8 max-w-48 object-contain"}))
-          ($ :button
-             {:onClick toggle-collapsed
-              :className "p-2 rounded-md hover:bg-gray-200 transition-colors"
-              :title (if collapsed? "Expand sidebar" "Collapse sidebar")}
+          ($ :button {:onClick toggle-collapsed
+                      :className "p-2 rounded-md hover:bg-gray-200 transition-colors"
+                      :title (if collapsed? "Expand sidebar" "Collapse sidebar")}
              (if collapsed?
                ($ ChevronRightIcon {:className "h-5 w-5"})
                ($ ChevronLeftIcon {:className "h-5 w-5"}))))
 
        ;; Navigation
        ($ :nav.flex-1.p-3
+          ;; Global Navigation (always visible) - uses our new nav-link component
           ($ :div.space-y-2
-             ;; Overview link
-             ($ Link
-                {:href "/"
-                 :className (str "flex items-center px-3 py-2 rounded-md transition-colors "
-                                 (if collapsed? "justify-center" "")
-                                 (if (= location "/")
-                                   "bg-gray-300 text-gray-900"
-                                   "hover:bg-gray-200 text-gray-700"))
-                 :title (when collapsed? "Overview")}
+             ($ nav-link {:href "/" :location location :collapsed? collapsed? :title "Overview"}
                 ($ HomeIcon {:className "h-5 w-5 flex-shrink-0"})
-                (when-not collapsed?
-                  ($ :span.ml-3 "Overview")))
+                (when-not collapsed? ($ :span.ml-3 "Overview")))
 
-             ;; Agents link
-             ($ Link
-                {:href "/agents"
-                 :className (str "flex items-center px-3 py-2 rounded-md transition-colors "
-                                 (if collapsed? "justify-center" "")
-                                 (if (or (= location "/agents")
-                                         (.startsWith location "/agents/"))
-                                   "bg-gray-300 text-gray-900"
-                                   "hover:bg-gray-200 text-gray-700"))
-                 :title (when collapsed? "Agents")}
+             ($ nav-link {:href "/agents" :location location :collapsed? collapsed? :title "Agents"}
                 ($ CpuChipIcon {:className "h-5 w-5 flex-shrink-0"})
-                (when-not collapsed?
-                  ($ :span.ml-3 "Agents")))
+                (when-not collapsed? ($ :span.ml-3 "Agents")))
 
-             ;; Datasets link
-             ($ Link
-                {:href "/datasets"
-                 :className (str "flex items-center px-3 py-2 rounded-md transition-colors "
-                                 (if collapsed? "justify-center" "")
-                                 (if (or (= location "/datasets")
-                                         (.startsWith location "/datasets/"))
-                                   "bg-gray-300 text-gray-900"
-                                   "hover:bg-gray-200 text-gray-700"))
-                 :title (when collapsed? "Datasets")}
+             ($ nav-link {:href "/datasets" :location location :collapsed? collapsed? :title "Datasets"}
                 ($ CircleStackIcon {:className "h-5 w-5 flex-shrink-0"})
-                (when-not collapsed?
-                  ($ :span.ml-3 "Datasets"))))))))
+                (when-not collapsed? ($ :span.ml-3 "Datasets"))))
+
+          ;; CONDITIONAL: Agent-specific Navigation
+          (when (and module-id agent-name)
+            ($ agent-context-nav {:module-id module-id
+                                  :agent-name agent-name
+                                  :collapsed? collapsed?}))
+
+          ;; TODO: You can add another section here for Datasets when a module-id is present but an agent-name is not.
+          ;; (when (and module-id (not agent-name))
+          ;;  ($ dataset-context-nav ...))
+          ))))
 
 ;; Breadcrumb for sub-navigation within sections
 (defui breadcrumb []
