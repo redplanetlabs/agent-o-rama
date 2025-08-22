@@ -265,7 +265,7 @@
         decoded-agent-name (url-decode agent-name)
         client-objects (objects decoded-module-id decoded-agent-name)
         config-pstate (:config-pstate client-objects)
-        current-config-map (foreign-select-one STAY config-pstate)]
+        current-config-map (or (foreign-select-one STAY config-pstate {:pkey 0}) {})]
     ;; Iterate through all defined configs, get their current value, and add metadata
     (for [[key config-def] aor-types/ALL-CONFIGS]
       (let [current-value (get current-config-map key (:default config-def))]
