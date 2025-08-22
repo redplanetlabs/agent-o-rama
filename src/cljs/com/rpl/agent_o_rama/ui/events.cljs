@@ -129,15 +129,20 @@
                      
                      ;; Always update the summary and completion status first.
                      (when summary
-                       (let [{:keys [forks fork-of]} summary]
-                         (state/dispatch [:db/set-values
-                                          [[:invocations-data invoke-id :summary] summary]
-                                          [[:invocations-data invoke-id :historical-graph] historical-graph]
-                                          [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]
+                       (let [{:keys [forks fork-of]} summary
+                             ;; Build key-value pairs conditionally
+                             kvps (cond-> [[[:invocations-data invoke-id :summary] summary]
                                           [[:invocations-data invoke-id :task-id] task-id]
                                           [[:invocations-data invoke-id :forks] forks]
                                           [[:invocations-data invoke-id :fork-of] fork-of]
-                                          [[:invocations-data invoke-id :status] :success]])))
+                                          [[:invocations-data invoke-id :status] :success]]
+                                    (some? historical-graph)
+                                    (conj [[:invocations-data invoke-id :historical-graph] historical-graph])
+                                    
+                                    (some? root-invoke-id)
+                                    (conj [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]))]
+                         (state/dispatch (into [:db/set-values] kvps))))
+
                      
                      (when (contains? page-data :is-complete)
                        (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] is-complete]))
@@ -187,7 +192,6 @@
                    (let [historical-graph (get-in db [:invocations-data invoke-id :historical-graph])
                          current-raw-nodes (get-in db [:invocations-data invoke-id :graph :raw-nodes])
                          merged-raw-nodes (merge current-raw-nodes new-nodes-map)
-                         
                          ;; Prioritize the ID from the payload, fallback to the one in db.
                          root-invoke-id (or root-invoke-id-from-payload
                                             (get-in db [:invocations-data invoke-id :root-invoke-id]))
