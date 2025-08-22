@@ -146,41 +146,40 @@
                      (when (and nodes (seq nodes))
                        (state/dispatch [:invocation/merge-nodes invoke-id nodes]))
 
-                     ;; Now, decide on the next action with the updated state.
-                     (let [updated-db @state/app-db
-                           agent-is-now-complete? (get-in updated-db [:invocations-data invoke-id :is-complete])]
+                     ;; Now, decide on the next action based on the server response.
+                     (cond
+                       ;; If the agent is complete, simply stop.
+                       is-complete
+                       (do (println "[POLLING-STATELESS] Loop ended.") nil)
+
+                       ;; If there are immediate next leaves, fast-poll.
+                       (seq next-leaves)
+                       (do
+                         (println "[POLLING-STATELESS] Fast pagination: continuing...")
+                         (state/dispatch [:invocation/fetch-graph-page
+                                          (assoc current-invocation :leaves (vec next-leaves) :initial? false)]))
                        
-                       (cond
-                         ;; If the agent is complete, simply stop.
-                         agent-is-now-complete?
-                         (do (println "[POLLING-STATELESS] Loop ended.") nil)
+                       ;; Otherwise, schedule a slow poll.
+                       :else
+                       (do
+                         (println "[POLLING-STATELESS] Scheduling delayed re-poll...")
+                         (js/setTimeout
+                          (fn []
+                            (let [current-db @state/app-db
+                                  is-still-incomplete? (not (get-in current-db [:invocations-data invoke-id :is-complete]))
+                                  current-leaves (state/get-unfinished-leaves current-db invoke-id)]
 
-                         ;; If there are immediate next leaves, fast-poll.
-                         (seq next-leaves)
-                         (do
-                           (println "[POLLING-STATELESS] Fast pagination: continuing...")
-                           (state/dispatch [:invocation/fetch-graph-page
-                                            (assoc current-invocation :leaves (vec next-leaves) :initial? false)]))
-                         
-                         ;; Otherwise, schedule a slow poll.
-                         :else
-                         (do
-                           (println "[POLLING-STATELESS] Scheduling delayed re-poll...")
-                           (js/setTimeout
-                            (fn []
-                              (let [current-db @state/app-db
-                                    is-still-incomplete? (not (get-in current-db [:invocations-data invoke-id :is-complete]))
-                                    current-leaves (state/get-unfinished-leaves current-db invoke-id)]
+                              (if-not is-still-incomplete?
+                                (println "[POLLING-STATELESS] Delayed re-poll cancelled (agent completed).")
+                                (do
+                                  (state/dispatch [:db/update-value [:invocations-data invoke-id :idle-polls] (fnil inc 0)])
+                                  (println "[POLLING-STATELESS] Delayed re-poll executing.")
+                                  (state/dispatch [:invocation/fetch-graph-page
+                                                   (assoc current-invocation :leaves current-leaves :initial? false)])))))
+                          2000)))
+                     )
+                     nil))
 
-                                (if-not is-still-incomplete?
-                                  (println "[POLLING-STATELESS] Delayed re-poll cancelled (agent completed).")
-                                  (do
-                                    (state/dispatch [:db/update-value [:invocations-data invoke-id :idle-polls] (fnil inc 0)])
-                                    (println "[POLLING-STATELESS] Delayed re-poll executing.")
-                                    (state/dispatch [:invocation/fetch-graph-page
-                                                     (assoc current-invocation :leaves current-leaves :initial? false)])))))
-                            2000))))
-                     nil)))
 
 
 (state/reg-event :invocation/merge-nodes
