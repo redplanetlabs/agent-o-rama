@@ -7,6 +7,9 @@
   (:import
    [com.github.f4b6a3.uuid
     UuidCreator]
+   [com.jayway.jsonpath
+    JsonPath
+    Predicate]
    [com.rpl.agentorama.impl
     AORExceptionInfo]
    [com.rpl.rama.helpers
@@ -268,3 +271,9 @@
 (defn contains-string?
   [^String s substring]
   (.contains s substring))
+
+(defn read-json-path
+  [obj json-path]
+  (JsonPath/read ^Object obj
+                 ^String json-path
+                 ^"[Lcom.jayway.jsonpath.Predicate;" (into-array Predicate [])))

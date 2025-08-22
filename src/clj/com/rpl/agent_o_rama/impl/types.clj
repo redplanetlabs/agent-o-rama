@@ -345,12 +345,6 @@
                         (str "change-")
                         symbol)]
     `(do
-       (def ~csym
-         {:name      ~cname
-          :schema-fn ~schema-fn
-          :doc       ~doc
-          :default   ~config-default})
-       (alter-var-root (var ALL-CONFIGS) assoc ~cname ~csym)
        (defn ~change-sym
          [value#]
          (let [schema-fn# ~schema-fn]
@@ -361,6 +355,13 @@
                {:name ~cname :value value# :value-type (class value#)})))
            (->ChangeConfig ~cname value#)
          ))
+       (def ~csym
+         {:name      ~cname
+          :schema-fn ~schema-fn
+          :doc       ~doc
+          :default   ~config-default
+          :change-fn ~change-sym})
+       (alter-var-root (var ALL-CONFIGS) assoc ~cname ~csym)
      )))
 
 (defn get-config

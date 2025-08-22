@@ -25,6 +25,10 @@
                    com.fasterxml.jackson.core/jackson-databind
                    com.fasterxml.jackson.dataformat/jackson-dataformat-yaml
                    com.ethlo.time/itu]]
+                 [com.jayway.jsonpath/json-path
+                  "2.9.0"
+                  :exclusions
+                  [org.slf4j/slf4j-api]]
 
                  ;; ui dependencies
                  [ring/ring-core "1.9.5"]
