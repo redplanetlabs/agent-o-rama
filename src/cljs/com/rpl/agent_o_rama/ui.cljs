@@ -21,11 +21,13 @@
 (defui nav-link [{:keys [href location collapsed? title children]}]
   (let [is-active? (or (= location href)
                        (and (not= href "/") (.startsWith location href)))
-        link-classes (str "flex items-center px-3 py-2 rounded-md transition-colors text-sm font-medium "
-                          (if collapsed? "justify-center" "")
+        link-classes (str "flex items-center rounded-md transition-colors text-sm font-medium "
+                          (if collapsed?
+                            "justify-center p-2 w-10 h-10"
+                            "px-3 py-2")
                           (if is-active?
-                            "bg-gray-300 text-gray-900"
-                            "hover:bg-gray-200 text-gray-700"))]
+                            " bg-gray-300 text-gray-900"
+                            " hover:bg-gray-200 text-gray-700"))]
     ($ Link {:href href :className link-classes :title (when collapsed? title)}
        (if collapsed?
          (first children) ; Only show the icon when collapsed
@@ -34,29 +36,34 @@
 ;; Agent-specific navigation component
 (defui agent-context-nav [{:keys [module-id agent-name collapsed?]}]
   (let [[location _] (useLocation)]
-    ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2
-       (when-not collapsed?
-         ($ :div.px-3.text-xs.font-semibold.text-gray-500 "AGENT"))
+    ($ :<>
+       ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2
+          (when-not collapsed?
+            ($ :div.px-3.text-xs.font-semibold.text-gray-500 "MODULE"))
 
-       ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/invocations")
-                    :location location :collapsed? collapsed? :title "Invocations"}
-          ($ RectangleStackIcon {:className "h-5 w-5 flex-shrink-0"})
-          (when-not collapsed? ($ :span.ml-3 "Invocations")))
+          ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/datsets")
+                       :location location :collapsed? collapsed? :title "Datasets"}
+             ($ ChartBarIcon {:className "h-5 w-5 flex-shrink-0"})
+             (when-not collapsed? ($ :span.ml-3 "Datasets")))
 
-       ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/datsets")
-                    :location location :collapsed? collapsed? :title "Datasets"}
-          ($ ChartBarIcon {:className "h-5 w-5 flex-shrink-0"})
-          (when-not collapsed? ($ :span.ml-3 "Evaluations")))
+          ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/evaluations")
+                       :location location :collapsed? collapsed? :title "Evaluations"}
+             ($ BeakerIcon {:className "h-5 w-5 flex-shrink-0"})
+             (when-not collapsed? ($ :span.ml-3 "Evaluations"))))
        
-       ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/evaluations")
-                    :location location :collapsed? collapsed? :title "Evaluations"}
-          ($ BeakerIcon {:className "h-5 w-5 flex-shrink-0"})
-          (when-not collapsed? ($ :span.ml-3 "Evaluations")))
+       ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2
+          (when-not collapsed?
+            ($ :div.px-3.text-xs.font-semibold.text-gray-500 "AGENT"))
 
-       ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/config")
-                    :location location :collapsed? collapsed? :title "Config (soon)"}
-          ($ Cog6ToothIcon {:className "h-5 w-5 flex-shrink-0"})
-          (when-not collapsed? ($ :span.ml-3 "Config"))))))
+          ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/invocations")
+                       :location location :collapsed? collapsed? :title "Invocations"}
+             ($ RectangleStackIcon {:className "h-5 w-5 flex-shrink-0"})
+             (when-not collapsed? ($ :span.ml-3 "Invocations")))
+
+          ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/config")
+                       :location location :collapsed? collapsed? :title "Config (soon)"}
+             ($ Cog6ToothIcon {:className "h-5 w-5 flex-shrink-0"})
+             (when-not collapsed? ($ :span.ml-3 "Config")))))))
 
 (defui sidebar-nav []
   (let [[location _] (useLocation)
