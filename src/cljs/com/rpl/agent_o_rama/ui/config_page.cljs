@@ -46,7 +46,7 @@
                              "bg-blue-600 text-white hover:bg-blue-700")}
                (if submitting?
                  ($ :<> ($ common/spinner {:size :medium}) "Saving...")
-                 ($ :<> ($ CheckIcon.h-4.w-4) "Save"))))
+                 ($ :<> ($ CheckIcon {:className "h-4 w-4"}) "Save"))))
 
          ($ :div.flex.justify-between.items-center.mt-2.text-xs.text-gray-500
             ($ :span "Default: " ($ :code.font-mono default-value))
@@ -75,7 +75,7 @@
          error ($ :div.text-center.py-8.text-red-500 "Error loading configuration: " error)
          :else ($ :div.space-y-4.max-w-2xl.mx-auto
                   ($ :div.bg-blue-50.border-l-4.border-blue-400.p-4.rounded-r-lg.flex.items-center.gap-3
-                     ($ InformationCircleIcon.h-6.w-6.text-blue-600.flex-shrink-0)
+                     ($ InformationCircleIcon {:className "h-6 w-6 text-blue-600 flex-shrink-0"})
                      ($ :p.text-sm.text-blue-800 "Changes are applied live to all running tasks for this agent. No restart is required."))
 
                   (for [item (sort-by :key data)]
