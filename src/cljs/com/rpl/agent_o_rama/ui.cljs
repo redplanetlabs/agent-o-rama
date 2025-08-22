@@ -5,7 +5,7 @@
    [clojure.string :as str]
 
    [com.rpl.agent-o-rama.ui.agents :as agents]
-   ["wouter" :refer [Link Route Switch Router useLocation useRoute useParams]]
+   ["wouter" :refer [Link Route Switch Router useLocation]]
    ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon ChevronLeftIcon ChevronRightIcon
                                           RectangleStackIcon ChartBarIcon BeakerIcon Cog6ToothIcon]]
 
@@ -60,12 +60,15 @@
 
 (defui sidebar-nav []
   (let [[location _] (useLocation)
-        ;; Derive params from the current route using a matcher
-                ;; Derive params from the current route using a matcher
-        [match params] (useRoute "/agents/:module-id/:agent-name")
-        params-clj (js->clj params :keywordize-keys true)
-        module-id (:module-id params-clj)
-        agent-name (:agent-name params-clj)
+        ;; this is a hack, because wouter doesn't support useParams outside of Route components
+        ;; or nested routes. probably should switch to reitit or something.
+        url-segments (-> location
+                         (str/replace #"^/" "")
+                         (str/split #"/")
+                         vec)
+        ;; Extract agent context from URL: /agents/module-id/agent-name/...
+        [section module-id agent-name] url-segments
+        is-agent-context? (and (= section "agents") module-id agent-name)
         [collapsed? set-collapsed] (common/use-local-storage "sidebar-collapsed?" false)
         toggle-collapsed #(set-collapsed (not collapsed?))]
 
@@ -100,8 +103,7 @@
                 ($ CircleStackIcon {:className "h-5 w-5 flex-shrink-0"})
                 (when-not collapsed? ($ :span.ml-3 "Datasets"))))
 
-          ;; CONDITIONAL: Agent-specific Navigation
-          (when (and match module-id agent-name)
+          (when is-agent-context?
             ($ agent-context-nav {:module-id module-id
                                   :agent-name agent-name
                                   :collapsed? collapsed?}))
