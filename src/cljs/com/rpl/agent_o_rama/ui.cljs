@@ -60,13 +60,12 @@
 
 (defui sidebar-nav []
   (let [[location _] (useLocation)
-        ;; The KEY CHANGE: Read route params to get context
-        params (js->clj (useParams) :keywordize-keys true)
-        {:keys [module-id agent-name]} params
+        ;; Derive params from the current route using a matcher
+        [match params] (useRoute "/agents/:module-id/:agent-name*")
+        {:keys [module-id agent-name]} (js->clj params :keywordize-keys true)
         [collapsed? set-collapsed] (common/use-local-storage "sidebar-collapsed?" false)
         toggle-collapsed #(set-collapsed (not collapsed?))]
 
-    (println "PARAMS" params)
     ($ :div {:className (str "h-screen flex flex-col bg-gray-100 transition-all duration-300 "
                              (if collapsed? "w-16" "w-64"))}
        ;; Header (no changes here)
@@ -84,7 +83,7 @@
 
        ;; Navigation
        ($ :nav.flex-1.p-3
-          ;; Global Navigation (always visible) - uses our new nav-link component
+          ;; Global Navigation (always visible)
           ($ :div.space-y-2
              ($ nav-link {:href "/" :location location :collapsed? collapsed? :title "Overview"}
                 ($ HomeIcon {:className "h-5 w-5 flex-shrink-0"})
@@ -99,7 +98,7 @@
                 (when-not collapsed? ($ :span.ml-3 "Datasets"))))
 
           ;; CONDITIONAL: Agent-specific Navigation
-          (when (and module-id agent-name)
+          (when (and match module-id agent-name)
             ($ agent-context-nav {:module-id module-id
                                   :agent-name agent-name
                                   :collapsed? collapsed?}))
@@ -192,23 +191,22 @@
 ;; Main app component
  ;; Main app component
 (defui app []
-  ($ :<>
+  ($ Router
      ($ :div.flex.h-screen.bg-gray-50
         ($ sidebar-nav)
         ($ :div.flex-1.flex.flex-col.min-h-0
            ($ breadcrumb)
            ($ :div.flex-1.overflow-auto
-              ($ Router
-                 ;; Agent routes
-                 ($ Route {:path "/agents/:module-id/:agent-name/invocations" :component agents/invocations})
-                 ($ Route {:path "/agents/:module-id/:agent-name/invocations/:invoke-id" :component agents/invoke})
-                 ($ Route {:path "/agents/:module-id/:agent-name/evaluations" :component agents/evaluations})
-                 ($ Route {:path "/agents/:module-id/:agent-name/stats" :component stats/stats})
-                 ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
-                 ($ Route {:path "/agents" :component agents/index})
+              ;; Agent routes
+              ($ Route {:path "/agents/:module-id/:agent-name/invocations" :component agents/invocations})
+              ($ Route {:path "/agents/:module-id/:agent-name/invocations/:invoke-id" :component agents/invoke})
+              ($ Route {:path "/agents/:module-id/:agent-name/evaluations" :component agents/evaluations})
+              ($ Route {:path "/agents/:module-id/:agent-name/stats" :component stats/stats})
+              ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
+              ($ Route {:path "/agents" :component agents/index})
 
-                 ;; Home route
-                 ($ Route {:path "/" :component agents/index})))))
+              ;; Home route
+              ($ Route {:path "/" :component agents/index}))))
      ;; Global modal component
      ($ global-modal-component)))
 
