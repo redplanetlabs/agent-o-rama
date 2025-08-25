@@ -157,19 +157,32 @@
 
 (defui expandable-list-component [{:keys [items color title-singular truncate-length depth]
                                    :or {truncate-length 50 depth 0}}]
-  ($ :div {:className (str "text-" color "-500 space-y-1 rounded-sm")
-           :style {:background-color "rgba(0, 0, 0, 0.02)"}}
-     (for [[idx item] (map-indexed vector items)]
-       ($ :div {:key idx
-                :className "flex items-start gap-2"}
-          ($ :span {:className (str "text-" color "-400 text-xs flex-shrink-0")}
-             (str (inc idx) "."))
-          ;; Recursively render each item using the generic viewer
-          ($ :div {:className "flex-1"}
-             ($ generic-data-viewer {:data item
-                                     :color color
-                                     :truncate-length truncate-length
-                                     :depth depth}))))))
+  (let [[show-all-items set-show-all-items] (useState false)
+        has-many-items? (> (count items) 5)
+        displayed-items (if (or show-all-items (not has-many-items?))
+                          items
+                          (take 5 items))]
+    ($ :div {:className (str "text-" color "-500 space-y-1 rounded-sm")
+             :style {:background-color "rgba(0, 0, 0, 0.02)"}}
+       (for [[idx item] (map-indexed vector displayed-items)]
+         ($ :div {:key idx
+                  :className "flex items-start gap-2"}
+            ($ :span {:className (str "text-" color "-400 text-xs flex-shrink-0")}
+               (str (inc idx) "."))
+            ;; Recursively render each item using the generic viewer
+            ($ :div {:className "flex-1"}
+               ($ generic-data-viewer {:data item
+                                       :color color
+                                       :truncate-length truncate-length
+                                       :depth depth}))))
+       ;; Show all/less button at the bottom
+       (when has-many-items?
+         ($ :div {:className "mt-2 pl-2"}
+            ($ :button {:className "text-xs text-blue-600 hover:underline cursor-pointer"
+                        :onClick #(set-show-all-items (not show-all-items))}
+               (if show-all-items
+                 "Show less"
+                 (str "... show all (" (count items) ")"))))))))
 
 (defui generic-data-viewer [{:keys [data color truncate-length depth]
                              :or {truncate-length 80 depth 0}}]
@@ -599,7 +612,7 @@
                                                               {:title (str "Exception in " node-name)
                                                                :content throwable-str}]))
                                   :title "Click to view full exception"}
-                              first-line))
+                            first-line))
                       ($ :div {:className "flex items-center gap-2 justify-end"}
                          ;; Button to navigate to the node in the graph
                          ($ :button {:className (str "text-xs font-medium px-2 py-1 rounded "
