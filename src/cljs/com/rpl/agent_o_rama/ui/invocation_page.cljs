@@ -74,7 +74,7 @@
                                            new-path (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name)
                                                          "/invocations/" task-id "-" agent-invoke-id)]
                                        (state/dispatch [:ui/clear-fork-state])
-                                       (rfe/navigate new-path))
+                                       (rfe/push-state :agent/invocation-detail {:module-id module-id :agent-name agent-name :invoke-id (str task-id "-" agent-invoke-id)}))
                                      (js/console.error "Fork failed:" (:error reply)))))))
 
         handle-clear-fork (fn []

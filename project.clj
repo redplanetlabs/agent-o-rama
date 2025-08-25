@@ -66,7 +66,9 @@
                                        [com.pitch/uix.core "1.4.3"]
                                        [com.pitch/uix.dom "1.4.3"]
                                        [thheller/shadow-cljs "3.1.7"]
+                                       [metosin/reitit "0.9.1"]
                                        [metosin/reitit-frontend "0.9.1"]
+                                       [metosin/reitit-malli "0.9.1"]
                                        [net.java.dev.jna/jna "5.17.0"] ;; to fix
                                                                        ;; dynlink
                                                                        ;; error

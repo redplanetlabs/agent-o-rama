@@ -11,6 +11,8 @@
    [reitit.core :as r]
    [reitit.frontend :as rf]
    [reitit.frontend.easy :as rfe]
+   [reitit.coercion :as coercion]
+   [reitit.coercion.malli :as malli]
    ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon ChevronLeftIcon ChevronRightIcon
                                           RectangleStackIcon ChartBarIcon BeakerIcon Cog6ToothIcon]]
 
@@ -53,7 +55,7 @@
 ;; =============================================================================
 
 (defui with-router [{:keys [routes children]}]
-  (let [router (uix/use-memo #(rf/router routes) [routes])]
+  (let [router (uix/use-memo #(rf/router routes {:data {:coercion malli/coercion}}) [routes])]
     (uix/use-effect
      #(do
         (reset! router-instance router)

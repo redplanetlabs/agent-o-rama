@@ -29,14 +29,14 @@
   (let [task-id (:task-id invoke)
         agent-id (:agent-id invoke)
         start-time (:start-time-millis invoke)
-        url (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations/" task-id "-" agent-id)]
+        href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations/" task-id "-" agent-id)
+        invoke-id (str task-id "-" agent-id)]
     ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
-       {:key url
+       {:key href
         :onClick (fn [e]
-                   (when on-click
-                     (. e stopPropagation)
-                     (on-click url)))}
-       ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium (str task-id "-" agent-id))
+                   (. e stopPropagation)
+                   (rfe/push-state :agent/invocation-detail {:module-id module-id :agent-name agent-name :invoke-id invoke-id}))}
+       ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium invoke-id)
        ($ :td.px-4.py-3.text-sm.text-gray-600.font-mono
           {:title (common/format-timestamp start-time)}
           (common/format-relative-time start-time))
@@ -151,7 +151,7 @@
                                        :invoke invoke
                                        :module-id module-id
                                        :agent-name agent-name
-                                       :on-click rfe/navigate})))
+                                       :on-click (fn [url] (set! (.-href (.-location js/window)) url))})))
 
             ;; Load More button
                (when has-more?
@@ -198,10 +198,12 @@
                                     :invoke invoke
                                     :module-id module-id
                                     :agent-name agent-name
-                                    :on-click rfe/navigate})))
+                                    :on-click (fn [url] (set! (.-href (.-location js/window)) url))})))
             ($ :tfoot.bg-gray-50.border-t.border-gray-200
                ($ :tr.hover:bg-gray-100.transition-colors.duration-150
-                  {:onClick (fn [_] (rfe/navigate (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations")))}
+                  {:onClick (fn [_]
+                              (set! (.-href (.-location js/window))
+                                    (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations")))}
                   ($ :td.px-4.py-3.cursor-pointer {:colSpan 5}
                      ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
                         ($ :span.mr-2.text-sm.font-medium "View all invocations")
@@ -314,7 +316,7 @@
                                  (let [data (:data reply)
                                        trace-url (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations/" (:task-id data) "-" (:invoke-id data))]
                                    (update-field :args "") ;; Clear args on success
-                                   (rfe/navigate trace-url))
+                                   (rfe/push-state :agent/invocation-detail {:module-id module-id :agent-name agent-name :invoke-id (str (:task-id data) "-" (:invoke-id data))}))
                                  (update-field :error-msg (str "Error: " (or (:error reply) "Unknown error"))))))
                             ;; Invalid JSON
                             (do
