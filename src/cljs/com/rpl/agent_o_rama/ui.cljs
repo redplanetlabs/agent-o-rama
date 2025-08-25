@@ -31,11 +31,13 @@
    ["agents"
     ["" {:name :agents/index, :view agents/index}]
     ["/:module-id"
+     ;; Module-level routes with literal segments FIRST
      ["/datasets"
       ["" {:name :module/datasets, :view datasets/index}]
       ["/:dataset-id" {:name :module/dataset-detail, :view datasets/detail}]]
      ["/evaluations" {:name :module/evaluations, :view agents/evaluations}]
-     ["/:agent-name"
+     ;; Agent routes with prefix to avoid conflicts
+     ["/agent/:agent-name"
       ["" {:name :agent/detail, :view agents/agent}]
       ["/invocations"
        ["" {:name :agent/invocations, :view agents/invocations}]
@@ -103,12 +105,12 @@
           (when-not collapsed?
             ($ :div.px-3.text-xs.font-semibold.text-gray-500 "AGENT"))
 
-          ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/invocations")
+          ($ nav-link {:href (str "/agents/" module-id "/agent/" agent-name "/invocations")
                        :location location :collapsed? collapsed? :title "Invocations"}
              ($ RectangleStackIcon {:className "h-5 w-5 flex-shrink-0"})
              (when-not collapsed? ($ :span.ml-3 "Invocations")))
 
-          ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/config")
+          ($ nav-link {:href (str "/agents/" module-id "/agent/" agent-name "/config")
                        :location location :collapsed? collapsed? :title "Config"}
              ($ Cog6ToothIcon {:className "h-5 w-5 flex-shrink-0"})
              (when-not collapsed? ($ :span.ml-3 "Config")))))))
@@ -187,16 +189,16 @@
                                 ;; Agent invocation detail
                                 (and module-id agent-name invoke-id)
                                 [{:label (str (common/url-decode module-id) ":" (common/url-decode agent-name))
-                                  :path (str "/agents/" module-id "/" agent-name)}
+                                  :path (str "/agents/" module-id "/agent/" agent-name)}
                                  {:label "Invocations"
-                                  :path (str "/agents/" module-id "/" agent-name "/invocations")}
+                                  :path (str "/agents/" module-id "/agent/" agent-name "/invocations")}
                                  {:label (common/url-decode invoke-id)
                                   :path nil}] ; Current page
 
                                 ;; Agent detail pages
                                 (and module-id agent-name)
                                 [{:label (str (common/url-decode module-id) ":" (common/url-decode agent-name))
-                                  :path (str "/agents/" module-id "/" agent-name)}
+                                  :path (str "/agents/" module-id "/agent/" agent-name)}
                                  {:label (case route-name
                                            :agent/invocations "Invocations"
                                            :agent/config "Config"

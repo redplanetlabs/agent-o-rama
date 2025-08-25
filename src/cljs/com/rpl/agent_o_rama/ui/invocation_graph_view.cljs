@@ -15,8 +15,7 @@
    ["react-dom" :refer [createPortal]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
    ["@dagrejs/dagre" :as Dagre]
-   ["@heroicons/react/24/outline" :refer [ExclamationTriangleIcon ArrowPathIcon ArrowTopRightOnSquareIcon]]
-   ["wouter" :as wouter]))
+   ["@heroicons/react/24/outline" :refer [ExclamationTriangleIcon ArrowPathIcon ArrowTopRightOnSquareIcon]]))
 
 (defn format-ms [ms]
   (let [date (js/Date. ms)
@@ -558,9 +557,9 @@
               ($ :div {:className "flex items-center gap-2"}
                  ($ :span {:className "text-sm font-medium text-gray-600"} "Fork of:")
                  (let [parent-id (get fork-of :parent-agent-id)
-                       url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" parent-id)]
-                   ($ wouter/Link {:href url
-                                   :className "font-mono text-sm text-blue-600 hover:underline"}
+                       url (str "/agents/" module-id "/agent/" agent-name "/invocations/" task-id "-" parent-id)]
+                   ($ :a {:href url
+                          :className "font-mono text-sm text-blue-600 hover:underline"}
                       (str task-id "-" parent-id)))))
 
             ;; Children Links
@@ -571,9 +570,9 @@
                  ($ :ul {:className "list-disc list-inside pl-4"}
                     (for [fork-id displayed-forks]
                       ($ :li {:key fork-id}
-                         (let [url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" fork-id)]
-                           ($ wouter/Link {:href url
-                                           :className "font-mono text-sm text-blue-600 hover:underline"}
+                         (let [url (str "/agents/" module-id "/agent/" agent-name "/invocations/" task-id "-" fork-id)]
+                           ($ :a {:href url
+                                  :className "font-mono text-sm text-blue-600 hover:underline"}
                               (str task-id "-" fork-id))))))
                  ;; Show all/less button at the bottom
                  (when has-many-forks?

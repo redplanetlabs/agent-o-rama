@@ -29,7 +29,7 @@
   (let [task-id (:task-id invoke)
         agent-id (:agent-id invoke)
         start-time (:start-time-millis invoke)
-        url (str "/agents/" module-id "/" agent-name "/invocations/" task-id "-" agent-id)]
+        url (str "/agents/" module-id "/agent/" agent-name "/invocations/" task-id "-" agent-id)]
     ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
        {:key url
         :onClick (fn [e]
@@ -67,7 +67,7 @@
                        ($ :div.text-gray-500 "No agents found"))
       :else ($ :div.p-4
                (for [agent data
-                     :let [url (str "/agents/" (:module-id agent) "/" (:agent-name agent))]]
+                     :let [url (str "/agents/" (:module-id agent) "/agent/" (:agent-name agent))]]
                  ($ :div.p-4.transition-colors.duration-150.hover:bg-gray-200.bg-gray-100.m-4 {:key url}
                     ($ :a {:href url}
                        ($ :div.flex.items-center.group
@@ -201,7 +201,7 @@
                                     :on-click rfe/navigate})))
             ($ :tfoot.bg-gray-50.border-t.border-gray-200
                ($ :tr.hover:bg-gray-100.transition-colors.duration-150
-                  {:onClick (fn [_] (rfe/navigate (str "/agents/" module-id "/" agent-name "/invocations")))}
+                  {:onClick (fn [_] (rfe/navigate (str "/agents/" module-id "/agent/" agent-name "/invocations")))}
                   ($ :td.px-4.py-3.cursor-pointer {:colSpan 5}
                      ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
                         ($ :span.mr-2.text-sm.font-medium "View all invocations")
@@ -236,7 +236,7 @@
 (defui stats-summary [{:keys [module-id agent-name]}]
   ($ :div.p-4.flex.gap-1
      ($ :a
-        {:href (str "/agents/" module-id "/" agent-name "/stats")
+        {:href (str "/agents/" module-id "/agent/" agent-name "/stats")
          :style {:flex-grow "1"}}
         ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6.hover:shadow-md.transition-shadow.duration-150.cursor-pointer.relative
            ($ :div.flex.justify-between.items-start
@@ -261,7 +261,7 @@
                       {:metric "Error Rate" :value "8.1%" :threshold "< 5%" :time-ago "1d ago"}]]
     ($ :div.p-4.flex.gap-1
        ($ :a
-          {:href (str "/agents/" module-id "/" agent-name "/alerts")
+          {:href (str "/agents/" module-id "/agent/" agent-name "/alerts")
            :style {:flex-grow "1"}}
           ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6.hover:shadow-md.transition-shadow.duration-150.cursor-pointer.relative
              ($ :div.flex.justify-between.items-start
@@ -312,8 +312,7 @@
                                (update-field :loading? false)
                                (if (:success reply)
                                  (let [data (:data reply)
-                                       trace-url (str "/agents/" module-id "/" agent-name "/invocations/"
-                                                      (:task-id data) "-" (:invoke-id data))]
+                                       trace-url (str "/agents/" module-id "/agent/" agent-name "/invocations/" (:task-id data) "-" (:invoke-id data))]
                                    (update-field :args "") ;; Clear args on success
                                    (rfe/navigate trace-url))
                                  (update-field :error-msg (str "Error: " (or (:error reply) "Unknown error"))))))

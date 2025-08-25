@@ -71,7 +71,7 @@
                                  (fn [reply]
                                    (if (:success reply)
                                      (let [{:keys [task-id agent-invoke-id]} (:data reply)
-                                           new-path (str "/agents/" module-id "/" agent-name
+                                           new-path (str "/agents/" module-id "/agent/" agent-name
                                                          "/invocations/" task-id "-" agent-invoke-id)]
                                        (state/dispatch [:ui/clear-fork-state])
                                        (rfe/navigate new-path))
