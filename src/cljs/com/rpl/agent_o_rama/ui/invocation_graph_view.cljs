@@ -109,7 +109,8 @@
                            (.preventDefault e)
                            (.stopPropagation e)
                            (state/dispatch [:modal/hide]))}
-          ($ :div {:className "bg-white rounded-lg shadow-xl max-w-4xl max-h-[80vh] overflow-hidden"
+
+          ($ :div {:className "bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-full overflow-hidden mx-4 my-8"
                    :onClick (fn [e]
                               (.preventDefault e)
                               (.stopPropagation e))}
@@ -122,7 +123,7 @@
                                        (.stopPropagation e)
                                        (state/dispatch [:modal/hide]))}
                    "×"))
-             ($ :div {:className "p-4 overflow-auto max-h-96"}
+             ($ :div {:className "p-4 overflow-auto max-h-full"}
                 ;; Support both custom components and text content
                 (if (:component data)
                   (:component data)
