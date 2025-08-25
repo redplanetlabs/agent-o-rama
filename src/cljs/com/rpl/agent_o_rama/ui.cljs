@@ -91,12 +91,12 @@
           (when-not collapsed?
             ($ :div.px-3.text-xs.font-semibold.text-gray-500 "MODULE"))
 
-          ($ nav-link {:href (str "/agents/" module-id "/datasets")
+          ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/datasets")
                        :location location :collapsed? collapsed? :title "Datasets"}
              ($ CircleStackIcon {:className "h-5 w-5 flex-shrink-0"})
              (when-not collapsed? ($ :span.ml-3 "Datasets")))
 
-          ($ nav-link {:href (str "/agents/" module-id "/evaluations")
+          ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/evaluations")
                        :location location :collapsed? collapsed? :title "Evaluations"}
              ($ BeakerIcon {:className "h-5 w-5 flex-shrink-0"})
              (when-not collapsed? ($ :span.ml-3 "Evaluations"))))
@@ -105,12 +105,12 @@
           (when-not collapsed?
             ($ :div.px-3.text-xs.font-semibold.text-gray-500 "AGENT"))
 
-          ($ nav-link {:href (str "/agents/" module-id "/agent/" agent-name "/invocations")
+          ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations")
                        :location location :collapsed? collapsed? :title "Invocations"}
              ($ RectangleStackIcon {:className "h-5 w-5 flex-shrink-0"})
              (when-not collapsed? ($ :span.ml-3 "Invocations")))
 
-          ($ nav-link {:href (str "/agents/" module-id "/agent/" agent-name "/config")
+          ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/config")
                        :location location :collapsed? collapsed? :title "Config"}
              ($ Cog6ToothIcon {:className "h-5 w-5 flex-shrink-0"})
              (when-not collapsed? ($ :span.ml-3 "Config")))))))
@@ -122,12 +122,12 @@
        (when-not collapsed?
          ($ :div.px-3.text-xs.font-semibold.text-gray-500 "MODULE"))
 
-       ($ nav-link {:href (str "/agents/" module-id "/datasets")
+       ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/datasets")
                     :location location :collapsed? collapsed? :title "Datasets"}
           ($ CircleStackIcon {:className "h-5 w-5 flex-shrink-0"})
           (when-not collapsed? ($ :span.ml-3 "Datasets")))
 
-       ($ nav-link {:href (str "/agents/" module-id "/evaluations")
+       ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/evaluations")
                     :location location :collapsed? collapsed? :title "Evaluations"}
           ($ BeakerIcon {:className "h-5 w-5 flex-shrink-0"})
           (when-not collapsed? ($ :span.ml-3 "Evaluations"))))))
@@ -189,16 +189,16 @@
                                 ;; Agent invocation detail
                                 (and module-id agent-name invoke-id)
                                 [{:label (str (common/url-decode module-id) ":" (common/url-decode agent-name))
-                                  :path (str "/agents/" module-id "/agent/" agent-name)}
+                                  :path (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name))}
                                  {:label "Invocations"
-                                  :path (str "/agents/" module-id "/agent/" agent-name "/invocations")}
+                                  :path (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations")}
                                  {:label (common/url-decode invoke-id)
                                   :path nil}] ; Current page
 
                                 ;; Agent detail pages
                                 (and module-id agent-name)
                                 [{:label (str (common/url-decode module-id) ":" (common/url-decode agent-name))
-                                  :path (str "/agents/" module-id "/agent/" agent-name)}
+                                  :path (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name))}
                                  {:label (case route-name
                                            :agent/invocations "Invocations"
                                            :agent/config "Config"
@@ -209,16 +209,16 @@
                                 ;; Dataset detail
                                 (and module-id dataset-id)
                                 [{:label (common/url-decode module-id)
-                                  :path (str "/agents/" module-id)}
+                                  :path (str "/agents/" (common/url-encode module-id))}
                                  {:label "Datasets"
-                                  :path (str "/agents/" module-id "/datasets")}
+                                  :path (str "/agents/" (common/url-encode module-id) "/datasets")}
                                  {:label (common/url-decode dataset-id)
                                   :path nil}] ; Current page
 
                                 ;; Module level pages
                                 (and module-id)
                                 [{:label (common/url-decode module-id)
-                                  :path (str "/agents/" module-id)}
+                                  :path (str "/agents/" (common/url-encode module-id))}
                                  {:label (case route-name
                                            :module/datasets "Datasets"
                                            :module/evaluations "Evaluations"

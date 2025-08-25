@@ -557,7 +557,7 @@
               ($ :div {:className "flex items-center gap-2"}
                  ($ :span {:className "text-sm font-medium text-gray-600"} "Fork of:")
                  (let [parent-id (get fork-of :parent-agent-id)
-                       url (str "/agents/" module-id "/agent/" agent-name "/invocations/" task-id "-" parent-id)]
+                       url (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations/" task-id "-" parent-id)]
                    ($ :a {:href url
                           :className "font-mono text-sm text-blue-600 hover:underline"}
                       (str task-id "-" parent-id)))))
@@ -570,7 +570,7 @@
                  ($ :ul {:className "list-disc list-inside pl-4"}
                     (for [fork-id displayed-forks]
                       ($ :li {:key fork-id}
-                         (let [url (str "/agents/" module-id "/agent/" agent-name "/invocations/" task-id "-" fork-id)]
+                         (let [url (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations/" task-id "-" fork-id)]
                            ($ :a {:href url
                                   :className "font-mono text-sm text-blue-600 hover:underline"}
                               (str task-id "-" fork-id))))))
