@@ -28,6 +28,7 @@
     AgentsTopology
     AgentStream
     AgentStreamByInvoke
+    CreateEvaluatorOptions
     HumanInputRequest
     MultiAgg$Impl
     UpdateMode]
@@ -60,14 +61,15 @@
   (let [^StreamTopology stream-topology (stream-topology
                                          topologies
                                          aor-types/AGENTS-TOPOLOGY-NAME)
-        mb-topology          (microbatch-topology
-                              topologies
-                              aor-types/AGENTS-MB-TOPOLOGY-NAME)
-        defined?-vol         (volatile! false)
-        agents-vol           (volatile! {})
-        mirror-agents-vol    (volatile! {})
-        store-info-vol       (volatile! {})
-        declared-objects-vol (volatile! {})]
+        mb-topology            (microbatch-topology
+                                topologies
+                                aor-types/AGENTS-MB-TOPOLOGY-NAME)
+        defined?-vol           (volatile! false)
+        agents-vol             (volatile! {})
+        mirror-agents-vol      (volatile! {})
+        store-info-vol         (volatile! {})
+        declared-objects-vol   (volatile! {})
+        evaluator-builders-vol (volatile! {})]
     (reify
      AgentsTopology
      (newAgent [this name]
@@ -129,6 +131,18 @@
         name
         (h/convert-jfn jfn)
         (i/convert-agent-object-options options)))
+
+     (declareEvaluatorBuilder [this name builder-jfn]
+       (.declareEvaluatorBuilder this name builder-jfn nil))
+     (declareEvaluatorBuilder [this name builder-jfn options]
+       (let [builder-fn (h/convert-jfn builder-jfn)]
+         (aor-types/declare-evaluator-builder-internal this
+                                                       name
+                                                       (fn [params]
+                                                         (h/convert-jfn
+                                                          (builder-fn params)))
+                                                       (if options @options))))
+
      (declareClusterAgent [this localName moduleName agentName]
        (check-unique-agent-name! agents-vol mirror-agents-vol localName)
        ;; this connects the modules so a module update removing an agent needed
@@ -150,7 +164,8 @@
         @agents-vol
         @mirror-agents-vol
         @store-info-vol
-        @declared-objects-vol))
+        @declared-objects-vol
+        @evaluator-builders-vol))
      aor-types/AgentsTopologyInternal
      (declare-agent-object-builder-internal [this name afn options]
        (when-not (ifn? afn)
@@ -174,6 +189,34 @@
                   "threadSafe"  (:thread-safe? full-options)
                   "autoTracing" (:auto-tracing? full-options)
                   "builderFn"   afn
+                 })
+       ))
+     (declare-evaluator-builder-internal [this name builder-fn options]
+       (when (contains? @evaluator-builders-vol name)
+         (throw (h/ex-info "Evaluator builder already declared" {:name name})))
+       (when (h/contains-string? name "/")
+         (throw (h/ex-info "Evaluator builder name may not include '/'"
+                           {:name name})))
+       (when-not (ifn? builder-fn)
+         (throw (h/ex-info "Builder must be a function"
+                           {:type (class builder-fn)})))
+       (let [full-options (merge {:params       {}
+                                  :input-path?  true
+                                  :output-path? true
+                                  :reference-output-path? true}
+                                 options)]
+         (h/validate-options! name
+                              full-options
+                              {:params       h/map-spec
+                               :input-path?  h/boolean-spec
+                               :output-path? h/boolean-spec
+                               :reference-output-path? h/boolean-spec
+                              })
+         (vswap! evaluator-builders-vol
+                 assoc
+                 name
+                 {:builder-fn builder-fn
+                  :options    options
                  })
        ))
     )))
@@ -214,6 +257,15 @@
                                                     afn
                                                     options)))
 
+
+(defn declare-evaluator-builder
+  ([agents-topology name builder-fn]
+   (declare-evaluator-builder agents-topology name builder-fn nil))
+  ([agents-topology name builder-fn options]
+   (aor-types/declare-evaluator-builder-internal agents-topology
+                                                 name
+                                                 builder-fn
+                                                 options)))
 (defn declare-cluster-agent
   [^AgentsTopology agents-topology local-name module-name agent-name]
   (.declareClusterAgent agents-topology local-name module-name agent-name))
@@ -346,7 +398,14 @@
         datasets-search-query (foreign-query
                                cluster
                                module-name
-                               (queries/search-datasets-name))]
+                               (queries/search-datasets-name))
+
+        evals-depot           (foreign-depot cluster
+                                             module-name
+                                             (po/evaluators-depot-name))
+        evals-pstate          (foreign-depot cluster
+                                             module-name
+                                             (po/evaluators-task-global-name))]
     (reify
      AgentManager
      (getAgentNames [this]
@@ -711,6 +770,30 @@
                                                  snapshotName)))
      (searchDatasets [this searchString limit]
        (foreign-invoke-query datasets-search-query searchString limit))
+
+
+     (createEvaluator [this name builderName params description options]
+       (foreign-append!
+        evals-depot
+        (aor-types/->valid-AddEvaluator
+         name
+         builderName
+         params
+         description
+         (.inputJsonPath options)
+         (.outputJsonPath options)
+         (.referenceOutputJsonPath options)
+        )))
+     (removeEvaluator [this name]
+       (foreign-append!
+        evals-depot
+        (aor-types/->valid-RemoveEvaluator name)
+       ))
+     (searchEvaluators [this searchString]
+       (into #{}
+             (foreign-select
+              [MAP-KEYS (view h/contains-string? searchString)]
+              evals-pstate)))
      (close [this]
        (close! datasets-depot))
      aor-types/UnderlyingObjects
@@ -995,6 +1078,35 @@
 (defn search-datasets
   [^AgentManager manager search-string limit]
   (.searchDatasets manager search-string limit))
+
+(defn create-evaluator!
+  ([^AgentManager manager name builder-name params description]
+   (create-evaluator! manager name builder-name params description nil))
+  ([^AgentManager manager name builder-name params description options]
+   (h/validate-options! name
+                        options
+                        {:input-json-path  h/string-spec
+                         :output-json-path h/string-spec
+                         :reference-output-json-path h/string-spec})
+   (let [joptions (CreateEvaluatorOptions.)]
+     (set! (.inputJsonPath joptions) (:input-json-path options))
+     (set! (.outputJsonPath joptions) (:output-json-path options))
+     (set! (.referenceOutputJsonPath joptions)
+           (:reference-output-json-path options))
+     (.createEvaluator manager
+                       name
+                       builder-name
+                       params
+                       description
+                       joptions))))
+
+(defn remove-evaluator!
+  [^AgentManager manager name]
+  (.removeEvaluator manager name))
+
+(defn search-evaluators
+  [^AgentManager manager search-string]
+  (.searchEvaluators manager search-string))
 
 (defn start-ui
   (^AutoCloseable [ipc] (start-ui ipc nil))

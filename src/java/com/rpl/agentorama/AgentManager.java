@@ -33,4 +33,8 @@ public interface AgentManager extends IFetchAgentClient, Closeable {
   void snapshotDataset(UUID datasetId, String fromSnapshotName, String toSnapshotName);
   void removeDatasetSnapshot(UUID datasetId, String snapshotName);
   Map<UUID, String> searchDatasets(String searchString, int limit);
+
+  void createEvaluator(String name, String builderName, Map params, String description, CreateEvaluatorOptions options);
+  void removeEvaluator(String name);
+  Set<String> searchEvaluators(String searchString);
 }

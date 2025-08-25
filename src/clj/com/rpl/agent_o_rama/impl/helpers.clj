@@ -277,3 +277,7 @@
   (JsonPath/read ^Object obj
                  ^String json-path
                  ^"[Lcom.jayway.jsonpath.Predicate;" (into-array Predicate [])))
+
+(defn compile-json-path
+  [^String json-path]
+  (JsonPath/compile json-path (into-array Predicate [])))

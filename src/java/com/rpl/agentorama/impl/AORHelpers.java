@@ -14,8 +14,10 @@ public class AORHelpers {
       Util.getIFn("com.rpl.agent-o-rama.impl.agent-node", "wrap-agent-object");
   public static IFn FREEZE = Util.getIFn("taoensso.nippy", "freeze");
   public static IFn THAW = Util.getIFn("taoensso.nippy", "thaw");
-  public static IFn MAKE_OPTIONS =
+  public static IFn MAKE_TOOLS_AGENT_OPTIONS =
       Util.getIFn("com.rpl.agent-o-rama.impl.java", "mk-tools-agent-options");
+  public static IFn MAKE_EVALUATOR_BUILDER_OPTIONS =
+      Util.getIFn("com.rpl.agent-o-rama.impl.java", "mk-evaluator-builder-options");
   public static IFn CREATE_TOOL_INFO =
       Util.getIFn("com.rpl.agent-o-rama.impl.java", "create-tool-info");
   public static IFn CREATE_TOOL_INFO_WITH_CONTEXT =

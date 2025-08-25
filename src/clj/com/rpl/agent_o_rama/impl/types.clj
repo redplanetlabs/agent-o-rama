@@ -309,6 +309,20 @@
   [dataset-id :- UUID
    snapshot-name :- String])
 
+;; Evaluators
+
+(drp/defrecord+ AddEvaluator
+  [name :- String
+   builder-name :- String
+   params :- {String Object}
+   description :- String
+   input-json-path :- (s/maybe String)
+   output-json-path :- (s/maybe String)
+   reference-output-json-path :- (s/maybe String)
+  ])
+
+(drp/defrecord+ RemoveEvaluator
+  [name :- String])
 
 ;; Internal protocols
 
@@ -316,7 +330,8 @@
   (underlying-objects [this]))
 
 (defprotocol AgentsTopologyInternal
-  (declare-agent-object-builder-internal [this name afn options]))
+  (declare-agent-object-builder-internal [this name afn options])
+  (declare-evaluator-builder-internal [this name builder-fn options]))
 
 (defprotocol AgentClientInternal
   (stream-internal [this agent-invoke node callback-fn])
