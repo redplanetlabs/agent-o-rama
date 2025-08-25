@@ -8,8 +8,7 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [reitit.frontend.easy :as rfe]
    [clojure.string :as str]))
-(def example-schema "
-{
+(def example-schema "{
   \"type\": \"object\",
   \"properties\": {
     \"context\": {
@@ -21,8 +20,7 @@
     }
   },
   \"required\": [\"context\", \"prompt\"]
-}
-")
+}")
 ;; =============================================================================
 ;; MODAL FOR CREATING DATASETS
 ;; =============================================================================
@@ -63,22 +61,23 @@
                           :required true
                           :onChange #(set-name (.. % -target -value))}))
             ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700 "Description")
-               ($ :textarea {:className "w-full h-20 p-3 border rounded-md text-sm resize-y transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+               ($ :label.block.text-sm.font-medium.text-gray-700 "Description (Optional)")
+               ($ :textarea {:className "w-full h-15 p-3 border rounded-md text-sm resize-y transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                              :value description
                              :onChange #(set-description (.. % -target -value))}))
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700 "Input JSON Schema (Optional)")
-               ($ :textarea {:className "w-full h-32 p-3 border rounded-md font-mono text-sm resize-y transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                             :value input-schema
-                             :placeholder example-schema
-                             :onChange #(set-input-schema (.. % -target -value))}))
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700 "Output JSON Schema (Optional)")
-               ($ :textarea {:className "w-full h-32 p-3 border rounded-md font-mono text-sm resize-y transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                             :value output-schema
-                             :placeholder example-schema
-                             :onChange #(set-output-schema (.. % -target -value))}))
+            ($ :div.grid.grid-cols-2.gap-4
+               ($ :div
+                  ($ :label.block.text-sm.font-medium.text-gray-700 "Input JSON Schema (Optional)")
+                  ($ :textarea {:className "w-full h-80 p-3 border rounded-md font-mono text-sm resize-y transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                                :value input-schema
+                                :placeholder example-schema
+                                :onChange #(set-input-schema (.. % -target -value))}))
+               ($ :div
+                  ($ :label.block.text-sm.font-medium.text-gray-700 "Output JSON Schema (Optional)")
+                  ($ :textarea {:className "w-full h-80 p-3 border rounded-md font-mono text-sm resize-y transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                                :value output-schema
+                                :placeholder example-schema
+                                :onChange #(set-output-schema (.. % -target -value))})))
 
             ;; JSON Schema Help Box
             ($ :div.bg-blue-50.border.border-blue-200.rounded-md.p-4
