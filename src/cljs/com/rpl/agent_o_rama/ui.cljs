@@ -20,6 +20,7 @@
    [com.rpl.agent-o-rama.ui.stats :as stats]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.state :as state]
+   [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.invocation-graph-view :refer [global-modal-component]]
    [com.rpl.agent-o-rama.ui.events])) ;; Ensure event handlers are registered at app startup
 
@@ -119,7 +120,14 @@
 
 ;; Module-specific navigation component
 (defui module-context-nav [{:keys [module-id collapsed?]}]
-  (let [location (or (get-in (state/use-sub [:route]) [:path]) "/")]
+  (let [location (or (get-in (state/use-sub [:route]) [:path]) "/")
+        ;; Query for module-specific agents
+        {:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:module-agents module-id]
+          :sente-event [:api/get-agents-for-module {:module-id module-id}]
+          :enabled? (boolean module-id)
+          :refetch-interval-ms 5000})]
     ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2
        (when-not collapsed?
          ($ :div.px-3.text-xs.font-semibold.text-gray-500 "MODULE"))
@@ -132,7 +140,34 @@
        ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/evaluations")
                     :location location :collapsed? collapsed? :title "Evaluations"}
           ($ BeakerIcon {:className "h-5 w-5 flex-shrink-0"})
-          (when-not collapsed? ($ :span.ml-3 "Evaluations"))))))
+          (when-not collapsed? ($ :span.ml-3 "Evaluations")))
+
+       ;; Module-specific agents list
+       (cond
+         ;; Show loading state
+         loading?
+         ($ :div.px-3.py-2.text-xs.text-gray-500.flex.items-center.gap-2
+            ($ common/spinner {:size :small})
+            (when-not collapsed? "Loading agents..."))
+
+         ;; Show error state
+         error
+         ($ :div.px-3.py-2.text-xs.text-red-500 {:title error}
+            (when-not collapsed? "Error loading agents"))
+
+         ;; Render the list of agents
+                  ;; Render the list of agents directly in MODULE section
+         (seq data)
+         (for [agent data
+               :let [decoded-agent-name (common/url-decode (:agent-name agent))]]
+           ($ nav-link {:key (:agent-name agent)
+                        :href (str "/agents/" (common/url-encode module-id) "/agent/" (:agent-name agent))
+                        :location location
+                        :collapsed? collapsed?
+                        :title decoded-agent-name}
+              ($ CpuChipIcon {:className "h-5 w-5 flex-shrink-0"})
+              (when-not collapsed?
+                ($ :span.ml-3.truncate decoded-agent-name))))))))
 
 (defui sidebar-nav []
   (let [match (state/use-sub [:route])
@@ -160,7 +195,7 @@
                ($ ChevronLeftIcon {:className "h-5 w-5"}))))
 
        ;; Navigation
-       ($ :nav.flex-1.p-3
+       ($ :nav.flex-1.p-3.overflow-y-auto
           ($ :div.space-y-2
              ($ nav-link {:href "/" :location location :collapsed? collapsed? :title "Overview"}
                 ($ HomeIcon {:className "h-5 w-5 flex-shrink-0"})
@@ -171,7 +206,7 @@
                                   :agent-name agent-name
                                   :collapsed? collapsed?}))
 
-          (when is-module-context?
+          (when module-id
             ($ module-context-nav {:module-id module-id
                                    :collapsed? collapsed?}))))))
 

@@ -304,3 +304,17 @@
         (throw (ex-info (str "Failed to set config: " (.getMessage e))
                         {:key key :value value}))))))
 
+(defmethod api-handler :api/get-agents-for-module
+  [_ {:keys [module-id]} uid]
+  (let [decoded-module-id (url-decode module-id)]
+    (if-let [manager (get-manager decoded-module-id)]
+      ;; If we found the manager for the module, get its agent names
+      (let [agent-names (aor/agent-names manager)]
+        (mapv (fn [agent-name]
+                {:module-id module-id ; Return the original encoded ID for URL generation
+                 :agent-name (url-encode agent-name)})
+              agent-names))
+      ;; If no manager is found for the module-id, return an empty list.
+      ;; This can happen transiently or if the module has no agents.
+      [])))
+
