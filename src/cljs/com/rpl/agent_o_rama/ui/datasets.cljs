@@ -101,8 +101,8 @@
               ($ :p.text-sm.text-red-700.whitespace-pre-wrap error-msg)))
 
          ($ :div.mt-6.flex.justify-end.gap-3
-            ($ :button.px-4.py-2.border.border-gray-300.rounded-md.text-sm.font-medium {:type "button" :onClick #(state/dispatch [:modal/hide])} "Cancel")
-            ($ :button.px-4.py-2.border.border-transparent.rounded-md.text-sm.font-medium.text-white.bg-blue-600.hover:bg-blue-700.flex.items-center.gap-2
+            ($ :button.px-4.py-2.border.border-gray-300.rounded-md.text-sm.font-medium.cursor-pointer {:type "button" :onClick #(state/dispatch [:modal/hide])} "Cancel")
+            ($ :button.px-4.py-2.border.border-transparent.rounded-md.text-sm.font-medium.text-white.bg-blue-600.hover:bg-blue-700.flex.items-center.gap-2.cursor-pointer
                {:type "submit" :disabled (or submitting? (str/blank? name))}
                (when submitting? ($ common/spinner {:size :medium}))
                "Create"))))))
@@ -134,7 +134,7 @@
           ($ :div
              ($ :h1.text-2xl.font-bold.text-gray-900 "Datasets for " ($ :span.text-indigo-600 module-id))
              ($ :p.mt-2.text-sm.text-gray-600 "Create and manage datasets for agent training and evaluation."))
-          ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700
+          ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer
              {:onClick #(state/dispatch [:modal/show :create-dataset
                                          {:title "Create New Dataset"
                                           :component ($ CreateDatasetForm {:module-id module-id-raw
