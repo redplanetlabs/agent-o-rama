@@ -6,6 +6,7 @@
 
    [com.rpl.agent-o-rama.ui.agents :as agents]
    [com.rpl.agent-o-rama.ui.config-page :as config-page]
+   [com.rpl.agent-o-rama.ui.datasets :as datasets]
    ["wouter" :refer [Link Route Switch Router useLocation]]
    ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon ChevronLeftIcon ChevronRightIcon
                                           RectangleStackIcon ChartBarIcon BeakerIcon Cog6ToothIcon]]
@@ -15,7 +16,7 @@
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.invocation-graph-view :refer [global-modal-component]]
-   [com.rpl.agent-o-rama.ui.events])) ;; Ensure event handlers are registered at app startup
+   [com.rpl.agent-o-rama.ui.events])) ;; Ensure event handlers are registered at app startup ;; Ensure event handlers are registered at app startup
 
 ;; Sidebar navigation component
  ;; Reusable nav-link component
@@ -42,9 +43,9 @@
           (when-not collapsed?
             ($ :div.px-3.text-xs.font-semibold.text-gray-500 "MODULE"))
 
-          ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/datsets")
+          ($ nav-link {:href (str "/agents/" module-id "/datasets")
                        :location location :collapsed? collapsed? :title "Datasets"}
-             ($ ChartBarIcon {:className "h-5 w-5 flex-shrink-0"})
+             ($ CircleStackIcon {:className "h-5 w-5 flex-shrink-0"})
              (when-not collapsed? ($ :span.ml-3 "Datasets")))
 
           ($ nav-link {:href (str "/agents/" module-id "/" agent-name "/evaluations")
@@ -66,6 +67,23 @@
              ($ Cog6ToothIcon {:className "h-5 w-5 flex-shrink-0"})
              (when-not collapsed? ($ :span.ml-3 "Config")))))))
 
+ ;; Module-specific navigation component
+(defui module-context-nav [{:keys [module-id collapsed?]}]
+  (let [[location _] (useLocation)]
+    ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2
+       (when-not collapsed?
+         ($ :div.px-3.text-xs.font-semibold.text-gray-500 "MODULE"))
+
+       ($ nav-link {:href (str "/agents/" module-id "/datasets")
+                    :location location :collapsed? collapsed? :title "Datasets"}
+          ($ CircleStackIcon {:className "h-5 w-5 flex-shrink-0"})
+          (when-not collapsed? ($ :span.ml-3 "Datasets")))
+
+       ($ nav-link {:href (str "/agents/" module-id "/evaluations")
+                    :location location :collapsed? collapsed? :title "Evaluations"}
+          ($ BeakerIcon {:className "h-5 w-5 flex-shrink-0"})
+          (when-not collapsed? ($ :span.ml-3 "Evaluations"))))))
+
 (defui sidebar-nav []
   (let [[location _] (useLocation)
         ;; this is a hack, because wouter doesn't support useParams outside of Route components
@@ -74,9 +92,13 @@
                          (str/replace #"^/" "")
                          (str/split #"/")
                          vec)
-        ;; Extract agent context from URL: /agents/module-id/agent-name/...
-        [section module-id agent-name] url-segments
-        is-agent-context? (and (= section "agents") module-id agent-name)
+        [section module-id agent-name-or-section] url-segments
+        module-sections #{"datasets" "evaluations"}
+        ;; this is hack, should probably use reitit again
+        is-agent-context? (and (= section "agents") module-id agent-name-or-section
+                               (not (contains? module-sections agent-name-or-section)))
+        is-module-context? (and (= section "agents") module-id
+                                (contains? module-sections agent-name-or-section))
         [collapsed? set-collapsed] (common/use-local-storage "sidebar-collapsed?" false)
         toggle-collapsed #(set-collapsed (not collapsed?))]
 
@@ -97,7 +119,6 @@
 
        ;; Navigation
        ($ :nav.flex-1.p-3
-          ;; Global Navigation (always visible)
           ($ :div.space-y-2
              ($ nav-link {:href "/" :location location :collapsed? collapsed? :title "Overview"}
                 ($ HomeIcon {:className "h-5 w-5 flex-shrink-0"})
@@ -105,8 +126,12 @@
 
           (when is-agent-context?
             ($ agent-context-nav {:module-id module-id
-                                  :agent-name agent-name
+                                  :agent-name agent-name-or-section
                                   :collapsed? collapsed?}))
+
+          (when is-module-context?
+            ($ module-context-nav {:module-id module-id
+                                   :collapsed? collapsed?}))
 
           ;; TODO: You can add another section here for Datasets when a module-id is present but an agent-name is not.
           ;; (when (and module-id (not agent-name))
@@ -133,7 +158,8 @@
                                       ;; Check if this is an agent module/agent-name pair
                                       is-agent-pair? (and (= (get segments 0) "agents")
                                                           (= (count result) 1)
-                                                          next-segment)
+                                                          next-segment
+                                                          (not (#{"datasets" "evaluations"} next-segment)))
                                       ;; Build the item
                                       item (if is-agent-pair?
                                              ;; Merge module/agent into one breadcrumb
@@ -184,19 +210,29 @@
         ($ :div.flex-1.flex.flex-col.min-h-0
            ($ breadcrumb)
            ($ :div.flex-1.overflow-auto
-              ;; Agent routes
-              ($ Route {:path "/agents/:module-id/:agent-name/invocations" :component agents/invocations})
-              ($ Route {:path "/agents/:module-id/:agent-name/invocations/:invoke-id" :component agents/invoke})
-              ($ Route {:path "/agents/:module-id/:agent-name/evaluations" :component agents/evaluations})
-              ($ Route {:path "/agents/:module-id/:agent-name/config" :component config-page/config-page})
-              ($ Route {:path "/agents/:module-id/:agent-name/stats" :component stats/stats})
-              ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
-              ($ Route {:path "/agents" :component agents/index})
+              ($ Switch
+                ;; Datasets routes (module-scoped) - MUST come before agent routes
+                 ($ Route {:path "/agents/:module-id/datasets/:dataset-id" :component datasets/detail})
+                 ($ Route {:path "/agents/:module-id/datasets" :component datasets/index})
 
-              ;; Home route
-              ($ Route {:path "/" :component agents/index}))))
-     ;; Global modal component
-     ($ global-modal-component)))
+                ;; Module-level evaluations (placeholder component for now)
+                 ($ Route {:path "/agents/:module-id/evaluations" :component agents/evaluations})
+
+                ;; Agent-specific routes - more specific paths first
+                 ($ Route {:path "/agents/:module-id/:agent-name/invocations/:invoke-id" :component agents/invoke})
+                 ($ Route {:path "/agents/:module-id/:agent-name/invocations" :component agents/invocations})
+                 ($ Route {:path "/agents/:module-id/:agent-name/evaluations" :component agents/evaluations})
+                 ($ Route {:path "/agents/:module-id/:agent-name/config" :component config-page/config-page})
+                 ($ Route {:path "/agents/:module-id/:agent-name/stats" :component stats/stats})
+                 ($ Route {:path "/agents/:module-id/:agent-name" :component agents/agent})
+
+                ;; General routes
+                 ($ Route {:path "/agents" :component agents/index})
+
+                ;; Home route
+                 ($ Route {:path "/" :component agents/index}))))
+;; Global modal component
+        ($ global-modal-component))))
 
 (defn init []
   (sente/init!)
