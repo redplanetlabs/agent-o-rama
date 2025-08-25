@@ -17,6 +17,7 @@
                  :has-more? true
                  :loading? false}
    :queries {} ; New map to store all query states
+   :route nil ; Current route match from reitit
    :ui {:selected-node-id nil
         :forking-mode? false
         :changed-nodes {}
@@ -251,6 +252,14 @@
            (fn [db]
              [:ui :modal (s/terminal-val {:active nil
                                           :data {}})]))
+
+;; =============================================================================
+;; ROUTING EVENTS
+;; =============================================================================
+
+(reg-event :route/navigated
+           (fn [db new-match]
+             [:route (s/terminal-val new-match)]))
 
 ;; =============================================================================
 ;; DEBUGGING HELPERS

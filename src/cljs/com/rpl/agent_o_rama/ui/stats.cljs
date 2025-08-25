@@ -2,13 +2,12 @@
   (:require
    [com.rpl.agent-o-rama.ui.agent-graph :as agent-graph]
    [clojure.string :as str]
-   
+
    [uix.core :as uix :refer [defui defhook $]]
-   ["wouter" :as wouter :refer [useLocation]]
    ["uplot" :as uplot]
    ["css-element-queries/src/ResizeSensor" :as ResizeSensor]
 
-   
+   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]))
 
@@ -34,20 +33,20 @@
                 ($ :div {:className "text-xs text-gray-500 truncate max-w-64"}
                    (:message selected-version)))
              ($ :svg {:className "h-5 w-5 text-gray-400" :viewBox "0 0 20 20" :fill "currentColor"}
-                ($ :path {:fillRule "evenodd" 
-                          :d "M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" 
+                ($ :path {:fillRule "evenodd"
+                          :d "M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
                           :clipRule "evenodd"}))))
-       
+
        (when is-open
          ($ :div {:className "absolute right-0 z-10 mt-2 w-80 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"}
             ($ :div {:className "py-1"}
                (for [version dummy-versions]
                  ($ :button {:key (:sha version)
                              :className (str "block w-full px-4 py-3 text-left text-sm hover:bg-gray-100 "
-                                           (when (= (:sha version) (:sha selected-version))
-                                             "bg-gray-50"))
+                                             (when (= (:sha version) (:sha selected-version))
+                                               "bg-gray-50"))
                              :onClick #(do (set-selected-version version)
-                                         (set-is-open false))}
+                                           (set-is-open false))}
                     ($ :div {:className "flex justify-between items-start"}
                        ($ :div {:className "flex-1"}
                           ($ :div {:className "font-mono text-sm font-medium text-gray-900"}
@@ -88,23 +87,23 @@
       ($ :div {:className "mt-6 p-6"}
          ($ :h3 {:className "text-lg font-semibold text-gray-800 mb-4"}
             (str "Stats for Node: " node-id))
-         
+
          ($ :div {:className "grid grid-cols-2 md:grid-cols-4 gap-4"}
-            
+
             ;; Execution Time
             ($ :div {:className "bg-blue-50 p-4 rounded-lg"}
                ($ :div {:className "text-sm font-medium text-blue-600"}
                   "Execution Time")
                ($ :div {:className "text-2xl font-bold text-blue-900"}
                   (str (:execution-time stats) "ms")))
-            
+
             ;; Model Calls
             ($ :div {:className "bg-green-50 p-4 rounded-lg"}
                ($ :div {:className "text-sm font-medium text-green-600"}
                   "Model Calls")
                ($ :div {:className "text-2xl font-bold text-green-900"}
                   (:model-calls stats)))
-            
+
             ;; Tokens
             ($ :div {:className "bg-purple-50 p-4 rounded-lg"}
                ($ :div {:className "text-sm font-medium text-purple-600"}
@@ -113,7 +112,7 @@
                   (str "In: " (get-in stats [:tokens :input])))
                ($ :div {:className "text-lg font-bold text-purple-900"}
                   (str "Out: " (get-in stats [:tokens :output]))))
-            
+
             ;; Store Operations
             ($ :div {:className "bg-orange-50 p-4 rounded-lg"}
                ($ :div {:className "text-sm font-medium text-orange-600"}
@@ -122,7 +121,7 @@
                   (str "R: " (get-in stats [:store-operations :reads])))
                ($ :div {:className "text-lg font-bold text-orange-900"}
                   (str "W: " (get-in stats [:store-operations :writes])))))))
-    
+
     ;; Show overall stats when no node is selected
     (let [stats (generate-overall-stats selected-version)]
       ($ :div {:className "mt-6 p-6"}
@@ -130,30 +129,30 @@
             "Overall Agent Graph Stats")
          ($ :p {:className "text-sm text-gray-600 mb-4"}
             "Aggregate performance metrics across all nodes. Click on a node to see individual stats.")
-         
+
          ($ :div {:className "grid grid-cols-2 md:grid-cols-5 gap-4"}
-            
+
             ;; Total Execution Time
             ($ :div {:className "bg-blue-50 p-4 rounded-lg"}
                ($ :div {:className "text-sm font-medium text-blue-600"}
                   "Total Execution Time")
                ($ :div {:className "text-2xl font-bold text-blue-900"}
                   (str (:total-execution-time stats) "ms")))
-            
+
             ;; Nodes Executed
             ($ :div {:className "bg-indigo-50 p-4 rounded-lg"}
                ($ :div {:className "text-sm font-medium text-indigo-600"}
                   "Nodes Executed")
                ($ :div {:className "text-2xl font-bold text-indigo-900"}
                   (:nodes-executed stats)))
-            
+
             ;; Total Model Calls
             ($ :div {:className "bg-green-50 p-4 rounded-lg"}
                ($ :div {:className "text-sm font-medium text-green-600"}
                   "Total Model Calls")
                ($ :div {:className "text-2xl font-bold text-green-900"}
                   (:total-model-calls stats)))
-            
+
             ;; Total Tokens
             ($ :div {:className "bg-purple-50 p-4 rounded-lg"}
                ($ :div {:className "text-sm font-medium text-purple-600"}
@@ -162,7 +161,7 @@
                   (str "In: " (get-in stats [:total-tokens :input])))
                ($ :div {:className "text-lg font-bold text-purple-900"}
                   (str "Out: " (get-in stats [:total-tokens :output]))))
-            
+
             ;; Total Store Operations
             ($ :div {:className "bg-orange-50 p-4 rounded-lg"}
                ($ :div {:className "text-sm font-medium text-orange-600"}
@@ -173,7 +172,7 @@
                   (str "W: " (get-in stats [:total-store-operations :writes])))))))))
 
 (defui agent-graph [{:keys [selected-version]}]
-  (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
+  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
         {:keys [data loading?]}
         (queries/use-sente-query {:query-key [:graph module-id agent-name]
                                   :sente-event [:query/graph module-id agent-name]})
@@ -186,7 +185,7 @@
                                :selected-node selected-node
                                :set-selected-node set-selected-node
                                :fitView false})
-         ($ stats-panel {:selected-node selected-node 
+         ($ stats-panel {:selected-node selected-node
                          :selected-version selected-version})))))
 
 ;; Generate sinusoidal data for charts
@@ -199,17 +198,17 @@
 (defn generate-metric-data [metric-name points]
   (case metric-name
     "execution time" (generate-sine-data 2 100 0 points) ; Higher frequency, moderate amplitude
-    "tokens" (generate-sine-data 1.5 500 0.5 points)     ; Medium frequency, high amplitude
-    "latency" (generate-sine-data 3 50 1 points)         ; High frequency, low amplitude
+    "tokens" (generate-sine-data 1.5 500 0.5 points) ; Medium frequency, high amplitude
+    "latency" (generate-sine-data 3 50 1 points) ; High frequency, low amplitude
     "model calls" (generate-sine-data 0.8 10 0.2 points) ; Low frequency, low amplitude
     "nodes executed" (generate-sine-data 1.2 8 0.8 points) ; Medium frequency, low amplitude
     (generate-sine-data 1 100 0 points))) ; Default
 
 (defn- element-available-content-width
   [element]
-  (let [computed-style       (js/getComputedStyle element)
-        padding-left         (js/parseInt (.-paddingLeft computed-style))
-        padding-right        (js/parseInt (.-paddingRight computed-style))
+  (let [computed-style (js/getComputedStyle element)
+        padding-left (js/parseInt (.-paddingLeft computed-style))
+        padding-right (js/parseInt (.-paddingRight computed-style))
         element-client-width (.-clientWidth element)]
     (- element-client-width padding-left padding-right)))
 
@@ -217,7 +216,7 @@
   (let [container-ref (uix/use-ref)
         chart-instance-ref (uix/use-ref)
         [time-data sine-data] data]
-    
+
     ;; Initialize uPlot chart
     (uix/use-effect
      (fn []
@@ -229,10 +228,10 @@
               (let [;; Get the actual rendered width
                     container-rect (.getBoundingClientRect @container-ref)
                     chart-width (.-width container-rect)
-                    
+
                     ;; Format data for uPlot: [[x-values], [y-values]]
                     chart-data (clj->js [(js/Array.from time-data) (js/Array.from sine-data)])
-                    
+
                     ;; Chart options
                     opts (clj->js
                           {:width chart-width
@@ -259,13 +258,13 @@
                                    :stroke "#e5e7eb"
                                    :grid {:stroke "#f3f4f6"}
                                    :size 60}]})
-                    
+
                     ;; Create a div inside the container for uPlot
                     chart-div (js/document.createElement "div")]
-                
+
                 ;; Append the div to container
                 (.appendChild @container-ref chart-div)
-                
+
                 ;; Create chart instance in the new div
                 (let [chart-instance (uplot. opts chart-data chart-div)]
                   (reset! chart-instance-ref chart-instance)))))))
@@ -278,25 +277,24 @@
 
     ;; Automatic plot resizing effect
     (uix/use-effect
-      (fn []
-        (let [container-element @container-ref]
-          (when (and container-element @chart-instance-ref)
-            (let [resize-sensor (ResizeSensor.
-                                  container-element
-                                  (fn []
-                                    (when-let [chart-instance @chart-instance-ref]
-                                      (let [container-rect (.getBoundingClientRect container-element)
-                                            new-width (.-width container-rect)]
-                                        (.setSize
-                                          chart-instance
-                                          (clj->js
-                                            {:width new-width
-                                             :height 200}))))))]
+     (fn []
+       (let [container-element @container-ref]
+         (when (and container-element @chart-instance-ref)
+           (let [resize-sensor (ResizeSensor.
+                                container-element
+                                (fn []
+                                  (when-let [chart-instance @chart-instance-ref]
+                                    (let [container-rect (.getBoundingClientRect container-element)
+                                          new-width (.-width container-rect)]
+                                      (.setSize
+                                       chart-instance
+                                       (clj->js
+                                        {:width new-width
+                                         :height 200}))))))]
               ;; Return cleanup function
-              (fn []
-                (.detach resize-sensor))))))
-      [@container-ref])
-
+             (fn []
+               (.detach resize-sensor))))))
+     [@container-ref])
 
     ($ :div {:className "bg-white p-4 rounded-lg shadow-sm border w-full"
              :ref container-ref
@@ -319,9 +317,10 @@
                       :data data}))))))
 
 (defui stats []
-  (let [[selected-version set-selected-version] (uix/use-state (first dummy-versions))]
+  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
+        [selected-version set-selected-version] (uix/use-state (first dummy-versions))]
     ($ :div.p-4
-       ($ version-dropdown {:selected-version selected-version 
+       ($ version-dropdown {:selected-version selected-version
                             :set-selected-version set-selected-version})
        ($ agent-graph {:selected-version selected-version})
        ($ stats-timeseries))))

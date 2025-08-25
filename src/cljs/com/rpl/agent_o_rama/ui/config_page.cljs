@@ -1,7 +1,6 @@
 (ns com.rpl.agent-o-rama.ui.config-page
   (:require
    [uix.core :as uix :refer [defui $]]
-   ["wouter" :refer [useParams]]
    ["@heroicons/react/24/outline" :refer [CheckIcon ArrowPathIcon InformationCircleIcon]]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
@@ -60,7 +59,7 @@
               submit-error))))))
 
 (defui config-page []
-  (let [{:strs [module-id agent-name]} (js->clj (useParams))
+  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
         {:keys [data loading? error] :as query-result}
         (queries/use-sente-query
          {:query-key [:agent-config module-id agent-name]

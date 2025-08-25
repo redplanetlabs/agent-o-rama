@@ -7,13 +7,12 @@
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.specter :as s]
-   ["wouter" :refer [useParams useLocation]]))
+   [reitit.frontend.easy :as rfe]))
 
 (defui invocation-page []
-  (let [{:strs [module-id agent-name invoke-id]} (js->clj (useParams))
-        [location set-location] (useLocation)
+  (let [{:keys [module-id agent-name invoke-id]} (state/use-sub [:route :path-params])
 
-        ;; 1. Subscribe to all necessary state from app-db
+;; 1. Subscribe to all necessary state from app-db
                 ;; 1. Subscribe to the entire invocation state object
         invocation-state (state/use-sub [:invocations-data invoke-id])
 
@@ -75,7 +74,7 @@
                                            new-path (str "/agents/" module-id "/" agent-name
                                                          "/invocations/" task-id "-" agent-invoke-id)]
                                        (state/dispatch [:ui/clear-fork-state])
-                                       (set-location new-path))
+                                       (rfe/navigate new-path))
                                      (js/console.error "Fork failed:" (:error reply)))))))
 
         handle-clear-fork (fn []

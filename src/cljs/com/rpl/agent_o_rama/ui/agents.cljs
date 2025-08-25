@@ -4,7 +4,7 @@
    [com.rpl.agent-o-rama.ui.agent-graph :as agent-graph]
 
    [uix.core :as uix :refer [defui defhook $]]
-   ["wouter" :as wouter :refer [useLocation]]
+   [reitit.frontend.easy :as rfe]
 
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
@@ -69,7 +69,7 @@
                (for [agent data
                      :let [url (str "/agents/" (:module-id agent) "/" (:agent-name agent))]]
                  ($ :div.p-4.transition-colors.duration-150.hover:bg-gray-200.bg-gray-100.m-4 {:key url}
-                    ($ wouter/Link {:href url}
+                    ($ :a {:href url}
                        ($ :div.flex.items-center.group
                           ($ :div.flex-1
                              ($ :div.text-lg.font-medium.text-indigo-600.group-hover:text-indigo-800
@@ -78,7 +78,7 @@
                                 "View agent details"))))))))))
 
 (defui invocations []
-  (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
+  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
 
         ;; Subscribe to invocations state from app-db
         all-invokes (state/use-sub [:invocations :all-invokes])
@@ -86,8 +86,6 @@
         has-more? (state/use-sub [:invocations :has-more?])
         loading? (state/use-sub [:invocations :loading?])
         connected? (state/use-sub [:sente :connected?])
-
-        [location navigate] (useLocation)
 
         ;; Fetch function that handles the entire flow
         fetch-invocations (fn [pagination append?]
@@ -153,7 +151,7 @@
                                        :invoke invoke
                                        :module-id module-id
                                        :agent-name agent-name
-                                       :on-click navigate})))
+                                       :on-click rfe/navigate})))
 
             ;; Load More button
                (when has-more?
@@ -170,15 +168,13 @@
                                             :clipRule "evenodd"}))))))))))))))
 
 (defui mini-invocations []
-  (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
+  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
         {:keys [data loading? error]}
         (queries/use-sente-query {:query-key [:mini-invocations module-id agent-name]
                                   :sente-event [:api/get-invocations {:module-id module-id
                                                                       :agent-name agent-name
                                                                       :pagination {}}]
-                                  :refetch-interval-ms 2000})
-
-        [location navigate] (useLocation)]
+                                  :refetch-interval-ms 2000})]
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
                   ($ :div.text-gray-500 "Loading invocations via Sente..."))
@@ -202,10 +198,10 @@
                                     :invoke invoke
                                     :module-id module-id
                                     :agent-name agent-name
-                                    :on-click (fn [url] (navigate url))})))
+                                    :on-click rfe/navigate})))
             ($ :tfoot.bg-gray-50.border-t.border-gray-200
                ($ :tr.hover:bg-gray-100.transition-colors.duration-150
-                  {:onClick (fn [_] (navigate (str "/agents/" module-id "/" agent-name "/invocations")))}
+                  {:onClick (fn [_] (rfe/navigate (str "/agents/" module-id "/" agent-name "/invocations")))}
                   ($ :td.px-4.py-3.cursor-pointer {:colSpan 5}
                      ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
                         ($ :span.mr-2.text-sm.font-medium "View all invocations")
@@ -215,13 +211,13 @@
                                      :clipRule "evenodd"})))))))))))
 
 (defui evaluations []
-  (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))]
+  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])]
     ($ :div
        ($ :h2.text-xl.font-semibold.mb-4 "Evaluations")
        ($ :div.text-gray-500 "Evaluations functionality coming soon..."))))
 
 (defui agent-graph []
-  (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
+  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
         {:keys [data loading? error]}
         (queries/use-sente-query {:query-key [:graph module-id agent-name]
                                   :sente-event [:api/get-graph {:module-id module-id
@@ -239,7 +235,7 @@
 
 (defui stats-summary [{:keys [module-id agent-name]}]
   ($ :div.p-4.flex.gap-1
-     ($ wouter/Link
+     ($ :a
         {:href (str "/agents/" module-id "/" agent-name "/stats")
          :style {:flex-grow "1"}}
         ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6.hover:shadow-md.transition-shadow.duration-150.cursor-pointer.relative
@@ -264,7 +260,7 @@
                       {:metric "Latency" :value "847ms" :threshold "< 500ms" :time-ago "4h ago"}
                       {:metric "Error Rate" :value "8.1%" :threshold "< 5%" :time-ago "1d ago"}]]
     ($ :div.p-4.flex.gap-1
-       ($ wouter/Link
+       ($ :a
           {:href (str "/agents/" module-id "/" agent-name "/alerts")
            :style {:flex-grow "1"}}
           ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6.hover:shadow-md.transition-shadow.duration-150.cursor-pointer.relative
@@ -290,8 +286,6 @@
         args (or (:args manual-run-state) "")
         loading? (or (:loading? manual-run-state) false)
         error-msg (:error-msg manual-run-state)
-
-        [location navigate] (useLocation)
 
         ;; State update helper
         update-field (fn [field value]
@@ -321,7 +315,7 @@
                                        trace-url (str "/agents/" module-id "/" agent-name "/invocations/"
                                                       (:task-id data) "-" (:invoke-id data))]
                                    (update-field :args "") ;; Clear args on success
-                                   (navigate trace-url))
+                                   (rfe/navigate trace-url))
                                  (update-field :error-msg (str "Error: " (or (:error reply) "Unknown error"))))))
                             ;; Invalid JSON
                             (do
@@ -352,8 +346,7 @@
             ($ :div.text-red-700.text-sm error-msg))))))
 
 (defui agent []
-  (let [{:strs [module-id agent-name]} (js->clj (wouter/useParams))
-        [location navigate] (useLocation)]
+  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])]
 
     ($ :div.p-4
        ($ :div.text-xl.font-semibold.mb-4 "Agent Details")
@@ -371,7 +364,7 @@
           ($ mini-invocations)))))
 
 (defui invoke []
-  (let [{:strs [module-id agent-name invoke-id]} (js->clj (wouter/useParams))]
+  (let [{:keys [module-id agent-name invoke-id]} (state/use-sub [:route :path-params])]
 
     ($ :div
        ;; Sticky header with all controls
@@ -382,5 +375,3 @@
        ;; Graph content
        ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
           ($ invocation-page/invocation-page)))))
-
-
