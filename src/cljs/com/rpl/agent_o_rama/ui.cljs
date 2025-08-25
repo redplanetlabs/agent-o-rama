@@ -89,34 +89,19 @@
 ;; Agent-specific navigation component
 (defui agent-context-nav [{:keys [module-id agent-name collapsed?]}]
   (let [location (or (get-in (state/use-sub [:route]) [:path]) "/")]
-    ($ :<>
-       ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2
-          (when-not collapsed?
-            ($ :div.px-3.text-xs.font-semibold.text-gray-500 "MODULE"))
+    ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2
+       (when-not collapsed?
+         ($ :div.px-3.text-xs.font-semibold.text-gray-500 "AGENT"))
 
-          ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/datasets")
-                       :location location :collapsed? collapsed? :title "Datasets"}
-             ($ CircleStackIcon {:className "h-5 w-5 flex-shrink-0"})
-             (when-not collapsed? ($ :span.ml-3 "Datasets")))
+       ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations")
+                    :location location :collapsed? collapsed? :title "Invocations"}
+          ($ RectangleStackIcon {:className "h-5 w-5 flex-shrink-0"})
+          (when-not collapsed? ($ :span.ml-3 "Invocations")))
 
-          ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/evaluations")
-                       :location location :collapsed? collapsed? :title "Evaluations"}
-             ($ BeakerIcon {:className "h-5 w-5 flex-shrink-0"})
-             (when-not collapsed? ($ :span.ml-3 "Evaluations"))))
-
-       ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2
-          (when-not collapsed?
-            ($ :div.px-3.text-xs.font-semibold.text-gray-500 "AGENT"))
-
-          ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations")
-                       :location location :collapsed? collapsed? :title "Invocations"}
-             ($ RectangleStackIcon {:className "h-5 w-5 flex-shrink-0"})
-             (when-not collapsed? ($ :span.ml-3 "Invocations")))
-
-          ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/config")
-                       :location location :collapsed? collapsed? :title "Config"}
-             ($ Cog6ToothIcon {:className "h-5 w-5 flex-shrink-0"})
-             (when-not collapsed? ($ :span.ml-3 "Config")))))))
+       ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/config")
+                    :location location :collapsed? collapsed? :title "Config"}
+          ($ Cog6ToothIcon {:className "h-5 w-5 flex-shrink-0"})
+          (when-not collapsed? ($ :span.ml-3 "Config"))))))
 
 ;; Module-specific navigation component
 (defui module-context-nav [{:keys [module-id collapsed?]}]
@@ -201,14 +186,16 @@
                 ($ HomeIcon {:className "h-5 w-5 flex-shrink-0"})
                 (when-not collapsed? ($ :span.ml-3 "Overview"))))
 
+          ;; Show MODULE section first when we have a module-id
+          (when module-id
+            ($ module-context-nav {:module-id module-id
+                                   :collapsed? collapsed?}))
+
+          ;; Then show AGENT section when we're in agent context
           (when is-agent-context?
             ($ agent-context-nav {:module-id module-id
                                   :agent-name agent-name
-                                  :collapsed? collapsed?}))
-
-          (when module-id
-            ($ module-context-nav {:module-id module-id
-                                   :collapsed? collapsed?}))))))
+                                  :collapsed? collapsed?}))))))
 
 ;; =============================================================================
 ;; BREADCRUMB COMPONENT
