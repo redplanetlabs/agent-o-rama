@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.datasets
   (:require
    [uix.core :as uix :refer [defui defhook $]]
-   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon XMarkIcon]]
+   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.sente :as sente]
@@ -12,7 +12,7 @@
 ;; =============================================================================
 ;; MODAL FOR CREATING DATASETS
 ;; =============================================================================
-(defui CreateDatasetModal [{:keys [module-id on-success on-cancel]}]
+(defui CreateDatasetForm [{:keys [module-id on-success]}]
   (let [[name set-name] (uix/use-state "")
         [description set-description] (uix/use-state "")
         [input-schema set-input-schema] (uix/use-state "")
@@ -34,41 +34,36 @@
                (fn [reply]
                  (set-submitting false)
                  (if (:success reply)
-                   (on-success)
+                   (do
+                     (state/dispatch [:modal/hide])
+                     (on-success))
                    (set-error-msg (or (:error reply) "An unknown error occurred."))))))]
 
-      ($ :div.fixed.inset-0.z-50.bg-gray-500.bg-opacity-75.flex.items-center.justify-center
-         ($ :div.bg-white.rounded-lg.shadow-xl.w-full.max-w-2xl.p-6
-            {:onClick (fn [e] (.stopPropagation e))}
-            ($ :form {:onSubmit handle-create}
-               ($ :div.flex.justify-between.items-center.mb-4
-                  ($ :h2.text-lg.font-medium.text-gray-900 "Create New Dataset")
-                  ($ :button {:type "button" :onClick on-cancel}
-                     ($ XMarkIcon {:className "h-6 w-6 text-gray-400 hover:text-gray-600"})))
-               ($ :div.space-y-4
-                  ($ :div
-                     ($ :label.block.text-sm.font-medium.text-gray-700 "Name *")
-                     ($ :input.mt-1.block.w-full.rounded-md.border-gray-300.shadow-sm {:type "text" :value name :required true :onChange #(set-name (.. % -target -value))}))
-                  ($ :div
-                     ($ :label.block.text-sm.font-medium.text-gray-700 "Description")
-                     ($ :textarea.mt-1.block.w-full.rounded-md.border-gray-300.shadow-sm {:rows 2 :value description :onChange #(set-description (.. % -target -value))}))
-                  ($ :div
-                     ($ :label.block.text-sm.font-medium.text-gray-700 "Input JSON Schema (Optional)")
-                     ($ :textarea.mt-1.block.w-full.font-mono.text-xs.rounded-md.border-gray-300.shadow-sm {:rows 4 :value input-schema :onChange #(set-input-schema (.. % -target -value))}))
-                  ($ :div
-                     ($ :label.block.text-sm.font-medium.text-gray-700 "Output JSON Schema (Optional)")
-                     ($ :textarea.mt-1.block.w-full.font-mono.text-xs.rounded-md.border-gray-300.shadow-sm {:rows 4 :value output-schema :onChange #(set-output-schema (.. % -target -value))})))
+      ($ :form {:onSubmit handle-create}
+         ($ :div.space-y-4
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700 "Name *")
+               ($ :input.mt-1.block.w-full.rounded-md.border-gray-300.shadow-sm {:type "text" :value name :required true :onChange #(set-name (.. % -target -value))}))
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700 "Description")
+               ($ :textarea.mt-1.block.w-full.rounded-md.border-gray-300.shadow-sm {:rows 2 :value description :onChange #(set-description (.. % -target -value))}))
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700 "Input JSON Schema (Optional)")
+               ($ :textarea.mt-1.block.w-full.font-mono.text-xs.rounded-md.border-gray-300.shadow-sm {:rows 4 :value input-schema :onChange #(set-input-schema (.. % -target -value))}))
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700 "Output JSON Schema (Optional)")
+               ($ :textarea.mt-1.block.w-full.font-mono.text-xs.rounded-md.border-gray-300.shadow-sm {:rows 4 :value output-schema :onChange #(set-output-schema (.. % -target -value))})))
 
-               (when error-msg
-                 ($ :div.mt-4.p-3.bg-red-50.border.border-red-200.rounded-md
-                    ($ :p.text-sm.text-red-700.whitespace-pre-wrap error-msg)))
+         (when error-msg
+           ($ :div.mt-4.p-3.bg-red-50.border.border-red-200.rounded-md
+              ($ :p.text-sm.text-red-700.whitespace-pre-wrap error-msg)))
 
-               ($ :div.mt-6.flex.justify-end.gap-3
-                  ($ :button.px-4.py-2.border.border-gray-300.rounded-md.text-sm.font-medium {:type "button" :onClick on-cancel} "Cancel")
-                  ($ :button.px-4.py-2.border.border-transparent.rounded-md.text-sm.font-medium.text-white.bg-blue-600.hover:bg-blue-700.flex.items-center.gap-2
-                     {:type "submit" :disabled (or submitting? (str/blank? name))}
-                     (when submitting? ($ common/spinner {:size :medium}))
-                     "Create"))))))))
+         ($ :div.mt-6.flex.justify-end.gap-3
+            ($ :button.px-4.py-2.border.border-gray-300.rounded-md.text-sm.font-medium {:type "button" :onClick #(state/dispatch [:modal/hide])} "Cancel")
+            ($ :button.px-4.py-2.border.border-transparent.rounded-md.text-sm.font-medium.text-white.bg-blue-600.hover:bg-blue-700.flex.items-center.gap-2
+               {:type "submit" :disabled (or submitting? (str/blank? name))}
+               (when submitting? ($ common/spinner {:size :medium}))
+               "Create"))))))
 
 (defn get-dataset-path [module-id dataset-id]
   (rfe/href :module/dataset-detail
@@ -82,7 +77,7 @@
   (let [;; Get module_id from route, needs decoding for display
         module-id-raw (get-in (state/use-sub [:route]) [:path-params :module-id])
         module-id (when module-id-raw (common/url-decode module-id-raw))
-        [create-modal-open? set-create-modal-open] (uix/use-state false)
+
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
          {:query-key [:datasets module-id]
@@ -98,15 +93,12 @@
              ($ :h1.text-2xl.font-bold.text-gray-900 "Datasets for " ($ :span.text-indigo-600 module-id))
              ($ :p.mt-2.text-sm.text-gray-600 "Create and manage datasets for agent training and evaluation."))
           ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700
-             {:onClick #(set-create-modal-open true)}
+             {:onClick #(state/dispatch [:modal/show :create-dataset
+                                         {:title "Create New Dataset"
+                                          :component ($ CreateDatasetForm {:module-id module-id-raw
+                                                                           :on-success refetch})}])}
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Create New Dataset"))
-
-       ;; Conditionally render the modal
-       (when create-modal-open?
-         ($ CreateDatasetModal {:module-id module-id-raw
-                                :on-success #(do (refetch) (set-create-modal-open false))
-                                :on-cancel #(set-create-modal-open false)}))
 
        (cond
          loading? ($ :div.text-center.py-12 "Loading datasets...")

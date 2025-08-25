@@ -123,8 +123,11 @@
                                        (state/dispatch [:modal/hide]))}
                    "×"))
              ($ :div {:className "p-4 overflow-auto max-h-96"}
-                ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
-                   (:content data)))))
+                ;; Support both custom components and text content
+                (if (:component data)
+                  (:component data)
+                  ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
+                     (:content data))))))
        (.-body js/document)))))
 
 (defn pretty-format [item]
