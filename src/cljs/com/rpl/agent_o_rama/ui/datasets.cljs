@@ -32,13 +32,16 @@
         [submitting? set-submitting] (uix/use-state false)
         [error-msg set-error-msg] (uix/use-state nil)]
 
-    (letfn [(handle-create [e]
-              (println "Form submitted! Name:" name "Module ID:" module-id)
-              (.preventDefault e)
-              (println "After preventDefault - about to set submitting state")
+    ;; Test if we can even get console output at all
+    (js/console.log "CreateDatasetForm rendered with name:" name)
+
+    (letfn [(handle-create []
+              (js/console.log "Button clicked! Name:" name "Module ID:" module-id)
+              (println "Button clicked! Name:" name "Module ID:" module-id)
+              (js/console.log "About to set submitting state")
               (set-submitting true)
               (set-error-msg nil)
-              (println "Making sente request...")
+              (js/console.log "Making sente request...")
               (sente/request!
                [:api/create-dataset {:module-id module-id
                                      :name name
@@ -47,18 +50,19 @@
                                      :output-schema output-schema}]
                15000 ;; Timeout
                (fn [reply]
+                 (js/console.log "Got reply from server:" reply)
                  (println "Got reply from server:" reply)
                  (set-submitting false)
                  (if (:success reply)
                    (do
-                     (println "Success! Hiding modal and calling on-success")
+                     (js/console.log "Success! Hiding modal and calling on-success")
                      (state/dispatch [:modal/hide])
                      (on-success))
                    (do
-                     (println "Error in reply:" (:error reply))
+                     (js/console.log "Error in reply:" (:error reply))
                      (set-error-msg (or (:error reply) "An unknown error occurred.")))))))]
 
-      ($ :form {:onSubmit handle-create}
+      ($ :div
          ($ :div.space-y-4
             ($ :div
                ($ :label.block.text-sm.font-medium.text-gray-700 "Name *")
@@ -108,11 +112,14 @@
               ($ :p.text-sm.text-red-700.whitespace-pre-wrap error-msg)))
 
          ($ :div.mt-6.flex.justify-end.gap-3
-            ($ :button.px-4.py-2.border.border-gray-300.rounded-md.text-sm.font-medium.cursor-pointer {:type "button" :onClick #(state/dispatch [:modal/hide])} "Cancel")
+            ($ :button.px-4.py-2.border.border-gray-300.rounded-md.text-sm.font-medium.cursor-pointer
+               {:type "button" :onClick #(state/dispatch [:modal/hide])}
+               "Cancel")
             (let [is-disabled? (or submitting? (str/blank? name))]
               ($ :button
-                 {:type "submit"
+                 {:type "button"
                   :disabled is-disabled?
+                  :onClick #(when-not is-disabled? (handle-create))
                   :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
                                   (if is-disabled?
                                     "text-gray-400 bg-gray-300 cursor-not-allowed"
