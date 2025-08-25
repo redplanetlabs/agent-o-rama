@@ -410,7 +410,7 @@
                                          can-navigate? (and (not (nil? task-id)) (not (nil? agent-invoke-id)) module-id agent-name)
                                          target-url (when can-navigate?
                                                       (str "/agents/" (common/url-encode module-id)
-                                                           "/" (common/url-encode agent-name)
+                                                           "/agent/" (common/url-encode agent-name)
                                                            "/invocations/" task-id "-" agent-invoke-id))]
                                      (when target-url
                                        ($ :button {:onClick (fn [] (js/window.open target-url "_blank"))
