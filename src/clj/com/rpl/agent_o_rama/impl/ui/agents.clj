@@ -7,12 +7,14 @@
    [com.rpl.agent-o-rama.impl.ui :as ui]
    [com.rpl.agent-o-rama.impl.json-serialize :as jser]
    [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.queries :as queries]
    [clojure.walk :as walk]
    [clojure.string :as str]
    [jsonista.core :as j])
   (:import
    [com.rpl.agentorama AgentInvoke]
-   [java.net URLEncoder URLDecoder]))
+   [java.net URLEncoder URLDecoder]
+   [java.util UUID]))
 
 (defn url-encode [s]
   "Encode string for safe use in URLs using standard URL encoding"
@@ -317,4 +319,61 @@
       ;; If no manager is found for the module-id, return an empty list.
       ;; This can happen transiently or if the module has no agents.
       [])))
+
+;; =============================================================================
+;; DATASET CRUD API HANDLERS
+;; =============================================================================
+
+(defmethod api-handler :api/get-datasets
+  [_ {:keys [module-id pagination]} uid]
+  "Fetches a paginated list of all datasets for a given module."
+  (let [decoded-module-id (url-decode module-id)
+        manager (get-manager decoded-module-id)
+        datasets-page-query (:datasets-page-query (aor-types/underlying-objects manager))]
+    ;; Use page size of 100 to avoid needing pagination on the UI for now
+    (foreign-invoke-query datasets-page-query 100 pagination)))
+
+(defmethod api-handler :api/get-dataset-props
+  [_ {:keys [module-id dataset-id]} uid]
+  "Fetches the properties (name, description, schemas) for a single dataset."
+  (let [decoded-module-id (url-decode module-id)
+        manager (get-manager decoded-module-id)
+        datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
+    (queries/get-dataset-properties datasets-pstate (UUID/fromString dataset-id))))
+
+(defmethod api-handler :api/create-dataset
+  [_ {:keys [module-id name description input-schema output-schema]} uid]
+  "Creates a new dataset. Handles validation errors from the backend."
+  (let [decoded-module-id (url-decode module-id)
+        manager (get-manager decoded-module-id)]
+    (try
+      (let [dataset-id (aor/create-dataset!
+                        manager
+                        name
+                        {:description (when-not (str/blank? description) description)
+                         :input-json-schema (when-not (str/blank? input-schema) input-schema)
+                         :output-json-schema (when-not (str/blank? output-schema) output-schema)})]
+        {:status :ok, :dataset-id dataset-id})
+      (catch Exception e
+        ;; Propagate validation or other errors back to the UI
+        (throw (ex-info (-> e .getCause .getMessage) {}))))))
+
+(defmethod api-handler :api/update-dataset-props
+  [_ {:keys [module-id dataset-id name description]} uid]
+  "Updates the properties of an existing dataset."
+  (let [decoded-module-id (url-decode module-id)
+        manager (get-manager decoded-module-id)
+        uuid (UUID/fromString dataset-id)]
+    (aor/set-dataset-name! manager uuid name)
+    (aor/set-dataset-description! manager uuid description)
+    {:status :ok}))
+
+(defmethod api-handler :api/delete-dataset
+  [_ {:keys [module-id dataset-id]} uid]
+  "Deletes a dataset."
+  (let [decoded-module-id (url-decode module-id)
+        manager (get-manager decoded-module-id)
+        uuid (UUID/fromString dataset-id)]
+    (aor/destroy-dataset! manager uuid)
+    {:status :ok}))
 

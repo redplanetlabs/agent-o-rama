@@ -1,96 +1,203 @@
 (ns com.rpl.agent-o-rama.ui.datasets
   (:require
    [uix.core :as uix :refer [defui defhook $]]
-   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon]]
+   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon XMarkIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.state :as state]))
+   [com.rpl.agent-o-rama.ui.state :as state]
+   [com.rpl.agent-o-rama.ui.sente :as sente]
+   [com.rpl.agent-o-rama.ui.queries :as queries]
+   [reitit.frontend.easy :as rfe]
+   [clojure.string :as str]))
+
+;; =============================================================================
+;; MODAL FOR CREATING DATASETS
+;; =============================================================================
+(defui CreateDatasetModal [{:keys [module-id on-success on-cancel]}]
+  (let [[name set-name] (uix/use-state "")
+        [description set-description] (uix/use-state "")
+        [input-schema set-input-schema] (uix/use-state "")
+        [output-schema set-output-schema] (uix/use-state "")
+        [submitting? set-submitting] (uix/use-state false)
+        [error-msg set-error-msg] (uix/use-state nil)]
+
+    (letfn [(handle-create [e]
+              (.preventDefault e)
+              (set-submitting true)
+              (set-error-msg nil)
+              (sente/request!
+               [:api/create-dataset {:module-id module-id
+                                     :name name
+                                     :description description
+                                     :input-schema input-schema
+                                     :output-schema output-schema}]
+               15000 ;; Timeout
+               (fn [reply]
+                 (set-submitting false)
+                 (if (:success reply)
+                   (on-success)
+                   (set-error-msg (or (:error reply) "An unknown error occurred."))))))]
+
+      ($ :div.fixed.inset-0.z-50.bg-gray-500.bg-opacity-75.flex.items-center.justify-center
+         ($ :div.bg-white.rounded-lg.shadow-xl.w-full.max-w-2xl.p-6
+            {:onClick (fn [e] (.stopPropagation e))}
+            ($ :form {:onSubmit handle-create}
+               ($ :div.flex.justify-between.items-center.mb-4
+                  ($ :h2.text-lg.font-medium.text-gray-900 "Create New Dataset")
+                  ($ :button {:type "button" :onClick on-cancel}
+                     ($ XMarkIcon {:className "h-6 w-6 text-gray-400 hover:text-gray-600"})))
+               ($ :div.space-y-4
+                  ($ :div
+                     ($ :label.block.text-sm.font-medium.text-gray-700 "Name *")
+                     ($ :input.mt-1.block.w-full.rounded-md.border-gray-300.shadow-sm {:type "text" :value name :required true :onChange #(set-name (.. % -target -value))}))
+                  ($ :div
+                     ($ :label.block.text-sm.font-medium.text-gray-700 "Description")
+                     ($ :textarea.mt-1.block.w-full.rounded-md.border-gray-300.shadow-sm {:rows 2 :value description :onChange #(set-description (.. % -target -value))}))
+                  ($ :div
+                     ($ :label.block.text-sm.font-medium.text-gray-700 "Input JSON Schema (Optional)")
+                     ($ :textarea.mt-1.block.w-full.font-mono.text-xs.rounded-md.border-gray-300.shadow-sm {:rows 4 :value input-schema :onChange #(set-input-schema (.. % -target -value))}))
+                  ($ :div
+                     ($ :label.block.text-sm.font-medium.text-gray-700 "Output JSON Schema (Optional)")
+                     ($ :textarea.mt-1.block.w-full.font-mono.text-xs.rounded-md.border-gray-300.shadow-sm {:rows 4 :value output-schema :onChange #(set-output-schema (.. % -target -value))})))
+
+               (when error-msg
+                 ($ :div.mt-4.p-3.bg-red-50.border.border-red-200.rounded-md
+                    ($ :p.text-sm.text-red-700.whitespace-pre-wrap error-msg)))
+
+               ($ :div.mt-6.flex.justify-end.gap-3
+                  ($ :button.px-4.py-2.border.border-gray-300.rounded-md.text-sm.font-medium {:type "button" :onClick on-cancel} "Cancel")
+                  ($ :button.px-4.py-2.border.border-transparent.rounded-md.text-sm.font-medium.text-white.bg-blue-600.hover:bg-blue-700.flex.items-center.gap-2
+                     {:type "submit" :disabled (or submitting? (str/blank? name))}
+                     (when submitting? ($ common/spinner {:size :medium}))
+                     "Create"))))))))
+
+(defn get-dataset-path [module-id dataset-id]
+  (rfe/href :module/dataset-detail
+            {:module-id (common/url-encode module-id)
+             :dataset-id (str dataset-id)}))
 
 ;; =============================================================================
 ;; DATASETS INDEX PAGE
 ;; =============================================================================
-
 (defui datasets-index []
-  ($ :div.p-6
-     ;; Header
-     ($ :div.flex.items-center.justify-between.mb-6
-        ($ :div
-           ($ :h1.text-2xl.font-bold.text-gray-900 "Datasets")
-           ($ :p.mt-2.text-sm.text-gray-600
-              "Create and manage datasets for agent training and evaluation."))
-        ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500
-           ($ PlusIcon {:className "h-5 w-5 mr-2"})
-           "Create New Dataset"))
+  (let [;; Get module_id from route, needs decoding for display
+        module-id-raw (get-in (state/use-sub [:route]) [:path-params :module-id])
+        module-id (when module-id-raw (common/url-decode module-id-raw))
+        [create-modal-open? set-create-modal-open] (uix/use-state false)
+        {:keys [data loading? error refetch]}
+        (queries/use-sente-query
+         {:query-key [:datasets module-id]
+          :sente-event [:api/get-datasets {:module-id module-id-raw :pagination nil}]
+          :enabled? (boolean module-id-raw)
+          :refetch-interval-ms 5000})
+        datasets (get-in data [:datasets])]
 
-     ;; Search bar
-     ($ :div.mb-6
-        ($ :input {:type "text"
-                   :placeholder "Search datasets..."
-                   :className "block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"}))
+    ($ :div.p-6
+       ;; Header
+       ($ :div.flex.items-center.justify-between.mb-6
+          ($ :div
+             ($ :h1.text-2xl.font-bold.text-gray-900 "Datasets for " ($ :span.text-indigo-600 module-id))
+             ($ :p.mt-2.text-sm.text-gray-600 "Create and manage datasets for agent training and evaluation."))
+          ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700
+             {:onClick #(set-create-modal-open true)}
+             ($ PlusIcon {:className "h-5 w-5 mr-2"})
+             "Create New Dataset"))
 
-     ;; Datasets list placeholder
-     ($ :div.space-y-4
-        ;; Placeholder dataset card
-        ($ :div.bg-white.overflow-hidden.shadow.rounded-lg.p-6
-           ($ :div.flex.items-center.justify-between
-              ($ :div
-                 ($ :h3.text-lg.font-medium.text-gray-900 "Example Dataset")
-                 ($ :p.mt-1.text-sm.text-gray-600 "A sample dataset for demonstration purposes."))
-              ($ :div.flex.space-x-2
-                 ($ :button.text-blue-600.hover:text-blue-800.text-sm.font-medium "Edit")
-                 ($ :button.text-red-600.hover:text-red-800.text-sm.font-medium "Delete"))))
+       ;; Conditionally render the modal
+       (when create-modal-open?
+         ($ CreateDatasetModal {:module-id module-id-raw
+                                :on-success #(do (refetch) (set-create-modal-open false))
+                                :on-cancel #(set-create-modal-open false)}))
 
-        ;; Empty state
-        ($ :div.text-center.py-12
-           ($ CircleStackIcon {:className "mx-auto h-12 w-12 text-gray-400"})
-           ($ :h3.mt-2.text-sm.font-medium.text-gray-900 "No datasets yet")
-           ($ :p.mt-1.text-sm.text-gray-500 "Get started by creating your first dataset.")
-           ($ :div.mt-6
-              ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.shadow-sm.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500
-                 ($ PlusIcon {:className "h-5 w-5 mr-2"})
-                 "Create Dataset"))))))
+       (cond
+         loading? ($ :div.text-center.py-12 "Loading datasets...")
+         error ($ :div.text-center.py-12.text-red-500 "Error: " error)
+         (empty? datasets)
+         ($ :div.text-center.py-12
+            ($ CircleStackIcon {:className "mx-auto h-12 w-12 text-gray-400"})
+            ($ :h3.mt-2.text-sm.font-medium.text-gray-900 "No datasets yet")
+            ($ :p.mt-1.text-sm.text-gray-500 "Get started by creating your first dataset."))
+         :else
+         ($ :div.space-y-4
+            (for [dataset datasets]
+              ($ :div.bg-white.shadow.rounded-lg.p-6 {:key (:dataset-id dataset)}
+                 ($ :div.flex.items-center.justify-between
+                    ($ :a {:href (get-dataset-path module-id (:dataset-id dataset))}
+                       ($ :h3.text-lg.font-medium.text-gray-900.hover:text-blue-600 (:name dataset))
+                       ($ :p.mt-1.text-sm.text-gray-600 (or (:description dataset) "No description.")))
+                    ($ :div.flex.space-x-4
+                       ($ :button.text-red-600.hover:text-red-800.p-1.rounded-full.hover:bg-red-100
+                          {:onClick (fn []
+                                      (when (js/confirm (str "Are you sure you want to delete '" (:name dataset) "'?"))
+                                        (sente/request! [:api/delete-dataset
+                                                         {:module-id module-id-raw :dataset-id (:dataset-id dataset)}]
+                                                        5000
+                                                        #(when (:success %) (refetch)))))}
+                          ($ TrashIcon {:className "h-5 w-5"})))))))))))
 
 ;; =============================================================================
 ;; DATASET DETAIL PAGE
 ;; =============================================================================
 
 (defui dataset-detail []
-  ($ :div.p-6
-     ;; Header
-     ($ :div.mb-6
-        ($ :h1.text-2xl.font-bold.text-gray-900 "Dataset Detail")
-        ($ :p.mt-2.text-sm.text-gray-600 "Manage dataset properties, snapshots, and examples."))
+  (let [;; Get IDs from route
+        {:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
+        decoded-module-id (when module-id (common/url-decode module-id))
 
-     ;; Dataset properties section
-     ($ :div.bg-white.shadow.rounded-lg.p-6.mb-6
-        ($ :h2.text-lg.font-medium.text-gray-900.mb-4 "Dataset Properties")
-        ($ :div.space-y-4
-           ($ :div
-              ($ :label.block.text-sm.font-medium.text-gray-700 "Name")
-              ($ :p.mt-1.text-sm.text-gray-900 "My Awesome Dataset"))
-           ($ :div
-              ($ :label.block.text-sm.font-medium.text-gray-700 "Description")
-              ($ :p.mt-1.text-sm.text-gray-900 "A detailed description of this dataset..."))))
+        ;; Fetch dataset properties
+        {:keys [data loading? error refetch]}
+        (queries/use-sente-query
+         {:query-key [:dataset-props module-id dataset-id]
+          :sente-event [:api/get-dataset-props {:module-id module-id :dataset-id dataset-id}]
+          :enabled? (boolean (and module-id dataset-id))})]
 
-     ;; Snapshots section
-     ($ :div.bg-white.shadow.rounded-lg.p-6.mb-6
-        ($ :div.flex.items-center.justify-between.mb-4
-           ($ :h2.text-lg.font-medium.text-gray-900 "Snapshots")
-           ($ :button.text-blue-600.hover:text-blue-800.text-sm.font-medium "Create Snapshot"))
-        ($ :div
-           ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Current Snapshot")
-           ($ :select.block.w-64.px-3.py-2.border.border-gray-300.rounded-md.shadow-sm.focus:outline-none.focus:ring-blue-500.focus:border-blue-500
-              ($ :option {:value "latest"} "Latest")
-              ($ :option {:value "snapshot-1"} "Snapshot 1"))))
+    ($ :div.p-6
+       (cond
+         loading? ($ :div "Loading dataset details...")
+         error ($ :div "Error: " error)
+         data
+         (let [dataset data
+               [is-editing? set-is-editing] (uix/use-state false)
+               [edit-name set-edit-name] (uix/use-state (:name dataset))
+               [edit-desc set-edit-desc] (uix/use-state (:description dataset))]
 
-     ;; Examples section
-     ($ :div.bg-white.shadow.rounded-lg.p-6
-        ($ :div.flex.items-center.justify-between.mb-4
-           ($ :h2.text-lg.font-medium.text-gray-900 "Examples")
-           ($ :div.flex.space-x-2
-              ($ :button.text-blue-600.hover:text-blue-800.text-sm.font-medium "Add Example")
-              ($ :button.text-blue-600.hover:text-blue-800.text-sm.font-medium "Upload JSONL")))
-        ($ :div.text-center.py-8
-           ($ :p.text-sm.text-gray-500 "No examples in this snapshot yet.")))))
+           (letfn [(handle-save []
+                     (sente/request! [:api/update-dataset-props
+                                      {:module-id module-id
+                                       :dataset-id dataset-id
+                                       :name edit-name
+                                       :description edit-desc}]
+                                     5000
+                                     (fn [reply]
+                                       (if (:success reply)
+                                         (do
+                                           (set-is-editing false)
+                                           (refetch))
+                                         (js/alert (str "Save failed: " (:error reply)))))))
+                   (handle-cancel []
+                     (set-edit-name (:name dataset))
+                     (set-edit-desc (:description dataset))
+                     (set-is-editing false))]
+             ($ :div
+                ;; Header
+                ($ :div.flex.justify-between.items-center.mb-6
+                   (if is-editing?
+                     ($ :input.text-2xl.font-bold.text-gray-900.border.rounded.px-2 {:value edit-name :onChange #(set-edit-name (.. % -target -value))})
+                     ($ :h1.text-2xl.font-bold.text-gray-900 (:name dataset)))
+                   (if is-editing?
+                     ($ :div.space-x-2
+                        ($ :button.px-3.py-1.rounded.bg-gray-200.text-sm {:onClick handle-cancel} "Cancel")
+                        ($ :button.px-3.py-1.rounded.bg-blue-600.text-white.text-sm {:onClick handle-save} "Save"))
+                     ($ :button {:onClick #(set-is-editing true)}
+                        ($ PencilIcon {:className "h-5 w-5 text-gray-500 hover:text-gray-700"}))))
+                (if is-editing?
+                  ($ :textarea.text-sm.text-gray-600.border.rounded.w-full.p-2 {:value edit-desc :rows 3 :onChange #(set-edit-desc (.. % -target -value))})
+                  ($ :p.text-sm.text-gray-600 (or (:description dataset) "No description.")))
+
+                ;; Placeholder for snapshots and examples
+                ($ :div.mt-8.space-y-8
+                   ($ :div.bg-gray-50.p-4.rounded-lg "Snapshots section coming soon...")
+                   ($ :div.bg-gray-50.p-4.rounded-lg "Examples section coming soon...")))))
+         :else ($ :div "No data available.")))))
 
 ;; =============================================================================
 ;; EXPORTS
