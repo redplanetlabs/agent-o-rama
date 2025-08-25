@@ -23,11 +23,15 @@
   (java.net.URLDecoder/decode ^String s "UTF-8"))
 
 (defn get-client [module-id agent-name]
+  (def module-id module-id)
   ;; Expects already-decoded module-id and agent-name (API handlers decode them)
   (select-one [module-id
                :clients
                agent-name]
               (ui/get-object :aor-cache)))
+
+(defn get-manager [module-id]
+  (select-one [module-id :manager] (ui/get-object :aor-cache)))
 
 (defn objects [module-id agent-name]
   (aor-types/underlying-objects (get-client module-id agent-name)))
