@@ -256,9 +256,9 @@
                      ($ :h1.text-2xl.font-bold.text-gray-900 (:name dataset)))
                    (if is-editing?
                      ($ :div.space-x-2
-                        ($ :button.px-3.py-1.rounded.bg-gray-200.text-sm {:onClick handle-cancel} "Cancel")
-                        ($ :button.px-3.py-1.rounded.bg-blue-600.text-white.text-sm {:onClick handle-save} "Save"))
-                     ($ :button {:onClick #(set-is-editing true)}
+                        ($ :button.px-3.py-1.rounded.bg-gray-200.text-sm.cursor-pointer {:onClick handle-cancel} "Cancel")
+                        ($ :button.px-3.py-1.rounded.bg-blue-600.text-white.text-sm.cursor-pointer {:onClick handle-save} "Save"))
+                     ($ :button.cursor-pointer {:onClick #(set-is-editing true)}
                         ($ PencilIcon {:className "h-5 w-5 text-gray-500 hover:text-gray-700"}))))
                 (if is-editing?
                   ($ :textarea.text-sm.text-gray-600.border.rounded.w-full.p-2 {:value edit-desc :rows 3 :onChange #(set-edit-desc (.. % -target -value))})
