@@ -144,7 +144,7 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
                 j/read-value
             )))))
     :description
-    "Define an LLM judge to evaluate an agent invoke with customizable prompt, model, temperature, and output schema. The judge can output any number of scores."
+    "Define an LLM judge with customizable prompt, model, temperature, and output schema. By configuring the output schema with multiple keys, the judge can return scores for multiple evaluations at once."
     :options
     {:params
      {"prompt"
