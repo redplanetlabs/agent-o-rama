@@ -212,6 +212,7 @@
     ;; Update edit state when data changes
     (uix/use-effect
      (fn []
+       (println "data" data)
        (when data
          (set-edit-name (:name data))
          (set-edit-desc (:description data))))
@@ -255,6 +256,38 @@
                 (if is-editing?
                   ($ :textarea.text-sm.text-gray-600.border.rounded.w-full.p-2 {:value edit-desc :rows 3 :onChange #(set-edit-desc (.. % -target -value))})
                   ($ :p.text-sm.text-gray-600 (or (:description dataset) "No description.")))
+
+                ($ :div.mt-8
+                   ($ :h2.text-lg.font-semibold.text-gray-900.mb-4 "JSON Schemas")
+                   (let [input-schema (:input-json-schema dataset)
+                         output-schema (:output-json-schema dataset)]
+                     (if (and (nil? input-schema) (nil? output-schema))
+                       ;; No schemas defined - show single message
+                       ($ :div.p-6.border.rounded-md.bg-gray-50.text-gray-500.text-center
+                          {:className "border-gray-300"}
+                          "No schemas defined")
+                       ;; At least one schema exists - show side by side panels
+                       ($ :div.grid.grid-cols-2.gap-6
+                          ;; Input Schema
+                          ($ :div
+                             ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Input Schema")
+                             (if input-schema
+                               ($ :pre.w-full.h-80.p-3.border.rounded-md.font-mono.text-sm.bg-gray-50.overflow-auto.text-gray-800
+                                  {:className "border-gray-300"}
+                                  input-schema)
+                               ($ :div.w-full.h-80.p-3.border.rounded-md.bg-gray-50.text-gray-500.text-sm.flex.items-center.justify-center
+                                  {:className "border-gray-300"}
+                                  "No input schema defined")))
+                          ;; Output Schema
+                          ($ :div
+                             ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Output Schema")
+                             (if output-schema
+                               ($ :pre.w-full.h-80.p-3.border.rounded-md.font-mono.text-sm.bg-gray-50.overflow-auto.text-gray-800
+                                  {:className "border-gray-300"}
+                                  output-schema)
+                               ($ :div.w-full.h-80.p-3.border.rounded-md.bg-gray-50.text-gray-500.text-sm.flex.items-center.justify-center
+                                  {:className "border-gray-300"}
+                                  "No output schema defined")))))))
 
                 ;; Placeholder for snapshots and examples
                 ($ :div.mt-8.space-y-8
