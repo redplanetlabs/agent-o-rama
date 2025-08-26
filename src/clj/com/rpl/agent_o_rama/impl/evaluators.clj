@@ -100,7 +100,7 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
             ;;      1.4.0
             output-schema   (get params "outputSchema")]
         (fn [{:strs [input output referenceOutput agentNode]}]
-          (let [^AgentNode agent-node (get params "agentNode")
+          (let [^AgentNode agent-node (get params "fetcher")
                 model  (.getAgentObject agent-node model-name)
                 prompt (-> prompt-template
                            (str/replace "%input" input)

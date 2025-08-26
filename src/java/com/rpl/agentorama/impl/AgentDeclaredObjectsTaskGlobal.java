@@ -7,6 +7,7 @@ import com.rpl.rama.integration.*;
 
 import clojure.lang.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   public static ThreadLocal<Long> ACQUIRE_TIMEOUT_MILLIS = new ThreadLocal<>();
@@ -44,12 +45,14 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
         return (IFn) curr.get(2);
       }
     }
-    Map<Keyword, Object> eparams = _evaluatorBuilders.get(builderName);
-    if(eparams==null) throw new RuntimeException("Invalid evaluator builder name: " + builderName);
-    IFn builderFn = (IFn) eparams.get(Keyword.intern(null, "builder-fn"));
-    IFn ret = (IFn) builderFn.invoke(params);
-    _evaluators.put(name, Arrays.asList(builderName, params, ret));
-    return ret;
+    synchronized(_evaluators) {
+      Map<Keyword, Object> eparams = _evaluatorBuilders.get(builderName);
+      if(eparams==null) throw new RuntimeException("Invalid evaluator builder name: " + builderName);
+      IFn builderFn = (IFn) eparams.get(Keyword.intern(null, "builder-fn"));
+      IFn ret = (IFn) builderFn.invoke(params);
+      _evaluators.put(name, Arrays.asList(builderName, params, ret));
+      return ret;
+    }
   }
 
   public Object getAgentObjectFromResource(String name) {
@@ -95,7 +98,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   @Override
   public void prepareForTask(int taskId, TaskGlobalContext context) {
     _thisModuleName = context.getModuleInstanceInfo().getModuleName();
-    _evaluators = new HashMap();
+    _evaluators = new ConcurrentHashMap();
 
     _objects = new HashMap();
     for(String name: _builders.keySet()) {

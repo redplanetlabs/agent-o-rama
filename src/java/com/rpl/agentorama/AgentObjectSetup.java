@@ -1,7 +1,7 @@
 package com.rpl.agentorama;
 
-import com.rpl.agentorama.impl.IFetchAgentObject;
+import com.rpl.agentorama.AgentObjectFetcher;
 
-public interface AgentObjectSetup extends IFetchAgentObject {
+public interface AgentObjectSetup extends AgentObjectFetcher {
   String getObjectName();
 }

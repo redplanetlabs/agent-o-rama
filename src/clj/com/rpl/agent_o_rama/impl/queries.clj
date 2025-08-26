@@ -3,6 +3,7 @@
         [com.rpl.rama.path])
   (:require
    [clojure.string :as str]
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -16,7 +17,9 @@
     PersistentQueue]
    [java.util
     Comparator
-    PriorityQueue]))
+    PriorityQueue]
+   [java.util.concurrent
+    CompletableFuture]))
 
 (defn tracing-query-name
   [agent-name]
@@ -54,6 +57,10 @@
 (defn all-evaluator-builders-name
   []
   "_aor-all-evaluator-builders")
+
+(defn try-evaluator-name
+  []
+  "_aor-try-evaluator")
 
 (defn- to-pqueue
   [coll]
@@ -473,3 +480,47 @@
     [:> *res]
     (|origin)
     (evals/all-evaluator-builders :> *res)))
+
+(defn evaluator-event
+  [^CompletableFuture cf name builder-name builder-params params]
+  (let [declared-objects-tg (po/agent-declared-objects-task-global)
+        fetcher (anode/mk-fetcher)]
+    (fn []
+      (try
+        (let [eval-fn (.getEvaluator declared-objects-tg
+                                     name
+                                     builder-name
+                                     builder-params)
+              params  (assoc (into {} params) "fetcher" fetcher)]
+          (.complete cf (eval-fn params))
+        )
+        (catch Throwable t
+          (.completeExceptionally cf t))
+        (finally
+          (anode/release-acquired-objects! fetcher)))
+    )))
+
+(def INVALID-EVALUATOR ::invalid)
+
+(defn declare-try-evaluator-query-topology
+  [topologies]
+  (let [evals-pstate-sym (symbol (po/evaluators-task-global-name))]
+    (<<query-topology topologies
+      (try-evaluator-name)
+      [*name *params :> *res]
+      (|direct 0)
+      (local-select> (keypath *name)
+                     evals-pstate-sym
+                     :> {:keys [*builder-name *builder-params]})
+      (<<if (nil? *builder-name)
+        (identity INVALID-EVALUATOR :> *res)
+       (else>)
+        (h/mk-completable-future :> *cf)
+        (anode/submit-virtual-task! nil
+                                    (evaluator-event *cf
+                                                     *name
+                                                     *builder-name
+                                                     *builder-params
+                                                     *params))
+        (completable-future> *cf :> *res))
+      (|origin))))

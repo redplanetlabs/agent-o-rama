@@ -24,6 +24,7 @@
     AgentInvoke
     AgentManager
     AgentNode
+    AgentObjectFetcher
     AgentObjectSetup
     AgentsTopology
     AgentStream
@@ -33,8 +34,7 @@
     MultiAgg$Impl
     UpdateMode]
    [com.rpl.agentorama.impl
-    IFetchAgentClient
-    IFetchAgentObject]
+    IFetchAgentClient]
    [com.rpl.rama
     PState$Declaration
     PState$Schema]
@@ -337,7 +337,7 @@
   (.getStore agent-node name))
 
 (defn get-agent-object
-  [^IFetchAgentObject fetch name]
+  [^AgentObjectFetcher fetch name]
   (.getAgentObject fetch name))
 
 (defn stream-chunk!
@@ -411,7 +411,12 @@
                                              (po/evaluators-depot-name))
         evals-pstate          (foreign-pstate cluster
                                               module-name
-                                              (po/evaluators-task-global-name))]
+                                              (po/evaluators-task-global-name))
+
+        try-eval-query        (foreign-query
+                               cluster
+                               module-name
+                               (queries/try-evaluator-name))]
     (reify
      AgentManager
      (getAgentNames [this]
@@ -805,6 +810,11 @@
               [MAP-KEYS
                (selected? (view h/contains-string? searchString) identity)]
               evals-pstate)))
+     (tryEvaluator [this name params]
+       (let [ret (foreign-invoke-query try-eval-query name params)]
+         (when (= ret queries/INVALID-EVALUATOR)
+           (throw (h/ex-info "Invalid evaluator" {:name name})))
+         ret))
      (close [this]
        (close! datasets-depot))
      aor-types/UnderlyingObjects
@@ -1118,6 +1128,10 @@
 (defn search-evaluators
   [^AgentManager manager search-string]
   (.searchEvaluators manager search-string))
+
+(defn try-evaluator
+  [^AgentManager manager name params]
+  (.tryEvaluator manager name params))
 
 (defn start-ui
   (^AutoCloseable [ipc] (start-ui ipc nil))

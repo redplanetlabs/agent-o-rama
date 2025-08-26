@@ -84,7 +84,7 @@
      (aor/create-evaluator! manager
                             "x1 def"
                             "concise-x"
-                            {"len" "100"}
+                            {"len" "3"}
                             "my eval 3")
 
 
@@ -141,11 +141,17 @@
      (is (= #{"abc2 def" "abc"} (aor/search-evaluators manager "abc")))
      (is (= #{} (aor/search-evaluators manager "invalid")))
 
+
+     (is (= {"concise?" false "not-concise?" true}
+            (aor/try-evaluator manager "x1 def" {"output" "..."})))
+     (is (= {"concise?" true "not-concise?" false}
+            (aor/try-evaluator manager "x1 def" {"output" "...."})))
+
+
+
      (aor/remove-evaluator! manager "not-an-eval")
      (aor/remove-evaluator! manager "x1 def")
      (is (= #{"abc2 def"} (aor/search-evaluators manager "def")))
-
-
 
      ;; TODO: <<<<>>>>>
      ;; - complete clojure API for declare and client methods for create,
@@ -165,5 +171,9 @@
      ;;       - still separate interfaces since setup only has one of them
      ;;     - UI should look up evaluator builder to determine what
      ;;     input/output/refOutput to prompt for
+
+
+     ;; TODO: <<<<>>>> tests that default evals work
+     ;;   - can make a mock chat model
 
     )))

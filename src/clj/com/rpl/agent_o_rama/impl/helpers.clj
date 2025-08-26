@@ -21,6 +21,7 @@
    [java.util
     UUID]
    [java.util.concurrent
+    CompletableFuture
     Semaphore]
    [java.util.function
     Function]))
@@ -293,3 +294,7 @@
 (defn compile-json-path
   [^String json-path]
   (JsonPath/compile json-path (into-array Predicate [])))
+
+(defn mk-completable-future
+  []
+  (CompletableFuture.))
