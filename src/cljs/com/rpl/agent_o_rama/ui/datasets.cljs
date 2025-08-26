@@ -179,7 +179,7 @@
                        ($ :h3.text-lg.font-medium.text-gray-900.hover:text-blue-600 (:name dataset))
                        ($ :p.mt-1.text-sm.text-gray-600 (or (:description dataset) "No description.")))
                     ($ :div.flex.space-x-4
-                       ($ :button.text-red-600.hover:text-red-800.p-1.rounded-full.hover:bg-red-100
+                       ($ :button.text-red-600.hover:text-red-800.p-1.rounded-full.hover:bg-red-100.cursor-pointer
                           {:onClick (fn []
                                       (when (js/confirm (str "Are you sure you want to delete '" (:name dataset) "'?"))
                                         (sente/request! [:api/delete-dataset
@@ -202,18 +202,27 @@
         (queries/use-sente-query
          {:query-key [:dataset-props module-id dataset-id]
           :sente-event [:api/get-dataset-props {:module-id module-id :dataset-id dataset-id}]
-          :enabled? (boolean (and module-id dataset-id))})]
+          :enabled? (boolean (and module-id dataset-id))})
+
+        ;; State hooks - always called regardless of data availability
+        [is-editing? set-is-editing] (uix/use-state false)
+        [edit-name set-edit-name] (uix/use-state "")
+        [edit-desc set-edit-desc] (uix/use-state "")]
+
+    ;; Update edit state when data changes
+    (uix/use-effect
+     (fn []
+       (when data
+         (set-edit-name (:name data))
+         (set-edit-desc (:description data))))
+     [data])
 
     ($ :div.p-6
        (cond
          loading? ($ :div "Loading dataset details...")
          error ($ :div "Error: " error)
          data
-         (let [dataset data
-               [is-editing? set-is-editing] (uix/use-state false)
-               [edit-name set-edit-name] (uix/use-state (:name dataset))
-               [edit-desc set-edit-desc] (uix/use-state (:description dataset))]
-
+         (let [dataset data]
            (letfn [(handle-save []
                      (sente/request! [:api/update-dataset-props
                                       {:module-id module-id
