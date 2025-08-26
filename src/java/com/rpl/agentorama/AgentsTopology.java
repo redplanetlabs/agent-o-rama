@@ -26,8 +26,17 @@ public interface AgentsTopology {
   void declareAgentObjectBuilder(String name, RamaFunction1<AgentObjectSetup, Object> builder);
   void declareAgentObjectBuilder(String name, RamaFunction1<AgentObjectSetup, Object> builder, AgentObjectOptions options);
 
-  void declareEvaluatorBuilder(String name, String description, RamaFunction1<Map, RamaFunction1<Map, Map>> builder);
-  void declareEvaluatorBuilder(String name, String description, RamaFunction1<Map, RamaFunction1<Map, Map>> builder, EvaluatorBuilderOptions options);
+  <Input, RefOutput, Output> void declareEvaluatorBuilder(
+      String name,
+      String description,
+      RamaFunction1<Map<String, String>,
+                    RamaFunction4<AgentObjectFetcher, Input, RefOutput, Output, Map>> builder);
+  <Input, RefOutput, Output> void declareEvaluatorBuilder(
+      String name,
+      String description,
+      RamaFunction1<Map<String, String>,
+                    RamaFunction4<AgentObjectFetcher, Input, RefOutput, Output, Map>> builder,
+      EvaluatorBuilderOptions options);
 
   void declareClusterAgent(String localName, String moduleName, String agentName);
 

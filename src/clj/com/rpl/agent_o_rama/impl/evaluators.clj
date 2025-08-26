@@ -13,7 +13,8 @@
    [jsonista.core :as j])
   (:import
    [com.rpl.agentorama
-    AgentNode]
+    AgentNode
+    AgentObjectFetcher]
    [com.rpl.agent_o_rama.impl.types
     AddEvaluator
     RemoveEvaluator]
@@ -122,13 +123,12 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
             ;;      - they're releasing feature to do exactly that this week in
             ;;      1.4.0
             output-schema   (get params "outputSchema")]
-        (fn [{:strs [input output referenceOutput agentNode]}]
-          (let [^AgentNode agent-node (get params "fetcher")
-                model  (.getAgentObject agent-node model-name)
+        (fn [fetcher input ref-output output]
+          (let [model  (.getAgentObject ^AgentObjectFetcher fetcher model-name)
                 prompt (-> prompt-template
                            (str/replace "%input" input)
                            (str/replace "%output" output)
-                           (str/replace "%referenceOutput" referenceOutput))]
+                           (str/replace "%referenceOutput" ref-output))]
             (-> model
                 (lc4j/chat
                  (lc4j/chat-request
@@ -174,12 +174,8 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
    {:builder-fn
     (fn [params]
       (let [len (Long/parseLong (get params "threshold"))]
-        (fn [params]
-          {"concise?"
-           (< (-> params
-                  (get "output")
-                  message-length)
-              len)})))
+        (fn [fetcher input ref-output output]
+          {"concise?" (< (message-length output) len)})))
     :description
     "Boolean evaluator on whether the output's length is below a threshold. Works on strings or Langchain4j message types. User message length is calculated as the sum of the lengths of text contents within, with other types of content ignored."
     :options

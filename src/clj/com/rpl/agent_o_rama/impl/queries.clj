@@ -490,9 +490,14 @@
         (let [eval-fn (.getEvaluator declared-objects-tg
                                      name
                                      builder-name
-                                     builder-params)
-              params  (assoc (into {} params) "fetcher" fetcher)]
-          (.complete cf (eval-fn params))
+                                     builder-params)]
+          (.complete cf
+                     ;; TODO: <<<<>>>>
+                     ;;  - make this dispatch on type of evaluator
+                     (eval-fn fetcher
+                              (get params "input")
+                              (get params "referenceOutput")
+                              (get params "output")))
         )
         (catch Throwable t
           (.completeExceptionally cf t))
@@ -507,6 +512,9 @@
   (let [evals-pstate-sym (symbol (po/evaluators-task-global-name))]
     (<<query-topology topologies
       (try-evaluator-name)
+      ;; TODO: <<<<>>>>
+      ;;   - make this generally able to try any evaluator, and map params based
+      ;;   on the type of evaluator
       [*name *params :> *res]
       (|direct 0)
       (local-select> (keypath *name)

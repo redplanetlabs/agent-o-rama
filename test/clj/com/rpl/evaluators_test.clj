@@ -28,8 +28,8 @@
          "concise-10"
          "Concise 10 limit"
          (fn [params]
-           (fn [{:strs [input output referenceOutput]}]
-             (let [len (+ (count input) (count output) (count referenceOutput))]
+           (fn [fetcher input ref-output output]
+             (let [len (+ (count input) (count output) (count ref-output))]
                {"concise?" (< len 10)}
              ))))
         (aor/declare-evaluator-builder
@@ -38,10 +38,10 @@
          "Concise X limit"
          (fn [params]
            (let [target (Long/parseLong (get params "len"))]
-             (fn [{:strs [input output referenceOutput]}]
+             (fn [fetcher input ref-output output]
                (let [len (+ (count input)
                             (count output)
-                            (count referenceOutput))]
+                            (count ref-output))]
                  {"concise?"     (<= len target)
                   "not-concise?" (> len target)}
                ))))
@@ -143,9 +143,11 @@
 
 
      (is (= {"concise?" true "not-concise?" false}
-            (aor/try-evaluator manager "x1 def" {"output" "..."})))
+            (aor/try-evaluator manager "x1 def" nil nil "...")))
      (is (= {"concise?" false "not-concise?" true}
-            (aor/try-evaluator manager "x1 def" {"output" "...."})))
+            (aor/try-evaluator manager "x1 def" nil nil "....")))
+
+     ;; TODO: <<<<>>>> verify input/ref-output passed through
 
 
 
@@ -154,8 +156,6 @@
      (is (= #{"abc2 def"} (aor/search-evaluators manager "def")))
 
      ;; TODO: <<<<>>>>>
-     ;; - complete clojure API for declare and client methods for create,
-     ;; delete, search
      ;; - and java API declareEvaluatorBuilder
      ;; - need to verify building/caching on each task is working
      ;;   - and that if it changes params, it clears the cache

@@ -23,4 +23,15 @@ public class TestSnippets {
       ToolsAgentOptions.errorHandlerStaticString("abcde")
       );
   }
+
+  public static void declareEvaluatorBuilders(AgentsTopology topology) {
+    topology.declareEvaluatorBuilder("jeb1", "java builder 1", (Map<String, String> buildParams) -> {
+      int target = Integer.parseInt(buildParams.get("target"));
+      return (AgentObjectFetcher fetcher, String input, Object refOutput, String output) -> {
+        Map ret = new HashMap();
+        ret.put("score", output.length() < target);
+        return ret;
+      };
+    });
+  }
 }

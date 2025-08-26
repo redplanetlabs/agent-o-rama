@@ -810,8 +810,12 @@
               [MAP-KEYS
                (selected? (view h/contains-string? searchString) identity)]
               evals-pstate)))
-     (tryEvaluator [this name params]
-       (let [ret (foreign-invoke-query try-eval-query name params)]
+     (tryEvaluator [this name input referenceOutput output]
+       (let [ret (foreign-invoke-query try-eval-query
+                                       name
+                                       {"input"  input
+                                        "referenceOutput" referenceOutput
+                                        "output" output})]
          (when (= ret queries/INVALID-EVALUATOR)
            (throw (h/ex-info "Invalid evaluator" {:name name})))
          ret))
@@ -1130,8 +1134,8 @@
   (.searchEvaluators manager search-string))
 
 (defn try-evaluator
-  [^AgentManager manager name params]
-  (.tryEvaluator manager name params))
+  [^AgentManager manager name input reference-output output]
+  (.tryEvaluator manager name input reference-output output))
 
 (defn start-ui
   (^AutoCloseable [ipc] (start-ui ipc nil))

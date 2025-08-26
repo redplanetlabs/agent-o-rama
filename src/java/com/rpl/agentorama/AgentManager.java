@@ -37,5 +37,5 @@ public interface AgentManager extends IFetchAgentClient, Closeable {
   void createEvaluator(String name, String builderName, Map params, String description, CreateEvaluatorOptions options);
   void removeEvaluator(String name);
   Set<String> searchEvaluators(String searchString);
-  Map tryEvaluator(String name, Map params);
+  Map tryEvaluator(String name, Object input, Object referenceOutput, Object output);
 }
