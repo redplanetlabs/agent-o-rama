@@ -42,8 +42,8 @@
                (let [len (+ (count input)
                             (count output)
                             (count referenceOutput))]
-                 {"concise?"     (< len target)
-                  "not-concise?" (>= len target)}
+                 {"concise?"     (<= len target)
+                  "not-concise?" (> len target)}
                ))))
          {:params       {"len" "the target length"}
           :input-path?  true
@@ -142,9 +142,9 @@
      (is (= #{} (aor/search-evaluators manager "invalid")))
 
 
-     (is (= {"concise?" false "not-concise?" true}
-            (aor/try-evaluator manager "x1 def" {"output" "..."})))
      (is (= {"concise?" true "not-concise?" false}
+            (aor/try-evaluator manager "x1 def" {"output" "..."})))
+     (is (= {"concise?" false "not-concise?" true}
             (aor/try-evaluator manager "x1 def" {"output" "...."})))
 
 
