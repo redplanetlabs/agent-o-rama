@@ -141,13 +141,15 @@
      (is (= #{"abc2 def" "abc"} (aor/search-evaluators manager "abc")))
      (is (= #{} (aor/search-evaluators manager "invalid")))
 
+     (aor/remove-evaluator! manager "not-an-eval")
+     (aor/remove-evaluator! manager "x1 def")
+     (is (= #{"abc2 def"} (aor/search-evaluators manager "def")))
+
 
 
      ;; TODO: <<<<>>>>>
      ;; - complete clojure API for declare and client methods for create,
      ;; delete, search
-     ;;   - need method to fetch all the builders, including built-in ones
-     ; (defn remove-evaluator [^AgentManager manager name]
      ;; - and java API declareEvaluatorBuilder
      ;; - need to verify building/caching on each task is working
      ;;   - does it need a lock? how is it actually accessed for experiments?
