@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [ex-info])
   (:use [com.rpl.rama.path])
   (:require
+   [clojure.set :as set]
    [clojure.string :as str]
    [com.rpl.rama.ops :as ops])
   (:import
@@ -221,14 +222,25 @@
 
 (defn validate-options!
   [context options spec]
-  (let [errors (->> options
-                    (mapv
-                     (fn [[k v]]
-                       (if-let [sfn (get spec k)]
-                         (if-let [s (sfn v)]
-                           (format "Value for option %s is invalid: %s" k s))
-                         (format "%s is an invalid option" k))))
-                    (filterv some?))]
+  (let [provided (-> options
+                     keys
+                     set)
+        allowed  (-> options
+                     keys
+                     set)
+        invalid  (set/difference provided allowed)
+        errors   (->> options
+                      (mapv
+                       (fn [[k v]]
+                         (if-let [sfn (get spec k)]
+                           (if-let [s (sfn v)]
+                             (format "Value for option %s is invalid: %s"
+                                     k
+                                     s))
+                           (format "%s is an invalid option" k))))
+                      (filterv some?))]
+    (when-not (empty? invalid)
+      (throw (ex-info "Invalid options specified" {:invalid invalid})))
     (when-not (empty? errors)
       (throw (ex-info "Invalid options" {:errors errors :context context}))
     )))

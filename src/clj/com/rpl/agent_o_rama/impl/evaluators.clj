@@ -91,7 +91,7 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
   {"aor/llm-judge"
    {:builder-fn
     (fn [params]
-      (let [temperature     (parse-double (get params "temperature"))
+      (let [temperature     (Double/parseDouble (get params "temperature"))
             prompt-template (get params "prompt")
             model-name      (get params "model")
             ;; TODO: <<<<>>>>
@@ -150,7 +150,7 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
    "aor/conciseness"
    {:builder-fn
     (fn [params]
-      (let [len (parse-long (get params "threshold"))]
+      (let [len (Long/parseLong (get params "threshold"))]
         (fn [params]
           {"concise?"
            (< (-> params
@@ -187,6 +187,15 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
       (catch Throwable t
         (h/throwable->str t)))))
 
+(defn try-make-evaluator
+  [{:keys [builder-fn]} params]
+  (try
+    (builder-fn params)
+    nil
+    (catch Throwable t
+      (format "Error making evaluator\n\n%s" (h/throwable->str t))
+    )))
+
 (defn verify-evaluator-add
   [{:keys [builder-name params input-json-path output-json-path
            reference-output-json-path]}]
@@ -222,12 +231,12 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
               (invalid-json-path output-json-path))
 
       (invalid-json-path reference-output-json-path)
-      (format "Invalid reference output JSON path: %\n\n%s"
+      (format "Invalid reference output JSON path: %s\n\n%s"
               reference-output-json-path
               (invalid-json-path reference-output-json-path))
 
       :else
-      nil)))
+      (try-make-evaluator builder-info params))))
 
 (defn all-evaluator-builders
   []
@@ -244,7 +253,11 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
            :> {:keys [*name *builder-name *params *description
                        *input-json-path *output-json-path
                        *reference-output-json-path]})
-     (verify-evaluator-add *data :> *error-str)
+     (local-select> (view contains? *name) $$evals :> *exists?)
+     (ifexpr *exists?
+       "Evaluator already exists"
+       (verify-evaluator-add *data)
+       :> *error-str)
      (<<if (some? *error-str)
        (ack-return> *error-str)
       (else>)

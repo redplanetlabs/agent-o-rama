@@ -409,9 +409,9 @@
         evals-depot           (foreign-depot cluster
                                              module-name
                                              (po/evaluators-depot-name))
-        evals-pstate          (foreign-depot cluster
-                                             module-name
-                                             (po/evaluators-task-global-name))]
+        evals-pstate          (foreign-pstate cluster
+                                              module-name
+                                              (po/evaluators-task-global-name))]
     (reify
      AgentManager
      (getAgentNames [this]
@@ -779,17 +779,21 @@
 
 
      (createEvaluator [this name builderName params description options]
-       (foreign-append!
-        evals-depot
-        (aor-types/->valid-AddEvaluator
-         name
-         builderName
-         params
-         description
-         (.inputJsonPath options)
-         (.outputJsonPath options)
-         (.referenceOutputJsonPath options)
-        )))
+       (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
+             (foreign-append!
+              evals-depot
+              (aor-types/->valid-AddEvaluator
+               name
+               builderName
+               params
+               description
+               (.inputJsonPath options)
+               (.outputJsonPath options)
+               (.referenceOutputJsonPath options)
+              ))]
+         (when error
+           (throw (h/ex-info "Error creating evaluator" {:info error})))
+       ))
      (removeEvaluator [this name]
        (foreign-append!
         evals-depot
@@ -798,7 +802,8 @@
      (searchEvaluators [this searchString]
        (into #{}
              (foreign-select
-              [MAP-KEYS (view h/contains-string? searchString)]
+              [MAP-KEYS
+               (selected? (view h/contains-string? searchString) identity)]
               evals-pstate)))
      (close [this]
        (close! datasets-depot))

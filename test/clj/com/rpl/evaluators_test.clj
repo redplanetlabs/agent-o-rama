@@ -37,7 +37,7 @@
          "concise-x"
          "Concise X limit"
          (fn [params]
-           (let [target (parse-long (get params "len"))]
+           (let [target (Long/parseLong (get params "len"))]
              (fn [{:strs [input output referenceOutput]}]
                (let [len (+ (count input)
                             (count output)
@@ -61,19 +61,107 @@
      (rtest/launch-module! ipc module {:tasks 2 :threads 2})
      (bind module-name (get-module-name module))
      (bind manager (aor/agent-manager ipc module-name))
+     (bind builders-query
+       (foreign-query ipc module-name (queries/all-evaluator-builders-name)))
+
+     (bind builders
+       (foreign-invoke-query builders-query))
+     (is (contains? builders "aor/llm-judge"))
+     (is (contains? builders "aor/conciseness"))
+     (is (contains? builders "concise-x"))
+     (is (contains? builders "concise-10"))
+
+
+     (aor/create-evaluator! manager "abc" "concise-10" {} "my eval 1")
+     (aor/create-evaluator! manager
+                            "abc2 def"
+                            "concise-10"
+                            {}
+                            "my eval 2"
+                            {:input-json-path  "$.a"
+                             :output-json-path "$.b"
+                             :reference-output-json-path "$"})
+     (aor/create-evaluator! manager
+                            "x1 def"
+                            "concise-x"
+                            {"len" "100"}
+                            "my eval 3")
+
+
+     (try
+       (aor/create-evaluator! manager "abc" "concise-10" {} "invalid")
+       (is false)
+       (catch clojure.lang.ExceptionInfo e
+         (is (h/contains-string? (ex-message e) "Evaluator already exists"))
+       ))
+     (try
+       (aor/create-evaluator! manager
+                              "invalid-x"
+                              "concise-x"
+                              {"len" "abc"}
+                              "invalid")
+       (is false)
+       (catch clojure.lang.ExceptionInfo e
+         (is (h/contains-string? (ex-message e) "NumberFormatException"))
+       ))
+     (try
+       (aor/create-evaluator! manager
+                              "invalid"
+                              "concise-10" {}
+                              ""
+                              {:input-json-path "$$"})
+       (is false)
+       (catch clojure.lang.ExceptionInfo e
+         (is (h/contains-string? (ex-message e) "Invalid input JSON path"))
+       ))
+     (try
+       (aor/create-evaluator! manager
+                              "invalid"
+                              "concise-10" {}
+                              ""
+                              {:output-json-path "$$"})
+       (is false)
+       (catch clojure.lang.ExceptionInfo e
+         (is (h/contains-string? (ex-message e) "Invalid output JSON path"))
+       ))
+     (try
+       (aor/create-evaluator! manager
+                              "invalid"
+                              "concise-10" {}
+                              ""
+                              {:reference-output-json-path "$$"})
+       (is false)
+       (catch clojure.lang.ExceptionInfo e
+         (is (h/contains-string? (ex-message e)
+                                 "Invalid reference output JSON path"))
+       ))
+
+     (is (= #{"abc2 def" "x1 def"} (aor/search-evaluators manager "def")))
+     (is (= #{"x1 def"} (aor/search-evaluators manager "x1")))
+     (is (= #{"abc2 def" "abc"} (aor/search-evaluators manager "abc")))
+     (is (= #{} (aor/search-evaluators manager "invalid")))
+
+
 
      ;; TODO: <<<<>>>>>
      ;; - complete clojure API for declare and client methods for create,
      ;; delete, search
      ;;   - need method to fetch all the builders, including built-in ones
-     ;; (defn create-evaluator!
-     ;;   ([^AgentManager manager name builder-name params description]
-     ;;    (create-evaluator! manager name builder-name params description nil))
-     ;;   ([^AgentManager manager name builder-name params description options]
      ; (defn remove-evaluator [^AgentManager manager name]
-     ; (defn search-evaluators [^AgentManager manager search-string]
      ;; - and java API declareEvaluatorBuilder
-     ;; - need to verify building/caching one each task is working
+     ;; - need to verify building/caching on each task is working
      ;;   - does it need a lock? how is it actually accessed for experiments?
+
+     ;; TODO: <<<<>>>> use query topology to try out an evaluator
+     ;;   - runs on virtual thread with agent node so can access objects
+     ;;     - but shouldn't be able to emit... maybe instead of agent node, it's
+     ;;     just fetcher
+     ;;       - and make that interface public
+     ;;       - still need to make sure to release those objects...
+     ;;       - shoudl sub-agents be accessible? seems like yes
+     ;;     - expose new interface that's union of those two interfaces
+     ;;       - still separate interfaces since setup only has one of them
+     ;;     - UI should look up evaluator builder to determine what
+     ;;     input/output/refOutput to prompt for
 
     )))
