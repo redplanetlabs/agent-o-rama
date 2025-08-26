@@ -331,7 +331,8 @@
 
 (defprotocol AgentsTopologyInternal
   (declare-agent-object-builder-internal [this name afn options])
-  (declare-evaluator-builder-internal [this name builder-fn options]))
+  (declare-evaluator-builder-internal [this name description builder-fn
+                                       options]))
 
 (defprotocol AgentClientInternal
   (stream-internal [this agent-invoke node callback-fn])

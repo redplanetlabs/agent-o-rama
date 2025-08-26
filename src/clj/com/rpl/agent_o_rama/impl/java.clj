@@ -67,9 +67,13 @@
     (reify
      EvaluatorBuilderOptions$Impl
      (param [this name description]
+       (.param this name description ""))
+     (param [this name description defaultValue]
        (when (contains? (:params @options) name)
          (throw (h/ex-info "Param already declared" {:name name})))
-       (setval [h/VOLATILE :params (keypath name)] description options))
+       (setval [h/VOLATILE :params (keypath name)]
+               {:description description :default defaultValue}
+               options))
      (withoutInputPath [this]
        (vswap! options assoc :input-path? false))
      (withoutOutputPath [this]

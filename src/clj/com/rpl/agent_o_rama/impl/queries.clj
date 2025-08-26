@@ -3,6 +3,7 @@
         [com.rpl.rama.path])
   (:require
    [clojure.string :as str]
+   [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
@@ -49,6 +50,10 @@
 (defn search-datasets-name
   []
   "_aor-search-datasets")
+
+(defn all-evaluator-builders-name
+  []
+  "_aor-all-evaluator-builders")
 
 (defn- to-pqueue
   [coll]
@@ -460,3 +465,11 @@
       :pagination-params (when (= (count examples) amt)
                            (h/last-key examples))}
    )))
+
+(defn declare-all-evaluator-builders-query-topology
+  [topologies]
+  (<<query-topology topologies
+    (all-evaluator-builders-name)
+    [:> *res]
+    (|origin)
+    (evals/all-evaluator-builders :> *res)))

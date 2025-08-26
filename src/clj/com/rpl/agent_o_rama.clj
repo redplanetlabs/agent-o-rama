@@ -132,12 +132,13 @@
         (h/convert-jfn jfn)
         (i/convert-agent-object-options options)))
 
-     (declareEvaluatorBuilder [this name builder-jfn]
-       (.declareEvaluatorBuilder this name builder-jfn nil))
-     (declareEvaluatorBuilder [this name builder-jfn options]
+     (declareEvaluatorBuilder [this name description builder-jfn]
+       (.declareEvaluatorBuilder this name description builder-jfn nil))
+     (declareEvaluatorBuilder [this name description builder-jfn options]
        (let [builder-fn (h/convert-jfn builder-jfn)]
          (aor-types/declare-evaluator-builder-internal this
                                                        name
+                                                       description
                                                        (fn [params]
                                                          (h/convert-jfn
                                                           (builder-fn params)))
@@ -191,7 +192,8 @@
                   "builderFn"   afn
                  })
        ))
-     (declare-evaluator-builder-internal [this name builder-fn options]
+     (declare-evaluator-builder-internal [this name description builder-fn
+                                          options]
        (when (contains? @evaluator-builders-vol name)
          (throw (h/ex-info "Evaluator builder already declared" {:name name})))
        (when (h/contains-string? name "/")
@@ -212,11 +214,14 @@
                                :output-path? h/boolean-spec
                                :reference-output-path? h/boolean-spec
                               })
+         ;; TODO: <<<<>>>> validate params as map<string, map<:description,
+         ;; :default>
          (vswap! evaluator-builders-vol
                  assoc
                  name
-                 {:builder-fn builder-fn
-                  :options    options
+                 {:builder-fn  builder-fn
+                  :description description
+                  :options     options
                  })
        ))
     )))
@@ -259,11 +264,12 @@
 
 
 (defn declare-evaluator-builder
-  ([agents-topology name builder-fn]
-   (declare-evaluator-builder agents-topology name builder-fn nil))
-  ([agents-topology name builder-fn options]
+  ([agents-topology name description builder-fn]
+   (declare-evaluator-builder agents-topology name description builder-fn nil))
+  ([agents-topology name description builder-fn options]
    (aor-types/declare-evaluator-builder-internal agents-topology
                                                  name
+                                                 description
                                                  builder-fn
                                                  options)))
 (defn declare-cluster-agent

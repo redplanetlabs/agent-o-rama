@@ -6,21 +6,186 @@
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.rama.ops :as ops])
+   [com.rpl.agent-o-rama.langchain4j :as lc4j]
+   [com.rpl.rama.ops :as ops]
+   [jsonista.core :as j])
   (:import
+   [com.rpl.agentorama
+    AgentNode]
    [com.rpl.agent_o_rama.impl.types
     AddEvaluator
-    RemoveEvaluator]))
+    RemoveEvaluator]
+   [dev.langchain4j.data.message
+    AiMessage
+    SystemMessage
+    TextContent
+    ToolExecutionResultMessage
+    UserMessage]))
 
-(defn invalid-json-path?
+(defprotocol MessageLength
+  (message-length [this]))
+
+(extend-protocol MessageLength
+  nil
+  (message-length [this] 0)
+
+  String
+  (message-length [this] (count this))
+
+  AiMessage
+  (message-length [this]
+    (-> this
+        .text
+        count))
+
+  SystemMessage
+  (message-length [this]
+    (-> this
+        .text
+        count))
+
+  ToolExecutionResultMessage
+  (message-length [this]
+    (-> this
+        .text
+        count))
+
+  UserMessage
+  (message-length [this]
+    (let [contents (filter #(instance? TextContent %) (.contents this))]
+      (reduce
+       +
+       0
+       (mapv
+        (fn [^TextContent tc]
+          (-> tc
+              .text
+              count))))
+    )))
+
+(def DEFAULT-LLM-OUTPUT-SCHEMA
+  "{
+  \"type\": \"object\",
+  \"properties\": {
+    \"score\": {
+      \"type\": \"integer\",
+      \"minimum\": 0,
+      \"maximum\": 10
+    }
+  },
+  \"required\": [\"score\"],
+  \"additionalProperties\": false
+}")
+
+(def DEFAULT-LLM-PROMPT
+  "You are an impartial evaluator. Your task is to judge the quality of a model's output.
+
+- **Input**: %input
+- **Reference Output**: %referenceOutput
+- **Model Output**: %output
+
+Evaluate whether the Model Output correctly and completely answers the Input, matching the meaning of the Reference Output.
+Be strict: minor wording differences are acceptable, but factual errors, omissions, or contradictions are not.")
+
+(def BUILT-IN
+  {"aor/llm-judge"
+   {:builder-fn
+    (fn [params]
+      (let [temperature     (parse-double (get params "temperature"))
+            prompt-template (get params "prompt")
+            model-name      (get params "model")
+            ;; TODO: <<<<>>>>
+            ;;  - need to convert output-schema to lagnchain4j version
+            ;;      - they're releasing feature to do exactly that this week in
+            ;;      1.4.0
+            output-schema   (get params "outputSchema")]
+        (fn [{:strs [input output referenceOutput agentNode]}]
+          (let [^AgentNode agent-node (get params "agentNode")
+                model  (.getAgentObject agent-node model-name)
+                prompt (-> prompt-template
+                           (str/replace "%input" input)
+                           (str/replace "%output" output)
+                           (str/replace "%referenceOutput" referenceOutput))]
+            (-> model
+                (lc4j/chat
+                 (lc4j/chat-request
+                  [prompt]
+                  {:temperature     temperature
+                   :response-format
+                   (lc4j/json-response-format
+                    "Evaluation"
+                    output-schema
+                   )}))
+                .aiMessage
+                .text
+                j/read-value
+            )))))
+    :description
+    "Define an LLM judge to evaluate an agent invoke with customizable prompt, model, temperature, and output schema. The judge can output any number of scores."
+    :options
+    {:params
+     {"prompt"
+      {:description
+       "Prompt for the LLM. %input, %output, and %referenceOutput can be used as variables in the prompt"
+       :default     DEFAULT-LLM-PROMPT
+      }
+
+      "model"
+      {:description
+       "Model to use. This refers to a model declared as an agent object in the module."
+      }
+
+      "temperature"
+      {:description
+       "Floating-point temperature of the LLM"
+       :default     "0.0"
+      }
+      "outputSchema"
+      {:description
+       "JSON schema for the output of the LLM. Each key of the output is a separate evaluation score."
+       :default     DEFAULT-LLM-OUTPUT-SCHEMA
+      }}}
+   }
+
+   "aor/conciseness"
+   {:builder-fn
+    (fn [params]
+      (let [len (parse-long (get params "threshold"))]
+        (fn [params]
+          {"concise?"
+           (< (-> params
+                  (get "output")
+                  message-length)
+              len)})))
+    :description
+    "Boolean evaluator on whether the output's length is below a threshold. Works on strings or Langchain4j message types. User message length is calculated as the sum of the lengths of text contents within, with other types of content ignored."
+    :options
+    {:params
+     {"threshold"
+      {:description
+       "Threshold length in terms of number of characters for a message to be concise"
+       :default     "300"
+      }}
+     :input-path? false
+     :reference-output-path? false}
+   }
+
+   ;; TODO: <<<<>>>>
+   ;;  - add regex match evaluator
+   ;;  - check other ones that come with LangSmith
+
+  })
+
+
+(defn invalid-json-path
   [json-path]
   (if (empty? json-path)
-    false
+    nil
     (try
       (h/compile-json-path json-path)
-      false
+      nil
       (catch Throwable t
-        true))))
+        (h/throwable->str t)))))
 
 (defn verify-evaluator-add
   [{:keys [builder-name params input-json-path output-json-path
@@ -46,18 +211,29 @@
               declared-set
               provided-set)
 
-      (invalid-json-path? input-json-path)
-      (format "Invalid input JSON path: %s" input-json-path)
+      (invalid-json-path input-json-path)
+      (format "Invalid input JSON path: %s\n\n%s"
+              input-json-path
+              (invalid-json-path input-json-path))
 
-      (invalid-json-path? output-json-path)
-      (format "Invalid output JSON path: %s" output-json-path)
+      (invalid-json-path output-json-path)
+      (format "Invalid output JSON path: %s\n\n%s"
+              output-json-path
+              (invalid-json-path output-json-path))
 
-      (invalid-json-path? reference-output-json-path)
-      (format "Invalid reference output JSON path: %s"
-              reference-output-json-path)
+      (invalid-json-path reference-output-json-path)
+      (format "Invalid reference output JSON path: %\n\n%s"
+              reference-output-json-path
+              (invalid-json-path reference-output-json-path))
 
       :else
       nil)))
+
+(defn all-evaluator-builders
+  []
+  (let [declared-objects (po/agent-declared-objects-task-global)]
+    (merge BUILT-IN
+           (.getEvaluatorBuilders declared-objects))))
 
 (deframaop handle-evaluators-op
   [*data]
