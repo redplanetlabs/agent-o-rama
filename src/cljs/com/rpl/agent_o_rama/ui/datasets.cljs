@@ -192,6 +192,13 @@
 ;; DATASET DETAIL PAGE
 ;; =============================================================================
 
+(defn pretty-print-json [json-str]
+  "Pretty prints a JSON string, falls back to original if parsing fails"
+  (try
+    (js/JSON.stringify (js/JSON.parse json-str) nil 2)
+    (catch js/Error _
+      json-str)))
+
 (defui dataset-detail []
   (let [;; Get IDs from route
         {:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
@@ -274,7 +281,7 @@
                              (if input-schema
                                ($ :pre.w-full.h-80.p-3.border.rounded-md.font-mono.text-sm.bg-gray-50.overflow-auto.text-gray-800
                                   {:className "border-gray-300"}
-                                  input-schema)
+                                  (pretty-print-json input-schema))
                                ($ :div.w-full.h-80.p-3.border.rounded-md.bg-gray-50.text-gray-500.text-sm.flex.items-center.justify-center
                                   {:className "border-gray-300"}
                                   "No input schema defined")))
@@ -284,7 +291,7 @@
                              (if output-schema
                                ($ :pre.w-full.h-80.p-3.border.rounded-md.font-mono.text-sm.bg-gray-50.overflow-auto.text-gray-800
                                   {:className "border-gray-300"}
-                                  output-schema)
+                                  (pretty-print-json output-schema))
                                ($ :div.w-full.h-80.p-3.border.rounded-md.bg-gray-50.text-gray-500.text-sm.flex.items-center.justify-center
                                   {:className "border-gray-300"}
                                   "No output schema defined")))))))
