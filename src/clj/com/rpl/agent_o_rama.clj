@@ -214,8 +214,7 @@
                                :output-path? h/boolean-spec
                                :reference-output-path? h/boolean-spec
                               })
-         ;; TODO: <<<<>>>> validate params as map<string, map<:description,
-         ;; :default>
+         (evals/validate-params! (:params full-options))
          (vswap! evaluator-builders-vol
                  assoc
                  name

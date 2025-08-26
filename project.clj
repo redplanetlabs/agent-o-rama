@@ -29,6 +29,7 @@
                   "2.9.0"
                   :exclusions
                   [org.slf4j/slf4j-api]]
+                 [expound "0.9.0"]
 
                  ;; ui dependencies
                  [ring/ring-core "1.9.5"]

@@ -45,7 +45,7 @@
                  {"concise?"     (<= len target)
                   "not-concise?" (> len target)}
                ))))
-         {:params       {"len" "the target length"}
+         {:params       {"len" {:description "the target length"}}
           :input-path?  true
           :output-path? false
           :reference-output-path? false})
@@ -158,19 +158,9 @@
      ;; delete, search
      ;; - and java API declareEvaluatorBuilder
      ;; - need to verify building/caching on each task is working
-     ;;   - does it need a lock? how is it actually accessed for experiments?
+     ;;   - and that if it changes params, it clears the cache
+     ;;     - just make new concise-x
 
-     ;; TODO: <<<<>>>> use query topology to try out an evaluator
-     ;;   - runs on virtual thread with agent node so can access objects
-     ;;     - but shouldn't be able to emit... maybe instead of agent node, it's
-     ;;     just fetcher
-     ;;       - and make that interface public
-     ;;       - still need to make sure to release those objects...
-     ;;       - shoudl sub-agents be accessible? seems like yes
-     ;;     - expose new interface that's union of those two interfaces
-     ;;       - still separate interfaces since setup only has one of them
-     ;;     - UI should look up evaluator builder to determine what
-     ;;     input/output/refOutput to prompt for
 
 
      ;; TODO: <<<<>>>> tests that default evals work

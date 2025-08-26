@@ -3,11 +3,13 @@
         [com.rpl.rama path])
   (:require
    [clojure.string :as str]
+   [clojure.spec.alpha :as spec]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.rama.ops :as ops]
+   [expound.alpha :as expound]
    [jsonista.core :as j])
   (:import
    [com.rpl.agentorama
@@ -21,6 +23,27 @@
     TextContent
     ToolExecutionResultMessage
     UserMessage]))
+
+(spec/def ::description string?)
+(spec/def ::default string?)
+(def ^:private allowed-entry-keys #{:description :default})
+
+(spec/def ::param-entry
+  (spec/and
+   (spec/keys :opt-un [::description ::default])
+   (fn [m]
+     (and (map? m)
+          (every? allowed-entry-keys (keys m))))))
+
+(spec/def ::params
+  (spec/map-of string? (spec/nilable ::param-entry)))
+
+(defn validate-params!
+  [params]
+  (when-not (spec/valid? ::params params)
+    (throw (h/ex-info (str "Invalid params declaration"
+                           (expound/expound-str ::params params))
+                      {}))))
 
 (defprotocol MessageLength
   (message-length [this]))
