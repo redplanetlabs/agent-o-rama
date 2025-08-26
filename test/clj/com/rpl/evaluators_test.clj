@@ -15,7 +15,10 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.test-common :as tc]))
+   [com.rpl.test-common :as tc])
+  (:import
+   [com.rpl.aortest
+    TestSnippets]))
 
 (deftest evaluator-operations-test
   (with-open [ipc (rtest/create-ipc)]
@@ -49,6 +52,7 @@
           :input-path?  true
           :output-path? false
           :reference-output-path? false})
+        (TestSnippets/declareEvaluatorBuilders topology)
         (-> topology
             (aor/new-agent "foo")
             (aor/node
@@ -70,6 +74,8 @@
      (is (contains? builders "aor/conciseness"))
      (is (contains? builders "concise-x"))
      (is (contains? builders "concise-10"))
+     (is (contains? builders "jeb1"))
+     (is (contains? builders "jeb2"))
 
 
      (aor/create-evaluator! manager "abc" "concise-10" {} "my eval 1")

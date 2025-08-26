@@ -73,13 +73,17 @@
          (throw (h/ex-info "Param already declared" {:name name})))
        (setval [h/VOLATILE :params (keypath name)]
                {:description description :default defaultValue}
-               options))
+               options)
+       this)
      (withoutInputPath [this]
-       (vswap! options assoc :input-path? false))
+       (vswap! options assoc :input-path? false)
+       this)
      (withoutOutputPath [this]
-       (vswap! options assoc :output-path? false))
+       (vswap! options assoc :output-path? false)
+       this)
      (withoutReferenceOutputPath [this]
-       (vswap! options assoc :reference-output-path? false))
+       (vswap! options assoc :reference-output-path? false)
+       this)
      clojure.lang.IDeref
      (deref [this]
        @options

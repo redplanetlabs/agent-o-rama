@@ -26,12 +26,27 @@ public class TestSnippets {
 
   public static void declareEvaluatorBuilders(AgentsTopology topology) {
     topology.declareEvaluatorBuilder("jeb1", "java builder 1", (Map<String, String> buildParams) -> {
-      int target = Integer.parseInt(buildParams.get("target"));
-      return (AgentObjectFetcher fetcher, String input, Object refOutput, String output) -> {
+      return (AgentObjectFetcher fetcher, String input, Long refOutput, String output) -> {
         Map ret = new HashMap();
-        ret.put("score", output.length() < target);
+        ret.put("score", input.length() + refOutput + output.length());
         return ret;
       };
     });
+    topology.declareEvaluatorBuilder(
+      "jeb2",
+      "java builder 2",
+      (Map<String, String> buildParams) -> {
+        int foo1 = Integer.parseInt(buildParams.get("foo1"));
+        int foo2 = Integer.parseInt(buildParams.get("foo2"));
+        return (AgentObjectFetcher fetcher, String input, Long refOutput, String output) -> {
+          Map ret = new HashMap();
+          ret.put("score", input.length() + foo1 + foo2 + refOutput + output.length());
+          return ret;
+        };
+      },
+      EvaluatorBuilderOptions.param("foo1", "a number")
+                             .param("foo2", "another number")
+                             .withoutOutputPath()
+    );
   }
 }
