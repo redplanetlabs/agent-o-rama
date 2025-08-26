@@ -276,7 +276,7 @@
                        ;; At least one schema exists - show side by side panels
                        ($ :div.grid.grid-cols-2.gap-6
                           ;; Input Schema
-                          ($ :div
+                          ($ :div.overflow-x-scroll
                              ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Input Schema")
                              (if input-schema
                                ($ :pre.w-full.h-80.p-3.border.rounded-md.font-mono.text-sm.bg-gray-50.overflow-auto.text-gray-800
@@ -286,7 +286,7 @@
                                   {:className "border-gray-300"}
                                   "No input schema defined")))
                           ;; Output Schema
-                          ($ :div
+                          ($ :div.overflow-x-scroll
                              ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Output Schema")
                              (if output-schema
                                ($ :pre.w-full.h-80.p-3.border.rounded-md.font-mono.text-sm.bg-gray-50.overflow-auto.text-gray-800
