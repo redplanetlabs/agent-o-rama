@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   public static ThreadLocal<Long> ACQUIRE_TIMEOUT_MILLIS = new ThreadLocal<>();
-
   Map<String, Map<String, Object>> _builders;
   Map<String, Map<Keyword, Object>> _evaluatorBuilders;
   Map<String, List<String>> _agentsInfo;
@@ -47,6 +46,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     }
     synchronized(_evaluators) {
       Map<Keyword, Object> eparams = _evaluatorBuilders.get(builderName);
+      if(eparams==null) eparams = (Map<Keyword,Object>) ((Map)AORHelpers.BUILT_IN_EVAL_BUILDERS.deref()).get(builderName);
       if(eparams==null) throw new RuntimeException("Invalid evaluator builder name: " + builderName);
       IFn builderFn = (IFn) eparams.get(Keyword.intern(null, "builder-fn"));
       IFn ret = (IFn) builderFn.invoke(params);

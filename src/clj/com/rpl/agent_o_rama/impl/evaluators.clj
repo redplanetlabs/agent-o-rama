@@ -175,7 +175,7 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
     (fn [params]
       (let [len (Long/parseLong (get params "threshold"))]
         (fn [fetcher input ref-output output]
-          {"concise?" (< (message-length output) len)})))
+          {"concise?" (<= (message-length output) len)})))
     :description
     "Boolean evaluator on whether the output's length is below a threshold. Works on strings or Langchain4j message types. User message length is calculated as the sum of the lengths of text contents within, with other types of content ignored."
     :options
@@ -188,11 +188,6 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
      :input-path? false
      :reference-output-path? false}
    }
-
-   ;; TODO: <<<<>>>>
-   ;;  - add regex match evaluator
-   ;;  - check other ones that come with LangSmith
-
   })
 
 
@@ -215,12 +210,16 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
       (format "Error making evaluator\n\n%s" (h/throwable->str t))
     )))
 
+(defn all-evaluator-builders
+  []
+  (let [declared-objects (po/agent-declared-objects-task-global)]
+    (merge BUILT-IN
+           (.getEvaluatorBuilders declared-objects))))
+
 (defn verify-evaluator-add
   [{:keys [builder-name params input-json-path output-json-path
            reference-output-json-path]}]
-  (let [builder-info    (-> (po/agent-declared-objects-task-global)
-                            .getEvaluatorBuilders
-                            (get builder-name))
+  (let [builder-info    (get (all-evaluator-builders) builder-name)
         declared-params (-> builder-info
                             :options
                             :params)
@@ -256,12 +255,6 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
 
       :else
       (try-make-evaluator builder-info params))))
-
-(defn all-evaluator-builders
-  []
-  (let [declared-objects (po/agent-declared-objects-task-global)]
-    (merge BUILT-IN
-           (.getEvaluatorBuilders declared-objects))))
 
 (deframaop handle-evaluators-op
   [*data]

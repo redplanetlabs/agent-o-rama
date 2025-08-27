@@ -182,9 +182,23 @@
             (aor/try-evaluator manager "x1 def" nil nil "...")))
 
 
+     ;; verify default evals
+     (aor/create-evaluator! manager
+                            "aconcise6"
+                            "aor/conciseness"
+                            {"threshold" "6"}
+                            "built-in")
+
+     (is (= {"concise?" true}
+            (aor/try-evaluator manager "aconcise6" nil nil ".....")))
+     (is (= {"concise?" true}
+            (aor/try-evaluator manager "aconcise6" nil nil "......")))
+     (is (= {"concise?" false}
+            (aor/try-evaluator manager "aconcise6" nil nil ".......")))
 
 
-     ;; TODO: <<<<>>>> tests that default evals work
+     ;; TODO: <<<<>>>> tests LLM as judge with mock chat model
+     ;;  - need output schema converter from langchain4j
      ;;   - can make a mock chat model
 
     )))

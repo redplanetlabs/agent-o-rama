@@ -1,7 +1,9 @@
 package com.rpl.agentorama.impl;
 
 import clojure.lang.IFn;
+import clojure.lang.Var;
 import com.rpl.rama.impl.Util;
+import java.util.*;
 
 public class AORHelpers {
   public static final IFn CREATE_AGENTS_TOPOLOGY =
@@ -23,6 +25,7 @@ public class AORHelpers {
   public static IFn CREATE_TOOL_INFO_WITH_CONTEXT =
       Util.getIFn("com.rpl.agent-o-rama.impl.java", "create-tool-info-with-context");
   public static final IFn START_UI = Util.getIFn("com.rpl.agent-o-rama", "start-ui");
+  public static final Var BUILT_IN_EVAL_BUILDERS = Util.getVar("com.rpl.agent-o-rama.impl.evaluators", "BUILT-IN");
 
   public static byte[] freeze(Object v) {
     return (byte[]) FREEZE.invoke(v);
