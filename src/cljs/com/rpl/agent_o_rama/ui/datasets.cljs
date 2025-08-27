@@ -390,19 +390,20 @@
         [search-query set-search-query] (uix/use-state "")
         [show-info? set-show-info] (uix/use-state false)
 
-        ;; Fetch dataset properties
-                ;; Fetch dataset properties
-                ;; Fetch dataset properties
-        {:keys [data loading? error]}
+        ;; --- START OF FIX ---
+
+        ;; 1. Fetch dataset properties, RENAMING keys to avoid collision
+        {:keys [data loading? error refetch] :as props-query}
         (queries/use-sente-query
          {:query-key [:dataset-props module-id dataset-id]
           :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
 
-        ;; Query for examples for the selected dataset and snapshot (moved to top level)
-                ;; Query for examples for the selected dataset and snapshot (moved to top level)
-                ;; Query for examples for the selected dataset and snapshot (moved to top level)
-        {:keys [data examples-data loading-examples? error-examples? refetch-examples] :as examples-query}
+        ;; Rename destructured keys for clarity
+        {dataset-props :data, props-loading? :loading?, props-error :error, props-refetch :refetch} props-query
+
+        ;; 2. Fetch examples, also RENAMING keys
+        {:keys [data loading? error refetch] :as examples-query}
         (queries/use-sente-query
          {:query-key [:dataset-examples module-id dataset-id snapshot-name]
           :sente-event [:datasets/get-examples-page {:module-id module-id
@@ -411,15 +412,21 @@
                                                      :pagination nil}]
           :enabled? (boolean (and module-id dataset-id))})
 
-        examples (let [examples-data examples-data ;; Use examples-data from the examples query
-                       raw-examples (get examples-data :examples)
-                       ;; Extract both UUID and data, adding the UUID as :example-id
+        ;; Rename destructured keys for clarity
+        {examples-response :data, examples-loading? :loading?, examples-error :error, examples-refetch :refetch} examples-query
+
+        ;; 3. Use the correctly named variables
+        dataset dataset-props ;; Correctly assign dataset properties
+
+        examples (let [raw-examples (get examples-response :examples) ;; Use renamed response
                        extracted-examples (mapv (fn [[uuid example-data]]
                                                   (assoc example-data :example-id uuid))
                                                 raw-examples)]
                    extracted-examples)
 
-        ;; Filter examples based on search query
+        ;; --- END OF FIX ---
+
+        ;; Filter examples based on search query (logic remains the same)
         filtered-examples (if (str/blank? search-query)
                             examples
                             (filter (fn [example]
@@ -430,16 +437,13 @@
                                         (or (str/includes? (str/lower-case input-str) search-lower)
                                             (str/includes? (str/lower-case output-str) search-lower)
                                             (str/includes? (str/lower-case tags-str) search-lower))))
-                                    examples))
-
-                dataset data  ;; Dataset properties come from the first query's data
-                ]
+                                    examples))]
 
     ($ :div.h-full.flex.flex-col
        (cond
-         loading? ($ :div.p-6 "Loading dataset details...")
-         error ($ :div.p-6 "Error: " error)
-         dataset
+         props-loading? ($ :div.p-6 "Loading dataset details...") ;; Use props-loading?
+         props-error ($ :div.p-6 "Error: " props-error) ;; Use props-error
+         dataset ;; This will now correctly be the props data object
          ($ :div.h-full.flex.flex-col
             ;; Header Bar
             ($ :div.bg-white.border-b.border-gray-200.px-6.py-4
@@ -457,8 +461,7 @@
 
                   ;; Right side - Controls
                   ($ :div.flex.items-center.space-x-4
-                     ;; Snapshot input
-                                          ;; Snapshot select
+                     ;; Snapshot select
                      ($ :div.flex.items-center.space-x-2
                         ($ :label.text-sm.font-medium.text-gray-700 "Snapshot:")
                         ($ :select {:className "px-3 py-1 border border-gray-300 rounded-md text-sm w-32"
@@ -483,7 +486,7 @@
                                                      :component ($ AddExampleForm {:module-id module-id
                                                                                    :dataset-id dataset-id
                                                                                    :snapshot-name snapshot-name
-                                                                                   :on-success refetch-examples})}])}
+                                                                                   :on-success examples-refetch})}])} ;; Use examples-refetch
                         ($ PlusIcon {:className "h-4 w-4 mr-2"})
                         "Add Example"))))
 
@@ -532,10 +535,10 @@
                   ;; Examples content
                   ($ :div.flex-1.overflow-hidden
                      (cond
-                       loading-examples? ($ :div.flex.items-center.justify-center.h-full
+                       examples-loading? ($ :div.flex.items-center.justify-center.h-full ;; Use examples-loading?
                                             ($ :div "Loading examples..."))
-                       error-examples? ($ :div.flex.items-center.justify-center.h-full
-                                          ($ :div.text-red-500 "Error loading examples."))
+                       examples-error ($ :div.flex.items-center.justify-center.h-full ;; Use examples-error
+                                         ($ :div.text-red-500 "Error loading examples."))
                        (empty? examples) ($ :div.flex.items-center.justify-center.h-full
                                             ($ :div.text-center.text-gray-500
                                                ($ :p "No examples yet.")
