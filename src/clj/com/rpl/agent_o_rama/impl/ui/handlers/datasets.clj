@@ -90,3 +90,31 @@
         ;; The validation error from `add-dataset-example!` will be in the cause.
         (let [cause (.getCause e)]
           (throw (ex-info (or (and cause (.getMessage cause)) (.getMessage e)) {})))))))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-snapshot-names
+  [{:keys [module-id dataset-id]} uid]
+  (let [decoded-module-id (common/url-decode module-id)
+        manager (common/get-manager decoded-module-id)
+        datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
+    (queries/get-dataset-snapshot-names datasets-pstate (UUID/fromString dataset-id))))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/create-snapshot
+  [{:keys [module-id dataset-id from-snapshot-name to-snapshot-name]} uid]
+  (let [decoded-module-id (common/url-decode module-id)
+        manager (common/get-manager decoded-module-id)
+        from-name (when-not (str/blank? from-snapshot-name) from-snapshot-name)]
+    (try
+      (aor/snapshot-dataset! manager (UUID/fromString dataset-id) from-name to-snapshot-name)
+      {:status :ok}
+      (catch Exception e
+        (throw (ex-info (-> e .getCause .getMessage) {}))))))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/delete-snapshot
+  [{:keys [module-id dataset-id snapshot-name]} uid]
+  (let [decoded-module-id (common/url-decode module-id)
+        manager (common/get-manager decoded-module-id)]
+    (try
+      (aor/remove-dataset-snapshot! manager (UUID/fromString dataset-id) snapshot-name)
+      {:status :ok}
+      (catch Exception e
+        (throw (ex-info (-> e .getCause .getMessage) {}))))))

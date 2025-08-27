@@ -260,6 +260,96 @@
                  (when submitting? ($ common/spinner {:size :medium}))
                  "Add Example")))))))
 
+(defui CreateSnapshotForm [{:keys [module-id dataset-id from-snapshot-name on-success]}]
+  (let [[to-name set-to-name] (uix/use-state "")
+        [submitting? set-submitting] (uix/use-state false)
+        [error-msg set-error-msg] (uix/use-state nil)
+
+        handle-create (fn []
+                        (set-submitting true)
+                        (set-error-msg nil)
+                        (sente/request!
+                         [:datasets/create-snapshot {:module-id module-id
+                                                     :dataset-id dataset-id
+                                                     :from-snapshot-name from-snapshot-name
+                                                     :to-snapshot-name to-name}]
+                         10000
+                         (fn [reply]
+                           (set-submitting false)
+                           (if (:success reply)
+                             (do (state/dispatch [:modal/hide])
+                                 (on-success))
+                             (set-error-msg (:error reply))))))]
+    ($ :div
+       ($ :div.space-y-4
+          ($ :div
+             ($ :label.block.text-sm.font-medium.text-gray-700 "Source Snapshot")
+             ($ :p.mt-1.text-sm.text-gray-500.bg-gray-100.p-2.rounded-md
+                (if (str/blank? from-snapshot-name) "Latest (Working Copy)" from-snapshot-name)))
+          ($ :div
+             ($ :label.block.text-sm.font-medium.text-gray-700 "New Snapshot Name *")
+             ($ :input {:className "w-full p-3 border rounded-md"
+                        :type "text" :value to-name :required true
+                        :onChange #(set-to-name (.. % -target -value))})))
+       (when error-msg
+         ($ :div.mt-4.p-3.bg-red-50.border.border-red-200.rounded-md
+            ($ :p.text-sm.text-red-700.whitespace-pre-wrap error-msg)))
+       ($ :div.mt-6.flex.justify-end.gap-3
+          ($ :button.px-4.py-2.border.rounded-md {:type "button" :onClick #(state/dispatch [:modal/hide])} "Cancel")
+          (let [is-disabled? (or submitting? (str/blank? to-name))]
+            ($ :button {:type "button" :disabled is-disabled? :onClick handle-create
+                        :className (str "px-4 py-2 rounded-md flex items-center "
+                                        (if is-disabled? "bg-gray-300 cursor-not-allowed" "bg-blue-600 text-white hover:bg-blue-700"))}
+               (when submitting? ($ common/spinner {:size :medium})) "Create"))))))
+
+(defui SnapshotManager [{:keys [module-id dataset-id selected-snapshot set-selected-snapshot]}]
+  (let [{:keys [data loading? error refetch]}
+        (queries/use-sente-query
+         {:query-key [:snapshot-names module-id dataset-id]
+          :sente-event [:datasets/get-snapshot-names {:module-id module-id :dataset-id dataset-id}]
+          :enabled? (boolean (and module-id dataset-id))})
+
+        snapshot-names (or (sort data) [])
+
+        handle-create (fn []
+                        (state/dispatch [:modal/show :create-snapshot
+                                         {:title "Create New Snapshot"
+                                          :component ($ CreateSnapshotForm
+                                                        {:module-id module-id
+                                                         :dataset-id dataset-id
+                                                         :from-snapshot-name selected-snapshot
+                                                         :on-success refetch})}]))
+
+        handle-delete (fn []
+                        (when (js/confirm (str "Are you sure you want to delete snapshot '" selected-snapshot "'?"))
+                          (sente/request!
+                           [:datasets/delete-snapshot {:module-id module-id :dataset-id dataset-id :snapshot-name selected-snapshot}]
+                           10000
+                           (fn [reply]
+                             (if (:success reply)
+                               (do
+                                 (set-selected-snapshot "") ;; Reset view to latest
+                                 (refetch)) ;; Refetch the list
+                               (js/alert (str "Error deleting snapshot: " (:error reply))))))))]
+    ($ :div.flex.items-center.space-x-4
+       ($ :div.flex.items-center.space-x-2
+          ($ :label.text-sm.font-medium.text-gray-700 "Snapshot:")
+          ($ :select {:className "px-3 py-1 border border-gray-300 rounded-md text-sm w-48"
+                      :value selected-snapshot
+                      :disabled loading?
+                      :onChange #(set-selected-snapshot (.. % -target -value))}
+             ($ :option {:value ""} "Latest (Working Copy)")
+             (when error ($ :option {:disabled true} "Error loading..."))
+             (for [name snapshot-names]
+               ($ :option {:key name :value name} name))))
+       ($ :button {:className "px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-md"
+                   :onClick handle-create}
+          "+ Create Snapshot")
+       (when-not (str/blank? selected-snapshot)
+         ($ :button {:className "px-3 py-1 text-sm bg-red-100 text-red-700 hover:bg-red-200 rounded-md"
+                     :onClick handle-delete}
+            "🗑️ Delete")))))
+
 (defui ExamplesList [{:keys [examples]}]
   (let [[open-dropdown set-open-dropdown] (uix/use-state nil)]
 
@@ -457,7 +547,7 @@
 
         ;; State for selected snapshot and search
         ;; State for selected snapshot and info panel
-        [snapshot-name set-snapshot-name] (uix/use-state "")
+        [selected-snapshot-name set-selected-snapshot-name] (uix/use-state "")
         [show-info? set-show-info] (uix/use-state false)
 
         ;; --- START OF FIX ---
@@ -475,10 +565,10 @@
         ;; 2. Fetch examples, also RENAMING keys
         {:keys [data loading? error refetch] :as examples-query}
         (queries/use-sente-query
-         {:query-key [:dataset-examples module-id dataset-id snapshot-name]
+         {:query-key [:dataset-examples module-id dataset-id selected-snapshot-name]
           :sente-event [:datasets/get-examples-page {:module-id module-id
                                                      :dataset-id dataset-id
-                                                     :snapshot-name snapshot-name
+                                                     :snapshot-name selected-snapshot-name
                                                      :pagination nil}]
           :enabled? (boolean (and module-id dataset-id))})
 
@@ -523,24 +613,21 @@
                   ;; Right side - Controls
                   ($ :div.flex.items-center.space-x-4
                      ;; Snapshot select
-                     ($ :div.flex.items-center.space-x-2
-                        ($ :label.text-sm.font-medium.text-gray-700 "Snapshot:")
-                        ($ :select {:className "px-3 py-1 border border-gray-300 rounded-md text-sm w-32"
-                                    :value snapshot-name
-                                    :onChange #(set-snapshot-name (.. % -target -value))}
-                           ($ :option {:value ""} "latest")
-                           ;; TODO: Add actual snapshots from dataset
-                           ))
+                     ;; SNAPSHOT MANAGER
+                     ($ SnapshotManager {:module-id module-id
+                                         :dataset-id dataset-id
+                                         :selected-snapshot selected-snapshot-name
+                                         :set-selected-snapshot set-selected-snapshot-name})
 
                      ;; Search bar
 
 ;; Add Example button
                      ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer
                         {:onClick #(state/dispatch [:modal/show :add-example
-                                                    {:title "Add New Example"
+                                                    {:title (str "Add Example to '" (if (str/blank? selected-snapshot-name) "Latest" selected-snapshot-name) "'")
                                                      :component ($ AddExampleForm {:module-id module-id
                                                                                    :dataset-id dataset-id
-                                                                                   :snapshot-name snapshot-name
+                                                                                   :snapshot-name selected-snapshot-name
                                                                                    :on-success examples-refetch})}])} ;; Use examples-refetch
                         ($ PlusIcon {:className "h-4 w-4 mr-2"})
                         "Add Example"))))
