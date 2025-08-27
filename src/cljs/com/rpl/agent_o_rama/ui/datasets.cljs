@@ -197,6 +197,99 @@
                  (when submitting? ($ common/spinner {:size :medium}))
                  "Save Changes")))))))
 
+(defui AddExampleForm [{:keys [module-id dataset-id snapshot-name on-success]}]
+  (let [[input set-input] (uix/use-state "")
+        [output set-output] (uix/use-state "")
+        [submitting? set-submitting] (uix/use-state false)
+        [error-msg set-error-msg] (uix/use-state nil)]
+
+    (letfn [(handle-add []
+              (set-submitting true)
+              (set-error-msg nil)
+
+              ;; Client-side JSON validation for quick feedback
+              (try
+                (when-not (str/blank? input) (js/JSON.parse input))
+                (when-not (str/blank? output) (js/JSON.parse output))
+                ;; If parsing succeeds, send to server
+                (sente/request!
+                 [:datasets/add-example {:module-id module-id
+                                         :dataset-id dataset-id
+                                         :snapshot-name snapshot-name
+                                         :input input
+                                         :output output}]
+                 10000
+                 (fn [reply]
+                   (set-submitting false)
+                   (if (:success reply)
+                     (do (state/dispatch [:modal/hide]) (on-success))
+                     (set-error-msg (or (:error reply) "An unknown server error occurred.")))))
+                (catch js/Error e
+                  (set-submitting false)
+                  (set-error-msg (str "Invalid JSON: " (.-message e))))))]
+      ($ :div
+         ($ :div.space-y-4
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700 "Input (JSON)")
+               ($ :textarea {:className "w-full h-48 p-3 border rounded-md font-mono text-sm resize-y"
+                             :value input
+                             :placeholder "Enter input as a valid JSON object..."
+                             :onChange #(set-input (.. % -target -value))}))
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700 "Reference Output (JSON, Optional)")
+               ($ :textarea {:className "w-full h-48 p-3 border rounded-md font-mono text-sm resize-y"
+                             :value output
+                             :placeholder "Enter reference output as valid JSON..."
+                             :onChange #(set-output (.. % -target -value))})))
+
+         (when error-msg
+           ($ :div.mt-4.p-3.bg-red-50.border.border-red-200.rounded-md
+              ($ :p.text-sm.text-red-700.whitespace-pre-wrap error-msg)))
+
+         ($ :div.mt-6.flex.justify-end.gap-3
+            ($ :button.px-4.py-2.border.rounded-md.text-sm {:type "button" :onClick #(state/dispatch [:modal/hide])} "Cancel")
+            (let [is-disabled? (or submitting? (str/blank? input))]
+              ($ :button {:type "button"
+                          :disabled is-disabled?
+                          :onClick handle-add
+                          :className (str "px-4 py-2 border rounded-md text-sm font-medium flex items-center cursor-pointer "
+                                          (if is-disabled? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                              "bg-blue-600 text-white hover:bg-blue-700"))}
+                 (when submitting? ($ common/spinner {:size :medium}))
+                 "Add Example")))))))
+
+(defui ExamplesList [{:keys [examples]}]
+  ($ :div.mt-4.border.rounded-lg.overflow-hidden
+     ($ :table.min-w-full.divide-y.divide-gray-200
+        ($ :thead.bg-gray-50
+           ($ :tr
+              ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Input")
+              ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Output")
+              ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Tags")
+              ($ :th.relative.px-6.py-3)))
+        ($ :tbody.bg-white.divide-y.divide-gray-200
+           (for [example examples]
+             ($ :tr {:key (:example-id example)}
+                ($ :td.px-6.py-4.whitespace-nowrap.text-sm.font-mono
+                   (let [input-str (if (string? (:input example))
+                                     (:input example)
+                                     (js/JSON.stringify (clj->js (:input example)) nil 2))
+                         truncated (if (> (count input-str) 100)
+                                     (str (subs input-str 0 97) "...")
+                                     input-str)]
+                     ($ :span {:title input-str :className "cursor-help"} truncated)))
+                ($ :td.px-6.py-4.whitespace-nowrap.text-sm.font-mono
+                   (let [output-str (if (string? (:reference-output example))
+                                      (:reference-output example)
+                                      (js/JSON.stringify (clj->js (:reference-output example)) nil 2))
+                         truncated (if (> (count output-str) 100)
+                                     (str (subs output-str 0 97) "...")
+                                     output-str)]
+                     ($ :span {:title output-str :className "cursor-help"} (or truncated "—"))))
+                ($ :td.px-6.py-4.whitespace-nowrap.text-sm.text-gray-500 (str (:tags example)))
+                ($ :td.px-6.py-4.whitespace-nowrap.text-right.text-sm.font-medium
+                   ($ :button.text-indigo-600.hover:text-indigo-900 "Edit"))))))))
+
 (defn get-dataset-path [module-id dataset-id]
   (rfe/href :module/dataset-detail
             {:module-id (common/url-encode module-id)
@@ -292,12 +385,27 @@
         {:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
         decoded-module-id (when module-id (common/url-decode module-id))
 
+        ;; State for selected snapshot (moved to top level)
+        [snapshot-name set-snapshot-name] (uix/use-state "")
+
         ;; Fetch dataset properties
         {:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:dataset-props module-id dataset-id]
           :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
-          :enabled? (boolean (and module-id dataset-id))})]
+          :enabled? (boolean (and module-id dataset-id))})
+
+        ;; Query for examples for the selected dataset and snapshot (moved to top level)
+        {:keys [data-examples loading-examples? error-examples? refetch-examples]}
+        (queries/use-sente-query
+         {:query-key [:dataset-examples module-id dataset-id snapshot-name]
+          :sente-event [:datasets/get-examples-page {:module-id module-id
+                                                     :dataset-id dataset-id
+                                                     :snapshot-name snapshot-name
+                                                     :pagination nil}]
+          :enabled? (boolean (and module-id dataset-id))})
+
+        examples (vals (get data-examples :examples))]
 
     ($ :div.p-6
        (cond
@@ -339,10 +447,30 @@
                                 {:className "border-gray-300"}
                                 "No output schema defined")))))))
 
-              ;; Placeholder for snapshots and examples
+              ;; Snapshots and examples section
               ($ :div.mt-8.space-y-8
                  ($ :div.bg-gray-50.p-4.rounded-lg "Snapshots section coming soon...")
-                 ($ :div.bg-gray-50.p-4.rounded-lg "Examples section coming soon..."))))
+
+                 ;; Examples section
+                 ($ :div
+                    ($ :div.flex.justify-between.items-center
+                       ($ :h2.text-lg.font-semibold.text-gray-900 "Examples")
+                       ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer
+                          {:onClick #(state/dispatch [:modal/show :add-example
+                                                      {:title "Add New Example"
+                                                       :component ($ AddExampleForm {:module-id module-id
+                                                                                     :dataset-id dataset-id
+                                                                                     :snapshot-name snapshot-name
+                                                                                     :on-success refetch-examples})}])}
+                          ($ PlusIcon {:className "h-4 w-4 mr-2"})
+                          "Add Example"))
+
+                    (cond
+                      loading-examples? ($ :div.mt-4.text-center "Loading examples...")
+                      error-examples? ($ :div.mt-4.text-center.text-red-500 "Error loading examples.")
+                      (empty? examples) ($ :div.mt-4.text-center.p-6.border.rounded-md.bg-gray-50.text-gray-500
+                                           "No examples yet. Click 'Add Example' to start.")
+                      :else ($ ExamplesList {:examples examples}))))))
          :else ($ :div "No data available.")))))
 
 ;; =============================================================================

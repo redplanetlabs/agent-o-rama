@@ -4,7 +4,8 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
    [com.rpl.agent-o-rama.impl.queries :as queries]
-   [clojure.string :as str])
+   [clojure.string :as str]
+   [jsonista.core :as j])
   (:import [java.util UUID])
   (:use [com.rpl.rama]))
 
@@ -55,3 +56,37 @@
         manager (common/get-manager decoded-module-id)]
     (aor/destroy-dataset! manager dataset-id)
     {:status :ok}))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-examples-page
+  [{:keys [module-id dataset-id snapshot-name pagination]} uid]
+  (let [decoded-module-id (common/url-decode module-id)
+        manager (common/get-manager decoded-module-id)
+        datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
+    (queries/get-dataset-examples-page
+     datasets-pstate
+     (UUID/fromString dataset-id)
+     (when-not (str/blank? snapshot-name) snapshot-name)
+     100 ;; Page size
+     (:pagination-params pagination))))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-example
+  [{:keys [module-id dataset-id snapshot-name input output]} uid]
+  (let [decoded-module-id (common/url-decode module-id)
+        manager (common/get-manager decoded-module-id)]
+    (try
+      ;; Input/Output from the UI will be JSON strings. We must parse them.
+      (let [parsed-input (when-not (str/blank? input) (j/read-value input))
+            parsed-output (when-not (str/blank? output) (j/read-value output))]
+        (aor/add-dataset-example! manager
+                                  (UUID/fromString dataset-id)
+                                  parsed-input
+                                  {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)
+                                   :reference-output parsed-output})
+        {:status :ok})
+      (catch com.fasterxml.jackson.core.JsonParseException e
+        (throw (ex-info (str "Invalid JSON provided: " (.getOriginalMessage e))
+                        {:field (if (str/includes? (.getMessage e) "input") :input :output)})))
+      (catch Exception e
+        ;; The validation error from `add-dataset-example!` will be in the cause.
+        (let [cause (.getCause e)]
+          (throw (ex-info (or (and cause (.getMessage cause)) (.getMessage e)) {})))))))
