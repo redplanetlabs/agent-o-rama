@@ -53,10 +53,10 @@
 ;; A more robust default handler
 (defmethod -event-msg-handler :default [_])
 
-(defmethod -event-msg-handler :chsk/ws-ping [_])
-(defmethod -event-msg-handler :chsk/ws-pong [_])
-(defmethod -event-msg-handler :chsk/uidport-open [_])
-(defmethod -event-msg-handler :chsk/uidport-close [_])
+(defmethod -event-msg-handler :chsk/ws-ping [_ _])
+(defmethod -event-msg-handler :chsk/ws-pong [_ _])
+(defmethod -event-msg-handler :chsk/uidport-open [_ _])
+(defmethod -event-msg-handler :chsk/uidport-close [_ _])
 
 (defonce router_ (atom nil))
 
