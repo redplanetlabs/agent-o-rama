@@ -385,18 +385,22 @@
         {:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
         decoded-module-id (when module-id (common/url-decode module-id))
 
-        ;; State for selected snapshot (moved to top level)
+        ;; State for selected snapshot and search
         [snapshot-name set-snapshot-name] (uix/use-state "")
+        [search-query set-search-query] (uix/use-state "")
+        [show-info? set-show-info] (uix/use-state false)
 
         ;; Fetch dataset properties
                 ;; Fetch dataset properties
-        {:keys [data dataset-data loading? error]}
+                ;; Fetch dataset properties
+        {:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:dataset-props module-id dataset-id]
           :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
 
         ;; Query for examples for the selected dataset and snapshot (moved to top level)
+                ;; Query for examples for the selected dataset and snapshot (moved to top level)
                 ;; Query for examples for the selected dataset and snapshot (moved to top level)
         {:keys [data examples-data loading-examples? error-examples? refetch-examples] :as examples-query}
         (queries/use-sente-query
@@ -407,79 +411,142 @@
                                                      :pagination nil}]
           :enabled? (boolean (and module-id dataset-id))})
 
-        examples (let [examples-data data ;; Use 'data' from the examples query
+        examples (let [examples-data examples-data ;; Use examples-data from the examples query
                        raw-examples (get examples-data :examples)
                        ;; Extract both UUID and data, adding the UUID as :example-id
                        extracted-examples (mapv (fn [[uuid example-data]]
                                                   (assoc example-data :example-id uuid))
                                                 raw-examples)]
-                   extracted-examples)]
+                   extracted-examples)
 
-    ($ :div.p-6
+        ;; Filter examples based on search query
+        filtered-examples (if (str/blank? search-query)
+                            examples
+                            (filter (fn [example]
+                                      (let [input-str (str (:input example))
+                                            output-str (str (:reference-output example))
+                                            tags-str (str (:tags example))
+                                            search-lower (str/lower-case search-query)]
+                                        (or (str/includes? (str/lower-case input-str) search-lower)
+                                            (str/includes? (str/lower-case output-str) search-lower)
+                                            (str/includes? (str/lower-case tags-str) search-lower))))
+                                    examples))
+
+                dataset data  ;; Dataset properties come from the first query's data
+                ]
+
+    ($ :div.h-full.flex.flex-col
        (cond
-         loading? ($ :div "Loading dataset details...")
-         error ($ :div "Error: " error)
-         data
-         (let [dataset data]
-           ($ :div
-              ;; Header (now view-only)
-              ($ :div.mb-6
-                 ($ :h1.text-2xl.font-bold.text-gray-900 (:name dataset))
-                 ($ :p.text-sm.text-gray-600.mt-1 (or (:description dataset) "No description.")))
+         loading? ($ :div.p-6 "Loading dataset details...")
+         error ($ :div.p-6 "Error: " error)
+         dataset
+         ($ :div.h-full.flex.flex-col
+            ;; Header Bar
+            ($ :div.bg-white.border-b.border-gray-200.px-6.py-4
+               ($ :div.flex.items-center.justify-between
+                  ;; Left side - Title and info
+                  ($ :div.flex.items-center.space-x-4
+                     ($ :h1.text-2xl.font-bold.text-gray-900 (:name dataset))
+                     ;; Info button
+                     ($ :button.p-2.text-gray-400.hover:text-gray-600.rounded-full.hover:bg-gray-100
+                        {:onClick #(set-show-info (not show-info?))
+                         :title "Dataset Information"}
+                        ($ :svg {:className "h-5 w-5" :fill "none" :viewBox "0 0 24 24" :stroke "currentColor"}
+                           ($ :path {:strokeLinecap "round" :strokeLinejoin "round" :strokeWidth 2
+                                     :d "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"}))))
 
-              ($ :div.mt-8
-                 ($ :h2.text-lg.font-semibold.text-gray-900.mb-4 "JSON Schemas")
-                 (let [input-schema (:input-json-schema dataset)
-                       output-schema (:output-json-schema dataset)]
-                   (if (and (nil? input-schema) (nil? output-schema))
-                     ($ :div.p-6.border.rounded-md.bg-gray-50.text-gray-500.text-center
-                        {:className "border-gray-300"}
-                        "No schemas defined")
-                     ($ :div.grid.grid-cols-2.gap-6
-                        ($ :div.overflow-x-scroll
-                           ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Input Schema")
-                           (if input-schema
-                             ($ :pre.w-full.h-80.p-3.border.rounded-md.font-mono.text-sm.bg-gray-50.overflow-auto.text-gray-800
-                                {:className "border-gray-300"}
-                                (pretty-print-json input-schema))
-                             ($ :div.w-full.h-80.p-3.border.rounded-md.bg-gray-50.text-gray-500.text-sm.flex.items-center.justify-center
-                                {:className "border-gray-300"}
-                                "No input schema defined")))
-                        ($ :div.overflow-x-scroll
-                           ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Output Schema")
-                           (if output-schema
-                             ($ :pre.w-full.h-80.p-3.border.rounded-md.font-mono.text-sm.bg-gray-50.overflow-auto.text-gray-800
-                                {:className "border-gray-300"}
-                                (pretty-print-json output-schema))
-                             ($ :div.w-full.h-80.p-3.border.rounded-md.bg-gray-50.text-gray-500.text-sm.flex.items-center.justify-center
-                                {:className "border-gray-300"}
-                                "No output schema defined")))))))
+                  ;; Right side - Controls
+                  ($ :div.flex.items-center.space-x-4
+                     ;; Snapshot input
+                                          ;; Snapshot select
+                     ($ :div.flex.items-center.space-x-2
+                        ($ :label.text-sm.font-medium.text-gray-700 "Snapshot:")
+                        ($ :select {:className "px-3 py-1 border border-gray-300 rounded-md text-sm w-32"
+                                    :value snapshot-name
+                                    :onChange #(set-snapshot-name (.. % -target -value))}
+                           ($ :option {:value ""} "latest")
+                           ;; TODO: Add actual snapshots from dataset
+                           ))
 
-              ;; Snapshots and examples section
-              ($ :div.mt-8.space-y-8
-                 ($ :div.bg-gray-50.p-4.rounded-lg "Snapshots section coming soon...")
+                     ;; Search bar
+                     ($ :div.flex.items-center.space-x-2
+                        ($ :input {:className "px-3 py-1 border border-gray-300 rounded-md text-sm w-64"
+                                   :type "text"
+                                   :value search-query
+                                   :placeholder "Search examples..."
+                                   :onChange #(set-search-query (.. % -target -value))}))
 
-                 ;; Examples section
-                 ($ :div
-                    ($ :div.flex.justify-between.items-center
-                       ($ :h2.text-lg.font-semibold.text-gray-900 "Examples")
-                       ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700
-                          {:onClick #(state/dispatch [:modal/show :add-example
-                                                      {:title "Add New Example"
-                                                       :component ($ AddExampleForm {:module-id module-id
-                                                                                     :dataset-id dataset-id
-                                                                                     :snapshot-name snapshot-name
-                                                                                     :on-success refetch-examples})}])}
-                          ($ PlusIcon {:className "h-4 w-4 mr-2"})
-                          "Add Example"))
+                     ;; Add Example button
+                     ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700
+                        {:onClick #(state/dispatch [:modal/show :add-example
+                                                    {:title "Add New Example"
+                                                     :component ($ AddExampleForm {:module-id module-id
+                                                                                   :dataset-id dataset-id
+                                                                                   :snapshot-name snapshot-name
+                                                                                   :on-success refetch-examples})}])}
+                        ($ PlusIcon {:className "h-4 w-4 mr-2"})
+                        "Add Example"))))
 
-                    (cond
-                      loading-examples? ($ :div.mt-4.text-center "Loading examples...")
-                      error-examples? ($ :div.mt-4.text-center.text-red-500 "Error loading examples.")
-                      (empty? examples) ($ :div.mt-4.text-center.p-6.border.rounded-md.bg-gray-50.text-gray-500
-                                           "No examples yet. Click 'Add Example' to start.")
-                      :else ($ ExamplesList {:examples examples}))))))
-         :else ($ :div "No data available.")))))
+            ;; Info Panel (collapsible)
+            (when show-info?
+              ($ :div.bg-blue-50.border-b.border-blue-200.px-6.py-4
+                 ($ :div.space-y-4
+                    ;; Description
+                    (when (:description dataset)
+                      ($ :div
+                         ($ :h3.text-sm.font-medium.text-blue-900 "Description")
+                         ($ :p.text-sm.text-blue-700.mt-1 (:description dataset))))
+
+                    ;; Schemas
+                    (let [input-schema (:input-json-schema dataset)
+                          output-schema (:output-json-schema dataset)]
+                      (when (or input-schema output-schema)
+                        ($ :div
+                           ($ :h3.text-sm.font-medium.text-blue-900 "Schemas")
+                           ($ :div.grid.grid-cols-2.gap-4.mt-2
+                              (when input-schema
+                                ($ :div
+                                   ($ :h4.text-xs.font-medium.text-blue-800.mb-1 "Input Schema")
+                                   ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-32.text-blue-800
+                                      (pretty-print-json input-schema))))
+                              (when output-schema
+                                ($ :div
+                                   ($ :h4.text-xs.font-medium.text-blue-800.mb-1 "Output Schema")
+                                   ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-32.text-blue-800
+                                      (pretty-print-json output-schema)))))))))))
+
+            ;; Examples Section (main content)
+            ($ :div.flex-1.overflow-hidden.p-6
+               ($ :div.h-full.flex.flex-col
+                  ;; Examples header with count
+                  ($ :div.flex.items-center.justify-between.mb-4
+                     ($ :h2.text-lg.font-semibold.text-gray-900
+                        (str "Examples (" (count filtered-examples)
+                             (when (not= (count filtered-examples) (count examples))
+                               (str " of " (count examples))) ")"))
+                     (when (and (not (str/blank? search-query)) (not= (count filtered-examples) (count examples)))
+                       ($ :button.text-sm.text-gray-500.hover:text-gray-700
+                          {:onClick #(set-search-query "")}
+                          "Clear search")))
+
+                  ;; Examples content
+                  ($ :div.flex-1.overflow-hidden
+                     (cond
+                       loading-examples? ($ :div.flex.items-center.justify-center.h-full
+                                            ($ :div "Loading examples..."))
+                       error-examples? ($ :div.flex.items-center.justify-center.h-full
+                                          ($ :div.text-red-500 "Error loading examples."))
+                       (empty? examples) ($ :div.flex.items-center.justify-center.h-full
+                                            ($ :div.text-center.text-gray-500
+                                               ($ :p "No examples yet.")
+                                               ($ :p.text-sm.mt-1 "Click 'Add Example' to get started.")))
+                       (empty? filtered-examples) ($ :div.flex.items-center.justify-center.h-full
+                                                     ($ :div.text-center.text-gray-500
+                                                        ($ :p "No examples match your search.")
+                                                        ($ :p.text-sm.mt-1 "Try a different search term.")))
+                       :else ($ :div.h-full.overflow-auto
+                                ($ ExamplesList {:examples filtered-examples})))))))
+         :else ($ :div.p-6 "No data available.")))))
 
 ;; =============================================================================
 ;; EXPORTS
