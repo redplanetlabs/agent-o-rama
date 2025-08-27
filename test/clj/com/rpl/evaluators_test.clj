@@ -18,7 +18,12 @@
    [com.rpl.test-common :as tc])
   (:import
    [com.rpl.aortest
-    TestSnippets]))
+    TestSnippets]
+   [dev.langchain4j.data.message
+    AiMessage
+    SystemMessage
+    ToolExecutionResultMessage
+    UserMessage]))
 
 (deftest evaluator-operations-test
   (with-open [ipc (rtest/create-ipc)]
@@ -195,10 +200,63 @@
             (aor/try-evaluator manager "aconcise6" nil nil "......")))
      (is (= {"concise?" false}
             (aor/try-evaluator manager "aconcise6" nil nil ".......")))
-
+     (is (= {"concise?" true}
+            (aor/try-evaluator manager "aconcise6" nil nil nil)))
+     (is
+      (= {"concise?" true}
+         (aor/try-evaluator manager "aconcise6" nil nil (AiMessage. "......"))))
+     (is
+      (=
+       {"concise?" false}
+       (aor/try-evaluator manager "aconcise6" nil nil (AiMessage. "......."))))
+     (is
+      (= {"concise?" true}
+         (aor/try-evaluator manager
+                            "aconcise6"
+                            nil
+                            nil
+                            (SystemMessage. "......"))))
+     (is
+      (=
+       {"concise?" false}
+       (aor/try-evaluator manager
+                          "aconcise6"
+                          nil
+                          nil
+                          (SystemMessage. "......."))))
+     (is
+      (= {"concise?" true}
+         (aor/try-evaluator
+          manager
+          "aconcise6"
+          nil
+          nil
+          (ToolExecutionResultMessage. "id" "name" "......"))))
+     (is
+      (=
+       {"concise?" false}
+       (aor/try-evaluator manager
+                          "aconcise6"
+                          nil
+                          nil
+                          (ToolExecutionResultMessage. "id" "name" "......."))))
+     (is
+      (=
+       {"concise?" true}
+       (aor/try-evaluator manager "aconcise6" nil nil (UserMessage. "......"))))
+     (is
+      (=
+       {"concise?" false}
+       (aor/try-evaluator manager
+                          "aconcise6"
+                          nil
+                          nil
+                          (UserMessage. "......."))))
 
      ;; TODO: <<<<>>>> tests LLM as judge with mock chat model
      ;;  - need output schema converter from langchain4j
      ;;   - can make a mock chat model
+     ;;  - verify the prompt that comes through
+     ;;  - verify parsing of the output
 
     )))

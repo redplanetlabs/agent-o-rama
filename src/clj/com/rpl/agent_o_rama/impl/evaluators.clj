@@ -84,7 +84,8 @@
         (fn [^TextContent tc]
           (-> tc
               .text
-              count))))
+              count))
+        contents))
     )))
 
 (def DEFAULT-LLM-OUTPUT-SCHEMA
