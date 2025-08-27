@@ -170,10 +170,17 @@
      (is (= {"score" 166} (aor/try-evaluator manager "j2" "a" 50 "abcde")))
 
 
-     ;; TODO: <<<<>>>>>
-     ;; - need to verify building/caching on each task is working
-     ;;   - and that if it changes params, it clears the cache
-     ;;     - just make new concise-x
+     ;; verify cache gets reset since params changed
+     (aor/create-evaluator! manager
+                            "x1 def"
+                            "concise-x"
+                            {"len" "2"}
+                            "my eval 3")
+     (is (= {"concise?" true "not-concise?" false}
+            (aor/try-evaluator manager "x1 def" nil nil "..")))
+     (is (= {"concise?" false "not-concise?" true}
+            (aor/try-evaluator manager "x1 def" nil nil "...")))
+
 
 
 
