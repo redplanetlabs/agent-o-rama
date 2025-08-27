@@ -611,7 +611,9 @@
         {:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
         decoded-module-id (when module-id (common/url-decode module-id))
 
-        ;; State for selected snapshot and search
+        ;; State for selected tab
+        [active-tab set-active-tab] (uix/use-state "examples")
+
         ;; State for selected snapshot and info panel
         [selected-snapshot-name set-selected-snapshot-name] (uix/use-state "")
         [show-info? set-show-info] (uix/use-state false)
@@ -664,8 +666,6 @@
                   ;; Left side - Title and info
                   ($ :div.flex.items-center.space-x-4
                      ($ :h1.text-2xl.font-bold.text-gray-900 (:name dataset))
-                     ;; Info button
-                     ;; Info button with conditional chevron
                      ;; Details button with conditional chevron
                      ($ :button.inline-flex.items-center.px-3.py-1.text-sm.text-gray-600.hover:text-gray-800.rounded-md.hover:bg-gray-100.cursor-pointer
                         {:onClick #(set-show-info (not show-info?))
@@ -675,27 +675,8 @@
                           ($ ChevronUpIcon {:className "h-4 w-4"})
                           ($ ChevronDownIcon {:className "h-4 w-4"}))))
 
-                  ;; Right side - Controls
-                  ($ :div.flex.items-center.space-x-4
-                     ;; Snapshot select
-                     ;; SNAPSHOT MANAGER
-                     ($ SnapshotManager {:module-id module-id
-                                         :dataset-id dataset-id
-                                         :selected-snapshot selected-snapshot-name
-                                         :set-selected-snapshot set-selected-snapshot-name})
-
-                     ;; Search bar
-
-;; Add Example button
-                     ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer
-                        {:onClick #(state/dispatch [:modal/show :add-example
-                                                    {:title (str "Add Example to '" (if (str/blank? selected-snapshot-name) "Latest" selected-snapshot-name) "'")
-                                                     :component ($ AddExampleForm {:module-id module-id
-                                                                                   :dataset-id dataset-id
-                                                                                   :snapshot-name selected-snapshot-name
-                                                                                   :on-success examples-refetch})}])} ;; Use examples-refetch
-                        ($ PlusIcon {:className "h-4 w-4 mr-2"})
-                        "Add Example"))))
+                  ;; Right side - removed snapshot manager and add example button
+                  ($ :div.flex.items-center.space-x-4)))
 
             ;; Info Panel (collapsible)
             (when show-info?
@@ -707,7 +688,6 @@
                          ($ :h3.text-sm.font-medium.text-blue-900 "Description")
                          ($ :p.text-sm.text-blue-700.mt-1 (:description dataset))))
 
-                    ;; Schemas
                     ;; Schemas - Always show this section
                     (let [input-schema (:input-json-schema dataset)
                           output-schema (:output-json-schema dataset)]
@@ -731,22 +711,91 @@
                                  ($ :div.text-xs.bg-gray-100.p-2.rounded.text-gray-500.italic
                                     "Schema: nil")))))))))
 
-            ;; Examples Section (main content)
+            ;; Tab Navigation
+            ($ :div.bg-white.border-b.border-gray-200
+               ($ :nav.flex.space-x-8.px-6 {:aria-label "Tabs"}
+                  ;; Experiments Tab
+                  ($ :button.py-4.px-1.border-b-2.font-medium.text-sm.cursor-pointer
+                     {:className (if (= active-tab "experiments")
+                                   "cursor-pointer border-indigo-500 text-indigo-600"
+                                   "cursor-pointer border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300")
+                      :onClick #(set-active-tab "experiments")}
+                     "Experiments")
+
+                  ;; Comparative Experiments Tab
+                  ($ :button.py-4.px-1.border-b-2.font-medium.text-sm.cursor-pointer
+                     {:className (if (= active-tab "comparative-experiments")
+                                   "cursor-pointer border-indigo-500 text-indigo-600"
+                                   "cursor-pointer border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300")
+                      :onClick #(set-active-tab "comparative-experiments")}
+                     "Comparative Experiments")
+
+                  ;; Examples Tab
+                  ($ :button.py-4.px-1.border-b-2.font-medium.text-sm.cursor-pointer
+                     {:className (if (= active-tab "examples")
+                                   "cursor-pointer border-indigo-500 text-indigo-600"
+                                   "cursor-pointer border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300")
+                      :onClick #(set-active-tab "examples")}
+                     "Examples")))
+
+            ;; Tab Content Section (main content)
             ($ :div.flex-1.overflow-hidden
-               ($ :div.h-full.flex.flex-col
-                  ;; Examples content
-                  ($ :div.flex-1.overflow-hidden
-                     (cond
-                       examples-loading? ($ :div.flex.items-center.justify-center.h-full ;; Use examples-loading?
-                                            ($ :div "Loading examples..."))
-                       examples-error ($ :div.flex.items-center.justify-center.h-full ;; Use examples-error
-                                         ($ :div.text-red-500 "Error loading examples."))
-                       (empty? examples) ($ :div.flex.items-center.justify-center.h-full
-                                            ($ :div.text-center.text-gray-500
-                                               ($ :p "No examples yet.")
-                                               ($ :p.text-sm.mt-1 "Click 'Add Example' to get started.")))
-                       :else ($ :div.h-full.overflow-auto
-                                ($ ExamplesList {:examples examples})))))))
+               (case active-tab
+                 "experiments"
+                 ($ :div.flex.items-center.justify-center.h-full
+                    ($ :div.text-center.text-gray-500
+                       ($ :p "Experiments functionality coming soon.")))
+
+                 "comparative-experiments"
+                 ($ :div.flex.items-center.justify-center.h-full
+                    ($ :div.text-center.text-gray-500
+                       ($ :p "Comparative experiments functionality coming soon.")))
+
+                 "examples"
+                 ($ :div.h-full.flex.flex-col
+                    ;; Examples Tab Header with Controls
+                    ($ :div.bg-gray-50.border-b.border-gray-200.px-6.py-4
+                       ($ :div.flex.items-center.justify-between
+                          ;; Left side - Snapshot Manager
+                          ($ :div.flex.items-center.space-x-4
+                             ($ :span.text-sm.font-medium.text-gray-700 "Snapshot:")
+                             ($ SnapshotManager {:module-id module-id
+                                                 :dataset-id dataset-id
+                                                 :selected-snapshot selected-snapshot-name
+                                                 :set-selected-snapshot set-selected-snapshot-name}))
+
+                          ;; Right side - Add Example button
+                          ($ :div.flex.items-center.space-x-4
+                             ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer
+                                {:onClick #(state/dispatch [:modal/show :add-example
+                                                            {:title (str "Add Example to '" (if (str/blank? selected-snapshot-name) "Latest" selected-snapshot-name) "'")
+                                                             :component ($ AddExampleForm {:module-id module-id
+                                                                                           :dataset-id dataset-id
+                                                                                           :snapshot-name selected-snapshot-name
+                                                                                           :on-success examples-refetch})}])}
+                                ($ PlusIcon {:className "h-4 w-4 mr-2"})
+                                "Add Example"))))
+
+                    ;; Examples Content
+                    ($ :div.flex-1.overflow-hidden
+                       ($ :div.h-full.flex.flex-col
+                          ($ :div.flex-1.overflow-hidden
+                             (cond
+                               examples-loading? ($ :div.flex.items-center.justify-center.h-full
+                                                    ($ :div "Loading examples..."))
+                               examples-error ($ :div.flex.items-center.justify-center.h-full
+                                                 ($ :div.text-red-500 "Error loading examples."))
+                               (empty? examples) ($ :div.flex.items-center.justify-center.h-full
+                                                    ($ :div.text-center.text-gray-500
+                                                       ($ :p "No examples yet.")
+                                                       ($ :p.text-sm.mt-1 "Click 'Add Example' to get started.")))
+                               :else ($ :div.h-full.overflow-auto
+                                        ($ ExamplesList {:examples examples})))))))
+
+                 ;; Default case
+                 ($ :div.flex.items-center.justify-center.h-full
+                    ($ :div.text-center.text-gray-500
+                       ($ :p "Unknown tab selected."))))))
          :else ($ :div.p-6 "No data available.")))))
 
 ;; =============================================================================
