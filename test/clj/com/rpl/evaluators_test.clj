@@ -153,16 +153,24 @@
      (is (= {"concise?" false "not-concise?" true}
             (aor/try-evaluator manager "x1 def" nil nil "....")))
 
-     ;; TODO: <<<<>>>> verify input/ref-output passed through
-
-
 
      (aor/remove-evaluator! manager "not-an-eval")
      (aor/remove-evaluator! manager "x1 def")
      (is (= #{"abc2 def"} (aor/search-evaluators manager "def")))
 
+
+     (aor/create-evaluator! manager "j1" "jeb1" {} "my java eval")
+     (aor/create-evaluator! manager
+                            "j2"
+                            "jeb2"
+                            {"foo1" "10" "foo2" "100"}
+                            "my java eval 2")
+
+     (is (= {"score" 56} (aor/try-evaluator manager "j1" "a" 50 "abcde")))
+     (is (= {"score" 166} (aor/try-evaluator manager "j2" "a" 50 "abcde")))
+
+
      ;; TODO: <<<<>>>>>
-     ;; - and java API declareEvaluatorBuilder
      ;; - need to verify building/caching on each task is working
      ;;   - and that if it changes params, it clears the cache
      ;;     - just make new concise-x
