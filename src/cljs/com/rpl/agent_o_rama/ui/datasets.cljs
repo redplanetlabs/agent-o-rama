@@ -373,12 +373,28 @@
 ;; DATASET DETAIL PAGE
 ;; =============================================================================
 
-(defn pretty-print-json [json-str]
-  "Pretty prints a JSON string, falls back to original if parsing fails"
+(defn pretty-print-json [json-data]
+  "Pretty prints JSON data, handling both strings and objects"
   (try
-    (js/JSON.stringify (js/JSON.parse json-str) nil 2)
+    (cond
+      ;; If it's already a string, try to parse and re-stringify it
+      (string? json-data)
+      (js/JSON.stringify (js/JSON.parse json-data) nil 2)
+
+      ;; If it's a JavaScript object or Clojure data, stringify it
+      (some? json-data)
+      (js/JSON.stringify (clj->js json-data) nil 2)
+
+      ;; If it's nil or undefined, return empty string
+      :else "")
     (catch js/Error _
-      json-str)))
+      ;; If parsing fails, try to stringify as-is, or fall back to string representation
+      (try
+        (if (string? json-data)
+          json-data
+          (js/JSON.stringify (clj->js json-data) nil 2))
+        (catch js/Error _
+          (str json-data))))))
 
 (defui dataset-detail []
   (let [;; Get IDs from route
@@ -386,8 +402,8 @@
         decoded-module-id (when module-id (common/url-decode module-id))
 
         ;; State for selected snapshot and search
+        ;; State for selected snapshot and info panel
         [snapshot-name set-snapshot-name] (uix/use-state "")
-        [search-query set-search-query] (uix/use-state "")
         [show-info? set-show-info] (uix/use-state false)
 
         ;; --- START OF FIX ---
@@ -425,19 +441,7 @@
                    extracted-examples)
 
         ;; --- END OF FIX ---
-
-        ;; Filter examples based on search query (logic remains the same)
-        filtered-examples (if (str/blank? search-query)
-                            examples
-                            (filter (fn [example]
-                                      (let [input-str (str (:input example))
-                                            output-str (str (:reference-output example))
-                                            tags-str (str (:tags example))
-                                            search-lower (str/lower-case search-query)]
-                                        (or (str/includes? (str/lower-case input-str) search-lower)
-                                            (str/includes? (str/lower-case output-str) search-lower)
-                                            (str/includes? (str/lower-case tags-str) search-lower))))
-                                    examples))]
+        ]
 
     ($ :div.h-full.flex.flex-col
        (cond
@@ -472,14 +476,8 @@
                            ))
 
                      ;; Search bar
-                     ($ :div.flex.items-center.space-x-2
-                        ($ :input {:className "px-3 py-1 border border-gray-300 rounded-md text-sm w-64"
-                                   :type "text"
-                                   :value search-query
-                                   :placeholder "Search examples..."
-                                   :onChange #(set-search-query (.. % -target -value))}))
 
-                     ;; Add Example button
+;; Add Example button
                      ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700
                         {:onClick #(state/dispatch [:modal/show :add-example
                                                     {:title "Add New Example"
@@ -501,22 +499,28 @@
                          ($ :p.text-sm.text-blue-700.mt-1 (:description dataset))))
 
                     ;; Schemas
+                    ;; Schemas - Always show this section
                     (let [input-schema (:input-json-schema dataset)
                           output-schema (:output-json-schema dataset)]
-                      (when (or input-schema output-schema)
-                        ($ :div
-                           ($ :h3.text-sm.font-medium.text-blue-900 "Schemas")
-                           ($ :div.grid.grid-cols-2.gap-4.mt-2
-                              (when input-schema
-                                ($ :div
-                                   ($ :h4.text-xs.font-medium.text-blue-800.mb-1 "Input Schema")
-                                   ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-32.text-blue-800
-                                      (pretty-print-json input-schema))))
-                              (when output-schema
-                                ($ :div
-                                   ($ :h4.text-xs.font-medium.text-blue-800.mb-1 "Output Schema")
-                                   ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-32.text-blue-800
-                                      (pretty-print-json output-schema)))))))))))
+                      ($ :div
+                         ($ :h3.text-sm.font-medium.text-blue-900 "Schemas")
+                         ($ :div.grid.grid-cols-2.gap-4.mt-2
+                            ;; Input Schema - always show
+                            ($ :div
+                               ($ :h4.text-xs.font-medium.text-blue-800.mb-1 "Input Schema")
+                               (if input-schema
+                                 ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-32.text-blue-800
+                                    (pretty-print-json input-schema))
+                                 ($ :div.text-xs.bg-gray-100.p-2.rounded.text-gray-500.italic
+                                    "Schema: nil")))
+                            ;; Output Schema - always show
+                            ($ :div
+                               ($ :h4.text-xs.font-medium.text-blue-800.mb-1 "Output Schema")
+                               (if output-schema
+                                 ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-32.text-blue-800
+                                    (pretty-print-json output-schema))
+                                 ($ :div.text-xs.bg-gray-100.p-2.rounded.text-gray-500.italic
+                                    "Schema: nil")))))))))
 
             ;; Examples Section (main content)
             ($ :div.flex-1.overflow-hidden.p-6
@@ -524,13 +528,7 @@
                   ;; Examples header with count
                   ($ :div.flex.items-center.justify-between.mb-4
                      ($ :h2.text-lg.font-semibold.text-gray-900
-                        (str "Examples (" (count filtered-examples)
-                             (when (not= (count filtered-examples) (count examples))
-                               (str " of " (count examples))) ")"))
-                     (when (and (not (str/blank? search-query)) (not= (count filtered-examples) (count examples)))
-                       ($ :button.text-sm.text-gray-500.hover:text-gray-700
-                          {:onClick #(set-search-query "")}
-                          "Clear search")))
+                        (str "Examples (" (count examples) ")")))
 
                   ;; Examples content
                   ($ :div.flex-1.overflow-hidden
@@ -543,12 +541,8 @@
                                             ($ :div.text-center.text-gray-500
                                                ($ :p "No examples yet.")
                                                ($ :p.text-sm.mt-1 "Click 'Add Example' to get started.")))
-                       (empty? filtered-examples) ($ :div.flex.items-center.justify-center.h-full
-                                                     ($ :div.text-center.text-gray-500
-                                                        ($ :p "No examples match your search.")
-                                                        ($ :p.text-sm.mt-1 "Try a different search term.")))
                        :else ($ :div.h-full.overflow-auto
-                                ($ ExamplesList {:examples filtered-examples})))))))
+                                ($ ExamplesList {:examples examples})))))))
          :else ($ :div.p-6 "No data available.")))))
 
 ;; =============================================================================
