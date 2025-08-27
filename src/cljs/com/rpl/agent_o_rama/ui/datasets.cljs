@@ -389,14 +389,16 @@
         [snapshot-name set-snapshot-name] (uix/use-state "")
 
         ;; Fetch dataset properties
-        {:keys [data loading? error]}
+                ;; Fetch dataset properties
+        {:keys [data dataset-data loading? error]}
         (queries/use-sente-query
          {:query-key [:dataset-props module-id dataset-id]
           :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
 
         ;; Query for examples for the selected dataset and snapshot (moved to top level)
-        {:keys [data-examples loading-examples? error-examples? refetch-examples]}
+                ;; Query for examples for the selected dataset and snapshot (moved to top level)
+        {:keys [data examples-data loading-examples? error-examples? refetch-examples] :as examples-query}
         (queries/use-sente-query
          {:query-key [:dataset-examples module-id dataset-id snapshot-name]
           :sente-event [:datasets/get-examples-page {:module-id module-id
@@ -405,7 +407,13 @@
                                                      :pagination nil}]
           :enabled? (boolean (and module-id dataset-id))})
 
-        examples (vals (get data-examples :examples))]
+        examples (let [examples-data data ;; Use 'data' from the examples query
+                       raw-examples (get examples-data :examples)
+                       ;; Extract both UUID and data, adding the UUID as :example-id
+                       extracted-examples (mapv (fn [[uuid example-data]]
+                                                  (assoc example-data :example-id uuid))
+                                                raw-examples)]
+                   extracted-examples)]
 
     ($ :div.p-6
        (cond
@@ -455,7 +463,7 @@
                  ($ :div
                     ($ :div.flex.justify-between.items-center
                        ($ :h2.text-lg.font-semibold.text-gray-900 "Examples")
-                       ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer
+                       ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700
                           {:onClick #(state/dispatch [:modal/show :add-example
                                                       {:title "Add New Example"
                                                        :component ($ AddExampleForm {:module-id module-id
