@@ -134,12 +134,15 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
                 (lc4j/chat
                  (lc4j/chat-request
                   [prompt]
-                  {:temperature     temperature
-                   :response-format
-                   (lc4j/json-response-format
-                    "Evaluation"
-                    output-schema
-                   )}))
+                  {:temperature temperature
+                   ;; TODO: <<<<>>>>
+                   ; :response-format
+                   ; (lc4j/json-response-format
+                   ;  "Evaluation"
+                   ;  output-schema
+                   ; )
+
+                  }))
                 .aiMessage
                 .text
                 j/read-value

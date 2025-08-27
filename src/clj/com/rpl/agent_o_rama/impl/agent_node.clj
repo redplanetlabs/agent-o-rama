@@ -168,11 +168,13 @@
 (defn record-nested-op!-impl
   [^AgentNode agent-node nested-op-type start-time-millis finish-time-millis
    info-map]
-  (.recordNestedOp agent-node
-                   (nested-op-type->java nested-op-type)
-                   start-time-millis
-                   finish-time-millis
-                   info-map))
+  ;; can be nil when trying evaluators
+  (when agent-node
+    (.recordNestedOp agent-node
+                     (nested-op-type->java nested-op-type)
+                     start-time-millis
+                     finish-time-millis
+                     info-map)))
 
 (defmacro timed-agent-call
   [expr agent-node-sym agent-info-tuple [res-sym] info-map-expr]

@@ -15,7 +15,8 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.test-common :as tc])
+   [com.rpl.test-common :as tc]
+   [jsonista.core :as j])
   (:import
    [com.rpl.aortest
     TestSnippets]
@@ -23,7 +24,26 @@
     AiMessage
     SystemMessage
     ToolExecutionResultMessage
-    UserMessage]))
+    UserMessage]
+   [dev.langchain4j.model.chat
+    ChatModel]
+   [dev.langchain4j.model.chat.response
+    ChatResponse$Builder]))
+
+(defrecord MockChatModel []
+  ChatModel
+  (doChat [this request]
+    (let [^UserMessage m (-> request
+                             .messages
+                             last)]
+      (-> (ChatResponse$Builder.)
+          (.aiMessage (AiMessage. (j/write-value-as-string
+                                   {"temperature" (.temperature request)
+                                    "message"     (.singleText m)
+                                    ;; TODO: <<<<>>>> add
+                                    ;; responseFormat().jsonSchema() here
+                                   })))
+          .build))))
 
 (deftest evaluator-operations-test
   (with-open [ipc (rtest/create-ipc)]
@@ -31,6 +51,10 @@
      (bind module
        (aor/agentmodule
         [topology]
+        (aor/declare-agent-object-builder
+         topology
+         "my-model"
+         (fn [setup] (->MockChatModel)))
         (aor/declare-evaluator-builder
          topology
          "concise-10"
@@ -253,10 +277,24 @@
                           nil
                           (UserMessage. "......."))))
 
-     ;; TODO: <<<<>>>> tests LLM as judge with mock chat model
-     ;;  - need output schema converter from langchain4j
-     ;;   - can make a mock chat model
-     ;;  - verify the prompt that comes through
-     ;;  - verify parsing of the output
 
+
+     (aor/create-evaluator! manager
+                            "ajudge"
+                            "aor/llm-judge"
+                            {"prompt"
+                             "1 %input 2 %referenceOutput 3 %output 4 %input"
+                             "model"        "my-model"
+                             "temperature"  "1.2"
+                             ;; TODO: <<<<>>>> add output schema
+                             "outputSchema" "{}"
+                            }
+                            "a judge")
+
+     (is (= {"message" "1 AB 2 CD 3 EF 4 AB" "temperature" 1.2}
+            (aor/try-evaluator manager
+                               "ajudge"
+                               "AB"
+                               "CD"
+                               "EF")))
     )))

@@ -12,6 +12,7 @@
    [com.rpl.rama.ops :as ops])
   (:import
    [com.rpl.agentorama.impl
+    AgentDeclaredObjectsTaskGlobal
     AgentNodeExecutorTaskGlobal]
    [clojure.lang
     PersistentQueue]
@@ -491,6 +492,9 @@
                                      name
                                      builder-name
                                      builder-params)]
+          (h/thread-local-set!
+           AgentDeclaredObjectsTaskGlobal/ACQUIRE_TIMEOUT_MILLIS
+           30000)
           (.complete cf
                      ;; TODO: <<<<>>>>
                      ;;  - make this dispatch on type of evaluator
