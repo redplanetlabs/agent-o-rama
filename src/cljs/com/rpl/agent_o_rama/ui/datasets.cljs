@@ -457,12 +457,14 @@
                      ($ :h1.text-2xl.font-bold.text-gray-900 (:name dataset))
                      ;; Info button
                      ;; Info button with conditional chevron
-                     ($ :button.p-2.text-gray-400.hover:text-gray-600.rounded-full.hover:bg-gray-100
+                     ;; Details button with conditional chevron
+                     ($ :button.inline-flex.items-center.px-3.py-1.text-sm.text-gray-600.hover:text-gray-800.rounded-md.hover:bg-gray-100.cursor-pointer
                         {:onClick #(set-show-info (not show-info?))
                          :title (if show-info? "Hide Dataset Information" "Show Dataset Information")}
+                        ($ :span.mr-1 "Details")
                         (if show-info?
-                          ($ ChevronUpIcon {:className "h-5 w-5"})
-                          ($ ChevronDownIcon {:className "h-5 w-5"}))))
+                          ($ ChevronUpIcon {:className "h-4 w-4"})
+                          ($ ChevronDownIcon {:className "h-4 w-4"}))))
 
                   ;; Right side - Controls
                   ($ :div.flex.items-center.space-x-4
