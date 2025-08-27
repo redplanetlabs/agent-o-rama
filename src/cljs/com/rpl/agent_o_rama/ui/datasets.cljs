@@ -302,14 +302,17 @@
                                         (if is-disabled? "bg-gray-300 cursor-not-allowed" "bg-blue-600 text-white hover:bg-blue-700"))}
                (when submitting? ($ common/spinner {:size :medium})) "Create"))))))
 
-(defui DropdownRow [{:keys [label selected? on-select delete-button]}]
-  ($ :button.group.flex.items-center.justify-between.w-full.px-4.py-2.text-sm.hover:bg-gray-100
+(defui DropdownRow [{:keys [label selected? on-select delete-button action? icon]}]
+  ($ :button.group.flex.items-center.justify-between.w-full.px-4.py-2.text-sm.hover:bg-gray-100.cursor-pointer
      {:onClick on-select
-      :className (if selected?
-                   "text-blue-600 bg-blue-50"
-                   "text-gray-700")}
+      :className (cond
+                   action? "text-blue-600 hover:bg-blue-50"
+                   selected? "text-blue-600 bg-blue-50"
+                   :else "text-gray-700")}
      ($ :div.flex.items-center.justify-between.w-full
-        ($ :span.truncate label)
+        ($ :div.flex.items-center
+           (when icon icon)
+           ($ :span.truncate {:className (when icon "ml-3")} label))
         ($ :div.flex.items-center.space-x-2
            (when selected? ($ :span "✓"))
            delete-button))))
@@ -380,7 +383,7 @@
 
           ;; Dropdown menu
           (when dropdown-open?
-            ($ :div.origin-top-right.absolute.right-0.mt-1.w-64.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
+            ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
                {:onClick #(.stopPropagation %)}
                ($ :div.py-1
                   ;; Latest option
