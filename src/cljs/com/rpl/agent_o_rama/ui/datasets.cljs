@@ -302,6 +302,18 @@
                                         (if is-disabled? "bg-gray-300 cursor-not-allowed" "bg-blue-600 text-white hover:bg-blue-700"))}
                (when submitting? ($ common/spinner {:size :medium})) "Create"))))))
 
+(defui DropdownRow [{:keys [label selected? on-select delete-button]}]
+  ($ :button.group.flex.items-center.justify-between.w-full.px-4.py-2.text-sm.hover:bg-gray-100
+     {:onClick on-select
+      :className (if selected?
+                   "text-blue-600 bg-blue-50"
+                   "text-gray-700")}
+     ($ :div.flex.items-center.justify-between.w-full
+        ($ :span.truncate label)
+        ($ :div.flex.items-center.space-x-2
+           (when selected? ($ :span "✓"))
+           delete-button))))
+
 (defui SnapshotManager [{:keys [module-id dataset-id selected-snapshot set-selected-snapshot]}]
   (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
 
@@ -356,10 +368,9 @@
      [dropdown-open?])
 
     ($ :div.flex.items-center.space-x-2
-       ($ :label.text-sm.font-medium.text-gray-700 "Snapshot:")
        ($ :div.relative.inline-block.text-left
           ;; Main dropdown button
-          ($ :button.inline-flex.items-center.justify-between.w-64.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500
+          ($ :button.inline-flex.items-center.justify-between.w-64.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500.cursor-pointer
              {:onClick (fn [e]
                          (.stopPropagation e)
                          (set-dropdown-open (not dropdown-open?)))
@@ -369,46 +380,37 @@
 
           ;; Dropdown menu
           (when dropdown-open?
-            ($ :div.origin-top-right.absolute.right-0.mt-1.w-64.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
+            ($ :div.origin-top-right.absolute.right-0.mt-1.w-64.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
                {:onClick #(.stopPropagation %)}
                ($ :div.py-1
                   ;; Latest option
-                  ($ :button.group.flex.items-center.justify-between.w-full.px-4.py-2.text-sm.hover:bg-gray-100
-                     {:onClick #(handle-select "")
-                      :className (if (str/blank? selected-snapshot)
-                                   "text-blue-600 bg-blue-50"
-                                   "text-gray-700")}
-                     ($ :span "Latest (Working Copy)")
-                     (when (str/blank? selected-snapshot)
-                       ($ :span "✓")))
+                  ($ DropdownRow {:label "Latest (Working Copy)"
+                                  :selected? (str/blank? selected-snapshot)
+                                  :on-select #(handle-select "")
+                                  :delete-button nil})
 
                   ;; Named snapshots
                   (for [name snapshot-names]
-                    ($ :button.group.flex.items-center.justify-between.w-full.px-4.py-2.text-sm.hover:bg-gray-100
-                       {:key name
-                        :onClick #(handle-select name)
-                        :className (if (= selected-snapshot name)
-                                     "text-blue-600 bg-blue-50"
-                                     "text-gray-700")}
-                       ($ :div.flex.items-center.justify-between.w-full
-                          ($ :span.truncate name)
-                          ($ :div.flex.items-center.space-x-2
-                             (when (= selected-snapshot name) ($ :span "✓"))
-                             ($ :button.text-red-600.hover:text-red-800.p-1.rounded.hover:bg-red-100
-                                {:onClick (fn [e]
-                                            (.stopPropagation e)
-                                            (handle-delete name))
-                                 :title (str "Delete " name)}
-                                ($ TrashIcon {:className "h-3 w-3"}))))))
+                    ($ DropdownRow {:key name
+                                    :label name
+                                    :selected? (= selected-snapshot name)
+                                    :on-select #(handle-select name)
+                                    :delete-button ($ :button.text-red-600.hover:text-red-800.p-1.rounded.hover:bg-red-100
+                                                      {:onClick (fn [e]
+                                                                  (.stopPropagation e)
+                                                                  (handle-delete name))
+                                                       :title (str "Delete " name)}
+                                                      ($ TrashIcon {:className "h-3 w-3"}))}))
 
                   ;; Divider
                   ($ :div.border-t.border-gray-100.my-1)
 
                   ;; New snapshot action
-                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-blue-600.hover:bg-blue-50
-                     {:onClick handle-create}
-                     ($ PlusIcon {:className "mr-3 h-4 w-4"})
-                     "New snapshot"))))))))
+                  ($ DropdownRow {:label "New snapshot"
+                                  :action? true
+                                  :on-select handle-create
+                                  :icon ($ PlusIcon {:className "h-4 w-4"})
+                                  :delete-button nil}))))))))
 
 (defui ExamplesList [{:keys [examples]}]
   (let [[open-dropdown set-open-dropdown] (uix/use-state nil)]
