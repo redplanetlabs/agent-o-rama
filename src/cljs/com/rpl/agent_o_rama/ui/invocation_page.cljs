@@ -62,7 +62,7 @@
         handle-execute-fork (fn []
                               (when (not (empty? changed-nodes))
                                 (sente/request!
-                                 [:api/execute-fork
+                                 [:invocations/execute-fork
                                   {:module-id module-id
                                    :agent-name agent-name
                                    :invoke-id invoke-id
@@ -89,23 +89,7 @@
         handle-toggle-forking-mode (fn []
                                      (state/dispatch [:ui/toggle-forking-mode]))
 
-        handle-paginate-node (fn [missing-node-id]
-                               ;; Only allow pagination for complete invocations
-                               (when is-complete
-                                 (sente/request!
-                                  [:api/paginate-node
-                                   {:module-id module-id
-                                    :agent-name agent-name
-                                    :invoke-id invoke-id
-                                    :missing-node-id missing-node-id}]
-                                  5000
-                                  (fn [reply]
-                                    (when (:success reply)
-                                      ;; Extract nodes from paginated response format
-                                      (let [{:keys [invokes-map]} (:data reply)]
-                                        (state/dispatch [:invocation/merge-nodes
-                                                         invoke-id
-                                                         invokes-map])))))))
+        handle-paginate-node (fn [missing-node-id] :todo)
 
         ;; Prepare the data for the view
         view-props {:module-id module-id
