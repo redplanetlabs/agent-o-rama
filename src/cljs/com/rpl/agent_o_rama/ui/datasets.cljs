@@ -298,7 +298,7 @@
           ($ :button.px-4.py-2.border.rounded-md {:type "button" :onClick #(state/dispatch [:modal/hide])} "Cancel")
           (let [is-disabled? (or submitting? (str/blank? to-name))]
             ($ :button {:type "button" :disabled is-disabled? :onClick handle-create
-                        :className (str "px-4 py-2 rounded-md flex items-center "
+                        :className (str "px-4 py-2 rounded-md flex items-center cursor-pointer "
                                         (if is-disabled? "bg-gray-300 cursor-not-allowed" "bg-blue-600 text-white hover:bg-blue-700"))}
                (when submitting? ($ common/spinner {:size :medium})) "Create"))))))
 
@@ -333,7 +333,6 @@
                                (js/alert (str "Error deleting snapshot: " (:error reply))))))))]
     ($ :div.flex.items-center.space-x-4
        ($ :div.flex.items-center.space-x-2
-          ($ :label.text-sm.font-medium.text-gray-700 "Snapshot:")
           ($ :select {:className "px-3 py-1 border border-gray-300 rounded-md text-sm w-48"
                       :value selected-snapshot
                       :disabled loading?
@@ -342,11 +341,11 @@
              (when error ($ :option {:disabled true} "Error loading..."))
              (for [name snapshot-names]
                ($ :option {:key name :value name} name))))
-       ($ :button {:className "px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-md"
+       ($ :button {:className "px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-md cursor-pointer"
                    :onClick handle-create}
           "+ Create Snapshot")
        (when-not (str/blank? selected-snapshot)
-         ($ :button {:className "px-3 py-1 text-sm bg-red-100 text-red-700 hover:bg-red-200 rounded-md"
+         ($ :button {:className "px-3 py-1 text-sm bg-red-100 text-red-700 hover:bg-red-200 rounded-md cursor-pointer"
                      :onClick handle-delete}
             "🗑️ Delete")))))
 
