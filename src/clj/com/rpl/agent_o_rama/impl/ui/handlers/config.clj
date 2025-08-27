@@ -14,42 +14,36 @@
     :else :text))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :config/get-all
-  [ev-msg]
-  (common/handle-api-call
-   (fn [{:keys [module-id agent-name]} uid]
-     (let [decoded-module-id (common/url-decode module-id)
-           decoded-agent-name (common/url-decode agent-name)
-           client-objects (common/objects decoded-module-id decoded-agent-name)
-           config-pstate (:config-pstate client-objects)
-           current-config-map (or (foreign-select-one STAY config-pstate {:pkey 0}) {})]
-       (for [[key config-def] aor-types/ALL-CONFIGS]
-         (let [current-value (get current-config-map key (:default config-def))]
-           {:key key
-            :doc (:doc config-def)
-            :current-value (str current-value)
-            :default-value (str (:default config-def))
-            :input-type (schema-fn->input-type (:schema-fn config-def))}))))
-   ev-msg))
+  [{:keys [module-id agent-name]} uid]
+  (let [decoded-module-id (common/url-decode module-id)
+        decoded-agent-name (common/url-decode agent-name)
+        client-objects (common/objects decoded-module-id decoded-agent-name)
+        config-pstate (:config-pstate client-objects)
+        current-config-map (or (foreign-select-one STAY config-pstate {:pkey 0}) {})]
+    (for [[key config-def] aor-types/ALL-CONFIGS]
+      (let [current-value (get current-config-map key (:default config-def))]
+        {:key key
+         :doc (:doc config-def)
+         :current-value (str current-value)
+         :default-value (str (:default config-def))
+         :input-type (schema-fn->input-type (:schema-fn config-def))}))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :config/set
-  [ev-msg]
-  (common/handle-api-call
-   (fn [{:keys [module-id agent-name key value]} uid]
-     (let [decoded-module-id (common/url-decode module-id)
-           decoded-agent-name (common/url-decode agent-name)
-           client-objects (common/objects decoded-module-id decoded-agent-name)
-           agent-config-depot (:agent-config-depot client-objects)
-           config-def (get aor-types/ALL-CONFIGS key)]
-       (when-not config-def
-         (throw (ex-info "Unknown configuration key" {:key key})))
-       (try
-         (let [parsed-value (case (schema-fn->input-type (:schema-fn config-def))
-                              :number (Long/parseLong value)
-                              value)
-               change-fn (:change-fn config-def)
-               change-record (change-fn parsed-value)]
-           (foreign-append! agent-config-depot change-record)
-           {:success true})
-         (catch Exception e
-           (throw (ex-info (str "Failed to set config: " (.getMessage e)) {:key key :value value}))))))
-   ev-msg))
+  [{:keys [module-id agent-name key value]} uid]
+  (let [decoded-module-id (common/url-decode module-id)
+        decoded-agent-name (common/url-decode agent-name)
+        client-objects (common/objects decoded-module-id decoded-agent-name)
+        agent-config-depot (:agent-config-depot client-objects)
+        config-def (get aor-types/ALL-CONFIGS key)]
+    (when-not config-def
+      (throw (ex-info "Unknown configuration key" {:key key})))
+    (try
+      (let [parsed-value (case (schema-fn->input-type (:schema-fn config-def))
+                           :number (Long/parseLong value)
+                           value)
+            change-fn (:change-fn config-def)
+            change-record (change-fn parsed-value)]
+        (foreign-append! agent-config-depot change-record)
+        {:success true})
+      (catch Exception e
+        (throw (ex-info (str "Failed to set config: " (.getMessage e)) {:key key :value value}))))))

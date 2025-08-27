@@ -75,17 +75,3 @@
 
 ;; --- New API Handler Wrapper ---
 
-(defn handle-api-call [handler-fn ev-msg]
-  "Wrapper that handles the common pattern of API calls: 
-   - Extracts data and reply function from the Sente event message
-   - Calls the handler function with the data and user ID  
-   - Serializes the result for UI consumption
-   - Handles exceptions and returns appropriate error responses"
-  (let [{:keys [?data ?reply-fn uid]} ev-msg]
-    (try
-      (let [result (handler-fn ?data uid)
-            serializable-result (->ui-serializable result)]
-        (?reply-fn {:success true :data serializable-result}))
-      (catch Exception e
-        (?reply-fn {:success false
-                    :error (.getMessage e)})))))
