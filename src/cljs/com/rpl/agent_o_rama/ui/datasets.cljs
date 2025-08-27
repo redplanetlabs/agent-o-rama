@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [reitit.frontend.easy :as rfe]
    [clojure.string :as str]))
+
 (def example-schema "{
   \"type\": \"object\",
   \"properties\": {
@@ -21,6 +22,7 @@
   },
   \"required\": [\"context\", \"prompt\"]
 }")
+
 ;; =============================================================================
 ;; MODAL FOR CREATING DATASETS
 ;; =============================================================================
