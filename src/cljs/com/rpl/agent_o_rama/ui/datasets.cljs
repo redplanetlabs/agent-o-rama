@@ -661,7 +661,7 @@
          dataset ;; This will now correctly be the props data object
          ($ :div.h-full.flex.flex-col
             ;; Header Bar
-            ($ :div.bg-white.border-b.border-gray-200.px-6.py-4
+            ($ :div.bg-white.px-6.py-4
                ($ :div.flex.items-center.justify-between
                   ;; Left side - Title and info
                   ($ :div.flex.items-center.space-x-4
