@@ -63,7 +63,7 @@
         {:keys [data loading? error] :as query-result}
         (queries/use-sente-query
          {:query-key [:agent-config module-id agent-name]
-          :sente-event [:api/get-agent-config {:module-id module-id :agent-name agent-name}]
+          :sente-event [:config/get-all {:module-id module-id :agent-name agent-name}]
           :refetch-interval-ms 5000})]
 
     ($ :div.p-6

@@ -102,7 +102,7 @@
 (state/reg-event :invocation/fetch-graph-page
                  (fn [db {:keys [invoke-id module-id agent-name leaves initial?]}]
                    (sente/request!
-                    [:api/fetch-graph-page
+                    [:invocations/get-graph-page
                      {:invoke-id invoke-id
                       :module-id module-id
                       :agent-name agent-name
@@ -226,7 +226,7 @@
                    (state/dispatch [:db/set-value [:ui :hitl :submitting (s/keypath (:invoke-id request))] true])
 
                    (sente/request!
-                    [:api/provide-human-input
+                    [:invocations/provide-human-input
                      {:module-id module-id
                       :agent-name agent-name
                       :invoke-id invoke-id
@@ -251,7 +251,7 @@
                      (state/dispatch [:db/set-value state-path {:submitting? true :error nil}])
 
                      (sente/request!
-                      [:api/set-agent-config {:module-id module-id :agent-name agent-name :key key :value value}]
+                      [:config/set {:module-id module-id :agent-name agent-name :key key :value value}]
                       10000 ;; 10 second timeout
                       (fn [reply]
                         (if (:success reply)

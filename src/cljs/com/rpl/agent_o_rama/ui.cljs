@@ -110,7 +110,7 @@
         {:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:module-agents module-id]
-          :sente-event [:api/get-agents-for-module {:module-id module-id}]
+          :sente-event [:agents/get-for-module {:module-id module-id}]
           :enabled? (boolean module-id)
           :refetch-interval-ms 5000})]
     ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2

@@ -52,7 +52,7 @@
   ;; The entire complex useEffect is replaced by this single line!
   (let [{:keys [data loading? error]}
         (queries/use-sente-query {:query-key [:agents]
-                                  :sente-event [:api/get-agents]
+                                  :sente-event [:agents/get-all]
                                   :refetch-interval-ms 2000})]
 
     (cond
@@ -91,9 +91,9 @@
         fetch-invocations (fn [pagination append?]
                             (state/dispatch [:invocations/set-loading true])
                             (sente/request!
-                             [:api/get-invocations {:module-id module-id
-                                                    :agent-name agent-name
-                                                    :pagination pagination}]
+                             [:invocations/get-page {:module-id module-id
+                                                     :agent-name agent-name
+                                                     :pagination pagination}]
                              5000
                              (fn [reply]
                                (state/dispatch [:invocations/set-loading false])
@@ -171,9 +171,9 @@
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
         {:keys [data loading? error]}
         (queries/use-sente-query {:query-key [:mini-invocations module-id agent-name]
-                                  :sente-event [:api/get-invocations {:module-id module-id
-                                                                      :agent-name agent-name
-                                                                      :pagination {}}]
+                                  :sente-event [:invocations/get-page {:module-id module-id
+                                                                       :agent-name agent-name
+                                                                       :pagination {}}]
                                   :refetch-interval-ms 2000})]
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
@@ -222,8 +222,8 @@
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
         {:keys [data loading? error]}
         (queries/use-sente-query {:query-key [:graph module-id agent-name]
-                                  :sente-event [:api/get-graph {:module-id module-id
-                                                                :agent-name agent-name}]
+                                  :sente-event [:invocations/get-graph {:module-id module-id
+                                                                        :agent-name agent-name}]
                                   :refetch-interval-ms 2000})]
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
@@ -306,9 +306,9 @@
                           (if parsed-args
                             ;; Make Sente request
                             (sente/request!
-                             [:api/run-agent {:module-id module-id
-                                              :agent-name agent-name
-                                              :args parsed-args}]
+                             [:invocations/run-agent {:module-id module-id
+                                                      :agent-name agent-name
+                                                      :args parsed-args}]
                              5000
                              (fn [reply]
                                (update-field :loading? false)

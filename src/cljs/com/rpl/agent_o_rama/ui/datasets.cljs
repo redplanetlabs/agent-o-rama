@@ -43,11 +43,11 @@
               (set-error-msg nil)
               (js/console.log "Making sente request...")
               (sente/request!
-               [:api/create-dataset {:module-id module-id
-                                     :name name
-                                     :description description
-                                     :input-schema input-schema
-                                     :output-schema output-schema}]
+               [:datasets/create {:module-id module-id
+                                  :name name
+                                  :description description
+                                  :input-schema input-schema
+                                  :output-schema output-schema}]
                15000 ;; Timeout
                (fn [reply]
                  (js/console.log "Got reply from server:" reply)
@@ -143,7 +143,7 @@
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
          {:query-key [:datasets module-id]
-          :sente-event [:api/get-datasets {:module-id module-id-raw :pagination nil}]
+          :sente-event [:datasets/get-all {:module-id module-id-raw :pagination nil}]
           :enabled? (boolean module-id-raw)
           :refetch-interval-ms 5000})
         datasets (get-in data [:datasets])]
@@ -182,7 +182,7 @@
                        ($ :button.text-red-600.hover:text-red-800.p-1.rounded-full.hover:bg-red-100.cursor-pointer
                           {:onClick (fn []
                                       (when (js/confirm (str "Are you sure you want to delete '" (:name dataset) "'?"))
-                                        (sente/request! [:api/delete-dataset
+                                        (sente/request! [:datasets/delete
                                                          {:module-id module-id-raw :dataset-id (:dataset-id dataset)}]
                                                         5000
                                                         #(when (:success %) (refetch)))))}
@@ -208,7 +208,7 @@
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
          {:query-key [:dataset-props module-id dataset-id]
-          :sente-event [:api/get-dataset-props {:module-id module-id :dataset-id dataset-id}]
+          :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
 
         ;; State hooks - always called regardless of data availability
@@ -232,7 +232,7 @@
          data
          (let [dataset data]
            (letfn [(handle-save []
-                     (sente/request! [:api/update-dataset-props
+                     (sente/request! [:datasets/update-props
                                       {:module-id module-id
                                        :dataset-id dataset-id
                                        :name edit-name
