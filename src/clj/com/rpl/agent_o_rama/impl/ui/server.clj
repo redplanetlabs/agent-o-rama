@@ -1,6 +1,11 @@
 (ns com.rpl.agent-o-rama.impl.ui.server
   (:require
    [com.rpl.agent-o-rama.impl.ui.sente :as sente]
+   ;; Load all handler namespaces to register their defmethods
+   [com.rpl.agent-o-rama.impl.ui.handlers.agents]
+   [com.rpl.agent-o-rama.impl.ui.handlers.config]
+   [com.rpl.agent-o-rama.impl.ui.handlers.datasets]
+   [com.rpl.agent-o-rama.impl.ui.handlers.invocations]
    [ring.util.response :as resp]
    [ring.middleware.resource :as resource]
    [ring.middleware.file :as ring-file]

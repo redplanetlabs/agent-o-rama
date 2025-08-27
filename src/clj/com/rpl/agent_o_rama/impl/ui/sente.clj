@@ -1,10 +1,6 @@
 (ns com.rpl.agent-o-rama.impl.ui.sente
   (:require
    [clojure.tools.logging :as log]
-   [com.rpl.agent-o-rama.impl.ui.handlers.agents] ; Require to register defmethods
-   [com.rpl.agent-o-rama.impl.ui.handlers.config] ;
-   [com.rpl.agent-o-rama.impl.ui.handlers.datasets] ;
-   [com.rpl.agent-o-rama.impl.ui.handlers.invocations] ;
    [taoensso.sente :as sente]
    [taoensso.sente.packers.transit :as sente-transit]
    [taoensso.sente.server-adapters.http-kit :as http-kit-adapter]))

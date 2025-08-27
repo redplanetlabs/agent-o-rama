@@ -2,9 +2,9 @@
   (:require
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.helpers :as h]
-   [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
-   [com.rpl.agent-o-rama.impl.ui.sente :refer [-event-msg-handler]])
-  (:use [com.rpl.rama]))
+   [com.rpl.agent-o-rama.impl.ui.handlers.common :as common])
+  (:use [com.rpl.rama]
+        [com.rpl.rama.path]))
 
 (defn- schema-fn->input-type [schema-fn]
   (cond
@@ -13,7 +13,7 @@
     (= schema-fn h/boolean-spec) :boolean
     :else :text))
 
-(defmethod -event-msg-handler :config/get-all
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :config/get-all
   [ev-msg]
   (common/handle-api-call
    (fn [{:keys [module-id agent-name]} uid]
@@ -31,7 +31,7 @@
             :input-type (schema-fn->input-type (:schema-fn config-def))}))))
    ev-msg))
 
-(defmethod -event-msg-handler :config/set
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :config/set
   [ev-msg]
   (common/handle-api-call
    (fn [{:keys [module-id agent-name key value]} uid]

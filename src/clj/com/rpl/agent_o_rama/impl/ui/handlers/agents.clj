@@ -2,12 +2,14 @@
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.ui :as ui]
-   [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
-   [com.rpl.agent-o-rama.impl.ui.sente :refer [-event-msg-handler]])
+   [com.rpl.agent-o-rama.impl.ui.handlers.common :as common])
   (:use [com.rpl.rama]
         [com.rpl.rama.path]))
 
-(defmethod -event-msg-handler :agents/get-all
+;; We need to reference the multimethod from sente namespace
+;; Since we can't require it directly due to circular dependency,
+;; we'll use a qualified symbol to extend it
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :agents/get-all
   [ev-msg]
   (common/handle-api-call
    (fn [_ uid]
@@ -17,7 +19,7 @@
         :agent-name (common/url-encode agent-name)}))
    ev-msg))
 
-(defmethod -event-msg-handler :agents/get-for-module
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :agents/get-for-module
   [ev-msg]
   (common/handle-api-call
    (fn [{:keys [module-id]} uid]

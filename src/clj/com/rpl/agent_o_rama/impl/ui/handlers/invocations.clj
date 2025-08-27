@@ -4,11 +4,10 @@
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
-   [com.rpl.agent-o-rama.impl.ui.sente :refer [-event-msg-handler]]
    [jsonista.core :as j])
   (:import [com.rpl.agentorama AgentInvoke]))
 
-(defmethod -event-msg-handler :invocations/get-page
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-page
   [ev-msg]
   (common/handle-api-call
    (fn [{:keys [module-id agent-name pagination]} uid]
@@ -20,7 +19,7 @@
         10 pages)))
    ev-msg))
 
-(defmethod -event-msg-handler :invocations/run-agent
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/run-agent
   [ev-msg]
   (common/handle-api-call
    (fn [{:keys [module-id agent-name args]} uid]
@@ -33,7 +32,7 @@
           :invoke-id (.getAgentInvokeId inv)})))
    ev-msg))
 
-(defmethod -event-msg-handler :invocations/get-graph-page
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-graph-page
   [ev-msg]
   (common/handle-api-call
    (fn [{:keys [module-id agent-name invoke-id leaves initial?]} uid]
@@ -68,7 +67,7 @@
          is-initial-load? (assoc :root-invoke-id root-invoke-id :historical-graph historical-graph))))
    ev-msg))
 
-(defmethod -event-msg-handler :invocations/execute-fork
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/execute-fork
   [ev-msg]
   (common/handle-api-call
    (fn [{:keys [module-id agent-name invoke-id changed-nodes]} uid]
@@ -85,7 +84,7 @@
         :task-id (:taskId (bean result))}))
    ev-msg))
 
-(defmethod -event-msg-handler :invocations/provide-human-input
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/provide-human-input
   [ev-msg]
   (common/handle-api-call
    (fn [{:keys [module-id agent-name request response]} uid]
@@ -97,8 +96,7 @@
        {:ok true}))
    ev-msg))
 
-;; Legacy handler for backward compatibility - maps to get-graph-page
-(defmethod -event-msg-handler :invocations/get-graph
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-graph
   [ev-msg]
   (common/handle-api-call
    (fn [{:keys [module-id agent-name]} uid]

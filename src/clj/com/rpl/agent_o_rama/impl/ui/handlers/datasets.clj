@@ -3,12 +3,12 @@
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
-   [com.rpl.agent-o-rama.impl.ui.sente :refer [-event-msg-handler]]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [clojure.string :as str])
-  (:import [java.util UUID]))
+  (:import [java.util UUID])
+  (:use [com.rpl.rama]))
 
-(defmethod -event-msg-handler :datasets/get-all
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-all
   [ev-msg]
   (common/handle-api-call
    (fn [{:keys [module-id pagination]} uid]
@@ -18,7 +18,7 @@
        (foreign-invoke-query datasets-page-query 100 pagination)))
    ev-msg))
 
-(defmethod -event-msg-handler :datasets/get-props
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-props
   [ev-msg]
   (common/handle-api-call
    (fn [{:keys [module-id dataset-id]} uid]
@@ -28,7 +28,7 @@
        (queries/get-dataset-properties datasets-pstate (UUID/fromString dataset-id))))
    ev-msg))
 
-(defmethod -event-msg-handler :datasets/create
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/create
   [ev-msg]
   (common/handle-api-call
    (fn [{:keys [module-id name description input-schema output-schema]} uid]
@@ -44,7 +44,7 @@
            (throw (ex-info (-> e .getCause .getMessage) {}))))))
    ev-msg))
 
-(defmethod -event-msg-handler :datasets/update-props
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/update-props
   [ev-msg]
   (common/handle-api-call
    (fn [{:keys [module-id dataset-id name description]} uid]
@@ -56,7 +56,7 @@
        {:status :ok}))
    ev-msg))
 
-(defmethod -event-msg-handler :datasets/delete
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/delete
   [ev-msg]
   (common/handle-api-call
    (fn [{:keys [module-id dataset-id]} uid]
