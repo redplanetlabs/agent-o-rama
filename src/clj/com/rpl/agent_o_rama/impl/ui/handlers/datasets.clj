@@ -27,14 +27,11 @@
   [{:keys [module-id name description input-schema output-schema]} uid]
   (let [decoded-module-id (common/url-decode module-id)
         manager (common/get-manager decoded-module-id)]
-    (try
-      (let [dataset-id (aor/create-dataset! manager name
-                                            {:description (when-not (str/blank? description) description)
-                                             :input-json-schema (when-not (str/blank? input-schema) input-schema)
-                                             :output-json-schema (when-not (str/blank? output-schema) output-schema)})]
-        {:status :ok, :dataset-id dataset-id})
-      (catch Exception e
-        (throw (ex-info (-> e .getCause .getMessage) {}))))))
+    (let [dataset-id (aor/create-dataset! manager name
+                                          {:description (when-not (str/blank? description) description)
+                                           :input-json-schema (when-not (str/blank? input-schema) input-schema)
+                                           :output-json-schema (when-not (str/blank? output-schema) output-schema)})]
+      {:status :ok, :dataset-id dataset-id})))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/set-name
   [{:keys [module-id dataset-id name]} uid]

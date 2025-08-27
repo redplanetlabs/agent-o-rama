@@ -303,12 +303,13 @@
                (when submitting? ($ common/spinner {:size :medium})) "Create"))))))
 
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon]}]
-  ($ :button.group.flex.items-center.justify-between.w-full.px-4.py-2.text-sm.hover:bg-gray-100.cursor-pointer
+  ($ :button
      {:onClick on-select
-      :className (cond
-                   action? "text-blue-600 hover:bg-blue-50"
-                   selected? "text-blue-600 bg-blue-50"
-                   :else "text-gray-700")}
+      :className (str "group flex items-center justify-between w-full px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer "
+                      (cond
+                        action? "text-blue-600 hover:bg-blue-50"
+                        selected? "text-blue-600 bg-blue-50"
+                        :else "text-gray-700"))}
      ($ :div.flex.items-center.justify-between.w-full
         ($ :div.flex.items-center
            (when icon icon)
