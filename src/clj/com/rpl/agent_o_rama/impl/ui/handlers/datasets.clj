@@ -49,9 +49,8 @@
   (common/handle-api-call
    (fn [{:keys [module-id dataset-id name]} uid]
      (let [decoded-module-id (common/url-decode module-id)
-           manager (common/get-manager decoded-module-id)
-           uuid (UUID/fromString dataset-id)]
-       (aor/set-dataset-name! manager uuid name)
+           manager (common/get-manager decoded-module-id)]
+       (aor/set-dataset-name! manager dataset-id name)
        {:status :ok}))
    ev-msg))
 
@@ -60,9 +59,8 @@
   (common/handle-api-call
    (fn [{:keys [module-id dataset-id description]} uid]
      (let [decoded-module-id (common/url-decode module-id)
-           manager (common/get-manager decoded-module-id)
-           uuid (UUID/fromString dataset-id)]
-       (aor/set-dataset-description! manager uuid description)
+           manager (common/get-manager decoded-module-id)]
+       (aor/set-dataset-description! manager dataset-id description)
        {:status :ok}))
    ev-msg))
 
@@ -71,8 +69,7 @@
   (common/handle-api-call
    (fn [{:keys [module-id dataset-id]} uid]
      (let [decoded-module-id (common/url-decode module-id)
-           manager (common/get-manager decoded-module-id)
-           uuid (UUID/fromString dataset-id)]
-       (aor/destroy-dataset! manager uuid)
+           manager (common/get-manager decoded-module-id)]
+       (aor/destroy-dataset! manager dataset-id)
        {:status :ok}))
    ev-msg))
