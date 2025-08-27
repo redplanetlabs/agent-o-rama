@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.datasets
   (:require
    [uix.core :as uix :refer [defui defhook $]]
-   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon]]
+   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.sente :as sente]
@@ -252,9 +252,9 @@
               ($ :button {:type "button"
                           :disabled is-disabled?
                           :onClick handle-add
-                          :className (str "px-4 py-2 border rounded-md text-sm font-medium flex items-center cursor-pointer "
+                          :className (str "px-4 py-2 border rounded-md text-sm font-medium flex items-center "
                                           (if is-disabled? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                              "bg-blue-600 text-white hover:bg-blue-700"))}
+                                              "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"))}
                  (when submitting? ($ common/spinner {:size :medium}))
                  "Add Example")))))))
 
@@ -456,12 +456,13 @@
                   ($ :div.flex.items-center.space-x-4
                      ($ :h1.text-2xl.font-bold.text-gray-900 (:name dataset))
                      ;; Info button
+                     ;; Info button with conditional chevron
                      ($ :button.p-2.text-gray-400.hover:text-gray-600.rounded-full.hover:bg-gray-100
                         {:onClick #(set-show-info (not show-info?))
-                         :title "Dataset Information"}
-                        ($ :svg {:className "h-5 w-5" :fill "none" :viewBox "0 0 24 24" :stroke "currentColor"}
-                           ($ :path {:strokeLinecap "round" :strokeLinejoin "round" :strokeWidth 2
-                                     :d "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"}))))
+                         :title (if show-info? "Hide Dataset Information" "Show Dataset Information")}
+                        (if show-info?
+                          ($ ChevronUpIcon {:className "h-5 w-5"})
+                          ($ ChevronDownIcon {:className "h-5 w-5"}))))
 
                   ;; Right side - Controls
                   ($ :div.flex.items-center.space-x-4
@@ -478,7 +479,7 @@
                      ;; Search bar
 
 ;; Add Example button
-                     ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700
+                     ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer
                         {:onClick #(state/dispatch [:modal/show :add-example
                                                     {:title "Add New Example"
                                                      :component ($ AddExampleForm {:module-id module-id
