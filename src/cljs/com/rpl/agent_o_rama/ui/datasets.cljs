@@ -303,7 +303,9 @@
                (when submitting? ($ common/spinner {:size :medium})) "Create"))))))
 
 (defui SnapshotManager [{:keys [module-id dataset-id selected-snapshot set-selected-snapshot]}]
-  (let [{:keys [data loading? error refetch]}
+  (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
+
+        {:keys [data loading? error refetch]}
         (queries/use-sente-query
          {:query-key [:snapshot-names module-id dataset-id]
           :sente-event [:datasets/get-snapshot-names {:module-id module-id :dataset-id dataset-id}]
@@ -312,6 +314,7 @@
         snapshot-names (or (sort data) [])
 
         handle-create (fn []
+                        (set-dropdown-open false)
                         (state/dispatch [:modal/show :create-snapshot
                                          {:title "Create New Snapshot"
                                           :component ($ CreateSnapshotForm
@@ -320,34 +323,92 @@
                                                          :from-snapshot-name selected-snapshot
                                                          :on-success refetch})}]))
 
-        handle-delete (fn []
-                        (when (js/confirm (str "Are you sure you want to delete snapshot '" selected-snapshot "'?"))
+        handle-delete (fn [snapshot-name]
+                        (set-dropdown-open false)
+                        (when (js/confirm (str "Are you sure you want to delete snapshot '" snapshot-name "'?"))
                           (sente/request!
-                           [:datasets/delete-snapshot {:module-id module-id :dataset-id dataset-id :snapshot-name selected-snapshot}]
+                           [:datasets/delete-snapshot {:module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name}]
                            10000
                            (fn [reply]
                              (if (:success reply)
                                (do
-                                 (set-selected-snapshot "") ;; Reset view to latest
+                                 (when (= selected-snapshot snapshot-name)
+                                   (set-selected-snapshot "")) ;; Reset view to latest if deleting current
                                  (refetch)) ;; Refetch the list
-                               (js/alert (str "Error deleting snapshot: " (:error reply))))))))]
-    ($ :div.flex.items-center.space-x-4
-       ($ :div.flex.items-center.space-x-2
-          ($ :select {:className "px-3 py-1 border border-gray-300 rounded-md text-sm w-48"
-                      :value selected-snapshot
-                      :disabled loading?
-                      :onChange #(set-selected-snapshot (.. % -target -value))}
-             ($ :option {:value ""} "Latest (Working Copy)")
-             (when error ($ :option {:disabled true} "Error loading..."))
-             (for [name snapshot-names]
-               ($ :option {:key name :value name} name))))
-       ($ :button {:className "px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-md cursor-pointer"
-                   :onClick handle-create}
-          "+ Create Snapshot")
-       (when-not (str/blank? selected-snapshot)
-         ($ :button {:className "px-3 py-1 text-sm bg-red-100 text-red-700 hover:bg-red-200 rounded-md cursor-pointer"
-                     :onClick handle-delete}
-            "🗑️ Delete")))))
+                               (js/alert (str "Error deleting snapshot: " (:error reply))))))))
+
+        handle-select (fn [snapshot-name]
+                        (set-dropdown-open false)
+                        (set-selected-snapshot snapshot-name))
+
+        current-display-name (if (str/blank? selected-snapshot)
+                               "Latest (Working Copy)"
+                               selected-snapshot)]
+
+    ;; Close dropdown when clicking outside
+    (uix/use-effect
+     (fn []
+       (let [handle-click (fn [e]
+                            (when dropdown-open?
+                              (set-dropdown-open false)))]
+         (.addEventListener js/document "click" handle-click)
+         #(.removeEventListener js/document "click" handle-click)))
+     [dropdown-open?])
+
+    ($ :div.flex.items-center.space-x-2
+       ($ :label.text-sm.font-medium.text-gray-700 "Snapshot:")
+       ($ :div.relative.inline-block.text-left
+          ;; Main dropdown button
+          ($ :button.inline-flex.items-center.justify-between.w-64.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500
+             {:onClick (fn [e]
+                         (.stopPropagation e)
+                         (set-dropdown-open (not dropdown-open?)))
+              :disabled loading?}
+             ($ :span.truncate current-display-name)
+             ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
+
+          ;; Dropdown menu
+          (when dropdown-open?
+            ($ :div.origin-top-right.absolute.right-0.mt-1.w-64.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
+               {:onClick #(.stopPropagation %)}
+               ($ :div.py-1
+                  ;; Latest option
+                  ($ :button.group.flex.items-center.justify-between.w-full.px-4.py-2.text-sm.hover:bg-gray-100
+                     {:onClick #(handle-select "")
+                      :className (if (str/blank? selected-snapshot)
+                                   "text-blue-600 bg-blue-50"
+                                   "text-gray-700")}
+                     ($ :span "Latest (Working Copy)")
+                     (when (str/blank? selected-snapshot)
+                       ($ :span "✓")))
+
+                  ;; Named snapshots
+                  (for [name snapshot-names]
+                    ($ :button.group.flex.items-center.justify-between.w-full.px-4.py-2.text-sm.hover:bg-gray-100
+                       {:key name
+                        :onClick #(handle-select name)
+                        :className (if (= selected-snapshot name)
+                                     "text-blue-600 bg-blue-50"
+                                     "text-gray-700")}
+                       ($ :div.flex.items-center.justify-between.w-full
+                          ($ :span.truncate name)
+                          ($ :div.flex.items-center.space-x-2
+                             (when (= selected-snapshot name) ($ :span "✓"))
+                             ($ :button.text-red-600.hover:text-red-800.p-1.rounded.hover:bg-red-100
+                                {:onClick (fn [e]
+                                            (.stopPropagation e)
+                                            (handle-delete name))
+                                 :title (str "Delete " name)}
+                                ($ TrashIcon {:className "h-3 w-3"}))))))
+
+                  ;; Divider
+                  ($ :div.border-t.border-gray-100.my-1)
+
+                  ;; New snapshot action
+                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-blue-600.hover:bg-blue-50
+                     {:onClick handle-create}
+                     ($ PlusIcon {:className "mr-3 h-4 w-4"})
+                     "New snapshot"))))))))
 
 (defui ExamplesList [{:keys [examples]}]
   (let [[open-dropdown set-open-dropdown] (uix/use-state nil)]
@@ -581,10 +642,9 @@
                        extracted-examples (mapv (fn [[uuid example-data]]
                                                   (assoc example-data :example-id uuid))
                                                 raw-examples)]
-                   extracted-examples)
+                   extracted-examples)]
 
         ;; --- END OF FIX ---
-        ]
 
     ($ :div.h-full.flex.flex-col
        (cond
