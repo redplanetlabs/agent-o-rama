@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.datasets
   (:require
    [uix.core :as uix :refer [defui defhook $]]
-   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon]]
+   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.sente :as sente]
@@ -259,36 +259,88 @@
                  "Add Example")))))))
 
 (defui ExamplesList [{:keys [examples]}]
-  ($ :div.mt-4.border.rounded-lg.overflow-hidden
-     ($ :table.min-w-full.divide-y.divide-gray-200
-        ($ :thead.bg-gray-50
-           ($ :tr
-              ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Input")
-              ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Output")
-              ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Tags")
-              ($ :th.relative.px-6.py-3)))
-        ($ :tbody.bg-white.divide-y.divide-gray-200
-           (for [example examples]
-             ($ :tr {:key (:example-id example)}
-                ($ :td.px-6.py-4.whitespace-nowrap.text-sm.font-mono
-                   (let [input-str (if (string? (:input example))
-                                     (:input example)
-                                     (js/JSON.stringify (clj->js (:input example)) nil 2))
-                         truncated (if (> (count input-str) 100)
-                                     (str (subs input-str 0 97) "...")
-                                     input-str)]
-                     ($ :span {:title input-str :className "cursor-help"} truncated)))
-                ($ :td.px-6.py-4.whitespace-nowrap.text-sm.font-mono
-                   (let [output-str (if (string? (:reference-output example))
-                                      (:reference-output example)
-                                      (js/JSON.stringify (clj->js (:reference-output example)) nil 2))
-                         truncated (if (> (count output-str) 100)
-                                     (str (subs output-str 0 97) "...")
-                                     output-str)]
-                     ($ :span {:title output-str :className "cursor-help"} (or truncated "—"))))
-                ($ :td.px-6.py-4.whitespace-nowrap.text-sm.text-gray-500 (str (:tags example)))
-                ($ :td.px-6.py-4.whitespace-nowrap.text-right.text-sm.font-medium
-                   ($ :button.text-indigo-600.hover:text-indigo-900 "Edit"))))))))
+  (let [[open-dropdown set-open-dropdown] (uix/use-state nil)]
+
+    ;; Close dropdown when clicking outside
+    (uix/use-effect
+     (fn []
+       (let [handle-click (fn [e]
+                            (when open-dropdown
+                              (set-open-dropdown nil)))]
+         (.addEventListener js/document "click" handle-click)
+         #(.removeEventListener js/document "click" handle-click)))
+     [open-dropdown])
+
+    ($ :div.mt-4.overflow-visible
+       ($ :table.min-w-full.divide-y.divide-gray-200
+          ($ :thead.bg-gray-50
+             ($ :tr
+                ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Input")
+                ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Output")
+                ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Tags")
+                ($ :th.relative.px-6.py-3)))
+          ($ :tbody.bg-white.divide-y.divide-gray-200
+             (for [example examples]
+               (let [example-id (:example-id example)
+                     is-open? (= open-dropdown example-id)]
+                 ($ :tr {:key example-id}
+                    ($ :td.px-6.py-4.whitespace-nowrap.text-sm.font-mono
+                       (let [input-str (if (string? (:input example))
+                                         (:input example)
+                                         (js/JSON.stringify (clj->js (:input example)) nil 2))
+                             truncated (if (> (count input-str) 100)
+                                         (str (subs input-str 0 97) "...")
+                                         input-str)]
+                         ($ :span {:title input-str :className "cursor-help"} truncated)))
+                    ($ :td.px-6.py-4.whitespace-nowrap.text-sm.font-mono
+                       (let [output-str (if (string? (:reference-output example))
+                                          (:reference-output example)
+                                          (js/JSON.stringify (clj->js (:reference-output example)) nil 2))
+                             truncated (if (> (count output-str) 100)
+                                         (str (subs output-str 0 97) "...")
+                                         output-str)]
+                         ($ :span {:title output-str :className "cursor-help"} (or truncated "—"))))
+                    ($ :td.px-6.py-4.whitespace-nowrap.text-sm.text-gray-500 (str (:tags example)))
+                    ($ :td.px-6.py-4.whitespace-nowrap.text-right.text-sm.font-medium
+                       ($ :div.relative.inline-block.text-left
+                          ;; Three dots button
+                          ($ :button.inline-flex.items-center.justify-center.w-8.h-8.rounded-full.text-gray-400.hover:text-gray-600.hover:bg-gray-100.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500
+                             {:onClick (fn [e]
+                                         (.stopPropagation e)
+                                         (set-open-dropdown (if is-open? nil example-id)))}
+                             ($ EllipsisVerticalIcon {:className "h-5 w-5"}))
+
+                          ;; Dropdown menu
+                          (when is-open?
+                            ($ :div.origin-top-right.absolute.right-0.mt-2.w-48.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
+                               {:onClick #(.stopPropagation %)}
+                               ($ :div.py-1
+                                  ;; Edit option
+                                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900
+                                     {:onClick (fn []
+                                                 (set-open-dropdown nil)
+                                                 ;; TODO: Implement edit functionality
+                                                 (println "Edit example:" example-id))}
+                                     ($ PencilIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
+                                     "Edit")
+
+                                  ;; Delete option
+                                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900
+                                     {:onClick (fn []
+                                                 (set-open-dropdown nil)
+                                                 ;; TODO: Implement delete functionality
+                                                 (println "Delete example:" example-id))}
+                                     ($ TrashIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
+                                     "Delete")
+
+                                  ;; Try with evaluator option
+                                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900
+                                     {:onClick (fn []
+                                                 (set-open-dropdown nil)
+                                                 ;; TODO: Implement evaluator functionality
+                                                 (println "Try with evaluator:" example-id))}
+                                     ($ PlayIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
+                                     "Try with evaluator"))))))))))))))
 
 (defn get-dataset-path [module-id dataset-id]
   (rfe/href :module/dataset-detail
@@ -526,13 +578,8 @@
                                     "Schema: nil")))))))))
 
             ;; Examples Section (main content)
-            ($ :div.flex-1.overflow-hidden.p-6
+            ($ :div.flex-1.overflow-hidden
                ($ :div.h-full.flex.flex-col
-                  ;; Examples header with count
-                  ($ :div.flex.items-center.justify-between.mb-4
-                     ($ :h2.text-lg.font-semibold.text-gray-900
-                        (str "Examples (" (count examples) ")")))
-
                   ;; Examples content
                   ($ :div.flex-1.overflow-hidden
                      (cond
