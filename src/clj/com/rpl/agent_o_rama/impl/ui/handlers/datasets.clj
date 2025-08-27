@@ -44,14 +44,24 @@
            (throw (ex-info (-> e .getCause .getMessage) {}))))))
    ev-msg))
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/update-props
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/set-name
   [ev-msg]
   (common/handle-api-call
-   (fn [{:keys [module-id dataset-id name description]} uid]
+   (fn [{:keys [module-id dataset-id name]} uid]
      (let [decoded-module-id (common/url-decode module-id)
            manager (common/get-manager decoded-module-id)
            uuid (UUID/fromString dataset-id)]
        (aor/set-dataset-name! manager uuid name)
+       {:status :ok}))
+   ev-msg))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/set-description
+  [ev-msg]
+  (common/handle-api-call
+   (fn [{:keys [module-id dataset-id description]} uid]
+     (let [decoded-module-id (common/url-decode module-id)
+           manager (common/get-manager decoded-module-id)
+           uuid (UUID/fromString dataset-id)]
        (aor/set-dataset-description! manager uuid description)
        {:status :ok}))
    ev-msg))
