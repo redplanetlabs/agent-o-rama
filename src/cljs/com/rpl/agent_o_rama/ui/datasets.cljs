@@ -47,64 +47,62 @@
                                  :output-schema (:value output-schema-field)
                                  :on-success on-success}))]
 
-
-
-      ($ :div
-         ($ :div.space-y-4
-            ($ forms/form-field {:label "Name"
-                                 :value (:value name-field)
-                                 :on-change (:set-value name-field)
-                                 :error (:error name-field)
-                                 :required? true})
-            ($ forms/form-field {:label "Description"
-                                 :type :textarea
-                                 :value (:value description-field)
-                                 :on-change (:set-value description-field)
-                                 :placeholder "Optional description for this dataset"
-                                 :rows 3})
-            ($ :div.grid.grid-cols-2.gap-4
-               ($ forms/form-field {:label "Input JSON Schema"
-                                    :type :textarea
-                                    :value (:value input-schema-field)
-                                    :on-change (:set-value input-schema-field)
-                                    :error (:error input-schema-field)
-                                    :placeholder example-schema
-                                    :rows 20
-                                    :class-name "font-mono"})
-               ($ forms/form-field {:label "Output JSON Schema"
-                                    :type :textarea
-                                    :value (:value output-schema-field)
-                                    :on-change (:set-value output-schema-field)
-                                    :error (:error output-schema-field)
-                                    :placeholder example-schema
-                                    :rows 20
-                                    :class-name "font-mono"}))
+    ($ :div
+       ($ :div.space-y-4
+          ($ forms/form-field {:label "Name"
+                               :value (:value name-field)
+                               :on-change (:set-value name-field)
+                               :error (:error name-field)
+                               :required? true})
+          ($ forms/form-field {:label "Description"
+                               :type :textarea
+                               :value (:value description-field)
+                               :on-change (:set-value description-field)
+                               :placeholder "Optional description for this dataset"
+                               :rows 3})
+          ($ :div.grid.grid-cols-2.gap-4
+             ($ forms/form-field {:label "Input JSON Schema"
+                                  :type :textarea
+                                  :value (:value input-schema-field)
+                                  :on-change (:set-value input-schema-field)
+                                  :error (:error input-schema-field)
+                                  :placeholder example-schema
+                                  :rows 20
+                                  :class-name "font-mono"})
+             ($ forms/form-field {:label "Output JSON Schema"
+                                  :type :textarea
+                                  :value (:value output-schema-field)
+                                  :on-change (:set-value output-schema-field)
+                                  :error (:error output-schema-field)
+                                  :placeholder example-schema
+                                  :rows 20
+                                  :class-name "font-mono"}))
 
             ;; JSON Schema Help Box
-            ($ :div.bg-blue-50.border.border-blue-200.rounded-md.p-4
-               ($ :div.flex
-                  ($ :div.flex-shrink-0
-                     ($ :svg {:className "h-5 w-5 text-blue-400" :fill "currentColor" :viewBox "0 0 20 20"}
-                        ($ :path {:fillRule "evenodd" :d "M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" :clipRule "evenodd"})))
-                  ($ :div.ml-3
-                     ($ :h3.text-sm.font-medium.text-blue-800 "JSON Schema Guidelines")
-                     ($ :div.mt-2.text-sm.text-blue-700
-                        ($ :ul.list-disc.space-y-1.pl-5
-                           ($ :li
-                              "Follow "
-                              ($ :a.underline.hover:text-blue-900 {:href "https://json-schema.org/" :target "_blank"} "JSON Schema")
-                              " specification")
-                           ($ :li "AOR supports " ($ :code.bg-blue-100.px-1.rounded "x-javaType") " extension to reference Java types")
-                           ($ :li "Do not include " ($ :code.bg-blue-100.px-1.rounded "$schema") " or " ($ :code.bg-blue-100.px-1.rounded "$vocabulary") " keys - these are added automatically")))))))
+          ($ :div.bg-blue-50.border.border-blue-200.rounded-md.p-4
+             ($ :div.flex
+                ($ :div.flex-shrink-0
+                   ($ :svg {:className "h-5 w-5 text-blue-400" :fill "currentColor" :viewBox "0 0 20 20"}
+                      ($ :path {:fillRule "evenodd" :d "M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" :clipRule "evenodd"})))
+                ($ :div.ml-3
+                   ($ :h3.text-sm.font-medium.text-blue-800 "JSON Schema Guidelines")
+                   ($ :div.mt-2.text-sm.text-blue-700
+                      ($ :ul.list-disc.space-y-1.pl-5
+                         ($ :li
+                            "Follow "
+                            ($ :a.underline.hover:text-blue-900 {:href "https://json-schema.org/" :target "_blank"} "JSON Schema")
+                            " specification")
+                         ($ :li "AOR supports " ($ :code.bg-blue-100.px-1.rounded "x-javaType") " extension to reference Java types")
+                         ($ :li "Do not include " ($ :code.bg-blue-100.px-1.rounded "$schema") " or " ($ :code.bg-blue-100.px-1.rounded "$vocabulary") " keys - these are added automatically")))))))
 
-         (when error
-           ($ forms/form-error {:error error}))
+       (when error
+         ($ forms/form-error {:error error}))
 
-         ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
-                                :on-submit handle-create
-                                :submit-text "Create Dataset"
-                                :submitting? submitting?
-                                :disabled? (not is-valid?)}))))
+       ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
+                              :on-submit handle-create
+                              :submit-text "Create Dataset"
+                              :submitting? submitting?
+                              :disabled? (not is-valid?)}))))
 
 (defui EditDatasetForm [{:keys [module-id dataset-id initial-name initial-description on-success]}]
   (let [name-field (forms/use-form-state initial-name [forms/required])
@@ -122,26 +120,26 @@
                                :initial-description initial-description
                                :on-success on-success}))]
 
-      ($ :div
-         ($ :div.space-y-4
-            ($ forms/form-field {:label "Name"
-                                 :value (:value name-field)
-                                 :on-change (:set-value name-field)
-                                 :error (:error name-field)
-                                 :required? true})
-            ($ forms/form-field {:label "Description"
-                                 :type :textarea
-                                 :value (:value description-field)
-                                 :on-change (:set-value description-field)
-                                 :rows 3}))
+    ($ :div
+       ($ :div.space-y-4
+          ($ forms/form-field {:label "Name"
+                               :value (:value name-field)
+                               :on-change (:set-value name-field)
+                               :error (:error name-field)
+                               :required? true})
+          ($ forms/form-field {:label "Description"
+                               :type :textarea
+                               :value (:value description-field)
+                               :on-change (:set-value description-field)
+                               :rows 3}))
 
-         ($ forms/form-error {:error error})
+       ($ forms/form-error {:error error})
 
-         ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
-                                  :on-submit handle-save
-                                  :submit-text "Save Changes"
-                                  :submitting? submitting?
-                                  :disabled? (not is-valid?)}))))
+       ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
+                              :on-submit handle-save
+                              :submit-text "Save Changes"
+                              :submitting? submitting?
+                              :disabled? (not is-valid?)}))))
 
 (defui AddExampleForm [{:keys [module-id dataset-id snapshot-name on-success]}]
   (let [input-field (forms/use-form-state "" [forms/required forms/valid-json])
@@ -157,34 +155,34 @@
                               :snapshot-name snapshot-name
                               :input (:value input-field)
                               :output (:value output-field)
-                                                               :on-success on-success}))]
+                              :on-success on-success}))]
 
-      ($ :div
-         ($ :div.space-y-4
-            ($ forms/form-field {:label "Input (JSON)"
-                                 :type :textarea
-                                 :value (:value input-field)
-                                 :on-change (:set-value input-field)
-                                 :error (:error input-field)
-                                 :placeholder "Enter input as a valid JSON object..."
-                                 :rows 12
-                                 :class-name "font-mono"})
-            ($ forms/form-field {:label "Reference Output (JSON, Optional)"
-                                 :type :textarea
-                                 :value (:value output-field)
-                                 :on-change (:set-value output-field)
-                                 :error (:error output-field)
-                                 :placeholder "Enter reference output as valid JSON..."
-                                 :rows 12
-                                 :class-name "font-mono"}))
+    ($ :div
+       ($ :div.space-y-4
+          ($ forms/form-field {:label "Input (JSON)"
+                               :type :textarea
+                               :value (:value input-field)
+                               :on-change (:set-value input-field)
+                               :error (:error input-field)
+                               :placeholder "Enter input as a valid JSON object..."
+                               :rows 12
+                               :class-name "font-mono"})
+          ($ forms/form-field {:label "Reference Output (JSON, Optional)"
+                               :type :textarea
+                               :value (:value output-field)
+                               :on-change (:set-value output-field)
+                               :error (:error output-field)
+                               :placeholder "Enter reference output as valid JSON..."
+                               :rows 12
+                               :class-name "font-mono"}))
 
-         ($ forms/form-error {:error error})
+       ($ forms/form-error {:error error})
 
-         ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
-                                :on-submit handle-add
-                                :submit-text "Add Example"
-                                :submitting? submitting?
-                                :disabled? (not is-valid?)}))))
+       ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
+                              :on-submit handle-add
+                              :submit-text "Add Example"
+                              :submitting? submitting?
+                              :disabled? (not is-valid?)}))))
 
 (defui CreateSnapshotForm [{:keys [module-id dataset-id from-snapshot-name on-success]}]
   (let [to-name-field (forms/use-form-state "" [forms/required])
@@ -219,13 +217,13 @@
                                :on-change (:set-value to-name-field)
                                :error (:error to-name-field)
                                :required? true})))
-       (when error-msg
-         ($ forms/form-error {:error error-msg}))
-       ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
-                               :on-submit handle-create
-                               :submit-text "Create"
-                               :submitting? submitting?
-                               :disabled? (not is-valid?)})))
+    (when error-msg
+      ($ forms/form-error {:error error-msg}))
+    ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
+                           :on-submit handle-create
+                           :submit-text "Create"
+                           :submitting? submitting?
+                           :disabled? (not is-valid?)})))
 
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon]}]
   ($ :div
@@ -585,7 +583,7 @@
 
         examples (let [raw-examples (get examples-response :examples) ;; Use renamed response
                        extracted-examples (mapv (fn [[uuid example-data]]
-                                                  (assoc example-data :example-id uuid))
+                                                  (assoc example-data :example-id (str uuid)))
                                                 raw-examples)]
                    extracted-examples)]
 
