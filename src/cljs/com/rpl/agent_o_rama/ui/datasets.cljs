@@ -484,8 +484,8 @@
   ([module-id dataset-id initial-name initial-description on-success]
    (state/dispatch [:form/init :edit-dataset
                     (-> edit-dataset-form-spec
-                        (assoc-in [:fields :name] (or initial-name ""))
-                        (assoc-in [:fields :description] (or initial-description ""))
+                        (assoc-in [:fields :name] initial-name)
+                        (assoc-in [:fields :description] initial-description)
                         (assoc-in [:submit-event 1] {:module-id module-id
                                                      :dataset-id dataset-id
                                                      :initial-name initial-name
