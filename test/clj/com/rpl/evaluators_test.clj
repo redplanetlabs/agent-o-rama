@@ -124,6 +124,34 @@
                 "extra" extra})))
          {:params {"extra" {:description "extra value"}}})
 
+
+        (aor/declare-summary-evaluator-builder
+         topology
+         "sum1"
+         "Summary comparator"
+         (fn [params]
+           (fn [fetcher example-runs]
+             {"res"
+              (reduce
+               (fn [res {:keys [input reference-output output]}]
+                 (+ res input reference-output output))
+               0
+               example-runs)}
+           )))
+        (aor/declare-summary-evaluator-builder
+         topology
+         "sum2"
+         "Summary comparator"
+         (fn [{:strs [extra]}]
+           (fn [fetcher example-runs]
+             {"res"
+              (reduce
+               (fn [res {:keys [input reference-output output]}]
+                 (+ res input reference-output output))
+               (parse-long extra)
+               example-runs)}))
+         {:params {"extra" {:description "extra value"}}})
+
         (TestSnippets/declareEvaluatorBuilders topology)
         (-> topology
             (aor/new-agent "foo")
@@ -388,7 +416,42 @@
      (is (= {"res" :c "extra" "99"}
             (aor/try-comparative-evaluator manager "myc2" 2 1 [:a :b :c])))
 
-     ;; TODO: <<<<>>>> test summary and comparative declarations and tries (both
-     ;; clojure and Java for declarations)
+
+     (is (thrown? clojure.lang.ExceptionInfo
+                  (aor/create-evaluator! manager
+                                         "ajudge"
+                                         "sum1"
+                                         {}
+                                         "my summer")))
+
+     (aor/create-evaluator! manager
+                            "sum1"
+                            "sum1"
+                            {}
+                            "my summer")
+
+     (aor/create-evaluator! manager
+                            "sum2"
+                            "sum2"
+                            {"extra" "10"}
+                            "my summer 2")
+
+     (is (thrown? clojure.lang.ExceptionInfo
+                  (aor/try-evaluator manager "sum1" 1 2 [:a :b :c])))
+
+     (is (= {"res" 21}
+            (aor/try-summary-evaluator manager
+                                       "sum1"
+                                       [(aor/mk-example-run 1 2 3)
+                                        (aor/mk-example-run 4 5 6)])))
+     (is (= {"res" 31}
+            (aor/try-summary-evaluator manager
+                                       "sum2"
+                                       [(aor/mk-example-run 1 2 3)
+                                        (aor/mk-example-run 4 5 6)])))
+
+
+
+     ;; TODO: <<<<>>>> test declaring and using java comparative and summary
      ;;   - test f1 built-in
     )))
