@@ -153,13 +153,25 @@
                               :disabled? (not is-valid?)}))))
 
 (defui EditExampleForm [{:keys [module-id dataset-id snapshot-name example-id initial-input initial-output on-success]}]
-  (let [input-field (forms/use-form-state (or initial-input "") [forms/required forms/valid-json])
-        output-field (forms/use-form-state (or initial-output "") [forms/valid-json])
+  (let [;; Convert initial values to JSON strings for form display
+        initial-input-str (if (string? initial-input) 
+                           initial-input 
+                           (if initial-input 
+                             (js/JSON.stringify (clj->js initial-input) nil 2)
+                             ""))
+        initial-output-str (if (string? initial-output)
+                            initial-output
+                            (if initial-output
+                              (js/JSON.stringify (clj->js initial-output) nil 2)
+                              ""))
+
+        input-field (forms/use-form-state initial-input-str [forms/required forms/valid-json])
+        output-field (forms/use-form-state initial-output-str [forms/valid-json])
         {:keys [submitting? error submit]} (forms/use-global-form-submission :dataset/edit-example)
 
         ;; Check if form values have changed from initial values
-        is-changed? (or (not= (:value input-field) (or initial-input ""))
-                        (not= (:value output-field) (or initial-output "")))
+        is-changed? (or (not= (:value input-field) initial-input-str)
+                        (not= (:value output-field) initial-output-str))
 
         is-valid? (and (nil? (:error input-field))
                        (nil? (:error output-field))
