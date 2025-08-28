@@ -191,7 +191,7 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
    }
 
    ;; TODO: <<<<>>>>
-   ;;  - add f1 score buildeer
+   ;;  - add f1 score builder
   })
 
 

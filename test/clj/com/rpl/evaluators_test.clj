@@ -90,6 +90,40 @@
           :input-path?  true
           :output-path? false
           :reference-output-path? false})
+
+        (aor/declare-comparative-evaluator-builder
+         topology
+         "compare1"
+         "A comparator"
+         (fn [params]
+           (fn [fetcher input ref-output outputs]
+             (let [v (cond (< input ref-output)
+                           (nth outputs 0)
+
+                           (> input ref-output)
+                           (nth outputs 2)
+
+                           :else
+                           (nth outputs 1))]
+               {"res" v}))))
+        (aor/declare-comparative-evaluator-builder
+         topology
+         "compare2"
+         "Another comparator"
+         (fn [{:strs [extra]}]
+           (fn [fetcher input ref-output outputs]
+             (let [v (cond (< input ref-output)
+                           (nth outputs 0)
+
+                           (> input ref-output)
+                           (nth outputs 2)
+
+                           :else
+                           (nth outputs 1))]
+               {"res"   v
+                "extra" extra})))
+         {:params {"extra" {:description "extra value"}}})
+
         (TestSnippets/declareEvaluatorBuilders topology)
         (-> topology
             (aor/new-agent "foo")
@@ -316,6 +350,45 @@
                             "CD"
                             "EF")))
 
+     (try
+       (aor/create-evaluator! manager
+                              "ajudge"
+                              "compare1"
+                              {}
+                              "my comparator")
+       (is false)
+       (catch clojure.lang.ExceptionInfo e
+         (is
+          (h/contains-string? (ex-message e) "Evaluator already exists"))))
+
+     (aor/create-evaluator! manager
+                            "myc"
+                            "compare1"
+                            {}
+                            "my comparator")
+     (aor/create-evaluator! manager
+                            "myc2"
+                            "compare2"
+                            {"extra" "99"}
+                            "my comparator")
+
+     (is (thrown? clojure.lang.ExceptionInfo
+                  (aor/try-evaluator manager "myc" 1 2 [:a :b :c])))
+
+     (is (= {"res" :a}
+            (aor/try-comparative-evaluator manager "myc" 1 2 [:a :b :c])))
+     (is (= {"res" :b}
+            (aor/try-comparative-evaluator manager "myc" 1 1 [:a :b :c])))
+     (is (= {"res" :c}
+            (aor/try-comparative-evaluator manager "myc" 2 1 [:a :b :c])))
+     (is (= {"res" :a "extra" "99"}
+            (aor/try-comparative-evaluator manager "myc2" 1 2 [:a :b :c])))
+     (is (= {"res" :b "extra" "99"}
+            (aor/try-comparative-evaluator manager "myc2" 1 1 [:a :b :c])))
+     (is (= {"res" :c "extra" "99"}
+            (aor/try-comparative-evaluator manager "myc2" 2 1 [:a :b :c])))
+
      ;; TODO: <<<<>>>> test summary and comparative declarations and tries (both
      ;; clojure and Java for declarations)
+     ;;   - test f1 built-in
     )))
