@@ -225,20 +225,22 @@
                                :disabled? (not is-valid?)})))
 
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon]}]
-  ($ :button
-     {:onClick on-select
-      :className (str "group flex items-center justify-between w-full px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer "
+  ($ :div
+     {:className (str "group flex items-center justify-between w-full px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer "
                       (cond
                         action? "text-blue-600 hover:bg-blue-50"
                         selected? "text-blue-600 bg-blue-50"
-                        :else "text-gray-700"))}
+                        :else "text-gray-700"))
+      :onClick on-select}
      ($ :div.flex.items-center.justify-between.w-full
         ($ :div.flex.items-center
            (when icon icon)
            ($ :span.truncate {:className (when icon "ml-3")} label))
         ($ :div.flex.items-center.space-x-2
            (when selected? ($ :span "✓"))
-           delete-button))))
+           (when delete-button
+             ($ :div {:onClick #(.stopPropagation %)}
+                delete-button))))))
 
 (defui SnapshotManager [{:keys [module-id dataset-id selected-snapshot set-selected-snapshot]}]
   (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
