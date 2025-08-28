@@ -502,6 +502,48 @@
                                        [(aor/mk-example-run 1 2 3)
                                         (aor/mk-example-run 4 5 6)])))
 
-     ;; TODO: <<<<>>>>
-     ;;   - test f1 built-in
+
+     (aor/create-evaluator! manager
+                            "myf1"
+                            "aor/f1-score"
+                            {"positiveValue" "+"}
+                            "my f1 score")
+
+     (is (= {"score" 1.0}
+            (aor/try-summary-evaluator manager
+                                       "myf1"
+                                       [(aor/mk-example-run nil "+" "+")
+                                        (aor/mk-example-run nil "-" "-")
+                                        (aor/mk-example-run nil "+" "+")])))
+     (is (= {"score" (double (/ 2 3))}
+            (aor/try-summary-evaluator manager
+                                       "myf1"
+                                       [(aor/mk-example-run nil "+" "+")
+                                        (aor/mk-example-run nil "-" "+")])))
+     (is (= {"score" 0.0}
+            (aor/try-summary-evaluator manager
+                                       "myf1"
+                                       [(aor/mk-example-run nil "+" "-")])))
+     (is (= {"score" 0.0}
+            (aor/try-summary-evaluator manager
+                                       "myf1"
+                                       [(aor/mk-example-run nil "-" "-")
+                                        (aor/mk-example-run nil "-" "-")
+                                        (aor/mk-example-run nil "-" "-")])))
+     (is (= {"score" 0.5}
+            (aor/try-summary-evaluator manager
+                                       "myf1"
+                                       [(aor/mk-example-run nil "+" "+")
+                                        (aor/mk-example-run nil "-" "+")
+                                        (aor/mk-example-run nil "+" "-")])))
+     (is (= {"score" 0.0}
+            (aor/try-summary-evaluator manager
+                                       "myf1"
+                                       [])))
+     (is (= {"score" 0.0}
+            (aor/try-summary-evaluator manager
+                                       "myf1"
+                                       [(aor/mk-example-run nil "-" "+")
+                                        (aor/mk-example-run nil "-" "+")
+                                        (aor/mk-example-run nil "-" "+")])))
     )))

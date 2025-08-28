@@ -190,8 +190,47 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
      :reference-output-path? false}
    }
 
-   ;; TODO: <<<<>>>>
-   ;;  - add f1 score builder
+   "aor/f1-score"
+   {:type        :summary
+    :builder-fn
+    (fn [{:strs [positiveValue]}]
+      (fn [fetcher example-runs]
+        (let [{:keys [tp fp fn]}
+              (reduce
+               (fn [{:keys [tp fp fn] :as acc}
+                    {:keys [output reference-output]}]
+                 (cond
+                   (and (= output positiveValue)
+                        (= reference-output positiveValue))
+                   (assoc acc :tp (inc tp))
+
+                   (and (= output positiveValue)
+                        (not= reference-output positiveValue))
+                   (assoc acc :fp (inc fp))
+
+                   (and (not= output positiveValue)
+                        (= reference-output positiveValue))
+                   (assoc acc :fn (inc fn))
+
+                   :else acc))
+               {:tp 0 :fp 0 :fn 0}
+               example-runs)
+              precision (if (pos? (+ tp fp)) (/ tp (+ tp fp)) 0.0)
+              recall    (if (pos? (+ tp fn)) (/ tp (+ tp fn)) 0.0)]
+          {"score"
+           (if (pos? (+ precision recall))
+             (double (/ (* 2 precision recall) (+ precision recall)))
+             0.0)})))
+    :description
+    "Compute F1 score on a list of runs using the provided 'positiveValue' param to determine true positives, false positives, and false negatives."
+    :options
+    {:params
+     {"positiveValue"
+      {:description
+       "Value considered a positive classification"
+      }}
+     :input-path? false}
+   }
   })
 
 
