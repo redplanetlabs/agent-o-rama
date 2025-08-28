@@ -287,6 +287,7 @@
   (queries/declare-search-datasets-topology topologies)
   (queries/declare-all-evaluator-builders-query-topology topologies)
   (queries/declare-try-evaluator-query-topology topologies)
+  (queries/declare-search-evaluators-query-topology topologies)
   (doseq [[agent-name agent-graph] agent-graphs]
     (define-agent! agent-name
                    setup

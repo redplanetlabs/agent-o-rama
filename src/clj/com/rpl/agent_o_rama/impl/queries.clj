@@ -63,6 +63,10 @@
   []
   "_aor-try-evaluator")
 
+(defn search-evaluators-name
+  []
+  "_aor-search-evaluators")
+
 (defn- to-pqueue
   [coll]
   (reduce conj PersistentQueue/EMPTY coll))
@@ -541,3 +545,56 @@
                                                    *params))
       (completable-future> *cf :> *res)
       (|origin))))
+
+(defn conj-vol!
+  [v item]
+  (vswap! v conj item))
+
+;; - filters can contain :search-string, which matches against the evaluator
+;; name, or :types which is set of :regular, :comparative, or :summary
+;; - limit is approximate, it will return at least that amount and up to twice
+;; that amount
+;; - returns {:items [{:name ... :description ... :builder-name ...
+;;                    :builder-params ... <all the other info in the PState>}
+;;                    ...]
+;;            :pagination-params <next-key>}
+(defn declare-search-evaluators-query-topology
+  [topologies]
+  (let [evals-pstate-sym (symbol (po/evaluators-task-global-name))]
+    (<<query-topology topologies
+      (search-evaluators-name)
+      [*filters *limit *next-key :> *res]
+      (identity *filters :> {:keys [*types *search-string]})
+      (|direct 0)
+      (str/lower-case *search-string :> *search-string-lower)
+      (volatile! [] :> *results)
+      (evals/all-evaluator-builders :> *builders)
+      (loop<- [*next-key *next-key
+               :> *page-key]
+        (yield-if-overtime)
+        (local-select> (sorted-map-range-from *next-key *limit)
+                       evals-pstate-sym
+                       :> *m)
+        (<<atomic
+          (ops/explode *m :> [*name {:keys [*builder-name] :as *info}])
+          (select> [(keypath *builder-name) :type] *builders :> *type)
+          (filter> (some? *type))
+          (<<if (some? *types)
+            (filter> (contains? *types *type)))
+          (<<if (some? *search-string)
+            (filter> (h/contains-string? (str/lower-case *name)
+                                         *search-string-lower)))
+          (conj-vol! *results (assoc *info :name *name)))
+        (<<cond
+         (case> (< (count *m) *limit))
+          (:> nil)
+
+         (case> (>= (count @*results) *limit))
+          (:> (h/last-key *m))
+
+         (default>)
+          (continue> (h/last-key *m))))
+      (deref *results :> *items)
+      (|origin)
+      (hash-map :items *items :pagination-params *page-key :> *res)
+    )))
