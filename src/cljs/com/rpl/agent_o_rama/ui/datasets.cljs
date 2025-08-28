@@ -28,40 +28,38 @@
 ;; MODAL FOR CREATING DATASETS
 ;; =============================================================================
 (defui CreateDatasetForm [{:keys [form-id]}]
-  (let [{:keys [get-field set-field error]} (forms/use-centralized-form form-id)
-        name-val (get-field :name)
-        input-schema-val (get-field :input-schema)
-        output-schema-val (get-field :output-schema)
-        name-error (forms/required name-val)
-        input-schema-error (forms/valid-json input-schema-val)
-        output-schema-error (forms/valid-json output-schema-val)]
+  (let [{:keys [error]} (forms/use-centralized-form form-id)
+        name-field (forms/use-form-field form-id :name)
+        description-field (forms/use-form-field form-id :description)
+        input-schema-field (forms/use-form-field form-id :input-schema)
+        output-schema-field (forms/use-form-field form-id :output-schema)]
 
     ($ forms/form
        ($ forms/form-field {:label "Name"
-                            :value name-val
-                            :on-change #(set-field :name %)
-                            :error name-error
+                            :value (:value name-field)
+                            :on-change (:on-change name-field)
+                            :error (:error name-field)
                             :required? true})
        ($ forms/form-field {:label "Description"
                             :type :textarea
-                            :value (get-field :description)
-                            :on-change #(set-field :description %)
+                            :value (:value description-field)
+                            :on-change (:on-change description-field)
                             :placeholder "Optional description for this dataset"
                             :rows 3})
        ($ :div.grid.grid-cols-2.gap-4
           ($ forms/form-field {:label "Input JSON Schema"
                                :type :textarea
-                               :value input-schema-val
-                               :on-change #(set-field :input-schema %)
-                               :error input-schema-error
+                               :value (:value input-schema-field)
+                               :on-change (:on-change input-schema-field)
+                               :error (:error input-schema-field)
                                :placeholder example-schema
                                :rows 15
                                :class-name "font-mono"})
           ($ forms/form-field {:label "Output JSON Schema"
                                :type :textarea
-                               :value output-schema-val
-                               :on-change #(set-field :output-schema %)
-                               :error output-schema-error
+                               :value (:value output-schema-field)
+                               :on-change (:on-change output-schema-field)
+                               :error (:error output-schema-field)
                                :placeholder example-schema
                                :rows 15
                                :class-name "font-mono"}))
@@ -98,22 +96,17 @@
        ($ forms/form-field {:label "Name"
                             :value (:value name-field)
                             :on-change (:on-change name-field)
+                            :error (:error name-field)
                             :required? true})
        ($ forms/form-field {:label "Description"
                             :type :textarea
                             :value (:value description-field)
                             :on-change (:on-change description-field)
+                            :error (:error description-field)
                             :rows 3})
 
        ;; form-error now reads from the centralized state
-       ($ forms/form-error {:error error})
-
-       ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
-                              ;; Submission is now a simple, declarative event
-                              :on-submit #(state/dispatch [:form/submit form-id])
-                              :submit-text "Save Changes"
-                              :submitting? submitting?
-                              :disabled? (not valid?)}))))
+       ($ forms/form-error {:error error}))))
 
 (defui AddExampleForm [{:keys [form-id]}]
   (let [;; Use the centralized form hook
@@ -128,6 +121,7 @@
                             :type :textarea
                             :value (:value input-field)
                             :on-change (:on-change input-field)
+                            :error (:error input-field)
                             :placeholder "Enter input as a valid JSON object..."
                             :rows 12
                             :class-name "font-mono"})
@@ -135,19 +129,13 @@
                             :type :textarea
                             :value (:value output-field)
                             :on-change (:on-change output-field)
+                            :error (:error output-field)
                             :placeholder "Enter reference output as valid JSON..."
                             :rows 12
                             :class-name "font-mono"})
 
        ;; form-error now reads from the centralized state
-       ($ forms/form-error {:error error})
-
-       ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
-                              ;; Submission is now a simple, declarative event
-                              :on-submit #(state/dispatch [:form/submit form-id])
-                              :submit-text "Add Example"
-                              :submitting? submitting?
-                              :disabled? (not valid?)}))))
+       ($ forms/form-error {:error error}))))
 
 (defui EditExampleForm [{:keys [module-id dataset-id snapshot-name example-id initial-input initial-output on-success]}]
   (let [;; Convert initial values to JSON strings for form display
@@ -204,13 +192,7 @@
                             :rows 12
                             :class-name "font-mono"})
 
-       ($ forms/form-error {:error error})
-
-       ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
-                              :on-submit handle-save
-                              :submit-text "Save Changes"
-                              :submitting? submitting?
-                              :disabled? (not is-valid?)}))))
+       ($ forms/form-error {:error error}))))
 
 (defui CreateSnapshotForm [{:keys [module-id dataset-id from-snapshot-name on-success]}]
   (let [to-name-field (forms/use-form-state "" [forms/required])
@@ -246,13 +228,7 @@
                             :error (:error to-name-field)
                             :required? true})
        (when error-msg
-         ($ forms/form-error {:error error-msg}))
-
-       ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
-                              :on-submit handle-create
-                              :submit-text "Create"
-                              :submitting? submitting?
-                              :disabled? (not is-valid?)}))))
+         ($ forms/form-error {:error error-msg})))))
 
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon]}]
   ($ :div

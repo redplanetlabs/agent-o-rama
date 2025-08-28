@@ -63,11 +63,12 @@
   "Hook for working with centralized form state management.
    
    Usage:
-   (let [{:keys [fields set-field valid? submitting? error]} (use-centralized-form form-id)]
+   (let [{:keys [fields field-errors set-field valid? submitting? error]} (use-centralized-form form-id)]
      ...)"
   [form-id]
   (let [form-state (state/use-sub [:forms form-id])
         fields (or (:fields form-state) {})
+        field-errors (or (:field-errors form-state) {})
         valid? (boolean (:valid? form-state))
         submitting? (boolean (:submitting? form-state))
         error (:error form-state)
@@ -83,6 +84,7 @@
                    [fields])]
 
     {:fields fields
+     :field-errors field-errors
      :get-field get-field
      :set-field set-field
      :valid? valid?
@@ -93,17 +95,19 @@
   "Hook for individual form field that integrates with centralized state.
    
    Usage:
-   (let [{:keys [value on-change]} (use-form-field form-id :name)]
+   (let [{:keys [value error on-change]} (use-form-field form-id :name)]
      ...)"
   [form-id field-key]
-  (let [{:keys [get-field set-field]} (use-centralized-form form-id)
+  (let [{:keys [get-field set-field field-errors]} (use-centralized-form form-id)
         value (get-field field-key)
+        error (get field-errors field-key)
         on-change (uix/use-callback
                    (fn [new-value]
                      (set-field field-key new-value))
                    [set-field field-key])]
 
     {:value value
+     :error error
      :on-change on-change}))
 
 ;; =============================================================================

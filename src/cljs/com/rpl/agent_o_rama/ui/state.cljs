@@ -286,24 +286,29 @@
 ;; =============================================================================
 
 (defn- validate-form-fields
-  "Validates all fields in a form using their configured validators.
-   Returns true if all fields are valid, false otherwise."
+  "Validate fields against validators. Returns a map {:valid? boolean :errors {field-key error-str-or-nil}}"
   [fields validators]
-  (every? (fn [[field-key field-value]]
-            (let [field-validators (get validators field-key)]
-              (if field-validators
-                (every? #(nil? (% field-value)) field-validators)
-                true))) ; No validators means field is valid
-          fields))
+  (let [field-keys (set (concat (keys fields) (keys validators)))
+        errors (into {}
+                     (for [k field-keys]
+                       (let [value (get fields k "")
+                             field-validators (get validators k)
+                             first-error (when (seq field-validators)
+                                           (some #(% value) field-validators))]
+                         [k first-error])))]
+    {:errors errors
+     :valid? (every? nil? (vals errors))}))
 
 (reg-event :form/init
            (fn [db form-id {:keys [fields validators submit-event]}]
-             [:forms form-id (s/terminal-val {:fields (or fields {})
-                                              :validators (or validators {})
-                                              :valid? (validate-form-fields (or fields {}) (or validators {}))
-                                              :submitting? false
-                                              :error nil
-                                              :submit-event submit-event})]))
+             (let [{:keys [valid? errors]} (validate-form-fields (or fields {}) (or validators {}))]
+               [:forms form-id (s/terminal-val {:fields (or fields {})
+                                                :validators (or validators {})
+                                                :field-errors errors
+                                                :valid? valid?
+                                                :submitting? false
+                                                :error nil
+                                                :submit-event submit-event})])))
 
 (reg-event :form/update-field
            (fn [db form-id field-key value]
@@ -312,10 +317,11 @@
                (fn [form-state]
                  (let [updated-fields (assoc (:fields form-state) field-key value)
                        validators (:validators form-state)
-                       new-valid? (validate-form-fields updated-fields validators)]
+                       {:keys [valid? errors]} (validate-form-fields updated-fields validators)]
                    (assoc form-state
                           :fields updated-fields
-                          :valid? new-valid?))))]))
+                          :field-errors errors
+                          :valid? valid?))))]))
 
 (reg-event :form/set-submitting
            (fn [db form-id submitting?]
@@ -352,10 +358,11 @@
               (s/terminal
                (fn [form-state]
                  (let [validators (:validators form-state)
-                       new-valid? (validate-form-fields initial-fields validators)]
+                       {:keys [valid? errors]} (validate-form-fields initial-fields validators)]
                    (assoc form-state
                           :fields initial-fields
-                          :valid? new-valid?
+                          :field-errors errors
+                          :valid? valid?
                           :error nil
                           :submitting? false))))]))
 
