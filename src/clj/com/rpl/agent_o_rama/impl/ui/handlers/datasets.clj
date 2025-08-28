@@ -82,11 +82,7 @@
         {:status :ok})
       (catch com.fasterxml.jackson.core.JsonParseException e
         (throw (ex-info (str "Invalid JSON provided: " (.getOriginalMessage e))
-                        {:field (if (str/includes? (.getMessage e) "input") :input :output)})))
-      (catch Exception e
-        ;; The validation error from `add-dataset-example!` will be in the cause.
-        (let [cause (.getCause e)]
-          (throw (ex-info (or (and cause (.getMessage cause)) (.getMessage e)) {})))))))
+                        {:field (if (str/includes? (.getMessage e) "input") :input :output)}))))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-snapshot-names
   [{:keys [module-id dataset-id]} uid]
@@ -100,31 +96,21 @@
   (let [decoded-module-id (common/url-decode module-id)
         manager (common/get-manager decoded-module-id)
         from-name (when-not (str/blank? from-snapshot-name) from-snapshot-name)]
-    (try
-      (aor/snapshot-dataset! manager (UUID/fromString dataset-id) from-name to-snapshot-name)
-      {:status :ok}
-      (catch Exception e
-        (throw (ex-info (-> e .getCause .getMessage) {}))))))
+    (aor/snapshot-dataset! manager (UUID/fromString dataset-id) from-name to-snapshot-name)
+    {:status :ok}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/delete-snapshot
   [{:keys [module-id dataset-id snapshot-name]} uid]
   (let [decoded-module-id (common/url-decode module-id)
         manager (common/get-manager decoded-module-id)]
-    (try
-      (aor/remove-dataset-snapshot! manager (UUID/fromString dataset-id) snapshot-name)
-      {:status :ok}
-      (catch Exception e
-        (throw (ex-info (-> e .getCause .getMessage) {}))))))
+    (aor/remove-dataset-snapshot! manager (UUID/fromString dataset-id) snapshot-name)
+    {:status :ok}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/delete-example
   [{:keys [module-id dataset-id snapshot-name example-id]} uid]
   (let [decoded-module-id (common/url-decode module-id)
         manager (common/get-manager decoded-module-id)]
-    (try
-      (aor/remove-dataset-example! manager
-                                   (UUID/fromString dataset-id)
-                                   (UUID/fromString example-id)
-                                   {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)})
-      {:status :ok}
-      (catch Exception e
-        (throw (ex-info (-> e .getCause .getMessage) {}))))))
+    (aor/remove-dataset-example! manager
+                                 (UUID/fromString dataset-id)
+                                 (UUID/fromString example-id)
+                                 {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)})))
