@@ -99,7 +99,7 @@
 
 (defui form-field
   "Reusable form field component with label, input, and error display.
-   
+
    Props:
    - :label - Field label text
    - :type - Input type (:text, :textarea, :email, etc.)

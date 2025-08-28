@@ -32,12 +32,12 @@
         description-field (forms/use-form-state "")
         input-schema-field (forms/use-form-state "" [forms/valid-json])
         output-schema-field (forms/use-form-state "" [forms/valid-json])
-        {:keys [submitting? error submit]} (forms/use-global-form-submission :dataset/create)]
+        {:keys [submitting? error submit]} (forms/use-global-form-submission :dataset/create)
 
         is-valid? (and (nil? (:error name-field))
-                        (nil? (:error input-schema-field))
-                        (nil? (:error output-schema-field))
-                        (not (str/blank? (:value name-field))))
+                       (nil? (:error input-schema-field))
+                       (nil? (:error output-schema-field))
+                       (not (str/blank? (:value name-field))))
 
         handle-create (fn []
                         (submit {:module-id module-id
@@ -45,7 +45,7 @@
                                  :description (:value description-field)
                                  :input-schema (:value input-schema-field)
                                  :output-schema (:value output-schema-field)
-                                 :on-success on-success}))
+                                 :on-success on-success}))]
 
       ($ :div
          ($ :div.space-y-4
@@ -109,16 +109,16 @@
         description-field (forms/use-form-state initial-description)
         {:keys [submitting? error submit]} (forms/use-global-form-submission :dataset/edit)
         is-changed? (or (not= (:value name-field) initial-name) (not= (:value description-field) initial-description))
-        is-valid? (and (nil? (:error name-field)) is-changed?)]
+        is-valid? (and (nil? (:error name-field)) is-changed?)
 
         handle-save (fn []
-                        (submit {:module-id module-id
-                                 :dataset-id dataset-id
-                                 :name (:value name-field)
-                                 :description (:value description-field)
-                                 :initial-name initial-name
-                                 :initial-description initial-description
-                                 :on-success on-success}))
+                      (submit {:module-id module-id
+                               :dataset-id dataset-id
+                               :name (:value name-field)
+                               :description (:value description-field)
+                               :initial-name initial-name
+                               :initial-description initial-description
+                               :on-success on-success}))]
 
       ($ :div
          ($ :div.space-y-4
@@ -147,15 +147,16 @@
         {:keys [submitting? error submit]} (forms/use-global-form-submission :dataset/add-example)
         is-valid? (and (nil? (:error input-field))
                        (nil? (:error output-field))
-                       (not (str/blank? (:value input-field))))]
+                       (not (str/blank? (:value input-field))))
 
         handle-add (fn []
-                        (submit {:module-id module-id
-                                 :dataset-id dataset-id
-                                 :snapshot-name snapshot-name
-                                 :input (:value input-field)
-                                 :output (:value output-field)
-                                 :on-success on-success}))
+                     (submit {:module-id module-id
+                              :dataset-id dataset-id
+                              :snapshot-name snapshot-name
+                              :input (:value input-field)
+                              :output (:value output-field)
+                                                               :on-success on-success}))]
+
       ($ :div
          ($ :div.space-y-4
             ($ forms/form-field {:label "Input (JSON)"
