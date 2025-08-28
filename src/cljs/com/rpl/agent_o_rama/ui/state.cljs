@@ -1,11 +1,32 @@
 (ns com.rpl.agent-o-rama.ui.state
   (:require
    [com.rpl.specter :as s]
-   [uix.core :as uix]))
+   [uix.core :as uix]
+   [clojure.string :as str]))
 
 ;; =============================================================================
 ;; APP-DB: The Single Source of Truth
 ;; =============================================================================
+
+;; =============================================================================
+;; FORM VALIDATORS (defined here to avoid circular dependencies)
+;; =============================================================================
+
+(def required
+  "Validator for required fields"
+  (fn [value]
+    (when (str/blank? value)
+      "This field is required")))
+
+(def valid-json
+  "Validator for JSON strings"
+  (fn [value]
+    (when-not (str/blank? value)
+      (try
+        (js/JSON.parse value)
+        nil ; Valid JSON
+        (catch js/Error e
+          (str "Invalid JSON: " (.-message e)))))))
 
 (def initial-db
   {:current-invocation {:invoke-id nil
@@ -358,6 +379,47 @@
                                         :on-error (fn [error]
                                                     (dispatch [:form/set-submitting (or form-id :create-dataset) false])
                                                     (dispatch [:form/set-error (or form-id :create-dataset) error]))}])
+             nil))
+
+ ;; Enhanced modal/form events for datasets
+;; NOTE: Modal initialization is now handled directly in the UI layer
+;; to avoid circular dependencies between state and UI components
+
+;; Modal events removed - handled directly in UI layer
+
+(reg-event :dataset/edit
+           (fn [db {:keys [module-id dataset-id name description initial-name initial-description on-success form-id]}]
+             ;; This event will be handled by the datasets namespace which has access to sente
+             (dispatch [:sente/request {:event [:datasets/edit {:module-id module-id
+                                                                :dataset-id dataset-id
+                                                                :name name
+                                                                :description description}]
+                                        :timeout 10000
+                                        :on-success (fn []
+                                                      (dispatch [:modal/hide])
+                                                      (dispatch [:form/clear (or form-id :edit-dataset)])
+                                                      (when on-success (on-success)))
+                                        :on-error (fn [error]
+                                                    (dispatch [:form/set-submitting (or form-id :edit-dataset) false])
+                                                    (dispatch [:form/set-error (or form-id :edit-dataset) error]))}])
+             nil))
+
+(reg-event :dataset/add-example
+           (fn [db {:keys [module-id dataset-id snapshot-name input output on-success form-id]}]
+             ;; This event will be handled by the datasets namespace which has access to sente
+             (dispatch [:sente/request {:event [:datasets/add-example {:module-id module-id
+                                                                       :dataset-id dataset-id
+                                                                       :snapshot-name snapshot-name
+                                                                       :input input
+                                                                       :output output}]
+                                        :timeout 10000
+                                        :on-success (fn []
+                                                      (dispatch [:modal/hide])
+                                                      (dispatch [:form/clear (or form-id :add-example)])
+                                                      (when on-success (on-success)))
+                                        :on-error (fn [error]
+                                                    (dispatch [:form/set-submitting (or form-id :add-example) false])
+                                                    (dispatch [:form/set-error (or form-id :add-example) error]))}])
              nil)) ; This handler only dispatches other events
 
 ;; =============================================================================
