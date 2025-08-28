@@ -174,8 +174,9 @@
                     :placeholder placeholder
                     :onChange #(on-change (.. % -target -value))}))
 
-       (when error
-         ($ :p.text-sm.text-red-600.mt-1 error)))))
+       (if error
+         ($ :p.text-sm.text-red-600.mt-1 error)
+         ($ :div.mt-1.h-5)))))
 
 (defui form-actions
   "Reusable form action buttons (Cancel/Submit).
