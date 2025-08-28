@@ -27,89 +27,54 @@
 ;; =============================================================================
 ;; MODAL FOR CREATING DATASETS
 ;; =============================================================================
-(defui CreateDatasetForm [{:keys [module-id on-success]}]
-  (let [name-field (forms/use-form-state "" [forms/required])
-        description-field (forms/use-form-state "")
-        input-schema-field (forms/use-form-state "" [forms/valid-json])
-        output-schema-field (forms/use-form-state "" [forms/valid-json])
-        {:keys [submitting? error submit]} (forms/use-global-form-submission :dataset/create)
+(defui CreateDatasetForm [{:keys [form-id]}]
+  (let [{:keys [get-field set-field]} (forms/use-centralized-form form-id)]
 
-        is-valid? (and (nil? (:error name-field))
-                       (nil? (:error input-schema-field))
-                       (nil? (:error output-schema-field))
-                       (not (str/blank? (:value name-field))))
+    ;; Pure form content - no header/footer/scroll logic handled by modal
+    ($ :div.p-6
+       ($ :div.space-y-4
+          ($ forms/form-field {:label "Name"
+                               :value (get-field :name)
+                               :on-change #(set-field :name %)
+                               :required? true})
+          ($ forms/form-field {:label "Description"
+                               :type :textarea
+                               :value (get-field :description)
+                               :on-change #(set-field :description %)
+                               :placeholder "Optional description for this dataset"
+                               :rows 3})
+          ($ :div.grid.grid-cols-2.gap-4
+             ($ forms/form-field {:label "Input JSON Schema"
+                                  :type :textarea
+                                  :value (get-field :input-schema)
+                                  :on-change #(set-field :input-schema %)
+                                  :placeholder example-schema
+                                  :rows 15
+                                  :class-name "font-mono"})
+             ($ forms/form-field {:label "Output JSON Schema"
+                                  :type :textarea
+                                  :value (get-field :output-schema)
+                                  :on-change #(set-field :output-schema %)
+                                  :placeholder example-schema
+                                  :rows 15
+                                  :class-name "font-mono"}))
 
-        handle-create (fn []
-                        (submit {:module-id module-id
-                                 :name (:value name-field)
-                                 :description (:value description-field)
-                                 :input-schema (:value input-schema-field)
-                                 :output-schema (:value output-schema-field)
-                                 :on-success on-success}))]
-
-    ;; Modal structure: Header (handled by modal) + Scrollable Body + Fixed Footer
-    ($ :div.flex.flex-col.h-96
-       ;; Scrollable body section
-       ($ :div.flex-1.min-h-0.overflow-y-auto
-          ($ :div.p-6
-             ($ :div.space-y-4
-                ($ forms/form-field {:label "Name"
-                                     :value (:value name-field)
-                                     :on-change (:set-value name-field)
-                                     :error (:error name-field)
-                                     :required? true})
-                ($ forms/form-field {:label "Description"
-                                     :type :textarea
-                                     :value (:value description-field)
-                                     :on-change (:set-value description-field)
-                                     :placeholder "Optional description for this dataset"
-                                     :rows 3})
-                ($ :div.grid.grid-cols-2.gap-4
-                   ($ forms/form-field {:label "Input JSON Schema"
-                                        :type :textarea
-                                        :value (:value input-schema-field)
-                                        :on-change (:set-value input-schema-field)
-                                        :error (:error input-schema-field)
-                                        :placeholder example-schema
-                                        :rows 15
-                                        :class-name "font-mono"})
-                   ($ forms/form-field {:label "Output JSON Schema"
-                                        :type :textarea
-                                        :value (:value output-schema-field)
-                                        :on-change (:set-value output-schema-field)
-                                        :error (:error output-schema-field)
-                                        :placeholder example-schema
-                                        :rows 15
-                                        :class-name "font-mono"}))
-
-                ;; JSON Schema Help Box
-                ($ :div.bg-blue-50.border.border-blue-200.rounded-md.p-4
-                   ($ :div.flex
-                      ($ :div.flex-shrink-0
-                         ($ :svg {:className "h-5 w-5 text-blue-400" :fill "currentColor" :viewBox "0 0 20 20"}
-                            ($ :path {:fillRule "evenodd" :d "M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" :clipRule "evenodd"})))
-                      ($ :div.ml-3
-                         ($ :h3.text-sm.font-medium.text-blue-800 "JSON Schema Guidelines")
-                         ($ :div.mt-2.text-sm.text-blue-700
-                            ($ :ul.list-disc.space-y-1.pl-5
-                               ($ :li
-                                  "Follow "
-                                  ($ :a.underline.hover:text-blue-900 {:href "https://json-schema.org/" :target "_blank"} "JSON Schema")
-                                  " specification")
-                               ($ :li "AOR supports " ($ :code.bg-blue-100.px-1.rounded "x-javaType") " extension to reference Java types")
-                               ($ :li "Do not include " ($ :code.bg-blue-100.px-1.rounded "$schema") " or " ($ :code.bg-blue-100.px-1.rounded "$vocabulary") " keys - these are added automatically"))))))
-
-                ;; Error display inside scrollable area
-                (when error
-                  ($ forms/form-error {:error error}))))
-
-       ;; Fixed footer section
-       ($ :div.flex-shrink-0.border-t.border-gray-200.bg-white.px-6.py-4
-          ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
-                                 :on-submit handle-create
-                                 :submit-text "Create Dataset"
-                                 :submitting? submitting?
-                                 :disabled? (not is-valid?)}))))))
+          ;; JSON Schema Help Box
+          ($ :div.bg-blue-50.border.border-blue-200.rounded-md.p-4
+             ($ :div.flex
+                ($ :div.flex-shrink-0
+                   ($ :svg {:className "h-5 w-5 text-blue-400" :fill "currentColor" :viewBox "0 0 20 20"}
+                      ($ :path {:fillRule "evenodd" :d "M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" :clipRule "evenodd"})))
+                ($ :div.ml-3
+                   ($ :h3.text-sm.font-medium.text-blue-800 "JSON Schema Guidelines")
+                   ($ :div.mt-2.text-sm.text-blue-700
+                      ($ :ul.list-disc.space-y-1.pl-5
+                         ($ :li
+                            "Follow "
+                            ($ :a.underline.hover:text-blue-900 {:href "https://json-schema.org/" :target "_blank"} "JSON Schema")
+                            " specification")
+                         ($ :li "AOR supports " ($ :code.bg-blue-100.px-1.rounded "x-javaType") " extension to reference Java types")
+                         ($ :li "Do not include " ($ :code.bg-blue-100.px-1.rounded "$schema") " or " ($ :code.bg-blue-100.px-1.rounded "$vocabulary") " keys - these are added automatically"))))))))))
 
 (defui EditDatasetForm [{:keys [module-id dataset-id initial-name initial-description on-success]}]
   (let [name-field (forms/use-form-state initial-name [forms/required])
@@ -190,6 +155,7 @@
                               :submit-text "Add Example"
                               :submitting? submitting?
                               :disabled? (not is-valid?)}))))
+
 
 (defui CreateSnapshotForm [{:keys [module-id dataset-id from-snapshot-name on-success]}]
   (let [to-name-field (forms/use-form-state "" [forms/required])
@@ -470,10 +436,25 @@
              ($ :h1.text-2xl.font-bold.text-gray-900 "Datasets for " ($ :span.text-indigo-600 module-id))
              ($ :p.mt-2.text-sm.text-gray-600 "Create and manage datasets for agent training and evaluation."))
           ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer
-             {:onClick #(state/dispatch [:modal/show :create-dataset
-                                         {:title "Create New Dataset"
-                                          :component ($ CreateDatasetForm {:module-id module-id-raw
-                                                                           :on-success refetch})}])}
+             {:onClick (fn []
+                         ;; Initialize the form state
+                         (state/dispatch [:form/init :create-dataset
+                                          {:fields {:name ""
+                                                    :description ""
+                                                    :input-schema ""
+                                                    :output-schema ""}
+                                           :validators {:name [forms/required]
+                                                        :input-schema [forms/valid-json]
+                                                        :output-schema [forms/valid-json]}
+                                           :submit-event [:dataset/create {:module-id module-id-raw
+                                                                           :on-success refetch
+                                                                           :form-id :create-dataset}]}])
+                         ;; Show the modal
+                         (state/dispatch [:modal/show :create-dataset
+                                          {:title "Create New Dataset"
+                                           :form-id :create-dataset
+                                           :submit-text "Create Dataset"
+                                           :component ($ CreateDatasetForm {:form-id :create-dataset})}]))}
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Create New Dataset"))
 

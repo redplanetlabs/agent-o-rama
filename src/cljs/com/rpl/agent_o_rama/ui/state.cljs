@@ -18,6 +18,7 @@
                  :loading? false}
    :queries {} ; New map to store all query states
    :route nil ; Current route match from reitit
+   :forms {} ; Form states keyed by form-id -> {:fields {} :valid? false :submitting? false :error nil :submit-event [...]}
    :ui {:selected-node-id nil
         :forking-mode? false
         :changed-nodes {}
@@ -258,6 +259,106 @@
                                           :data {}
                                           :form {:submitting? false
                                                  :error nil}})]))
+
+ ;; =============================================================================
+;; FORM STATE MANAGEMENT EVENTS
+;; =============================================================================
+
+(defn- validate-form-fields
+  "Validates all fields in a form using their configured validators.
+   Returns true if all fields are valid, false otherwise."
+  [fields validators]
+  (every? (fn [[field-key field-value]]
+            (let [field-validators (get validators field-key)]
+              (if field-validators
+                (every? #(nil? (% field-value)) field-validators)
+                true))) ; No validators means field is valid
+          fields))
+
+(reg-event :form/init
+           (fn [db form-id {:keys [fields validators submit-event]}]
+             [:forms form-id (s/terminal-val {:fields (or fields {})
+                                              :validators (or validators {})
+                                              :valid? (validate-form-fields (or fields {}) (or validators {}))
+                                              :submitting? false
+                                              :error nil
+                                              :submit-event submit-event})]))
+
+(reg-event :form/update-field
+           (fn [db form-id field-key value]
+             [:forms form-id
+              (s/terminal
+               (fn [form-state]
+                 (let [updated-fields (assoc (:fields form-state) field-key value)
+                       validators (:validators form-state)
+                       new-valid? (validate-form-fields updated-fields validators)]
+                   (assoc form-state
+                          :fields updated-fields
+                          :valid? new-valid?))))]))
+
+(reg-event :form/set-submitting
+           (fn [db form-id submitting?]
+             [:forms form-id :submitting? (s/terminal-val submitting?)]))
+
+(reg-event :form/set-error
+           (fn [db form-id error]
+             [:forms form-id :error (s/terminal-val error)]))
+
+(reg-event :form/submit
+           (fn [db form-id]
+             (let [form-state (s/select-one [:forms form-id] db)]
+               (when (:valid? form-state)
+                 ;; Set submitting to true
+                 (dispatch [:form/set-submitting form-id true])
+                 ;; Clear any previous error
+                 (dispatch [:form/set-error form-id nil])
+                 ;; Get the domain event template and merge in field data
+                 (let [submit-event (:submit-event form-state)
+                       event-type (first submit-event)
+                       event-data (second submit-event)
+                       full-event [event-type (merge event-data (:fields form-state))]]
+                   ;; Dispatch the actual business logic event
+                   (dispatch full-event)))
+               nil))) ; This handler only dispatches other events
+
+(reg-event :form/clear
+           (fn [db form-id]
+             [:forms (s/terminal #(dissoc % form-id))]))
+
+(reg-event :form/reset
+           (fn [db form-id initial-fields]
+             [:forms form-id
+              (s/terminal
+               (fn [form-state]
+                 (let [validators (:validators form-state)
+                       new-valid? (validate-form-fields initial-fields validators)]
+                   (assoc form-state
+                          :fields initial-fields
+                          :valid? new-valid?
+                          :error nil
+                          :submitting? false))))]))
+
+ ;; =============================================================================
+;; BUSINESS LOGIC EVENTS (DOMAIN-SPECIFIC)
+;; =============================================================================
+
+(reg-event :dataset/create
+           (fn [db {:keys [module-id name description input-schema output-schema on-success form-id]}]
+             ;; This event will be handled by the datasets namespace which has access to sente
+             (dispatch [:sente/request {:event [:datasets/create {:module-id module-id
+                                                                  :name name
+                                                                  :description description
+                                                                  :input-schema input-schema
+                                                                  :output-schema output-schema}]
+                                        :timeout 10000
+                                        :on-success (fn []
+                                                      (dispatch [:modal/hide])
+                                                      (dispatch [:form/clear (or form-id :create-dataset)])
+                                                      (when on-success (on-success)))
+                                        :on-error (fn [error]
+                                                    (dispatch [:form/set-submitting (or form-id :create-dataset) false])
+                                                    (dispatch [:form/set-error (or form-id :create-dataset) error]))}])
+             nil)) ; This handler only dispatches other events
 
 ;; =============================================================================
 ;; ROUTING EVENTS

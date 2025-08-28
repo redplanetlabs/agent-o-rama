@@ -17,21 +17,21 @@
    (let [{:keys [value set-value error]} (use-form-state initial-value validators)]
      ...)"
   [initial-value & [validators]]
-   (let [[value set-value] (uix/use-state initial-value)
-         [error set-error] (uix/use-state nil)
+  (let [[value set-value] (uix/use-state initial-value)
+        [error set-error] (uix/use-state nil)
 
          ;; Validate the current value whenever it changes
-         _ (uix/use-effect
-            (fn []
-              (let [validation-error (when (seq validators)
-                                       (some #(% value) validators))]
-                (set-error validation-error)))
-            [value])]
+        _ (uix/use-effect
+           (fn []
+             (let [validation-error (when (seq validators)
+                                      (some #(% value) validators))]
+               (set-error validation-error)))
+           [value])]
 
-     {:value value
-      :set-value set-value
-      :error error
-      :set-error set-error}))
+    {:value value
+     :set-value set-value
+     :error error
+     :set-error set-error}))
 
 (defhook use-global-form-submission
   "Hook that provides access to global form submission state.
@@ -58,6 +58,53 @@
      :error error
      :clear-error clear-error
      :submit submit}))
+
+(defhook use-centralized-form
+  "Hook for working with centralized form state management.
+   
+   Usage:
+   (let [{:keys [fields set-field valid? submitting? error]} (use-centralized-form form-id)]
+     ...)"
+  [form-id]
+  (let [form-state (state/use-sub [:forms form-id])
+        fields (or (:fields form-state) {})
+        valid? (boolean (:valid? form-state))
+        submitting? (boolean (:submitting? form-state))
+        error (:error form-state)
+
+        set-field (uix/use-callback
+                   (fn [field-key value]
+                     (state/dispatch [:form/update-field form-id field-key value]))
+                   [form-id])
+
+        get-field (uix/use-callback
+                   (fn [field-key]
+                     (get fields field-key ""))
+                   [fields])]
+
+    {:fields fields
+     :get-field get-field
+     :set-field set-field
+     :valid? valid?
+     :submitting? submitting?
+     :error error}))
+
+(defhook use-form-field
+  "Hook for individual form field that integrates with centralized state.
+   
+   Usage:
+   (let [{:keys [value on-change]} (use-form-field form-id :name)]
+     ...)"
+  [form-id field-key]
+  (let [{:keys [get-field set-field]} (use-centralized-form form-id)
+        value (get-field field-key)
+        on-change (uix/use-callback
+                   (fn [new-value]
+                     (set-field field-key new-value))
+                   [set-field field-key])]
+
+    {:value value
+     :on-change on-change}))
 
 ;; =============================================================================
 ;; COMMON FORM VALIDATORS
@@ -112,7 +159,6 @@
    - :rows - For textarea, number of rows"
   [{:keys [label value on-change error required? placeholder class-name type rows]
     :or {type :text rows 3}}]
-
 
   (let [input-classes (str "w-full p-3 border rounded-md text-sm transition-colors "
                            (if error

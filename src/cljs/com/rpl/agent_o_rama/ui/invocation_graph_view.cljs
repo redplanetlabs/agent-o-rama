@@ -100,7 +100,29 @@
 
 (defui global-modal-component []
   (let [modal-state (state/use-sub [:ui :modal])
-        {:keys [active data]} modal-state]
+        {:keys [active data]} modal-state
+
+        ;; Check if this modal has an associated form
+        form-id (:form-id data)
+        form-state (state/use-sub [:forms form-id]) ; Always call hook, will be nil if form-id is nil
+        has-form? (boolean form-id)
+
+        ;; Form-related subscriptions
+        form-valid? (if has-form? (:valid? form-state) true)
+        form-submitting? (if has-form? (:submitting? form-state) false)
+        form-error (:error form-state)
+
+        ;; Form submission handler
+        handle-submit (when has-form?
+                        (fn []
+                          (state/dispatch [:form/submit form-id])))
+
+        ;; Cancel handler
+        handle-cancel (fn []
+                        (when has-form?
+                          (state/dispatch [:form/clear form-id]))
+                        (state/dispatch [:modal/hide]))]
+
     (when active
       (createPortal
        ($ :div {:className "fixed inset-0 flex items-center justify-center z-50"
@@ -108,27 +130,55 @@
                 :onClick (fn [e]
                            (.preventDefault e)
                            (.stopPropagation e)
-                           (state/dispatch [:modal/hide]))}
+                           handle-cancel)}
 
-          ($ :div {:className "bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-full overflow-hidden mx-4 my-8"
+          ($ :div {:className "bg-white rounded-lg shadow-xl w-full max-w-5xl overflow-hidden mx-4 my-8 flex flex-col max-h-screen"
                    :onClick (fn [e]
                               (.preventDefault e)
                               (.stopPropagation e))}
-             ($ :div {:className "p-4 border-b border-gray-200 flex justify-between items-center"}
+
+             ;; Header (fixed)
+             ($ :div {:className "flex-shrink-0 p-4 border-b border-gray-200 flex justify-between items-center bg-white"}
                 ($ :h3 {:className "text-lg font-medium text-gray-800"}
                    (:title data))
                 ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer"
-                            :onClick (fn [e]
-                                       (.preventDefault e)
-                                       (.stopPropagation e)
-                                       (state/dispatch [:modal/hide]))}
+                            :onClick handle-cancel}
                    "×"))
-             ($ :div {:className "p-4 overflow-auto max-h-full"}
+
+             ;; Body (scrollable)
+             ($ :div {:className "flex-1 min-h-0 overflow-y-auto"}
                 ;; Support both custom components and text content
                 (if (:component data)
                   (:component data)
-                  ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
-                     (:content data))))))
+                  ($ :div {:className "p-4"}
+                     ($ :pre {:className "text-sm font-mono text-gray-800 whitespace-pre-wrap break-all"}
+                        (:content data)))))
+
+             ;; Footer (fixed) - only show if this is a form modal
+             (when has-form?
+               ($ :div {:className "flex-shrink-0 border-t border-gray-200 bg-white px-6 py-4"}
+                  ;; Show form-level error if present
+                  (when form-error
+                    ($ :div {:className "mb-4 p-3 bg-red-50 border border-red-200 rounded-md"}
+                       ($ :p {:className "text-sm text-red-700 whitespace-pre-wrap"} form-error)))
+
+                  ;; Action buttons
+                  ($ :div {:className "flex justify-end gap-3"}
+                     ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer"
+                                 :type "button"
+                                 :onClick handle-cancel}
+                        "Cancel")
+
+                     ($ :button {:type "button"
+                                 :disabled (or (not form-valid?) form-submitting?)
+                                 :onClick handle-submit
+                                 :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
+                                                 (if (or (not form-valid?) form-submitting?)
+                                                   "text-gray-400 bg-gray-300 cursor-not-allowed"
+                                                   "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
+                        (when form-submitting?
+                          ($ :div {:className "animate-spin rounded-full h-4 w-4 border-b-2 border-white"}))
+                        (:submit-text data "Submit")))))))
        (.-body js/document)))))
 
 (defn pretty-format [item]
