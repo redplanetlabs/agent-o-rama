@@ -28,7 +28,7 @@
 ;; MODAL FOR CREATING DATASETS
 ;; =============================================================================
 (defui CreateDatasetForm [{:keys [form-id]}]
-  (let [{:keys [get-field set-field]} (forms/use-centralized-form form-id)
+  (let [{:keys [get-field set-field error]} (forms/use-centralized-form form-id)
         name-val (get-field :name)
         input-schema-val (get-field :input-schema)
         output-schema-val (get-field :output-schema)
@@ -67,7 +67,7 @@
                                :class-name "font-mono"}))
 
        ;; Server-side error for centralized forms
-       ($ forms/form-error {:error (:error (forms/use-centralized-form form-id))})
+       ($ forms/form-error {:error error})
 
        ;; JSON Schema Help Box
        ($ :div.bg-blue-50.border.border-blue-200.rounded-md.p-4
