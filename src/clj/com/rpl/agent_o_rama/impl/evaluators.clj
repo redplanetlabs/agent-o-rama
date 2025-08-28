@@ -220,9 +220,11 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
           {"score"
            (if (pos? (+ precision recall))
              (double (/ (* 2 precision recall) (+ precision recall)))
-             0.0)})))
+             0.0)
+           "precision" (double precision)
+           "recall"    (double recall)})))
     :description
-    "Compute F1 score on a list of runs using the provided 'positiveValue' param to determine true positives, false positives, and false negatives."
+    "Compute F1, precision, and recall scores on a list of runs using the provided 'positiveValue' param to determine true positives, false positives, and false negatives."
     :options
     {:params
      {"positiveValue"
