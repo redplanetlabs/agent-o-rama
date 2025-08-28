@@ -27,6 +27,17 @@
 ;; =============================================================================
 ;; MODAL FOR CREATING DATASETS
 ;; =============================================================================
+ ;; Form specification co-located with component
+(def create-dataset-form-spec
+  {:fields {:name ""
+            :description ""
+            :input-schema ""
+            :output-schema ""}
+   :validators {:name [forms/required]
+                :input-schema [forms/valid-json]
+                :output-schema [forms/valid-json]}
+   :submit-event [:dataset/create]})
+
 (defui CreateDatasetForm [{:keys [form-id]}]
   (let [{:keys [error]} (forms/use-centralized-form form-id)
         name-field (forms/use-form-field form-id :name)
@@ -84,6 +95,25 @@
                       ($ :li "AOR supports " ($ :code.bg-blue-100.px-1.rounded "x-javaType") " extension to reference Java types")
                       ($ :li "Do not include " ($ :code.bg-blue-100.px-1.rounded "$schema") " or " ($ :code.bg-blue-100.px-1.rounded "$vocabulary") " keys - these are added automatically")))))))))
 
+(defn show-create-dataset-modal! [module-id-raw refetch]
+  (state/dispatch [:form/init :create-dataset
+                   (-> create-dataset-form-spec
+                       (assoc-in [:submit-event 1] {:module-id module-id-raw
+                                                    :on-success refetch
+                                                    :form-id :create-dataset}))])
+  (state/dispatch [:modal/show :create-dataset
+                   {:title "Create New Dataset"
+                    :form-id :create-dataset
+                    :submit-text "Create Dataset"
+                    :component ($ CreateDatasetForm {:form-id :create-dataset})}]))
+
+;; Form specification co-located with component
+(def edit-dataset-form-spec
+  {:fields {:name ""
+            :description ""}
+   :validators {:name [forms/required]}
+   :submit-event [:dataset/edit]})
+
 (defui EditDatasetForm [{:keys [form-id]}]
   (let [;; Use the centralized form hook
         {:keys [valid? submitting? error]} (forms/use-centralized-form form-id)
@@ -107,6 +137,14 @@
 
        ;; form-error now reads from the centralized state
        ($ forms/form-error {:error error}))))
+
+;; Form specification co-located with component
+(def add-example-form-spec
+  {:fields {:input ""
+            :output ""}
+   :validators {:input [forms/required forms/valid-json]
+                :output [forms/valid-json]}
+   :submit-event [:dataset/add-example]})
 
 (defui AddExampleForm [{:keys [form-id]}]
   (let [;; Use the centralized form hook
@@ -137,7 +175,40 @@
        ;; form-error now reads from the centralized state
        ($ forms/form-error {:error error}))))
 
-(defui EditExampleForm [{:keys [module-id dataset-id snapshot-name example-id initial-input initial-output on-success]}]
+;; Form specification co-located with component
+(def edit-example-form-spec
+  {:fields {:input ""
+            :output ""}
+   :validators {:input [forms/required forms/valid-json]
+                :output [forms/valid-json]}
+   :submit-event [:dataset/edit-example]})
+
+(defui EditExampleForm [{:keys [form-id]}]
+  (let [{:keys [error]} (forms/use-centralized-form form-id)
+        input-field (forms/use-form-field form-id :input)
+        output-field (forms/use-form-field form-id :output)]
+
+    ($ forms/form
+       ($ forms/form-field {:label "Input (JSON)"
+                            :type :textarea
+                            :value (:value input-field)
+                            :on-change (:on-change input-field)
+                            :error (:error input-field)
+                            :placeholder "Enter input as a valid JSON object..."
+                            :rows 12
+                            :class-name "font-mono"})
+       ($ forms/form-field {:label "Reference Output (JSON, Optional)"
+                            :type :textarea
+                            :value (:value output-field)
+                            :on-change (:on-change output-field)
+                            :error (:error output-field)
+                            :placeholder "Enter reference output as valid JSON..."
+                            :rows 12
+                            :class-name "font-mono"})
+
+       ($ forms/form-error {:error error}))))
+
+(defn show-edit-example-modal! [module-id dataset-id snapshot-name example-id initial-input initial-output on-success]
   (let [;; Convert initial values to JSON strings for form display
         initial-input-str (if (string? initial-input)
                             initial-input
@@ -148,74 +219,37 @@
                              initial-output
                              (if initial-output
                                (js/JSON.stringify (clj->js initial-output) nil 2)
-                               ""))
+                               ""))]
 
-        input-field (forms/use-form-state initial-input-str [forms/required forms/valid-json])
-        output-field (forms/use-form-state initial-output-str [forms/valid-json])
-        {:keys [submitting? error submit]} (forms/use-global-form-submission :dataset/edit-example)
+    (state/dispatch [:form/init :edit-example
+                     (-> edit-example-form-spec
+                         (assoc-in [:fields :input] initial-input-str)
+                         (assoc-in [:fields :output] initial-output-str)
+                         (assoc-in [:submit-event 1] {:module-id module-id
+                                                      :dataset-id dataset-id
+                                                      :snapshot-name snapshot-name
+                                                      :example-id example-id
+                                                      :input initial-input-str
+                                                      :output initial-output-str
+                                                      :initial-input initial-input
+                                                      :initial-output initial-output
+                                                      :on-success on-success}))])
+    (state/dispatch [:modal/show :edit-example
+                     {:title "Edit Example"
+                      :form-id :edit-example
+                      :submit-text "Save Changes"
+                      :component ($ EditExampleForm {:form-id :edit-example})}])))
 
-        ;; Check if form values have changed from initial values
-        is-changed? (or (not= (:value input-field) initial-input-str)
-                        (not= (:value output-field) initial-output-str))
+;; Form specification co-located with component
+(def create-snapshot-form-spec
+  {:fields {:snapshot-name ""}
+   :validators {:snapshot-name [forms/required]}
+   :submit-event [:dataset/create-snapshot]})
 
-        is-valid? (and (nil? (:error input-field))
-                       (nil? (:error output-field))
-                       (not (str/blank? (:value input-field)))
-                       is-changed?)
+(defui CreateSnapshotForm [{:keys [form-id from-snapshot-name]}]
+  (let [{:keys [error]} (forms/use-centralized-form form-id)
+        snapshot-name-field (forms/use-form-field form-id :snapshot-name)]
 
-        handle-save (fn []
-                      (submit {:module-id module-id
-                               :dataset-id dataset-id
-                               :snapshot-name snapshot-name
-                               :example-id example-id
-                               :input (:value input-field)
-                               :output (:value output-field)
-                               :initial-input initial-input
-                               :initial-output initial-output
-                               :on-success on-success}))]
-
-    ($ forms/form
-       ($ forms/form-field {:label "Input (JSON)"
-                            :type :textarea
-                            :value (:value input-field)
-                            :on-change (:set-value input-field)
-                            :error (:error input-field)
-                            :placeholder "Enter input as a valid JSON object..."
-                            :rows 12
-                            :class-name "font-mono"})
-       ($ forms/form-field {:label "Reference Output (JSON, Optional)"
-                            :type :textarea
-                            :value (:value output-field)
-                            :on-change (:set-value output-field)
-                            :error (:error output-field)
-                            :placeholder "Enter reference output as valid JSON..."
-                            :rows 12
-                            :class-name "font-mono"})
-
-       ($ forms/form-error {:error error}))))
-
-(defui CreateSnapshotForm [{:keys [module-id dataset-id from-snapshot-name on-success]}]
-  (let [to-name-field (forms/use-form-state "" [forms/required])
-        [submitting? set-submitting] (uix/use-state false)
-        [error-msg set-error-msg] (uix/use-state nil)
-        is-valid? (and (nil? (:error to-name-field))
-                       (not (str/blank? (:value to-name-field))))
-
-        handle-create (fn []
-                        (set-submitting true)
-                        (set-error-msg nil)
-                        (sente/request!
-                         [:datasets/create-snapshot {:module-id module-id
-                                                     :dataset-id dataset-id
-                                                     :from-snapshot-name from-snapshot-name
-                                                     :to-snapshot-name (:value to-name-field)}]
-                         10000
-                         (fn [reply]
-                           (set-submitting false)
-                           (if (:success reply)
-                             (do (state/dispatch [:modal/hide])
-                                 (on-success))
-                             (set-error-msg (:error reply))))))]
     ($ forms/form
        ($ :div
           ($ :label.block.text-sm.font-medium.text-gray-700 "Source Snapshot")
@@ -223,12 +257,25 @@
              (if (str/blank? from-snapshot-name) "Latest (Working Copy)" from-snapshot-name)))
 
        ($ forms/form-field {:label "New Snapshot Name"
-                            :value (:value to-name-field)
-                            :on-change (:set-value to-name-field)
-                            :error (:error to-name-field)
+                            :value (:value snapshot-name-field)
+                            :on-change (:on-change snapshot-name-field)
+                            :error (:error snapshot-name-field)
                             :required? true})
-       (when error-msg
-         ($ forms/form-error {:error error-msg})))))
+       ($ forms/form-error {:error error}))))
+
+(defn show-create-snapshot-modal! [module-id dataset-id from-snapshot-name on-success]
+  (state/dispatch [:form/init :create-snapshot
+                   (-> create-snapshot-form-spec
+                       (assoc-in [:submit-event 1] {:module-id module-id
+                                                    :dataset-id dataset-id
+                                                    :from-snapshot-name from-snapshot-name
+                                                    :on-success on-success}))])
+  (state/dispatch [:modal/show :create-snapshot
+                   {:title "Create New Snapshot"
+                    :form-id :create-snapshot
+                    :submit-text "Create Snapshot"
+                    :component ($ CreateSnapshotForm {:form-id :create-snapshot
+                                                      :from-snapshot-name from-snapshot-name})}]))
 
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon]}]
   ($ :div
@@ -261,13 +308,10 @@
 
         handle-create (fn []
                         (set-dropdown-open false)
-                        (state/dispatch [:modal/show :create-snapshot
-                                         {:title "Create New Snapshot"
-                                          :component ($ CreateSnapshotForm
-                                                        {:module-id module-id
-                                                         :dataset-id dataset-id
-                                                         :from-snapshot-name selected-snapshot
-                                                         :on-success refetch})}]))
+                        (show-create-snapshot-modal! module-id
+                                                     dataset-id
+                                                     selected-snapshot
+                                                     refetch))
 
         handle-delete (fn [snapshot-name]
                         (set-dropdown-open false)
@@ -407,16 +451,13 @@
                                   ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900.cursor-pointer
                                      {:onClick (fn []
                                                  (set-open-dropdown nil)
-                                                 (state/dispatch [:modal/show :edit-example
-                                                                  {:title "Edit Example"
-                                                                   :component ($ EditExampleForm
-                                                                                 {:module-id module-id
-                                                                                  :dataset-id dataset-id
-                                                                                  :snapshot-name snapshot-name
-                                                                                  :example-id example-id
-                                                                                  :initial-input (:input example)
-                                                                                  :initial-output (:reference-output example)
-                                                                                  :on-success refetch})}]))}
+                                                 (show-edit-example-modal! module-id
+                                                                           dataset-id
+                                                                           snapshot-name
+                                                                           example-id
+                                                                           (:input example)
+                                                                           (:reference-output example)
+                                                                           refetch))}
                                      ($ PencilIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                      "Edit")
 
@@ -458,19 +499,15 @@
 ;; =============================================================================
  ;; Helper function to show edit dataset modal with centralized state
 (defn show-edit-dataset-modal! [module-id dataset-id initial-name initial-description on-success]
-  ;; 1. Initialize the form state
   (state/dispatch [:form/init :edit-dataset
-                   {:fields {:name initial-name
-                             :description initial-description}
-                    :validators {:name [forms/required]}
-                    :submit-event [:dataset/edit
-                                   {:module-id module-id
-                                    :dataset-id dataset-id
-                                    :initial-name initial-name
-                                    :initial-description initial-description
-                                    :on-success on-success}]}])
-
-  ;; 2. Show the modal with the component
+                   (-> edit-dataset-form-spec
+                       (assoc-in [:fields :name] initial-name)
+                       (assoc-in [:fields :description] initial-description)
+                       (assoc-in [:submit-event 1] {:module-id module-id
+                                                    :dataset-id dataset-id
+                                                    :initial-name initial-name
+                                                    :initial-description initial-description
+                                                    :on-success on-success}))])
   (state/dispatch [:modal/show :edit-dataset
                    {:title (str "Edit Dataset: " initial-name)
                     :form-id :edit-dataset
@@ -479,19 +516,12 @@
 
 ;; Helper function to show add example modal with centralized state  
 (defn show-add-example-modal! [module-id dataset-id snapshot-name on-success]
-  ;; 1. Initialize the form state
   (state/dispatch [:form/init :add-example
-                   {:fields {:input ""
-                             :output ""}
-                    :validators {:input [forms/required forms/valid-json]
-                                 :output [forms/valid-json]}
-                    :submit-event [:dataset/add-example
-                                   {:module-id module-id
-                                    :dataset-id dataset-id
-                                    :snapshot-name snapshot-name
-                                    :on-success on-success}]}])
-
-  ;; 2. Show the modal with the component
+                   (-> add-example-form-spec
+                       (assoc-in [:submit-event 1] {:module-id module-id
+                                                    :dataset-id dataset-id
+                                                    :snapshot-name snapshot-name
+                                                    :on-success on-success}))])
   (state/dispatch [:modal/show :add-example
                    {:title "Add Example"
                     :form-id :add-example
@@ -518,25 +548,7 @@
              ($ :h1.text-2xl.font-bold.text-gray-900 "Datasets for " ($ :span.text-indigo-600 module-id))
              ($ :p.mt-2.text-sm.text-gray-600 "Create and manage datasets for agent training and evaluation."))
           ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer
-             {:onClick (fn []
-                         ;; Initialize the form state
-                         (state/dispatch [:form/init :create-dataset
-                                          {:fields {:name ""
-                                                    :description ""
-                                                    :input-schema ""
-                                                    :output-schema ""}
-                                           :validators {:name [forms/required]
-                                                        :input-schema [forms/valid-json]
-                                                        :output-schema [forms/valid-json]}
-                                           :submit-event [:dataset/create {:module-id module-id-raw
-                                                                           :on-success refetch
-                                                                           :form-id :create-dataset}]}])
-                         ;; Show the modal
-                         (state/dispatch [:modal/show :create-dataset
-                                          {:title "Create New Dataset"
-                                           :form-id :create-dataset
-                                           :submit-text "Create Dataset"
-                                           :component ($ CreateDatasetForm {:form-id :create-dataset})}]))}
+             {:onClick #(show-create-dataset-modal! module-id-raw refetch)}
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Create New Dataset"))
 
