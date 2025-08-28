@@ -28,12 +28,19 @@
 ;; MODAL FOR CREATING DATASETS
 ;; =============================================================================
 (defui CreateDatasetForm [{:keys [form-id]}]
-  (let [{:keys [get-field set-field]} (forms/use-centralized-form form-id)]
+  (let [{:keys [get-field set-field]} (forms/use-centralized-form form-id)
+        name-val (get-field :name)
+        input-schema-val (get-field :input-schema)
+        output-schema-val (get-field :output-schema)
+        name-error (forms/required name-val)
+        input-schema-error (forms/valid-json input-schema-val)
+        output-schema-error (forms/valid-json output-schema-val)]
 
     ($ forms/form
        ($ forms/form-field {:label "Name"
-                            :value (get-field :name)
+                            :value name-val
                             :on-change #(set-field :name %)
+                            :error name-error
                             :required? true})
        ($ forms/form-field {:label "Description"
                             :type :textarea
@@ -44,18 +51,23 @@
        ($ :div.grid.grid-cols-2.gap-4
           ($ forms/form-field {:label "Input JSON Schema"
                                :type :textarea
-                               :value (get-field :input-schema)
+                               :value input-schema-val
                                :on-change #(set-field :input-schema %)
+                               :error input-schema-error
                                :placeholder example-schema
                                :rows 15
                                :class-name "font-mono"})
           ($ forms/form-field {:label "Output JSON Schema"
                                :type :textarea
-                               :value (get-field :output-schema)
+                               :value output-schema-val
                                :on-change #(set-field :output-schema %)
+                               :error output-schema-error
                                :placeholder example-schema
                                :rows 15
                                :class-name "font-mono"}))
+
+       ;; Server-side error for centralized forms
+       ($ forms/form-error {:error (:error (forms/use-centralized-form form-id))})
 
        ;; JSON Schema Help Box
        ($ :div.bg-blue-50.border.border-blue-200.rounded-md.p-4
@@ -72,7 +84,7 @@
                          ($ :a.underline.hover:text-blue-900 {:href "https://json-schema.org/" :target "_blank"} "JSON Schema")
                          " specification")
                       ($ :li "AOR supports " ($ :code.bg-blue-100.px-1.rounded "x-javaType") " extension to reference Java types")
-                      ($ :li "Do not include " ($ :code.bg-blue-100.px-1.rounded "$schema") " or " ($ :code.bg-blue-100.px-1.rounded "$vocabulary") " keys - these are added automatically")))))))))
+                      ($ :li "Do not include " ($ :code.bg-blue-100.px-1.rounded "$schema") " or " ($ :code.bg-blue-100.px-1.rounded "$vocabulary") " keys - these are added automatically"))))))))
 
 (defui EditDatasetForm [{:keys [module-id dataset-id initial-name initial-description on-success]}]
   (let [name-field (forms/use-form-state initial-name [forms/required])
