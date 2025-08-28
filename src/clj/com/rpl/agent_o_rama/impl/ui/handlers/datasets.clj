@@ -115,3 +115,16 @@
       {:status :ok}
       (catch Exception e
         (throw (ex-info (-> e .getCause .getMessage) {}))))))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/delete-example
+  [{:keys [module-id dataset-id snapshot-name example-id]} uid]
+  (let [decoded-module-id (common/url-decode module-id)
+        manager (common/get-manager decoded-module-id)]
+    (try
+      (aor/remove-dataset-example! manager
+                                   (UUID/fromString dataset-id)
+                                   (UUID/fromString example-id)
+                                   {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)})
+      {:status :ok}
+      (catch Exception e
+        (throw (ex-info (-> e .getCause .getMessage) {}))))))

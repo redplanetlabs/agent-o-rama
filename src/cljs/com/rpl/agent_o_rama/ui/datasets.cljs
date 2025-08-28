@@ -416,7 +416,7 @@
                                   :icon ($ PlusIcon {:className "h-4 w-4"})
                                   :delete-button nil}))))))))
 
-(defui ExamplesList [{:keys [examples]}]
+(defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success]}]
   (let [[open-dropdown set-open-dropdown] (uix/use-state nil)]
 
     ;; Close dropdown when clicking outside
@@ -483,12 +483,22 @@
                                      "Edit")
 
                                   ;; Delete option
-                                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900
+                                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-red-100.hover:text-red-800
                                      {:onClick (fn []
                                                  (set-open-dropdown nil)
-                                                 ;; TODO: Implement delete functionality
-                                                 (println "Delete example:" example-id))}
-                                     ($ TrashIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
+                                                 (when (js/confirm "Are you sure you want to delete this example?")
+                                                   (sente/request!
+                                                    [:datasets/delete-example
+                                                     {:module-id module-id
+                                                      :dataset-id dataset-id
+                                                      :snapshot-name snapshot-name
+                                                      :example-id example-id}]
+                                                    10000
+                                                    (fn [reply]
+                                                      (if (:success reply)
+                                                        (when on-delete-success (on-delete-success))
+                                                        (js/alert (str "Error deleting example: " (:error reply))))))))}
+                                     ($ TrashIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-red-500"})
                                      "Delete")
 
                                   ;; Try with evaluator option
@@ -790,7 +800,11 @@
                                                        ($ :p "No examples yet.")
                                                        ($ :p.text-sm.mt-1 "Click 'Add Example' to get started.")))
                                :else ($ :div.h-full.overflow-auto
-                                        ($ ExamplesList {:examples examples})))))))
+                                        ($ ExamplesList {:examples examples
+                                                         :module-id module-id
+                                                         :dataset-id dataset-id
+                                                         :snapshot-name selected-snapshot-name
+                                                         :on-delete-success examples-refetch})))))))
 
                  ;; Default case
                  ($ :div.flex.items-center.justify-center.h-full
