@@ -311,7 +311,11 @@
                         (show-create-snapshot-modal! module-id
                                                      dataset-id
                                                      selected-snapshot
-                                                     refetch))
+                                                     (fn [created-snapshot-name]
+                                                       ;; Set the newly created snapshot as selected
+                                                       (set-selected-snapshot created-snapshot-name)
+                                                       ;; Refetch the snapshot names list
+                                                       (refetch))))
 
         handle-delete (fn [snapshot-name]
                         (set-dropdown-open false)

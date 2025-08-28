@@ -398,3 +398,25 @@
                        (state/dispatch [:db/set-value [:ui :modal :form :error]
                                         (str "Invalid JSON: " (.-message e))])))
                    nil))
+
+(state/reg-event :dataset/create-snapshot
+                 (fn [db {:keys [module-id dataset-id from-snapshot-name snapshot-name on-success]}]
+                   ;; Set modal form to submitting state
+                   (state/dispatch [:db/set-value [:ui :modal :form :submitting?] true])
+                   (state/dispatch [:db/set-value [:ui :modal :form :error] nil])
+
+                   (sente/request!
+                    [:datasets/create-snapshot {:module-id module-id
+                                                :dataset-id dataset-id
+                                                :from-snapshot-name from-snapshot-name
+                                                :to-snapshot-name snapshot-name}]
+                    15000
+                    (fn [reply]
+                      (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
+                      (if (:success reply)
+                        (do
+                          (state/dispatch [:modal/hide])
+                          ;; Pass the created snapshot name to the success callback
+                          (when on-success (on-success snapshot-name)))
+                        (state/dispatch [:db/set-value [:ui :modal :form :error] (:error reply)]))))
+                   nil))
