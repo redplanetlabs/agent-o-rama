@@ -239,6 +239,12 @@
     ($ :div {:className (str "mt-4 p-3 bg-red-50 border border-red-200 rounded-md " class-name)}
        ($ :p.text-sm.text-red-700.whitespace-pre-wrap error))))
 
+(defui form
+  [{:keys [children]}]
+
+  ($ :form.p-4
+     children))
+
 ;; =============================================================================
 ;; EXAMPLE USAGE PATTERN
 ;; =============================================================================
