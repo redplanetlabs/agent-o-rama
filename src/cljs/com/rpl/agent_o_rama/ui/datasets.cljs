@@ -376,7 +376,7 @@
                                   :icon ($ PlusIcon {:className "h-4 w-4"})
                                   :delete-button nil}))))))))
 
-(defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success]}]
+(defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success refetch]}]
   (let [[open-dropdown set-open-dropdown] (uix/use-state nil)]
 
     ;; Close dropdown when clicking outside
@@ -446,7 +446,7 @@
                                                                                   :example-id example-id
                                                                                   :initial-input (:input example)
                                                                                   :initial-output (:reference-output example)
-                                                                                  :on-success examples-refetch})}]))}
+                                                                                  :on-success refetch})}]))}
                                      ($ PencilIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                      "Edit")
 
@@ -787,7 +787,8 @@
                                                          :module-id module-id
                                                          :dataset-id dataset-id
                                                          :snapshot-name selected-snapshot-name
-                                                         :on-delete-success examples-refetch})))))))
+                                                         :on-delete-success examples-refetch
+                                                         :refetch examples-refetch})))))))
 
                  ;; Default case
                  ($ :div.flex.items-center.justify-center.h-full
