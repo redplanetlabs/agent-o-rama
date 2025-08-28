@@ -141,9 +141,26 @@
 ;; Form specification co-located with component
  ;; Unified form specification for both adding and editing examples
 ;; The dynamic parts (initial fields, submit event) will be added at runtime
-(def example-form-spec
-  {:validators {:input [forms/required forms/valid-json]
-                :output [forms/valid-json]}})
+ ;; Function to create form specification for both adding and editing examples
+(defn example-form-spec [mode config]
+  (case mode
+    :create
+    {:fields {:input "" :output ""}
+     :validators {:input [forms/required forms/valid-json]
+                  :output [forms/valid-json]}
+     :submit-event [:dataset/add-example (-> config
+                                             (select-keys [:module-id :dataset-id :snapshot-name :on-success])
+                                             (assoc :form-id :example-form))]}
+
+    :edit
+    (let [{:keys [initial-input initial-output]} config]
+      {:fields {:input (if initial-input (js/JSON.stringify (clj->js initial-input) nil 2) "")
+                :output (if initial-output (js/JSON.stringify (clj->js initial-output) nil 2) "")}
+       :validators {:input [forms/required forms/valid-json]
+                    :output [forms/valid-json]}
+       :submit-event [:dataset/edit-example (-> config
+                                                (select-keys [:module-id :dataset-id :snapshot-name :example-id :on-success])
+                                                (assoc :form-id :example-form))]})))
 
 ;; Unified form component for both adding and editing examples
 (defui ExampleForm [{:keys [form-id]}]
@@ -175,33 +192,16 @@
    - mode: :create or :edit
    - config: A map of parameters for the operation."
   [mode config]
-  (let [form-id :example-form ; Use a consistent form ID for both modes
-        ;; Determine mode-specific properties
-        {:keys [title submit-text submit-event-type initial-fields submit-payload]}
-        (case mode
-          :create
-          {:title "Add Example"
-           :submit-text "Add Example"
-           :submit-event-type :dataset/add-example
-           :initial-fields {:input "" :output ""}
-           :submit-payload (select-keys config [:module-id :dataset-id :snapshot-name :on-success])}
+  (let [form-id :example-form
+        form-spec (example-form-spec mode config)
+        {:keys [title submit-text]} (case mode
+                                      :create {:title "Add Example" :submit-text "Add Example"}
+                                      :edit {:title "Edit Example" :submit-text "Save Changes"})]
 
-          :edit
-          (let [{:keys [initial-input initial-output]} config]
-            {:title "Edit Example"
-             :submit-text "Save Changes"
-             :submit-event-type :dataset/edit-example
-             :initial-fields {:input (if initial-input (js/JSON.stringify (clj->js initial-input) nil 2) "")
-                              :output (if initial-output (js/JSON.stringify (clj->js initial-output) nil 2) "")}
-             :submit-payload (select-keys config [:module-id :dataset-id :snapshot-name :example-id :on-success])}))]
+    ;; Initialize the centralized form state
+    (state/dispatch [:form/init form-id form-spec])
 
-    ;; Initialize the centralized form state with the correct configuration
-    (state/dispatch [:form/init form-id
-                     (-> example-form-spec
-                         (assoc :fields initial-fields)
-                         (assoc :submit-event [submit-event-type (assoc submit-payload :form-id form-id)]))])
-
-    ;; Show the modal with the correct title and component
+    ;; Show the modal
     (state/dispatch [:modal/show form-id
                      {:title title
                       :form-id form-id
