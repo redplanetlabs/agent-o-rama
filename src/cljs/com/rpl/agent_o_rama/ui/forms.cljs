@@ -113,6 +113,7 @@
   [{:keys [label value on-change error required? placeholder class-name type rows]
     :or {type :text rows 3}}]
 
+
   (let [input-classes (str "w-full p-3 border rounded-md text-sm transition-colors "
                            (if error
                              "border-red-300 focus:ring-red-500 focus:border-red-500"

@@ -47,6 +47,8 @@
                                  :output-schema (:value output-schema-field)
                                  :on-success on-success}))]
 
+
+
       ($ :div
          ($ :div.space-y-4
             ($ forms/form-field {:label "Name"
@@ -76,7 +78,7 @@
                                     :error (:error output-schema-field)
                                     :placeholder example-schema
                                     :rows 20
-                                    :class-name "font-mono"})))
+                                    :class-name "font-mono"}))
 
             ;; JSON Schema Help Box
             ($ :div.bg-blue-50.border.border-blue-200.rounded-md.p-4
@@ -102,7 +104,7 @@
                                 :on-submit handle-create
                                 :submit-text "Create Dataset"
                                 :submitting? submitting?
-                                :disabled? (not is-valid?)})))
+                                :disabled? (not is-valid?)}))))
 
 (defui EditDatasetForm [{:keys [module-id dataset-id initial-name initial-description on-success]}]
   (let [name-field (forms/use-form-state initial-name [forms/required])
@@ -179,10 +181,10 @@
          ($ forms/form-error {:error error})
 
          ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
-                                  :on-submit handle-add
-                                  :submit-text "Add Example"
-                                  :submitting? submitting?
-                                  :disabled? (not is-valid?)})))
+                                :on-submit handle-add
+                                :submit-text "Add Example"
+                                :submitting? submitting?
+                                :disabled? (not is-valid?)}))))
 
 (defui CreateSnapshotForm [{:keys [module-id dataset-id from-snapshot-name on-success]}]
   (let [to-name-field (forms/use-form-state "" [forms/required])
