@@ -161,7 +161,7 @@
          :textarea
          ($ :textarea {:id field-id
                        :className input-classes
-                       :value value
+                       :value (or value "")
                        :placeholder placeholder
                        :rows rows
                        :onChange #(on-change (.. % -target -value))})
@@ -170,7 +170,7 @@
          ($ :input {:id field-id
                     :type (name type)
                     :className input-classes
-                    :value value
+                    :value (or value "")
                     :placeholder placeholder
                     :onChange #(on-change (.. % -target -value))}))
 
