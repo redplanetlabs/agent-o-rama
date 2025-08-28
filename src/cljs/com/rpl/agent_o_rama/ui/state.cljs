@@ -25,7 +25,9 @@
         :current-route "/"
         :breadcrumbs []
         :modal {:active nil ;; nil or modal type keyword
-                :data {}} ;; modal-specific data
+                :data {} ;; modal-specific data
+                :form {:submitting? false
+                       :error nil}}
         :hitl {:responses {} ;; Keyed by invoke-id -> response text
                :submitting {}}}
    :sente {:connected? false
@@ -246,12 +248,16 @@
 (reg-event :modal/show
            (fn [db modal-type modal-data]
              [:ui :modal (s/terminal-val {:active modal-type
-                                          :data modal-data})]))
+                                          :data modal-data
+                                          :form {:submitting? false
+                                                 :error nil}})]))
 
 (reg-event :modal/hide
            (fn [db]
              [:ui :modal (s/terminal-val {:active nil
-                                          :data {}})]))
+                                          :data {}
+                                          :form {:submitting? false
+                                                 :error nil}})]))
 
 ;; =============================================================================
 ;; ROUTING EVENTS

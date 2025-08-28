@@ -31,38 +31,16 @@
         [description set-description] (uix/use-state "")
         [input-schema set-input-schema] (uix/use-state "")
         [output-schema set-output-schema] (uix/use-state "")
-        [submitting? set-submitting] (uix/use-state false)
-        [error-msg set-error-msg] (uix/use-state nil)]
-
-    ;; Test if we can even get console output at all
-    (js/console.log "CreateDatasetForm rendered with name:" name)
+        submitting? (state/use-sub [:ui :modal :form :submitting?])
+        error-msg (state/use-sub [:ui :modal :form :error])]
 
     (letfn [(handle-create []
-              (js/console.log "Button clicked! Name:" name "Module ID:" module-id)
-              (println "Button clicked! Name:" name "Module ID:" module-id)
-              (js/console.log "About to set submitting state")
-              (set-submitting true)
-              (set-error-msg nil)
-              (js/console.log "Making sente request...")
-              (sente/request!
-               [:datasets/create {:module-id module-id
-                                  :name name
-                                  :description description
-                                  :input-schema input-schema
-                                  :output-schema output-schema}]
-               15000 ;; Timeout
-               (fn [reply]
-                 (js/console.log "Got reply from server:" reply)
-                 (println "Got reply from server:" reply)
-                 (set-submitting false)
-                 (if (:success reply)
-                   (do
-                     (js/console.log "Success! Hiding modal and calling on-success")
-                     (state/dispatch [:modal/hide])
-                     (on-success))
-                   (do
-                     (js/console.log "Error in reply:" (:error reply))
-                     (set-error-msg (or (:error reply) "An unknown error occurred.")))))))]
+              (state/dispatch [:dataset/create {:module-id module-id
+                                                :name name
+                                                :description description
+                                                :input-schema input-schema
+                                                :output-schema output-schema
+                                                :on-success on-success}]))]
 
       ($ :div
          ($ :div.space-y-4
@@ -132,37 +110,19 @@
 (defui EditDatasetForm [{:keys [module-id dataset-id initial-name initial-description on-success]}]
   (let [[name set-name] (uix/use-state initial-name)
         [description set-description] (uix/use-state initial-description)
-        [submitting? set-submitting] (uix/use-state false)
-        [error-msg set-error-msg] (uix/use-state nil)
+        ;; Subscribe to global modal form state
+        submitting? (state/use-sub [:ui :modal :form :submitting?])
+        error-msg (state/use-sub [:ui :modal :form :error])
         is-changed? (or (not= name initial-name) (not= description initial-description))]
 
     (letfn [(handle-save []
-              (set-submitting true)
-              (set-error-msg nil)
-
-              ;; Create two promises, one for each Sente request
-              (let [name-promise (js/Promise.
-                                  (fn [resolve reject]
-                                    (sente/request!
-                                     [:datasets/set-name {:module-id module-id :dataset-id dataset-id :name name}]
-                                     5000
-                                     #(if (:success %) (resolve %) (reject (:error %))))))
-                    desc-promise (js/Promise.
-                                  (fn [resolve reject]
-                                    (sente/request!
-                                     [:datasets/set-description {:module-id module-id :dataset-id dataset-id :description description}]
-                                     5000
-                                     #(if (:success %) (resolve %) (reject (:error %))))))]
-
-                ;; Use Promise.all to wait for both to complete
-                (-> (.all js/Promise [name-promise desc-promise])
-                    (.then (fn [_]
-                             (set-submitting false)
-                             (state/dispatch [:modal/hide])
-                             (on-success)))
-                    (.catch (fn [error]
-                              (set-submitting false)
-                              (set-error-msg (str "Failed to save: " error)))))))]
+              (state/dispatch [:dataset/edit {:module-id module-id
+                                              :dataset-id dataset-id
+                                              :name name
+                                              :description description
+                                              :initial-name initial-name
+                                              :initial-description initial-description
+                                              :on-success on-success}]))]
 
       ($ :div
          ($ :div.space-y-4
@@ -202,33 +162,17 @@
 (defui AddExampleForm [{:keys [module-id dataset-id snapshot-name on-success]}]
   (let [[input set-input] (uix/use-state "")
         [output set-output] (uix/use-state "")
-        [submitting? set-submitting] (uix/use-state false)
-        [error-msg set-error-msg] (uix/use-state nil)]
+        ;; Subscribe to global modal form state
+        submitting? (state/use-sub [:ui :modal :form :submitting?])
+        error-msg (state/use-sub [:ui :modal :form :error])]
 
     (letfn [(handle-add []
-              (set-submitting true)
-              (set-error-msg nil)
-
-              ;; Client-side JSON validation for quick feedback
-              (try
-                (when-not (str/blank? input) (js/JSON.parse input))
-                (when-not (str/blank? output) (js/JSON.parse output))
-                ;; If parsing succeeds, send to server
-                (sente/request!
-                 [:datasets/add-example {:module-id module-id
-                                         :dataset-id dataset-id
-                                         :snapshot-name snapshot-name
-                                         :input input
-                                         :output output}]
-                 10000
-                 (fn [reply]
-                   (set-submitting false)
-                   (if (:success reply)
-                     (do (state/dispatch [:modal/hide]) (on-success))
-                     (set-error-msg (or (:error reply) "An unknown server error occurred.")))))
-                (catch js/Error e
-                  (set-submitting false)
-                  (set-error-msg (str "Invalid JSON: " (.-message e))))))]
+              (state/dispatch [:dataset/add-example {:module-id module-id
+                                                     :dataset-id dataset-id
+                                                     :snapshot-name snapshot-name
+                                                     :input input
+                                                     :output output
+                                                     :on-success on-success}]))]
       ($ :div
          ($ :div.space-y-4
             ($ :div
@@ -253,7 +197,7 @@
             (let [is-disabled? (or submitting? (str/blank? input))]
               ($ :button {:type "button"
                           :disabled is-disabled?
-                          :onClick handle-add
+                          :onClick #(when-not is-disabled? (handle-add))
                           :className (str "px-4 py-2 border rounded-md text-sm font-medium flex items-center "
                                           (if is-disabled? "bg-gray-300 text-gray-500 cursor-not-allowed"
                                               "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"))}

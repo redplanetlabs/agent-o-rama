@@ -1,7 +1,8 @@
 (ns com.rpl.agent-o-rama.ui.events
   (:require [com.rpl.agent-o-rama.ui.sente :as sente]
             [com.rpl.agent-o-rama.ui.state :as state]
-            [com.rpl.specter :as s]))
+            [com.rpl.specter :as s]
+            [clojure.string :as str]))
 
 ;; Orchestration events that perform side-effects using sente helpers,
 ;; keeping React components pure.
@@ -263,4 +264,103 @@
                             (js/console.error "Config update failed:" (:error reply))
                             (state/dispatch [:db/set-value state-path {:submitting? false :error (:error reply)}])
                             (when on-error (on-error (:error reply))))))))
+                   nil))
+
+ ;; =============================================================================
+;; DATASET FORM EVENTS
+;; =============================================================================
+
+(state/reg-event :dataset/create
+                 (fn [db {:keys [module-id name description input-schema output-schema on-success]}]
+                   ;; Set modal form to submitting state
+                   (state/dispatch [:db/set-value [:ui :modal :form :submitting?] true])
+                   (state/dispatch [:db/set-value [:ui :modal :form :error] nil])
+
+                   (sente/request!
+                    [:datasets/create {:module-id module-id
+                                       :name name
+                                       :description description
+                                       :input-schema input-schema
+                                       :output-schema output-schema}]
+                    15000
+                    (fn [reply]
+                      (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
+                      (if (:success reply)
+                        (do
+                          (state/dispatch [:modal/hide])
+                          (when on-success (on-success)))
+                        (state/dispatch [:db/set-value [:ui :modal :form :error] (:error reply)]))))
+                   nil))
+
+(state/reg-event :dataset/edit
+                 (fn [db {:keys [module-id dataset-id name description initial-name initial-description on-success]}]
+                   ;; Set modal form to submitting state
+                   (state/dispatch [:db/set-value [:ui :modal :form :submitting?] true])
+                   (state/dispatch [:db/set-value [:ui :modal :form :error] nil])
+
+                   ;; Create promises for both API calls (name and description)
+                   (let [name-promise (js/Promise.
+                                       (fn [resolve reject]
+                                         (if (= name initial-name)
+                                           (resolve {:success true}) ; Skip if unchanged
+                                           (sente/request!
+                                            [:datasets/set-name {:module-id module-id
+                                                                 :dataset-id dataset-id
+                                                                 :name name}]
+                                            5000
+                                            #(if (:success %) (resolve %) (reject (:error %)))))))
+                         desc-promise (js/Promise.
+                                       (fn [resolve reject]
+                                         (if (= description initial-description)
+                                           (resolve {:success true}) ; Skip if unchanged
+                                           (sente/request!
+                                            [:datasets/set-description {:module-id module-id
+                                                                        :dataset-id dataset-id
+                                                                        :description description}]
+                                            5000
+                                            #(if (:success %) (resolve %) (reject (:error %)))))))]
+
+                     ;; Wait for both requests to complete
+                     (-> (.all js/Promise [name-promise desc-promise])
+                         (.then (fn [_]
+                                  (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
+                                  (state/dispatch [:modal/hide])
+                                  (when on-success (on-success))))
+                         (.catch (fn [error]
+                                   (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
+                                   (state/dispatch [:db/set-value [:ui :modal :form :error]
+                                                    (str "Failed to save: " error)])))))
+                   nil))
+
+(state/reg-event :dataset/add-example
+                 (fn [db {:keys [module-id dataset-id snapshot-name input output on-success]}]
+                   ;; Set modal form to submitting state
+                   (state/dispatch [:db/set-value [:ui :modal :form :submitting?] true])
+                   (state/dispatch [:db/set-value [:ui :modal :form :error] nil])
+
+                   ;; Client-side JSON validation for quick feedback
+                   (try
+                     (when-not (str/blank? input) (js/JSON.parse input))
+                     (when-not (str/blank? output) (js/JSON.parse output))
+
+                     ;; If parsing succeeds, send to server
+                     (sente/request!
+                      [:datasets/add-example {:module-id module-id
+                                              :dataset-id dataset-id
+                                              :snapshot-name snapshot-name
+                                              :input input
+                                              :output output}]
+                      10000
+                      (fn [reply]
+                        (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
+                        (if (:success reply)
+                          (do
+                            (state/dispatch [:modal/hide])
+                            (when on-success (on-success)))
+                          (state/dispatch [:db/set-value [:ui :modal :form :error]
+                                           (or (:error reply) "An unknown server error occurred.")]))))
+                     (catch js/Error e
+                       (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
+                       (state/dispatch [:db/set-value [:ui :modal :form :error]
+                                        (str "Invalid JSON: " (.-message e))])))
                    nil)) ; No immediate state change
