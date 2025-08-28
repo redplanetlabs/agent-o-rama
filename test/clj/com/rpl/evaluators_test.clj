@@ -452,6 +452,56 @@
 
 
 
-     ;; TODO: <<<<>>>> test declaring and using java comparative and summary
+     (aor/create-evaluator! manager
+                            "myjc"
+                            "jcompare1"
+                            {}
+                            "my comparator")
+     (aor/create-evaluator! manager
+                            "myjc2"
+                            "jcompare2"
+                            {"extra" "99"}
+                            "my comparator")
+
+     (is (= {"res" :a}
+            (aor/try-comparative-evaluator manager "myjc" 1 2 [:a :b :c])))
+     (is (= {"res" :b}
+            (aor/try-comparative-evaluator manager "myjc" 1 1 [:a :b :c])))
+     (is (= {"res" :c}
+            (aor/try-comparative-evaluator manager "myjc" 2 1 [:a :b :c])))
+     (is (= {"res" :a "extra" "99"}
+            (aor/try-comparative-evaluator manager "myjc2" 1 2 [:a :b :c])))
+     (is (= {"res" :b "extra" "99"}
+            (aor/try-comparative-evaluator manager "myjc2" 1 1 [:a :b :c])))
+     (is (= {"res" :c "extra" "99"}
+            (aor/try-comparative-evaluator manager "myjc2" 2 1 [:a :b :c])))
+
+
+
+     (aor/create-evaluator! manager
+                            "jsum1"
+                            "jsum1"
+                            {}
+                            "my summer")
+
+     (aor/create-evaluator! manager
+                            "jsum2"
+                            "jsum2"
+                            {"extra" "10"}
+                            "my summer 2")
+
+
+     (is (= {"res" 21}
+            (aor/try-summary-evaluator manager
+                                       "jsum1"
+                                       [(aor/mk-example-run 1 2 3)
+                                        (aor/mk-example-run 4 5 6)])))
+     (is (= {"res" 31}
+            (aor/try-summary-evaluator manager
+                                       "jsum2"
+                                       [(aor/mk-example-run 1 2 3)
+                                        (aor/mk-example-run 4 5 6)])))
+
+     ;; TODO: <<<<>>>>
      ;;   - test f1 built-in
     )))
