@@ -136,15 +136,38 @@
      (declareEvaluatorBuilder [this name description builder-jfn]
        (.declareEvaluatorBuilder this name description builder-jfn nil))
      (declareEvaluatorBuilder [this name description builder-jfn options]
-       (let [builder-fn (h/convert-jfn builder-jfn)]
-         (aor-types/declare-evaluator-builder-internal this
-                                                       name
-                                                       description
-                                                       (fn [params]
-                                                         (h/convert-jfn
-                                                          (builder-fn params)))
-                                                       (if options @options))))
-
+       (aor-types/declare-java-evaluator-builer
+        this
+        :regular
+        name
+        description
+        builder-jfn
+        options))
+     (declareComparativeEvaluatorBuilder [this name description builder-jfn]
+       (.declareComparativeEvaluatorBuilder this
+                                            name
+                                            description
+                                            builder-jfn
+                                            nil))
+     (declareComparativeEvaluatorBuilder [this name description builder-jfn
+                                          options]
+       (aor-types/declare-java-evaluator-builer
+        this
+        :comparative
+        name
+        description
+        builder-jfn
+        options))
+     (declareSummaryEvaluatorBuilder [this name description builder-jfn]
+       (.declareSummaryEvaluatorBuilder this name description builder-jfn nil))
+     (declareSummaryEvaluatorBuilder [this name description builder-jfn options]
+       (aor-types/declare-java-evaluator-builer
+        this
+        :summary
+        name
+        description
+        builder-jfn
+        options))
      (declareClusterAgent [this localName moduleName agentName]
        (check-unique-agent-name! agents-vol mirror-agents-vol localName)
        ;; this connects the modules so a module update removing an agent needed
@@ -193,7 +216,7 @@
                   "builderFn"   afn
                  })
        ))
-     (declare-evaluator-builder-internal [this name description builder-fn
+     (declare-evaluator-builder-internal [this type name description builder-fn
                                           options]
        (when (contains? @evaluator-builders-vol name)
          (throw (h/ex-info "Evaluator builder already declared" {:name name})))
@@ -220,6 +243,7 @@
                  assoc
                  name
                  {:builder-fn  builder-fn
+                  :type        type
                   :description description
                   :options     options
                  })
@@ -268,10 +292,42 @@
    (declare-evaluator-builder agents-topology name description builder-fn nil))
   ([agents-topology name description builder-fn options]
    (aor-types/declare-evaluator-builder-internal agents-topology
+                                                 :regular
                                                  name
                                                  description
                                                  builder-fn
                                                  options)))
+
+(defn declare-comparative-evaluator-builder
+  ([agents-topology name description builder-fn]
+   (declare-comparative-evaluator-builder agents-topology
+                                          name
+                                          description
+                                          builder-fn
+                                          nil))
+  ([agents-topology name description builder-fn options]
+   (aor-types/declare-evaluator-builder-internal agents-topology
+                                                 :comparative
+                                                 name
+                                                 description
+                                                 builder-fn
+                                                 options)))
+
+(defn declare-summary-evaluator-builder
+  ([agents-topology name description builder-fn]
+   (declare-summary-evaluator-builder agents-topology
+                                      name
+                                      description
+                                      builder-fn
+                                      nil))
+  ([agents-topology name description builder-fn options]
+   (aor-types/declare-evaluator-builder-internal agents-topology
+                                                 :summary
+                                                 name
+                                                 description
+                                                 builder-fn
+                                                 options)))
+
 (defn declare-cluster-agent
   [^AgentsTopology agents-topology local-name module-name agent-name]
   (.declareClusterAgent agents-topology local-name module-name agent-name))
@@ -390,33 +446,39 @@
                               {:module-name module-name}))
           ))
 
-        datasets-depot        (foreign-depot cluster
-                                             module-name
-                                             (po/datasets-depot-name))
-        datasets-pstate       (foreign-pstate
-                               cluster
-                               module-name
-                               (po/datasets-task-global-name))
-        datasets-page-query   (foreign-query
-                               cluster
-                               module-name
-                               (queries/get-datasets-page-query-name))
-        datasets-search-query (foreign-query
-                               cluster
-                               module-name
-                               (queries/search-datasets-name))
+        datasets-depot          (foreign-depot cluster
+                                               module-name
+                                               (po/datasets-depot-name))
+        datasets-pstate         (foreign-pstate
+                                 cluster
+                                 module-name
+                                 (po/datasets-task-global-name))
+        datasets-page-query     (foreign-query
+                                 cluster
+                                 module-name
+                                 (queries/get-datasets-page-query-name))
+        datasets-search-query   (foreign-query
+                                 cluster
+                                 module-name
+                                 (queries/search-datasets-name))
 
-        evals-depot           (foreign-depot cluster
-                                             module-name
-                                             (po/evaluators-depot-name))
-        evals-pstate          (foreign-pstate cluster
-                                              module-name
-                                              (po/evaluators-task-global-name))
+        evals-depot             (foreign-depot cluster
+                                               module-name
+                                               (po/evaluators-depot-name))
+        evals-pstate            (foreign-pstate
+                                 cluster
+                                 module-name
+                                 (po/evaluators-task-global-name))
 
-        try-eval-query        (foreign-query
-                               cluster
-                               module-name
-                               (queries/try-evaluator-name))]
+        try-eval-query          (foreign-query
+                                 cluster
+                                 module-name
+                                 (queries/try-evaluator-name))
+
+        all-eval-builders-query (foreign-query
+                                 cluster
+                                 module-name
+                                 (queries/all-evaluator-builders-name))]
     (reify
      AgentManager
      (getAgentNames [this]
@@ -811,20 +873,41 @@
                (selected? (view h/contains-string? searchString) identity)]
               evals-pstate)))
      (tryEvaluator [this name input referenceOutput output]
-       (let [ret (foreign-invoke-query try-eval-query
-                                       name
-                                       {"input"  input
-                                        "referenceOutput" referenceOutput
-                                        "output" output})]
-         (when (= ret queries/INVALID-EVALUATOR)
-           (throw (h/ex-info "Invalid evaluator" {:name name})))
-         ret))
+       (evals/try-evaluator-impl
+        evals-pstate
+        try-eval-query
+        all-eval-builders-query
+        name
+        :regular
+        {"input"  input
+         "referenceOutput" referenceOutput
+         "output" output}))
+
+     (tryComparativeEvaluator [this name input referenceOutput outputs]
+       (evals/try-evaluator-impl
+        evals-pstate
+        try-eval-query
+        all-eval-builders-query
+        name
+        :comparative
+        {"input"           input
+         "referenceOutput" referenceOutput
+         "outputs"         outputs}))
+     (trySummaryEvaluator [this name exampleRuns]
+       (evals/try-evaluator-impl
+        evals-pstate
+        try-eval-query
+        all-eval-builders-query
+        name
+        :summary
+        {"exampleRuns" exampleRuns}))
      (close [this]
        (close! datasets-depot))
      aor-types/UnderlyingObjects
      (underlying-objects [this]
-       {:datasets-pstate     datasets-pstate
-        :datasets-page-query datasets-page-query
+       {:datasets-pstate         datasets-pstate
+        :datasets-page-query     datasets-page-query
+        :all-eval-builders-query all-eval-builders-query
        }))))
 
 (defn agent-client
@@ -1136,6 +1219,18 @@
 (defn try-evaluator
   [^AgentManager manager name input reference-output output]
   (.tryEvaluator manager name input reference-output output))
+
+(defn try-comparative-evaluator
+  [^AgentManager manager name input reference-output outputs]
+  (.tryComparativeEvaluator manager name input reference-output outputs))
+
+(defn mk-example-run
+  [input reference-output output]
+  (aor-types/->ExampleRunImpl input reference-output output))
+
+(defn try-summary-evaluator
+  [^AgentManager manager name example-runs]
+  (.trySummaryEvaluator manager name example-runs))
 
 (defn start-ui
   (^AutoCloseable [ipc] (start-ui ipc nil))

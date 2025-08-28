@@ -114,7 +114,8 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
 
 (def BUILT-IN
   {"aor/llm-judge"
-   {:builder-fn
+   {:type        :regular
+    :builder-fn
     (fn [params]
       (let [temperature     (Double/parseDouble (get params "temperature"))
             prompt-template (get params "prompt")
@@ -175,7 +176,8 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
    }
 
    "aor/conciseness"
-   {:builder-fn
+   {:type        :regular
+    :builder-fn
     (fn [params]
       (let [len (Long/parseLong (get params "threshold"))]
         (fn [fetcher input ref-output output]
@@ -192,6 +194,9 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
      :input-path? false
      :reference-output-path? false}
    }
+
+   ;; TODO: <<<<>>>>
+   ;;  - add f1 score buildeer
   })
 
 
@@ -290,3 +295,26 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
     (case> RemoveEvaluator :> {:keys [*name]})
      (local-transform> [(keypath *name) NONE>] $$evals)
    )))
+
+(defn try-evaluator-impl
+  [evals-pstate try-eval-query all-eval-builders-query name type params]
+  (let [{:keys [builder-name builder-params]} (foreign-select-one (keypath name)
+                                                                  evals-pstate)
+        all-builders (foreign-invoke-query all-eval-builders-query)
+        actual-type  (-> all-builders
+                         (get builder-name)
+                         :type)]
+    (when (nil? builder-name)
+      (throw (h/ex-info "Evaluator does not exist" {:name name})))
+    (when-not (contains? all-builders builder-name)
+      (throw (h/ex-info "Builder for evaluator no longer exists"
+                        {:name name :builder-name builder-name})))
+    (when (not= type actual-type)
+      (throw (h/ex-info "Evaluator type mismatch"
+                        {:actual actual-type :expected type})))
+    (foreign-invoke-query try-eval-query
+                          name
+                          type
+                          builder-name
+                          builder-params
+                          params)))

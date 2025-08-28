@@ -483,7 +483,7 @@
     (evals/all-evaluator-builders :> *res)))
 
 (defn evaluator-event
-  [^CompletableFuture cf name builder-name builder-params params]
+  [^CompletableFuture cf name eval-type builder-name builder-params params]
   (let [declared-objects-tg (po/agent-declared-objects-task-global)
         fetcher (anode/mk-fetcher)]
     (fn []
@@ -495,13 +495,29 @@
           (h/thread-local-set!
            AgentDeclaredObjectsTaskGlobal/ACQUIRE_TIMEOUT_MILLIS
            30000)
-          (.complete cf
-                     ;; TODO: <<<<>>>>
-                     ;;  - make this dispatch on type of evaluator
-                     (eval-fn fetcher
-                              (get params "input")
-                              (get params "referenceOutput")
-                              (get params "output")))
+          (.complete
+           cf
+           (cond
+             (= eval-type :regular)
+             (eval-fn fetcher
+                      (get params "input")
+                      (get params "referenceOutput")
+                      (get params "output"))
+
+             (= eval-type :comparative)
+             (eval-fn fetcher
+                      (get params "input")
+                      (get params "referenceOutput")
+                      (get params "outputs"))
+
+             (= eval-type :summary)
+             (eval-fn fetcher
+                      (get params "exampleRuns"))
+
+             :else
+             (throw (h/ex-info "Invalid evaluator type"
+                               {:type eval-type}))
+           ))
         )
         (catch Throwable t
           (.completeExceptionally cf t))
@@ -509,30 +525,19 @@
           (anode/release-acquired-objects! fetcher)))
     )))
 
-(def INVALID-EVALUATOR ::invalid)
-
 (defn declare-try-evaluator-query-topology
   [topologies]
   (let [evals-pstate-sym (symbol (po/evaluators-task-global-name))]
     (<<query-topology topologies
       (try-evaluator-name)
-      ;; TODO: <<<<>>>>
-      ;;   - make this generally able to try any evaluator, and map params based
-      ;;   on the type of evaluator
-      [*name *params :> *res]
-      (|direct 0)
-      (local-select> (keypath *name)
-                     evals-pstate-sym
-                     :> {:keys [*builder-name *builder-params]})
-      (<<if (nil? *builder-name)
-        (identity INVALID-EVALUATOR :> *res)
-       (else>)
-        (h/mk-completable-future :> *cf)
-        (anode/submit-virtual-task! nil
-                                    (evaluator-event *cf
-                                                     *name
-                                                     *builder-name
-                                                     *builder-params
-                                                     *params))
-        (completable-future> *cf :> *res))
+      [*name *type *builder-name *builder-params *params :> *res]
+      (h/mk-completable-future :> *cf)
+      (anode/submit-virtual-task! nil
+                                  (evaluator-event *cf
+                                                   *name
+                                                   *type
+                                                   *builder-name
+                                                   *builder-params
+                                                   *params))
+      (completable-future> *cf :> *res)
       (|origin))))

@@ -10,6 +10,7 @@
    [com.rpl.agentorama
     AgentComplete
     AgentInvoke
+    ExampleRun
     HumanInputRequest
     ToolInfo]
    [com.rpl.agentorama.impl
@@ -324,6 +325,15 @@
 (drp/defrecord+ RemoveEvaluator
   [name :- String])
 
+(drp/defrecord+ ExampleRunImpl
+  [input :- Object
+   reference-output :- Object
+   output :- Object]
+  ExampleRun
+  (getInput [this] input)
+  (getReferenceOutput [this] reference-output)
+  (getOutput [this] output))
+
 ;; Internal protocols
 
 (defprotocol UnderlyingObjects
@@ -331,8 +341,21 @@
 
 (defprotocol AgentsTopologyInternal
   (declare-agent-object-builder-internal [this name afn options])
-  (declare-evaluator-builder-internal [this name description builder-fn
+  (declare-evaluator-builder-internal [this type name description builder-fn
                                        options]))
+
+
+(defn declare-java-evaluator-builer
+  [this type name description builder-fn options]
+  (let [builder-fn (h/convert-jfn builder-fn)]
+    (declare-evaluator-builder-internal this
+                                        type
+                                        name
+                                        description
+                                        (fn [params]
+                                          (h/convert-jfn
+                                           (builder-fn params)))
+                                        (if options @options))))
 
 (defprotocol AgentClientInternal
   (stream-internal [this agent-invoke node callback-fn])

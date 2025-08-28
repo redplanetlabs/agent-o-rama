@@ -38,4 +38,6 @@ public interface AgentManager extends IFetchAgentClient, Closeable {
   void removeEvaluator(String name);
   Set<String> searchEvaluators(String searchString);
   Map tryEvaluator(String name, Object input, Object referenceOutput, Object output);
+  Map tryComparativeEvaluator(String name, Object input, Object referenceOutput, List<Object> outputs);
+  Map trySummaryEvaluator(String name, List<ExampleRun> exampleRuns);
 }

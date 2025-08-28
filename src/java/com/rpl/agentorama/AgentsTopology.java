@@ -38,6 +38,30 @@ public interface AgentsTopology {
                     RamaFunction4<AgentObjectFetcher, Input, RefOutput, Output, Map>> builder,
       EvaluatorBuilderOptions options);
 
+  <Input, RefOutput, Output> void declareComparativeEvaluatorBuilder(
+      String name,
+      String description,
+      RamaFunction1<Map<String, String>,
+                    RamaFunction4<AgentObjectFetcher, Input, RefOutput, List<Output>, Map>> builder);
+  <Input, RefOutput, Output> void declareComparativeEvaluatorBuilder(
+      String name,
+      String description,
+      RamaFunction1<Map<String, String>,
+                    RamaFunction4<AgentObjectFetcher, Input, RefOutput, List<Output>, Map>> builder,
+      EvaluatorBuilderOptions options);
+
+  void declareSummaryEvaluatorBuilder(
+      String name,
+      String description,
+      RamaFunction1<Map<String, String>,
+                    RamaFunction2<AgentObjectFetcher, List<ExampleRun>, Map>> builder);
+  void declareSummaryEvaluatorBuilder(
+      String name,
+      String description,
+      RamaFunction1<Map<String, String>,
+                    RamaFunction2<AgentObjectFetcher, List<ExampleRun>, Map>> builder,
+      EvaluatorBuilderOptions options);
+
   void declareClusterAgent(String localName, String moduleName, String agentName);
 
   StreamTopology getStreamTopology();
