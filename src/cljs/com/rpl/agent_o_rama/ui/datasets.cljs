@@ -184,7 +184,7 @@
                                 :on-submit handle-add
                                 :submit-text "Add Example"
                                 :submitting? submitting?
-                                :disabled? (not is-valid?)}))))
+                                :disabled? (not is-valid?)})))
 
 (defui CreateSnapshotForm [{:keys [module-id dataset-id from-snapshot-name on-success]}]
   (let [to-name-field (forms/use-form-state "" [forms/required])
