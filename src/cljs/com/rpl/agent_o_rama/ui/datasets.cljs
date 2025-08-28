@@ -422,7 +422,7 @@
                     ($ :td.px-6.py-4.whitespace-nowrap.text-right.text-sm.font-medium
                        ($ :div.relative.inline-block.text-left
                           ;; Three dots button
-                          ($ :button.inline-flex.items-center.justify-center.w-8.h-8.rounded-full.text-gray-400.hover:text-gray-600.hover:bg-gray-100.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500
+                          ($ :button.inline-flex.items-center.justify-center.w-8.h-8.rounded-full.text-gray-400.hover:text-gray-600.hover:bg-gray-100.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500.cursor-pointer
                              {:onClick (fn [e]
                                          (.stopPropagation e)
                                          (set-open-dropdown (if is-open? nil example-id)))}
@@ -434,7 +434,7 @@
                                {:onClick #(.stopPropagation %)}
                                ($ :div.py-1
                                   ;; Edit option
-                                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900
+                                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900.cursor-pointer
                                      {:onClick (fn []
                                                  (set-open-dropdown nil)
                                                  (state/dispatch [:modal/show :edit-example
@@ -451,7 +451,7 @@
                                      "Edit")
 
                                   ;; Delete option
-                                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-red-100.hover:text-red-800
+                                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-red-100.hover:text-red-800.cursor-pointer
                                      {:onClick (fn []
                                                  (set-open-dropdown nil)
                                                  (when (js/confirm "Are you sure you want to delete this example?")
@@ -470,7 +470,7 @@
                                      "Delete")
 
                                   ;; Try with evaluator option
-                                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900
+                                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900.cursor-pointer
                                      {:onClick (fn []
                                                  (set-open-dropdown nil)
                                                  ;; TODO: Implement evaluator functionality
