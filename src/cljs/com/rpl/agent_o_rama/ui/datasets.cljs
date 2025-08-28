@@ -95,17 +95,20 @@
                       ($ :li "AOR supports " ($ :code.bg-blue-100.px-1.rounded "x-javaType") " extension to reference Java types")
                       ($ :li "Do not include " ($ :code.bg-blue-100.px-1.rounded "$schema") " or " ($ :code.bg-blue-100.px-1.rounded "$vocabulary") " keys - these are added automatically")))))))))
 
-(defn show-create-dataset-modal! [module-id-raw refetch]
-  (state/dispatch [:form/init :create-dataset
-                   (-> create-dataset-form-spec
-                       (assoc-in [:submit-event 1] {:module-id module-id-raw
-                                                    :on-success refetch
-                                                    :form-id :create-dataset}))])
-  (state/dispatch [:modal/show :create-dataset
-                   {:title "Create New Dataset"
-                    :form-id :create-dataset
-                    :submit-text "Create Dataset"
-                    :component ($ CreateDatasetForm {:form-id :create-dataset})}]))
+(defn show-create-dataset-modal!
+  "Shows the create dataset modal. The refetch parameter is optional and kept for backward compatibility."
+  ([module-id-raw] (show-create-dataset-modal! module-id-raw nil))
+  ([module-id-raw refetch]
+   (state/dispatch [:form/init :create-dataset
+                    (-> create-dataset-form-spec
+                        (assoc-in [:submit-event 1] {:module-id module-id-raw
+                                                     :on-success refetch
+                                                     :form-id :create-dataset}))])
+   (state/dispatch [:modal/show :create-dataset
+                    {:title "Create New Dataset"
+                     :form-id :create-dataset
+                     :submit-text "Create Dataset"
+                     :component ($ CreateDatasetForm {:form-id :create-dataset})}])))
 
 ;; Form specification co-located with component
 (def edit-dataset-form-spec
@@ -231,19 +234,22 @@
                             :required? true})
        ($ forms/form-error {:error error}))))
 
-(defn show-create-snapshot-modal! [module-id dataset-id from-snapshot-name on-success]
-  (state/dispatch [:form/init :create-snapshot
-                   (-> create-snapshot-form-spec
-                       (assoc-in [:submit-event 1] {:module-id module-id
-                                                    :dataset-id dataset-id
-                                                    :from-snapshot-name from-snapshot-name
-                                                    :on-success on-success}))])
-  (state/dispatch [:modal/show :create-snapshot
-                   {:title "Create New Snapshot"
-                    :form-id :create-snapshot
-                    :submit-text "Create Snapshot"
-                    :component ($ CreateSnapshotForm {:form-id :create-snapshot
-                                                      :from-snapshot-name from-snapshot-name})}]))
+(defn show-create-snapshot-modal!
+  "Shows the create snapshot modal. The on-success parameter is optional and kept for backward compatibility."
+  ([module-id dataset-id from-snapshot-name] (show-create-snapshot-modal! module-id dataset-id from-snapshot-name nil))
+  ([module-id dataset-id from-snapshot-name on-success]
+   (state/dispatch [:form/init :create-snapshot
+                    (-> create-snapshot-form-spec
+                        (assoc-in [:submit-event 1] {:module-id module-id
+                                                     :dataset-id dataset-id
+                                                     :from-snapshot-name from-snapshot-name
+                                                     :on-success on-success}))])
+   (state/dispatch [:modal/show :create-snapshot
+                    {:title "Create New Snapshot"
+                     :form-id :create-snapshot
+                     :submit-text "Create Snapshot"
+                     :component ($ CreateSnapshotForm {:form-id :create-snapshot
+                                                       :from-snapshot-name from-snapshot-name})}])))
 
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon]}]
   ($ :div
@@ -281,9 +287,7 @@
                                                      selected-snapshot
                                                      (fn [created-snapshot-name]
                                                        ;; Set the newly created snapshot as selected
-                                                       (set-selected-snapshot created-snapshot-name)
-                                                       ;; Refetch the snapshot names list
-                                                       (refetch))))
+                                                       (set-selected-snapshot created-snapshot-name))))
 
         handle-delete (fn [snapshot-name]
                         (set-dropdown-open false)
@@ -296,7 +300,8 @@
                                (do
                                  (when (= selected-snapshot snapshot-name)
                                    (set-selected-snapshot "")) ;; Reset view to latest if deleting current
-                                 (refetch)) ;; Refetch the list
+                                 ;; Invalidate snapshot names query to trigger refetch
+                                 (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}]))
                                (js/alert (str "Error deleting snapshot: " (:error reply))))))))
 
         handle-select (fn [snapshot-name]
@@ -362,7 +367,7 @@
                                   :icon ($ PlusIcon {:className "h-4 w-4"})
                                   :delete-button nil}))))))))
 
-(defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success refetch]}]
+(defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success]}]
   (let [[open-dropdown set-open-dropdown] (uix/use-state nil)]
 
     ;; Close dropdown when clicking outside
@@ -429,8 +434,7 @@
                                                                        :snapshot-name snapshot-name
                                                                        :example-id example-id
                                                                        :initial-input (:input example)
-                                                                       :initial-output (:reference-output example)
-                                                                       :on-success refetch}))}
+                                                                       :initial-output (:reference-output example)}))}
                                      ($ PencilIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                      "Edit")
 
@@ -448,7 +452,10 @@
                                                     10000
                                                     (fn [reply]
                                                       (if (:success reply)
-                                                        (when on-delete-success (on-delete-success))
+                                                        (do
+                                                          ;; Invalidate dataset examples query to trigger refetch
+                                                          (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                                          (when on-delete-success (on-delete-success)))
                                                         (js/alert (str "Error deleting example: " (:error reply))))))))}
                                      ($ TrashIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-red-500"})
                                      "Delete")
@@ -471,21 +478,24 @@
 ;; DATASETS INDEX PAGE
 ;; =============================================================================
  ;; Helper function to show edit dataset modal with centralized state
-(defn show-edit-dataset-modal! [module-id dataset-id initial-name initial-description on-success]
-  (state/dispatch [:form/init :edit-dataset
-                   (-> edit-dataset-form-spec
-                       (assoc-in [:fields :name] initial-name)
-                       (assoc-in [:fields :description] initial-description)
-                       (assoc-in [:submit-event 1] {:module-id module-id
-                                                    :dataset-id dataset-id
-                                                    :initial-name initial-name
-                                                    :initial-description initial-description
-                                                    :on-success on-success}))])
-  (state/dispatch [:modal/show :edit-dataset
-                   {:title (str "Edit Dataset: " initial-name)
-                    :form-id :edit-dataset
-                    :submit-text "Save Changes"
-                    :component ($ EditDatasetForm {:form-id :edit-dataset})}]))
+(defn show-edit-dataset-modal!
+  "Shows the edit dataset modal. The on-success parameter is optional and kept for backward compatibility."
+  ([module-id dataset-id initial-name initial-description] (show-edit-dataset-modal! module-id dataset-id initial-name initial-description nil))
+  ([module-id dataset-id initial-name initial-description on-success]
+   (state/dispatch [:form/init :edit-dataset
+                    (-> edit-dataset-form-spec
+                        (assoc-in [:fields :name] initial-name)
+                        (assoc-in [:fields :description] initial-description)
+                        (assoc-in [:submit-event 1] {:module-id module-id
+                                                     :dataset-id dataset-id
+                                                     :initial-name initial-name
+                                                     :initial-description initial-description
+                                                     :on-success on-success}))])
+   (state/dispatch [:modal/show :edit-dataset
+                    {:title (str "Edit Dataset: " initial-name)
+                     :form-id :edit-dataset
+                     :submit-text "Save Changes"
+                     :component ($ EditDatasetForm {:form-id :edit-dataset})}])))
 
 ;; Helper function to show add example modal with centralized state  
 
@@ -509,7 +519,7 @@
              ($ :h1.text-2xl.font-bold.text-gray-900 "Datasets for " ($ :span.text-indigo-600 module-id))
              ($ :p.mt-2.text-sm.text-gray-600 "Create and manage datasets for agent training and evaluation."))
           ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer
-             {:onClick #(show-create-dataset-modal! module-id-raw refetch)}
+             {:onClick #(show-create-dataset-modal! module-id-raw)}
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Create New Dataset"))
 
@@ -540,8 +550,7 @@
                            :onClick #(show-edit-dataset-modal! module-id-raw
                                                                (:dataset-id dataset)
                                                                (:name dataset)
-                                                               (:description dataset)
-                                                               refetch)}
+                                                               (:description dataset))}
                           ($ PencilIcon {:className "h-5 w-5"}))
 
                        ;; Delete Button
@@ -552,7 +561,9 @@
                                         (sente/request! [:datasets/delete
                                                          {:module-id module-id-raw :dataset-id (:dataset-id dataset)}]
                                                         5000
-                                                        #(when (:success %) (refetch)))))}
+                                                        #(when (:success %)
+                                                           ;; Invalidate datasets query to trigger refetch
+                                                           (state/dispatch [:query/invalidate {:query-key-pattern [:datasets module-id]}])))))}
                           ($ TrashIcon {:className "h-5 w-5"})))))))))))
 
 ;; =============================================================================
@@ -746,8 +757,7 @@
                                 {:onClick #(show-example-modal! :create
                                                                 {:module-id module-id
                                                                  :dataset-id dataset-id
-                                                                 :snapshot-name selected-snapshot-name
-                                                                 :on-success examples-refetch})}
+                                                                 :snapshot-name selected-snapshot-name})}
                                 ($ PlusIcon {:className "h-4 w-4 mr-2"})
                                 "Add Example"))))
 
@@ -768,9 +778,7 @@
                                         ($ ExamplesList {:examples examples
                                                          :module-id module-id
                                                          :dataset-id dataset-id
-                                                         :snapshot-name selected-snapshot-name
-                                                         :on-delete-success examples-refetch
-                                                         :refetch examples-refetch})))))))
+                                                         :snapshot-name selected-snapshot-name})))))))
 
                  ;; Default case
                  ($ :div.flex.items-center.justify-center.h-full

@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.events
   (:require [com.rpl.agent-o-rama.ui.sente :as sente]
             [com.rpl.agent-o-rama.ui.state :as state]
+            [com.rpl.agent-o-rama.ui.common :as common]
             [com.rpl.specter :as s]
             [clojure.string :as str]))
 
@@ -288,6 +289,11 @@
                       (if (:success reply)
                         (do
                           (state/dispatch [:modal/hide])
+                          ;; Invalidate datasets query to trigger refetch
+                          ;; Need to decode module-id to match query key format
+                          (let [decoded-module-id (when module-id (common/url-decode module-id))]
+                            (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}]))
+                          ;; Keep backward compatibility for now
                           (when on-success (on-success)))
                         (state/dispatch [:db/set-value [:ui :modal :form :error] (:error reply)]))))
                    nil))
@@ -325,6 +331,12 @@
                          (.then (fn [_]
                                   (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
                                   (state/dispatch [:modal/hide])
+                                  ;; Invalidate both datasets list and dataset properties
+                                  ;; Need to decode module-id to match query key format
+                                  (let [decoded-module-id (when module-id (common/url-decode module-id))]
+                                    (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}])
+                                    (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-props decoded-module-id dataset-id]}]))
+                                  ;; Keep backward compatibility for now
                                   (when on-success (on-success))))
                          (.catch (fn [error]
                                    (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
@@ -356,6 +368,9 @@
                         (if (:success reply)
                           (do
                             (state/dispatch [:modal/hide])
+                            ;; Invalidate dataset examples query to trigger refetch
+                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                            ;; Keep backward compatibility for now
                             (when on-success (on-success)))
                           (state/dispatch [:db/set-value [:ui :modal :form :error]
                                            (or (:error reply) "An unknown server error occurred.")]))))
@@ -390,6 +405,9 @@
                         (if (:success reply)
                           (do
                             (state/dispatch [:modal/hide])
+                            ;; Invalidate dataset examples query to trigger refetch
+                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                            ;; Keep backward compatibility for now
                             (when on-success (on-success)))
                           (state/dispatch [:db/set-value [:ui :modal :form :error]
                                            (or (:error reply) "An unknown server error occurred.")]))))
@@ -416,6 +434,9 @@
                       (if (:success reply)
                         (do
                           (state/dispatch [:modal/hide])
+                          ;; Invalidate snapshot names query to trigger refetch
+                          (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}])
+                          ;; Keep backward compatibility for now
                           ;; Pass the created snapshot name to the success callback
                           (when on-success (on-success snapshot-name)))
                         (state/dispatch [:db/set-value [:ui :modal :form :error] (:error reply)]))))

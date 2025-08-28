@@ -63,6 +63,16 @@
      ;; Re-run effect if `fetch-data` identity changes
      [connected? enabled? page-is-visible? refetch-interval-ms fetch-data refetch-on-mount])
 
+    ;; Effect to watch for invalidation flag and auto-refetch
+    (uix/use-effect
+     (fn []
+       (when (and (:should-refetch? query-state) connected? enabled? page-is-visible?)
+         ;; Clear the flag first to prevent infinite loops
+         (state/dispatch [:db/set-value (into state-path [:should-refetch?]) false])
+         ;; Then refetch the data
+         (fetch-data)))
+     [(:should-refetch? query-state) connected? enabled? page-is-visible? fetch-data])
+
     ;; Return the result map including the refetch function
     (let [default-state {:data nil :status nil :error nil :fetching? false}
           current-state (or query-state default-state)

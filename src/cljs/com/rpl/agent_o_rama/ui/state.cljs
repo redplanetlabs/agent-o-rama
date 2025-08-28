@@ -263,6 +263,38 @@
                                       (cond-> (nil? (:data current-state))
                                         (assoc :status :error)))))])))
 
+(reg-event :query/invalidate
+           (fn [db {:keys [query-key-pattern]}]
+             ;; Find all query keys that match the pattern and mark them for refetch
+             ;; This allows invalidating multiple related queries at once
+             (let [queries-path [:queries]
+                   current-queries (get-in @app-db queries-path {})
+                   matching-keys (if (vector? query-key-pattern)
+                                   ;; Exact match for specific query key
+                                   [query-key-pattern]
+                                   ;; Pattern matching for multiple queries
+                                   (filter (fn [query-key]
+                                             (cond
+                                               (keyword? query-key-pattern)
+                                               ;; Match first element of query key
+                                               (= (first query-key) query-key-pattern)
+
+                                               (fn? query-key-pattern)
+                                               ;; Custom predicate function
+                                               (query-key-pattern query-key)
+
+                                               :else false))
+                                           (keys current-queries)))]
+
+               ;; Mark matching queries as stale by setting a flag
+               ;; The use-sente-query hook will check this flag and refetch
+               (reduce (fn [path query-key]
+                         (into path
+                               [(into queries-path [query-key])
+                                (s/terminal #(assoc % :should-refetch? true))]))
+                       []
+                       matching-keys))))
+
  ;; =============================================================================
 ;; MODAL EVENTS
 ;; =============================================================================
