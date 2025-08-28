@@ -101,9 +101,9 @@
   ([module-id-raw refetch]
    (state/dispatch [:form/init :create-dataset
                     (-> create-dataset-form-spec
-                        (assoc-in [:submit-event 1] {:module-id module-id-raw
-                                                     :on-success refetch
-                                                     :form-id :create-dataset}))])
+                        (assoc :submit-event [:dataset/create {:module-id module-id-raw
+                                                               :on-success refetch
+                                                               :form-id :create-dataset}]))])
    (state/dispatch [:modal/show :create-dataset
                     {:title "Create New Dataset"
                      :form-id :create-dataset
@@ -240,10 +240,10 @@
   ([module-id dataset-id from-snapshot-name on-success]
    (state/dispatch [:form/init :create-snapshot
                     (-> create-snapshot-form-spec
-                        (assoc-in [:submit-event 1] {:module-id module-id
-                                                     :dataset-id dataset-id
-                                                     :from-snapshot-name from-snapshot-name
-                                                     :on-success on-success}))])
+                        (assoc :submit-event [:dataset/create-snapshot {:module-id module-id
+                                                                        :dataset-id dataset-id
+                                                                        :from-snapshot-name from-snapshot-name
+                                                                        :on-success on-success}]))])
    (state/dispatch [:modal/show :create-snapshot
                     {:title "Create New Snapshot"
                      :form-id :create-snapshot
@@ -486,11 +486,11 @@
                     (-> edit-dataset-form-spec
                         (assoc-in [:fields :name] initial-name)
                         (assoc-in [:fields :description] initial-description)
-                        (assoc-in [:submit-event 1] {:module-id module-id
-                                                     :dataset-id dataset-id
-                                                     :initial-name initial-name
-                                                     :initial-description initial-description
-                                                     :on-success on-success}))])
+                        (assoc :submit-event [:dataset/edit {:module-id module-id
+                                                             :dataset-id dataset-id
+                                                             :initial-name initial-name
+                                                             :initial-description initial-description
+                                                             :on-success on-success}]))])
    (state/dispatch [:modal/show :edit-dataset
                     {:title (str "Edit Dataset: " initial-name)
                      :form-id :edit-dataset
