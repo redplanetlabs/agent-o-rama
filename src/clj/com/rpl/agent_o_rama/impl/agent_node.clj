@@ -72,9 +72,10 @@
 
 (defn- verify-successful-cf!
   [^CompletableFuture cf]
-  (.get cf)
-  (when (.isCompletedExceptionally cf)
-    (throw (h/ex-info "Streaming append failed" {} (.get cf)))))
+  (try
+    (.get cf)
+    (catch Exception e
+      (throw (h/ex-info "Streaming append failed" {} e)))))
 
 ;; these are for redef in tests
 (defn identity-streaming-index [v] v)

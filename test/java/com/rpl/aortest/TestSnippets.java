@@ -48,5 +48,7 @@ public class TestSnippets {
                              .param("foo2", "another number")
                              .withoutOutputPath()
     );
+
+    // TODO: add comparative and summary ones
   }
 }

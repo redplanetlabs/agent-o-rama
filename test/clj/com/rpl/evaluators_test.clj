@@ -297,4 +297,7 @@
                                "AB"
                                "CD"
                                "EF")))
+
+     ;; TODO: <<<<>>>> test summary and comparative declarations and tries (both
+     ;; clojure and Java for declarations)
     )))
