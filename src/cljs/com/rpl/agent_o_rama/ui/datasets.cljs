@@ -6,6 +6,7 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.ui.forms :as forms]
    [reitit.frontend.easy :as rfe]
    [clojure.string :as str]))
 
@@ -27,48 +28,55 @@
 ;; MODAL FOR CREATING DATASETS
 ;; =============================================================================
 (defui CreateDatasetForm [{:keys [module-id on-success]}]
-  (let [[name set-name] (uix/use-state "")
-        [description set-description] (uix/use-state "")
-        [input-schema set-input-schema] (uix/use-state "")
-        [output-schema set-output-schema] (uix/use-state "")
-        submitting? (state/use-sub [:ui :modal :form :submitting?])
-        error-msg (state/use-sub [:ui :modal :form :error])]
+  (let [name-field (forms/use-form-state "" [forms/required])
+        description-field (forms/use-form-state "")
+        input-schema-field (forms/use-form-state "" [forms/valid-json])
+        output-schema-field (forms/use-form-state "" [forms/valid-json])
+        {:keys [submitting? error submit]} (forms/use-global-form-submission :dataset/create)]
 
-    (letfn [(handle-create []
-              (state/dispatch [:dataset/create {:module-id module-id
-                                                :name name
-                                                :description description
-                                                :input-schema input-schema
-                                                :output-schema output-schema
-                                                :on-success on-success}]))]
+        is-valid? (and (nil? (:error name-field))
+                        (nil? (:error input-schema-field))
+                        (nil? (:error output-schema-field))
+                        (not (str/blank? (:value name-field))))
+
+        handle-create (fn []
+                        (submit {:module-id module-id
+                                 :name (:value name-field)
+                                 :description (:value description-field)
+                                 :input-schema (:value input-schema-field)
+                                 :output-schema (:value output-schema-field)
+                                 :on-success on-success}))
 
       ($ :div
          ($ :div.space-y-4
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700 "Name *")
-               ($ :input {:className "w-full p-3 border rounded-md text-sm transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                          :type "text"
-                          :value name
-                          :required true
-                          :onChange #(set-name (.. % -target -value))}))
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700 "Description (Optional)")
-               ($ :textarea {:className "w-full h-15 p-3 border rounded-md text-sm resize-y transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                             :value description
-                             :onChange #(set-description (.. % -target -value))}))
+            ($ forms/form-field {:label "Name"
+                                 :value (:value name-field)
+                                 :on-change (:set-value name-field)
+                                 :error (:error name-field)
+                                 :required? true})
+            ($ forms/form-field {:label "Description"
+                                 :type :textarea
+                                 :value (:value description-field)
+                                 :on-change (:set-value description-field)
+                                 :placeholder "Optional description for this dataset"
+                                 :rows 3})
             ($ :div.grid.grid-cols-2.gap-4
-               ($ :div
-                  ($ :label.block.text-sm.font-medium.text-gray-700 "Input JSON Schema (Optional)")
-                  ($ :textarea {:className "w-full h-80 p-3 border rounded-md font-mono text-sm resize-y transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                                :value input-schema
-                                :placeholder example-schema
-                                :onChange #(set-input-schema (.. % -target -value))}))
-               ($ :div
-                  ($ :label.block.text-sm.font-medium.text-gray-700 "Output JSON Schema (Optional)")
-                  ($ :textarea {:className "w-full h-80 p-3 border rounded-md font-mono text-sm resize-y transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                                :value output-schema
-                                :placeholder example-schema
-                                :onChange #(set-output-schema (.. % -target -value))})))
+               ($ forms/form-field {:label "Input JSON Schema"
+                                    :type :textarea
+                                    :value (:value input-schema-field)
+                                    :on-change (:set-value input-schema-field)
+                                    :error (:error input-schema-field)
+                                    :placeholder example-schema
+                                    :rows 20
+                                    :class-name "font-mono"})
+               ($ forms/form-field {:label "Output JSON Schema"
+                                    :type :textarea
+                                    :value (:value output-schema-field)
+                                    :on-change (:set-value output-schema-field)
+                                    :error (:error output-schema-field)
+                                    :placeholder example-schema
+                                    :rows 20
+                                    :class-name "font-mono"})))
 
             ;; JSON Schema Help Box
             ($ :div.bg-blue-50.border.border-blue-200.rounded-md.p-4
@@ -87,127 +95,100 @@
                            ($ :li "AOR supports " ($ :code.bg-blue-100.px-1.rounded "x-javaType") " extension to reference Java types")
                            ($ :li "Do not include " ($ :code.bg-blue-100.px-1.rounded "$schema") " or " ($ :code.bg-blue-100.px-1.rounded "$vocabulary") " keys - these are added automatically")))))))
 
-         (when error-msg
-           ($ :div.mt-4.p-3.bg-red-50.border.border-red-200.rounded-md
-              ($ :p.text-sm.text-red-700.whitespace-pre-wrap error-msg)))
+         (when error
+           ($ forms/form-error {:error error}))
 
-         ($ :div.mt-6.flex.justify-end.gap-3
-            ($ :button.px-4.py-2.border.border-gray-300.rounded-md.text-sm.font-medium.cursor-pointer
-               {:type "button" :onClick #(state/dispatch [:modal/hide])}
-               "Cancel")
-            (let [is-disabled? (or submitting? (str/blank? name))]
-              ($ :button
-                 {:type "button"
-                  :disabled is-disabled?
-                  :onClick #(when-not is-disabled? (handle-create))
-                  :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
-                                  (if is-disabled?
-                                    "text-gray-400 bg-gray-300 cursor-not-allowed"
-                                    "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
-                 (when submitting? ($ common/spinner {:size :medium}))
-                 "Create")))))))
+         ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
+                                :on-submit handle-create
+                                :submit-text "Create Dataset"
+                                :submitting? submitting?
+                                :disabled? (not is-valid?)})))
 
 (defui EditDatasetForm [{:keys [module-id dataset-id initial-name initial-description on-success]}]
-  (let [[name set-name] (uix/use-state initial-name)
-        [description set-description] (uix/use-state initial-description)
-        ;; Subscribe to global modal form state
-        submitting? (state/use-sub [:ui :modal :form :submitting?])
-        error-msg (state/use-sub [:ui :modal :form :error])
-        is-changed? (or (not= name initial-name) (not= description initial-description))]
+  (let [name-field (forms/use-form-state initial-name [forms/required])
+        description-field (forms/use-form-state initial-description)
+        {:keys [submitting? error submit]} (forms/use-global-form-submission :dataset/edit)
+        is-changed? (or (not= (:value name-field) initial-name) (not= (:value description-field) initial-description))
+        is-valid? (and (nil? (:error name-field)) is-changed?)]
 
-    (letfn [(handle-save []
-              (state/dispatch [:dataset/edit {:module-id module-id
-                                              :dataset-id dataset-id
-                                              :name name
-                                              :description description
-                                              :initial-name initial-name
-                                              :initial-description initial-description
-                                              :on-success on-success}]))]
+        handle-save (fn []
+                        (submit {:module-id module-id
+                                 :dataset-id dataset-id
+                                 :name (:value name-field)
+                                 :description (:value description-field)
+                                 :initial-name initial-name
+                                 :initial-description initial-description
+                                 :on-success on-success}))
 
       ($ :div
          ($ :div.space-y-4
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700 "Name *")
-               ($ :input {:className "w-full p-3 border rounded-md text-sm transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                          :type "text"
-                          :value name
-                          :required true
-                          :onChange #(set-name (.. % -target -value))}))
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700 "Description (Optional)")
-               ($ :textarea {:className "w-full h-24 p-3 border rounded-md text-sm resize-y transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                             :value description
-                             :onChange #(set-description (.. % -target -value))})))
+            ($ forms/form-field {:label "Name"
+                                 :value (:value name-field)
+                                 :on-change (:set-value name-field)
+                                 :error (:error name-field)
+                                 :required? true})
+            ($ forms/form-field {:label "Description"
+                                 :type :textarea
+                                 :value (:value description-field)
+                                 :on-change (:set-value description-field)
+                                 :rows 3}))
 
-         (when error-msg
-           ($ :div.mt-4.p-3.bg-red-50.border.border-red-200.rounded-md
-              ($ :p.text-sm.text-red-700 error-msg)))
+         ($ forms/form-error {:error error})
 
-         ($ :div.mt-6.flex.justify-end.gap-3
-            ($ :button.px-4.py-2.border.border-gray-300.rounded-md.text-sm.font-medium.cursor-pointer
-               {:type "button" :onClick #(state/dispatch [:modal/hide])}
-               "Cancel")
-            (let [is-disabled? (or submitting? (not is-changed?) (str/blank? name))]
-              ($ :button
-                 {:type "button"
-                  :disabled is-disabled?
-                  :onClick #(when-not is-disabled? (handle-save))
-                  :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
-                                  (if is-disabled?
-                                    "text-gray-400 bg-gray-300 cursor-not-allowed"
-                                    "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
-                 (when submitting? ($ common/spinner {:size :medium}))
-                 "Save Changes")))))))
+         ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
+                                  :on-submit handle-save
+                                  :submit-text "Save Changes"
+                                  :submitting? submitting?
+                                  :disabled? (not is-valid?)}))))
 
 (defui AddExampleForm [{:keys [module-id dataset-id snapshot-name on-success]}]
-  (let [[input set-input] (uix/use-state "")
-        [output set-output] (uix/use-state "")
-        ;; Subscribe to global modal form state
-        submitting? (state/use-sub [:ui :modal :form :submitting?])
-        error-msg (state/use-sub [:ui :modal :form :error])]
+  (let [input-field (forms/use-form-state "" [forms/required forms/valid-json])
+        output-field (forms/use-form-state "" [forms/valid-json])
+        {:keys [submitting? error submit]} (forms/use-global-form-submission :dataset/add-example)
+        is-valid? (and (nil? (:error input-field))
+                       (nil? (:error output-field))
+                       (not (str/blank? (:value input-field))))]
 
-    (letfn [(handle-add []
-              (state/dispatch [:dataset/add-example {:module-id module-id
-                                                     :dataset-id dataset-id
-                                                     :snapshot-name snapshot-name
-                                                     :input input
-                                                     :output output
-                                                     :on-success on-success}]))]
+        handle-add (fn []
+                        (submit {:module-id module-id
+                                 :dataset-id dataset-id
+                                 :snapshot-name snapshot-name
+                                 :input (:value input-field)
+                                 :output (:value output-field)
+                                 :on-success on-success}))
       ($ :div
          ($ :div.space-y-4
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700 "Input (JSON)")
-               ($ :textarea {:className "w-full h-48 p-3 border rounded-md font-mono text-sm resize-y"
-                             :value input
-                             :placeholder "Enter input as a valid JSON object..."
-                             :onChange #(set-input (.. % -target -value))}))
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700 "Reference Output (JSON, Optional)")
-               ($ :textarea {:className "w-full h-48 p-3 border rounded-md font-mono text-sm resize-y"
-                             :value output
-                             :placeholder "Enter reference output as valid JSON..."
-                             :onChange #(set-output (.. % -target -value))})))
+            ($ forms/form-field {:label "Input (JSON)"
+                                 :type :textarea
+                                 :value (:value input-field)
+                                 :on-change (:set-value input-field)
+                                 :error (:error input-field)
+                                 :placeholder "Enter input as a valid JSON object..."
+                                 :rows 12
+                                 :class-name "font-mono"})
+            ($ forms/form-field {:label "Reference Output (JSON, Optional)"
+                                 :type :textarea
+                                 :value (:value output-field)
+                                 :on-change (:set-value output-field)
+                                 :error (:error output-field)
+                                 :placeholder "Enter reference output as valid JSON..."
+                                 :rows 12
+                                 :class-name "font-mono"})))
 
-         (when error-msg
-           ($ :div.mt-4.p-3.bg-red-50.border.border-red-200.rounded-md
-              ($ :p.text-sm.text-red-700.whitespace-pre-wrap error-msg)))
+         ($ forms/form-error {:error error})
 
-         ($ :div.mt-6.flex.justify-end.gap-3
-            ($ :button.px-4.py-2.border.rounded-md.text-sm {:type "button" :onClick #(state/dispatch [:modal/hide])} "Cancel")
-            (let [is-disabled? (or submitting? (str/blank? input))]
-              ($ :button {:type "button"
-                          :disabled is-disabled?
-                          :onClick #(when-not is-disabled? (handle-add))
-                          :className (str "px-4 py-2 border rounded-md text-sm font-medium flex items-center "
-                                          (if is-disabled? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                              "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"))}
-                 (when submitting? ($ common/spinner {:size :medium}))
-                 "Add Example")))))))
+         ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
+                                  :on-submit handle-add
+                                  :submit-text "Add Example"
+                                  :submitting? submitting?
+                                  :disabled? (not is-valid?)})))
 
 (defui CreateSnapshotForm [{:keys [module-id dataset-id from-snapshot-name on-success]}]
-  (let [[to-name set-to-name] (uix/use-state "")
+  (let [to-name-field (forms/use-form-state "" [forms/required])
         [submitting? set-submitting] (uix/use-state false)
         [error-msg set-error-msg] (uix/use-state nil)
+        is-valid? (and (nil? (:error to-name-field))
+                       (not (str/blank? (:value to-name-field))))
 
         handle-create (fn []
                         (set-submitting true)
@@ -216,7 +197,7 @@
                          [:datasets/create-snapshot {:module-id module-id
                                                      :dataset-id dataset-id
                                                      :from-snapshot-name from-snapshot-name
-                                                     :to-snapshot-name to-name}]
+                                                     :to-snapshot-name (:value to-name-field)}]
                          10000
                          (fn [reply]
                            (set-submitting false)
@@ -230,21 +211,18 @@
              ($ :label.block.text-sm.font-medium.text-gray-700 "Source Snapshot")
              ($ :p.mt-1.text-sm.text-gray-500.bg-gray-100.p-2.rounded-md
                 (if (str/blank? from-snapshot-name) "Latest (Working Copy)" from-snapshot-name)))
-          ($ :div
-             ($ :label.block.text-sm.font-medium.text-gray-700 "New Snapshot Name *")
-             ($ :input {:className "w-full p-3 border rounded-md"
-                        :type "text" :value to-name :required true
-                        :onChange #(set-to-name (.. % -target -value))})))
+          ($ forms/form-field {:label "New Snapshot Name"
+                               :value (:value to-name-field)
+                               :on-change (:set-value to-name-field)
+                               :error (:error to-name-field)
+                               :required? true})))
        (when error-msg
-         ($ :div.mt-4.p-3.bg-red-50.border.border-red-200.rounded-md
-            ($ :p.text-sm.text-red-700.whitespace-pre-wrap error-msg)))
-       ($ :div.mt-6.flex.justify-end.gap-3
-          ($ :button.px-4.py-2.border.rounded-md {:type "button" :onClick #(state/dispatch [:modal/hide])} "Cancel")
-          (let [is-disabled? (or submitting? (str/blank? to-name))]
-            ($ :button {:type "button" :disabled is-disabled? :onClick handle-create
-                        :className (str "px-4 py-2 rounded-md flex items-center cursor-pointer "
-                                        (if is-disabled? "bg-gray-300 cursor-not-allowed" "bg-blue-600 text-white hover:bg-blue-700"))}
-               (when submitting? ($ common/spinner {:size :medium})) "Create"))))))
+         ($ forms/form-error {:error error-msg}))
+       ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
+                               :on-submit handle-create
+                               :submit-text "Create"
+                               :submitting? submitting?
+                               :disabled? (not is-valid?)})))
 
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon]}]
   ($ :button

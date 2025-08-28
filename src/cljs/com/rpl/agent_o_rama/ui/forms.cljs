@@ -12,26 +12,26 @@
 
 (defhook use-form-state
   "Hook for managing form field state with optional validation.
-   
+
    Usage:
    (let [{:keys [value set-value error]} (use-form-state initial-value validators)]
      ...)"
-  ([initial-value] (use-form-state initial-value []))
-  ([initial-value validators]
+  [initial-value & [validators]]
    (let [[value set-value] (uix/use-state initial-value)
          [error set-error] (uix/use-state nil)
 
          ;; Validate the current value whenever it changes
          _ (uix/use-effect
             (fn []
-              (let [validation-error (some #(% value) validators)]
+              (let [validation-error (when (seq validators)
+                                       (some #(% value) validators))]
                 (set-error validation-error)))
             [value])]
 
      {:value value
       :set-value set-value
       :error error
-      :set-error set-error})))
+      :set-error set-error}))
 
 (defhook use-global-form-submission
   "Hook that provides access to global form submission state.
