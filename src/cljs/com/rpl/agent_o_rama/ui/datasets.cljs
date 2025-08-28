@@ -139,51 +139,14 @@
        ($ forms/form-error {:error error}))))
 
 ;; Form specification co-located with component
-(def add-example-form-spec
-  {:fields {:input ""
-            :output ""}
-   :validators {:input [forms/required forms/valid-json]
-                :output [forms/valid-json]}
-   :submit-event [:dataset/add-example]})
+ ;; Unified form specification for both adding and editing examples
+;; The dynamic parts (initial fields, submit event) will be added at runtime
+(def example-form-spec
+  {:validators {:input [forms/required forms/valid-json]
+                :output [forms/valid-json]}})
 
-(defui AddExampleForm [{:keys [form-id]}]
-  (let [;; Use the centralized form hook
-        {:keys [valid? submitting? error]} (forms/use-centralized-form form-id)
-
-        ;; Use the field-specific hook for clean binding
-        input-field (forms/use-form-field form-id :input)
-        output-field (forms/use-form-field form-id :output)]
-
-    ($ forms/form
-       ($ forms/form-field {:label "Input (JSON)"
-                            :type :textarea
-                            :value (:value input-field)
-                            :on-change (:on-change input-field)
-                            :error (:error input-field)
-                            :placeholder "Enter input as a valid JSON object..."
-                            :rows 12
-                            :class-name "font-mono"})
-       ($ forms/form-field {:label "Reference Output (JSON, Optional)"
-                            :type :textarea
-                            :value (:value output-field)
-                            :on-change (:on-change output-field)
-                            :error (:error output-field)
-                            :placeholder "Enter reference output as valid JSON..."
-                            :rows 12
-                            :class-name "font-mono"})
-
-       ;; form-error now reads from the centralized state
-       ($ forms/form-error {:error error}))))
-
-;; Form specification co-located with component
-(def edit-example-form-spec
-  {:fields {:input ""
-            :output ""}
-   :validators {:input [forms/required forms/valid-json]
-                :output [forms/valid-json]}
-   :submit-event [:dataset/edit-example]})
-
-(defui EditExampleForm [{:keys [form-id]}]
+;; Unified form component for both adding and editing examples
+(defui ExampleForm [{:keys [form-id]}]
   (let [{:keys [error]} (forms/use-centralized-form form-id)
         input-field (forms/use-form-field form-id :input)
         output-field (forms/use-form-field form-id :output)]
@@ -205,40 +168,45 @@
                             :placeholder "Enter reference output as valid JSON..."
                             :rows 12
                             :class-name "font-mono"})
-
        ($ forms/form-error {:error error}))))
 
-(defn show-edit-example-modal! [module-id dataset-id snapshot-name example-id initial-input initial-output on-success]
-  (let [;; Convert initial values to JSON strings for form display
-        initial-input-str (if (string? initial-input)
-                            initial-input
-                            (if initial-input
-                              (js/JSON.stringify (clj->js initial-input) nil 2)
-                              ""))
-        initial-output-str (if (string? initial-output)
-                             initial-output
-                             (if initial-output
-                               (js/JSON.stringify (clj->js initial-output) nil 2)
-                               ""))]
+(defn show-example-modal!
+  "Initializes and shows a modal for either creating or editing an example.
+   - mode: :create or :edit
+   - config: A map of parameters for the operation."
+  [mode config]
+  (let [form-id :example-form ; Use a consistent form ID for both modes
+        ;; Determine mode-specific properties
+        {:keys [title submit-text submit-event-type initial-fields submit-payload]}
+        (case mode
+          :create
+          {:title "Add Example"
+           :submit-text "Add Example"
+           :submit-event-type :dataset/add-example
+           :initial-fields {:input "" :output ""}
+           :submit-payload (select-keys config [:module-id :dataset-id :snapshot-name :on-success])}
 
-    (state/dispatch [:form/init :edit-example
-                     (-> edit-example-form-spec
-                         (assoc-in [:fields :input] initial-input-str)
-                         (assoc-in [:fields :output] initial-output-str)
-                         (assoc-in [:submit-event 1] {:module-id module-id
-                                                      :dataset-id dataset-id
-                                                      :snapshot-name snapshot-name
-                                                      :example-id example-id
-                                                      :input initial-input-str
-                                                      :output initial-output-str
-                                                      :initial-input initial-input
-                                                      :initial-output initial-output
-                                                      :on-success on-success}))])
-    (state/dispatch [:modal/show :edit-example
-                     {:title "Edit Example"
-                      :form-id :edit-example
-                      :submit-text "Save Changes"
-                      :component ($ EditExampleForm {:form-id :edit-example})}])))
+          :edit
+          (let [{:keys [initial-input initial-output]} config]
+            {:title "Edit Example"
+             :submit-text "Save Changes"
+             :submit-event-type :dataset/edit-example
+             :initial-fields {:input (if initial-input (js/JSON.stringify (clj->js initial-input) nil 2) "")
+                              :output (if initial-output (js/JSON.stringify (clj->js initial-output) nil 2) "")}
+             :submit-payload (select-keys config [:module-id :dataset-id :snapshot-name :example-id :on-success])}))]
+
+    ;; Initialize the centralized form state with the correct configuration
+    (state/dispatch [:form/init form-id
+                     (-> example-form-spec
+                         (assoc :fields initial-fields)
+                         (assoc :submit-event [submit-event-type (assoc submit-payload :form-id form-id)]))])
+
+    ;; Show the modal with the correct title and component
+    (state/dispatch [:modal/show form-id
+                     {:title title
+                      :form-id form-id
+                      :submit-text submit-text
+                      :component ($ ExampleForm {:form-id form-id})}])))
 
 ;; Form specification co-located with component
 (def create-snapshot-form-spec
@@ -455,13 +423,14 @@
                                   ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900.cursor-pointer
                                      {:onClick (fn []
                                                  (set-open-dropdown nil)
-                                                 (show-edit-example-modal! module-id
-                                                                           dataset-id
-                                                                           snapshot-name
-                                                                           example-id
-                                                                           (:input example)
-                                                                           (:reference-output example)
-                                                                           refetch))}
+                                                 (show-example-modal! :edit
+                                                                      {:module-id module-id
+                                                                       :dataset-id dataset-id
+                                                                       :snapshot-name snapshot-name
+                                                                       :example-id example-id
+                                                                       :initial-input (:input example)
+                                                                       :initial-output (:reference-output example)
+                                                                       :on-success refetch}))}
                                      ($ PencilIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                      "Edit")
 
@@ -519,18 +488,6 @@
                     :component ($ EditDatasetForm {:form-id :edit-dataset})}]))
 
 ;; Helper function to show add example modal with centralized state  
-(defn show-add-example-modal! [module-id dataset-id snapshot-name on-success]
-  (state/dispatch [:form/init :add-example
-                   (-> add-example-form-spec
-                       (assoc-in [:submit-event 1] {:module-id module-id
-                                                    :dataset-id dataset-id
-                                                    :snapshot-name snapshot-name
-                                                    :on-success on-success}))])
-  (state/dispatch [:modal/show :add-example
-                   {:title "Add Example"
-                    :form-id :add-example
-                    :submit-text "Add Example"
-                    :component ($ AddExampleForm {:form-id :add-example})}]))
 
 (defui datasets-index []
   (let [;; Get module_id from route, needs decoding for display
@@ -786,10 +743,11 @@
                           ;; Right side - Add Example button
                           ($ :div.flex.items-center.space-x-4
                              ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer
-                                {:onClick #(show-add-example-modal! module-id
-                                                                    dataset-id
-                                                                    selected-snapshot-name
-                                                                    examples-refetch)}
+                                {:onClick #(show-example-modal! :create
+                                                                {:module-id module-id
+                                                                 :dataset-id dataset-id
+                                                                 :snapshot-name selected-snapshot-name
+                                                                 :on-success examples-refetch})}
                                 ($ PlusIcon {:className "h-4 w-4 mr-2"})
                                 "Add Example"))))
 
