@@ -152,6 +152,57 @@
                               :submitting? submitting?
                               :disabled? (not is-valid?)}))))
 
+(defui EditExampleForm [{:keys [module-id dataset-id snapshot-name example-id initial-input initial-output on-success]}]
+  (let [input-field (forms/use-form-state (or initial-input "") [forms/required forms/valid-json])
+        output-field (forms/use-form-state (or initial-output "") [forms/valid-json])
+        {:keys [submitting? error submit]} (forms/use-global-form-submission :dataset/edit-example)
+
+        ;; Check if form values have changed from initial values
+        is-changed? (or (not= (:value input-field) (or initial-input ""))
+                        (not= (:value output-field) (or initial-output "")))
+
+        is-valid? (and (nil? (:error input-field))
+                       (nil? (:error output-field))
+                       (not (str/blank? (:value input-field)))
+                       is-changed?)
+
+        handle-save (fn []
+                      (submit {:module-id module-id
+                               :dataset-id dataset-id
+                               :snapshot-name snapshot-name
+                               :example-id example-id
+                               :input (:value input-field)
+                               :output (:value output-field)
+                               :initial-input initial-input
+                               :initial-output initial-output
+                               :on-success on-success}))]
+
+    ($ forms/form
+       ($ forms/form-field {:label "Input (JSON)"
+                            :type :textarea
+                            :value (:value input-field)
+                            :on-change (:set-value input-field)
+                            :error (:error input-field)
+                            :placeholder "Enter input as a valid JSON object..."
+                            :rows 12
+                            :class-name "font-mono"})
+       ($ forms/form-field {:label "Reference Output (JSON, Optional)"
+                            :type :textarea
+                            :value (:value output-field)
+                            :on-change (:set-value output-field)
+                            :error (:error output-field)
+                            :placeholder "Enter reference output as valid JSON..."
+                            :rows 12
+                            :class-name "font-mono"})
+
+       ($ forms/form-error {:error error})
+
+       ($ forms/form-actions {:on-cancel #(state/dispatch [:modal/hide])
+                              :on-submit handle-save
+                              :submit-text "Save Changes"
+                              :submitting? submitting?
+                              :disabled? (not is-valid?)}))))
+
 
 
 (defui CreateSnapshotForm [{:keys [module-id dataset-id from-snapshot-name on-success]}]
@@ -374,8 +425,16 @@
                                   ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900
                                      {:onClick (fn []
                                                  (set-open-dropdown nil)
-                                                 ;; TODO: Implement edit functionality
-                                                 (println "Edit example:" example-id))}
+                                                 (state/dispatch [:modal/show :edit-example
+                                                                  {:title "Edit Example"
+                                                                   :component ($ EditExampleForm
+                                                                                 {:module-id module-id
+                                                                                  :dataset-id dataset-id
+                                                                                  :snapshot-name snapshot-name
+                                                                                  :example-id example-id
+                                                                                  :initial-input (:input example)
+                                                                                  :initial-output (:reference-output example)
+                                                                                  :on-success examples-refetch})}]))}
                                      ($ PencilIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                      "Edit")
 

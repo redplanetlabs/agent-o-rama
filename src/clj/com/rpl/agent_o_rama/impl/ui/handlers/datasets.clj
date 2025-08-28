@@ -114,3 +114,34 @@
                                  (UUID/fromString dataset-id)
                                  (UUID/fromString example-id)
                                  {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)})))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/edit-example
+  [{:keys [module-id dataset-id snapshot-name example-id input output]} uid]
+  (let [decoded-module-id (common/url-decode module-id)
+        manager (common/get-manager decoded-module-id)]
+    (try
+      ;; Input/Output from the UI will be JSON strings. We must parse them.
+      (let [parsed-input (when-not (str/blank? input) (j/read-value input))
+            parsed-output (when-not (str/blank? output) (j/read-value output))
+            snapshot-opts {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}]
+
+        ;; Update input if provided
+        (when parsed-input
+          (aor/set-dataset-example-input! manager
+                                          (UUID/fromString dataset-id)
+                                          (UUID/fromString example-id)
+                                          parsed-input
+                                          snapshot-opts))
+
+        ;; Update reference output if provided
+        (when parsed-output
+          (aor/set-dataset-example-reference-output! manager
+                                                     (UUID/fromString dataset-id)
+                                                     (UUID/fromString example-id)
+                                                     parsed-output
+                                                     snapshot-opts))
+
+        {:status :ok})
+      (catch com.fasterxml.jackson.core.JsonParseException e
+        (throw (ex-info (str "Invalid JSON provided: " (.getOriginalMessage e))
+                        {:field (if (str/includes? (.getMessage e) "input") :input :output)}))))))
