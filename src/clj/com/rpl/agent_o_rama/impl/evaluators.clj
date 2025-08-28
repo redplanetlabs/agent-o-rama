@@ -23,7 +23,9 @@
     SystemMessage
     TextContent
     ToolExecutionResultMessage
-    UserMessage]))
+    UserMessage]
+   [dev.langchain4j.model.chat.request.json
+    JsonRawSchema]))
 
 (spec/def ::description string?)
 (spec/def ::default string?)
@@ -120,10 +122,6 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
       (let [temperature     (Double/parseDouble (get params "temperature"))
             prompt-template (get params "prompt")
             model-name      (get params "model")
-            ;; TODO: <<<<>>>>
-            ;;  - need to convert output-schema to lagnchain4j version
-            ;;      - they're releasing feature to do exactly that this week in
-            ;;      1.4.0
             output-schema   (get params "outputSchema")]
         (fn [fetcher input ref-output output]
           (let [model  (.getAgentObject ^AgentObjectFetcher fetcher model-name)
@@ -135,14 +133,11 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
                 (lc4j/chat
                  (lc4j/chat-request
                   [prompt]
-                  {:temperature temperature
-                   ;; TODO: <<<<>>>>
-                   ; :response-format
-                   ; (lc4j/json-response-format
-                   ;  "Evaluation"
-                   ;  output-schema
-                   ; )
-
+                  {:temperature     temperature
+                   :response-format
+                   (lc4j/json-response-format
+                    "Evaluation"
+                    (JsonRawSchema/from output-schema))
                   }))
                 .aiMessage
                 .text

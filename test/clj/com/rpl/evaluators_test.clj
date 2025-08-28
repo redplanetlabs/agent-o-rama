@@ -27,8 +27,14 @@
     UserMessage]
    [dev.langchain4j.model.chat
     ChatModel]
+   [dev.langchain4j.model.chat.request.json
+    JsonRawSchema]
    [dev.langchain4j.model.chat.response
     ChatResponse$Builder]))
+
+(defn- raw-schema
+  [^JsonRawSchema s]
+  (.schema s))
 
 (defrecord MockChatModel []
   ChatModel
@@ -38,10 +44,13 @@
                              last)]
       (-> (ChatResponse$Builder.)
           (.aiMessage (AiMessage. (j/write-value-as-string
-                                   {"temperature" (.temperature request)
-                                    "message"     (.singleText m)
-                                    ;; TODO: <<<<>>>> add
-                                    ;; responseFormat().jsonSchema() here
+                                   {"temperature"  (.temperature request)
+                                    "message"      (.singleText m)
+                                    "outputSchema" (-> request
+                                                       .responseFormat
+                                                       .jsonSchema
+                                                       .rootElement
+                                                       raw-schema)
                                    })))
           .build))))
 
@@ -278,6 +287,15 @@
                           (UserMessage. "......."))))
 
 
+     (bind os
+       "{
+ \"type\": \"object\",
+ \"properties\": {
+   \"aaa\": { \"type\": \"string\" }
+ },
+ \"required\": [\"aaa\"],
+ \"additionalProperties\": false
+}")
 
      (aor/create-evaluator! manager
                             "ajudge"
@@ -286,17 +304,17 @@
                              "1 %input 2 %referenceOutput 3 %output 4 %input"
                              "model"        "my-model"
                              "temperature"  "1.2"
-                             ;; TODO: <<<<>>>> add output schema
-                             "outputSchema" "{}"
+                             "outputSchema" os
                             }
                             "a judge")
 
-     (is (= {"message" "1 AB 2 CD 3 EF 4 AB" "temperature" 1.2}
-            (aor/try-evaluator manager
-                               "ajudge"
-                               "AB"
-                               "CD"
-                               "EF")))
+     (is
+      (= {"message" "1 AB 2 CD 3 EF 4 AB" "temperature" 1.2 "outputSchema" os}
+         (aor/try-evaluator manager
+                            "ajudge"
+                            "AB"
+                            "CD"
+                            "EF")))
 
      ;; TODO: <<<<>>>> test summary and comparative declarations and tries (both
      ;; clojure and Java for declarations)
