@@ -461,6 +461,9 @@
                                  cluster
                                  module-name
                                  (queries/search-datasets-name))
+        multi-examples-query    (foreign-query cluster
+                                               module-name
+                                               (queries/multi-examples-name))
 
         evals-depot             (foreign-depot cluster
                                                module-name
@@ -912,6 +915,7 @@
      (underlying-objects [this]
        {:datasets-pstate         datasets-pstate
         :datasets-page-query     datasets-page-query
+        :multi-examples-query    multi-examples-query
         :all-eval-builders-query all-eval-builders-query
         :search-evals-query      search-evals-query
        }))))

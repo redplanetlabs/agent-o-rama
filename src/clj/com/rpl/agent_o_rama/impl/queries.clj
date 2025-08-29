@@ -55,6 +55,10 @@
   []
   "_aor-search-datasets")
 
+(defn multi-examples-name
+  []
+  "_aor-multi-examples")
+
 (defn all-evaluator-builders-name
   []
   "_aor-all-evaluator-builders")
@@ -477,6 +481,24 @@
       :pagination-params (when (= (count examples) amt)
                            (h/last-key examples))}
    )))
+
+;; returns map from example-id -> all example info
+(defn declare-multi-examples-query-topology
+  [topologies]
+  (let [datasets-sym (symbol (po/datasets-task-global-name))]
+    (<<query-topology topologies
+      (multi-examples-name)
+      [*dataset-id *snapshot *example-ids :> *res]
+      (|hash *dataset-id)
+      (apply multi-path (mapv keypath *example-ids) :> *examples-nav)
+      (local-select>
+       [(keypath *dataset-id :snapshots *snapshot)
+        (subselect *examples-nav)]
+       datasets-sym
+       :> *values)
+      (zipmap *example-ids *values :> *res)
+      (|origin)
+    )))
 
 (defn declare-all-evaluator-builders-query-topology
   [topologies]

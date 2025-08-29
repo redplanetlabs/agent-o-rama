@@ -530,6 +530,10 @@
          (foreign-query ipc
                         module-name
                         (queries/get-datasets-page-query-name)))
+       (bind multi-examples-query
+         (foreign-query ipc
+                        module-name
+                        (queries/multi-examples-name)))
 
 
        (bind schema1
@@ -1182,4 +1186,18 @@
                 :tags   #{}
                 :source "bulkUpload"}
               ]))
+
+       (is (= examples
+              (foreign-invoke-query multi-examples-query
+                                    ds-id4
+                                    nil
+                                    (keys examples))))
+
+       (bind less-examples (dissoc examples (h/last-key examples)))
+       (is (= less-examples
+              (foreign-invoke-query multi-examples-query
+                                    ds-id4
+                                    nil
+                                    (keys less-examples))))
+
       ))))
