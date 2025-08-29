@@ -18,6 +18,8 @@
    [com.rpl.test-common :as tc]
    [jsonista.core :as j])
   (:import
+   [com.rpl.agentorama
+    ExampleRun]
    [com.rpl.aortest
     TestSnippets]
    [dev.langchain4j.data.message
@@ -443,7 +445,7 @@
             (aor/try-summary-evaluator manager
                                        "sum1"
                                        [(aor/mk-example-run 1 2 3)
-                                        (aor/mk-example-run 4 5 6)])))
+                                        (ExampleRun/create 4 5 6)])))
      (is (= {"res" 31}
             (aor/try-summary-evaluator manager
                                        "sum2"
