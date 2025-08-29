@@ -139,11 +139,7 @@
                          missing-invoke-ids (clojure.set/difference pending-invoke-ids received-node-ids)
                          missing-leaves (into #{} (filter #(missing-invoke-ids (second %)) pending-leaves))]
 
-                     ;; First, always merge whatever data we did receive
-                     (when (seq nodes)
-                       (state/dispatch [:invocation/merge-nodes invoke-id nodes (:root-invoke-id page-data)]))
-
-                     ;; Always update the summary and completion status first.
+                     ;; First, always update the summary and completion status (including historical-graph).
                      (let [{:keys [summary historical-graph root-invoke-id task-id]} page-data]
                        (when summary
                          (let [{:keys [forks fork-of]} summary
@@ -162,6 +158,10 @@
 
                        (when (contains? page-data :is-complete)
                          (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] is-complete])))
+
+                     ;; Then merge the new nodes into the existing graph (this calls build-drawable-graph).
+                     (when (seq nodes)
+                       (state/dispatch [:invocation/merge-nodes invoke-id nodes (:root-invoke-id page-data)]))
 
                      ;; THE STATE MACHINE for the next action
                      (cond
