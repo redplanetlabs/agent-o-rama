@@ -79,20 +79,18 @@
 ;; This is the single entry point to start or restart polling
 (state/reg-event :invocation/start-graph-loading
                  (fn [db {:keys [invoke-id module-id agent-name]}]
-                   (state/dispatch [:invocation/set-current {:invoke-id invoke-id
-                                                             :module-id module-id
-                                                             :agent-name agent-name}])
+                   (let [current-invocation {:invoke-id invoke-id :module-id module-id :agent-name agent-name}]
+                     ;; Set the current context AND initialize the polling state
+                     (state/dispatch [:db/set-values
+                                      [[:current-invocation] current-invocation]
+                                      [[:invocations-data invoke-id :polling-state] :fast-polling]
+                                      [[:invocations-data invoke-id :pending-leaves] #{}]
+                                      [[:invocations-data invoke-id :status] :loading]])
 
-                   ;; Always fetch data on navigation to ensure fresh data
-                   ;; Set status to loading immediately to prevent stale data display
-                   (state/dispatch [:db/set-value [:invocations-data invoke-id :status] :loading])
-                   (state/dispatch [:invocation/fetch-graph-page
-                                    {:invoke-id invoke-id
-                                     :module-id module-id
-                                     :agent-name agent-name
-                                     :leaves []
-                                     :initial? true}])
-                   nil))
+                     ;; Kick off the very first fetch
+                     (state/dispatch [:invocation/fetch-graph-page
+                                      (assoc current-invocation :leaves [] :initial? true)])
+                     nil)))
 
 ;; =============================================================================
 ;; UNIFIED STREAMING LOOP
@@ -101,6 +99,10 @@
 ;; Kick off or continue fetching a page of graph data
 (state/reg-event :invocation/fetch-graph-page
                  (fn [db {:keys [invoke-id module-id agent-name leaves initial?]}]
+                   ;; Store the leaves we're asking for in the app-db BEFORE sending the request.
+                   (state/dispatch [:db/set-value [:invocations-data invoke-id :pending-leaves] (set leaves)])
+
+                   ;; The Sente request remains the same
                    (sente/request!
                     [:api/fetch-graph-page
                      {:invoke-id invoke-id
@@ -123,65 +125,86 @@
 
 (state/reg-event :invocation/process-graph-page
                  (fn [db invoke-id page-data]
-                   (let [{:keys [nodes next-leaves summary historical-graph root-invoke-id
-                                 task-id is-complete]} page-data
-                         current-invocation (get-in db [:current-invocation])]
+                   (let [{:keys [nodes next-leaves is-complete]} page-data
+                         current-invocation (get-in db [:current-invocation])
+
+                         ;; WHAT I ASKED FOR: Get pending leaves from our state
+                         pending-leaves (get-in db [:invocations-data invoke-id :pending-leaves] #{})
+
+                         ;; WHAT I GOT: Get the IDs of the nodes the server returned
+                         received-node-ids (set (keys nodes))
+                         pending-invoke-ids (set (map second pending-leaves))
+
+                         ;; THE COMPARISON: Find what's missing
+                         missing-invoke-ids (clojure.set/difference pending-invoke-ids received-node-ids)
+                         missing-leaves (into #{} (filter #(missing-invoke-ids (second %)) pending-leaves))]
+
+                     ;; First, always merge whatever data we did receive
+                     (when (seq nodes)
+                       (state/dispatch [:invocation/merge-nodes invoke-id nodes (:root-invoke-id page-data)]))
 
                      ;; Always update the summary and completion status first.
-                     (when summary
-                       (let [{:keys [forks fork-of]} summary
-                             ;; Build key-value pairs conditionally
-                             kvps (cond-> [[[:invocations-data invoke-id :summary] summary]
-                                           [[:invocations-data invoke-id :task-id] task-id]
-                                           [[:invocations-data invoke-id :forks] forks]
-                                           [[:invocations-data invoke-id :fork-of] fork-of]
-                                           [[:invocations-data invoke-id :status] :success]]
-                                    (some? historical-graph)
-                                    (conj [[:invocations-data invoke-id :historical-graph] historical-graph])
+                     (let [{:keys [summary historical-graph root-invoke-id task-id]} page-data]
+                       (when summary
+                         (let [{:keys [forks fork-of]} summary
+                               ;; Build key-value pairs conditionally
+                               kvps (cond-> [[[:invocations-data invoke-id :summary] summary]
+                                             [[:invocations-data invoke-id :task-id] task-id]
+                                             [[:invocations-data invoke-id :forks] forks]
+                                             [[:invocations-data invoke-id :fork-of] fork-of]
+                                             [[:invocations-data invoke-id :status] :success]]
+                                      (some? historical-graph)
+                                      (conj [[:invocations-data invoke-id :historical-graph] historical-graph])
 
-                                    (some? root-invoke-id)
-                                    (conj [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]))]
-                         (state/dispatch (into [:db/set-values] kvps))))
+                                      (some? root-invoke-id)
+                                      (conj [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]))]
+                           (state/dispatch (into [:db/set-values] kvps))))
 
-                     (when (contains? page-data :is-complete)
-                       (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] is-complete]))
+                       (when (contains? page-data :is-complete)
+                         (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] is-complete])))
 
-                     ;; Then merge the new nodes into the existing graph.
-                     (when (and nodes (seq nodes))
-                       (state/dispatch [:invocation/merge-nodes invoke-id nodes root-invoke-id]))
-
-                     ;; Now, decide on the next action based on the server response.
+                     ;; THE STATE MACHINE for the next action
                      (cond
-                       ;; If the agent is complete, simply stop.
+                       ;; --- CASE 1: AGENT IS COMPLETE ---
                        is-complete
-                       (do (println "[POLLING-STATELESS] Loop ended.") nil)
+                       (do
+                         (println "[POLLING-STATEFUL] Agent complete. Loop ending.")
+                         (state/dispatch [:db/set-value [:invocations-data invoke-id :polling-state] :complete]))
 
-                       ;; If there are immediate next leaves, fast-poll.
+                       ;; --- CASE 2: RECOVERY MODE (Race condition detected!) ---
+                       (not (empty? missing-leaves))
+                       (do
+                         (println "[POLLING-STATEFUL] Detected" (count missing-leaves) "missing leaves. Entering recovery poll.")
+                         (state/dispatch [:db/set-value [:invocations-data invoke-id :polling-state] :recovering])
+                         (js/setTimeout
+                          (fn []
+                             ;; The new frontier is the union of what was missing and any new leaves found.
+                            (let [new-frontier (vec (clojure.set/union missing-leaves (set next-leaves)))]
+                              (state/dispatch [:invocation/fetch-graph-page (assoc current-invocation :leaves new-frontier)])))
+                          1000)) ;; Delay of 1s to give backend time to catch up
+
+                       ;; --- CASE 3: FAST POLLING (Normal happy path) ---
                        (seq next-leaves)
                        (do
-                         (println "[POLLING-STATELESS] Fast pagination: continuing...")
-                         (state/dispatch [:invocation/fetch-graph-page
-                                          (assoc current-invocation :leaves (vec next-leaves) :initial? false)]))
+                         (println "[POLLING-STATEFUL] Fast pagination: continuing...")
+                         (state/dispatch [:db/set-value [:invocations-data invoke-id :polling-state] :fast-polling])
+                         (state/dispatch [:invocation/fetch-graph-page (assoc current-invocation :leaves (vec next-leaves))]))
 
-                       ;; Otherwise, schedule a slow poll.
+                       ;; --- CASE 4: SLOW POLLING (Agent is idle) ---
                        :else
                        (do
-                         (println "[POLLING-STATELESS] Scheduling delayed re-poll...")
+                         (println "[POLLING-STATEFUL] No new leaves. Scheduling delayed re-poll.")
+                         (state/dispatch [:db/set-value [:invocations-data invoke-id :polling-state] :slow-polling])
                          (js/setTimeout
                           (fn []
                             (let [current-db @state/app-db
-                                  is-still-incomplete? (not (get-in current-db [:invocations-data invoke-id :is-complete]))
-                                  current-leaves (state/get-unfinished-leaves current-db invoke-id)]
-
-                              (if-not is-still-incomplete?
-                                (println "[POLLING-STATELESS] Delayed re-poll cancelled (agent completed).")
-                                (do
-                                  (state/dispatch [:db/update-value [:invocations-data invoke-id :idle-polls] (fnil inc 0)])
-                                  (println "[POLLING-STATELESS] Delayed re-poll executing.")
-                                  (state/dispatch [:invocation/fetch-graph-page
-                                                   (assoc current-invocation :leaves current-leaves :initial? false)])))))
+                                  is-still-incomplete? (not (get-in current-db [:invocations-data invoke-id :is-complete]))]
+                              (when is-still-incomplete?
+                                (println "[POLLING-STATEFUL] Delayed re-poll executing.")
+                                 ;; Re-calculate leaves from scratch, as before
+                                (let [current-leaves (state/get-unfinished-leaves current-db invoke-id)]
+                                  (state/dispatch [:invocation/fetch-graph-page (assoc current-invocation :leaves current-leaves)])))))
                           2000)))
-
                      nil)))
 
 (state/reg-event :invocation/merge-nodes

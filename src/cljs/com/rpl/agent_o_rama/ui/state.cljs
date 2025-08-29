@@ -11,7 +11,7 @@
   {:current-invocation {:invoke-id nil
                         :module-id nil
                         :agent-name nil}
-   :invocations-data {} ;; Keyed by invoke-id -> {:graph {:raw-nodes {} :nodes {} :edges []} :implicit-edges [] :summary ... :root-invoke-id ... :task-id ... :is-complete false}
+   :invocations-data {} ;; Keyed by invoke-id -> {:graph {:raw-nodes {} :nodes {} :edges []} :implicit-edges [] :summary ... :root-invoke-id ... :task-id ... :is-complete false :pending-leaves #{} :polling-state :idle}
    :invocations {:all-invokes []
                  :pagination-params nil ;; Next pagination params from server
                  :has-more? true
