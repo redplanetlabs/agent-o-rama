@@ -3,7 +3,7 @@
   ;; TODO: fix agent-o-rama version
   :dependencies [[org.clojure/clojure "1.12.0"]
                  [com.rpl/agent-o-rama "0.9.0-SNAPSHOT"]
-                 [dev.langchain4j/langchain4j-open-ai "1.2.0"]
+                 [dev.langchain4j/langchain4j-open-ai "1.4.0"]
                  [dev.langchain4j/langchain4j-web-search-engine-tavily
                   "1.3.0-beta9"]
                  [http-kit "2.8.0"]]

@@ -95,7 +95,6 @@
                       ($ :li "AOR supports " ($ :code.bg-blue-100.px-1.rounded "x-javaType") " extension to reference Java types")
                       ($ :li "Do not include " ($ :code.bg-blue-100.px-1.rounded "$schema") " or " ($ :code.bg-blue-100.px-1.rounded "$vocabulary") " keys - these are added automatically")))))))))
 
-
 (defn show-create-dataset-modal!
   "Shows the create dataset modal. The refetch parameter is optional and kept for backward compatibility."
   ([module-id-raw] (show-create-dataset-modal! module-id-raw nil))
@@ -606,6 +605,9 @@
         [selected-snapshot-name set-selected-snapshot-name] (uix/use-state "")
         [show-info? set-show-info] (uix/use-state false)
 
+        ;; State for search string
+        [search-string set-search-string] (uix/use-state "")
+
         ;; --- START OF FIX ---
 
         ;; 1. Fetch dataset properties, RENAMING keys to avoid collision
@@ -621,11 +623,14 @@
         ;; 2. Fetch examples, also RENAMING keys
         {:keys [data loading? error refetch] :as examples-query}
         (queries/use-sente-query
-         {:query-key [:dataset-examples module-id dataset-id selected-snapshot-name]
-          :sente-event [:datasets/get-examples-page {:module-id module-id
-                                                     :dataset-id dataset-id
-                                                     :snapshot-name selected-snapshot-name
-                                                     :pagination nil}]
+         {:query-key [:dataset-examples module-id dataset-id selected-snapshot-name search-string]
+          :sente-event [:datasets/search-examples {:module-id module-id
+                                                   :dataset-id dataset-id
+                                                   :snapshot-name selected-snapshot-name
+                                                   :filters (when-not (str/blank? search-string)
+                                                              {:search-string search-string})
+                                                   :limit 20
+                                                   :pagination nil}]
           :enabled? (boolean (and module-id dataset-id))})
 
         ;; Rename destructured keys for clarity
@@ -744,13 +749,20 @@
                     ;; Examples Tab Header with Controls
                     ($ :div.bg-gray-50.border-b.border-gray-200.px-6.py-4
                        ($ :div.flex.items-center.justify-between
-                          ;; Left side - Snapshot Manager
+                          ;; Left side - Snapshot Manager and Search
                           ($ :div.flex.items-center.space-x-4
                              ($ :span.text-sm.font-medium.text-gray-700 "Snapshot:")
                              ($ SnapshotManager {:module-id module-id
                                                  :dataset-id dataset-id
                                                  :selected-snapshot selected-snapshot-name
-                                                 :set-selected-snapshot set-selected-snapshot-name}))
+                                                 :set-selected-snapshot set-selected-snapshot-name})
+
+                             ;; Search input field
+                             ($ :input.ml-4.px-3.py-1.border.border-gray-300.rounded-md.text-sm
+                                {:type "text"
+                                 :placeholder "Search examples..."
+                                 :value search-string
+                                 :onChange #(set-search-string (.. % -target -value))}))
 
                           ;; Right side - Add Example button
                           ($ :div.flex.items-center.space-x-4

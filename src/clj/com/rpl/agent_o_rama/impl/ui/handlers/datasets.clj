@@ -54,17 +54,18 @@
     (aor/destroy-dataset! manager dataset-id)
     {:status :ok}))
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-examples-page
-  [{:keys [module-id dataset-id snapshot-name pagination]} uid]
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/search-examples
+  [{:keys [module-id dataset-id snapshot-name filters limit pagination]} uid]
   (let [decoded-module-id (common/url-decode module-id)
         manager (common/get-manager decoded-module-id)
-        datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
-    #_(queries/get-dataset-examples-page
-     datasets-pstate
-     (UUID/fromString dataset-id)
-     (when-not (str/blank? snapshot-name) snapshot-name)
-     100 ;; Page size
-     (:pagination-params pagination))))
+        {:keys [search-examples-query]} (aor-types/underlying-objects manager)]
+    ;; [*dataset-id *snapshot *filters *limit *next-key :> *res]
+    (foreign-invoke-query search-examples-query
+                          (UUID/fromString dataset-id)
+                          (when-not (str/blank? snapshot-name) snapshot-name)
+                          (or filters {}) ; filters map for search functionality
+                          (or limit 20) ; reasonable default limit
+                          pagination)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-example
   [{:keys [module-id dataset-id snapshot-name input output]} uid]
