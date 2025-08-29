@@ -917,6 +917,7 @@
      aor-types/UnderlyingObjects
      (underlying-objects [this]
        {:datasets-pstate         datasets-pstate
+        :evals-pstate            evals-pstate
         :datasets-page-query     datasets-page-query
         :search-examples-query   search-examples-query
         :multi-examples-query    multi-examples-query
