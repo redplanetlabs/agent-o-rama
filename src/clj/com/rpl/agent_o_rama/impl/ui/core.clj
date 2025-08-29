@@ -23,7 +23,10 @@
     (doseq [mod modules]
       (let [manager (try
                       (aor/agent-manager rama-client mod)
-                      (catch Exception e ::no-aor))]
+                      (catch Exception e
+                        ;; TODO once we have logging, log this.
+                        ;; this is where it fails when aor updates and old modules need updating
+                        ::no-aor))]
         (when-not (= ::no-aor manager)
           (setval [ATOM :aor-cache (keypath mod) :manager]
                   manager
