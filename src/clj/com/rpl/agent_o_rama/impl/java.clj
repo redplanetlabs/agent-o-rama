@@ -6,6 +6,7 @@
    [com.rpl.agent-o-rama.impl.helpers :as h])
   (:import
    [com.rpl.agentorama
+    EvaluatorBuilderOptions$Impl
     ToolsAgentOptions$Impl
     ToolsAgentOptions$FunctionHandler
     ToolsAgentOptions$StaticStringHandler]))
@@ -58,3 +59,32 @@
 (defn create-tool-info-with-context
   [tool-spec jfn]
   (tools/tool-info tool-spec (h/convert-jfn jfn) {:include-context? true}))
+
+
+(defn mk-evaluator-builder-options
+  []
+  (let [options (volatile! {})]
+    (reify
+     EvaluatorBuilderOptions$Impl
+     (param [this name description]
+       (.param this name description ""))
+     (param [this name description defaultValue]
+       (when (contains? (:params @options) name)
+         (throw (h/ex-info "Param already declared" {:name name})))
+       (setval [h/VOLATILE :params (keypath name)]
+               {:description description :default defaultValue}
+               options)
+       this)
+     (withoutInputPath [this]
+       (vswap! options assoc :input-path? false)
+       this)
+     (withoutOutputPath [this]
+       (vswap! options assoc :output-path? false)
+       this)
+     (withoutReferenceOutputPath [this]
+       (vswap! options assoc :reference-output-path? false)
+       this)
+     clojure.lang.IDeref
+     (deref [this]
+       @options
+     ))))

@@ -23,4 +23,84 @@ public class TestSnippets {
       ToolsAgentOptions.errorHandlerStaticString("abcde")
       );
   }
+
+  public static void declareEvaluatorBuilders(AgentsTopology topology) {
+    topology.declareEvaluatorBuilder("jeb1", "java builder 1", (Map<String, String> buildParams) -> {
+      return (AgentObjectFetcher fetcher, String input, Long refOutput, String output) -> {
+        Map ret = new HashMap();
+        ret.put("score", input.length() + refOutput + output.length());
+        return ret;
+      };
+    });
+    topology.declareEvaluatorBuilder(
+      "jeb2",
+      "java builder 2",
+      (Map<String, String> buildParams) -> {
+        int foo1 = Integer.parseInt(buildParams.get("foo1"));
+        int foo2 = Integer.parseInt(buildParams.get("foo2"));
+        return (AgentObjectFetcher fetcher, String input, Long refOutput, String output) -> {
+          Map ret = new HashMap();
+          ret.put("score", input.length() + foo1 + foo2 + refOutput + output.length());
+          return ret;
+        };
+      },
+      EvaluatorBuilderOptions.param("foo1", "a number")
+                             .param("foo2", "another number")
+                             .withoutOutputPath()
+    );
+
+    topology.declareComparativeEvaluatorBuilder("jcompare1", "java compare 1", (Map<String, String> buildParams) -> {
+      return (AgentObjectFetcher fetcher, Long input, Long refOutput, List<clojure.lang.Keyword> outputs) -> {
+        clojure.lang.Keyword s;
+        if(input < refOutput) s = outputs.get(0);
+        else if(input > refOutput) s = outputs.get(2);
+        else s = outputs.get(1);
+        Map ret = new HashMap();
+        ret.put("res", s);
+        return ret;
+      };
+    });
+    topology.declareComparativeEvaluatorBuilder("jcompare2", "java compare 2", (Map<String, String> buildParams) -> {
+      return (AgentObjectFetcher fetcher, Long input, Long refOutput, List<clojure.lang.Keyword> outputs) -> {
+        clojure.lang.Keyword s;
+        if(input < refOutput) s = outputs.get(0);
+        else if(input > refOutput) s = outputs.get(2);
+        else s = outputs.get(1);
+        Map ret = new HashMap();
+        ret.put("res", s);
+        ret.put("extra", buildParams.get("extra"));
+        return ret;
+      };
+    },
+     EvaluatorBuilderOptions.param("extra", "more input"));
+
+
+    topology.declareSummaryEvaluatorBuilder("jsum1", "java sum 1", (Map<String, String> builderParams) -> {
+      return (AgentObjectFetcher fetcher, List<ExampleRun> runs) -> {
+        Long sum = 0L;
+        for(ExampleRun run: runs) {
+          sum+=(Long)run.getInput();
+          sum+=(Long)run.getReferenceOutput();
+          sum+=(Long)run.getOutput();
+        }
+        Map ret = new HashMap();
+        ret.put("res", sum);
+        return ret;
+      };
+    });
+    topology.declareSummaryEvaluatorBuilder("jsum2", "java sum 1", (Map<String, String> builderParams) -> {
+      return (AgentObjectFetcher fetcher, List<ExampleRun> runs) -> {
+        Long sum = Long.parseLong(builderParams.get("extra"));
+        for(ExampleRun run: runs) {
+          sum+=(Long)run.getInput();
+          sum+=(Long)run.getReferenceOutput();
+          sum+=(Long)run.getOutput();
+        }
+        Map ret = new HashMap();
+        ret.put("res", sum);
+        return ret;
+      };
+    },
+    EvaluatorBuilderOptions.param("extra", "more input"));
+  }
 }

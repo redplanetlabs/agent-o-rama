@@ -138,8 +138,13 @@
                                            [[:invocations-data invoke-id :forks] forks]
                                            [[:invocations-data invoke-id :fork-of] fork-of]
                                            [[:invocations-data invoke-id :status] :success]]
+                                           [[:invocations-data invoke-id :task-id] task-id]
+                                           [[:invocations-data invoke-id :forks] forks]
+                                           [[:invocations-data invoke-id :fork-of] fork-of]
+                                           [[:invocations-data invoke-id :status] :success]]
                                     (some? historical-graph)
                                     (conj [[:invocations-data invoke-id :historical-graph] historical-graph])
+
 
                                     (some? root-invoke-id)
                                     (conj [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]))]
@@ -147,6 +152,7 @@
 
                      (when (contains? page-data :is-complete)
                        (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] is-complete]))
+
 
                      ;; Then merge the new nodes into the existing graph.
                      (when (and nodes (seq nodes))
@@ -164,6 +170,7 @@
                          (println "[POLLING-STATELESS] Fast pagination: continuing...")
                          (state/dispatch [:invocation/fetch-graph-page
                                           (assoc current-invocation :leaves (vec next-leaves) :initial? false)]))
+
 
                        ;; Otherwise, schedule a slow poll.
                        :else
@@ -194,6 +201,7 @@
                          ;; Prioritize the ID from the payload, fallback to the one in db.
                          root-invoke-id (or root-invoke-id-from-payload
                                             (get-in db [:invocations-data invoke-id :root-invoke-id]))
+
 
                          {:keys [nodes edges implicit-edges]}
                          (build-drawable-graph merged-raw-nodes root-invoke-id historical-graph)]

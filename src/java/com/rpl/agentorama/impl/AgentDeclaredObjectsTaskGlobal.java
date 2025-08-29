@@ -5,24 +5,54 @@ import java.io.IOException;
 import com.rpl.agentorama.*;
 import com.rpl.rama.integration.*;
 
-import clojure.lang.IFn;
+import clojure.lang.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   public static ThreadLocal<Long> ACQUIRE_TIMEOUT_MILLIS = new ThreadLocal<>();
-
   Map<String, Map<String, Object>> _builders;
+  Map<String, Map<Keyword, Object>> _evaluatorBuilders;
   Map<String, List<String>> _agentsInfo;
 
   Map<String, WorkerManagedResource> _objects;
+  Map<String, List> _evaluators;
   String _thisModuleName;
   WorkerManagedResource<Map<String, AgentClient>> _agents;
 
 
   // agents is localName -> [moduleName, agentName] (nil for local module)
-  public AgentDeclaredObjectsTaskGlobal(Map<String, Map<String, Object>> builders, Map<String, List<String>> agentsInfo) {
+  public AgentDeclaredObjectsTaskGlobal(
+    Map<String, Map<String, Object>> builders,
+    Map<String, Map<Keyword, Object>> evaluatorBuilders,
+    Map<String, List<String>> agentsInfo) {
     _builders = builders;
+    _evaluatorBuilders = evaluatorBuilders;
     _agentsInfo = agentsInfo;
+  }
+
+  public Map getEvaluatorBuilders() {
+    return _evaluatorBuilders;
+  }
+
+  public IFn getEvaluator(String name, String builderName, Map<String, Object> params) {
+    List curr = _evaluators.get(name);
+    if(curr!=null) {
+      String prevBuilderName = (String) curr.get(0);
+      Map prevParams = (Map) curr.get(1);
+      if(builderName.equals(prevBuilderName) && params.equals(prevParams)) {
+        return (IFn) curr.get(2);
+      }
+    }
+    synchronized(_evaluators) {
+      Map<Keyword, Object> eparams = _evaluatorBuilders.get(builderName);
+      if(eparams==null) eparams = (Map<Keyword,Object>) ((Map)AORHelpers.BUILT_IN_EVAL_BUILDERS.deref()).get(builderName);
+      if(eparams==null) throw new RuntimeException("Invalid evaluator builder name: " + builderName);
+      IFn builderFn = (IFn) eparams.get(Keyword.intern(null, "builder-fn"));
+      IFn ret = (IFn) builderFn.invoke(params);
+      _evaluators.put(name, Arrays.asList(builderName, params, ret));
+      return ret;
+    }
   }
 
   public Object getAgentObjectFromResource(String name) {
@@ -68,6 +98,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   @Override
   public void prepareForTask(int taskId, TaskGlobalContext context) {
     _thisModuleName = context.getModuleInstanceInfo().getModuleName();
+    _evaluators = new ConcurrentHashMap();
 
     _objects = new HashMap();
     for(String name: _builders.keySet()) {

@@ -15,10 +15,15 @@
    - :refetch-interval-ms - If set, will refetch data at this interval (in ms)
                             but only when the browser tab is visible.
    - :refetch-on-mount - Boolean to control initial fetch (default: true)
+   - :refetch-on-mount - Boolean to control initial fetch (default: true)
 
    Returns:
    - :data - The fetched data
    - :loading? - Boolean indicating if request is in progress
+   - :error - Error message if request failed
+   - :refetch - Function to manually trigger a refetch"
+  [{:keys [query-key sente-event timeout-ms enabled? refetch-interval-ms refetch-on-mount]
+    :or {timeout-ms 10000 enabled? true refetch-on-mount true}}]
    - :error - Error message if request failed
    - :refetch - Function to manually trigger a refetch"
   [{:keys [query-key sente-event timeout-ms enabled? refetch-interval-ms refetch-on-mount]
@@ -31,7 +36,21 @@
 
         ;; Use the page visibility hook
         page-is-visible? (common/use-page-visibility)
+        page-is-visible? (common/use-page-visibility)
 
+        ;; Define the fetch function inside the hook so it has access to the closure
+        fetch-data (uix/use-callback
+                    (fn []
+                      (state/dispatch [:query/fetch-start {:query-key query-key}])
+                      (sente/request! sente-event timeout-ms
+                                      (fn [reply]
+                                        (if (:success reply)
+                                          (state/dispatch [:query/fetch-success {:query-key query-key :data (:data reply)}])
+                                          (state/dispatch [:query/fetch-error {:query-key query-key
+                                                                               :error (or (:error reply)
+                                                                                          (when (= reply :chsk/closed) "Connection closed")
+                                                                                          "Request failed")}])))))
+                    [query-key-str sente-event-str timeout-ms])]
         ;; Define the fetch function inside the hook so it has access to the closure
         fetch-data (uix/use-callback
                     (fn []
@@ -50,7 +69,13 @@
     (uix/use-effect
      (fn []
        (let [interval-id (atom nil)]
+    ;; Effect for initial fetch and polling setup
+    (uix/use-effect
+     (fn []
+       (let [interval-id (atom nil)]
          (when (and connected? enabled? page-is-visible?)
+           ;; Control initial fetch with new option
+           (when refetch-on-mount (fetch-data))
            ;; Control initial fetch with new option
            (when refetch-on-mount (fetch-data))
 
@@ -83,6 +108,8 @@
       {:data data
        :loading? loading?
        :fetching? fetching?
+       :error error
+       :refetch fetch-data}))) ; <--- EXPOSE REFETCH FUNCTION
        :error error
        :refetch fetch-data}))) ; <--- EXPOSE REFETCH FUNCTION
 

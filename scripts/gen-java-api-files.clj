@@ -113,6 +113,16 @@
     [["FunctionHandler..." "handlers"]]]
   ])
 
+(def EVALUATOR-BUILDER-OPTIONS-METHODS
+  [["param" "EvaluatorBuilderOptions.Impl"
+    [["String" "name"] ["String" "description"]]]
+   ["param" "EvaluatorBuilderOptions.Impl"
+    [["String" "name"] ["String" "description"] ["String" "defaultValue"]]]
+   ["withoutInputPath" "EvaluatorBuilderOptions.Impl" []]
+   ["withoutOutputPath" "EvaluatorBuilderOptions.Impl" []]
+   ["withoutReferenceOutputPath" "EvaluatorBuilderOptions.Impl" []]
+  ])
+
 (def UI-OPTIONS-METHODS
   [["port" "UIOptions" [["int" "portNumber"]]]
    ["noInputBeforeClose" "UIOptions" []]

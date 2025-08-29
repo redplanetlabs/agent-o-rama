@@ -21,14 +21,14 @@ public class AgentNodeExecutorTaskGlobal implements TaskGlobalObject {
   private static final ThreadLocal<Object> LOG_THROTTLER = new ThreadLocal<>();
 
   public void submitTask(UUID invokeId, clojure.lang.AFn f) {
-    _runningInvokeIds.put(invokeId, Arrays.asList());
+    if(invokeId!=null) _runningInvokeIds.put(invokeId, Arrays.asList());
     Runnable wrappedTask = () -> {
       try {
-	LOG_THROTTLER.set(_throttler);
+	      LOG_THROTTLER.set(_throttler);
         f.run();
-	LOG_THROTTLER.remove();
+	      LOG_THROTTLER.remove();
       } catch (Throwable t) {
-        _runningInvokeIds.remove(invokeId);
+        if(invokeId!=null) _runningInvokeIds.remove(invokeId);
         throw t;
       }
     };

@@ -48,7 +48,7 @@ public interface ToolsAgentOptions {
    * same as {@code ToolsAgentOptions.create().errorHandlerRethrow()}
    */
   static Impl create() {
-    return (Impl) AORHelpers.MAKE_OPTIONS.invoke();
+    return (Impl) AORHelpers.MAKE_TOOLS_AGENT_OPTIONS.invoke();
   }
   <% (dofor [[name ret args] TOOLS-AGENT-OPTIONS-METHODS] (str %>
   static <%= ret %> <%= name %>(<%= (args-declaration-str args) %>) {

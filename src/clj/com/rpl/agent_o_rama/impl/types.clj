@@ -10,6 +10,7 @@
    [com.rpl.agentorama
     AgentComplete
     AgentInvoke
+    ExampleRun
     HumanInputRequest
     ToolInfo]
    [com.rpl.agentorama.impl
@@ -260,6 +261,11 @@
 (drp/defrecord+ DestroyDataset
   [dataset-id :- UUID])
 
+(drp/defrecord+ LinkedTrace
+  [module-name :- String
+   agent-name :- String
+   agent-invoke :- AgentInvokeImpl])
+
 (drp/defrecord+ AddDatasetExample
   [dataset-id :- UUID
    snapshot-name :- (s/maybe String)
@@ -267,6 +273,8 @@
    input :- Object
    reference-output :- (s/maybe Object)
    tags :- (s/maybe #{String})
+   source :- (s/maybe String)
+   linked-trace :- (s/maybe LinkedTrace)
   ])
 
 (drp/defrecord+ UpdateDatasetExample
@@ -302,6 +310,29 @@
   [dataset-id :- UUID
    snapshot-name :- String])
 
+;; Evaluators
+
+(drp/defrecord+ AddEvaluator
+  [name :- String
+   builder-name :- String
+   params :- {String Object}
+   description :- String
+   input-json-path :- (s/maybe String)
+   output-json-path :- (s/maybe String)
+   reference-output-json-path :- (s/maybe String)
+  ])
+
+(drp/defrecord+ RemoveEvaluator
+  [name :- String])
+
+(drp/defrecord+ ExampleRunImpl
+  [input :- Object
+   reference-output :- Object
+   output :- Object]
+  ExampleRun
+  (getInput [this] input)
+  (getReferenceOutput [this] reference-output)
+  (getOutput [this] output))
 
 ;; Internal protocols
 
@@ -309,7 +340,22 @@
   (underlying-objects [this]))
 
 (defprotocol AgentsTopologyInternal
-  (declare-agent-object-builder-internal [this name afn options]))
+  (declare-agent-object-builder-internal [this name afn options])
+  (declare-evaluator-builder-internal [this type name description builder-fn
+                                       options]))
+
+
+(defn declare-java-evaluator-builer
+  [this type name description builder-fn options]
+  (let [builder-fn (h/convert-jfn builder-fn)]
+    (declare-evaluator-builder-internal this
+                                        type
+                                        name
+                                        description
+                                        (fn [params]
+                                          (h/convert-jfn
+                                           (builder-fn params)))
+                                        (if options @options))))
 
 (defprotocol AgentClientInternal
   (stream-internal [this agent-invoke node callback-fn])

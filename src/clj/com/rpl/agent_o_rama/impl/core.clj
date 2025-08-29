@@ -4,6 +4,7 @@
   (:require
    [clojure.set :as set]
    [com.rpl.agent-o-rama.impl.datasets :as datasets]
+   [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.partitioner :as apart]
@@ -211,7 +212,7 @@
 
 (defn define-agents!
   [setup topologies stream-topology mb-topology agent-graphs mirror-agents
-   store-info declared-objects]
+   store-info declared-objects evaluator-builders]
   (declare-object* setup
                    (symbol (po/agents-store-info-name))
                    (aor-types/->valid-StoreInfo store-info {}))
@@ -230,18 +231,27 @@
                    (symbol (po/agent-declared-objects-name))
                    (AgentDeclaredObjectsTaskGlobal.
                     declared-objects
+                    evaluator-builders
                     (mk-agents-info agent-graphs mirror-agents)))
 
   (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))
-        datasets-depot-sym     (symbol (po/datasets-depot-name))]
+        datasets-depot-sym     (symbol (po/datasets-depot-name))
+        evaluators-depot-sym   (symbol (po/evaluators-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
     (declare-depot* setup datasets-depot-sym (hash-by :dataset-id))
+    (declare-depot* setup evaluators-depot-sym :random {:global? true})
     (declare-pstate*
      stream-topology
      (symbol (po/datasets-task-global-name))
      po/DATASETS-PSTATE-SCHEMA)
+    (declare-pstate*
+     stream-topology
+     (symbol (po/evaluators-task-global-name))
+     po/EVALUATORS-PSTATE-SCHEMA
+     {:global? true})
 
-    (doseq [depot-sym [pstate-write-depot-sym datasets-depot-sym]]
+    (doseq [depot-sym [pstate-write-depot-sym datasets-depot-sym
+                       evaluators-depot-sym]]
       (set-launch-depot-dynamic-option!* setup
                                          depot-sym
                                          "depot.max.entries.per.partition"
@@ -265,6 +275,9 @@
 
      (source> datasets-depot-sym :> *data)
       (datasets/handle-datasets-op *data)
+
+     (source> evaluators-depot-sym :> *data)
+      (evals/handle-evaluators-op *data)
     ))
   (queries/declare-agent-get-names-query-topology topologies
                                                   (-> agent-graphs
@@ -272,6 +285,11 @@
                                                       set))
   (queries/declare-get-datasets-page-topology topologies)
   (queries/declare-search-datasets-topology topologies)
+  (queries/declare-search-examples-query-topology topologies)
+  (queries/declare-multi-examples-query-topology topologies)
+  (queries/declare-all-evaluator-builders-query-topology topologies)
+  (queries/declare-try-evaluator-query-topology topologies)
+  (queries/declare-search-evaluators-query-topology topologies)
   (doseq [[agent-name agent-graph] agent-graphs]
     (define-agent! agent-name
                    setup

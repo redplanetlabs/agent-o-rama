@@ -26,6 +26,42 @@ public interface AgentsTopology {
   void declareAgentObjectBuilder(String name, RamaFunction1<AgentObjectSetup, Object> builder);
   void declareAgentObjectBuilder(String name, RamaFunction1<AgentObjectSetup, Object> builder, AgentObjectOptions options);
 
+  <Input, RefOutput, Output> void declareEvaluatorBuilder(
+      String name,
+      String description,
+      RamaFunction1<Map<String, String>,
+                    RamaFunction4<AgentObjectFetcher, Input, RefOutput, Output, Map>> builder);
+  <Input, RefOutput, Output> void declareEvaluatorBuilder(
+      String name,
+      String description,
+      RamaFunction1<Map<String, String>,
+                    RamaFunction4<AgentObjectFetcher, Input, RefOutput, Output, Map>> builder,
+      EvaluatorBuilderOptions options);
+
+  <Input, RefOutput, Output> void declareComparativeEvaluatorBuilder(
+      String name,
+      String description,
+      RamaFunction1<Map<String, String>,
+                    RamaFunction4<AgentObjectFetcher, Input, RefOutput, List<Output>, Map>> builder);
+  <Input, RefOutput, Output> void declareComparativeEvaluatorBuilder(
+      String name,
+      String description,
+      RamaFunction1<Map<String, String>,
+                    RamaFunction4<AgentObjectFetcher, Input, RefOutput, List<Output>, Map>> builder,
+      EvaluatorBuilderOptions options);
+
+  void declareSummaryEvaluatorBuilder(
+      String name,
+      String description,
+      RamaFunction1<Map<String, String>,
+                    RamaFunction2<AgentObjectFetcher, List<ExampleRun>, Map>> builder);
+  void declareSummaryEvaluatorBuilder(
+      String name,
+      String description,
+      RamaFunction1<Map<String, String>,
+                    RamaFunction2<AgentObjectFetcher, List<ExampleRun>, Map>> builder,
+      EvaluatorBuilderOptions options);
+
   void declareClusterAgent(String localName, String moduleName, String agentName);
 
   StreamTopology getStreamTopology();

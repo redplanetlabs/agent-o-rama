@@ -164,14 +164,18 @@
         [collapsed? set-collapsed] (common/use-local-storage "sidebar-collapsed?" false)
         toggle-collapsed #(set-collapsed (not collapsed?))]
 
+
     ($ :div {:className (str "h-screen flex flex-col bg-gray-100 transition-all duration-300 "
                              (if collapsed? "w-16" "w-64"))}
-       ;; Header
+       ;; Header (no changes here)
        ($ :div.flex.items-center.justify-between.p-4.border-b.border-gray-200.overflow-hidden
           (when-not collapsed?
             ($ :img {:src "/logo-black.png"
                      :alt "Agent-O-Rama"
                      :className "h-8 max-w-48 object-contain"}))
+          ($ :button {:onClick toggle-collapsed
+                      :className "p-2 rounded-md hover:bg-gray-200 transition-colors"
+                      :title (if collapsed? "Expand sidebar" "Collapse sidebar")}
           ($ :button {:onClick toggle-collapsed
                       :className "p-2 rounded-md hover:bg-gray-200 transition-colors"
                       :title (if collapsed? "Expand sidebar" "Collapse sidebar")}
@@ -182,6 +186,7 @@
        ;; Navigation
        ($ :nav.flex-1.p-3.overflow-y-auto
           ($ :div.space-y-2
+             ($ nav-link {:href "/" :location location :collapsed? collapsed? :title "Overview"}
              ($ nav-link {:href "/" :location location :collapsed? collapsed? :title "Overview"}
                 ($ HomeIcon {:className "h-5 w-5 flex-shrink-0"})
                 (when-not collapsed? ($ :span.ml-3 "Overview"))))
@@ -195,7 +200,7 @@
           (when is-agent-context?
             ($ agent-context-nav {:module-id module-id
                                   :agent-name agent-name
-                                  :collapsed? collapsed?}))))))
+                                  :collapsed? collapsed?}))))))))
 
 ;; =============================================================================
 ;; BREADCRUMB COMPONENT

@@ -15,6 +15,7 @@
    [com.rpl.agentorama
     AgentClient
     AgentNode
+    AgentObjectFetcher
     HumanInputRequest
     IUnderlying
     NestedOpType
@@ -71,9 +72,10 @@
 
 (defn- verify-successful-cf!
   [^CompletableFuture cf]
-  (.get cf)
-  (when (.isCompletedExceptionally cf)
-    (throw (h/ex-info "Streaming append failed" {} (.get cf)))))
+  (try
+    (.get cf)
+    (catch Exception e
+      (throw (h/ex-info "Streaming append failed" {} e)))))
 
 ;; these are for redef in tests
 (defn identity-streaming-index [v] v)
@@ -167,11 +169,13 @@
 (defn record-nested-op!-impl
   [^AgentNode agent-node nested-op-type start-time-millis finish-time-millis
    info-map]
-  (.recordNestedOp agent-node
-                   (nested-op-type->java nested-op-type)
-                   start-time-millis
-                   finish-time-millis
-                   info-map))
+  ;; can be nil when trying evaluators
+  (when agent-node
+    (.recordNestedOp agent-node
+                     (nested-op-type->java nested-op-type)
+                     start-time-millis
+                     finish-time-millis
+                     info-map)))
 
 (defmacro timed-agent-call
   [expr agent-node-sym agent-info-tuple [res-sym] info-map-expr]
@@ -190,39 +194,56 @@
      ~res-sym
    ))
 
+(defn mk-fetcher
+  ^AgentObjectFetcher []
+  (let [declared-objects-tg   (po/agent-declared-objects-task-global)
+        acquired-objects-atom (atom [])]
+    (reify
+     AgentObjectFetcher
+     (getAgentObject [this name]
+       (let [ret (.getAgentObjectFromResource declared-objects-tg name)]
+         (swap! acquired-objects-atom conj [name ret])
+         ret
+       ))
+     AgentNodeInternal
+     (release-acquired-objects! [this]
+       (doseq [[name o] @acquired-objects-atom]
+         (.releaseAgentObject declared-objects-tg name o)))
+    )))
+
 (defn mk-agent-node
   [agent-name agent-graph agent-task-id agent-id curr-node invoke-id retry-num
    store-info ^RamaClientsTaskGlobal rama-clients]
-  (let [task-id               (ops/current-task-id)
-        result-vol            (volatile! nil)
-        emits-vol             (volatile! [])
-        nested-ops-vol        (volatile! [])
-        task-ids-vol          (volatile! nil)
-        emit-count-vol        (volatile! 0)
-        valid-output-nodes    (-> agent-graph
-                                  :node-map
-                                  (get curr-node)
-                                  :output-nodes)
+  (let [task-id             (ops/current-task-id)
+        result-vol          (volatile! nil)
+        emits-vol           (volatile! [])
+        nested-ops-vol      (volatile! [])
+        task-ids-vol        (volatile! nil)
+        emit-count-vol      (volatile! 0)
+        valid-output-nodes  (-> agent-graph
+                                :node-map
+                                (get curr-node)
+                                :output-nodes)
 
         ^com.rpl.rama.ModuleInstanceInfo module-instance-info
         (ops/module-instance-info)
 
-        this-module-name      (.getModuleName module-instance-info)
-        streaming-depot       (.getAgentStreamingDepot rama-clients agent-name)
-        human-depot           (.getAgentHumanDepot rama-clients agent-name)
-        streaming-recorder    (mk-streaming-recorder agent-task-id
-                                                     agent-id
-                                                     curr-node
-                                                     invoke-id
-                                                     retry-num
-                                                     streaming-depot)
+        this-module-name    (.getModuleName module-instance-info)
+        streaming-depot     (.getAgentStreamingDepot rama-clients agent-name)
+        human-depot         (.getAgentHumanDepot rama-clients agent-name)
+        streaming-recorder  (mk-streaming-recorder agent-task-id
+                                                   agent-id
+                                                   curr-node
+                                                   invoke-id
+                                                   retry-num
+                                                   streaming-depot)
 
-        declared-objects-tg   (po/agent-declared-objects-task-global)
+        declared-objects-tg (po/agent-declared-objects-task-global)
+
+        fetcher             (mk-fetcher)
 
         ^AgentNodeExecutorTaskGlobal node-exec
         (po/agent-node-executor-task-global)
-
-        acquired-objects-atom (atom [])
        ]
     (reify
      AgentNode
@@ -259,10 +280,7 @@
          (throw (h/ex-info "Cannot both emit and result" {})))
        (vreset! result-vol (aor-types/->valid-AgentResult arg false)))
      (getAgentObject [this name]
-       (let [ret (.getAgentObjectFromResource declared-objects-tg name)]
-         (swap! acquired-objects-atom conj [name ret])
-         ret
-       ))
+       (.getAgentObject fetcher name))
      (getStore [this name]
        (let [store-params
              (simpl/->valid-StoreParams
@@ -435,8 +453,7 @@
      AgentNodeInternal
      (get-streaming-recorder [this] streaming-recorder)
      (release-acquired-objects! [this]
-       (doseq [[name o] @acquired-objects-atom]
-         (.releaseAgentObject declared-objects-tg name o)))
+       (release-acquired-objects! fetcher))
      (agent-node-state [this]
        {:emits      @emits-vol
         :result     @result-vol

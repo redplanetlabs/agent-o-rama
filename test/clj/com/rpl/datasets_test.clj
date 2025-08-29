@@ -22,7 +22,11 @@
     JsonNode]
    [com.networknt.schema
     JsonSchema
-    ValidationMessage]))
+    ValidationMessage]
+   [com.rpl.agentorama
+    AddDatasetExampleOptions]
+   [dev.langchain4j.data.message
+    UserMessage]))
 
 
 (defrecord Person [name age])
@@ -528,6 +532,12 @@
          (foreign-query ipc
                         module-name
                         (queries/get-datasets-page-query-name)))
+       (bind search-examples-query
+         (foreign-query ipc module-name (queries/search-examples-name)))
+       (bind multi-examples-query
+         (foreign-query ipc
+                        module-name
+                        (queries/multi-examples-name)))
 
 
        (bind schema1
@@ -688,15 +698,17 @@
            (apply aor/add-dataset-example! args)))
 
        (bind add-example-and-wait-java!
-         (fn [^com.rpl.agentorama.AgentManager manager dataset-id snapshot-bame
+         (fn [^com.rpl.agentorama.AgentManager manager dataset-id snapshot-name
               input reference-output tags]
            (Thread/sleep 2)
-           (.addDatasetExample manager
-                               dataset-id
-                               snapshot-bame
-                               input
-                               reference-output
-                               tags)))
+           (let [options (AddDatasetExampleOptions.)]
+             (set! (.snapshotName options) snapshot-name)
+             (set! (.referenceOutput options) reference-output)
+             (set! (.tags options) tags)
+             (.addDatasetExample manager
+                                 dataset-id
+                                 input
+                                 options))))
 
        (bind add-example-and-wait-async!
          (fn [& args]
@@ -704,12 +716,17 @@
            (.get ^java.util.concurrent.CompletableFuture
                  (apply aor/add-dataset-example-async! args))))
 
-       (bind examples-no-timestamps
+       (bind examples-cleaned
          (fn [examples]
            (setval
-            [ALL (multi-path :created-at :modified-at)]
+            [ALL
+             (multi-path :created-at
+                         :modified-at
+                         :id
+                         [:source nil?]
+                         [:linked-trace nil?])]
             NONE
-            (vals examples))))
+            examples)))
 
        (bind check-times!
          (fn [created-at created-at2 modified-at modified-at2]
@@ -771,31 +788,51 @@
           pstate))
        (is (some? created-at))
        (is (= created-at modified-at))
-       (add-example-and-wait! manager
-                              ds-id1
-                              "example1-2"
-                              {:reference-output "output1-2"
-                               :tags #{"tag1" "tag2"}})
+       (bind li
+         (aor-types/->LinkedTrace "foo.Module"
+                                  "agent1"
+                                  (aor-types/->AgentInvokeImpl 1 2)))
+       (add-example-and-wait!
+        manager
+        ds-id1
+        "example1-2"
+        {:reference-output "output1-2"
+         :tags         #{"tag1" "tag2"}
+         :source       "ai"
+         :linked-trace li})
+
+       (bind get-examples-page
+         (fn [ds-id snapshot limit page-key]
+           (foreign-invoke-query search-examples-query
+                                 ds-id
+                                 snapshot
+                                 nil
+                                 limit
+                                 page-key)))
 
        (bind {:keys [examples pagination-params]}
-         (queries/get-dataset-examples-page pstate ds-id1 nil 10 nil))
+         (get-examples-page ds-id1 nil 10 nil))
        (is (nil? pagination-params))
-       (is (= (examples-no-timestamps examples)
+       (is (= (examples-cleaned examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
-               {:input "example1-2"
+               {:input        "example1-2"
                 :reference-output "output1-2"
-                :tags  #{"tag1" "tag2"}}]))
+                :tags         #{"tag1" "tag2"}
+                :source       "ai"
+                :linked-trace li}]))
        (verified-dataset-times
         ds-id1
         #(aor/snapshot-dataset! manager ds-id1 nil "snapshot1"))
        (bind {:keys [examples pagination-params]}
-         (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
+         (get-examples-page ds-id1 "snapshot1" 10 nil))
        (is (nil? pagination-params))
-       (is (= (examples-no-timestamps examples)
+       (is (= (examples-cleaned examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
-               {:input "example1-2"
+               {:input        "example1-2"
                 :reference-output "output1-2"
-                :tags  #{"tag1" "tag2"}}]))
+                :tags         #{"tag1" "tag2"}
+                :source       "ai"
+                :linked-trace li}]))
        (add-example-and-wait-java! manager
                                    ds-id1
                                    "snapshot1"
@@ -803,38 +840,45 @@
                                    nil
                                    nil)
        (bind {:keys [examples pagination-params]}
-         (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
+         (get-examples-page ds-id1 "snapshot1" 10 nil))
        (is (nil? pagination-params))
-       (is (= (examples-no-timestamps examples)
+       (is (= (examples-cleaned examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
-               {:input "example1-2"
+               {:input        "example1-2"
                 :reference-output "output1-2"
-                :tags  #{"tag1" "tag2"}}
+                :tags         #{"tag1" "tag2"}
+                :source       "ai"
+                :linked-trace li}
                {:input "examples1-1" :reference-output nil :tags #{}}]))
+
 
        ;; verify original isn't affected
        (bind {:keys [examples pagination-params]}
-         (queries/get-dataset-examples-page pstate ds-id1 nil 10 nil))
+         (get-examples-page ds-id1 nil 10 nil))
        (is (nil? pagination-params))
-       (is (= (examples-no-timestamps examples)
+       (is (= (examples-cleaned examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
-               {:input "example1-2"
+               {:input        "example1-2"
                 :reference-output "output1-2"
-                :tags  #{"tag1" "tag2"}}]))
+                :tags         #{"tag1" "tag2"}
+                :source       "ai"
+                :linked-trace li}]))
 
        (aor/snapshot-dataset! manager ds-id1 "snapshot1" "snapshot2")
        (bind {:keys [examples pagination-params]}
-         (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
+         (get-examples-page ds-id1 "snapshot1" 10 nil))
        (is (nil? pagination-params))
-       (is (= (examples-no-timestamps examples)
+       (is (= (examples-cleaned examples)
               [{:input "example1-1" :reference-output nil :tags #{}}
-               {:input "example1-2"
+               {:input        "example1-2"
                 :reference-output "output1-2"
-                :tags  #{"tag1" "tag2"}}
+                :tags         #{"tag1" "tag2"}
+                :source       "ai"
+                :linked-trace li}
                {:input "examples1-1" :reference-output nil :tags #{}}]))
 
 
-       (bind [id1 id2 id3] (keys examples))
+       (bind [id1 id2 id3] (mapv :id examples))
        (verified-example-times
         ds-id1
         nil
@@ -897,24 +941,42 @@
         #(aor/remove-dataset-example! manager ds-id1 id2))
        (aor/remove-dataset-example! manager ds-id1 id3 {:snapshot "snapshot1"})
 
-       (bind {:keys [examples pagination-params]}
-         (queries/get-dataset-examples-page pstate ds-id1 nil 10 nil))
-       (is (nil? pagination-params))
-       (is (= (examples-no-timestamps examples)
-              [{:input "!!example-1"
-                :reference-output "out1"
-                :tags  #{"bar"}}]))
+
+       (verified-example-times
+        ds-id1
+        nil
+        id1
+        #(aor/set-dataset-example-source! manager ds-id1 id1 "manual"))
+
+
+       (aor/set-dataset-example-source! manager
+                                        ds-id1
+                                        id1
+                                        "manual2"
+                                        {:snapshot "snapshot1"})
 
        (bind {:keys [examples pagination-params]}
-         (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
+         (get-examples-page ds-id1 nil 10 nil))
        (is (nil? pagination-params))
-       (is (= (examples-no-timestamps examples)
-              [{:input "snapshot-example-1"
+       (is (= (examples-cleaned examples)
+              [{:input  "!!example-1"
+                :reference-output "out1"
+                :tags   #{"bar"}
+                :source "manual"}]))
+
+       (bind {:keys [examples pagination-params]}
+         (get-examples-page ds-id1 "snapshot1" 10 nil))
+       (is (nil? pagination-params))
+       (is (= (examples-cleaned examples)
+              [{:input  "snapshot-example-1"
                 :reference-output "snap-out-1"
-                :tags  #{"a" "c"}}
-               {:input "example1-2"
+                :tags   #{"a" "c"}
+                :source "manual2"}
+               {:input        "example1-2"
                 :reference-output "output1-2"
-                :tags  #{"tag1" "tag2"}}]))
+                :tags         #{"tag1" "tag2"}
+                :source       "ai"
+                :linked-trace li}]))
 
        (is (= #{"snapshot1" "snapshot2"}
               (queries/get-dataset-snapshot-names pstate ds-id1)))
@@ -927,7 +989,7 @@
        (is (= #{"snapshot2"}
               (queries/get-dataset-snapshot-names pstate ds-id1)))
        (bind {:keys [examples pagination-params]}
-         (queries/get-dataset-examples-page pstate ds-id1 "snapshot1" 10 nil))
+         (get-examples-page ds-id1 "snapshot1" 10 nil))
        (is (nil? pagination-params))
        (is (empty? examples))
 
@@ -981,9 +1043,9 @@
 
 
        (bind {:keys [examples pagination-params]}
-         (queries/get-dataset-examples-page pstate ds-id3 nil 10 nil))
+         (get-examples-page ds-id3 nil 10 nil))
        (is (nil? pagination-params))
-       (is (= (examples-no-timestamps examples)
+       (is (= (examples-cleaned examples)
               [{:input {"p1" [1 2 3]}
                 :reference-output "xyz"
                 :tags  #{}}
@@ -992,7 +1054,7 @@
                 :reference-output nil
                 :tags  #{}}]))
 
-       (bind [id1 id2] (keys examples))
+       (bind [id1 id2] (mapv :id examples))
 
        (aor/set-dataset-example-input! manager ds-id3 id1 {"p1" [10]})
        (aor/set-dataset-example-reference-output! manager ds-id3 id1 "ww")
@@ -1018,9 +1080,9 @@
                                 "$: integer found, string expected"))))
 
        (bind {:keys [examples pagination-params]}
-         (queries/get-dataset-examples-page pstate ds-id3 nil 10 nil))
+         (get-examples-page ds-id3 nil 10 nil))
        (is (nil? pagination-params))
-       (is (= (examples-no-timestamps examples)
+       (is (= (examples-cleaned examples)
               [{:input {"p1" [10]}
                 :reference-output "ww"
                 :tags  #{}}
@@ -1041,9 +1103,9 @@
                               {"p1" [9]})
 
        (bind {:keys [examples pagination-params]}
-         (queries/get-dataset-examples-page pstate ds-id3 nil 3 nil))
+         (get-examples-page ds-id3 nil 3 nil))
        (is (some? pagination-params))
-       (is (= (examples-no-timestamps examples)
+       (is (= (examples-cleaned examples)
               [{:input {"p1" [10]}
                 :reference-output "ww"
                 :tags  #{}}
@@ -1057,13 +1119,13 @@
               ]))
 
        (bind {:keys [examples pagination-params]}
-         (queries/get-dataset-examples-page pstate
-                                            ds-id3
-                                            nil
-                                            3
-                                            pagination-params))
+         (get-examples-page
+          ds-id3
+          nil
+          3
+          pagination-params))
        (is (nil? pagination-params))
-       (is (= (examples-no-timestamps examples)
+       (is (= (examples-cleaned examples)
               [{:input {"p1" [8]}
                 :reference-output nil
                 :tags  #{}}
@@ -1123,18 +1185,142 @@
          (is (instance? Throwable ex)))
 
        (bind {:keys [examples pagination-params]}
-         (queries/get-dataset-examples-page pstate
-                                            ds-id4
-                                            nil
-                                            100
-                                            pagination-params))
+         (get-examples-page
+          ds-id4
+          nil
+          100
+          pagination-params))
        (is (nil? pagination-params))
-       (is (= (examples-no-timestamps examples)
-              [{:input "a"
+       (is (= (examples-cleaned examples)
+              [{:input  "a"
                 :reference-output "x"
-                :tags  #{"t1" "t2"}}
-               {:input "b"
+                :tags   #{"t1" "t2"}
+                :source "bulkUpload"}
+               {:input  "b"
                 :reference-output nil
-                :tags  #{}}
+                :tags   #{}
+                :source "bulkUpload"}
               ]))
+
+       (is (= (into {} (for [e examples] [(:id e) (dissoc e :id)]))
+              (foreign-invoke-query multi-examples-query
+                                    ds-id4
+                                    nil
+                                    (mapv :id examples))))
+
+       (bind less-examples (butlast examples))
+       (is (= (into {} (for [e less-examples] [(:id e) (dissoc e :id)]))
+              (foreign-invoke-query multi-examples-query
+                                    ds-id4
+                                    nil
+                                    (mapv :id less-examples))))
+
+
+
+       ;; test search with filters
+       (add-example-and-wait! manager
+                              ds-id5
+                              "hello how are you"
+                              {:reference-output "abc"
+                               :tags   #{"a" "b"}
+                               :source "manual"})
+       (add-example-and-wait! manager
+                              ds-id5
+                              "how are you"
+                              {:tags   #{"a"}
+                               :source "ai"})
+       (add-example-and-wait! manager
+                              ds-id5
+                              "apple banana")
+       (add-example-and-wait! manager
+                              ds-id5
+                              "hello banana")
+       (add-example-and-wait! manager
+                              ds-id5
+                              "the man said apple"
+                              {:reference-output "children"
+                               :tags   #{"a"}
+                               :source "manual"})
+       (add-example-and-wait! manager
+                              ds-id5
+                              (UserMessage. "apple")
+                              {:reference-output (UserMessage. "grOUcho")
+                               :source "ai"})
+
+
+       (bind {:keys [examples pagination-params]}
+         (foreign-invoke-query
+          search-examples-query
+          ds-id5
+          nil
+          {:tag "a"}
+          2
+          nil
+         ))
+       (is (= (examples-cleaned examples)
+              [{:input  "hello how are you"
+                :reference-output "abc"
+                :tags   #{"a" "b"}
+                :source "manual"}
+               {:input  "how are you"
+                :reference-output nil
+                :tags   #{"a"}
+                :source "ai"}
+              ]))
+       (bind {:keys [examples pagination-params]}
+         (foreign-invoke-query
+          search-examples-query
+          ds-id5
+          nil
+          {:tag "a"}
+          2
+          pagination-params
+         ))
+       (is (= (examples-cleaned examples)
+              [{:input  "the man said apple"
+                :reference-output "children"
+                :tags   #{"a"}
+                :source "manual"}
+              ]))
+       (is (nil? pagination-params))
+
+
+       (bind {:keys [examples pagination-params]}
+         (foreign-invoke-query
+          search-examples-query
+          ds-id5
+          nil
+          {:tag "a" :source "manual"}
+          3
+          nil
+         ))
+       (is (= (examples-cleaned examples)
+              [{:input  "hello how are you"
+                :reference-output "abc"
+                :tags   #{"a" "b"}
+                :source "manual"}
+               {:input  "the man said apple"
+                :reference-output "children"
+                :tags   #{"a"}
+                :source "manual"}
+              ]))
+       (is (nil? pagination-params))
+
+
+       (bind {:keys [examples pagination-params]}
+         (foreign-invoke-query
+          search-examples-query
+          ds-id5
+          nil
+          {:search-string "GROUCHO"}
+          3
+          nil
+         ))
+       (is (= (examples-cleaned examples)
+              [{:input  (UserMessage. "apple")
+                :reference-output (UserMessage. "grOUcho")
+                :tags   #{}
+                :source "ai"}
+              ]))
+       (is (nil? pagination-params))
       ))))

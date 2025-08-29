@@ -13,6 +13,7 @@
     AggInput
     ExceptionSummary
     ForkContext
+    LinkedTrace
     NestedOpInfo
     NodeHumanInputRequest
     HistoricalAgentGraphInfo
@@ -73,11 +74,15 @@
 
 (defn datasets-depot-name
   []
-  "*_agents-datasets-depot")
+  "*_agent-datasets-depot")
+
+(defn evaluators-depot-name
+  []
+  "*_agent-evaluators-depot")
 
 (defn agents-clients-name
   []
-  "*_agents-clients")
+  "*_agent-clients")
 
 (defn agent-graph-task-global-name
   [agent-name]
@@ -236,12 +241,27 @@
          :reference-output Object
          :tags             #{String}
          :source           String
+         :linked-trace     LinkedTrace
          :created-at       Long
          :modified-at      Long
         })
        {:subindex? true})
       {:subindex? true})}
    )})
+
+(defn evaluators-task-global-name
+  []
+  "$$_aor-evaluators")
+
+(def EVALUATORS-PSTATE-SCHEMA
+  {String (fixed-keys-schema
+           {:builder-name     String
+            :builder-params   {String Object}
+            :description      String
+            :input-json-path  String
+            :output-json-path String
+            :reference-output-json-path String
+           })})
 
 ;; Task global fetch helpers
 
@@ -326,6 +346,10 @@
 (defn datasets-task-global
   []
   (this-module-pobject-task-global (datasets-task-global-name)))
+
+(defn evaluators-task-global
+  []
+  (this-module-pobject-task-global (evaluators-task-global-name)))
 
 (defn log-throttler
   []

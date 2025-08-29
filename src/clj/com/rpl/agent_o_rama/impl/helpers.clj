@@ -2,11 +2,15 @@
   (:refer-clojure :exclude [ex-info])
   (:use [com.rpl.rama.path])
   (:require
+   [clojure.set :as set]
    [clojure.string :as str]
    [com.rpl.rama.ops :as ops])
   (:import
    [com.github.f4b6a3.uuid
     UuidCreator]
+   [com.jayway.jsonpath
+    JsonPath
+    Predicate]
    [com.rpl.agentorama.impl
     AORExceptionInfo]
    [com.rpl.rama.helpers
@@ -17,6 +21,7 @@
    [java.util
     UUID]
    [java.util.concurrent
+    CompletableFuture
     Semaphore]
    [java.util.function
     Function]))
@@ -218,14 +223,25 @@
 
 (defn validate-options!
   [context options spec]
-  (let [errors (->> options
-                    (mapv
-                     (fn [[k v]]
-                       (if-let [sfn (get spec k)]
-                         (if-let [s (sfn v)]
-                           (format "Value for option %s is invalid: %s" k s))
-                         (format "%s is an invalid option" k))))
-                    (filterv some?))]
+  (let [provided (-> options
+                     keys
+                     set)
+        allowed  (-> options
+                     keys
+                     set)
+        invalid  (set/difference provided allowed)
+        errors   (->> options
+                      (mapv
+                       (fn [[k v]]
+                         (if-let [sfn (get spec k)]
+                           (if-let [s (sfn v)]
+                             (format "Value for option %s is invalid: %s"
+                                     k
+                                     s))
+                           (format "%s is an invalid option" k))))
+                      (filterv some?))]
+    (when-not (empty? invalid)
+      (throw (ex-info "Invalid options specified" {:invalid invalid})))
     (when-not (empty? errors)
       (throw (ex-info "Invalid options" {:errors errors :context context}))
     )))
@@ -268,3 +284,17 @@
 (defn contains-string?
   [^String s substring]
   (.contains s substring))
+
+(defn read-json-path
+  [obj json-path]
+  (JsonPath/read ^Object obj
+                 ^String json-path
+                 ^"[Lcom.jayway.jsonpath.Predicate;" (into-array Predicate [])))
+
+(defn compile-json-path
+  [^String json-path]
+  (JsonPath/compile json-path (into-array Predicate [])))
+
+(defn mk-completable-future
+  []
+  (CompletableFuture.))

@@ -29,6 +29,7 @@
     ValidationContext
     SpecVersion$VersionFlag]
    [com.rpl.agentorama
+    AddDatasetExampleOptions
     AgentManager]
    [com.rpl.agent_o_rama.impl.types
     AddDatasetExample
@@ -342,7 +343,7 @@
 
     (case> AddDatasetExample
            :> {:keys [*snapshot-name *example-id *input *reference-output
-                       *tags]})
+                       *tags *source *linked-trace]})
      (get *props :input-json-schema :> *input-json-schema)
      (get *props :output-json-schema :> *output-json-schema)
      (validate-with-schema> *input-json-schema *input)
@@ -356,6 +357,8 @@
                         {:input            *input
                          :reference-output *reference-output
                          :tags             *tags
+                         :source           *source
+                         :linked-trace     *linked-trace
                          :created-at       *current-time-millis
                          :modified-at      *current-time-millis})])
 
@@ -453,16 +456,19 @@
                    (ex-info
                     "Tags must be an array of strings or omitted"
                     {:tags tags-v}))
-                  (let [tags (if (nil? tags-v) #{} (set tags-v))]
+                  (let [tags    (if (nil? tags-v) #{} (set tags-v))
+                        options (AddDatasetExampleOptions.)]
+                    (set! (.snapshotName options) snapshot-name)
+                    (set! (.tags options) tags)
+                    (set! (.referenceOutput options) output)
+                    (set! (.source options) "bulkUpload")
                     (.acquire sem)
                     (try
                       (let [cf
                             (.addDatasetExampleAsync manager
                                                      dataset-id
-                                                     snapshot-name
                                                      input
-                                                     output
-                                                     tags)]
+                                                     options)]
                         (.whenComplete cf
                                        (reify
                                         BiConsumer
