@@ -23,11 +23,14 @@
 (defmulti -event-msg-handler :id)
 
 (defn event-msg-handler
-  "Smart router that finds the dispatched handler and wraps it with
-   common logic like error handling, serialization, and response formatting."
-  [{:as ev-msg :keys [id ?reply-fn]}]
-  ;; Get the specific handler function for the event ID
-  (let [handler-fn (get-method -event-msg-handler id)]
+  "Smart router that preprocesses the event and then finds the dispatched handler."
+  [ev-msg]
+  (let [;; <<<< NEW PRE-PROCESSING STEP >>>>
+        processed-ev-msg (common/preprocess-event-msg ev-msg)
+
+        ;; The rest of the function now operates on the processed message
+        {:keys [id ?reply-fn ?data uid]} processed-ev-msg
+        handler-fn (get-method -event-msg-handler id)]
 
     ;; Check if we found a specific handler or just the default
     (if (= handler-fn (get-method -event-msg-handler :default))
@@ -38,17 +41,16 @@
           (?reply-fn {:success false, :error (str "No handler for event: " id)})))
 
       ;; A specific handler was found, so we wrap it and call it
-      (let [{:keys [?data uid]} ev-msg]
-        (try
-          ;; Call the core handler with the clean [data uid] signature
-          (let [result (handler-fn ?data uid)
-                serializable-result (common/->ui-serializable result)]
-            (when ?reply-fn
-              (?reply-fn {:success true :data serializable-result})))
-          (catch Exception e
-            (.printStackTrace e) ; Helpful for server-side debugging
-            (when ?reply-fn
-              (?reply-fn {:success false, :error (.getMessage e)}))))))))
+      (try
+        ;; Call the core handler with the clean [data uid] signature
+        (let [result (handler-fn ?data uid) ; Pass the processed ?data to the handler
+              serializable-result (common/->ui-serializable result)]
+          (when ?reply-fn
+            (?reply-fn {:success true :data serializable-result})))
+        (catch Exception e
+          (.printStackTrace e) ; Helpful for server-side debugging
+          (when ?reply-fn
+            (?reply-fn {:success false, :error (.getMessage e)})))))))
 
 ;; A more robust default handler
 (defmethod -event-msg-handler :default [_])

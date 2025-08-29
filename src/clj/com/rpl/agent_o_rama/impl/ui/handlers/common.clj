@@ -7,7 +7,8 @@
    [com.rpl.agent-o-rama.impl.json-serialize :as jser]
    [clojure.walk :as walk])
   (:import
-   [java.net URLEncoder URLDecoder]))
+   [java.net URLEncoder URLDecoder]
+   [java.util UUID]))
 
 ;; --- Shared Helper Functions (Moved from old agents.clj) ---
 
@@ -72,6 +73,37 @@
 (defn parse-url-pair [s]
   (let [[task-id agent-id] (clojure.string/split s #"-")]
     [(parse-long task-id) (parse-long agent-id)]))
+
+(defn preprocess-event-msg
+  "Cleans, parses, and enriches an incoming Sente event message."
+  [{:keys [?data] :as ev-msg}]
+  (if-not (map? ?data)
+    ev-msg ; Return original message if there's no data map to process
+    (let [;; Decode URL components if they exist
+          decoded-module-id (when-let [mid (:module-id ?data)]
+                              (url-decode mid))
+          decoded-agent-name (when-let [aname (:agent-name ?data)]
+                               (url-decode aname))
+
+          ;; Safely parse dataset-id only if it's a string
+          parsed-dataset-id (when-let [did (:dataset-id ?data)]
+                              (if (string? did) (UUID/fromString did) did))
+
+          ;; Fetch manager and client if possible
+          manager (when decoded-module-id (get-manager decoded-module-id))
+          client (when (and manager decoded-agent-name)
+                   (get-client decoded-module-id decoded-agent-name))
+
+          ;; Build the new, enriched data map
+          enriched-data (cond-> ?data
+                          decoded-module-id (assoc :decoded-module-id decoded-module-id)
+                          decoded-agent-name (assoc :decoded-agent-name decoded-agent-name)
+                          parsed-dataset-id (assoc :dataset-id parsed-dataset-id)
+                          manager (assoc :manager manager)
+                          client (assoc :client client))]
+
+      ;; Return the event message with the enriched data map
+      (assoc ev-msg :?data enriched-data))))
 
 ;; --- New API Handler Wrapper ---
 

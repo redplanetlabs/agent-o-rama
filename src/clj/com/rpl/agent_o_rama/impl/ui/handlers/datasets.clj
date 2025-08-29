@@ -10,139 +10,113 @@
   (:use [com.rpl.rama]))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-all
-  [{:keys [module-id pagination]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        manager (common/get-manager decoded-module-id)
-        datasets-page-query (:datasets-page-query (aor-types/underlying-objects manager))]
+  [{:keys [manager pagination]} uid]
+  (let [datasets-page-query (:datasets-page-query (aor-types/underlying-objects manager))]
     (foreign-invoke-query datasets-page-query 100 pagination)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-props
-  [{:keys [module-id dataset-id]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        manager (common/get-manager decoded-module-id)
-        datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
-    (queries/get-dataset-properties datasets-pstate (UUID/fromString dataset-id))))
+  [{:keys [manager dataset-id]} uid]
+  (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
+    (queries/get-dataset-properties datasets-pstate dataset-id)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/create
-  [{:keys [module-id name description input-schema output-schema]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        manager (common/get-manager decoded-module-id)]
-    (let [dataset-id (aor/create-dataset! manager name
-                                          {:description (when-not (str/blank? description) description)
-                                           :input-json-schema (when-not (str/blank? input-schema) input-schema)
-                                           :output-json-schema (when-not (str/blank? output-schema) output-schema)})]
-      {:status :ok, :dataset-id dataset-id})))
+  [{:keys [manager name description input-schema output-schema]} uid]
+  (let [dataset-id (aor/create-dataset! manager name
+                                        {:description (when-not (str/blank? description) description)
+                                         :input-json-schema (when-not (str/blank? input-schema) input-schema)
+                                         :output-json-schema (when-not (str/blank? output-schema) output-schema)})]
+    {:status :ok, :dataset-id dataset-id}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/set-name
-  [{:keys [module-id dataset-id name]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        manager (common/get-manager decoded-module-id)]
-    (aor/set-dataset-name! manager dataset-id name)
-    {:status :ok}))
+  [{:keys [manager dataset-id name]} uid]
+  (aor/set-dataset-name! manager dataset-id name)
+  {:status :ok})
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/set-description
-  [{:keys [module-id dataset-id description]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        manager (common/get-manager decoded-module-id)]
-    (aor/set-dataset-description! manager dataset-id description)
-    {:status :ok}))
+  [{:keys [manager dataset-id description]} uid]
+  (aor/set-dataset-description! manager dataset-id description)
+  {:status :ok})
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/delete
-  [{:keys [module-id dataset-id]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        manager (common/get-manager decoded-module-id)]
-    (aor/destroy-dataset! manager dataset-id)
-    {:status :ok}))
+  [{:keys [manager dataset-id]} uid]
+  (aor/destroy-dataset! manager dataset-id)
+  {:status :ok})
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/search-examples
-  [{:keys [module-id dataset-id snapshot-name filters limit pagination]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        manager (common/get-manager decoded-module-id)
-        {:keys [search-examples-query]} (aor-types/underlying-objects manager)]
+  [{:keys [manager dataset-id snapshot-name filters limit pagination]} uid]
+  (let [{:keys [search-examples-query]} (aor-types/underlying-objects manager)]
     ;; [*dataset-id *snapshot *filters *limit *next-key :> *res]
     (foreign-invoke-query search-examples-query
-                          (UUID/fromString dataset-id)
+                          dataset-id
                           (when-not (str/blank? snapshot-name) snapshot-name)
                           (or filters {}) ; filters map for search functionality
                           (or limit 20) ; reasonable default limit
                           pagination)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-example
-  [{:keys [module-id dataset-id snapshot-name input output]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        manager (common/get-manager decoded-module-id)]
-    (try
-      ;; Input/Output from the UI will be JSON strings. We must parse them.
-      (let [parsed-input (when-not (str/blank? input) (j/read-value input))
-            parsed-output (when-not (str/blank? output) (j/read-value output))]
-        (aor/add-dataset-example! manager
-                                  (UUID/fromString dataset-id)
-                                  parsed-input
-                                  {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)
-                                   :reference-output parsed-output})
-        {:status :ok})
-      (catch com.fasterxml.jackson.core.JsonParseException e
-        (throw (ex-info (str "Invalid JSON provided: " (.getOriginalMessage e))
-                        {:field (if (str/includes? (.getMessage e) "input") :input :output)}))))))
+  [{:keys [manager dataset-id snapshot-name input output]} uid]
+  (try
+    ;; Input/Output from the UI will be JSON strings. We must parse them.
+    (let [parsed-input (when-not (str/blank? input) (j/read-value input))
+          parsed-output (when-not (str/blank? output) (j/read-value output))]
+      (aor/add-dataset-example! manager
+                                dataset-id
+                                parsed-input
+                                {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)
+                                 :reference-output parsed-output})
+      {:status :ok})
+    (catch com.fasterxml.jackson.core.JsonParseException e
+      (throw (ex-info (str "Invalid JSON provided: " (.getOriginalMessage e))
+                      {:field (if (str/includes? (.getMessage e) "input") :input :output)})))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-snapshot-names
-  [{:keys [module-id dataset-id]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        manager (common/get-manager decoded-module-id)
-        datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
-    (queries/get-dataset-snapshot-names datasets-pstate (UUID/fromString dataset-id))))
+  [{:keys [manager dataset-id]} uid]
+  (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
+    (queries/get-dataset-snapshot-names datasets-pstate dataset-id)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/create-snapshot
-  [{:keys [module-id dataset-id from-snapshot-name to-snapshot-name]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        manager (common/get-manager decoded-module-id)
-        from-name (when-not (str/blank? from-snapshot-name) from-snapshot-name)]
-    (aor/snapshot-dataset! manager (UUID/fromString dataset-id) from-name to-snapshot-name)
+  [{:keys [manager dataset-id from-snapshot-name to-snapshot-name]} uid]
+  (let [from-name (when-not (str/blank? from-snapshot-name) from-snapshot-name)]
+    (aor/snapshot-dataset! manager dataset-id from-name to-snapshot-name)
     {:status :ok}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/delete-snapshot
-  [{:keys [module-id dataset-id snapshot-name]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        manager (common/get-manager decoded-module-id)]
-    (aor/remove-dataset-snapshot! manager (UUID/fromString dataset-id) snapshot-name)
-    {:status :ok}))
+  [{:keys [manager dataset-id snapshot-name]} uid]
+  (aor/remove-dataset-snapshot! manager dataset-id snapshot-name)
+  {:status :ok})
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/delete-example
-  [{:keys [module-id dataset-id snapshot-name example-id]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        manager (common/get-manager decoded-module-id)]
-    (aor/remove-dataset-example! manager
-                                 dataset-id
-                                 example-id
-                                 {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)})))
+  [{:keys [manager dataset-id snapshot-name example-id]} uid]
+  (aor/remove-dataset-example! manager
+                               dataset-id
+                               example-id
+                               {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/edit-example
-  [{:keys [module-id dataset-id snapshot-name example-id input output]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        manager (common/get-manager decoded-module-id)]
-    (try
-      ;; Input/Output from the UI will be JSON strings. We must parse them.
-      (let [parsed-input (when-not (str/blank? input) (j/read-value input))
-            parsed-output (when-not (str/blank? output) (j/read-value output))
-            snapshot-opts {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}]
+  [{:keys [manager dataset-id snapshot-name example-id input output]} uid]
+  (try
+    ;; Input/Output from the UI will be JSON strings. We must parse them.
+    (let [parsed-input (when-not (str/blank? input) (j/read-value input))
+          parsed-output (when-not (str/blank? output) (j/read-value output))
+          snapshot-opts {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}]
 
-        ;; Update input if provided
-        (when parsed-input
-          (aor/set-dataset-example-input! manager
-                                          (UUID/fromString dataset-id)
-                                          (UUID/fromString example-id)
-                                          parsed-input
-                                          snapshot-opts))
+      ;; Update input if provided
+      (when parsed-input
+        (aor/set-dataset-example-input! manager
+                                        dataset-id
+                                        example-id
+                                        parsed-input
+                                        snapshot-opts))
 
-        ;; Update reference output if provided
-        (when parsed-output
-          (aor/set-dataset-example-reference-output! manager
-                                                     (UUID/fromString dataset-id)
-                                                     (UUID/fromString example-id)
-                                                     parsed-output
-                                                     snapshot-opts))
+      ;; Update reference output if provided
+      (when parsed-output
+        (aor/set-dataset-example-reference-output! manager
+                                                   dataset-id
+                                                   example-id
+                                                   parsed-output
+                                                   snapshot-opts))
 
-        {:status :ok})
-      (catch com.fasterxml.jackson.core.JsonParseException e
-        (throw (ex-info (str "Invalid JSON provided: " (.getOriginalMessage e))
-                        {:field (if (str/includes? (.getMessage e) "input") :input :output)}))))))
+      {:status :ok})
+    (catch com.fasterxml.jackson.core.JsonParseException e
+      (throw (ex-info (str "Invalid JSON provided: " (.getOriginalMessage e))
+                      {:field (if (str/includes? (.getMessage e) "input") :input :output)})))))
