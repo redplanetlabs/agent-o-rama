@@ -59,7 +59,10 @@
                                                         (when (and agg-node-invoke-id
                                                                    (not (contains? emitted-ids agg-node-invoke-id))
                                                                    (contains? raw-nodes agg-node-invoke-id))
-                                                          (vswap! extra-visits-vol conj agg-node-invoke-id)
+                                                          
+                                                          (when (not (contains? visited agg-node-invoke-id))
+                                                              (vswap! extra-visits-vol conj agg-node-invoke-id))
+                                                          
                                                           [{:id (str "implicit-" current-id "-" agg-node-invoke-id)
                                                             :source (str current-id)
                                                             :target (str agg-node-invoke-id)
