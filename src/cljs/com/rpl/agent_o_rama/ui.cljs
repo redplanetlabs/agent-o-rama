@@ -173,9 +173,7 @@
             ($ :img {:src "/logo-black.png"
                      :alt "Agent-O-Rama"
                      :className "h-8 max-w-48 object-contain"}))
-          ($ :button {:onClick toggle-collapsed
-                      :className "p-2 rounded-md hover:bg-gray-200 transition-colors"
-                      :title (if collapsed? "Expand sidebar" "Collapse sidebar")}
+          
           ($ :button {:onClick toggle-collapsed
                       :className "p-2 rounded-md hover:bg-gray-200 transition-colors"
                       :title (if collapsed? "Expand sidebar" "Collapse sidebar")}
@@ -186,7 +184,6 @@
        ;; Navigation
        ($ :nav.flex-1.p-3.overflow-y-auto
           ($ :div.space-y-2
-             ($ nav-link {:href "/" :location location :collapsed? collapsed? :title "Overview"}
              ($ nav-link {:href "/" :location location :collapsed? collapsed? :title "Overview"}
                 ($ HomeIcon {:className "h-5 w-5 flex-shrink-0"})
                 (when-not collapsed? ($ :span.ml-3 "Overview"))))
@@ -200,7 +197,8 @@
           (when is-agent-context?
             ($ agent-context-nav {:module-id module-id
                                   :agent-name agent-name
-                                  :collapsed? collapsed?}))))))))
+                                  :collapsed? collapsed?}))))))
+
 
 ;; =============================================================================
 ;; BREADCRUMB COMPONENT
