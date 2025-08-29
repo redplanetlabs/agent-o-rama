@@ -67,6 +67,11 @@
   []
   "_aor-try-evaluator")
 
+(defn search-examples-name
+  []
+  []
+  "_aor-search-dataset-examples")
+
 (defn search-evaluators-name
   []
   "_aor-search-evaluators")
@@ -542,21 +547,6 @@
   (vswap! v conj item))
 
 
-(defn get-dataset-examples-page
-  ([datasets-pstate dataset-id snapshot-name amt]
-   (get-dataset-examples-page datasets-pstate dataset-id snapshot-name amt nil))
-  ([datasets-pstate dataset-id snapshot-name amt pagination-params]
-   (let [examples (foreign-select-one
-                   [(keypath dataset-id :snapshots snapshot-name)
-                    (sorted-map-range-from pagination-params
-                                           {:max-amt amt :inclusive? false})]
-                   datasets-pstate
-                  )]
-     {:examples examples
-      :pagination-params (when (= (count examples) amt)
-                           (h/last-key examples))}
-   )))
-
 (deframaop search-loop
   [$$p *map-path %filter *limit *next-key]
   (ramafn> %filter)
@@ -585,18 +575,52 @@
       (continue> (h/last-key *m))))
   (:> @*results *page-key))
 
-; (defn declare-search-examples-query-topology
-;   [topologies]
-;   ;; TODO: <<<<>>>
-;   ;; - factor out and provide:
-;   ;;    - path to get to the map portion
-;   ;;    - filter ramafn
-;   ;;    - what to assoc in
-;   ;;    - evals also fetches builders..
-;   ;;      - filter semifn should reeturn nil to remove, map of stuff to assoc
-;   in
-;   ;;      otherwise
-; )
+;; accepts filters :source, :tag, and search-string (looks for match within
+;; stringified input or reference-output)
+(defn declare-search-examples-query-topology
+  [topologies]
+  (let [datasets-sym (symbol (po/datasets-task-global-name))]
+    (<<query-topology topologies
+      (search-examples-name)
+      [*dataset-id *snapshot *filters *limit *next-key :> *res]
+      (|hash *dataset-id)
+      (identity
+       *filters
+       :> {*search-tag    :tag
+           *search-string :search-string
+           *search-source :source})
+      (ifexpr (some? *search-string)
+        (str/lower-case *search-string)
+        :> *search-string-lower)
+      (<<ramafn %filter
+        [*id {:keys [*input *reference-output *source *tags]}]
+        (<<cond
+         (case> (and> (some? *tag) (not (contains? *tags *search-tag))))
+          (:> nil)
+
+         (case> (and> (some? *search-source) (not= *source *search-source)))
+          (:> nil)
+
+         (case> (and> (some? *search-string-lower)
+                      (and>
+                       (not (h/contains-string? (str/lower-case (str *input))
+                                                 *search-string-lower))
+                       (not (h/contains-string? (str/lower-case
+                                                 (str *reference-output))
+                                                 *search-string-lower)))))
+          (:> nil)
+
+         (default>)
+          (:> {:id *id})))
+      (search-loop datasets-sym
+                   (keypath *dataset-id *snapshot)
+                   %filter
+                   *limit
+                   *next-key
+                   :> *items *page-key)
+      (|origin)
+      (hash-map :examples *items :pagination-params *page-key :> *res)
+    )))
 
 ;; - filters can contain :search-string, which matches against the evaluator
 ;; name, or :types which is set of :regular, :comparative, or :summary

@@ -461,6 +461,10 @@
                                  cluster
                                  module-name
                                  (queries/search-datasets-name))
+
+        search-examples-query   (foreign-query cluster
+                                               module-name
+                                               (queries/search-examples-name))
         multi-examples-query    (foreign-query cluster
                                                module-name
                                                (queries/multi-examples-name))
@@ -852,7 +856,6 @@
      (searchDatasets [this searchString limit]
        (foreign-invoke-query datasets-search-query searchString limit))
 
-
      (createEvaluator [this name builderName params description options]
        (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
              (foreign-append!
@@ -915,6 +918,7 @@
      (underlying-objects [this]
        {:datasets-pstate         datasets-pstate
         :datasets-page-query     datasets-page-query
+        :search-examples-query   search-examples-query
         :multi-examples-query    multi-examples-query
         :all-eval-builders-query all-eval-builders-query
         :search-evals-query      search-evals-query
