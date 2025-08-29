@@ -59,7 +59,7 @@
   (let [decoded-module-id (common/url-decode module-id)
         manager (common/get-manager decoded-module-id)
         datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
-    (queries/get-dataset-examples-page
+    #_(queries/get-dataset-examples-page
      datasets-pstate
      (UUID/fromString dataset-id)
      (when-not (str/blank? snapshot-name) snapshot-name)

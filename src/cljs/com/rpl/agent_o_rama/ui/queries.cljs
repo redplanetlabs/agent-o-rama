@@ -24,10 +24,6 @@
    - :refetch - Function to manually trigger a refetch"
   [{:keys [query-key sente-event timeout-ms enabled? refetch-interval-ms refetch-on-mount]
     :or {timeout-ms 10000 enabled? true refetch-on-mount true}}]
-   - :error - Error message if request failed
-   - :refetch - Function to manually trigger a refetch"
-  [{:keys [query-key sente-event timeout-ms enabled? refetch-interval-ms refetch-on-mount]
-    :or {timeout-ms 10000 enabled? true refetch-on-mount true}}]
   (let [state-path (into [:queries] query-key)
         query-state (state/use-sub state-path)
         connected? (state/use-sub [:sente :connected?])
@@ -51,24 +47,7 @@
                                                                                           (when (= reply :chsk/closed) "Connection closed")
                                                                                           "Request failed")}])))))
                     [query-key-str sente-event-str timeout-ms])]
-        ;; Define the fetch function inside the hook so it has access to the closure
-        fetch-data (uix/use-callback
-                    (fn []
-                      (state/dispatch [:query/fetch-start {:query-key query-key}])
-                      (sente/request! sente-event timeout-ms
-                                      (fn [reply]
-                                        (if (:success reply)
-                                          (state/dispatch [:query/fetch-success {:query-key query-key :data (:data reply)}])
-                                          (state/dispatch [:query/fetch-error {:query-key query-key
-                                                                               :error (or (:error reply)
-                                                                                          (when (= reply :chsk/closed) "Connection closed")
-                                                                                          "Request failed")}])))))
-                    [query-key-str sente-event-str timeout-ms])]
 
-    ;; Effect for initial fetch and polling setup
-    (uix/use-effect
-     (fn []
-       (let [interval-id (atom nil)]
     ;; Effect for initial fetch and polling setup
     (uix/use-effect
      (fn []
@@ -109,7 +88,4 @@
        :loading? loading?
        :fetching? fetching?
        :error error
-       :refetch fetch-data}))) ; <--- EXPOSE REFETCH FUNCTION
-       :error error
-       :refetch fetch-data}))) ; <--- EXPOSE REFETCH FUNCTION
-
+       :refetch fetch-data})))

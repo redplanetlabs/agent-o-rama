@@ -138,10 +138,6 @@
                                            [[:invocations-data invoke-id :forks] forks]
                                            [[:invocations-data invoke-id :fork-of] fork-of]
                                            [[:invocations-data invoke-id :status] :success]]
-                                           [[:invocations-data invoke-id :task-id] task-id]
-                                           [[:invocations-data invoke-id :forks] forks]
-                                           [[:invocations-data invoke-id :fork-of] fork-of]
-                                           [[:invocations-data invoke-id :status] :success]]
                                     (some? historical-graph)
                                     (conj [[:invocations-data invoke-id :historical-graph] historical-graph])
 
