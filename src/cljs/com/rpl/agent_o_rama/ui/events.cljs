@@ -48,7 +48,9 @@
                   ;; 2. FIND IMPLICIT EDGES
                   agg-context (:agg-context static-info)
                   potential-outputs (:output-nodes static-info)
-                  new-implicit-edges (when agg-context ; Only applies within an agg context
+                  extra-visits-vol (volatile! #{})
+                  new-implicit-edges (when (and agg-context
+                                                (not (contains? node-data :node-task-id)))
                                        (->> potential-outputs
                                             (filter #(= :agg-node (get-in historical-graph [:node-map % :node-type])))
                                             (mapcat (fn [out-agg-node-name]
@@ -57,6 +59,7 @@
                                                         (when (and agg-node-invoke-id
                                                                    (not (contains? emitted-ids agg-node-invoke-id))
                                                                    (contains? raw-nodes agg-node-invoke-id))
+                                                          (vswap! extra-visits-vol conj agg-node-invoke-id)
                                                           [{:id (str "implicit-" current-id "-" agg-node-invoke-id)
                                                             :source (str current-id)
                                                             :target (str agg-node-invoke-id)
@@ -65,7 +68,7 @@
                                             (vec)))]
 
               ;; 3. RECURSE
-              (recur (into remaining-to-visit drawable-children)
+              (recur (into remaining-to-visit (concat drawable-children @extra-visits-vol))
                      (assoc drawable-nodes current-id node-data)
                      (into real-edges new-real-edges)
                      (into implicit-edges (or new-implicit-edges []))
