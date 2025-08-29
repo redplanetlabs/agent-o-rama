@@ -547,3 +547,171 @@
                                         (aor/mk-example-run nil "-" "+")
                                         (aor/mk-example-run nil "-" "+")])))
     )))
+
+(deftest evaluators-search-test
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (aor/declare-comparative-evaluator-builder
+         topology
+         "compare"
+         ""
+         (fn [params]
+           (fn [fetcher input ref-output outputs]
+             {"res" "done"})))
+        (-> topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node]
+               (aor/result! agent-node "done")
+             )))
+       ))
+     (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+     (bind module-name (get-module-name module))
+     (bind manager (aor/agent-manager ipc module-name))
+     (bind search
+       (foreign-query ipc module-name (queries/search-evaluators-name)))
+
+     (bind regular!
+       (fn [name]
+         (aor/create-evaluator! manager
+                                name
+                                "aor/conciseness"
+                                {"threshold" "6"}
+                                "")))
+
+     (bind comparative!
+       (fn [name]
+         (aor/create-evaluator! manager
+                                name
+                                "compare"
+                                {}
+                                "")))
+
+     (bind summary!
+       (fn [name]
+         (aor/create-evaluator! manager
+                                name
+                                "aor/f1-score"
+                                {"positiveValue" "+"}
+                                "")))
+
+     (bind page-matches?
+       (fn [{:keys [items pagination-params]} expected last-key]
+         (let [items (transform ALL #(select-keys % [:name :type]) items)]
+           (and (= items expected) (= pagination-params last-key))
+         )))
+
+
+     (summary! "f1")
+     (regular! "hello")
+     (comparative! "my compare hello")
+     (regular! "my first eval hello")
+     (regular! "my second eval")
+     (summary! "nnn f1 my")
+     (comparative! "ooo")
+     (comparative! "p compare")
+     (summary! "q sum hello")
+     (regular! "zzz my hello")
+
+     (bind res (foreign-invoke-query search nil 3 nil))
+     (is (page-matches?
+          res
+          [{:name "f1" :type :summary}
+           {:name "hello" :type :regular}
+           {:name "my compare hello" :type :comparative}]
+          "my compare hello"))
+     (bind res (foreign-invoke-query search nil 3 (:pagination-params res)))
+     (is (page-matches?
+          res
+          [{:name "my first eval hello" :type :regular}
+           {:name "my second eval" :type :regular}
+           {:name "nnn f1 my" :type :summary}
+          ]
+          "nnn f1 my"))
+     (bind res (foreign-invoke-query search nil 3 (:pagination-params res)))
+     (is (page-matches?
+          res
+          [{:name "ooo" :type :comparative}
+           {:name "p compare" :type :comparative}
+           {:name "q sum hello" :type :summary}
+          ]
+          "q sum hello"))
+     (bind res (foreign-invoke-query search nil 3 (:pagination-params res)))
+     (is (page-matches?
+          res
+          [{:name "zzz my hello" :type :regular}
+          ]
+          nil))
+
+     (bind filters {:search-string "hello"})
+     (bind res (foreign-invoke-query search filters 2 nil))
+     (is (page-matches?
+          res
+          [{:name "hello" :type :regular}
+           {:name "my compare hello" :type :comparative}
+           {:name "my first eval hello" :type :regular}
+          ]
+          "my first eval hello"))
+     (bind res (foreign-invoke-query search filters 2 (:pagination-params res)))
+     (is (page-matches?
+          res
+          [{:name "q sum hello" :type :summary}
+           {:name "zzz my hello" :type :regular}]
+          "zzz my hello"))
+     (bind res (foreign-invoke-query search filters 2 (:pagination-params res)))
+     (is (page-matches?
+          res
+          []
+          nil))
+
+
+     (bind filters {:search-string "hello" :types #{:regular :comparative}})
+     (bind res (foreign-invoke-query search filters 2 nil))
+     (is (page-matches?
+          res
+          [{:name "hello" :type :regular}
+           {:name "my compare hello" :type :comparative}
+           {:name "my first eval hello" :type :regular}
+          ]
+          "my first eval hello"))
+     (bind res (foreign-invoke-query search filters 2 (:pagination-params res)))
+     (is (page-matches?
+          res
+          [{:name "zzz my hello" :type :regular}]
+          nil))
+
+     (bind filters {:types #{:summary}})
+     (bind res (foreign-invoke-query search filters 2 nil))
+     (is (page-matches?
+          res
+          [{:name "f1" :type :summary}
+           {:name "nnn f1 my" :type :summary}
+          ]
+          "nnn f1 my"))
+     (bind res (foreign-invoke-query search filters 2 (:pagination-params res)))
+     (is (page-matches?
+          res
+          [{:name "q sum hello" :type :summary}]
+          nil))
+
+     (bind filters {:types #{:regular}})
+     (bind res (foreign-invoke-query search filters 3 nil))
+     (is (page-matches?
+          res
+          [{:name "hello" :type :regular}
+           {:name "my first eval hello" :type :regular}
+           {:name "my second eval" :type :regular}
+          ]
+          "nnn f1 my"))
+     (bind res (foreign-invoke-query search filters 3 (:pagination-params res)))
+     (is (page-matches?
+          res
+          [{:name "zzz my hello" :type :regular}
+          ]
+          nil))
+    )))

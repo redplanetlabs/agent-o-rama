@@ -554,7 +554,7 @@
 ;; name, or :types which is set of :regular, :comparative, or :summary
 ;; - limit is approximate, it will return at least that amount and up to twice
 ;; that amount
-;; - returns {:items [{:name ... :description ... :builder-name ...
+;; - returns {:items [{:name ... :type ... :description ... :builder-name ...
 ;;                    :builder-params ... <all the other info in the PState>}
 ;;                    ...]
 ;;            :pagination-params <next-key>}
@@ -566,25 +566,31 @@
       [*filters *limit *next-key :> *res]
       (identity *filters :> {:keys [*types *search-string]})
       (|direct 0)
-      (str/lower-case *search-string :> *search-string-lower)
+      (ifexpr (some? *search-string)
+        (str/lower-case *search-string)
+        :> *search-string-lower)
       (volatile! [] :> *results)
       (evals/all-evaluator-builders :> *builders)
       (loop<- [*next-key *next-key
                :> *page-key]
         (yield-if-overtime)
-        (local-select> (sorted-map-range-from *next-key *limit)
-                       evals-pstate-sym
-                       :> *m)
+        (local-select>
+         (sorted-map-range-from *next-key {:inclusive? false :max-amt *limit})
+         evals-pstate-sym
+         :> *m)
         (<<atomic
           (ops/explode *m :> [*name {:keys [*builder-name] :as *info}])
           (select> [(keypath *builder-name) :type] *builders :> *type)
           (filter> (some? *type))
           (<<if (some? *types)
             (filter> (contains? *types *type)))
-          (<<if (some? *search-string)
+          (<<if (some? *search-string-lower)
             (filter> (h/contains-string? (str/lower-case *name)
                                          *search-string-lower)))
-          (conj-vol! *results (assoc *info :name *name)))
+          (conj-vol! *results
+                     (assoc *info
+                      :name *name
+                      :type *type)))
         (<<cond
          (case> (< (count *m) *limit))
           (:> nil)
