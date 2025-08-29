@@ -15,7 +15,6 @@
    - :refetch-interval-ms - If set, will refetch data at this interval (in ms)
                             but only when the browser tab is visible.
    - :refetch-on-mount - Boolean to control initial fetch (default: true)
-   - :refetch-on-mount - Boolean to control initial fetch (default: true)
 
    Returns:
    - :data - The fetched data
@@ -31,7 +30,6 @@
         sente-event-str (str sente-event)
 
         ;; Use the page visibility hook
-        page-is-visible? (common/use-page-visibility)
         page-is-visible? (common/use-page-visibility)
 
         ;; Define the fetch function inside the hook so it has access to the closure
@@ -53,8 +51,6 @@
      (fn []
        (let [interval-id (atom nil)]
          (when (and connected? enabled? page-is-visible?)
-           ;; Control initial fetch with new option
-           (when refetch-on-mount (fetch-data))
            ;; Control initial fetch with new option
            (when refetch-on-mount (fetch-data))
 

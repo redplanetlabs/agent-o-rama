@@ -112,8 +112,8 @@
   (let [decoded-module-id (common/url-decode module-id)
         manager (common/get-manager decoded-module-id)]
     (aor/remove-dataset-example! manager
-                                 (UUID/fromString dataset-id)
-                                 (UUID/fromString example-id)
+                                 dataset-id
+                                 example-id
                                  {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)})))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/edit-example

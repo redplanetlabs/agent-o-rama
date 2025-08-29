@@ -141,7 +141,6 @@
                                     (some? historical-graph)
                                     (conj [[:invocations-data invoke-id :historical-graph] historical-graph])
 
-
                                     (some? root-invoke-id)
                                     (conj [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]))]
                          (state/dispatch (into [:db/set-values] kvps))))
@@ -149,8 +148,7 @@
                      (when (contains? page-data :is-complete)
                        (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] is-complete]))
 
-
-                     ;; Then merge the new nodes into the existing graph.
+;; Then merge the new nodes into the existing graph.
                      (when (and nodes (seq nodes))
                        (state/dispatch [:invocation/merge-nodes invoke-id nodes root-invoke-id]))
 
@@ -167,8 +165,7 @@
                          (state/dispatch [:invocation/fetch-graph-page
                                           (assoc current-invocation :leaves (vec next-leaves) :initial? false)]))
 
-
-                       ;; Otherwise, schedule a slow poll.
+;; Otherwise, schedule a slow poll.
                        :else
                        (do
                          (println "[POLLING-STATELESS] Scheduling delayed re-poll...")
@@ -197,7 +194,6 @@
                          ;; Prioritize the ID from the payload, fallback to the one in db.
                          root-invoke-id (or root-invoke-id-from-payload
                                             (get-in db [:invocations-data invoke-id :root-invoke-id]))
-
 
                          {:keys [nodes edges implicit-edges]}
                          (build-drawable-graph merged-raw-nodes root-invoke-id historical-graph)]
@@ -373,7 +369,8 @@
                           (do
                             (state/dispatch [:modal/hide])
                             ;; Invalidate dataset examples query to trigger refetch
-                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                            ;; Invalidate dataset examples query to trigger refetch
+                            (state/dispatch [:query/invalidate {:query-key-pattern :dataset-examples}])
                             ;; Keep backward compatibility for now
                             (when on-success (on-success)))
                           (state/dispatch [:db/set-value [:ui :modal :form :error]
@@ -410,7 +407,7 @@
                           (do
                             (state/dispatch [:modal/hide])
                             ;; Invalidate dataset examples query to trigger refetch
-                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                            (state/dispatch [:query/invalidate {:query-key-pattern :dataset-examples}])
                             ;; Keep backward compatibility for now
                             (when on-success (on-success)))
                           (state/dispatch [:db/set-value [:ui :modal :form :error]
