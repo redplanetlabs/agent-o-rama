@@ -478,7 +478,12 @@
         all-eval-builders-query (foreign-query
                                  cluster
                                  module-name
-                                 (queries/all-evaluator-builders-name))]
+                                 (queries/all-evaluator-builders-name))
+
+        search-evals-query      (foreign-query
+                                 cluster
+                                 module-name
+                                 (queries/search-evaluators-name))]
     (reify
      AgentManager
      (getAgentNames [this]
@@ -908,6 +913,7 @@
        {:datasets-pstate         datasets-pstate
         :datasets-page-query     datasets-page-query
         :all-eval-builders-query all-eval-builders-query
+        :search-evals-query      search-evals-query
        }))))
 
 (defn agent-client
