@@ -24,7 +24,9 @@
     JsonSchema
     ValidationMessage]
    [com.rpl.agentorama
-    AddDatasetExampleOptions]))
+    AddDatasetExampleOptions]
+   [dev.langchain4j.data.message
+    UserMessage]))
 
 
 (defrecord Person [name age])
@@ -1213,4 +1215,112 @@
                                     nil
                                     (mapv :id less-examples))))
 
+
+
+       ;; test search with filters
+       (add-example-and-wait! manager
+                              ds-id5
+                              "hello how are you"
+                              {:reference-output "abc"
+                               :tags   #{"a" "b"}
+                               :source "manual"})
+       (add-example-and-wait! manager
+                              ds-id5
+                              "how are you"
+                              {:tags   #{"a"}
+                               :source "ai"})
+       (add-example-and-wait! manager
+                              ds-id5
+                              "apple banana")
+       (add-example-and-wait! manager
+                              ds-id5
+                              "hello banana")
+       (add-example-and-wait! manager
+                              ds-id5
+                              "the man said apple"
+                              {:reference-output "children"
+                               :tags   #{"a"}
+                               :source "manual"})
+       (add-example-and-wait! manager
+                              ds-id5
+                              (UserMessage. "apple")
+                              {:reference-output (UserMessage. "grOUcho")
+                               :source "ai"})
+
+
+       (bind {:keys [examples pagination-params]}
+         (foreign-invoke-query
+          search-examples-query
+          ds-id5
+          nil
+          {:tag "a"}
+          2
+          nil
+         ))
+       (is (= (examples-cleaned examples)
+              [{:input  "hello how are you"
+                :reference-output "abc"
+                :tags   #{"a" "b"}
+                :source "manual"}
+               {:input  "how are you"
+                :reference-output nil
+                :tags   #{"a"}
+                :source "ai"}
+              ]))
+       (bind {:keys [examples pagination-params]}
+         (foreign-invoke-query
+          search-examples-query
+          ds-id5
+          nil
+          {:tag "a"}
+          2
+          pagination-params
+         ))
+       (is (= (examples-cleaned examples)
+              [{:input  "the man said apple"
+                :reference-output "children"
+                :tags   #{"a"}
+                :source "manual"}
+              ]))
+       (is (nil? pagination-params))
+
+
+       (bind {:keys [examples pagination-params]}
+         (foreign-invoke-query
+          search-examples-query
+          ds-id5
+          nil
+          {:tag "a" :source "manual"}
+          3
+          nil
+         ))
+       (is (= (examples-cleaned examples)
+              [{:input  "hello how are you"
+                :reference-output "abc"
+                :tags   #{"a" "b"}
+                :source "manual"}
+               {:input  "the man said apple"
+                :reference-output "children"
+                :tags   #{"a"}
+                :source "manual"}
+              ]))
+       (is (nil? pagination-params))
+
+
+       (bind {:keys [examples pagination-params]}
+         (foreign-invoke-query
+          search-examples-query
+          ds-id5
+          nil
+          {:search-string "GROUCHO"}
+          3
+          nil
+         ))
+       (is (= (examples-cleaned examples)
+              [{:input  (UserMessage. "apple")
+                :reference-output (UserMessage. "grOUcho")
+                :tags   #{}
+                :source "ai"}
+              ]))
+       (is (nil? pagination-params))
       ))))

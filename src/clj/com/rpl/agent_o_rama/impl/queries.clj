@@ -601,13 +601,15 @@
          (case> (and> (some? *search-source) (not= *source *search-source)))
           (:> nil)
 
-         (case> (and> (some? *search-string-lower)
-                      (and>
-                       (not (h/contains-string? (str/lower-case (str *input))
-                                                 *search-string-lower))
-                       (not (h/contains-string? (str/lower-case
-                                                 (str *reference-output))
-                                                 *search-string-lower)))))
+         (case>
+          (and>
+           (some? *search-string-lower)
+           (and>
+            (not (h/contains-string? (str/lower-case (str (or> *input "")))
+                                      *search-string-lower))
+            (not (h/contains-string? (str/lower-case
+                                      (str (or> *reference-output "")))
+                                      *search-string-lower)))))
           (:> nil)
 
          (default>)
