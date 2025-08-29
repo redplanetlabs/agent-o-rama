@@ -390,7 +390,7 @@
                 ($ :th.relative.px-6.py-3)))
           ($ :tbody.bg-white.divide-y.divide-gray-200
              (for [example examples]
-               (let [example-id (:example-id example)
+               (let [example-id (:id example)
                      is-open? (= open-dropdown example-id)]
                  ($ :tr {:key example-id}
                     ($ :td.px-6.py-4.whitespace-nowrap.text-sm.font-mono
@@ -639,11 +639,7 @@
         ;; 3. Use the correctly named variables
         dataset dataset-props ;; Correctly assign dataset properties
 
-        examples (let [raw-examples (get examples-response :examples) ;; Use renamed response
-                       extracted-examples (mapv (fn [[uuid example-data]]
-                                                  (assoc example-data :example-id (str uuid)))
-                                                raw-examples)]
-                   extracted-examples)]
+        examples (get examples-response :examples)]
 
         ;; --- END OF FIX ---
 
