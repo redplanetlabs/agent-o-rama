@@ -14,10 +14,8 @@
     :else :text))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :config/get-all
-  [{:keys [module-id agent-name]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        decoded-agent-name (common/url-decode agent-name)
-        client-objects (common/objects decoded-module-id decoded-agent-name)
+  [{:keys [client]} uid]
+  (let [client-objects (aor-types/underlying-objects client)
         config-pstate (:config-pstate client-objects)
         current-config-map (or (foreign-select-one STAY config-pstate {:pkey 0}) {})]
     (for [[key config-def] aor-types/ALL-CONFIGS]
@@ -29,10 +27,8 @@
          :input-type (schema-fn->input-type (:schema-fn config-def))}))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :config/set
-  [{:keys [module-id agent-name key value]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        decoded-agent-name (common/url-decode agent-name)
-        client-objects (common/objects decoded-module-id decoded-agent-name)
+  [{:keys [client key value]} uid]
+  (let [client-objects (aor-types/underlying-objects client)
         agent-config-depot (:agent-config-depot client-objects)
         config-def (get aor-types/ALL-CONFIGS key)]
     (when-not config-def

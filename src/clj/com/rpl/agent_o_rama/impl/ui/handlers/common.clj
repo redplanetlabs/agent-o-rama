@@ -79,26 +79,29 @@
   [{:keys [?data] :as ev-msg}]
   (if-not (map? ?data)
     ev-msg ; Return original message if there's no data map to process
-    (let [;; Decode URL components if they exist
+    (let [;; --- Decode URL components ---
           decoded-module-id (when-let [mid (:module-id ?data)]
                               (url-decode mid))
           decoded-agent-name (when-let [aname (:agent-name ?data)]
                                (url-decode aname))
 
-          ;; Safely parse dataset-id only if it's a string
+          ;; --- Parse String Identifiers into Rich Types ---
           parsed-dataset-id (when-let [did (:dataset-id ?data)]
                               (if (string? did) (UUID/fromString did) did))
+          parsed-invoke-pair (when-let [iid (:invoke-id ?data)]
+                               (if (string? iid) (parse-url-pair iid) iid))
 
-          ;; Fetch manager and client if possible
+          ;; --- Fetch Common Contextual Objects ---
           manager (when decoded-module-id (get-manager decoded-module-id))
           client (when (and manager decoded-agent-name)
                    (get-client decoded-module-id decoded-agent-name))
 
-          ;; Build the new, enriched data map
+          ;; --- Build the new, enriched data map ---
           enriched-data (cond-> ?data
                           decoded-module-id (assoc :decoded-module-id decoded-module-id)
                           decoded-agent-name (assoc :decoded-agent-name decoded-agent-name)
                           parsed-dataset-id (assoc :dataset-id parsed-dataset-id)
+                          parsed-invoke-pair (assoc :invoke-pair parsed-invoke-pair) ; Store as a new key
                           manager (assoc :manager manager)
                           client (assoc :client client))]
 

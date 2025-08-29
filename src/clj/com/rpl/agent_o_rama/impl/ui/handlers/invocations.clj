@@ -8,33 +8,28 @@
   (:import [com.rpl.agentorama AgentInvoke]))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-page
-  [{:keys [module-id agent-name pagination]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        decoded-agent-name (common/url-decode agent-name)
-        pages (if (empty? pagination) nil pagination)]
+  [{:keys [client pagination]} uid]
+  (let [pages (if (empty? pagination) nil pagination)]
     (foreign-invoke-query
-     (:invokes-page-query (common/objects decoded-module-id decoded-agent-name))
+     (:invokes-page-query (aor-types/underlying-objects client))
      10 pages)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/run-agent
-  [{:keys [module-id agent-name args]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        decoded-agent-name (common/url-decode agent-name)]
-    (when-not (vector? args)
-      (throw (ex-info "must be a json list of args" {:bad-args args})))
-    (let [^AgentInvoke inv (apply aor/agent-initiate (common/get-client decoded-module-id decoded-agent-name) args)]
-      {:task-id (.getTaskId inv)
-       :invoke-id (.getAgentInvokeId inv)})))
+  [{:keys [client args]} uid]
+  (when-not (vector? args)
+    (throw (ex-info "must be a json list of args" {:bad-args args})))
+  (let [^AgentInvoke inv (apply aor/agent-initiate client args)]
+    {:task-id (.getTaskId inv)
+     :invoke-id (.getAgentInvokeId inv)}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-graph-page
-  [{:keys [module-id agent-name invoke-id leaves initial?]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        decoded-agent-name (common/url-decode agent-name)
-        client-objects (common/objects decoded-module-id decoded-agent-name)
+  [{:keys [client manager invoke-pair leaves initial?]} uid]
+  (let [client-objects (aor-types/underlying-objects client)
+        manager-objects (aor-types/underlying-objects manager)
         tracing-query (:tracing-query client-objects)
-        root-pstate (:root-pstate client-objects)
-        history-pstate (:graph-history-pstate client-objects)
-        [agent-task-id agent-id] (common/parse-url-pair invoke-id)
+        root-pstate (:root-pstate manager-objects)
+        history-pstate (:graph-history-pstate manager-objects)
+        [agent-task-id agent-id] invoke-pair
         is-initial-load? (boolean initial?)
         summary-info (merge
                       {:forks (foreign-select-one [(keypath agent-id) :forks (sorted-set-range-to-end 100)]
@@ -59,32 +54,26 @@
       is-initial-load? (assoc :root-invoke-id root-invoke-id :historical-graph historical-graph))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/execute-fork
-  [{:keys [module-id agent-name invoke-id changed-nodes]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        decoded-agent-name (common/url-decode agent-name)
-        [task-id agent-invoke-id] (common/parse-url-pair invoke-id)
+  [{:keys [client invoke-pair changed-nodes]} uid]
+  (let [[task-id agent-invoke-id] invoke-pair
         json-parsed-nodes (transform [MAP-VALS] #(j/read-value %) changed-nodes)
         rehydrated-nodes (common/from-ui-serializable json-parsed-nodes)
         ^AgentInvoke result (aor/agent-initiate-fork
-                             (common/get-client decoded-module-id decoded-agent-name)
+                             client
                              (aor-types/->AgentInvokeImpl task-id agent-invoke-id)
                              rehydrated-nodes)]
     {:agent-invoke-id (:agentInvokeId (bean result))
      :task-id (:taskId (bean result))}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/provide-human-input
-  [{:keys [module-id agent-name request response]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        decoded-agent-name (common/url-decode agent-name)
-        {:keys [agent-task-id agent-id node node-task-id invoke-id uuid prompt]} request
+  [{:keys [client request response]} uid]
+  (let [{:keys [agent-task-id agent-id node node-task-id invoke-id uuid prompt]} request
         req (aor-types/->NodeHumanInputRequest agent-task-id agent-id node node-task-id invoke-id prompt uuid)]
-    (aor/provide-human-input (common/get-client decoded-module-id decoded-agent-name) req response)
+    (aor/provide-human-input client req response)
     {:ok true}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-graph
-  [{:keys [module-id agent-name]} uid]
-  (let [decoded-module-id (common/url-decode module-id)
-        decoded-agent-name (common/url-decode agent-name)]
-    {:graph (foreign-invoke-query
-             (:current-graph-query
-              (common/objects decoded-module-id decoded-agent-name)))}))
+  [{:keys [client]} uid]
+  {:graph (foreign-invoke-query
+           (:current-graph-query
+            (aor-types/underlying-objects client)))})

@@ -17,12 +17,11 @@
      :agent-name (common/url-encode agent-name)}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :agents/get-for-module
-  [{:keys [module-id]} uid]
-  (let [decoded-module-id (common/url-decode module-id)]
-    (if-let [manager (common/get-manager decoded-module-id)]
-      (let [agent-names (aor/agent-names manager)]
-        (mapv (fn [agent-name]
-                {:module-id module-id
-                 :agent-name (common/url-encode agent-name)})
-              agent-names))
-      [])))
+  [{:keys [module-id manager]} uid] ; module-id is still needed for the response
+  (if manager
+    (let [agent-names (aor/agent-names manager)]
+      (mapv (fn [agent-name]
+              {:module-id module-id ; Use the original encoded module-id
+               :agent-name (common/url-encode agent-name)})
+            agent-names))
+    []))
