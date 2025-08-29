@@ -595,7 +595,7 @@
       (<<ramafn %filter
         [*id {:keys [*input *reference-output *source *tags]}]
         (<<cond
-         (case> (and> (some? *tag) (not (contains? *tags *search-tag))))
+         (case> (and> (some? *search-tag) (not (contains? *tags *search-tag))))
           (:> nil)
 
          (case> (and> (some? *search-source) (not= *source *search-source)))
@@ -613,7 +613,7 @@
          (default>)
           (:> {:id *id})))
       (search-loop datasets-sym
-                   (keypath *dataset-id *snapshot)
+                   (keypath *dataset-id :snapshots *snapshot)
                    %filter
                    *limit
                    *next-key
