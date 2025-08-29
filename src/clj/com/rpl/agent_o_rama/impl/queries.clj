@@ -451,37 +451,6 @@
       (into {} (take *limit *items) :> *res)
     )))
 
-
-(defn get-dataset-properties
-  [datasets-pstate dataset-id]
-  (foreign-select-one
-   [(keypath dataset-id) :props]
-   datasets-pstate
-  ))
-
-(defn get-dataset-snapshot-names
-  [datasets-pstate dataset-id]
-  (set
-   (foreign-select
-    [(keypath dataset-id) :snapshots MAP-KEYS some?]
-    datasets-pstate
-   )))
-
-(defn get-dataset-examples-page
-  ([datasets-pstate dataset-id snapshot-name amt]
-   (get-dataset-examples-page datasets-pstate dataset-id snapshot-name amt nil))
-  ([datasets-pstate dataset-id snapshot-name amt pagination-params]
-   (let [examples (foreign-select-one
-                   [(keypath dataset-id :snapshots snapshot-name)
-                    (sorted-map-range-from pagination-params
-                                           {:max-amt amt :inclusive? false})]
-                   datasets-pstate
-                  )]
-     {:examples examples
-      :pagination-params (when (= (count examples) amt)
-                           (h/last-key examples))}
-   )))
-
 ;; returns map from example-id -> all example info
 (defn declare-multi-examples-query-topology
   [topologies]
@@ -572,6 +541,63 @@
   [v item]
   (vswap! v conj item))
 
+
+(defn get-dataset-examples-page
+  ([datasets-pstate dataset-id snapshot-name amt]
+   (get-dataset-examples-page datasets-pstate dataset-id snapshot-name amt nil))
+  ([datasets-pstate dataset-id snapshot-name amt pagination-params]
+   (let [examples (foreign-select-one
+                   [(keypath dataset-id :snapshots snapshot-name)
+                    (sorted-map-range-from pagination-params
+                                           {:max-amt amt :inclusive? false})]
+                   datasets-pstate
+                  )]
+     {:examples examples
+      :pagination-params (when (= (count examples) amt)
+                           (h/last-key examples))}
+   )))
+
+(deframaop search-loop
+  [$$p *map-path %filter *limit *next-key]
+  (ramafn> %filter)
+  (volatile! [] :> *results)
+  (loop<- [*next-key *next-key
+           :> *page-key]
+    (yield-if-overtime)
+    (local-select>
+     [*map-path
+      (sorted-map-range-from *next-key {:inclusive? false :max-amt *limit})]
+     $$p
+     :> *m)
+    (<<atomic
+      (ops/explode *m :> [*id *info])
+      (%filter *id *info :> *assoc-map)
+      (<<if (some? *assoc-map)
+        (conj-vol! *results (merge *info *assoc-map))))
+    (<<cond
+     (case> (< (count *m) *limit))
+      (:> nil)
+
+     (case> (>= (count @*results) *limit))
+      (:> (h/last-key *m))
+
+     (default>)
+      (continue> (h/last-key *m))))
+  (:> @*results *page-key))
+
+; (defn declare-search-examples-query-topology
+;   [topologies]
+;   ;; TODO: <<<<>>>
+;   ;; - factor out and provide:
+;   ;;    - path to get to the map portion
+;   ;;    - filter ramafn
+;   ;;    - what to assoc in
+;   ;;    - evals also fetches builders..
+;   ;;      - filter semifn should reeturn nil to remove, map of stuff to assoc
+;   in
+;   ;;      otherwise
+; )
+
 ;; - filters can contain :search-string, which matches against the evaluator
 ;; name, or :types which is set of :regular, :comparative, or :summary
 ;; - limit is approximate, it will return at least that amount and up to twice
@@ -591,38 +617,48 @@
       (ifexpr (some? *search-string)
         (str/lower-case *search-string)
         :> *search-string-lower)
-      (volatile! [] :> *results)
       (evals/all-evaluator-builders :> *builders)
-      (loop<- [*next-key *next-key
-               :> *page-key]
-        (yield-if-overtime)
-        (local-select>
-         (sorted-map-range-from *next-key {:inclusive? false :max-amt *limit})
-         evals-pstate-sym
-         :> *m)
-        (<<atomic
-          (ops/explode *m :> [*name {:keys [*builder-name] :as *info}])
-          (select> [(keypath *builder-name) :type] *builders :> *type)
-          (filter> (some? *type))
-          (<<if (some? *types)
-            (filter> (contains? *types *type)))
-          (<<if (some? *search-string-lower)
-            (filter> (h/contains-string? (str/lower-case *name)
-                                         *search-string-lower)))
-          (conj-vol! *results
-                     (assoc *info
-                      :name *name
-                      :type *type)))
+      (<<ramafn %filter
+        [*name {:keys [*builder-name]}]
+        (select> [(keypath *builder-name) :type] *builders :> *type)
         (<<cond
-         (case> (< (count *m) *limit))
+         (case> (nil? *type))
           (:> nil)
 
-         (case> (>= (count @*results) *limit))
-          (:> (h/last-key *m))
+         (case> (and> (some? *types) (not (contains? *types *type))))
+          (:> nil)
+
+         (case> (and> (some? *search-string-lower)
+                      (not (h/contains-string? (str/lower-case *name)
+                                                *search-string-lower))))
+          (:> nil)
 
          (default>)
-          (continue> (h/last-key *m))))
-      (deref *results :> *items)
+          (:> {:name *name :type *type})))
+      (search-loop evals-pstate-sym
+                   STAY
+                   %filter
+                   *limit
+                   *next-key
+                   :> *items *page-key)
       (|origin)
       (hash-map :items *items :pagination-params *page-key :> *res)
     )))
+
+
+;; direct queries on PStates
+
+(defn get-dataset-properties
+  [datasets-pstate dataset-id]
+  (foreign-select-one
+   [(keypath dataset-id) :props]
+   datasets-pstate
+  ))
+
+(defn get-dataset-snapshot-names
+  [datasets-pstate dataset-id]
+  (set
+   (foreign-select
+    [(keypath dataset-id) :snapshots MAP-KEYS some?]
+    datasets-pstate
+   )))
