@@ -88,9 +88,7 @@
      (fn [agent-node messages]
        (let [openai     (aor/get-agent-object agent-node "openai")
              tools      (aor/agent-client agent-node "tools")
-             response   (lc4j/chat
-                         openai
-                         (lc4j/chat-request messages {:tools TOOLS}))
+             response   (lc4j/chat openai (lc4j/chat-request messages {:tools TOOLS}))
              ai-message (.aiMessage response)
              tool-calls (vec (.toolExecutionRequests ai-message))]
          (if (not-empty tool-calls)
