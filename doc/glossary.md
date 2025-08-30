@@ -86,6 +86,10 @@ A managed collection of input/output examples for agent testing and
 evaluation. Created and managed via agent manager dataset functions for
 tracking agent performance and behavior.
 
+## Evaluators
+
+Functions for measuring agent performance against datasets.
+
 ## Fork
 
 A mechanism to create new execution branches from existing agent
