@@ -1,5 +1,5 @@
 ;; -*- mode: clojure; -*-
-{:width           80
+{:width           100
  :comment         {:wrap? true :count? nil}
  :list            {:indent-arg 1 :respect-nl? true}
  :vector          {:respect-nl? true}
