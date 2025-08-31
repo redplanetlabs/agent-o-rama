@@ -65,7 +65,10 @@
 (defprotocol AgentNodeInternal
   (agent-node-state [this])
   (release-acquired-objects! [this])
-  (get-streaming-recorder [this]))
+  (get-streaming-recorder [this])
+  (get-cluster-retriever [this])
+  (get-this-module-name [this])
+  (get-evaluator-builders [this]))
 
 (defprotocol StreamingRecorderInternal
   (waitFinish [this]))
@@ -228,7 +231,6 @@
         ^com.rpl.rama.ModuleInstanceInfo module-instance-info
         (ops/module-instance-info)
 
-        this-module-name    (.getModuleName module-instance-info)
         streaming-depot     (.getAgentStreamingDepot rama-clients agent-name)
         human-depot         (.getAgentHumanDepot rama-clients agent-name)
         streaming-recorder  (mk-streaming-recorder agent-task-id
@@ -451,6 +453,12 @@
          ret
        ))
      AgentNodeInternal
+     (get-cluster-retriever [this]
+       (.getClusterRetriever declared-objects-tg))
+     (get-this-module-name [this]
+       (.getModuleName module-instance-info))
+     (get-evaluator-builders [this]
+       (.getEvaluatorBuilders declared-objects-tg))
      (get-streaming-recorder [this] streaming-recorder)
      (release-acquired-objects! [this]
        (release-acquired-objects! fetcher))

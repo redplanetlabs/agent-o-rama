@@ -334,6 +334,81 @@
   (getReferenceOutput [this] reference-output)
   (getOutput [this] output))
 
+;; Experiments
+
+(definterface ExperimentInputSelector)
+
+(drp/defrecord+ TagSelector
+  [tag :- String]
+  ExperimentInputSelector)
+
+(drp/defrecord+ ExampleIdsSelector
+  [example-ids :- [UUID]]
+  ExperimentInputSelector)
+
+
+(drp/defrecord+ EvaluatorSelector
+  [name :- String
+   remote? :- Boolean])
+
+
+(definterface TargetSpec)
+
+(drp/defrecord+ AgentTarget
+  [name :- String]
+  TargetSpec)
+
+(drp/defrecord+ NodeTarget
+  [agent-name :- String
+   node-name :- String]
+  TargetSpec)
+
+
+(drp/defrecord+ ExperimentTarget
+  [target-spec :- TargetSpec
+   input->args :- [String]])
+
+
+(definterface ExperimentSpec)
+
+(drp/defrecord+ RegularExperiment
+  [target :- ExperimentTarget]
+  ExperimentSpec)
+
+(drp/defrecord+ ComparativeExperiment
+  [targets :- [ExperimentTarget]]
+  ExperimentSpec)
+
+;; TODO: <<<<>>> API should be named with prefix and given a UUID7 str at the end
+;;    - is this even a depot append? it's probably just an invoke of the experiment agent
+;;      - yes it should so it can be initialized (for UI) synchronously, where it will show it's
+;p      pending
+;;      - root node can figure out what ranges of dataset IDs that executors should fetch
+;;        - want some fault-tolerance, don't want to do 100 LLM calls in a row for evaluators
+;;          - can have fault-tolereance by checking if example evaluation has been written
+;;          already...
+;;      - so summary evaluators at the end
+;;    - it needs access to experiments PState
+;;      - could declare it as a PState store, or could patch Rama to make all PStates available
+;;      - just make it available as an implicit PState store for now
+(drp/defrecord+ StartExperiment
+  [name :- String
+   cluster-conductor-host :- (s/maybe String)
+   module-name :- (s/maybe String)
+
+   dataset-id :- UUID
+   snapshot :- (s/maybe String)
+   selector :- (s/maybe ExperimentInputSelector)
+   evaluators :- [EvaluatorSelector]
+
+   spec :- ExperimentSpec
+
+   concurrency :- Long
+  ])
+
+(drp/defrecord+ DeleteExperiment
+  [name :- String])
+
 ;; Internal protocols
 
 (defprotocol UnderlyingObjects

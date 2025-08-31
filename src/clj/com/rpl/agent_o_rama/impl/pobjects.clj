@@ -12,6 +12,7 @@
     AgentResult
     AggInput
     ExceptionSummary
+    ExperimentInputSelector
     ForkContext
     LinkedTrace
     NestedOpInfo
@@ -225,6 +226,7 @@
   {UUID ; dataset-id
    (fixed-keys-schema
     {:props     (fixed-keys-schema
+                 ;; TODO: <<<<>>>> add cluster-conductor-host and module
                  {:name              String
                   :description       String
                   :input-json-schema String
@@ -246,12 +248,15 @@
          :modified-at      Long
         })
        {:subindex? true})
-      {:subindex? true})}
-   )})
+      {:subindex? true})
+     ;; TODO: <<<<>>>>
+     ;; :experiments ...
+    })})
 
 (defn evaluators-task-global-name
   []
   "$$_aor-evaluators")
+
 
 (def EVALUATORS-PSTATE-SCHEMA
   {String (fixed-keys-schema
@@ -261,6 +266,28 @@
             :input-json-path  String
             :output-json-path String
             :reference-output-json-path String
+           })})
+
+(defn experiments-task-global-name
+  []
+  "$$_aor-experiments")
+
+;; TODO: <<<<>>> hash by the prefix so can see them all together and query for them easily?
+;; - can just key by the prefix which is easier...
+;; - this should be keyed by the dataset ID...
+;;    - can't share, since could be experimenting on dataset from another module
+;;    - it could share if include more info in the dataset schema
+(def EXPERIMENTS-PSTATE-SCHEMA
+  {String (fixed-keys-schema
+           {:dataset-module-name :-String
+            :dataset-id          UUID
+            :snapshot            String
+            :selector            ExperimentInputSelector
+            :max-concurrency     Long
+            :results             (map-schema
+                                  UUID ; example ID
+                                  {java.util.List Object} ; [evaluator-name, metric-name] -> score
+                                  {:subindex? true})
            })})
 
 ;; Task global fetch helpers

@@ -165,6 +165,8 @@
     :next-inner {:list {:indent-arg 1}}}]
   "transform>"
   :arg1-body
+  "with-retriever"
+  :arg1-body
   "while"
   :arg1-body
  }

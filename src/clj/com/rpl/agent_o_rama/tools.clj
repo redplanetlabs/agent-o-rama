@@ -2,7 +2,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
-   [com.rpl.agent-o-rama.impl.core :as i]
+   [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.tools-impl :as tools-impl]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
@@ -81,8 +81,8 @@
                           options
                           {:error-handler h/fn-spec})
      (-> topology
-         (i/new-agent name)
-         (i/agg-start-node
+         (c/new-agent name)
+         (c/agg-start-node
           "begin"
           "tool"
           (fn begin
@@ -90,15 +90,15 @@
              (begin agent-node requests nil))
             ([agent-node requests caller-data]
              (doseq [r requests]
-               (i/emit! agent-node "tool" r caller-data)))))
-         (i/node
+               (c/emit! agent-node "tool" r caller-data)))))
+         (c/node
           "tool"
           "agg-results"
           (tools-impl/mk-tool-fn tools (:error-handler options)))
-         (i/agg-node
+         (c/agg-node
           "agg-results"
           nil
           aggs/+vec-agg
           (fn [agent-node agg-state _]
-            (i/result! agent-node agg-state)))
+            (c/result! agent-node agg-state)))
      ))))

@@ -19,8 +19,7 @@
     AgentFailedException
     AgentInvoke
     AgentNode
-    AgentObjectOptions$Impl
-    AgentsTopology]
+    AgentObjectOptions$Impl]
    [com.rpl.agentorama.impl
     RamaClientsTaskGlobal
     AgentDeclaredObjectsTaskGlobal
@@ -239,6 +238,8 @@
         evaluators-depot-sym   (symbol (po/evaluators-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
     (declare-depot* setup datasets-depot-sym (hash-by :dataset-id))
+    ;; TODO: <<<<>>>> can combine this with experiments by consuming here and using interfaces
+    ;; to distinguish eval vs. experiment types, and put impls for those in their namespaces
     (declare-depot* setup evaluators-depot-sym :random {:global? true})
     (declare-pstate*
      stream-topology
@@ -372,40 +373,3 @@
        )))
     ret
   ))
-
-(defn new-agent
-  [^AgentsTopology agents-topology name]
-  (.newAgent agents-topology name))
-
-(defn node
-  [agent-graph name output-nodes-spec node-fn]
-  (graph/internal-add-node!
-   agent-graph
-   name
-   output-nodes-spec
-   (aor-types/->Node node-fn)))
-
-(defn agg-start-node
-  [agent-graph name output-nodes-spec node-fn]
-  (graph/internal-add-node!
-   agent-graph
-   name
-   output-nodes-spec
-   (aor-types/->NodeAggStart node-fn nil)))
-
-(defn agg-node
-  [agent-graph name output-nodes-spec agg node-fn]
-  (graph/internal-add-agg-node!
-   agent-graph
-   name
-   output-nodes-spec
-   agg
-   node-fn))
-
-(defn emit!
-  [^AgentNode agent-node node & args]
-  (.emit agent-node node (into-array Object args)))
-
-(defn result!
-  [^AgentNode agent-node val]
-  (.result agent-node val))

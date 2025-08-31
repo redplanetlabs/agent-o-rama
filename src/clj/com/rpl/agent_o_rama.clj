@@ -4,6 +4,7 @@
   (:require
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.client :as iclient]
+   [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -338,19 +339,19 @@
 
 (defn new-agent
   [agents-topology name]
-  (i/new-agent agents-topology name))
+  (c/new-agent agents-topology name))
 
 (defn node
   [agent-graph name output-nodes-spec node-fn]
-  (i/node agent-graph name output-nodes-spec node-fn))
+  (c/node agent-graph name output-nodes-spec node-fn))
 
 (defn agg-start-node
   [agent-graph name output-nodes-spec node-fn]
-  (i/agg-start-node agent-graph name output-nodes-spec node-fn))
+  (c/agg-start-node agent-graph name output-nodes-spec node-fn))
 
 (defn agg-node
   [agent-graph name output-nodes-spec agg node-fn]
-  (i/agg-node agent-graph name output-nodes-spec agg node-fn))
+  (c/agg-node agent-graph name output-nodes-spec agg node-fn))
 
 (defn set-update-mode
   [^AgentGraph agent-graph mode]
@@ -382,11 +383,11 @@
 
 (defn emit!
   [agent-node node & args]
-  (apply i/emit! agent-node node args))
+  (apply c/emit! agent-node node args))
 
 (defn result!
   [agent-node val]
-  (i/result! agent-node val))
+  (c/result! agent-node val))
 
 (defn get-store
   [^AgentNode agent-node name]

@@ -608,7 +608,7 @@ Here are the sections to reflect on for writing: %s")
        )))
   ))
 
-(defn run-research-agent
+(defn run-agent
   []
   (with-open [ipc (rtest/create-ipc)
               ui  (aor/start-ui ipc)]
@@ -632,6 +632,3 @@ Here are the sections to reflect on for writing: %s")
             (recur (aor/agent-next-step researcher inv)))
           (println (:result step))))
     )))
-
-(comment
-  (run-research-agent))

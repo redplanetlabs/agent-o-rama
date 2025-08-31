@@ -3,6 +3,8 @@ package com.rpl.agentorama.impl;
 import java.io.IOException;
 
 import com.rpl.agentorama.*;
+import com.rpl.rama.PState;
+import com.rpl.rama.cluster.ClusterManagerBase;
 import com.rpl.rama.integration.*;
 
 import clojure.lang.*;
@@ -19,6 +21,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   Map<String, List> _evaluators;
   String _thisModuleName;
   WorkerManagedResource<Map<String, AgentClient>> _agents;
+  ClusterManagerBase _clusterRetriever;
 
 
   // agents is localName -> [moduleName, agentName] (nil for local module)
@@ -90,6 +93,10 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     }
   }
 
+  public ClusterManagerBase getClusterRetriever() {
+    return _clusterRetriever;
+  }
+
   private static Object makeObject(String name, IFn afn, AgentObjectSetup setup, boolean autoTracing) {
     Object o = afn.invoke(setup);
     return autoTracing ? AORHelpers.WRAP_AGENT_OBJECT.invoke(name, o) : o;
@@ -99,6 +106,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   public void prepareForTask(int taskId, TaskGlobalContext context) {
     _thisModuleName = context.getModuleInstanceInfo().getModuleName();
     _evaluators = new ConcurrentHashMap();
+    _clusterRetriever = context.getClusterRetriever();
 
     _objects = new HashMap();
     for(String name: _builders.keySet()) {
