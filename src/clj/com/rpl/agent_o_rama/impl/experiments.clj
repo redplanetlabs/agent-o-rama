@@ -25,6 +25,13 @@
   [agent-node]
   (.getEvaluatorBuilders ^AgentDeclaredObjectsTaskGlobal (anode/get-declared-objectsagent-node)))
 
+(defn get-evaluator
+  [agent-node name builder-name params]
+  (.getEvaluator ^AgentDeclaredObjectsTaskGlobal (anode/get-declared-objectsagent-node)
+                 name
+                 builder-name
+                 params))
+
 (defmacro with-retriever
   [[agent-node experiment] [retriever-sym] & body]
   `(let [{cluster-conductor-host# :cluster-conductor-host
@@ -132,7 +139,23 @@
        (foreign-select-one (keypath name) (if remote? ds-evals local-evals)))
      evaluators)))
 
-(defn define-experiments-agent
+(defn relevant-evaluators
+  [agent-node eval-info types]
+  (let [builders  (get-evaluator-builders agent-node)
+        relevant? (fn [{:keys [builder-name]}]
+                    (contains? types
+                               (-> builders
+                                   (get builder-name)
+                                   :type)))]
+    (select [ALL
+             (pred relevant?)
+             (view #(get-evaluator agent-node
+                                   (:name %)
+                                   (:builder-name %)
+                                   (:builder-params %)))]
+            eval-info)))
+
+(defn define-experiments-agent!
   [topology]
   (->
     topology
@@ -201,16 +224,24 @@
                         {:keys [name dataset-id] :as experiment}
                         example-ids]
          [retriever]
-         (let [eval-info (all-evaluator-info retriever experiment)
-               ;; TODO: <<<<>>>> make evaluators (just call .getEvaluator on the agent-node)
-               ;;   - maybe easier to just expose the whole thing
-               local-ds  (local-datasets-pstate retriever)
-               datasets  (datasets-pstate retriever)]
+         (let [eval-info  (all-evaluator-info retriever experiment)
+               evaluators (relevant-evaluators agent-node eval-info #{:regular :comparative})
+               local-ds   (local-datasets-pstate retriever)
+               datasets   (datasets-pstate retriever)]
+           (doseq [example-id example-ids]
+             ;; TODO: <<<<>>>>
+             ;;  - skip if already recorded results for this example ID
+             ;;     - how to store agent output vs. evaluators? probably different keys in PState so
+             ;;     UI can distinguish
 
-           ;; TODO: <<<<>>>>
-           ;;  - skip if already recorded results for this example ID
-           ;;     - how to store agent output vs. evaluators? probably different keys in PState so
-           ;;     UI can distinguish
+
+           )
+
+           ; (doseq [{:keys [builder-name builder-params]}]
+           ;
+           ;
+           ;   )
+
          ))))
     (c/agg-node
      "finish"
@@ -219,28 +250,4 @@
      (fn [agent-node _ experiment]
          ;; TODO: <<<<>>>> run summary evaluators if appropriate
      ))
-  )
-
-
-)
-
-; (drp/defrecord+ StartExperiment
-;   [name :- String
-;    cluster-conductor-host :- (s/maybe String)
-;    module-name :- (s/maybe String)
-;
-;    dataset-id :- UUID
-;    snapshot :- (s/maybe String)
-;    selector :- (s/maybe ExperimentInputSelector)
-;    evaluators :- [EvaluatorSelector]
-;
-;    spec :- ExperimentSpec
-;
-;    max-concurrency :- Long
-;   ])
-
-;; TODO: <<<<>>>>
-;;  - define agent here...
-;;    - really want to use Clojure API for this
-;;      - but impl/core needs to be able to reference this namespace
-;;    - API one is currently referencing one in impl/core
+  ))
