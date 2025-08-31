@@ -8,8 +8,22 @@
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.rama.ops :as ops]))
+   [com.rpl.rama.ops :as ops])
+  (:import
+   [com.rpl.agentorama.impl
+    AgentDeclaredObjectsTaskGlobal]))
 
+(defn get-cluster-retriever
+  [agent-node]
+  (.getClusterRetriever ^AgentDeclaredObjectsTaskGlobal (anode/get-declared-objects agent-node)))
+
+(defn get-this-module-name
+  [agent-node]
+  (.getThisModuleName ^AgentDeclaredObjectsTaskGlobal (anode/get-declared-objects agent-node)))
+
+(defn get-evaluator-builders
+  [agent-node]
+  (.getEvaluatorBuilders ^AgentDeclaredObjectsTaskGlobal (anode/get-declared-objectsagent-node)))
 
 (defmacro with-retriever
   [[agent-node experiment] [retriever-sym] & body]
@@ -23,7 +37,7 @@
 
          retriever# (if cluster-conductor-host#
                       (open-cluster-manager {"conductor.host" cluster-conductor-host#})
-                      (anode/get-cluster-retriever ~agent-node))
+                      (get-cluster-retriever ~agent-node))
 
          retriever-sym# {:retriever retriever :agent-node agent-node :experiment experiment}]
      (try
@@ -36,7 +50,7 @@
   [{:keys [agent-node retriever experiment]} pstate-name]
   (foreign-pstate
    retriever
-   (or (:module-name experiment) (anode/get-this-module-name agent-node))
+   (or (:module-name experiment) (get-this-module-name agent-node))
    pstate-name))
 
 (defn datasets-pstate
@@ -47,11 +61,18 @@
   [retriever]
   (get-pstate retriever (po/evaluators-task-global-name)))
 
+(defn local-datasets-pstate
+  [{:Keys [agent-node]}]
+  (foreign-pstate
+   (get-cluster-retriever agent-node)
+   (get-this-module-name agent-node)
+   (po/datasets-task-global-name)))
+
 (defn local-evals-pstate
   [{:Keys [agent-node]}]
   (foreign-pstate
-   (anode/get-cluster-retriever agent-node)
-   (anode/get-this-module-name agent-node)
+   (get-cluster-retriever agent-node)
+   (get-this-module-name agent-node)
    (po/evaluators-task-global-name)))
 
 (defn valid-evaluator-types
@@ -67,7 +88,7 @@
 
 (defn validate-evaluator
   [agent-node spec #{:keys [builder-name] :as evaluator}]
-  (let [builders (anode/get-evaluator-builders agent-node)
+  (let [builders (get-evaluator-builders agent-node)
         info     (get builders builder-name)]
     (cond
       (nil? evaluator)
@@ -81,6 +102,36 @@
        :experiment-type (class spec)
        :evaluator-type  (:type info)})))
 
+(defn retrieve-all-examples-ids
+  [datasets dataset-id snapshot selector]
+  (cond
+    (nil? selector)
+    (foreign-select [(keypath dataset-id :snapshots snapshot) MAP-KEYS] datasets)
+
+    (aor-types/TagSelector? selector)
+    (let [tag (:tag selector)]
+      (foreign-select [(keypath dataset-id :snapshots snapshot)
+                       ALL
+                       (selected? LAST :tags (view contains? tag) identity)
+                       FIRST]
+                      datasets)
+
+      (aor-types/ExampleIdsSelector? selector)
+      (:example-ids selector)
+
+      :else
+      (throw (h/ex-info "Unexpected dataset selector type" {:type (class selector)}))
+    )))
+
+(defn all-evaluator-info
+  [retriever {:keys [evaluators]}]
+  (let [ds-evals    (evals-pstate reriever)
+        local-evals (local-evals-pstate retriever)]
+    (mapv
+     (fn [{:keys [name remote?]}]
+       (foreign-select-one (keypath name) (if remote? ds-evals local-evals)))
+     evaluators)))
+
 (defn define-experiments-agent
   [topology]
   (->
@@ -90,27 +141,23 @@
      "start"
      "root"
      (fn [agent-node
-          {:keys [cluster-conductor-host module-name dataset-id snapshot evaluators spec]
+          {:keys [dataset-id snapshot spec]
            :as   experiment}]
        (with-retriever [agent-node experiment]
          [retriever]
          (let [datasets      (datasets-pstate retriever)
-               ds-evals      (evals-pstate reriever)
-               local-evals   (local-evals-pstate retriever)
+
+               eval-info     (all-evaluator-info retriever experiment)
                eval-problems
                (filterv some?
                 (mapv
-                 (fn [{:keys [name remote?]}]
-                   (let [evaluator (foreign-select-one (keypath name)
-                                                       (if remove?
-                                                         ds-evals
-                                                         local-evals))
-                         problem   (validate-evaluator agent-node spec evaluator)]
+                 (fn [evaluator]
+                   (let [problem (validate-evaluator agent-node spec evaluator)]
                      (when problem
                        (assoc problem
                         :name name
                         :remote? remote?))))
-                 evaluators))]
+                 eval-info))]
            (cond
              (not-empty eval-problems)
              (aor/result! agent-node
@@ -127,38 +174,50 @@
               datasets)
              (aor/result! agent-node {:error "Snapshot does not exist or has no examples"})
 
-
              :else
-             (let []
-               ;; TODO: <<<<>>>>
-               ;;  - look at dataset spec to divvy up the work, emitting concurrency times
-
-
-
-
-             ))
-
-
-         ))
-
-
-       ;; TODO: <<<<>>>> different agent for comparative? probably not
-       ;; - may have summary evaluators here though
-       ;; - could just pass the whole spec down and figure out if there are summary evaluators
-       ;; in last node
-     ))
+             (aor/emit! agent-node "root" experiment))
+         ))))
     (c/agg-start-node
      "root"
      "evaluate"
      (fn [agent-node
-          {:keys [name cluster-conductor-host module-name dataset-id snapshot selector evaluators
-                  spec concurrency]}]
-
-     ))
+          {:keys [dataset-id snapshot selector concurrency]
+           :as   experiment}]
+       (with-retriever [agent-node experiment]
+         [retriever]
+         (let [datasets    (datasets-pstate retriever)
+               example-ids (retrieve-all-examples-ids datasets dataset-id snapshot selector)
+               chunks      (h/split-into-n concurrency example-ids)]
+           (doseq [c chunks]
+             (when-not (empty? c)
+               (aor/emit! agent-node "evaluate" experiment c)))
+         ))
+       experiment))
     (c/node
      "evaluate"
      "finish"
-     (fn [agent-node example-range evaluators]
+     (fn [agent-node experiment example-ids]
+       (with-retriever [agent-node
+                        {:keys [name dataset-id] :as experiment}
+                        example-ids]
+         [retriever]
+         (let [eval-info (all-evaluator-info retriever experiment)
+               ;; TODO: <<<<>>>> make evaluators (just call .getEvaluator on the agent-node)
+               ;;   - maybe easier to just expose the whole thing
+               local-ds  (local-datasets-pstate retriever)
+               datasets  (datasets-pstate retriever)]
+
+           ;; TODO: <<<<>>>>
+           ;;  - skip if already recorded results for this example ID
+           ;;     - how to store agent output vs. evaluators? probably different keys in PState so
+           ;;     UI can distinguish
+         ))))
+    (c/agg-node
+     "finish"
+     nil
+     aggs/+vec-agg ; doesn't matter
+     (fn [agent-node _ experiment]
+         ;; TODO: <<<<>>>> run summary evaluators if appropriate
      ))
   )
 

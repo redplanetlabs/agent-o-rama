@@ -34,6 +34,10 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     _agentsInfo = agentsInfo;
   }
 
+  public String getThisModuleName() {
+    return _thisModuleName;
+  }
+
   public Map getEvaluatorBuilders() {
     return _evaluatorBuilders;
   }

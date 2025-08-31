@@ -66,9 +66,7 @@
   (agent-node-state [this])
   (release-acquired-objects! [this])
   (get-streaming-recorder [this])
-  (get-cluster-retriever [this])
-  (get-this-module-name [this])
-  (get-evaluator-builders [this]))
+  (get-declared-objects [this]))
 
 (defprotocol StreamingRecorderInternal
   (waitFinish [this]))
@@ -453,12 +451,8 @@
          ret
        ))
      AgentNodeInternal
-     (get-cluster-retriever [this]
-       (.getClusterRetriever declared-objects-tg))
-     (get-this-module-name [this]
-       (.getModuleName module-instance-info))
-     (get-evaluator-builders [this]
-       (.getEvaluatorBuilders declared-objects-tg))
+     (get-declared-objects [this]
+       declared-objects-tg)
      (get-streaming-recorder [this] streaming-recorder)
      (release-acquired-objects! [this]
        (release-acquired-objects! fetcher))
