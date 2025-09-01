@@ -2,81 +2,90 @@
   (:require
    [clojure.test :refer [deftest testing is]]
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.rama :as rama]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.agent.human-input-agent :refer [HumanInputAgentModule]])
+   [com.rpl.agent.human-input-agent :refer [HumanInputAgentModule human-helpful?]])
   (:import
    [com.rpl.agentorama
-    HumanInputRequest]))
+    HumanInputRequest]
+   [dev.langchain4j.data.message
+    UserMessage]
+   [dev.langchain4j.model.openai
+    OpenAiChatModel]))
+
+;; Test agent module using OpenAI
+(aor/defagentmodule TestHumanInputAgentModule
+  [topology]
+  (aor/declare-agent-object topology
+                            "openai-api-key"
+                            (or (System/getenv "OPENAI_API_KEY") "test-key"))
+  (aor/declare-agent-object-builder
+   topology
+   "openai"
+   (fn [setup]
+     (-> (OpenAiChatModel/builder)
+         (.apiKey (aor/get-agent-object setup "openai-api-key"))
+         (.modelName "gpt-4o-mini")
+         .build)))
+  (->
+   topology
+   (aor/new-agent "HumanInputAgent")
+   (aor/node
+    "chat"
+    nil
+    (fn [agent-node user-message]
+      (let [openai (aor/get-agent-object agent-node "openai")
+            response (-> (lc4j/chat openai [(UserMessage. user-message)])
+                         .aiMessage
+                         .text)
+            helpful? (human-helpful? agent-node response)]
+        (aor/result! agent-node
+                     {:response response
+                      :helpful helpful?}))))))
 
 (deftest human-input-agent-test
-  (testing "HumanInputAgent example handles human input correctly"
-    (with-open [ipc (rtest/create-ipc)]
-      (rtest/launch-module! ipc HumanInputAgentModule {:tasks 1 :threads 1})
+  (testing "HumanInputAgent handles human input correctly"
+    (if (System/getenv "OPENAI_API_KEY")
+      (with-open [ipc (rtest/create-ipc)]
+        (rtest/launch-module! ipc TestHumanInputAgentModule {:tasks 1 :threads 1})
 
-      (let [manager (aor/agent-manager ipc
-                                       (rama/get-module-name
-                                        HumanInputAgentModule))
-            agent   (aor/agent-client manager "HumanInputAgent")]
+        (let [manager (aor/agent-manager ipc
+                                         (rama/get-module-name
+                                          TestHumanInputAgentModule))
+              agent (aor/agent-client manager "HumanInputAgent")]
 
-        (testing "collects preferences and makes recommendation"
-          (let [invoke (aor/agent-initiate agent {:category "laptop"})]
+          (testing "processes user message and collects helpfulness feedback"
+            (let [invoke (aor/agent-initiate agent "What is AI?")]
 
-            ;; Handle budget input
-            (let [step1 (aor/agent-next-step agent invoke)]
-              (is (instance? HumanInputRequest step1))
-              (is (.contains (:prompt step1) "budget"))
-              (aor/provide-human-input agent step1 "800"))
+              ;; Handle helpfulness input request
+              (let [step1 (aor/agent-next-step agent invoke)]
+                (is (instance? HumanInputRequest step1))
+                (is (.contains (:prompt step1) "AI Response"))
+                (is (.contains (:prompt step1) "Was this response helpful?"))
+                (aor/provide-human-input agent step1 "y"))
 
-            ;; Handle quality input
-            (let [step2 (aor/agent-next-step agent invoke)]
-              (is (instance? HumanInputRequest step2))
-              (is (.contains (:prompt step2) "quality"))
-              (aor/provide-human-input agent step2 "premium"))
+              ;; Get final result
+              (let [result (aor/agent-result agent invoke)]
+                (is (string? (:response result)))
+                (is (= true (:helpful result))))))
 
-            ;; Handle urgency input
-            (let [step3 (aor/agent-next-step agent invoke)]
-              (is (instance? HumanInputRequest step3))
-              (is (.contains (:prompt step3) "urgent"))
-              (aor/provide-human-input agent step3 "medium"))
+          (testing "handles validation loop"
+            (let [invoke (aor/agent-initiate agent "Tell me about ML")]
 
-            ;; Handle confirmation input
-            (let [step4 (aor/agent-next-step agent invoke)]
-              (is (instance? HumanInputRequest step4))
-              (is (.contains (:prompt step4) "Recommendation"))
-              (aor/provide-human-input agent step4 "y"))
+              ;; First try with invalid input
+              (let [step1 (aor/agent-next-step agent invoke)]
+                (aor/provide-human-input agent step1 "maybe"))
 
-            ;; Get final result
-            (let [result (aor/agent-result agent invoke)]
-              (is (= "laptop" (:category result)))
-              (is (= 800.0 (get-in result [:preferences :budget])))
-              (is (= :premium (get-in result [:preferences :quality])))
-              (is (= :medium (get-in result [:preferences :urgency])))
-              (is (= "Mid-range premium option" (:recommendation result)))
-              (is (= true (:accepted result)))
-              (is (number? (:processed-at result))))))
+              ;; Should get validation prompt
+              (let [step2 (aor/agent-next-step agent invoke)]
+                (is (instance? HumanInputRequest step2))
+                (is (.contains (:prompt step2) "Please answer 'y' or 'n'"))
+                (aor/provide-human-input agent step2 "n"))
 
-        (testing "handles invalid inputs with defaults"
-          (let [invoke (aor/agent-initiate agent {:category "phone"})]
+              ;; Get final result
+              (let [result (aor/agent-result agent invoke)]
+                (is (string? (:response result)))
+                (is (= false (:helpful result))))))))
 
-            ;; Provide invalid budget (should default to 0.0)
-            (let [step1 (aor/agent-next-step agent invoke)]
-              (aor/provide-human-input agent step1 "invalid-number"))
-
-            ;; Provide invalid quality (should default to :basic)
-            (let [step2 (aor/agent-next-step agent invoke)]
-              (aor/provide-human-input agent step2 "invalid-quality"))
-
-            ;; Provide invalid urgency (should default to :medium)
-            (let [step3 (aor/agent-next-step agent invoke)]
-              (aor/provide-human-input agent step3 "invalid-urgency"))
-
-            ;; Decline recommendation
-            (let [step4 (aor/agent-next-step agent invoke)]
-              (aor/provide-human-input agent step4 "n"))
-
-            (let [result (aor/agent-result agent invoke)]
-              (is (= 0.0 (get-in result [:preferences :budget])))
-              (is (= :basic (get-in result [:preferences :quality])))
-              (is (= :medium (get-in result [:preferences :urgency])))
-              (is (= false (:accepted result))))))))))
+      (println "Skipping HumanInputAgent test - OPENAI_API_KEY not set"))))

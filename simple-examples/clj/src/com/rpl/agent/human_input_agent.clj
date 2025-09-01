@@ -8,140 +8,99 @@
   - Human-in-the-loop agent execution patterns"
   (:require
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.rama :as rama]
    [com.rpl.rama.test :as rtest])
   (:import
    [com.rpl.agentorama
-    HumanInputRequest]))
+    HumanInputRequest]
+   [dev.langchain4j.data.message
+    UserMessage]
+   [dev.langchain4j.model.openai
+    OpenAiStreamingChatModel]))
 
-;;; Agent module demonstrating human input functionality
+(defn human-helpful?
+  "Ask user if the response was helpful and loop until valid y/n answer."
+  [agent-node response]
+  (loop [res (aor/get-human-input
+              agent-node
+              (str "AI Response: "
+                   response
+                   "\n\nWas this response helpful? (y/n): "))]
+    (cond (= res "y") true
+          (= res "n") false
+          :else (recur (aor/get-human-input
+                        agent-node
+                        "Please answer 'y' or 'n'.")))))
+
 (aor/defagentmodule HumanInputAgentModule
   [topology]
-
+  (aor/declare-agent-object topology
+                            "openai-api-key"
+                            (System/getenv "OPENAI_API_KEY"))
+  (aor/declare-agent-object-builder
+   topology
+   "openai"
+   (fn [setup]
+     (-> (OpenAiStreamingChatModel/builder)
+         (.apiKey (aor/get-agent-object setup "openai-api-key"))
+         (.modelName "gpt-4o-mini")
+         .build)))
   (->
-    topology
-    (aor/new-agent "HumanInputAgent")
-
-    ;; Node that collects user preferences through human input
-    (aor/node
-     "collect-preferences"
-     "make-recommendation"
-     (fn [agent-node {:keys [category]}]
-       (println (format "Collecting preferences for %s category" category))
-
-       ;; Ask for budget preference
-       (let [budget-input (aor/get-human-input
-                           agent-node
-                           (format "What's your budget for %s? ($): " category))
-             budget       (try
-                            (Double/parseDouble budget-input)
-                            (catch NumberFormatException _
-                              0.0))]
-
-         ;; Ask for quality preference
-         (let [quality-input
-               (aor/get-human-input
-                agent-node
-                "What quality level do you prefer? (basic/premium): ")
-               quality (if (contains? #{"basic" "premium"} quality-input)
-                         (keyword quality-input)
-                         :basic)]
-
-           ;; Ask for urgency
-           (let [urgency-input (aor/get-human-input
-                                agent-node
-                                "How urgent is this? (low/medium/high): ")
-                 urgency       (if (contains? #{"low" "medium" "high"}
-                                              urgency-input)
-                                 (keyword urgency-input)
-                                 :medium)]
-
-             (aor/emit! agent-node
-                        "make-recommendation"
-                        {:category category
-                         :budget   budget
-                         :quality  quality
-                         :urgency  urgency}))))))
-
-    ;; Node that makes recommendations based on collected preferences
-    (aor/node
-     "make-recommendation"
-     nil
-     (fn [agent-node {:keys [category budget quality urgency]}]
-       (let [recommendation (cond
-                              (and (>= budget 1000) (= quality :premium))
-                              "High-end option with excellent features"
-
-                              (and (>= budget 500) (= quality :premium))
-                              "Mid-range premium option"
-
-                              (and (< budget 200) (= urgency :high))
-                              "Budget option for urgent needs"
-
-                              (= quality :basic)
-                              "Standard basic option"
-
-                              :else
-                              "Balanced mid-range option")
-
-             confirmation
-             (aor/get-human-input
-              agent-node
-              (format
-               "Recommendation: %s\nDo you accept this recommendation? (y/n): "
-               recommendation))]
-
-         (aor/result! agent-node
-                      {:category       category
-                       :preferences    {:budget  budget
-                                        :quality quality
-                                        :urgency urgency}
-                       :recommendation recommendation
-                       :accepted       (= confirmation "y")
-                       :processed-at   (System/currentTimeMillis)}))))))
+   topology
+   (aor/new-agent "HumanInputAgent")
+   (aor/node
+    "chat"
+    nil
+    (fn [agent-node user-message]
+      (let [openai (aor/get-agent-object agent-node "openai")
+            response (-> (lc4j/chat openai [(UserMessage. user-message)])
+                         .aiMessage
+                         .text)
+            helpful? (human-helpful? agent-node response)]
+        (aor/result! agent-node
+                     {:response response
+                      :helpful helpful?}))))))
 
 (defn -main
   "Run the human input agent example"
   [& _args]
-  (with-open [ipc (rtest/create-ipc)]
-    (rtest/launch-module! ipc HumanInputAgentModule {:tasks 1 :threads 1})
-
-    (let [manager (aor/agent-manager ipc
-                                     (rama/get-module-name
-                                      HumanInputAgentModule))
-          agent   (aor/agent-client manager "HumanInputAgent")]
-
-      (println "Human Input Agent Example:")
-      (println
-       "This agent will ask you questions to make personalized recommendations.")
-      (println)
-
-      ;; Start agent execution
-      (let [invoke (aor/agent-initiate agent {:category "laptop"})]
-
-        ;; Handle human input requests
-        (loop []
-          (let [step (aor/agent-next-step agent invoke)]
-            (if (instance? HumanInputRequest step)
-              (do
-                (print (:prompt step))
-                (flush)
-                (let [user-response (read-line)]
-                  (aor/provide-human-input agent step user-response)
-                  (recur)))
-              ;; Agent completed
-              (let [result (:result step)]
-                (println "\nRecommendation process completed!")
-                (println "  Category:" (:category result))
-                (println "  Your preferences:")
-                (println "    Budget: $" (get-in result [:preferences :budget]))
-                (println "    Quality:" (get-in result [:preferences :quality]))
-                (println "    Urgency:" (get-in result [:preferences :urgency]))
-                (println "  Recommendation:" (:recommendation result))
-                (println "  Accepted:" (:accepted result))))))
+  (if (System/getenv "OPENAI_API_KEY")
+    (with-open [ipc (rtest/create-ipc)
+                ui (aor/start-ui ipc)]
+      (rtest/launch-module! ipc HumanInputAgentModule {:tasks 4 :threads 2})
+      (let [module-name (rama/get-module-name HumanInputAgentModule)
+            agent-manager (aor/agent-manager ipc module-name)
+            chat-agent (aor/agent-client agent-manager "HumanInputAgent")
+            _ (print "Enter your message: ")
+            _ (flush)
+            user-message (read-line)
+            inv (aor/agent-initiate chat-agent user-message)]
+        (println)
+        (println user-message)
+        (loop [step (aor/agent-next-step chat-agent inv)]
+          (if (instance? HumanInputRequest step)
+            (do
+              (println (:prompt step))
+              (print ">> ")
+              (flush)
+              (aor/provide-human-input chat-agent step (read-line))
+              (println)
+              (recur (aor/agent-next-step chat-agent inv)))
+            (do
+              (println "Final result:")
+              (println (:result step)))))
 
         (println "\nNotice how:")
         (println "- Agents can request human input during execution")
         (println "- Input validation and defaults are handled gracefully")
-        (println "- Multiple input requests can be chained together")
-        (println "- Human responses influence the final result")))))
+        (println "- Human responses influence the final result")))
+
+    (do
+      (println "Human Input Agent Example:")
+      (println "OPENAI_API_KEY environment variable not set.")
+      (println "Please set your OpenAI API key to run this example:")
+      (println "  export OPENAI_API_KEY=your-api-key-here"))))
+
+(comment
+  (-main))
