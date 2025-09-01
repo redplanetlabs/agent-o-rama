@@ -10,26 +10,26 @@ This directory contains isolated examples demonstrating individual agent-o-rama 
 3. **`router_agent`** - Conditional routing between different processing nodes
 4. **`async_agent`** - Asynchronous initiation and result handling
 5. **`agent_objects_agent`** - Static and builder-based agent objects
+6. **`langchain4j_agent`** - LangChain4j chat model integration
 
 ### State Management Examples
-6. **`keyvalue_store_agent`** - Key-value store operations
-7. **`document_store_agent`** - Document store with field operations
-8. **`pstate_store_agent`** - PState store with path operations
+7. **`keyvalue_store_agent`** - Key-value store operations
+8. **`document_store_agent`** - Document store with field operations
+9. **`pstate_store_agent`** - PState store with path operations
 
 ### Communication Examples
-9. **`streaming_agent`** - Stream chunks from nodes
-10. **`human_input_agent`** - Request and handle human input
+10. **`streaming_agent`** - Stream chunks from nodes
+11. **`human_input_agent`** - Request and handle human input
 
 ### Advanced Patterns
-11. **`aggregation_agent`** - Fan-out/fan-in with agg-start-node and agg-node
-12. **`multi_agg_agent`** - Custom aggregation logic with multi-agg
-13. **`forking_agent`** - Agent execution branching
-14. **`tools_agent`** - LangChain4j tools integration
+12. **`aggregation_agent`** - Fan-out/fan-in with agg-start-node and agg-node
+13. **`multi_agg_agent`** - Custom aggregation logic with multi-agg
+14. **`forking_agent`** - Agent execution branching
+15. **`tools_agent`** - LangChain4j tools integration
 
 ### System Features
-15. **`dataset_agent`** - Dataset creation and management
-16. **`evaluator_agent`** - Evaluator creation and execution
-17. **`langchain4j_agent`** - LangChain4j chat model integration
+16. **`dataset_agent`** - Dataset creation and management
+17. **`evaluator_agent`** - Evaluator creation and execution
 18. **`ui_monitoring_agent`** - UI integration for monitoring
 19. **`cluster_agent`** - Cross-module agent communication
 
@@ -101,10 +101,10 @@ lein with-profile +dev repl
 
 Examples are ordered to build understanding progressively:
 
-- **Foundation** (1-4): Core agent system required for all other examples
-- **State Management** (5-8): Independent storage and resource patterns
-- **Communication** (9-10): Real-time interaction patterns
-- **Advanced Patterns** (11-14): Complex execution and integration patterns
-- **System Features** (15-19): Full-system capabilities and cross-module features
+- **Foundation** (1-6): Core agent system required for all other examples
+- **State Management** (7-9): Independent storage and resource patterns
+- **Communication** (10-11): Real-time interaction patterns
+- **Advanced Patterns** (12-15): Complex execution and integration patterns
+- **System Features** (16-19): Full-system capabilities and cross-module features
 
 Each example includes detailed comments explaining the demonstrated features and their usage patterns.
