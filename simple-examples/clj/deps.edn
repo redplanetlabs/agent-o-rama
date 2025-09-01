@@ -1,0 +1,7 @@
+;; Simple deps.edn for running examples using parent project dependencies
+;; To run examples, use: lein with-profile +dev run -m com.rpl.agent.basic-agent
+;; from the parent directory
+
+{:paths ["src"]
+ 
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}}}
