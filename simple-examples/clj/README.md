@@ -47,6 +47,12 @@ clj -M -m com.rpl.agent.agent-objects-agent
 clj -M -m com.rpl.agent.keyvalue-store-agent
 clj -M -m com.rpl.agent.document-store-agent
 clj -M -m com.rpl.agent.pstate-store-agent
+clj -M -m com.rpl.agent.streaming-agent
+clj -M -m com.rpl.agent.human-input-agent
+clj -M -m com.rpl.agent.aggregation-agent
+clj -M -m com.rpl.agent.multi-agg-agent
+clj -M -m com.rpl.agent.forking-agent
+clj -M -m com.rpl.agent.tools-agent
 
 # Run tests
 clj -M:test
@@ -63,6 +69,12 @@ lein with-profile +dev run -m com.rpl.agent.agent-objects-agent
 lein with-profile +dev run -m com.rpl.agent.keyvalue-store-agent
 lein with-profile +dev run -m com.rpl.agent.document-store-agent
 lein with-profile +dev run -m com.rpl.agent.pstate-store-agent
+lein with-profile +dev run -m com.rpl.agent.streaming-agent
+lein with-profile +dev run -m com.rpl.agent.human-input-agent
+lein with-profile +dev run -m com.rpl.agent.aggregation-agent
+lein with-profile +dev run -m com.rpl.agent.multi-agg-agent
+lein with-profile +dev run -m com.rpl.agent.forking-agent
+lein with-profile +dev run -m com.rpl.agent.tools-agent
 
 # Or from REPL
 lein with-profile +dev repl
