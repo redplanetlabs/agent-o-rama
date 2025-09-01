@@ -303,6 +303,10 @@
   []
   (CompletableFuture.))
 
+(defn cf-get
+  [^CompletableFuture cf]
+  (.get cf))
+
 (defn split-into-n
   [n coll]
   (let [rows (partition-all n coll)

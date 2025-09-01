@@ -281,63 +281,45 @@
      (fn [^AgentNode agent-node {:keys [name dataset-id snapshot spec] :as experiment} example-ids]
        (with-retriever [agent-node experiment]
          [retriever]
-         (let [datasets   (datasets-pstate retriever)
+         (let [datasets    (datasets-pstate retriever)
                invoke-fns
                (mapv
                 (fn [{:keys [target-spec input->args]}]
-                  (let [client (if (aor-types/AgentTarget? target-spec)
-                                 (.getAgentClient agent-node (:name target-spec))
-                                 (.getAgentClient agent-node (:agent-name target-spec)))
+                  (let [agent-name (:agent-name target-spec)
+                        client     (.getAgentClient agent-node agent-name)
                         compiled-input->args (mapv h/compile-json-path input->args)
                        ]
                     (fn [input]
                       (let [args (convert-input->args input compiled-input->args)]
-                        (if (aor-types/AgentTarget? target-spec)
-                          (apply c/agent-initiate-async client args)
-                          (apply c/agent-initiate-async
-                           client
-                           {:agent-name (:agent-name target-spec)
-                            :node       (:node target-spec)
-                            :args       args})))
+                        {:agent-name   agent-name
+                         :agent-invoke
+                         (if (aor-types/AgentTarget? target-spec)
+                           (apply c/agent-initiate-async client args)
+                           (c/agent-initiate-async client
+                                                   {:agent-name agent-name
+                                                    :node       (:node target-spec)
+                                                    :args       args}))})
                     )))
                 (aor-types/experiment-targets spec))
-               ;; TODO: <<<<>>> node type has different input format...
-               ;;   - need to pass forward to next node the agent that was invoked + the invoke ID
-               ;;   - {example-id -> [{:agent-name ...:agent-invoke  ...} ...]}
-               ;;  - need the agent clients here...
-              ]
-           (reduce
-            (fn [m example-id]
-              (let [input        (foreign-select-one
-                                  [(keypath dataset-id :snapshots snapshot example-id :input)]
-                                  datasets)
-
-                    invoke-infos nil]
-
-
-
-              )
-              ;; TODO: <<<<>>>
-              ;;  - look at spec and initiate all agents
-              ;;    - need to fetch dataset example input
-              ;;    - need to create arguments from experiment spec input->args
-              ;;  - for node invoke, initiate self agent with map with keys :agent-name :node
-              ;;  :args
-              ;;  - assoc into m example-id->[agent-invokes]
-              ;;      - TODO: <<<<>>> what about for individual node?
-              ;; TODO: <<<<<>>> result should also include the relevant agent invoke
-            )
-            {}
-            example-ids
-           )
-
-
-
+               invokes-map (->> example-ids
+                                (reduce
+                                 (fn [m example-id]
+                                   (let [input (foreign-select-one
+                                                [(keypath dataset-id
+                                                          :snapshots
+                                                          snapshot
+                                                          example-id
+                                                          :input)]
+                                                datasets)]
+                                     (assoc m example-id (mapv #(% input) invoke-fns))))
+                                 {})
+                                (transform [MAP-VALS ALL :agent-invoke] h/cf-get))]
+           (c/emit! agent-node "evaluate" experiment invokes-map)
          ))))
     (c/node
      "evaluate"
      "finish"
-     (fn [agent-node experiment example-id->invoke-ids]
+     (fn [agent-node experiment invokes-map]
        (with-retriever [agent-node
                         {:keys [name dataset-id] :as experiment}
                         example-ids]

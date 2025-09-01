@@ -355,7 +355,7 @@
 (defprotocol TargetSpec)
 
 (drp/defrecord+ AgentTarget
-  [name :- String]
+  [agent-name :- String]
   TargetSpec)
 
 (drp/defrecord+ NodeTarget
