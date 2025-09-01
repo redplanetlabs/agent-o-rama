@@ -36,7 +36,20 @@ This directory contains isolated examples demonstrating individual agent-o-rama 
 
 Each example is a self-contained namespace with a `-main` function. 
 
-From the main project directory, run examples using:
+### From the simple-examples/clj directory:
+
+```bash
+# Run specific example
+clj -M -m com.rpl.agent.basic-agent
+clj -M -m com.rpl.agent.multi-node-agent
+clj -M -m com.rpl.agent.async-agent
+clj -M -m com.rpl.agent.agent-objects-agent
+
+# Run tests
+clj -M:test
+```
+
+### From the main project directory (alternative):
 
 ```bash
 # Run specific example
@@ -50,6 +63,8 @@ lein with-profile +dev repl
 (require '[com.rpl.agent.basic-agent :as basic])
 (basic/-main)
 ```
+
+**Note**: Examples may take several minutes to start up due to Rama initialization.
 
 ## Feature Dependencies
 

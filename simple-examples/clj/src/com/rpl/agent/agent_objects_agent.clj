@@ -100,7 +100,7 @@
   "Run the agent objects example"
   [& _args]
   (with-open [ipc (rtest/create-ipc)]
-    (rtest/launch-module! ipc AgentObjectsModule {:tasks 2 :threads 1})
+    (rtest/launch-module! ipc AgentObjectsModule {:tasks 1 :threads 1})
 
     (let [manager (aor/agent-manager ipc (rama/get-module-name AgentObjectsModule))
           agent (aor/agent-client manager "AgentObjectsAgent")]

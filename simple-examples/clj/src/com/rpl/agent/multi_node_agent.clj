@@ -58,7 +58,7 @@
   "Run the multi-node agent example with various inputs"
   [& _args]
   (with-open [ipc (rtest/create-ipc)]
-    (rtest/launch-module! ipc MultiNodeAgentModule {:tasks 2 :threads 1})
+    (rtest/launch-module! ipc MultiNodeAgentModule {:tasks 1 :threads 1})
 
     (let [manager (aor/agent-manager ipc (rama/get-module-name MultiNodeAgentModule))
           agent (aor/agent-client manager "MultiNodeAgent")]

@@ -43,7 +43,7 @@
   "Run async agent example demonstrating concurrent execution"
   [& _args]
   (with-open [ipc (rtest/create-ipc)]
-    (rtest/launch-module! ipc AsyncAgentModule {:tasks 4 :threads 2})
+    (rtest/launch-module! ipc AsyncAgentModule {:tasks 1 :threads 1})
 
     (let [manager (aor/agent-manager ipc (rama/get-module-name AsyncAgentModule))
           agent (aor/agent-client manager "AsyncAgent")]

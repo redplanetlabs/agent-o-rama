@@ -36,7 +36,7 @@
   [& _args]
   ;; Create in-process cluster and launch the module
   (with-open [ipc (rtest/create-ipc)]
-    (rtest/launch-module! ipc BasicAgentModule {:tasks 2 :threads 1})
+    (rtest/launch-module! ipc BasicAgentModule {:tasks 1 :threads 1})
 
     ;; Get agent manager and client
     (let [manager (aor/agent-manager ipc (rama/get-module-name BasicAgentModule))
