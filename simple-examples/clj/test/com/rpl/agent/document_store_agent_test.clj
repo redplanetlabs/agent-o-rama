@@ -7,53 +7,46 @@
    [com.rpl.agent.document-store-agent :refer [DocumentStoreModule]]))
 
 (deftest document-store-agent-test
-  (testing "DocumentStoreAgent example produces expected results"
+  (testing "DocumentStoreAgent with simplified user profiles"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc DocumentStoreModule {:tasks 1 :threads 1})
 
       (let [manager (aor/agent-manager ipc
                                        (rama/get-module-name
                                         DocumentStoreModule))
-            agent   (aor/agent-client manager "DocumentStoreAgent")]
+            agent (aor/agent-client manager "DocumentStoreAgent")]
 
-        (testing "creates and stores user profile and product data"
+        (testing "creates and stores user profile"
           (let [result (aor/agent-invoke
                         agent
-                        {:user-id         "test-user"
-                         :profile-updates {:name  "Test User"
-                                           :email "test@example.com"
-                                           :age   25}
-                         :product-id      "test-product"
-                         :product-updates {:title    "Test Product"
-                                           :price    99.99
-                                           :category "test"}})]
-            (is (= "document-update" (:action result)))
+                        {:user-id "test-user"
+                         :profile-updates {:name "Test User"
+                                           :age 25
+                                           :preferences {:theme "dark"}}})]
             (is (= "test-user" (:user-id result)))
-            (is (= "Test User" (get-in result [:user-profile :name])))
-            (is (= "test@example.com" (get-in result [:user-profile :email])))
-            (is (= 25 (:user-age result)))
-            (is (= "test-product" (:product-id result)))
-            (is (= "Test Product" (get-in result [:product-data :title])))
-            (is (= 99.99 (:product-price result)))
-            (is (= "standard" (:recommendation result)))))
+            (is (= "Test User" (:name result)))
+            (is (= 25 (:age result)))
+            (is (= {:theme "dark"} (:preferences result)))))
 
         (testing "updates individual fields independently"
-          (let [result (aor/agent-invoke agent
-                                         {:user-id         "test-user"
-                                          :profile-updates {:age 30}  ; Only
-                                                                      ; update
-                                                                      ; age
-                                          :product-id      "test-product"
-                                          :product-updates {:price 150.0}})] ; Only
-                                                                             ; update
-                                                                             ; price
-            (is (= 30 (:user-age result)))
-            (is (= "Test User" (get-in result [:user-profile :name]))) ; Name
-                                                                       ; unchanged
-            (is (= 150.0 (:product-price result)))
-            (is (= "Test Product" (get-in result [:product-data :title]))) ; Title
-                                                                           ; unchanged
-            (is (= "premium" (:recommendation result))))) ; Should be premium
-                                                          ; now
+          (let [result (aor/agent-invoke
+                        agent
+                        {:user-id "test-user"
+                         :profile-updates {:age 30
+                                           :preferences {:notifications true}}})]
+            (is (= 30 (:age result)))
+            (is (= "Test User" (:name result))) ; Name unchanged
+            ;; Preferences should be merged
+            (is (= {:theme "dark" :notifications true} (:preferences result)))))
 
-      ))))
+        (testing "handles multiple users"
+          (let [result (aor/agent-invoke
+                        agent
+                        {:user-id "user2"
+                         :profile-updates {:name "Another User"
+                                           :age 35
+                                           :preferences {:theme "light"}}})]
+            (is (= "user2" (:user-id result)))
+            (is (= "Another User" (:name result)))
+            (is (= 35 (:age result)))
+            (is (= {:theme "light"} (:preferences result)))))))))
