@@ -944,11 +944,11 @@
 
 (defn agent-initiate
   ^AgentInvoke [^AgentClient agent-client & args]
-  (.initiate agent-client (into-array Object args)))
+  (apply c/agent-initiate agent-client args))
 
 (defn agent-initiate-async
   ^CompletableFuture [^AgentClient agent-client & args]
-  (.initiateAsync agent-client (into-array Object args)))
+  (apply c/agent-initiate-async agent-client args))
 
 (defn agent-fork
   [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]

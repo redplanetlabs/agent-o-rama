@@ -4,8 +4,12 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types])
   (:import
    [com.rpl.agentorama
+    AgentClient
+    AgentInvoke
     AgentNode
-    AgentsTopology]))
+    AgentsTopology]
+   [java.util.concurrent
+    CompletableFuture]))
 
 (defn new-agent
   [^AgentsTopology agents-topology name]
@@ -43,3 +47,11 @@
 (defn result!
   [^AgentNode agent-node val]
   (.result agent-node val))
+
+(defn agent-initiate
+  ^AgentInvoke [^AgentClient agent-client & args]
+  (.initiate agent-client (into-array Object args)))
+
+(defn agent-initiate-async
+  ^CompletableFuture [^AgentClient agent-client & args]
+  (.initiateAsync agent-client (into-array Object args)))

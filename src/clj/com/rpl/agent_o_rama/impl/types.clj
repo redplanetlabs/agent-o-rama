@@ -336,7 +336,7 @@
 
 ;; Experiments
 
-(definterface ExperimentInputSelector)
+(defprotocol ExperimentInputSelector)
 
 (drp/defrecord+ TagSelector
   [tag :- String]
@@ -352,7 +352,7 @@
    remote? :- Boolean])
 
 
-(definterface TargetSpec)
+(defprotocol TargetSpec)
 
 (drp/defrecord+ AgentTarget
   [name :- String]
@@ -360,7 +360,7 @@
 
 (drp/defrecord+ NodeTarget
   [agent-name :- String
-   node-name :- String]
+   node :- String]
   TargetSpec)
 
 
@@ -369,15 +369,18 @@
    input->args :- [String]])
 
 
-(definterface ExperimentSpec)
+(defprotocol ExperimentSpec
+  (experiment-targets [this]))
 
 (drp/defrecord+ RegularExperiment
   [target :- ExperimentTarget]
-  ExperimentSpec)
+  ExperimentSpec
+  (experiment-targets [this] [target]))
 
 (drp/defrecord+ ComparativeExperiment
   [targets :- [ExperimentTarget]]
-  ExperimentSpec)
+  ExperimentSpec
+  (experiment-targets [this] targets))
 
 ;; TODO: <<<<>>> API should be named with prefix and given a UUID7 str at the end
 ;;    - is this even a depot append? it's probably just an invoke of the experiment agent

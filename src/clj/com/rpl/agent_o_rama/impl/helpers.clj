@@ -291,6 +291,10 @@
                  ^String json-path
                  ^"[Lcom.jayway.jsonpath.Predicate;" (into-array Predicate [])))
 
+(defn read-compiled-json-path
+  [^Object obj ^JsonPath compiled]
+  (.read compiled obj))
+
 (defn compile-json-path
   [^String json-path]
   (JsonPath/compile json-path (into-array Predicate [])))

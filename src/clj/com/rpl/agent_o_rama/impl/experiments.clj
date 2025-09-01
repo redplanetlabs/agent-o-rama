@@ -11,9 +11,12 @@
    [com.rpl.rama.ops :as ops])
   (:import
    [com.rpl.agentorama
+    AgentClient
     AgentNode]
    [com.rpl.agentorama.impl
     AgentDeclaredObjectsTaskGlobal]))
+
+(def EXPERIMENTER-NAME "_aor-experimenter")
 
 (defn get-cluster-retriever
   [agent-node]
@@ -236,12 +239,18 @@
              (aor-types/->ExperimentFailure "Failure executing node" {:node node :args args} t))))
       ))))
 
+(defn convert-input->args
+  [input compiled-input->args]
+  (mapv
+   (fn [p]
+     (h/read-compiled-json-path input p))
+   compiled-input->args))
 
 (defn define-experiments-agent!
   [topology]
   (->
     topology
-    (c/new-agent "_aor-experimenter")
+    (c/new-agent EXPERIMENTER-NAME)
     (c/node
      "start"
      "root"
@@ -269,25 +278,54 @@
     (c/node
      "initiate"
      "evaluate"
-     (fn [agent-node experiment example-ids]
-       (with-retriever [agent-node
-                        {:keys [name dataset-id] :as experiment}
-                        example-ids]
+     (fn [^AgentNode agent-node {:keys [name dataset-id snapshot spec] :as experiment} example-ids]
+       (with-retriever [agent-node experiment]
          [retriever]
-         (let [datasets (datasets-pstate retriever)]
+         (let [datasets   (datasets-pstate retriever)
+               invoke-fns
+               (mapv
+                (fn [{:keys [target-spec input->args]}]
+                  (let [client (if (aor-types/AgentTarget? target-spec)
+                                 (.getAgentClient agent-node (:name target-spec))
+                                 (.getAgentClient agent-node (:agent-name target-spec)))
+                        compiled-input->args (mapv h/compile-json-path input->args)
+                       ]
+                    (fn [input]
+                      (let [args (convert-input->args input compiled-input->args)]
+                        (if (aor-types/AgentTarget? target-spec)
+                          (apply c/agent-initiate-async client args)
+                          (apply c/agent-initiate-async
+                           client
+                           {:agent-name (:agent-name target-spec)
+                            :node       (:node target-spec)
+                            :args       args})))
+                    )))
+                (aor-types/experiment-targets spec))
+               ;; TODO: <<<<>>> node type has different input format...
+               ;;   - need to pass forward to next node the agent that was invoked + the invoke ID
+               ;;   - {example-id -> [{:agent-name ...:agent-invoke  ...} ...]}
+               ;;  - need the agent clients here...
+              ]
            (reduce
             (fn [m example-id]
-                ;; TODO: <<<<>>>
-                ;;  - look at spec and initiate all agents
-                ;;    - need to fetch dataset example input
-                ;;    - need to create arguments from experiment spec input->args
-                ;;  - TODO: <<<>>>
-                ;;    - what if have an agent that can just execute a single node of another agent,
-                ;;    and package it's emits
-                ;;      - don't want the overhead of an entire other agent...
-                ;;        - could make this agent capable of doing it with a dispatch at the root...
-                ;;  - assoc into m example-id->[agent-invokes]
-                ;;      - TODO: <<<<>>> what about for individual node?
+              (let [input        (foreign-select-one
+                                  [(keypath dataset-id :snapshots snapshot example-id :input)]
+                                  datasets)
+
+                    invoke-infos nil]
+
+
+
+              )
+              ;; TODO: <<<<>>>
+              ;;  - look at spec and initiate all agents
+              ;;    - need to fetch dataset example input
+              ;;    - need to create arguments from experiment spec input->args
+              ;;  - for node invoke, initiate self agent with map with keys :agent-name :node
+              ;;  :args
+              ;;  - assoc into m example-id->[agent-invokes]
+              ;;      - TODO: <<<<>>> what about for individual node?
+              ;; TODO: <<<<<>>> result should also include the relevant agent invoke
             )
             {}
             example-ids
