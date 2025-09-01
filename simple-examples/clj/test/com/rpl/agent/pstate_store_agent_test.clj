@@ -11,8 +11,9 @@
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc PStateStoreModule {:tasks 1 :threads 1})
 
-      (let [manager (aor/agent-manager ipc
-                                       (rama/get-module-name PStateStoreModule))
+      (let [manager (aor/agent-manager
+                     ipc
+                     (rama/get-module-name PStateStoreModule))
             agent   (aor/agent-client manager "PStateStoreAgent")]
 
         (testing "creates company structure and first employee"
@@ -55,10 +56,10 @@
                         agent
                         {:company-id "test-corp"
                          :dept-id    "tech"
-                         :employee   {:id       "emp1"  ; Same ID - should
-                                                        ; update
+                         :employee   {:id       "emp1" ; Same ID - should
+                                                       ; update
                                       :name     "Test Employee"
-                                      :salary   100000  ; Updated salary
+                                      :salary   100000 ; Updated salary
                                       :metadata {:level "principal"}}})]
             (is (= 2 (:employee-count result))) ; Still 2 employees
             (is (= 95000 (:average-salary result))) ; (100000 + 90000) / 2
