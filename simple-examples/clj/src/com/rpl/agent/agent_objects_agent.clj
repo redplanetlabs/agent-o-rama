@@ -1,6 +1,6 @@
 (ns com.rpl.agent.agent-objects-agent
   "Demonstrates agent objects for sharing resources across agent nodes.
-  
+
   Features demonstrated:
   - declare-agent-object: Static shared objects
   - declare-agent-object-builder: Dynamic object creation with setup context
@@ -17,8 +17,10 @@
 ;;; Simple service that uses configuration
 (defrecord MessageService [config counter]
   Object
-  (toString [_] (format "MessageService[endpoint=%s, counter=%d]"
-                        (:api-endpoint config) @counter)))
+  (toString [_]
+    (format "MessageService[endpoint=%s, counter=%d]"
+            (:api-endpoint config)
+            @counter)))
 
 (defn create-message-service
   "Factory function for MessageService"
@@ -51,50 +53,59 @@
    topology
    "system-info"
    (fn [setup]
-     (let [config (aor/get-agent-object setup "app-config")
+     (let [config  (aor/get-agent-object setup "app-config")
            version (aor/get-agent-object setup "app-version")]
-       {:config config
-        :version version
+       {:config       config
+        :version      version
         :startup-time (System/currentTimeMillis)
-        :environment "development"})))
+        :environment  "development"})))
 
   (-> topology
       (aor/new-agent "AgentObjectsAgent")
 
       ;; First node: access static objects
-      (aor/node "access-static" "use-service"
+      (aor/node "access-static"
+                "use-service"
                 (fn [agent-node input]
-                  (let [config (aor/get-agent-object agent-node "app-config")
+                  (let [config  (aor/get-agent-object agent-node "app-config")
                         version (aor/get-agent-object agent-node "app-version")]
                     (println "Static objects accessed:")
                     (println "  Config:" config)
                     (println "  Version:" version)
-                    (aor/emit! agent-node "use-service" {:input input
-                                                         :config config
-                                                         :version version}))))
+                    (aor/emit! agent-node
+                               "use-service"
+                               {:input   input
+                                :config  config
+                                :version version}))))
 
       ;; Second node: use dynamic objects
-      (aor/node "use-service" "combine-info"
-                (fn [agent-node {:keys [input config version]}]
-                  (let [service (aor/get-agent-object agent-node "message-service")]
-                    ;; Use the service (increment counter)
-                    (swap! (:counter service) inc)
-                    (println "Service used:" service)
-                    (aor/emit! agent-node "combine-info" {:input input
-                                                          :service-state service
-                                                          :usage-count @(:counter service)}))))
+      (aor/node
+       "use-service"
+       "combine-info"
+       (fn [agent-node {:keys [input config version]}]
+         (let [service (aor/get-agent-object agent-node "message-service")]
+           ;; Use the service (increment counter)
+           (swap! (:counter service) inc)
+           (println "Service used:" service)
+           (aor/emit! agent-node
+                      "combine-info"
+                      {:input         input
+                       :service-state service
+                       :usage-count   @(:counter service)}))))
 
       ;; Final node: combine all information
-      (aor/node "combine-info" nil
-                (fn [agent-node {:keys [input service-state usage-count]}]
-                  (let [system-info (aor/get-agent-object agent-node "system-info")]
-                    (println "System info:" system-info)
-                    (let [result {:processed-input input
-                                  :service-info (str service-state)
-                                  :usage-count usage-count
-                                  :system-info system-info
-                                  :processed-at (System/currentTimeMillis)}]
-                      (aor/result! agent-node result)))))))
+      (aor/node
+       "combine-info"
+       nil
+       (fn [agent-node {:keys [input service-state usage-count]}]
+         (let [system-info (aor/get-agent-object agent-node "system-info")]
+           (println "System info:" system-info)
+           (let [result {:processed-input input
+                         :service-info    (str service-state)
+                         :usage-count     usage-count
+                         :system-info     system-info
+                         :processed-at    (System/currentTimeMillis)}]
+             (aor/result! agent-node result)))))))
 
 (defn -main
   "Run the agent objects example"
@@ -102,8 +113,9 @@
   (with-open [ipc (rtest/create-ipc)]
     (rtest/launch-module! ipc AgentObjectsModule {:tasks 1 :threads 1})
 
-    (let [manager (aor/agent-manager ipc (rama/get-module-name AgentObjectsModule))
-          agent (aor/agent-client manager "AgentObjectsAgent")]
+    (let [manager (aor/agent-manager ipc
+                                     (rama/get-module-name AgentObjectsModule))
+          agent   (aor/agent-client manager "AgentObjectsAgent")]
 
       (println "Agent Objects Example:")
 
@@ -121,4 +133,5 @@
         (println "Result 3:" result3))
 
       (println "\nNotice how the usage-count increases across invocations,")
-      (println "demonstrating that agent objects maintain state between invocations."))))
+      (println
+       "demonstrating that agent objects maintain state between invocations."))))

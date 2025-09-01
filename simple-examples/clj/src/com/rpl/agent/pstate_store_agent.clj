@@ -1,6 +1,6 @@
 (ns com.rpl.agent.pstate-store-agent
   "Demonstrates PState store operations for complex path-based data structures.
-  
+
   Features demonstrated:
   - declare-pstate-store: Create a PState store with schema
   - get-store: Access PState stores from agent nodes
@@ -11,192 +11,264 @@
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.store :as store]
-   [com.rpl.rama :as rama]
-   [com.rpl.rama.test :as rtest])
-  (:use [com.rpl.rama]
-        [com.rpl.rama.path]))
+   [com.rpl.rama :refer :all :as rama]
+   [com.rpl.rama.path :refer :all]
+   [com.rpl.rama.test :as rtest]))
 
 ;;; Agent module demonstrating PState store usage
 (aor/defagentmodule PStateStoreModule
   [topology]
-  
+
   ;; Declare PState store for hierarchical organization data
-  ;; Schema: {company-id -> {:name String, :departments {dept-id -> {:name String, :employees [{:id String, :name String, :salary Long}]}}}}
-  (aor/declare-pstate-store topology "organizations"
-                            {String {:name String
-                                     :departments {String {:name String
-                                                           :employees [{:id String
-                                                                        :name String  
-                                                                        :salary Long
-                                                                        :metadata Object}]}}}})
-  
-  (-> topology
-      (aor/new-agent "PStateStoreAgent")
-      
-      ;; Node to initialize or update organization data
-      (aor/node "update-org" "query-data"
-                (fn [agent-node {:keys [company-id company-name dept-id dept-name employee]}]
-                  (let [org-store (aor/get-store agent-node "organizations")]
-                    
-                    ;; Initialize company if it doesn't exist
-                    (when company-name
-                      (store/pstate-transform! [company-id :name] org-store company-id
-                                               (fn [existing] (or existing company-name))))
-                    
-                    ;; Initialize department if it doesn't exist
-                    (when dept-name
-                      (store/pstate-transform! [company-id :departments dept-id :name] org-store company-id
-                                               (fn [existing] (or existing dept-name))))
-                    
-                    ;; Add or update employee
-                    (when employee
-                      (let [emp-id (:id employee)]
-                        ;; Check if employee already exists
-                        (let [existing-employees (store/pstate-select [company-id :departments dept-id :employees] org-store company-id)]
-                          (if (some #(= (:id %) emp-id) existing-employees)
-                            ;; Update existing employee
-                            (store/pstate-transform! [company-id :departments dept-id :employees 
-                                                      (fn [emp] (= (:id emp) emp-id))] org-store company-id
-                                                     (constantly employee))
-                            ;; Add new employee
-                            (store/pstate-transform! [company-id :departments dept-id :employees] org-store company-id
-                                                     (fn [employees] (conj (or employees []) employee)))))))
-                    
-                    (println (format "Updated organization %s, department %s" company-id dept-id))
-                    (aor/emit! agent-node "query-data" {:company-id company-id 
-                                                        :dept-id dept-id
-                                                        :employee-id (when employee (:id employee))}))))
-      
-      ;; Node to query and analyze data
-      (aor/node "query-data" "calculate-metrics"
-                (fn [agent-node {:keys [company-id dept-id employee-id]}]
-                  (let [org-store (aor/get-store agent-node "organizations")]
-                    
-                    ;; Query various data paths
-                    (let [company-name (store/pstate-select [company-id :name] org-store company-id)
-                          dept-name (store/pstate-select [company-id :departments dept-id :name] org-store company-id)
-                          all-employees (store/pstate-select [company-id :departments dept-id :employees] org-store company-id)
-                          specific-employee (when employee-id
-                                              (store/pstate-select [company-id :departments dept-id :employees
-                                                                    (fn [emp] (= (:id emp) employee-id))] org-store company-id))
-                          all-departments (store/pstate-select [company-id :departments] org-store company-id)]
-                      
-                      (println (format "Queried %s -> %s: %d employees" 
-                                       company-name dept-name (count all-employees)))
-                      
-                      (aor/emit! agent-node "calculate-metrics" 
-                                 {:company-id company-id
-                                  :company-name company-name
-                                  :dept-id dept-id
-                                  :dept-name dept-name
-                                  :all-employees all-employees
-                                  :specific-employee specific-employee
-                                  :all-departments all-departments})))))
-      
-      ;; Final node to calculate metrics and return result
-      (aor/node "calculate-metrics" nil
-                (fn [agent-node {:keys [company-id company-name dept-id dept-name 
-                                        all-employees specific-employee all-departments]}]
-                  (let [org-store (aor/get-store agent-node "organizations")]
-                    
-                    ;; Calculate department metrics
-                    (let [total-employees (count all-employees)
-                          avg-salary (if (seq all-employees)
-                                       (/ (reduce + (map :salary all-employees)) total-employees)
-                                       0)
-                          dept-count (count (keys all-departments))
-                          
-                          ;; Demonstrate complex path querying - get all employee names across all departments
-                          all-company-employees (store/pstate-select [company-id :departments ALL :employees ALL :name] 
-                                                                      org-store company-id)
-                          
-                          result {:action "pstate-query"
-                                  :company-id company-id
-                                  :company-name company-name
-                                  :dept-id dept-id
-                                  :dept-name dept-name
-                                  :employee-count total-employees
-                                  :average-salary avg-salary
-                                  :department-count dept-count
-                                  :all-company-employee-names all-company-employees
-                                  :queried-employee specific-employee
-                                  :processed-at (System/currentTimeMillis)}]
-                      
-                      (aor/result! agent-node result))))))))
+
+  ;; Schema:
+  ;; {company-id ->
+  ;;   {:name String,
+  ;;    :departments {dept-id ->
+  ;; {:name String, :employees [{:id String, :name String, :salary Long}]}}}}
+  (aor/declare-pstate-store
+   topology
+   "$$organizations"
+   {String {:name        String
+            :departments {String {:name      String
+                                  :employees [{:id       String
+                                               :name     String
+                                               :salary   Long
+                                               :metadata Object}]}}}})
+
+  (->
+    topology
+    (aor/new-agent "PStateStoreAgent")
+
+    ;; Node to initialize or update organization data
+    (aor/node
+     "update-org"
+     "query-data"
+     (fn [agent-node
+          {:keys [company-id company-name dept-id dept-name employee]}]
+       (let [org-store (aor/get-store agent-node "$$organizations")]
+
+         ;; Initialize company if it doesn't exist
+         (when company-name
+           (store/pstate-transform!
+            [company-id :name]
+            org-store
+            company-id
+            (fn [existing] (or existing company-name))))
+
+         ;; Initialize department if it doesn't exist
+         (when dept-name
+           (store/pstate-transform!
+            [company-id :departments dept-id :name]
+            org-store
+            company-id
+            (fn [existing] (or existing dept-name))))
+
+         ;; Add or update employee
+         (when employee
+           (let [emp-id (:id employee)]
+             ;; Check if employee already exists
+             (let [existing-employees (store/pstate-select
+                                       [company-id :departments dept-id
+                                        :employees]
+                                       org-store
+                                       company-id)]
+               (if (some #(= (:id %) emp-id) existing-employees)
+                 ;; Update existing employee
+                 (store/pstate-transform!
+                  [company-id :departments dept-id :employees
+                   (fn [emp] (= (:id emp) emp-id))]
+                  org-store
+                  company-id
+                  (constantly employee))
+                 ;; Add new employee
+                 (store/pstate-transform!
+                  [company-id :departments dept-id :employees]
+                  org-store
+                  company-id
+                  (fn [employees] (conj (or employees []) employee)))))))
+
+         (println
+          (format "Updated organization %s, department %s" company-id dept-id))
+         (aor/emit! agent-node
+                    "query-data"
+                    {:company-id  company-id
+                     :dept-id     dept-id
+                     :employee-id (when employee (:id employee))}))))
+
+    ;; Node to query and analyze data
+    (aor/node
+     "query-data"
+     "calculate-metrics"
+     (fn [agent-node {:keys [company-id dept-id employee-id]}]
+       (let [org-store (aor/get-store agent-node "$$organizations")]
+
+         ;; Query various data paths
+         (let [company-name      (store/pstate-select
+                                  [company-id :name]
+                                  org-store
+                                  company-id)
+               dept-name         (store/pstate-select
+                                  [company-id :departments dept-id :name]
+                                  org-store
+                                  company-id)
+               all-employees     (store/pstate-select
+                                  [company-id :departments dept-id :employees]
+                                  org-store
+                                  company-id)
+               specific-employee (when employee-id
+                                   (store/pstate-select
+                                    [company-id :departments dept-id :employees
+                                     (fn [emp] (= (:id emp) employee-id))]
+                                    org-store
+                                    company-id))
+               all-departments   (store/pstate-select
+                                  [company-id :departments]
+                                  org-store
+                                  company-id)]
+
+           (println (format "Queried %s -> %s: %d employees"
+                            company-name
+                            dept-name
+                            (count all-employees)))
+
+           (aor/emit! agent-node
+                      "calculate-metrics"
+                      {:company-id        company-id
+                       :company-name      company-name
+                       :dept-id           dept-id
+                       :dept-name         dept-name
+                       :all-employees     all-employees
+                       :specific-employee specific-employee
+                       :all-departments   all-departments})))))
+
+    ;; Final node to calculate metrics and return result
+    (aor/node
+     "calculate-metrics"
+     nil
+     (fn [agent-node
+          {:keys [company-id company-name dept-id dept-name
+                  all-employees specific-employee all-departments]}]
+       (let [org-store (aor/get-store agent-node "$$organizations")]
+
+         ;; Calculate department metrics
+         (let [total-employees (count all-employees)
+               avg-salary      (if (seq all-employees)
+                                 (/ (reduce + (map :salary all-employees))
+                                    total-employees)
+                                 0)
+               dept-count      (count (keys all-departments))
+
+               ;; Demonstrate complex path querying - get all
+               ;; employee names across all departments
+               all-company-employees (store/pstate-select
+                                      [company-id :departments ALL :employees
+                                       ALL :name]
+                                      org-store
+                                      company-id)
+
+               result          {:action           "pstate-query"
+                                :company-id       company-id
+                                :company-name     company-name
+                                :dept-id          dept-id
+                                :dept-name        dept-name
+                                :employee-count   total-employees
+                                :average-salary   avg-salary
+                                :department-count dept-count
+                                :all-company-employee-names
+                                all-company-employees
+                                :queried-employee specific-employee
+                                :processed-at     (System/currentTimeMillis)}]
+
+           (aor/result! agent-node result)))))))
 
 (defn -main
   "Run the PState store agent example"
   [& _args]
   (with-open [ipc (rtest/create-ipc)]
     (rtest/launch-module! ipc PStateStoreModule {:tasks 1 :threads 1})
-    
-    (let [manager (aor/agent-manager ipc (rama/get-module-name PStateStoreModule))
-          agent (aor/agent-client manager "PStateStoreAgent")]
-      
+
+    (let [manager (aor/agent-manager ipc
+                                     (rama/get-module-name PStateStoreModule))
+          agent   (aor/agent-client manager "PStateStoreAgent")]
+
       (println "PState Store Agent Example:")
-      
+
       ;; First invocation: Create company and first employee
       (println "\n--- Creating company and first employee ---")
-      (let [result1 (aor/agent-invoke agent 
-                                      {:company-id "tech-corp"
-                                       :company-name "TechCorp Inc"
-                                       :dept-id "engineering"
-                                       :dept-name "Engineering"
-                                       :employee {:id "emp001"
-                                                  :name "Alice Johnson"
-                                                  :salary 95000
-                                                  :metadata {:level "senior" :skills ["clojure" "java"]}}})]
+      (let [result1 (aor/agent-invoke
+                     agent
+                     {:company-id   "tech-corp"
+                      :company-name "TechCorp Inc"
+                      :dept-id      "engineering"
+                      :dept-name    "Engineering"
+                      :employee     {:id       "emp001"
+                                     :name     "Alice Johnson"
+                                     :salary   95000
+                                     :metadata {:level  "senior"
+                                                :skills ["clojure" "java"]}}})]
         (println "Result 1:")
         (println "  Company:" (:company-name result1))
         (println "  Department:" (:dept-name result1))
         (println "  Employee count:" (:employee-count result1))
         (println "  Average salary:" (:average-salary result1)))
-      
+
       ;; Second invocation: Add another employee to same department
       (println "\n--- Adding second employee ---")
-      (let [result2 (aor/agent-invoke agent
-                                      {:company-id "tech-corp"
-                                       :dept-id "engineering"
-                                       :employee {:id "emp002"
-                                                  :name "Bob Smith"
-                                                  :salary 85000
-                                                  :metadata {:level "mid" :skills ["python" "sql"]}}})]
+      (let [result2 (aor/agent-invoke
+                     agent
+                     {:company-id "tech-corp"
+                      :dept-id    "engineering"
+                      :employee   {:id       "emp002"
+                                   :name     "Bob Smith"
+                                   :salary   85000
+                                   :metadata {:level  "mid"
+                                              :skills ["python" "sql"]}}})]
         (println "Result 2:")
         (println "  Employee count:" (:employee-count result2))
         (println "  Average salary:" (:average-salary result2))
-        (println "  All company employees:" (:all-company-employee-names result2)))
-      
+        (println "  All company employees:"
+                 (:all-company-employee-names result2)))
+
       ;; Third invocation: Add different department
       (println "\n--- Adding marketing department ---")
-      (let [result3 (aor/agent-invoke agent
-                                      {:company-id "tech-corp"
-                                       :dept-id "marketing"
-                                       :dept-name "Marketing"
-                                       :employee {:id "emp003"
-                                                  :name "Carol Davis"
-                                                  :salary 75000
-                                                  :metadata {:level "manager" :skills ["strategy" "analytics"]}}})]
+      (let [result3 (aor/agent-invoke
+                     agent
+                     {:company-id "tech-corp"
+                      :dept-id    "marketing"
+                      :dept-name  "Marketing"
+                      :employee   {:id       "emp003"
+                                   :name     "Carol Davis"
+                                   :salary   75000
+                                   :metadata {:level  "manager"
+                                              :skills ["strategy"
+                                                       "analytics"]}}})]
         (println "Result 3:")
         (println "  Department count:" (:department-count result3))
         (println "  Current dept employee count:" (:employee-count result3))
-        (println "  All company employees:" (:all-company-employee-names result3)))
-      
+        (println "  All company employees:"
+                 (:all-company-employee-names result3)))
+
       ;; Fourth invocation: Update existing employee
       (println "\n--- Updating employee salary ---")
-      (let [result4 (aor/agent-invoke agent
-                                      {:company-id "tech-corp"
-                                       :dept-id "engineering"
-                                       :employee {:id "emp001"  ; Same ID - will update
-                                                  :name "Alice Johnson"
-                                                  :salary 105000  ; Salary increase
-                                                  :metadata {:level "principal" :skills ["clojure" "java" "architecture"]}}})]
+      (let [result4 (aor/agent-invoke
+                     agent
+                     {:company-id "tech-corp"
+                      :dept-id    "engineering"
+                      :employee   {:id       "emp001" ; Same ID - will update
+                                   :name     "Alice Johnson"
+                                   :salary   105000 ; Salary increase
+                                   :metadata {:level  "principal"
+                                              :skills ["clojure" "java"
+                                                       "architecture"]}}})]
         (println "Result 4:")
         (println "  Employee count:" (:employee-count result4))
         (println "  Average salary:" (:average-salary result4))
         (println "  Updated employee:" (:queried-employee result4)))
-      
+
       (println "\nNotice how:")
       (println "- Complex nested data structures are supported")
       (println "- Path-based querying allows precise data access")
       (println "- Updates can target specific nested elements")
-      (println "- Cross-department queries are possible with path expressions"))))
+      (println
+       "- Cross-department queries are possible with path expressions"))))
