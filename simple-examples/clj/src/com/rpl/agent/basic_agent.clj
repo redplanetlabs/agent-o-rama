@@ -1,5 +1,5 @@
 (ns com.rpl.agent.basic-agent
-  "Demonstrates basic agent definition with a single node and synchronous invocation.
+  "Demonstrates basic agent definition with a single node and invocation.
 
   Features demonstrated:
   - defagentmodule: Define an agent module
@@ -24,30 +24,27 @@
       (aor/new-agent "BasicAgent")
       (aor/node "process"
                 nil
-                (fn [agent-node input]
-                  ;; Simple processing: uppercase the input string
-                  (let [result (if (string? input)
-                                 (.toUpperCase input)
-                                 (str "PROCESSED: " input))]
+                (fn [agent-node user-name]
+                  ;; Create a welcome message for the user
+                  (let [result (str "Welcome to agent-o-rama, " user-name "!")]
                     ;; Return the final result
                     (aor/result! agent-node result))))))
 
 (defn -main
   "Run the basic agent example with sample input"
   [& _args]
-  ;; Create in-process cluster and launch the module
+  ;; Create in-process cluster
   (with-open [ipc (rtest/create-ipc)]
+    ;; launch the agent module
     (rtest/launch-module! ipc BasicAgentModule {:tasks 1 :threads 1})
 
     ;; Get agent manager and client
-    (let [manager (aor/agent-manager ipc
-                                     (rama/get-module-name BasicAgentModule))
+    (let [manager (aor/agent-manager
+                   ipc
+                   (rama/get-module-name BasicAgentModule))
           agent   (aor/agent-client manager "BasicAgent")]
 
-      ;; Invoke agent synchronously with sample inputs
+      ;; Invoke agent synchronously with sample user names
       (println "Basic Agent Results:")
-      (println "Input: \"hello world\" -> Result:"
-               (aor/agent-invoke agent "hello world"))
-      (println "Input: 42 -> Result:" (aor/agent-invoke agent 42))
-      (println "Input: [:a :b :c] -> Result:"
-               (aor/agent-invoke agent [:a :b :c])))))
+      (println "User: \"Alice\" -> Result:" (aor/agent-invoke agent "Alice"))
+      (println "User: \"Bob\" -> Result:" (aor/agent-invoke agent "Bob")))))
