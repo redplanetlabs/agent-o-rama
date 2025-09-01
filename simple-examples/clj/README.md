@@ -6,7 +6,7 @@ This directory contains isolated examples demonstrating individual agent-o-rama 
 
 ### Foundation Examples
 1. **`basic_agent`** - Agent definition, single node, sync invocation
-2. **`multi_node_agent`** - Agent graph with multiple nodes and emissions  
+2. **`multi_node_agent`** - Agent graph with multiple nodes and emissions
 3. **`async_agent`** - Asynchronous initiation and result handling
 
 ### State Management Examples
@@ -34,7 +34,7 @@ This directory contains isolated examples demonstrating individual agent-o-rama 
 
 ## Running Examples
 
-Each example is a self-contained namespace with a `-main` function. 
+Each example is a self-contained namespace with a `-main` function.
 
 ### From the simple-examples/clj directory:
 
@@ -53,6 +53,11 @@ clj -M -m com.rpl.agent.aggregation-agent
 clj -M -m com.rpl.agent.multi-agg-agent
 clj -M -m com.rpl.agent.forking-agent
 clj -M -m com.rpl.agent.tools-agent
+clj -M -m com.rpl.agent.dataset-agent
+clj -M -m com.rpl.agent.evaluator-agent
+clj -M -m com.rpl.agent.langchain4j-agent
+clj -M -m com.rpl.agent.ui-monitoring-agent
+clj -M -m com.rpl.agent.cluster-agent
 
 # Run tests
 clj -M:test
@@ -75,6 +80,11 @@ lein with-profile +dev run -m com.rpl.agent.aggregation-agent
 lein with-profile +dev run -m com.rpl.agent.multi-agg-agent
 lein with-profile +dev run -m com.rpl.agent.forking-agent
 lein with-profile +dev run -m com.rpl.agent.tools-agent
+lein with-profile +dev run -m com.rpl.agent.dataset-agent
+lein with-profile +dev run -m com.rpl.agent.evaluator-agent
+lein with-profile +dev run -m com.rpl.agent.langchain4j-agent
+lein with-profile +dev run -m com.rpl.agent.ui-monitoring-agent
+lein with-profile +dev run -m com.rpl.agent.cluster-agent
 
 # Or from REPL
 lein with-profile +dev repl
@@ -91,7 +101,7 @@ Examples are ordered to build understanding progressively:
 - **Foundation** (1-3): Core agent system required for all other examples
 - **State Management** (4-7): Independent storage and resource patterns
 - **Communication** (8-9): Real-time interaction patterns
-- **Advanced Patterns** (10-13): Complex execution and integration patterns  
+- **Advanced Patterns** (10-13): Complex execution and integration patterns
 - **System Features** (14-18): Full-system capabilities and cross-module features
 
 Each example includes detailed comments explaining the demonstrated features and their usage patterns.
