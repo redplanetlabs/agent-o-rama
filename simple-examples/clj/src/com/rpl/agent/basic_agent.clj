@@ -22,13 +22,14 @@
   ;; Create agent with single node that processes input and returns result
   (-> topology
       (aor/new-agent "BasicAgent")
-      (aor/node "process"
-                nil
-                (fn [agent-node user-name]
-                  ;; Create a welcome message for the user
-                  (let [result (str "Welcome to agent-o-rama, " user-name "!")]
-                    ;; Return the final result
-                    (aor/result! agent-node result))))))
+      (aor/node
+       "process"
+       nil
+       (fn [agent-node user-name] ; user-name is the value in the agent-invoke
+         ;; Create a welcome message for the user
+         (let [result (str "Welcome to agent-o-rama, " user-name "!")]
+           ;; Return the final result
+           (aor/result! agent-node result))))))
 
 (defn -main
   "Run the basic agent example with sample input"

@@ -5,81 +5,68 @@
   - Agent graph with multiple connected nodes
   - emit!: Send data from one node to another
   - Node chaining and data flow
-  - Processing pipeline through graph traversal"
+  - Multi-step greeting process through graph traversal"
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.rama :as rama]
    [com.rpl.rama.test :as rtest]))
 
-;;; Multi-node agent demonstrating data flow through graph
+;;; Multi-node agent demonstrating greeting workflow through graph
 (aor/defagentmodule MultiNodeAgentModule
   [topology]
 
-  (-> topology
-      (aor/new-agent "MultiNodeAgent")
+  ;; Thread the agent through multiple node definitions using ->
+  ;; Each aor/node call returns a modified agent with the new node added
+  (-> (aor/new-agent topology "MultiNodeAgent")
 
-      ;; First node: validate and parse input
+      ;; First node: receive user name from the invoke call and forward it
       (aor/node
-       "validate"
-       "process"
-       (fn [agent-node input]
-         (println "Validate node processing:" input)
-         (cond
-           (number? input)
-           (aor/emit! agent-node "process" {:type :number :value input})
+       "receive"
+       "personalize" ; specifies the node we emit to
+       (fn [agent-node user-name]
+         (aor/emit! agent-node "personalize" user-name)))
 
-           (string? input)
-           (aor/emit! agent-node "process" {:type :string :value input})
+      ;; Second node: personalize the greeting message
+      (aor/node
+       "personalize"
+       "finalize" ; next node in the workflow
+       (fn [agent-node user-name]
+         (let [greeting (str "Hello, " user-name "!")]
+           ;; we emit as many values as the next node expects as input
+           (aor/emit! agent-node "finalize" user-name greeting))))
 
-           :else
-           (aor/emit! agent-node "process" {:type :other :value input}))))
-
-      ;; Second node: process based on type
-      (aor/node "process"
-                "finalize"
-                (fn [agent-node {:keys [type value]}]
-                  (println "Process node handling type:" type "value:" value)
-                  (let [processed (case type
-                                    :number (* value 2)
-                                    :string (.toUpperCase value)
-                                    :other (str "UNKNOWN: " value))]
-                    (aor/emit! agent-node
-                               "finalize"
-                               {:original  value
-                                :processed processed
-                                :type      type}))))
-
-      ;; Final node: format result
-      (aor/node "finalize"
-                nil
-                (fn [agent-node {:keys [original processed type]}]
-                  (println "Finalize node creating result")
-                  (let [result {:input          original
-                                :output         processed
-                                :transformation (name type)
-                                :timestamp      (System/currentTimeMillis)}]
-                    (aor/result! agent-node result))))))
+      ;; Final node: create complete welcome message
+      (aor/node
+       "finalize"
+       nil ; indicates this is a terminal node
+       (fn [agent-node user-name greeting] ; two values from emit!
+         (let [result (str greeting
+                           " Welcome to agent-o-rama! "
+                           "Thanks for joining us, "
+                           user-name
+                           ".")]
+           (aor/result! agent-node result))))))
 
 (defn -main
-  "Run the multi-node agent example with various inputs"
+  "Run the multi-node agent example with user names"
   [& _args]
   (with-open [ipc (rtest/create-ipc)]
     (rtest/launch-module! ipc MultiNodeAgentModule {:tasks 1 :threads 1})
 
-    (let [manager (aor/agent-manager ipc
-                                     (rama/get-module-name
-                                      MultiNodeAgentModule))
+    (let [manager (aor/agent-manager
+                   ipc
+                   (rama/get-module-name MultiNodeAgentModule))
           agent   (aor/agent-client manager "MultiNodeAgent")]
 
       (println "Multi-Node Agent Results:")
-      (println "\n--- Processing number ---")
-      (let [result1 (aor/agent-invoke agent 21)]
+      (println "\n--- Greeting Alice ---")
+      (let [result1 (aor/agent-invoke agent "Alice")]
         (println "Result:" result1))
 
-      (println "\n--- Processing string ---")
-      (let [result2 (aor/agent-invoke agent "hello world")]
+      (println "\n--- Greeting Bob ---")
+      (let [result2 (aor/agent-invoke agent "Bob")]
         (println "Result:" result2))
 
-      (println "\n--- Processing other ---")
-      (let [result3 (aor/agent-invoke agent [:a :b :c])]
+      (println "\n--- Greeting Charlie ---")
+      (let [result3 (aor/agent-invoke agent "Charlie")]
         (println "Result:" result3)))))

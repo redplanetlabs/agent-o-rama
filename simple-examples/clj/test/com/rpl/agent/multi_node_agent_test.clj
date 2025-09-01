@@ -7,21 +7,26 @@
    [com.rpl.agent.multi-node-agent :refer [MultiNodeAgentModule]]))
 
 (deftest multi-node-agent-test
-  (testing "MultiNodeAgent example produces expected results"
+  (testing "MultiNodeAgent greeting workflow"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc MultiNodeAgentModule {:tasks 1 :threads 1})
-      
-      (let [manager (aor/agent-manager ipc (rama/get-module-name MultiNodeAgentModule))
-            agent (aor/agent-client manager "MultiNodeAgent")]
-        
-        (testing "number processing through nodes"
-          (let [result (aor/agent-invoke agent 21)]
-            (is (= 21 (:input result)))
-            (is (= 42 (:output result)))
-            (is (= "number" (:transformation result)))))
-        
-        (testing "string processing through nodes"
-          (let [result (aor/agent-invoke agent "hello")]
-            (is (= "hello" (:input result)))
-            (is (= "HELLO" (:output result)))
-            (is (= "string" (:transformation result)))))))))
+
+      (let [manager (aor/agent-manager
+                     ipc
+                     (rama/get-module-name
+                      MultiNodeAgentModule))
+            agent   (aor/agent-client manager "MultiNodeAgent")]
+
+        (testing "creates complete greeting message for Alice"
+          (let [result (aor/agent-invoke agent "Alice")]
+            (is
+             (=
+              "Hello, Alice! Welcome to agent-o-rama! Thanks for joining us, Alice."
+              result))))
+
+        (testing "creates complete greeting message for Bob"
+          (let [result (aor/agent-invoke agent "Bob")]
+            (is
+             (=
+              "Hello, Bob! Welcome to agent-o-rama! Thanks for joining us, Bob."
+              result))))))))
