@@ -32,7 +32,7 @@
           (let [start-idx (* chunk-num chunk-size)
                 end-idx (min (+ start-idx chunk-size) data-size)
                 items (range start-idx end-idx)
-                progress (/ (inc chunk-num) total-chunks)]
+                progress (double (/ (inc chunk-num) total-chunks))]
 
              ;; Simulate processing time
             (Thread/sleep 100)
