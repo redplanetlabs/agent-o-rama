@@ -10,21 +10,15 @@
   (testing "AsyncAgent example produces expected results"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc AsyncAgentModule {:tasks 1 :threads 1})
-      
-      (let [manager (aor/agent-manager ipc (rama/get-module-name AsyncAgentModule))
-            agent (aor/agent-client manager "AsyncAgent")]
-        
-        (testing "synchronous invocation produces expected result structure"
-          (let [result (aor/agent-invoke agent {:task-name "Test Task" :duration 50})]
-            (is (= "Test Task" (:task result)))
-            (is (= 50 (:expected-duration result)))
-            (is (number? (:actual-duration result)))
-            (is (number? (:completed-at result)))))
-        
-        (testing "asynchronous initiation and result produces expected structure"
-          (let [invoke (aor/agent-initiate agent {:task-name "Async Task" :duration 30})
+      (let [manager (aor/agent-manager
+                     ipc
+                     (rama/get-module-name AsyncAgentModule))
+            agent   (aor/agent-client manager "AsyncAgent")]
+        (testing "synchronous invocation produces expected result"
+          (let [result (aor/agent-invoke agent "Test Task")]
+            (is (= "Task 'Test Task' completed successfully" result))))
+
+        (testing "asynchronous initiation and result produces expected result"
+          (let [invoke (aor/agent-initiate agent "Async Task")
                 result (aor/agent-result agent invoke)]
-            (is (= "Async Task" (:task result)))
-            (is (= 30 (:expected-duration result)))
-            (is (number? (:actual-duration result)))
-            (is (number? (:completed-at result)))))))))
+            (is (= "Task 'Async Task' completed successfully" result))))))))
