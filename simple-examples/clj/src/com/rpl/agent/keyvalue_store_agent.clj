@@ -21,62 +21,52 @@
   ;; Declare a key-value store for counters (String -> Long)
   (aor/declare-key-value-store topology "counters" String Long)
   
-  ;; Declare a key-value store for user data (String -> Object)
-  (aor/declare-key-value-store topology "user-data" String Object)
-  
   (-> topology
       (aor/new-agent "KeyValueStoreAgent")
       
-      ;; Node to increment a counter
-      (aor/node "increment-counter" "get-user-data"
-                (fn [agent-node {:keys [counter-name user-id]}]
+      ;; Single node to demonstrate store operations
+      (aor/node "manage-counter" nil
+                (fn [agent-node {:keys [counter-name operation value]}]
                   (let [counters-store (aor/get-store agent-node "counters")]
-                    ;; Get current value or default to 0
-                    (let [current-count (or (store/get counters-store counter-name) 0)
-                          new-count (inc current-count)]
-                      ;; Update the counter
-                      (store/put! counters-store counter-name new-count)
-                      (println (format "Counter '%s' incremented to %d" counter-name new-count))
-                      (aor/emit! agent-node "get-user-data" {:counter-name counter-name
-                                                             :new-count new-count
-                                                             :user-id user-id})))))
-      
-      ;; Node to manage user data
-      (aor/node "get-user-data" "finalize"
-                (fn [agent-node {:keys [counter-name new-count user-id]}]
-                  (let [user-store (aor/get-store agent-node "user-data")]
-                    ;; Get existing user data or create new
-                    (let [user-data (or (store/get user-store user-id) 
-                                        {:name user-id :interactions []})
-                          ;; Update user interaction history
-                          updated-data (update user-data :interactions 
-                                               conj {:counter counter-name 
-                                                     :count new-count 
-                                                     :timestamp (System/currentTimeMillis)})]
-                      ;; Store updated user data
-                      (store/put! user-store user-id updated-data)
-                      (println (format "User '%s' data updated" user-id))
-                      (aor/emit! agent-node "finalize" {:counter-name counter-name
-                                                        :new-count new-count
-                                                        :user-data updated-data})))))
-      
-      ;; Final node to return comprehensive result
-      (aor/node "finalize" nil
-                (fn [agent-node {:keys [counter-name new-count user-data]}]
-                  (let [counters-store (aor/get-store agent-node "counters")
-                        user-store (aor/get-store agent-node "user-data")]
-                    ;; Demonstrate store querying
-                    (let [all-counters (into {} (for [key ["page-views" "api-calls" "errors"]]
-                                                  [key (store/get counters-store key)]))
-                          total-interactions (count (:interactions user-data))]
-                      (let [result {:action "counter-increment"
-                                    :counter counter-name
-                                    :new-count new-count
-                                    :user-data user-data
-                                    :total-user-interactions total-interactions
-                                    :all-counters all-counters
-                                    :processed-at (System/currentTimeMillis)}]
-                        (aor/result! agent-node result))))))))
+                    
+                    (let [result (case operation
+                                   :get 
+                                   (let [current-value (store/get counters-store counter-name)]
+                                     {:action :get
+                                      :counter counter-name
+                                      :value current-value})
+                                   
+                                   :increment
+                                   (let [current-value (or (store/get counters-store counter-name) 0)
+                                         new-value (inc current-value)]
+                                     (store/put! counters-store counter-name new-value)
+                                     {:action :increment
+                                      :counter counter-name
+                                      :previous-value current-value
+                                      :new-value new-value})
+                                   
+                                   :set
+                                   (do
+                                     (store/put! counters-store counter-name value)
+                                     {:action :set
+                                      :counter counter-name
+                                      :value value})
+                                   
+                                   :update
+                                   (let [current-value (or (store/get counters-store counter-name) 0)
+                                         new-value (+ current-value value)]
+                                     (store/update! counters-store counter-name (fn [v] (+ (or v 0) value)))
+                                     {:action :update
+                                      :counter counter-name
+                                      :previous-value current-value
+                                      :added-value value
+                                      :new-value new-value}))]
+                      
+                      (println (format "Counter '%s' %s: %s" 
+                                       counter-name operation 
+                                       (or (:value result) (:new-value result) "completed")))
+                      
+                      (aor/result! agent-node (assoc result :processed-at (System/currentTimeMillis)))))))))
 
 (defn -main
   "Run the key-value store agent example"
@@ -89,25 +79,34 @@
       
       (println "Key-Value Store Agent Example:")
       
-      ;; Multiple invocations to show persistent state
-      (println "\n--- First invocation: page-views for alice ---")
-      (let [result1 (aor/agent-invoke agent {:counter-name "page-views" :user-id "alice"})]
-        (println "Result 1:" (select-keys result1 [:counter :new-count :total-user-interactions])))
+      ;; Demonstrate different counter operations
+      (println "\n--- Setting initial counter value ---")
+      (let [result1 (aor/agent-invoke agent {:counter-name "page-views" :operation :set :value 10})]
+        (println "Result:" (select-keys result1 [:action :counter :value])))
       
-      (println "\n--- Second invocation: api-calls for alice ---")
-      (let [result2 (aor/agent-invoke agent {:counter-name "api-calls" :user-id "alice"})]
-        (println "Result 2:" (select-keys result2 [:counter :new-count :total-user-interactions])))
+      (println "\n--- Getting current counter value ---")
+      (let [result2 (aor/agent-invoke agent {:counter-name "page-views" :operation :get})]
+        (println "Result:" (select-keys result2 [:action :counter :value])))
       
-      (println "\n--- Third invocation: page-views for bob ---")
-      (let [result3 (aor/agent-invoke agent {:counter-name "page-views" :user-id "bob"})]
-        (println "Result 3:" (select-keys result3 [:counter :new-count :total-user-interactions])))
+      (println "\n--- Incrementing counter ---")
+      (let [result3 (aor/agent-invoke agent {:counter-name "page-views" :operation :increment})]
+        (println "Result:" (select-keys result3 [:action :counter :previous-value :new-value])))
       
-      (println "\n--- Fourth invocation: page-views for alice again ---")
-      (let [result4 (aor/agent-invoke agent {:counter-name "page-views" :user-id "alice"})]
-        (println "Result 4:" (select-keys result4 [:counter :new-count :total-user-interactions]))
-        (println "All counters:" (:all-counters result4)))
+      (println "\n--- Updating counter by adding value ---")
+      (let [result4 (aor/agent-invoke agent {:counter-name "page-views" :operation :update :value 5})]
+        (println "Result:" (select-keys result4 [:action :counter :previous-value :added-value :new-value])))
+      
+      (println "\n--- Working with different counter ---")
+      (let [result5 (aor/agent-invoke agent {:counter-name "api-calls" :operation :increment})]
+        (println "Result:" (select-keys result5 [:action :counter :previous-value :new-value])))
+      
+      (println "\n--- Final state check ---")
+      (let [result6 (aor/agent-invoke agent {:counter-name "page-views" :operation :get})
+            result7 (aor/agent-invoke agent {:counter-name "api-calls" :operation :get})]
+        (println "page-views final value:" (:value result6))
+        (println "api-calls final value:" (:value result7)))
       
       (println "\nNotice how:")
-      (println "- Counters persist and increment across invocations")
-      (println "- User data accumulates interaction history")
-      (println "- Different users maintain separate state"))))
+      (println "- Counter values persist across invocations")
+      (println "- Different counters maintain separate state")
+      (println "- Various store operations (get, put, update) work correctly"))))

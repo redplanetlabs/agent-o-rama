@@ -14,22 +14,36 @@
       (let [manager (aor/agent-manager ipc (rama/get-module-name KeyValueStoreModule))
             agent (aor/agent-client manager "KeyValueStoreAgent")]
         
-        (testing "first invocation initializes counter and user data"
-          (let [result (aor/agent-invoke agent {:counter-name "test-counter" :user-id "test-user"})]
-            (is (= "counter-increment" (:action result)))
+        (testing "set operation stores value"
+          (let [result (aor/agent-invoke agent {:counter-name "test-counter" :operation :set :value 42})]
+            (is (= :set (:action result)))
             (is (= "test-counter" (:counter result)))
-            (is (= 1 (:new-count result)))
-            (is (= 1 (:total-user-interactions result)))
-            (is (= "test-user" (get-in result [:user-data :name])))))
+            (is (= 42 (:value result)))))
         
-        (testing "second invocation increments counter and adds interaction"
-          (let [result (aor/agent-invoke agent {:counter-name "test-counter" :user-id "test-user"})]
-            (is (= 2 (:new-count result)))
-            (is (= 2 (:total-user-interactions result)))
-            (is (= 2 (count (get-in result [:user-data :interactions]))))))
+        (testing "get operation retrieves stored value"
+          (let [result (aor/agent-invoke agent {:counter-name "test-counter" :operation :get})]
+            (is (= :get (:action result)))
+            (is (= "test-counter" (:counter result)))
+            (is (= 42 (:value result)))))
         
-        (testing "different counter name starts at 1"
-          (let [result (aor/agent-invoke agent {:counter-name "other-counter" :user-id "test-user"})]
-            (is (= "other-counter" (:counter result)))
-            (is (= 1 (:new-count result)))
-            (is (= 3 (:total-user-interactions result))))))))))
+        (testing "increment operation increases value"
+          (let [result (aor/agent-invoke agent {:counter-name "test-counter" :operation :increment})]
+            (is (= :increment (:action result)))
+            (is (= "test-counter" (:counter result)))
+            (is (= 42 (:previous-value result)))
+            (is (= 43 (:new-value result)))))
+        
+        (testing "update operation adds to existing value"
+          (let [result (aor/agent-invoke agent {:counter-name "test-counter" :operation :update :value 7})]
+            (is (= :update (:action result)))
+            (is (= "test-counter" (:counter result)))
+            (is (= 43 (:previous-value result)))
+            (is (= 7 (:added-value result)))
+            (is (= 50 (:new-value result)))))
+        
+        (testing "increment on non-existent counter starts at 0"
+          (let [result (aor/agent-invoke agent {:counter-name "new-counter" :operation :increment})]
+            (is (= :increment (:action result)))
+            (is (= "new-counter" (:counter result)))
+            (is (= 0 (:previous-value result)))
+            (is (= 1 (:new-value result)))))))))
