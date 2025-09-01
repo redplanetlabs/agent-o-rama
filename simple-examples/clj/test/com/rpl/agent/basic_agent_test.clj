@@ -7,13 +7,17 @@
    [com.rpl.agent.basic-agent :refer [BasicAgentModule]]))
 
 (deftest basic-agent-test
-  (testing "BasicAgent example runs without error"
+  (testing "BasicAgent example produces expected results"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc BasicAgentModule {:tasks 1 :threads 1})
-      
-      (let [manager (aor/agent-manager ipc (rama/get-module-name BasicAgentModule))
-            agent (aor/agent-client manager "BasicAgent")]
-        
-        (testing "agent processes input successfully"
-          (let [result (aor/agent-invoke agent "test")]
-            (is (some? result))))))))
+
+      (let [manager (aor/agent-manager
+                     ipc
+                     (rama/get-module-name BasicAgentModule))
+            agent   (aor/agent-client manager "BasicAgent")]
+
+        (testing "string input gets uppercased"
+          (is (= "HELLO" (aor/agent-invoke agent "hello"))))
+
+        (testing "number input gets processed with prefix"
+          (is (= "PROCESSED: 42" (aor/agent-invoke agent 42))))))))
