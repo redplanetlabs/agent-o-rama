@@ -22,8 +22,7 @@
   (aor/declare-key-value-store topology "$$counters" String Long)
 
   (->
-    topology
-    (aor/new-agent "KeyValueStoreAgent")
+    (aor/new-agent topology "KeyValueStoreAgent")
 
     ;; Single node to demonstrate store operations
     (aor/node
