@@ -10,20 +10,22 @@
   (testing "AgentObjectsAgent example produces expected results"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc AgentObjectsModule {:tasks 1 :threads 1})
-      
-      (let [manager (aor/agent-manager ipc (rama/get-module-name AgentObjectsModule))
+
+      (let [manager (aor/agent-manager
+                     ipc
+                     (rama/get-module-name AgentObjectsModule))
             agent (aor/agent-client manager "AgentObjectsAgent")]
-        
-        (testing "first invocation produces expected result structure"
-          (let [result (aor/agent-invoke agent "Hello")]
-            (is (= "Hello" (:processed-input result)))
-            (is (= 1 (:usage-count result)))
-            (is (string? (:service-info result)))
-            (is (map? (:system-info result)))
-            (is (= "1.2.3" (get-in result [:system-info :version])))
-            (is (number? (:processed-at result)))))
-        
-        (testing "second invocation increments usage count"
-          (let [result (aor/agent-invoke agent "World")]
-            (is (= "World" (:processed-input result)))
-            (is (= 2 (:usage-count result)))))))))
+
+        (testing "returns formatted messages with version and counter"
+          (let [result1 (aor/agent-invoke agent "Hello")
+                result2 (aor/agent-invoke agent "World")]
+            (is (= "v1.2.3: Hello (#1 -> alerts)" result1))
+            (is (= "v1.2.3: World (#1 -> alerts)" result2))))
+
+        (testing "concurrent invocations return formatted messages"
+          (let [invoke1 (aor/agent-initiate agent "Test1")
+                invoke2 (aor/agent-initiate agent "Test2")
+                result1 (aor/agent-result agent invoke1)
+                result2 (aor/agent-result agent invoke2)]
+            (is (= "v1.2.3: Test1 (#1 -> alerts)" result1))
+            (is (= "v1.2.3: Test2 (#1 -> alerts)" result2))))))))
