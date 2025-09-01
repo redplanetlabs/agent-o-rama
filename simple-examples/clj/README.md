@@ -9,9 +9,9 @@ This directory contains isolated examples demonstrating individual agent-o-rama 
 2. **`multi_node_agent`** - Agent graph with multiple nodes and emissions
 3. **`router_agent`** - Conditional routing between different processing nodes
 4. **`async_agent`** - Asynchronous initiation and result handling
+5. **`agent_objects_agent`** - Static and builder-based agent objects
 
 ### State Management Examples
-5. **`agent_objects_agent`** - Static and builder-based agent objects
 6. **`keyvalue_store_agent`** - Key-value store operations
 7. **`document_store_agent`** - Document store with field operations
 8. **`pstate_store_agent`** - PState store with path operations
