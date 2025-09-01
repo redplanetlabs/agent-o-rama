@@ -44,6 +44,9 @@ clj -M -m com.rpl.agent.basic-agent
 clj -M -m com.rpl.agent.multi-node-agent
 clj -M -m com.rpl.agent.async-agent
 clj -M -m com.rpl.agent.agent-objects-agent
+clj -M -m com.rpl.agent.keyvalue-store-agent
+clj -M -m com.rpl.agent.document-store-agent
+clj -M -m com.rpl.agent.pstate-store-agent
 
 # Run tests
 clj -M:test
@@ -57,6 +60,9 @@ lein with-profile +dev run -m com.rpl.agent.basic-agent
 lein with-profile +dev run -m com.rpl.agent.multi-node-agent
 lein with-profile +dev run -m com.rpl.agent.async-agent
 lein with-profile +dev run -m com.rpl.agent.agent-objects-agent
+lein with-profile +dev run -m com.rpl.agent.keyvalue-store-agent
+lein with-profile +dev run -m com.rpl.agent.document-store-agent
+lein with-profile +dev run -m com.rpl.agent.pstate-store-agent
 
 # Or from REPL
 lein with-profile +dev repl
