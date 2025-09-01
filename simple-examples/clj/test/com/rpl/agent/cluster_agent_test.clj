@@ -7,22 +7,28 @@
    [com.rpl.agent.cluster-agent :refer [ClusterAgentModule WorkerAgentModule]]))
 
 (deftest cluster-agent-test
-  (testing "ClusterAgent example demonstrates cross-module communication correctly"
+  (testing
+    "ClusterAgent example demonstrates cross-module communication correctly"
     (with-open [ipc (rtest/create-ipc)]
       ;; Deploy both modules to simulate cluster deployment
       (rtest/launch-module! ipc ClusterAgentModule {:tasks 2 :threads 2})
       (rtest/launch-module! ipc WorkerAgentModule {:tasks 2 :threads 2})
 
-      (let [coord-manager (agent-manager ipc (get-module-name ClusterAgentModule))
-            worker-manager (agent-manager ipc (get-module-name WorkerAgentModule))
+      (let [coord-manager     (agent-manager ipc
+                                             (get-module-name
+                                              ClusterAgentModule))
+            worker-manager    (agent-manager ipc
+                                             (get-module-name
+                                              WorkerAgentModule))
             coordinator-agent (agent-client coord-manager "CoordinatorAgent")
-            worker-agent (agent-client worker-manager "WorkerAgent")]
+            worker-agent      (agent-client worker-manager "WorkerAgent")]
 
         (testing "coordinator agent manages cross-module coordination"
           (let [result (agent-invoke coordinator-agent
                                      {:task-id "test-task-001"
                                       :workers 3
-                                      :data ["item1" "item2" "item3" "item4" "item5"]})]
+                                      :data    ["item1" "item2" "item3" "item4"
+                                                "item5"]})]
 
             ;; Verify coordinator result structure
             (is (= "coordination-complete" (:action result)))
@@ -39,8 +45,8 @@
         (testing "worker agent processes assigned work correctly"
           (let [result (agent-invoke worker-agent
                                      {:worker-id "test-worker-1"
-                                      :task "test-task-001"
-                                      :items ["item1" "item2"]})]
+                                      :task      "test-task-001"
+                                      :items     ["item1" "item2"]})]
 
             ;; Verify worker result structure
             (is (= "work-complete" (:action result)))
@@ -57,12 +63,12 @@
         (testing "multiple worker agents can work in parallel"
           (let [worker1-result (agent-invoke worker-agent
                                              {:worker-id "parallel-worker-1"
-                                              :task "parallel-task"
-                                              :items ["a" "b"]})
+                                              :task      "parallel-task"
+                                              :items     ["a" "b"]})
                 worker2-result (agent-invoke worker-agent
                                              {:worker-id "parallel-worker-2"
-                                              :task "parallel-task"
-                                              :items ["c" "d" "e"]})]
+                                              :task      "parallel-task"
+                                              :items     ["c" "d" "e"]})]
 
             ;; Verify both workers completed successfully
             (is (= "work-complete" (:action worker1-result)))
@@ -72,4 +78,6 @@
             (is (= "parallel-worker-1" (:worker-id worker1-result)))
             (is (= "parallel-worker-2" (:worker-id worker2-result)))
             (is (= 2 (get-in worker1-result [:work-result :items-processed])))
-            (is (= 3 (get-in worker2-result [:work-result :items-processed])))))))))
+            (is (= 3
+                   (get-in worker2-result
+                           [:work-result :items-processed])))))))))

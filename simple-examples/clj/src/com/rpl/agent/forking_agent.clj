@@ -26,9 +26,10 @@
      (fn [agent-node {:keys [base-value multiplier]}]
        (println (format "Initial processing: %d * %d" base-value multiplier))
        (let [result (* base-value multiplier)]
-         (aor/emit! agent-node "calculate" 
-                    {:original-input {:base-value base-value
-                                      :multiplier multiplier}
+         (aor/emit! agent-node
+                    "calculate"
+                    {:original-input  {:base-value base-value
+                                       :multiplier multiplier}
                      :processed-value result}))))
 
     ;; Calculation node that can be forked
@@ -38,29 +39,31 @@
      (fn [agent-node {:keys [original-input processed-value]}]
        (println (format "Calculating with processed value: %d" processed-value))
        (let [squared (* processed-value processed-value)
-             halved (/ processed-value 2.0)]
-         (aor/emit! agent-node "validate"
-                    {:original-input original-input
+             halved  (/ processed-value 2.0)]
+         (aor/emit! agent-node
+                    "validate"
+                    {:original-input  original-input
                      :processed-value processed-value
-                     :squared squared
-                     :halved halved}))))
+                     :squared         squared
+                     :halved          halved}))))
 
     ;; Validation node
     (aor/node
      "validate"
      nil
      (fn [agent-node {:keys [original-input processed-value squared halved]}]
-       (println (format "Validating results: squared=%d, halved=%.1f" squared halved))
+       (println
+        (format "Validating results: squared=%d, halved=%.1f" squared halved))
        (let [is-valid (and (pos? processed-value)
                            (>= squared processed-value))]
          (aor/result! agent-node
-                      {:action "calculation-complete"
-                       :original-input original-input
+                      {:action          "calculation-complete"
+                       :original-input  original-input
                        :processed-value processed-value
-                       :squared squared
-                       :halved halved
-                       :valid? is-valid
-                       :completed-at (System/currentTimeMillis)}))))))
+                       :squared         squared
+                       :halved          halved
+                       :valid?          is-valid
+                       :completed-at    (System/currentTimeMillis)}))))))
 
 (defn -main
   "Run the forking agent example"
@@ -90,9 +93,12 @@
 
         ;; Fork from the calculate node with different input
         (println "\n--- Fork 1: Different processed value ---")
-        (let [fork1 (aor/agent-fork agent base-invoke
-                                    {"calculate" [{:original-input {:base-value 10
-                                                                     :multiplier 2}
+        (let [fork1 (aor/agent-fork agent
+                                    base-invoke
+                                    {"calculate" [{:original-input  {:base-value
+                                                                     10
+                                                                     :multiplier
+                                                                     2}
                                                    :processed-value 20}]})]
           (println "Fork 1 result:")
           (println "  Processed value:" (:processed-value fork1))
@@ -101,10 +107,13 @@
 
         ;; Fork with async initiation
         (println "\n--- Fork 2: Async fork with larger value ---")
-        (let [fork2-invoke (aor/agent-initiate-fork agent base-invoke
-                                                    {"calculate" [{:original-input {:base-value 7
-                                                                                     :multiplier 4}
-                                                                   :processed-value 28}]})
+        (let [fork2-invoke (aor/agent-initiate-fork agent
+                                                    base-invoke
+                                                    {"calculate"
+                                                     [{:original-input
+                                                       {:base-value 7
+                                                        :multiplier 4}
+                                                       :processed-value 28}]})
               fork2-result (aor/agent-result agent fork2-invoke)]
           (println "Fork 2 result:")
           (println "  Processed value:" (:processed-value fork2-result))
@@ -113,12 +122,15 @@
 
         ;; Fork from validation node with custom data
         (println "\n--- Fork 3: Fork from validation node ---")
-        (let [fork3 (aor/agent-fork agent base-invoke
-                                    {"validate" [{:original-input {:base-value 1
-                                                                    :multiplier 1}
+        (let [fork3 (aor/agent-fork agent
+                                    base-invoke
+                                    {"validate" [{:original-input  {:base-value
+                                                                    1
+                                                                    :multiplier
+                                                                    1}
                                                   :processed-value 1
-                                                  :squared 1
-                                                  :halved 0.5}]})]
+                                                  :squared         1
+                                                  :halved          0.5}]})]
           (println "Fork 3 result:")
           (println "  Processed value:" (:processed-value fork3))
           (println "  Squared:" (:squared fork3))

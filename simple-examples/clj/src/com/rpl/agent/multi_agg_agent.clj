@@ -30,7 +30,7 @@
        (doseq [num numbers]
          (aor/emit! agent-node "analyze-numbers" num))
 
-       ;; Send strings for processing  
+       ;; Send strings for processing
        (doseq [str strings]
          (aor/emit! agent-node "analyze-strings" str))
 
@@ -43,9 +43,9 @@
      "analyze-numbers"
      "combine-analysis"
      (fn [agent-node number]
-       (let [analysis {:value number
+       (let [analysis {:value  number
                        :square (* number number)
-                       :even? (even? number)}]
+                       :even?  (even? number)}]
          (aor/emit! agent-node "combine-analysis" "number" analysis))))
 
     ;; Process strings
@@ -53,8 +53,8 @@
      "analyze-strings"
      "combine-analysis"
      (fn [agent-node string]
-       (let [analysis {:value string
-                       :length (count string)
+       (let [analysis {:value     string
+                       :length    (count string)
                        :uppercase (.toUpperCase string)}]
          (aor/emit! agent-node "combine-analysis" "string" analysis))))
 
@@ -63,8 +63,8 @@
      "analyze-keywords"
      "combine-analysis"
      (fn [agent-node keyword]
-       (let [analysis {:value keyword
-                       :name (name keyword)
+       (let [analysis {:value     keyword
+                       :name      (name keyword)
                        :namespace (namespace keyword)}]
          (aor/emit! agent-node "combine-analysis" "keyword" analysis))))
 
@@ -84,30 +84,38 @@
           [state analysis]
           (update state :keywords conj analysis)))
      (fn [agent-node aggregated-state _]
-       (let [numbers-count (count (:numbers aggregated-state))
-             strings-count (count (:strings aggregated-state))
-             keywords-count (count (:keywords aggregated-state))
-             
-             number-sum (reduce + (map :square (:numbers aggregated-state)))
-             avg-string-length (if (seq (:strings aggregated-state))
-                                 (/ (reduce + (map :length (:strings aggregated-state)))
-                                    strings-count)
-                                 0)
-             namespaced-keywords (filter :namespace (:keywords aggregated-state))]
+       (let [numbers-count       (count (:numbers aggregated-state))
+             strings-count       (count (:strings aggregated-state))
+             keywords-count      (count (:keywords aggregated-state))
 
-         (println (format "Combined analysis: %d numbers, %d strings, %d keywords"
-                          numbers-count strings-count keywords-count))
+             number-sum          (reduce +
+                                  (map :square (:numbers aggregated-state)))
+             avg-string-length   (if (seq (:strings aggregated-state))
+                                   (/ (reduce +
+                                       (map :length
+                                            (:strings aggregated-state)))
+                                      strings-count)
+                                   0)
+             namespaced-keywords (filter :namespace
+                                  (:keywords aggregated-state))]
+
+         (println
+          (format "Combined analysis: %d numbers, %d strings, %d keywords"
+                  numbers-count
+                  strings-count
+                  keywords-count))
 
          (aor/result! agent-node
-                      {:action "multi-analysis-complete"
-                       :summary {:numbers-analyzed numbers-count
-                                 :strings-analyzed strings-count
-                                 :keywords-analyzed keywords-count
-                                 :total-square-sum number-sum
-                                 :avg-string-length avg-string-length
-                                 :namespaced-keywords-count (count namespaced-keywords)}
+                      {:action           "multi-analysis-complete"
+                       :summary          {:numbers-analyzed numbers-count
+                                          :strings-analyzed strings-count
+                                          :keywords-analyzed keywords-count
+                                          :total-square-sum number-sum
+                                          :avg-string-length avg-string-length
+                                          :namespaced-keywords-count
+                                          (count namespaced-keywords)}
                        :detailed-results aggregated-state
-                       :processed-at (System/currentTimeMillis)}))))))
+                       :processed-at     (System/currentTimeMillis)}))))))
 
 (defn -main
   "Run the multi-agg agent example"
@@ -123,13 +131,13 @@
       (println "Processing mixed data types with custom aggregation logic")
 
       (let [result (aor/agent-invoke agent
-                                     {:numbers [1 2 3 4 5]
-                                      :strings ["hello" "world" "test"]
+                                     {:numbers  [1 2 3 4 5]
+                                      :strings  ["hello" "world" "test"]
                                       :keywords [:foo :bar :baz/qux ::local]})]
 
         (println "\nResults:")
         (println "  Action:" (:action result))
-        
+
         (let [summary (:summary result)]
           (println "  Summary:")
           (println "    Numbers analyzed:" (:numbers-analyzed summary))
@@ -137,7 +145,8 @@
           (println "    Keywords analyzed:" (:keywords-analyzed summary))
           (println "    Total square sum:" (:total-square-sum summary))
           (println "    Average string length:" (:avg-string-length summary))
-          (println "    Namespaced keywords:" (:namespaced-keywords-count summary)))
+          (println "    Namespaced keywords:"
+                   (:namespaced-keywords-count summary)))
 
         (let [details (:detailed-results result)]
           (println "  Sample detailed results:")
@@ -149,4 +158,5 @@
       (println "- Multi-agg handles different types of tagged inputs")
       (println "- Each 'on' clause processes specific data types")
       (println "- Complex state accumulation across multiple input streams")
-      (println "- Custom aggregation logic beyond simple built-in aggregators"))))
+      (println
+       "- Custom aggregation logic beyond simple built-in aggregators"))))

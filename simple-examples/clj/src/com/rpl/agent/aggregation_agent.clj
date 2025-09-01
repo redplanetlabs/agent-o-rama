@@ -27,7 +27,8 @@
      (fn [agent-node {:keys [data chunk-size]}]
        (let [chunks (partition-all chunk-size data)]
          (println (format "Distributing %d items into %d chunks"
-                          (count data) (count chunks)))
+                          (count data)
+                          (count chunks)))
 
          ;; Emit each chunk for parallel processing
          (doseq [chunk chunks]
@@ -49,9 +50,9 @@
 
          (aor/emit! agent-node
                     "collect-results"
-                    {:original-chunk chunk
+                    {:original-chunk  chunk
                      :processed-chunk processed-chunk
-                     :chunk-sum chunk-sum}))))
+                     :chunk-sum       chunk-sum}))))
 
     ;; Aggregate all results using built-in vector aggregator
     (aor/agg-node
@@ -59,19 +60,22 @@
      nil
      aggs/+vec-agg
      (fn [agent-node aggregated-results _]
-       (let [total-sum (reduce + (map :chunk-sum aggregated-results))
-             total-items (reduce + (map #(count (:original-chunk %)) aggregated-results))]
+       (let [total-sum   (reduce + (map :chunk-sum aggregated-results))
+             total-items (reduce +
+                          (map #(count (:original-chunk %))
+                               aggregated-results))]
 
          (println (format "Aggregated %d chunks, %d total items"
-                          (count aggregated-results) total-items))
+                          (count aggregated-results)
+                          total-items))
 
          (aor/result! agent-node
-                      {:action "aggregation-complete"
-                       :total-items total-items
-                       :total-sum total-sum
+                      {:action           "aggregation-complete"
+                       :total-items      total-items
+                       :total-sum        total-sum
                        :chunks-processed (count aggregated-results)
-                       :chunk-results aggregated-results
-                       :processed-at (System/currentTimeMillis)}))))))
+                       :chunk-results    aggregated-results
+                       :processed-at     (System/currentTimeMillis)}))))))
 
 (defn -main
   "Run the aggregation agent example"
@@ -80,7 +84,8 @@
     (rtest/launch-module! ipc AggregationAgentModule {:tasks 2 :threads 2})
 
     (let [manager (aor/agent-manager ipc
-                                     (rama/get-module-name AggregationAgentModule))
+                                     (rama/get-module-name
+                                      AggregationAgentModule))
           agent   (aor/agent-client manager "AggregationAgent")]
 
       (println "Aggregation Agent Example:")
@@ -91,7 +96,7 @@
 
         (println "\n--- Processing with chunk size 5 ---")
         (let [result1 (aor/agent-invoke agent
-                                        {:data test-data
+                                        {:data       test-data
                                          :chunk-size 5})]
           (println "Result 1:")
           (println "  Total items:" (:total-items result1))
@@ -100,7 +105,7 @@
 
         (println "\n--- Processing with chunk size 3 ---")
         (let [result2 (aor/agent-invoke agent
-                                        {:data test-data
+                                        {:data       test-data
                                          :chunk-size 3})]
           (println "Result 2:")
           (println "  Total items:" (:total-items result2))

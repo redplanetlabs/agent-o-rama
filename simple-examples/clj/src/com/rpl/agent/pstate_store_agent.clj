@@ -12,7 +12,7 @@
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.store :as store]
    [com.rpl.rama :refer :all :as rama]
-   [com.rpl.rama.path :refer :all]
+   [com.rpl.rama.path :refer :all :as path]
    [com.rpl.rama.test :as rtest]))
 
 ;;; Agent module demonstrating PState store usage
@@ -29,12 +29,15 @@
   (aor/declare-pstate-store
    topology
    "$$organizations"
-   {String {:name        String
-            :departments {String {:name      String
-                                  :employees [{:id       String
-                                               :name     String
-                                               :salary   Long
-                                               :metadata Object}]}}}})
+   {String (fixed-keys-schema
+            {:name        String
+             :departments {String (fixed-keys-schema
+                                   {:name      String
+                                    :employees [(fixed-keys-schema
+                                                 {:id       String
+                                                  :name     String
+                                                  :salary   Long
+                                                  :metadata Object})]})}})})
 
   (->
     topology
@@ -51,18 +54,18 @@
          ;; Initialize company if it doesn't exist
          (when company-name
            (store/pstate-transform!
-            [company-id :name]
+            [company-id :name
+             (path/term (fn [existing] (or existing company-name)))]
             org-store
-            company-id
-            (fn [existing] (or existing company-name))))
+            company-id))
 
          ;; Initialize department if it doesn't exist
          (when dept-name
            (store/pstate-transform!
-            [company-id :departments dept-id :name]
+            [company-id :departments dept-id :name
+             (path/term (fn [existing] (or existing dept-name)))]
             org-store
-            company-id
-            (fn [existing] (or existing dept-name))))
+            company-id))
 
          ;; Add or update employee
          (when employee
@@ -73,20 +76,11 @@
                                         :employees]
                                        org-store
                                        company-id)]
-               (if (some #(= (:id %) emp-id) existing-employees)
-                 ;; Update existing employee
-                 (store/pstate-transform!
-                  [company-id :departments dept-id :employees
-                   (fn [emp] (= (:id emp) emp-id))]
-                  org-store
-                  company-id
-                  (constantly employee))
-                 ;; Add new employee
-                 (store/pstate-transform!
-                  [company-id :departments dept-id :employees]
-                  org-store
-                  company-id
-                  (fn [employees] (conj (or employees []) employee)))))))
+               (store/pstate-transform!
+                [company-id :departments dept-id :employees emp-id
+                 (path/termval employee)]
+                org-store
+                company-id))))
 
          (println
           (format "Updated organization %s, department %s" company-id dept-id))

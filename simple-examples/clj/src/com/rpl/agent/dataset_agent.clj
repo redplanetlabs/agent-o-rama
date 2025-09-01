@@ -56,24 +56,28 @@
 
          ;; Create a math operations dataset
          (let [math-input-schema
-               {"type" "object"
+               {"type"       "object"
                 "properties" {"operation" {"type" "string"
-                                           "enum" ["add" "subtract" "multiply" "divide"]}
-                              "a" {"type" "number"}
-                              "b" {"type" "number"}}
-                "required" ["operation" "a" "b"]}
+                                           "enum" ["add" "subtract" "multiply"
+                                                   "divide"]}
+                              "a"         {"type" "number"}
+                              "b"         {"type" "number"}}
+                "required"   ["operation" "a" "b"]}
 
                math-output-schema
-               {"type" "object"
+               {"type"       "object"
                 "properties" {"result" {"type" ["number" "string"]}}
-                "required" ["result"]}
+                "required"   ["result"]}
 
                math-dataset-id
                (aor/create-dataset! manager
                                     "Math Operations Dataset"
-                                    {:description "Dataset for testing basic math operations"
-                                     :input-json-schema (pr-str math-input-schema)
-                                     :output-json-schema (pr-str math-output-schema)})]
+                                    {:description
+                                     "Dataset for testing basic math operations"
+                                     :input-json-schema (pr-str
+                                                         math-input-schema)
+                                     :output-json-schema (pr-str
+                                                          math-output-schema)})]
 
            (println "Created math dataset:" math-dataset-id)
 
@@ -82,7 +86,7 @@
                                      math-dataset-id
                                      {:operation "add" :a 5 :b 3}
                                      {:reference-output {:result 8}
-                                      :tags #{"basic" "addition"}
+                                      :tags   #{"basic" "addition"}
                                       :source "manual"})
 
            (aor/add-dataset-example! manager
@@ -94,27 +98,31 @@
            (aor/add-dataset-example! manager
                                      math-dataset-id
                                      {:operation "divide" :a 10 :b 0}
-                                     {:reference-output {:result "Error: Division by zero"}
+                                     {:reference-output
+                                      {:result "Error: Division by zero"}
                                       :tags #{"edge-case" "error"}})
 
            ;; Create a text processing dataset
            (let [text-input-schema
                  {"type" "string"}
 
-                 text-output-schema  
-                 {"type" "object"
-                  "properties" {"length" {"type" "number"}
+                 text-output-schema
+                 {"type"       "object"
+                  "properties" {"length"    {"type" "number"}
                                 "uppercase" {"type" "string"}
-                                "words" {"type" "array"
-                                         "items" {"type" "string"}}}
-                  "required" ["length" "uppercase" "words"]}
+                                "words"     {"type"  "array"
+                                             "items" {"type" "string"}}}
+                  "required"   ["length" "uppercase" "words"]}
 
                  text-dataset-id
                  (aor/create-dataset! manager
                                       "Text Processing Dataset"
-                                      {:description "Dataset for text analysis tasks"
-                                       :input-json-schema (pr-str text-input-schema)
-                                       :output-json-schema (pr-str text-output-schema)})]
+                                      {:description
+                                       "Dataset for text analysis tasks"
+                                       :input-json-schema (pr-str
+                                                           text-input-schema)
+                                       :output-json-schema
+                                       (pr-str text-output-schema)})]
 
              (println "Created text dataset:" text-dataset-id)
 
@@ -122,17 +130,18 @@
              (aor/add-dataset-example! manager
                                        text-dataset-id
                                        "hello world"
-                                       {:reference-output {:length 11
-                                                           :uppercase "HELLO WORLD"
-                                                           :words ["hello" "world"]}
+                                       {:reference-output
+                                        {:length    11
+                                         :uppercase "HELLO WORLD"
+                                         :words     ["hello" "world"]}
                                         :tags #{"simple" "two-words"}})
 
              (aor/add-dataset-example! manager
                                        text-dataset-id
                                        "test"
-                                       {:reference-output {:length 4
+                                       {:reference-output {:length    4
                                                            :uppercase "TEST"
-                                                           :words ["test"]}
+                                                           :words     ["test"]}
                                         :tags #{"simple" "single-word"}})
 
              ;; Create snapshot of text dataset
@@ -150,7 +159,7 @@
                            :text-dataset-id text-dataset-id
                            :examples-added 5
                            :snapshots-created 1
-                           :processed-at (System/currentTimeMillis)})))))))
+                           :processed-at (System/currentTimeMillis)}))))))))
 
 (defn -main
   "Run the dataset agent example"
@@ -179,9 +188,9 @@
         (println "\nSearching datasets:")
         (let [math-results (aor/search-datasets manager "Math" 10)
               text-results (aor/search-datasets manager "Text" 10)
-              all-results (aor/search-datasets manager "Dataset" 10)]
+              all-results  (aor/search-datasets manager "Dataset" 10)]
           (println "  Math datasets found:" (count math-results))
-          (println "  Text datasets found:" (count text-results))  
+          (println "  Text datasets found:" (count text-results))
           (println "  All datasets found:" (count all-results))))
 
       (println "\nNotice how:")

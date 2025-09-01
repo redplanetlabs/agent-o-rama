@@ -19,7 +19,7 @@
   [topology]
 
   ;; Declare a key-value store for counters (String -> Long)
-  (aor/declare-key-value-store topology "counters" String Long)
+  (aor/declare-key-value-store topology "$$counters" String Long)
 
   (->
     topology
@@ -30,7 +30,7 @@
      "manage-counter"
      nil
      (fn [agent-node {:keys [counter-name operation value]}]
-       (let [counters-store (aor/get-store agent-node "counters")]
+       (let [counters-store (aor/get-store agent-node "$$counters")]
 
          (let [result
                (case operation

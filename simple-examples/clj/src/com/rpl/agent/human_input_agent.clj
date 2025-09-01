@@ -39,18 +39,20 @@
                               0.0))]
 
          ;; Ask for quality preference
-         (let [quality-input (aor/get-human-input
-                              agent-node
-                              "What quality level do you prefer? (basic/premium): ")
-               quality       (if (contains? #{"basic" "premium"} quality-input)
-                               (keyword quality-input)
-                               :basic)]
+         (let [quality-input
+               (aor/get-human-input
+                agent-node
+                "What quality level do you prefer? (basic/premium): ")
+               quality (if (contains? #{"basic" "premium"} quality-input)
+                         (keyword quality-input)
+                         :basic)]
 
            ;; Ask for urgency
            (let [urgency-input (aor/get-human-input
                                 agent-node
                                 "How urgent is this? (low/medium/high): ")
-                 urgency       (if (contains? #{"low" "medium" "high"} urgency-input)
+                 urgency       (if (contains? #{"low" "medium" "high"}
+                                              urgency-input)
                                  (keyword urgency-input)
                                  :medium)]
 
@@ -81,20 +83,22 @@
 
                               :else
                               "Balanced mid-range option")
-             
-             confirmation (aor/get-human-input
-                           agent-node
-                           (format "Recommendation: %s\nDo you accept this recommendation? (y/n): "
-                                   recommendation))]
+
+             confirmation
+             (aor/get-human-input
+              agent-node
+              (format
+               "Recommendation: %s\nDo you accept this recommendation? (y/n): "
+               recommendation))]
 
          (aor/result! agent-node
-                      {:category category
-                       :preferences {:budget budget
-                                     :quality quality
-                                     :urgency urgency}
+                      {:category       category
+                       :preferences    {:budget  budget
+                                        :quality quality
+                                        :urgency urgency}
                        :recommendation recommendation
-                       :accepted (= confirmation "y")
-                       :processed-at (System/currentTimeMillis)}))))))
+                       :accepted       (= confirmation "y")
+                       :processed-at   (System/currentTimeMillis)}))))))
 
 (defn -main
   "Run the human input agent example"
@@ -103,11 +107,13 @@
     (rtest/launch-module! ipc HumanInputAgentModule {:tasks 1 :threads 1})
 
     (let [manager (aor/agent-manager ipc
-                                     (rama/get-module-name HumanInputAgentModule))
+                                     (rama/get-module-name
+                                      HumanInputAgentModule))
           agent   (aor/agent-client manager "HumanInputAgent")]
 
       (println "Human Input Agent Example:")
-      (println "This agent will ask you questions to make personalized recommendations.")
+      (println
+       "This agent will ask you questions to make personalized recommendations.")
       (println)
 
       ;; Start agent execution
@@ -134,8 +140,8 @@
                 (println "  Recommendation:" (:recommendation result))
                 (println "  Accepted:" (:accepted result))))))
 
-      (println "\nNotice how:")
-      (println "- Agents can request human input during execution")
-      (println "- Input validation and defaults are handled gracefully")
-      (println "- Multiple input requests can be chained together")
-      (println "- Human responses influence the final result"))))
+        (println "\nNotice how:")
+        (println "- Agents can request human input during execution")
+        (println "- Input validation and defaults are handled gracefully")
+        (println "- Multiple input requests can be chained together")
+        (println "- Human responses influence the final result")))))

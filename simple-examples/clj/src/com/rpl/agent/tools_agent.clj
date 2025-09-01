@@ -7,6 +7,7 @@
   - Tool function implementation and error handling
   - Parallel tool execution with aggregation"
   (:require
+   [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.tools :as tools]
    [com.rpl.rama :as rama]
@@ -19,25 +20,25 @@
 (defn calculate-tool
   "Simple calculator tool that performs basic arithmetic"
   [request]
-  (let [args (.arguments request)
+  (let [args      (.arguments request)
         operation (.get args "operation")
-        a (Double/parseDouble (.get args "a"))
-        b (Double/parseDouble (.get args "b"))
-        result (case operation
-                 "add" (+ a b)
-                 "subtract" (- a b)
-                 "multiply" (* a b)
-                 "divide" (if (zero? b)
-                            "Error: Division by zero"
-                            (/ a b))
-                 "Error: Unknown operation")]
+        a         (Double/parseDouble (.get args "a"))
+        b         (Double/parseDouble (.get args "b"))
+        result    (case operation
+                    "add" (+ a b)
+                    "subtract" (- a b)
+                    "multiply" (* a b)
+                    "divide" (if (zero? b)
+                               "Error: Division by zero"
+                               (/ a b))
+                    "Error: Unknown operation")]
     (str result)))
 
 (defn string-tool
   "String manipulation tool for text processing"
   [request]
-  (let [args (.arguments request)
-        text (.get args "text")
+  (let [args      (.arguments request)
+        text      (.get args "text")
         operation (.get args "operation")]
     (case operation
       "uppercase" (.toUpperCase text)
@@ -49,7 +50,7 @@
 (defn info-tool
   "Information tool that provides system information"
   [request]
-  (let [args (.arguments request)
+  (let [args      (.arguments request)
         info-type (.get args "type")]
     (case info-type
       "time" (str (System/currentTimeMillis))
@@ -90,7 +91,9 @@
   [topology]
 
   ;; Create tools agent with our tool definitions
-  (tools/new-tools-agent topology "ToolsAgent" [CALCULATOR-TOOL STRING-TOOL INFO-TOOL])
+  (tools/new-tools-agent topology
+                         "ToolsAgent"
+                         [CALCULATOR-TOOL STRING-TOOL INFO-TOOL])
 
   ;; Create a coordinator agent that uses tools
   (->
@@ -103,26 +106,26 @@
      nil
      (fn [agent-node requests]
        (let [tools-agent (aor/agent-client agent-node "ToolsAgent")]
-         
+
          (println (format "Executing %d tool requests" (count requests)))
-         
+
          ;; Send requests to tools agent and get results
          (let [results (aor/agent-invoke tools-agent requests)]
-           
+
            (println (format "Received %d tool results" (count results)))
-           
+
            (aor/result! agent-node
-                        {:action "tools-execution-complete"
+                        {:action         "tools-execution-complete"
                          :requests-count (count requests)
-                         :results-count (count results)
-                         :results results
-                         :processed-at (System/currentTimeMillis)})))))))
+                         :results-count  (count results)
+                         :results        results
+                         :processed-at   (System/currentTimeMillis)})))))))
 
 (defn create-tool-request
   "Helper to create ToolExecutionRequest objects"
   [tool-name args]
-  (ToolExecutionRequest/builder 
-   (.name tool-name) 
+  (ToolExecutionRequest/builder
+   (.name tool-name)
    (.arguments args)
    (.build)))
 
@@ -132,8 +135,9 @@
   (with-open [ipc (rtest/create-ipc)]
     (rtest/launch-module! ipc ToolsAgentModule {:tasks 2 :threads 2})
 
-    (let [manager (aor/agent-manager ipc
-                                     (rama/get-module-name ToolsAgentModule))
+    (let [manager     (aor/agent-manager ipc
+                                         (rama/get-module-name
+                                          ToolsAgentModule))
           coordinator (aor/agent-client manager "ToolsCoordinator")]
 
       (println "Tools Agent Example:")
@@ -141,26 +145,42 @@
 
       ;; Create tool execution requests
       (let [requests [;; Calculator requests
-                      (create-tool-request "calculator" {"operation" "add" "a" "15" "b" "25"})
-                      (create-tool-request "calculator" {"operation" "multiply" "a" "7" "b" "8"})
-                      (create-tool-request "calculator" {"operation" "divide" "a" "100" "b" "4"})
-                      
-                      ;; String processing requests  
-                      (create-tool-request "string-processor" {"text" "Hello World" "operation" "uppercase"})
-                      (create-tool-request "string-processor" {"text" "ReverseMe" "operation" "reverse"})
-                      (create-tool-request "string-processor" {"text" "Count Characters" "operation" "length"})
-                      
+                      (create-tool-request "calculator"
+                                           {"operation" "add"
+                                            "a"         "15"
+                                            "b"         "25"})
+                      (create-tool-request "calculator"
+                                           {"operation" "multiply"
+                                            "a"         "7"
+                                            "b"         "8"})
+                      (create-tool-request "calculator"
+                                           {"operation" "divide"
+                                            "a"         "100"
+                                            "b"         "4"})
+
+                      ;; String processing requests
+                      (create-tool-request "string-processor"
+                                           {"text"      "Hello World"
+                                            "operation" "uppercase"})
+                      (create-tool-request "string-processor"
+                                           {"text"      "ReverseMe"
+                                            "operation" "reverse"})
+                      (create-tool-request "string-processor"
+                                           {"text"      "Count Characters"
+                                            "operation" "length"})
+
                       ;; System info requests
                       (create-tool-request "system-info" {"type" "time"})
                       (create-tool-request "system-info" {"type" "memory"})
-                      (create-tool-request "system-info" {"type" "java-version"})]]
+                      (create-tool-request "system-info"
+                                           {"type" "java-version"})]]
 
         (let [result (aor/agent-invoke coordinator requests)]
           (println "\nResults:")
           (println "  Action:" (:action result))
           (println "  Requests processed:" (:requests-count result))
           (println "  Results received:" (:results-count result))
-          
+
           (println "\nDetailed results:")
           (doseq [[idx tool-result] (map-indexed vector (:results result))]
             (println (format "  [%d] %s" (inc idx) tool-result)))))
