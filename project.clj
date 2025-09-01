@@ -7,6 +7,8 @@
              "-Xmx6g"
              "-XX:+UseG1GC"
              "-XX:MetaspaceSize=500000000"
+             ;; Ensure stack traces are not elided
+             "-XX:-OmitStackTraceInFastThrow"
              ;; this gives us stack traces directly in output instead of an edn
              ;; file in tmp, which will be lost on CI
              "-Dclojure.main.report=stderr"
