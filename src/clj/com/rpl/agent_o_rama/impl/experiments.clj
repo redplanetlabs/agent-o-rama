@@ -10,6 +10,8 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.ops :as ops])
   (:import
+   [com.rpl.agentorama
+    AgentNode]
    [com.rpl.agentorama.impl
     AgentDeclaredObjectsTaskGlobal]))
 
@@ -195,13 +197,45 @@
     )))
 
 (defn handle-node-invoke
-  [agent-node {:keys [agent-name node input]}]
-  ;; TODO: <<<<>>> just need agent-name, node-name, and input
-  ;;    - should make a wrapper agent-node that just captures emit! and result!
-  ;;        - if it has result!, that should be the sole result
-  ;;        - otherwise it's list of [{"node" ... "args" ...}]
-  ;;    - capture errors as special type
-)
+  [^AgentNode agent-node {:keys [agent-name node args]}]
+  (let [^AgentDeclaredObjectsTaskGlobal declared-objects-tg (anode/get-declared-objects agent-node)
+        node-fn (-> agent-node
+                    .getAgentGraphs
+                    (get agent-name)
+                    :node-map
+                    (get node)
+                    :node
+                    :node-fn)]
+    (if (nil? node-fn)
+      (aor/result! agent-node
+                   (aor-types/->ExperimentFailure "Node does not exist" {:node node} nil))
+      (let [result-vol         (volatile! nil)
+            emits-vol          (volatile! [])
+
+            wrapper-agent-node
+            (reify
+             AgentNode
+             (emit [this node args]
+               (vswap! emits-vol conj [{"node" node "args" (vec args)}]))
+             (result [this arg]
+               (vreset! result-vol {:result arg}))
+             (getStore [this name]
+               (.getStore agent-node name))
+             (streamChunk [this chunk])
+             (recordNestedOp [this nestedOpType startTimeMillis finishTimeMillis info])
+             (getHumanInput [this prompt]
+               (.getHumanInput agent-node prompt)))]
+        (try
+          (apply node-fn wrapper-agent-node args)
+          (if (some? @result-vol)
+            (aor/result! agent-node (:result @result-vol))
+            (aor/result! agent-node @emits-vol))
+          (catch Throwable t
+            (aor/result!
+             agent-node
+             (aor-types/->ExperimentFailure "Failure executing node" {:node node :args args} t))))
+      ))))
+
 
 (defn define-experiments-agent!
   [topology]
