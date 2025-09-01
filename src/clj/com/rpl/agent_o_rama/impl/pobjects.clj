@@ -85,10 +85,6 @@
   []
   "*_agent-clients")
 
-(defn agent-graph-task-global-name
-  [agent-name]
-  (str "*_agent-graph-" agent-name))
-
 (defn agent-id-gen-task-global-name
   [name]
   (str "$$_agent-id-gen-" name))
@@ -277,18 +273,18 @@
 ;; - this should be keyed by the dataset ID...
 ;;    - can't share, since could be experimenting on dataset from another module
 ;;    - it could share if include more info in the dataset schema
-(def EXPERIMENTS-PSTATE-SCHEMA
-  {String (fixed-keys-schema
-           {:dataset-module-name :-String
-            :dataset-id          UUID
-            :snapshot            String
-            :selector            ExperimentInputSelector
-            :max-concurrency     Long
-            :results             (map-schema
-                                  UUID ; example ID
-                                  {java.util.List Object} ; [evaluator-name, metric-name] -> score
-                                  {:subindex? true})
-           })})
+; (def EXPERIMENTS-PSTATE-SCHEMA
+;   {String (fixed-keys-schema
+;            {:dataset-module-name :-String
+;             :dataset-id          UUID
+;             :snapshot            String
+;             :selector            ExperimentInputSelector
+;             :max-concurrency     Long
+;             :results             (map-schema
+;                                   UUID ; example ID
+;                                   {java.util.List Object} ; [evaluator-name, metric-name] -> score
+;                                   {:subindex? true})
+;            })})
 
 ;; Task global fetch helpers
 
@@ -326,7 +322,9 @@
 
 (defn agent-graph-task-global
   [name]
-  (declared-object-task-global (agent-graph-task-global-name name)))
+  (-> (agent-declared-objects-task-global)
+      .getAgentGraphs
+      (get name)))
 
 (defn agent-id-gen-task-global
   [name]

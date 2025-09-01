@@ -4,7 +4,7 @@
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
-   [com.rpl.agent-o-rama.impl.core :as i]
+   [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.throttled-logging :as tl]
@@ -75,7 +75,7 @@
                                             (merge base-info
                                                    {"type"   "success"
                                                     "result" ret}))
-              (i/emit! agent-node
+              (c/emit! agent-node
                        "agg-results"
                        (ToolExecutionResultMessage/from request (str ret))))
 
@@ -85,7 +85,7 @@
                                             start-time-millis
                                             (h/current-time-millis)
                                             (assoc base-info "type" "invalid"))
-              (i/emit! agent-node
+              (c/emit! agent-node
                        "agg-results"
                        (ToolExecutionResultMessage/from
                         request
@@ -94,7 +94,7 @@
           (catch Throwable t
             (try
               (let [error-ret (error-handler t)]
-                (i/emit! agent-node
+                (c/emit! agent-node
                          "agg-results"
                          (ToolExecutionResultMessage/from request error-ret))
                 (tl/warn :tool-exec-error t "Tool execution exception")

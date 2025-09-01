@@ -3,7 +3,6 @@ package com.rpl.agentorama.impl;
 import java.io.IOException;
 
 import com.rpl.agentorama.*;
-import com.rpl.rama.PState;
 import com.rpl.rama.cluster.ClusterManagerBase;
 import com.rpl.rama.integration.*;
 
@@ -16,6 +15,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   Map<String, Map<String, Object>> _builders;
   Map<String, Map<Keyword, Object>> _evaluatorBuilders;
   Map<String, List<String>> _agentsInfo;
+  Map<String, Object> _agentGraphs;
 
   Map<String, WorkerManagedResource> _objects;
   Map<String, List> _evaluators;
@@ -28,10 +28,12 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   public AgentDeclaredObjectsTaskGlobal(
     Map<String, Map<String, Object>> builders,
     Map<String, Map<Keyword, Object>> evaluatorBuilders,
-    Map<String, List<String>> agentsInfo) {
+    Map<String, List<String>> agentsInfo,
+    Map<String, Object> agentGraphs) {
     _builders = builders;
     _evaluatorBuilders = evaluatorBuilders;
     _agentsInfo = agentsInfo;
+    _agentGraphs = agentGraphs;
   }
 
   public String getThisModuleName() {
@@ -40,6 +42,10 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
 
   public Map getEvaluatorBuilders() {
     return _evaluatorBuilders;
+  }
+
+  public Map getAgentGraphs() {
+    return _agentGraphs;
   }
 
   public IFn getEvaluator(String name, String builderName, Map<String, Object> params) {

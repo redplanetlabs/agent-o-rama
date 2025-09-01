@@ -1,8 +1,10 @@
 (ns com.rpl.agent-o-rama.impl.clojure
   (:require
-   [com.rpl.agent-o-rama.impl.graph :as graph])
+   [com.rpl.agent-o-rama.impl.graph :as graph]
+   [com.rpl.agent-o-rama.impl.types :as aor-types])
   (:import
    [com.rpl.agentorama
+    AgentNode
     AgentsTopology]))
 
 (defn new-agent

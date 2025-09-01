@@ -59,10 +59,6 @@
                     :random
                     {:global? true})
 
-    (declare-object* setup
-                     (symbol (po/agent-graph-task-global-name agent-name))
-                     (graph/resolve-agent-graph agent-graph))
-
     (declare-pstate*
      stream-topology
      (symbol (po/agent-root-task-global-name agent-name))
@@ -231,7 +227,11 @@
                    (AgentDeclaredObjectsTaskGlobal.
                     declared-objects
                     evaluator-builders
-                    (mk-agents-info agent-graphs mirror-agents)))
+                    (mk-agents-info agent-graphs mirror-agents)
+                    (transform MAP-VALS
+                               graph/resolve-agent-graph
+                               agent-graphs)
+                   ))
 
   (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))
         datasets-depot-sym     (symbol (po/datasets-depot-name))

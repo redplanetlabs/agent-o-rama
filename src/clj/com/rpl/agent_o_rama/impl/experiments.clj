@@ -155,6 +155,54 @@
                                    (:builder-params %)))]
             eval-info)))
 
+(defn handle-experiment-start
+  [agent-node
+   {:keys [dataset-id snapshot spec]
+    :as   experiment}]
+  (with-retriever [agent-node experiment]
+    [retriever]
+    (let [datasets      (datasets-pstate retriever)
+
+          eval-info     (all-evaluator-info retriever experiment)
+          eval-problems
+          (filterv some?
+           (mapv
+            (fn [evaluator]
+              (let [problem (validate-evaluator agent-node spec evaluator)]
+                (when problem
+                  (assoc problem
+                   :name name
+                   :remote? remote?))))
+            eval-info))]
+      (cond
+        (not-empty eval-problems)
+        (aor/result! agent-node
+                     {:error    "Problem with one or more evaluators"
+                      :problems eval-problems})
+
+        (foreign-select-one
+         [(keypath dataset-id) (view nil?)]
+         datasets)
+        (aor/result! agent-node {:error "Dataset does not exist"})
+
+        (foreign-select-one
+         [(keypath dataset-id) :snapshots (keypath snapshot) (view nil?)]
+         datasets)
+        (aor/result! agent-node {:error "Snapshot does not exist or has no examples"})
+
+        :else
+        (aor/emit! agent-node "root" experiment))
+    )))
+
+(defn handle-node-invoke
+  [agent-node {:keys [agent-name node input]}]
+  ;; TODO: <<<<>>> just need agent-name, node-name, and input
+  ;;    - should make a wrapper agent-node that just captures emit! and result!
+  ;;        - if it has result!, that should be the sole result
+  ;;        - otherwise it's list of [{"node" ... "args" ...}]
+  ;;    - capture errors as special type
+)
+
 (defn define-experiments-agent!
   [topology]
   (->
@@ -163,46 +211,14 @@
     (c/node
      "start"
      "root"
-     (fn [agent-node
-          {:keys [dataset-id snapshot spec]
-           :as   experiment}]
-       (with-retriever [agent-node experiment]
-         [retriever]
-         (let [datasets      (datasets-pstate retriever)
-
-               eval-info     (all-evaluator-info retriever experiment)
-               eval-problems
-               (filterv some?
-                (mapv
-                 (fn [evaluator]
-                   (let [problem (validate-evaluator agent-node spec evaluator)]
-                     (when problem
-                       (assoc problem
-                        :name name
-                        :remote? remote?))))
-                 eval-info))]
-           (cond
-             (not-empty eval-problems)
-             (aor/result! agent-node
-                          {:error    "Problem with one or more evaluators"
-                           :problems eval-problems})
-
-             (foreign-select-one
-              [(keypath dataset-id) (view nil?)]
-              datasets)
-             (aor/result! agent-node {:error "Dataset does not exist"})
-
-             (foreign-select-one
-              [(keypath dataset-id) :snapshots (keypath snapshot) (view nil?)]
-              datasets)
-             (aor/result! agent-node {:error "Snapshot does not exist or has no examples"})
-
-             :else
-             (aor/emit! agent-node "root" experiment))
-         ))))
+     (fn [agent-node input]
+       (if (aor-types/StartExperiment? input)
+         (handle-experiment-start agent-node input)
+         (handle-node-invoke agent-node input))
+     ))
     (c/agg-start-node
      "root"
-     "evaluate"
+     "initiate"
      (fn [agent-node
           {:keys [dataset-id snapshot selector concurrency]
            :as   experiment}]
@@ -213,13 +229,43 @@
                chunks      (h/split-into-n concurrency example-ids)]
            (doseq [c chunks]
              (when-not (empty? c)
-               (aor/emit! agent-node "evaluate" experiment c)))
+               (aor/emit! agent-node "initiate" experiment c)))
          ))
        experiment))
     (c/node
+     "initiate"
+     "evaluate"
+     (fn [agent-node experiment example-ids]
+       (with-retriever [agent-node
+                        {:keys [name dataset-id] :as experiment}
+                        example-ids]
+         [retriever]
+         (let [datasets (datasets-pstate retriever)]
+           (reduce
+            (fn [m example-id]
+                ;; TODO: <<<<>>>
+                ;;  - look at spec and initiate all agents
+                ;;    - need to fetch dataset example input
+                ;;    - need to create arguments from experiment spec input->args
+                ;;  - TODO: <<<>>>
+                ;;    - what if have an agent that can just execute a single node of another agent,
+                ;;    and package it's emits
+                ;;      - don't want the overhead of an entire other agent...
+                ;;        - could make this agent capable of doing it with a dispatch at the root...
+                ;;  - assoc into m example-id->[agent-invokes]
+                ;;      - TODO: <<<<>>> what about for individual node?
+            )
+            {}
+            example-ids
+           )
+
+
+
+         ))))
+    (c/node
      "evaluate"
      "finish"
-     (fn [agent-node experiment example-ids]
+     (fn [agent-node experiment example-id->invoke-ids]
        (with-retriever [agent-node
                         {:keys [name dataset-id] :as experiment}
                         example-ids]
@@ -229,13 +275,17 @@
                local-ds   (local-datasets-pstate retriever)
                datasets   (datasets-pstate retriever)]
            (doseq [example-id example-ids]
-             ;; TODO: <<<<>>>>
-             ;;  - skip if already recorded results for this example ID
-             ;;     - how to store agent output vs. evaluators? probably different keys in PState so
-             ;;     UI can distinguish
-
 
            )
+           ;; TODO: <<<<>>>>
+           ;;  - skip if already recorded results for this example ID
+           ;;     - how to store agent output vs. evaluators? probably different keys in PState so
+           ;;     UI can distinguish
+           ;;     - would be nice not to have to run agents multiple times if there's a node
+           ;;     failure
+           ;;     - seems like this node should initiate agent invokes, and should get results in
+           ;;     next node
+           ;;     - need to keep track of failures
 
            ; (doseq [{:keys [builder-name builder-params]}]
            ;

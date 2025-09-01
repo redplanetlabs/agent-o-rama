@@ -360,13 +360,12 @@
 
 (defn declare-get-current-graph
   [topologies agent-name]
-  (let [agent-graph-sym (symbol (po/agent-graph-task-global-name agent-name))]
-    (<<query-topology topologies
-      (agent-get-current-graph-name agent-name)
-      [:> *res]
-      (|origin)
-      (graph/graph->historical-graph-info agent-graph-sym :> *res)
-    )))
+  (<<query-topology topologies
+    (agent-get-current-graph-name agent-name)
+    [:> *res]
+    (|origin)
+    (graph/graph->historical-graph-info (po/agent-graph-task-global agent-name) :> *res)
+  ))
 
 ;; Datasets
 
