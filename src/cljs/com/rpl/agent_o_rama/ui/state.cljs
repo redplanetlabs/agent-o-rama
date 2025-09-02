@@ -269,33 +269,42 @@
            (fn [db {:keys [query-key-pattern]}]
              ;; Find all query keys that match the pattern and mark them for refetch
              ;; This allows invalidating multiple related queries at once
+             ;; Now supports TanStack Query-style prefix matching for vectors
              (let [queries-path [:queries]
                    current-queries (get-in @app-db queries-path {})
-                   matching-keys (if (vector? query-key-pattern)
-                                   ;; Exact match for specific query key
-                                   [query-key-pattern]
-                                   ;; Pattern matching for multiple queries
-                                   (filter (fn [query-key]
-                                             (cond
-                                               (keyword? query-key-pattern)
-                                               ;; Match first element of query key
-                                               (= (first query-key) query-key-pattern)
+                   matching-keys (filter
+                                  (fn [query-key]
+                                    (cond
+                                      ;; Case 1: Pattern is a keyword (existing behavior)
+                                      ;; e.g., :dataset-examples
+                                      (keyword? query-key-pattern)
+                                      (= (first query-key) query-key-pattern)
 
-                                               (fn? query-key-pattern)
-                                               ;; Custom predicate function
-                                               (query-key-pattern query-key)
+                                      ;; Case 2: Pattern is a vector (TanStack Query-style prefix matching)
+                                      ;; e.g., [:dataset-examples "m1" "d1"]
+                                      (vector? query-key-pattern)
+                                      (and (vector? query-key)
+                                           (>= (count query-key) (count query-key-pattern))
+                                           (= query-key-pattern (subvec query-key 0 (count query-key-pattern))))
 
-                                               :else false))
-                                           (keys current-queries)))]
+                                      ;; Case 3: Pattern is a function (for complex logic)
+                                      (fn? query-key-pattern)
+                                      (query-key-pattern query-key)
+
+                                      :else false))
+                                  (keys current-queries))]
 
                ;; Mark matching queries as stale by setting a flag
                ;; The use-sente-query hook will check this flag and refetch
-               (reduce (fn [path query-key]
-                         (into path
-                               [(into queries-path [query-key])
-                                (s/terminal #(assoc % :should-refetch? true))]))
-                       []
-                       matching-keys))))
+               ;; Mark matching queries as stale by setting a flag
+               ;; The use-sente-query hook will check this flag and refetch
+               ;; Return proper Specter multi-path for multiple updates
+               (if (empty? matching-keys)
+                 [] ; No updates needed
+                 (apply s/multi-path
+                        (map (fn [query-key]
+                               (into queries-path [query-key :should-refetch?] [(s/terminal-val true)]))
+                             matching-keys))))))
 
  ;; =============================================================================
 ;; MODAL EVENTS
