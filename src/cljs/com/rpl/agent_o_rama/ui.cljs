@@ -7,6 +7,7 @@
    [com.rpl.agent-o-rama.ui.agents :as agents]
    [com.rpl.agent-o-rama.ui.config-page :as config-page]
    [com.rpl.agent-o-rama.ui.datasets :as datasets]
+   [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    ;; Replace wouter with reitit
    [reitit.core :as r]
    [reitit.frontend :as rf]
@@ -38,7 +39,7 @@
      ["/datasets"
       ["" {:name :module/datasets, :view datasets/index}]
       ["/:dataset-id" {:name :module/dataset-detail, :view datasets/detail}]]
-     ["/evaluations" {:name :module/evaluations, :view agents/evaluations}]
+     ["/evaluations" {:name :module/evaluations, :view evaluators/index}]
      ;; Agent routes with prefix to avoid conflicts
      ["/agent/:agent-name"
       ["" {:name :agent/detail, :view agents/agent}]
@@ -164,7 +165,6 @@
         [collapsed? set-collapsed] (common/use-local-storage "sidebar-collapsed?" false)
         toggle-collapsed #(set-collapsed (not collapsed?))]
 
-
     ($ :div {:className (str "h-screen flex flex-col bg-gray-100 transition-all duration-300 "
                              (if collapsed? "w-16" "w-64"))}
        ;; Header (no changes here)
@@ -173,7 +173,7 @@
             ($ :img {:src "/logo-black.png"
                      :alt "Agent-O-Rama"
                      :className "h-8 max-w-48 object-contain"}))
-          
+
           ($ :button {:onClick toggle-collapsed
                       :className "p-2 rounded-md hover:bg-gray-200 transition-colors"
                       :title (if collapsed? "Expand sidebar" "Collapse sidebar")}
@@ -198,7 +198,6 @@
             ($ agent-context-nav {:module-id module-id
                                   :agent-name agent-name
                                   :collapsed? collapsed?}))))))
-
 
 ;; =============================================================================
 ;; BREADCRUMB COMPONENT

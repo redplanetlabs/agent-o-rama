@@ -299,6 +299,7 @@
           ($ :pre.text-xs.bg-gray-100.p-2.rounded.mt-1.max-h-40.overflow-auto
              (pretty-print-json (:reference-output example))))
 
+
        ;; 2. Evaluator Selection
        ($ :div
           ($ :label.block.text-sm.font-medium.text-gray-700 {:htmlFor "eval-select"} "Evaluator")
@@ -617,7 +618,7 @@
           ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer
              {:onClick #(show-create-dataset-modal! module-id-raw)}
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
-             "Create New Dataset"))
+             "New Dataset"))
 
        (cond
          loading? ($ :div.text-center.py-12 "Loading datasets...")

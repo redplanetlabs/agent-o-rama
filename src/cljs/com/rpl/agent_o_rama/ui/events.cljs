@@ -441,3 +441,36 @@
                           (when on-success (on-success snapshot-name)))
                         (state/dispatch [:db/set-value [:ui :modal :form :error] (:error reply)]))))
                    nil))
+
+ ;; =============================================================================
+;; EVALUATOR FORM EVENTS
+;; =============================================================================
+
+(state/reg-event :evaluators/create
+                 (fn [db {:keys [module-id builder-name name description params input-json-path output-json-path reference-output-json-path on-success]}]
+                   ;; Set modal form to submitting state
+                   (state/dispatch [:form/set-submitting :create-evaluator true])
+                   (state/dispatch [:form/set-error :create-evaluator nil])
+
+                   (sente/request!
+                    [:evaluators/create {:module-id module-id
+                                         :builder-name builder-name
+                                         :name name
+                                         :description description
+                                         :params params
+                                         :input-json-path input-json-path
+                                         :output-json-path output-json-path
+                                         :reference-output-json-path reference-output-json-path}]
+                    15000
+                    (fn [reply]
+                      (state/dispatch [:form/set-submitting :create-evaluator false])
+                      (if (:success reply)
+                        (do
+                          (state/dispatch [:modal/hide])
+                          ;; Invalidate evaluators query to trigger refetch
+                          (let [decoded-module-id (when module-id (common/url-decode module-id))]
+                            (state/dispatch [:query/invalidate {:query-key-pattern [:evaluators decoded-module-id]}]))
+                          ;; Keep backward compatibility for now
+                          (when on-success (on-success)))
+                        (state/dispatch [:form/set-error :create-evaluator (:error reply)]))))
+                   nil))
