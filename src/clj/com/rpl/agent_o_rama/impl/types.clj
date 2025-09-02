@@ -365,7 +365,7 @@
 
 
 (drp/defrecord+ ExperimentTarget
-  [target-spec :- TargetSpec
+  [target-spec :- (s/protocol TargetSpec)
    input->args :- [String]])
 
 
@@ -401,10 +401,10 @@
 
    dataset-id :- UUID
    snapshot :- (s/maybe String)
-   selector :- (s/maybe ExperimentInputSelector)
+   selector :- (s/maybe (s/protocol ExperimentInputSelector))
    evaluators :- [EvaluatorSelector]
 
-   spec :- ExperimentSpec
+   spec :- (s/protocol ExperimentSpec)
 
    concurrency :- Long
   ])

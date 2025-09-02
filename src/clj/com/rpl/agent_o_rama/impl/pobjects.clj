@@ -3,12 +3,13 @@
   (:require
    [com.rpl.agent-o-rama.impl.types])
   (:import
+   [com.rpl.agentorama
+    AgentInvoke]
    [com.rpl.agentorama.impl
     AgentDeclaredObjectsTaskGlobal
     AgentNodeExecutorTaskGlobal
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
-    AgentInvoke
     AgentNodeEmit
     AgentResult
     AggInput
@@ -252,14 +253,16 @@
      (map-schema
       String ; prefix-UUID7
       (fixed-keys-schema
+       ;; TODO: <<<<>>> maybe this shoudl be fixed keys schema
+       ;;  - or just use flex serialization
        {:experiment-info StartExperiment
         :results         (map-schema
                           UUID ; example ID
                           ;; - agent invokes/results are keyed by their index in experiment targets
                           ;; - non-comparative experiment will have single one keyed at 0
                           (fixed-keys-schema
-                           {:agent-initiates {Long {:agent-name   String
-                                                    :agent-invoke AgentInvoke}}
+                           {:agent-initiates {Long (fixed-keys-schema {:agent-name   String
+                                                                       :agent-invoke AgentInvoke})}
                             :agent-results   {Long Object}
                             :evals           {String {String Object}} ; eval-name->eval-key->result
                            })
@@ -282,29 +285,6 @@
             :output-json-path String
             :reference-output-json-path String
            })})
-
-; (defn experiments-task-global-name
-;   []
-;   "$$_aor-experiments")
-
-;; TODO: <<<<>>> hash by the prefix so can see them all together and query for them easily?
-;; - can just key by the prefix which is easier...
-;; - this should be keyed by the dataset ID...
-;;    - can't share, since could be experimenting on dataset from another module
-;;    - it could share if include more info in the dataset schema
-; (def EXPERIMENTS-PSTATE-SCHEMA
-;   {String (fixed-keys-schema
-;            {:dataset-module-name :-String
-;             :dataset-id          UUID
-;             :snapshot            String
-;             :selector            ExperimentInputSelector
-;             :max-concurrency     Long
-;             :results             (map-schema
-;                                   UUID ; example ID
-;                                   {java.util.List Object} ; [evaluator-name, metric-name] ->
-;                                   score
-;                                   {:subindex? true})
-;            })})
 
 ;; Task global fetch helpers
 
