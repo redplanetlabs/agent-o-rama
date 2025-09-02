@@ -409,13 +409,6 @@
       :props
       :name))
 
-(def +concat
-  (accumulator
-   (fn [v]
-     (path END (termval v)))
-   :init-fn
-   (constantly [])))
-
 (defn contains-string?-pred
   [substring]
   (fn [s]
@@ -451,7 +444,7 @@
           (continue> (h/last-key *m) *new-results)
         ))
       (|origin)
-      (+concat *l :> *items)
+      (h/+concatv *l :> *items)
       (into {} (take *limit *items) :> *res)
     )))
 

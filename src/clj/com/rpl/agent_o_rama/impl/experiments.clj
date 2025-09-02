@@ -264,43 +264,38 @@
       (aor-types/->AgentResult {:message "Failure on example" :throwable t} true)
     )))
 
+(defn non-summary-evaluate!
+  [agent-node spec eval-fn input reference-output outputs]
+  (cond
+    (aor-types/RegularExperiment? spec)
+    (do
+      (assert (= 1 (count outputs)))
+      (eval-fn agent-node input reference-output (nth outputs 0)))
+
+    (aor-types/ComparativeExperiment? spec)
+    (eval-fn agent-node input reference-output outputs)
+
+    :else
+    (throw (h/ex-info "Unexpected experiment spec" {:type (class spec)}))))
+
 (defn evaluate!
-  [agent-node local-ds dataset-id name spec eval-name eval-fn example-id input reference-output
-   outputs]
+  [local-ds dataset-id eval-name prefix-path results-key failures-key runner-fn]
   (try
-    (let [results
-          (cond
-            (aor-types/RegularExperiment? spec)
-            (do
-              (assert (= 1 (count outputs)))
-              (eval-fn agent-node input reference-output (nth outputs 0)))
-
-            (aor-types/ComparativeExperiment? spec)
-            (eval-fn agent-node input reference-output outputs)
-
-            :else
-            (throw (h/ex-info "Unexpected experiment spec" {:type (class spec)})))]
+    (let [results (runner-fn)]
       (when-not (map? results)
         (throw (h/ex-info "Evaluator did not return a map of results" {:return results})))
       (store/pstate-transform!
-       [(keypath dataset-id :experiments name :results example-id :evals (termval results))]
+       [prefix-path (keypath results-key eval-name) (termval results)]
        local-ds
        dataset-id))
     (catch Throwable t
       (store/pstate-transform!
-       [(keypath dataset-id :experiments name :results example-id)
-        (multi-path [:evals (keypath eval-name) NONE>]
-                    [:eval-failures (keypath eval-name) (termval (h/throwable->str t))])]
+       [prefix-path
+        (multi-path [(keypath results-key eval-name) NONE>]
+                    [(keypath failures-key eval-name) (termval (h/throwable->str t))])]
        local-ds
        dataset-id)
     )))
-
-(def +concatv
-  (accumulator
-   (fn [v]
-     (path END (termval v)))
-   :init-fn
-   (constantly [])))
 
 (defn fetch-example-runs
   [local-ds datasets name dataset-id snapshot example-ids]
@@ -458,24 +453,26 @@
                  (doseq [[eval-name eval-fn] evaluators
                          :when (and (not (contains? curr-evals eval-name))
                                     (not (contains? eval-failures eval-name)))]
-                   (evaluate! agent-node
-                              local-ds
+                   (evaluate! local-ds
                               dataset-id
-                              name
-                              spec
                               eval-name
-                              eval-fn
-                              example-id
-                              input
-                              reference-output
-                              (select [MAP-VALS :val] agent-results))
+                              (keypath dataset-id :experiments name :results example-id)
+                              :evals
+                              :eval-failures
+                              #(non-summary-evaluate!
+                                agent-node
+                                spec
+                                eval-fn
+                                input
+                                reference-output
+                                (select [MAP-VALS :val] agent-results)))
                  ))))
            (c/emit! agent-node "finish" example-ids)
          ))))
     (c/agg-node
      "finish"
      nil
-     +concatv
+     h/+concatv
      (fn [agent-node example-ids {:keys [name dataset-id snapshot] :as experiment}]
        (with-retriever [agent-node experiment]
          [retriever]
@@ -485,13 +482,22 @@
                local-ds   (local-datasets-store retriever)]
            (when-not (empty? evaluators)
              (let [example-runs
-                   (fetch-example-runs local-ds datasets name dataset-id snapshot example-ids)]
-               (doseq [[eval-name eval-fn] evaluators]
-                 ;; TODO: <<<<>>>> run summary evaluators if appropriate
-                 ;;   - similarly, needs to check and skip if already ran
-                 ;;   - input is list<ExampleRun>
-                 ; [(keypath dataset-id :experiments name :summary-evals)]
-                 ;;   - need ALL the example IDs
+                   (fetch-example-runs local-ds datasets name dataset-id snapshot example-ids)
+
+                   {curr-evals :summary-evals curr-failures :summary-eval-failures}
+                   (store/pstate-select-one [(keypath dataset-id :experiments name)
+                                             (submap [:summary-evals :summary-eval-failures])]
+                                            local-ds)]
+               (doseq [[eval-name eval-fn] evaluators
+                       :when (and (not (contains? curr-evals eval-name))
+                                  (not (contains? curr-failures eval-name)))]
+                 (evaluate! local-ds
+                            dataset-id
+                            eval-name
+                            (keypath dataset-id :experiments name)
+                            :summary-evals
+                            :summary-eval-failures
+                            #(eval-fn agent-node example-runs))
                )))
            (store/pstate-transform!
             [(keypath dataset-id :experiments name :finish-time-millis)

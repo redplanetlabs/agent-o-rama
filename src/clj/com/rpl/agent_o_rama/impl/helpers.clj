@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.impl.helpers
   (:refer-clojure :exclude [ex-info])
-  (:use [com.rpl.rama.path])
+  (:use [com.rpl.rama]
+        [com.rpl.rama.path])
   (:require
    [clojure.set :as set]
    [clojure.string :as str]
@@ -313,3 +314,10 @@
         pad  (map #(take n (concat % (repeat nil))) rows)
         cols (apply map vector pad)]
     (mapv (comp vec #(remove nil? %)) cols)))
+
+(def +concatv
+  (accumulator
+   (fn [v]
+     (path END (termval v)))
+   :init-fn
+   (constantly [])))
