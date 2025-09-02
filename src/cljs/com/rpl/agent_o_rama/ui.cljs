@@ -120,12 +120,12 @@
        ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/datasets")
                     :location location :collapsed? collapsed? :title "Datasets"}
           ($ CircleStackIcon {:className "h-5 w-5 flex-shrink-0"})
-          (when-not collapsed? ($ :span.ml-3 "Datasets")))
+          (when-not collapsed? ($ :span.ml-3 "Datasets & Experiments")))
 
        ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/evaluations")
                     :location location :collapsed? collapsed? :title "Evaluations"}
           ($ BeakerIcon {:className "h-5 w-5 flex-shrink-0"})
-          (when-not collapsed? ($ :span.ml-3 "Evaluations")))
+          (when-not collapsed? ($ :span.ml-3 "Evaluators")))
 
        ;; Module-specific agents list
        (cond
