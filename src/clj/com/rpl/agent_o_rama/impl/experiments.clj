@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.store :as store]
+   [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops])
   (:import
    [com.rpl.agentorama
@@ -29,11 +30,11 @@
 
 (defn get-evaluator-builders
   [agent-node]
-  (.getEvaluatorBuilders ^AgentDeclaredObjectsTaskGlobal (anode/get-declared-objectsagent-node)))
+  (.getEvaluatorBuilders ^AgentDeclaredObjectsTaskGlobal (anode/get-declared-objects agent-node)))
 
 (defn get-evaluator
   [agent-node name builder-name params]
-  (.getEvaluator ^AgentDeclaredObjectsTaskGlobal (anode/get-declared-objectsagent-node)
+  (.getEvaluator ^AgentDeclaredObjectsTaskGlobal (anode/get-declared-objects agent-node)
                  name
                  builder-name
                  params))
@@ -44,15 +45,15 @@
           module-name# :module-name}
          ~experiment
 
-         _ (when (and cluster-conductor-host# (nil? module-name#))
-             (throw (h/ex-info "Must specify module when connecting to remote cluster"
-                               {:cluster-conductor-host cluster-conductor-host#})))
+         ~'_ (when (and cluster-conductor-host# (nil? module-name#))
+               (throw (h/ex-info "Must specify module when connecting to remote cluster"
+                                 {:cluster-conductor-host cluster-conductor-host#})))
 
          retriever# (if cluster-conductor-host#
                       (open-cluster-manager {"conductor.host" cluster-conductor-host#})
                       (get-cluster-retriever ~agent-node))
 
-         retriever-sym# {:retriever retriever :agent-node agent-node :experiment experiment}]
+         ~retriever-sym {:retriever retriever# :agent-node ~agent-node :experiment ~experiment}]
      (try
        ~@body
        (finally
@@ -79,7 +80,7 @@
   (.getStore ^AgentNode agent-node (po/datasets-task-global-name)))
 
 (defn local-evals-pstate
-  [{:Keys [agent-node]}]
+  [{:keys [agent-node]}]
   (foreign-pstate
    (get-cluster-retriever agent-node)
    (get-this-module-name agent-node)
@@ -97,7 +98,7 @@
         (throw (h/ex-info "Unexpected experiment spec" {:type (class spec)}))))
 
 (defn validate-evaluator
-  [agent-node spec #{:keys [builder-name] :as evaluator}]
+  [agent-node spec {:keys [builder-name] :as evaluator}]
   (let [builders (get-evaluator-builders agent-node)
         info     (get builders builder-name)]
     (cond
@@ -135,11 +136,14 @@
 
 (defn all-evaluator-info
   [retriever {:keys [evaluators]}]
-  (let [ds-evals    (evals-pstate reriever)
+  (let [ds-evals    (evals-pstate retriever)
         local-evals (local-evals-pstate retriever)]
     (mapv
      (fn [{:keys [name remote?]}]
-       (foreign-select-one (keypath name) (if remote? ds-evals local-evals)))
+       (if-let [m (foreign-select-one (keypath name) (if remote? ds-evals local-evals))]
+         (assoc m
+          :name name
+          :remote? remote?)))
      evaluators)))
 
 (defn relevant-evaluators
@@ -170,7 +174,7 @@
           eval-problems
           (filterv some?
            (mapv
-            (fn [evaluator]
+            (fn [{:keys [name remote?] :as evaluator}]
               (let [problem (validate-evaluator agent-node spec evaluator)]
                 (when problem
                   (assoc problem
@@ -179,28 +183,28 @@
             eval-info))]
       (cond
         (not-empty eval-problems)
-        (aor/result! agent-node
-                     {:error    "Problem with one or more evaluators"
-                      :problems eval-problems})
+        (c/result! agent-node
+                   {:error    "Problem with one or more evaluators"
+                    :problems eval-problems})
 
         (foreign-select-one
          [(keypath dataset-id) (view nil?)]
          datasets)
-        (aor/result! agent-node {:error "Dataset does not exist"})
+        (c/result! agent-node {:error "Dataset does not exist"})
 
         (foreign-select-one
          [(keypath dataset-id) :snapshots (keypath snapshot) (view nil?)]
          datasets)
-        (aor/result! agent-node {:error "Snapshot does not exist or has no examples"})
+        (c/result! agent-node {:error "Snapshot does not exist or has no examples"})
 
         :else
-        (aor/emit! agent-node "root" experiment))
+        (c/emit! agent-node "root" experiment))
     )))
 
 (defn handle-node-invoke
   [^AgentNode agent-node {:keys [agent-name node args]}]
   (let [^AgentDeclaredObjectsTaskGlobal declared-objects-tg (anode/get-declared-objects agent-node)
-        node-fn (-> agent-node
+        node-fn (-> declared-objects-tg
                     .getAgentGraphs
                     (get agent-name)
                     :node-map
@@ -208,9 +212,9 @@
                     :node
                     :node-fn)]
     (if (nil? node-fn)
-      (aor/result! agent-node
-                   (aor-types/->AgentResult {:message "Node does not exist" :node node}
-                                            true))
+      (c/result! agent-node
+                 (aor-types/->AgentResult {:message "Node does not exist" :node node}
+                                          true))
       (let [result-vol         (volatile! nil)
             emits-vol          (volatile! [])
 
@@ -230,10 +234,10 @@
         (try
           (apply node-fn wrapper-agent-node args)
           (if (some? @result-vol)
-            (aor/result! agent-node (:result @result-vol))
-            (aor/result! agent-node @emits-vol))
+            (c/result! agent-node (:result @result-vol))
+            (c/result! agent-node @emits-vol))
           (catch Throwable t
-            (aor/result!
+            (c/result!
              agent-node
              (aor-types/->AgentResult
               {:message "Failure executing node" :node node :args args :throwable t}
@@ -250,7 +254,7 @@
 (defn agent-result-obj
   [client agent-invoke]
   (try
-    (let [result (c/agent-result (nth clients i) (nth @initiates-vol i))]
+    (let [result (c/agent-result client agent-invoke)]
       (if (aor-types/AgentResult? result)
         result
         (aor-types/->AgentResult result false)))
@@ -284,7 +288,7 @@
                chunks      (h/split-into-n concurrency example-ids)]
            (doseq [c chunks]
              (when-not (empty? c)
-               (aor/emit! agent-node "invoke" experiment c)))
+               (c/emit! agent-node "invoke" experiment c)))
          ))
        experiment))
     (c/node
@@ -353,7 +357,7 @@
                        (termval result)]
                       local-ds
                       dataset-id)
-                     (vswap! results-vol conj info)
+                     (vswap! results-vol conj result)
                    )))
              ))
            (c/emit! agent-node "evaluate" experiment example-ids)
@@ -361,10 +365,8 @@
     (c/node
      "evaluate"
      "finish"
-     (fn [agent-node experiment invokes-map]
-       (with-retriever [agent-node
-                        {:keys [name dataset-id] :as experiment}
-                        example-ids]
+     (fn [agent-node {:keys [name dataset-id] :as experiment} example-ids]
+       (with-retriever [agent-node experiment]
          [retriever]
          (let [eval-info  (all-evaluator-info retriever experiment)
                evaluators (relevant-evaluators agent-node eval-info #{:regular :comparative})
