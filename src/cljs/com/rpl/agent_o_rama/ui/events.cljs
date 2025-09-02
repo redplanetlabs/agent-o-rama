@@ -368,12 +368,8 @@
                         (if (:success reply)
                           (do
                             (state/dispatch [:modal/hide])
-                            ;; Invalidate dataset examples query to trigger refetch
-                            ;; Invalidate dataset examples query to trigger refetch
-                            ;; Invalidate dataset examples query to trigger refetch with precise pattern
-                            ;; This will only invalidate examples for this specific dataset, not all datasets
-                            (let [decoded-module-id (when module-id (common/url-decode module-id))]
-                              (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples decoded-module-id dataset-id]}]))
+                            ;; Invalidate dataset examples query to trigger refetch for this dataset & snapshot
+                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
                             ;; Keep backward compatibility for now
                             (when on-success (on-success)))
                           (state/dispatch [:db/set-value [:ui :modal :form :error]
@@ -409,11 +405,8 @@
                         (if (:success reply)
                           (do
                             (state/dispatch [:modal/hide])
-                            ;; Invalidate dataset examples query to trigger refetch
-                            ;; Invalidate dataset examples query to trigger refetch with precise pattern
-                            ;; This will only invalidate examples for this specific dataset, not all datasets
-                            (let [decoded-module-id (when module-id (common/url-decode module-id))]
-                              (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples decoded-module-id dataset-id]}]))
+                            ;; Invalidate dataset examples query to trigger refetch for this dataset & snapshot
+                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
                             ;; Keep backward compatibility for now
                             (when on-success (on-success)))
                           (state/dispatch [:db/set-value [:ui :modal :form :error]

@@ -268,23 +268,34 @@
 (reg-event :query/invalidate
            (fn [db {:keys [query-key-pattern]}]
              ;; Find all query keys that match the pattern and mark them for refetch
-             ;; This allows invalidating multiple related queries at once
-             ;; Now supports TanStack Query-style prefix matching for vectors
+             ;; Supports nested query-key vectors stored under :queries as nested maps
              (let [queries-path [:queries]
                    current-queries (get-in @app-db queries-path {})
+                   ;; Collect all full query-key vectors under :queries (leaf maps contain :status)
+                   all-query-keys (letfn [(collect-keys [m prefix acc]
+                                            (reduce-kv
+                                             (fn [a k v]
+                                               (let [new-prefix (conj prefix k)]
+                                                 (cond
+                                                   (and (map? v) (contains? v :status))
+                                                   (conj a (vec new-prefix))
+
+                                                   (map? v)
+                                                   (collect-keys v new-prefix a)
+                                                   :else a)))
+                                             acc
+                                             m))]
+                                    (collect-keys current-queries [] []))
                    matching-keys (filter
                                   (fn [query-key]
                                     (cond
-                                      ;; Case 1: Pattern is a keyword (existing behavior)
-                                      ;; e.g., :dataset-examples
+                                      ;; Case 1: Pattern is a keyword: match first segment
                                       (keyword? query-key-pattern)
                                       (= (first query-key) query-key-pattern)
 
-                                      ;; Case 2: Pattern is a vector (TanStack Query-style prefix matching)
-                                      ;; e.g., [:dataset-examples "m1" "d1"]
+                                      ;; Case 2: Pattern is a vector: prefix match
                                       (vector? query-key-pattern)
-                                      (and (vector? query-key)
-                                           (>= (count query-key) (count query-key-pattern))
+                                      (and (>= (count query-key) (count query-key-pattern))
                                            (= query-key-pattern (subvec query-key 0 (count query-key-pattern))))
 
                                       ;; Case 3: Pattern is a function (for complex logic)
@@ -292,18 +303,13 @@
                                       (query-key-pattern query-key)
 
                                       :else false))
-                                  (keys current-queries))]
-
-               ;; Mark matching queries as stale by setting a flag
-               ;; The use-sente-query hook will check this flag and refetch
-               ;; Mark matching queries as stale by setting a flag
-               ;; The use-sente-query hook will check this flag and refetch
-               ;; Return proper Specter multi-path for multiple updates
-               (if (empty? matching-keys)
-                 [] ; No updates needed
+                                  all-query-keys)]
+               ;; Mark matching queries as stale by setting a flag (:should-refetch?)
+               (when (seq matching-keys)
                  (apply s/multi-path
                         (map (fn [query-key]
-                               (into queries-path [query-key :should-refetch?] [(s/terminal-val true)]))
+                               (into (into queries-path query-key)
+                                     [:should-refetch? (s/terminal-val true)]))
                              matching-keys))))))
 
  ;; =============================================================================
