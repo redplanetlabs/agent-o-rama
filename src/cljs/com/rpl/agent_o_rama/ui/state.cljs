@@ -71,7 +71,9 @@
    that will be applied to the current app-db via s/multi-transform. Handlers
    may return nil to indicate no state change is needed."
   [event-id handler-fn]
-  (swap! event-handlers assoc event-id handler-fn))
+  (if (contains? @event-handlers event-id)
+    (println "⚠️ Event handler already registered for event:" event-id)
+    (swap! event-handlers assoc event-id handler-fn)))
 
 (defn dispatch
   "Dispatch an event to update app-db. Event is a vector [event-id & args].
@@ -397,69 +399,6 @@
                           :valid? valid?
                           :error nil
                           :submitting? false))))]))
-
- ;; =============================================================================
-;; BUSINESS LOGIC EVENTS (DOMAIN-SPECIFIC)
-;; =============================================================================
-
-(reg-event :dataset/create
-           (fn [db {:keys [module-id name description input-schema output-schema on-success form-id]}]
-             ;; This event will be handled by the datasets namespace which has access to sente
-             (dispatch [:sente/request {:event [:datasets/create {:module-id module-id
-                                                                  :name name
-                                                                  :description description
-                                                                  :input-schema input-schema
-                                                                  :output-schema output-schema}]
-                                        :timeout 10000
-                                        :on-success (fn []
-                                                      (dispatch [:modal/hide])
-                                                      (dispatch [:form/clear (or form-id :create-dataset)])
-                                                      (when on-success (on-success)))
-                                        :on-error (fn [error]
-                                                    (dispatch [:form/set-submitting (or form-id :create-dataset) false])
-                                                    (dispatch [:form/set-error (or form-id :create-dataset) error]))}])
-             nil))
-
- ;; Enhanced modal/form events for datasets
-;; NOTE: Modal initialization is now handled directly in the UI layer
-;; to avoid circular dependencies between state and UI components
-
-;; Modal events removed - handled directly in UI layer
-
-(reg-event :dataset/edit
-           (fn [db {:keys [module-id dataset-id name description initial-name initial-description on-success form-id]}]
-             ;; This event will be handled by the datasets namespace which has access to sente
-             (dispatch [:sente/request {:event [:datasets/edit {:module-id module-id
-                                                                :dataset-id dataset-id
-                                                                :name name
-                                                                :description description}]
-                                        :timeout 10000
-                                        :on-success (fn []
-                                                      (dispatch [:modal/hide])
-                                                      (dispatch [:form/clear (or form-id :edit-dataset)])
-                                                      (when on-success (on-success)))
-                                        :on-error (fn [error]
-                                                    (dispatch [:form/set-submitting (or form-id :edit-dataset) false])
-                                                    (dispatch [:form/set-error (or form-id :edit-dataset) error]))}])
-             nil))
-
-(reg-event :dataset/add-example
-           (fn [db {:keys [module-id dataset-id snapshot-name input output on-success form-id]}]
-             ;; This event will be handled by the datasets namespace which has access to sente
-             (dispatch [:sente/request {:event [:datasets/add-example {:module-id module-id
-                                                                       :dataset-id dataset-id
-                                                                       :snapshot-name snapshot-name
-                                                                       :input input
-                                                                       :output output}]
-                                        :timeout 10000
-                                        :on-success (fn []
-                                                      (dispatch [:modal/hide])
-                                                      (dispatch [:form/clear (or form-id :add-example)])
-                                                      (when on-success (on-success)))
-                                        :on-error (fn [error]
-                                                    (dispatch [:form/set-submitting (or form-id :add-example) false])
-                                                    (dispatch [:form/set-error (or form-id :add-example) error]))}])
-             nil)) ; This handler only dispatches other events
 
 ;; =============================================================================
 ;; ROUTING EVENTS
