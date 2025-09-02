@@ -10,38 +10,9 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path]))
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/get-all
-  [{:keys [manager filters]} uid]
-  (let [evals-pstate (:evals-pstate (aor-types/underlying-objects manager))
-        all-builders-query (:all-eval-builders-query (aor-types/underlying-objects manager))
-        all-builders (foreign-invoke-query all-builders-query)
-        all-evals (foreign-select [ALL] evals-pstate)]
-    (->> all-evals
-         (map (fn [[name info]]
-                (let [builder-info (get all-builders (:builder-name info))]
-                  (assoc info :name name :type (:type builder-info)))))
-         ;; Optional filtering by type
-         (filter (if-let [types (:types filters)]
-                   #(contains? types (:type %))
-                   (constantly true)))
-         (into []))))
-
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/get-all-builders
-  [{:keys [manager module-id]} uid]
-  (let [all-builders-query (:all-eval-builders-query (aor-types/underlying-objects manager))]
-    (foreign-invoke-query all-builders-query)))
-
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/get-all-instances
   [{:keys [manager module-id]} uid]
-  (let [evals-pstate (:evals-pstate (aor-types/underlying-objects manager))
-        all-builders-query (:all-eval-builders-query (aor-types/underlying-objects manager))
-        all-builders (foreign-invoke-query all-builders-query)
-        all-evals (foreign-select [ALL] evals-pstate)]
-    (->> all-evals
-         (map (fn [[name info]]
-                (let [builder-info (get all-builders (:builder-name info))]
-                  (assoc info :name name :type (:type builder-info)))))
-         (into []))))
+  (foreign-invoke-query (:all-eval-builders-query (aor-types/underlying-objects manager))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/create
   [{:keys [manager module-id builder-name name description params input-json-path output-json-path reference-output-json-path]} uid]
