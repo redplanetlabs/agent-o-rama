@@ -943,11 +943,11 @@
   (.invokeAsync agent-client (into-array Object args)))
 
 (defn agent-initiate
-  ^AgentInvoke [^AgentClient agent-client & args]
+  ^AgentInvoke [agent-client & args]
   (apply c/agent-initiate agent-client args))
 
 (defn agent-initiate-async
-  ^CompletableFuture [^AgentClient agent-client & args]
+  ^CompletableFuture [agent-client & args]
   (apply c/agent-initiate-async agent-client args))
 
 (defn agent-fork
@@ -983,12 +983,12 @@
   (instance? HumanInputRequest obj))
 
 (defn agent-result
-  [^AgentClient agent-client agent-invoke]
-  (.result agent-client agent-invoke))
+  [agent-client agent-invoke]
+  (c/agent-result agent-client agent-invoke))
 
 (defn agent-result-async
-  ^CompletableFuture [^AgentClient agent-client agent-invoke]
-  (.resultAsync agent-client agent-invoke))
+  ^CompletableFuture [agent-client agent-invoke]
+  (c/agent-result-async agent-client agent-invoke))
 
 (defn agent-stream
   (^AgentStream [^AgentClient agent-client agent-invoke node]

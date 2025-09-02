@@ -412,12 +412,6 @@
 (drp/defrecord+ DeleteExperiment
   [name :- String])
 
-;; Returned by experiment agent
-(drp/defrecord+ ExperimentFailure
-  [message :- String
-   info :- (s/maybe java.util.Map)
-   throwable :- (s/maybe Throwable)])
-
 ;; Internal protocols
 
 (defprotocol UnderlyingObjects

@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.store :as store]
    [com.rpl.rama.ops :as ops])
   (:import
    [com.rpl.agentorama
@@ -73,12 +74,9 @@
   [retriever]
   (get-pstate retriever (po/evaluators-task-global-name)))
 
-(defn local-datasets-pstate
-  [{:Keys [agent-node]}]
-  (foreign-pstate
-   (get-cluster-retriever agent-node)
-   (get-this-module-name agent-node)
-   (po/datasets-task-global-name)))
+(defn local-datasets-store
+  [{:keys [agent-node]}]
+  (.getStore ^AgentNode agent-node (po/datasets-task-global-name)))
 
 (defn local-evals-pstate
   [{:Keys [agent-node]}]
@@ -211,7 +209,8 @@
                     :node-fn)]
     (if (nil? node-fn)
       (aor/result! agent-node
-                   (aor-types/->ExperimentFailure "Node does not exist" {:node node} nil))
+                   (aor-types/->AgentResult {:message "Node does not exist" :node node}
+                                            true))
       (let [result-vol         (volatile! nil)
             emits-vol          (volatile! [])
 
@@ -236,7 +235,9 @@
           (catch Throwable t
             (aor/result!
              agent-node
-             (aor-types/->ExperimentFailure "Failure executing node" {:node node :args args} t))))
+             (aor-types/->AgentResult
+              {:message "Failure executing node" :node node :args args :throwable t}
+              true))))
       ))))
 
 (defn convert-input->args
@@ -245,6 +246,17 @@
    (fn [p]
      (h/read-compiled-json-path input p))
    compiled-input->args))
+
+(defn agent-result-obj
+  [client agent-invoke]
+  (try
+    (let [result (c/agent-result (nth clients i) (nth @initiates-vol i))]
+      (if (aor-types/AgentResult? result)
+        result
+        (aor-types/->AgentResult result false)))
+    (catch Throwable t
+      (aor-types/->AgentResult {:message "Failure on example" :throwable t} true)
+    )))
 
 (defn define-experiments-agent!
   [topology]
@@ -272,21 +284,27 @@
                chunks      (h/split-into-n concurrency example-ids)]
            (doseq [c chunks]
              (when-not (empty? c)
-               (aor/emit! agent-node "initiate" experiment c)))
+               (aor/emit! agent-node "invoke" experiment c)))
          ))
        experiment))
     (c/node
-     "initiate"
+     "invoke"
      "evaluate"
      (fn [^AgentNode agent-node {:keys [name dataset-id snapshot spec] :as experiment} example-ids]
        (with-retriever [agent-node experiment]
          [retriever]
-         (let [datasets    (datasets-pstate retriever)
-               invoke-fns
+         (let [datasets     (datasets-pstate retriever)
+               local-ds     (local-datasets-store retriever)
+               targets      (aor-types/experiment-targets spec)
+               num-targets  (count targets)
+               clients      (mapv
+                             (fn [{:keys [target-spec]}]
+                               (.getAgentClient agent-node (:agent-name target-spec)))
+                             targets)
+               initiate-fns
                (mapv
-                (fn [{:keys [target-spec input->args]}]
+                (fn [{:keys [target-spec input->args]} client]
                   (let [agent-name (:agent-name target-spec)
-                        client     (.getAgentClient agent-node agent-name)
                         compiled-input->args (mapv h/compile-json-path input->args)
                        ]
                     (fn [input]
@@ -294,27 +312,51 @@
                         {:agent-name   agent-name
                          :agent-invoke
                          (if (aor-types/AgentTarget? target-spec)
-                           (apply c/agent-initiate-async client args)
-                           (c/agent-initiate-async client
-                                                   {:agent-name agent-name
-                                                    :node       (:node target-spec)
-                                                    :args       args}))})
+                           (apply c/agent-initiate client args)
+                           (c/agent-initiate client
+                                             {:agent-name agent-name
+                                              :node       (:node target-spec)
+                                              :args       args}))})
                     )))
-                (aor-types/experiment-targets spec))
-               invokes-map (->> example-ids
-                                (reduce
-                                 (fn [m example-id]
-                                   (let [input (foreign-select-one
-                                                [(keypath dataset-id
-                                                          :snapshots
-                                                          snapshot
-                                                          example-id
-                                                          :input)]
-                                                datasets)]
-                                     (assoc m example-id (mapv #(% input) invoke-fns))))
-                                 {})
-                                (transform [MAP-VALS ALL :agent-invoke] h/cf-get))]
-           (c/emit! agent-node "evaluate" experiment invokes-map)
+                targets
+                clients)]
+           (doseq [example-id example-ids]
+             (let [{:keys [agent-initiates agent-results]}
+                   (store/pstate-select-one
+                    [(keypath dataset-id :experiments name :results example-id)]
+                    local-ds)
+                   input         (when (< (count agent-initiates) (count targets))
+                                   (foreign-select-one
+                                    [(keypath dataset-id :snapshots snapshot example-id :input)]
+                                    datasets))
+
+                   initiates-vol (volatile! [])
+                   results-vol   (volatile! [])]
+               (dotimes [i num-targets]
+                 (if-let [info (get agent-initiates i)]
+                   (vswap! initiates-vol conj info)
+                   (let [info ((nth initiate-fns i) input)]
+                     (store/pstate-transform!
+                      [(keypath dataset-id :experiments name :results example-id :agent-initiates i)
+                       (termval info)]
+                      local-ds
+                      dataset-id)
+                     (vswap! initiates-vol conj info)
+                   )))
+               (dotimes [i num-targets]
+                 (if-let [result (get agent-results i)]
+                   (vswap! results-vol conj result)
+                   (let [result (agent-result-obj (nth clients i)
+                                                  (:agent-invoke (nth @initiates-vol i)))]
+                     (store/pstate-transform!
+                      [(keypath dataset-id :experiments name :results example-id :agent-results i)
+                       (termval result)]
+                      local-ds
+                      dataset-id)
+                     (vswap! results-vol conj info)
+                   )))
+             ))
+           (c/emit! agent-node "evaluate" experiment example-ids)
          ))))
     (c/node
      "evaluate"
@@ -326,7 +368,7 @@
          [retriever]
          (let [eval-info  (all-evaluator-info retriever experiment)
                evaluators (relevant-evaluators agent-node eval-info #{:regular :comparative})
-               local-ds   (local-datasets-pstate retriever)
+               local-ds   (local-datasets-store retriever)
                datasets   (datasets-pstate retriever)]
            (doseq [example-id example-ids]
 

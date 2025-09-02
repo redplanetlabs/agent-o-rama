@@ -55,3 +55,11 @@
 (defn agent-initiate-async
   ^CompletableFuture [^AgentClient agent-client & args]
   (.initiateAsync agent-client (into-array Object args)))
+
+(defn agent-result
+  [^AgentClient agent-client agent-invoke]
+  (.result agent-client agent-invoke))
+
+(defn agent-result-async
+  ^CompletableFuture [^AgentClient agent-client agent-invoke]
+  (.resultAsync agent-client agent-invoke))

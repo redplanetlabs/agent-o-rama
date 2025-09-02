@@ -8,6 +8,7 @@
     AgentNodeExecutorTaskGlobal
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
+    AgentInvoke
     AgentNodeEmit
     AgentResult
     AggInput
@@ -21,6 +22,7 @@
     Node
     NodeAgg
     NodeAggStart
+    StartExperiment
     StreamingChunk]
    [java.util
     UUID]))
@@ -221,14 +223,14 @@
 (def DATASETS-PSTATE-SCHEMA
   {UUID ; dataset-id
    (fixed-keys-schema
-    {:props     (fixed-keys-schema
-                 ;; TODO: <<<<>>>> add cluster-conductor-host and module
-                 {:name              String
-                  :description       String
-                  :input-json-schema String
-                  :output-json-schema String
-                  :created-at        Long
-                  :modified-at       Long})
+    {:props       (fixed-keys-schema
+                   ;; TODO: <<<<>>>> add cluster-conductor-host and module
+                   {:name              String
+                    :description       String
+                    :input-json-schema String
+                    :output-json-schema String
+                    :created-at        Long
+                    :modified-at       Long})
      :snapshots
      (map-schema
       String ; nil for latest
@@ -245,8 +247,25 @@
         })
        {:subindex? true})
       {:subindex? true})
-     ;; TODO: <<<<>>>>
-     ;; :experiments ...
+
+     :experiments
+     (map-schema
+      String ; prefix-UUID7
+      (fixed-keys-schema
+       {:experiment-info StartExperiment
+        :results         (map-schema
+                          UUID ; example ID
+                          ;; - agent invokes/results are keyed by their index in experiment targets
+                          ;; - non-comparative experiment will have single one keyed at 0
+                          (fixed-keys-schema
+                           {:agent-initiates {Long {:agent-name   String
+                                                    :agent-invoke AgentInvoke}}
+                            :agent-results   {Long Object}
+                            :evals           {String {String Object}} ; eval-name->eval-key->result
+                           })
+                          {:subindex? true})
+       })
+      {:subindex? true})
     })})
 
 (defn evaluators-task-global-name
@@ -264,9 +283,9 @@
             :reference-output-json-path String
            })})
 
-(defn experiments-task-global-name
-  []
-  "$$_aor-experiments")
+; (defn experiments-task-global-name
+;   []
+;   "$$_aor-experiments")
 
 ;; TODO: <<<<>>> hash by the prefix so can see them all together and query for them easily?
 ;; - can just key by the prefix which is easier...
@@ -282,7 +301,8 @@
 ;             :max-concurrency     Long
 ;             :results             (map-schema
 ;                                   UUID ; example ID
-;                                   {java.util.List Object} ; [evaluator-name, metric-name] -> score
+;                                   {java.util.List Object} ; [evaluator-name, metric-name] ->
+;                                   score
 ;                                   {:subindex? true})
 ;            })})
 
