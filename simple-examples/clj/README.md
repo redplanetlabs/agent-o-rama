@@ -26,13 +26,14 @@ This directory contains isolated examples demonstrating individual agent-o-rama 
 13. **`multi_agg_agent`** - Custom aggregation logic with multi-agg
 14. **`forking_agent`** - Agent execution branching
 15. **`structured_langchain4j_agent`** - JSON structured output with LangChain4j
-16. **`tools_agent`** - LangChain4j tools integration
+16. **`streaming_langchain4j_agent`** - Real-time streaming with LangChain4j models  
+17. **`tools_agent`** - LangChain4j tools integration
 
 ### System Features
-17. **`dataset_agent`** - Dataset creation and management
-18. **`evaluator_agent`** - Evaluator creation and execution
-19. **`ui_monitoring_agent`** - UI integration for monitoring
-20. **`cluster_agent`** - Cross-module agent communication
+18. **`dataset_agent`** - Dataset creation and management
+19. **`evaluator_agent`** - Evaluator creation and execution
+20. **`ui_monitoring_agent`** - UI integration for monitoring
+21. **`cluster_agent`** - Cross-module agent communication
 
 ## Running Examples
 
@@ -56,6 +57,7 @@ clj -M -m com.rpl.agent.aggregation-agent
 clj -M -m com.rpl.agent.multi-agg-agent
 clj -M -m com.rpl.agent.forking-agent
 clj -M -m com.rpl.agent.structured-langchain4j-agent
+clj -M -m com.rpl.agent.streaming-langchain4j-agent
 clj -M -m com.rpl.agent.tools-agent
 clj -M -m com.rpl.agent.dataset-agent
 clj -M -m com.rpl.agent.evaluator-agent
@@ -85,6 +87,7 @@ lein with-profile +dev run -m com.rpl.agent.aggregation-agent
 lein with-profile +dev run -m com.rpl.agent.multi-agg-agent
 lein with-profile +dev run -m com.rpl.agent.forking-agent
 lein with-profile +dev run -m com.rpl.agent.structured-langchain4j-agent
+lein with-profile +dev run -m com.rpl.agent.streaming-langchain4j-agent
 lein with-profile +dev run -m com.rpl.agent.tools-agent
 lein with-profile +dev run -m com.rpl.agent.dataset-agent
 lein with-profile +dev run -m com.rpl.agent.evaluator-agent
@@ -107,7 +110,7 @@ Examples are ordered to build understanding progressively:
 - **Foundation** (1-6): Core agent system required for all other examples
 - **State Management** (7-9): Independent storage and resource patterns
 - **Communication** (10-11): Real-time interaction patterns
-- **Advanced Patterns** (12-16): Complex execution and integration patterns
-- **System Features** (17-20): Full-system capabilities and cross-module features
+- **Advanced Patterns** (12-17): Complex execution and integration patterns
+- **System Features** (18-21): Full-system capabilities and cross-module features
 
 Each example includes detailed comments explaining the demonstrated features and their usage patterns.
