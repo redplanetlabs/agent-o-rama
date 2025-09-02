@@ -59,8 +59,8 @@
                                                         {:base-value 1
                                                          :multiplier 1}
                                                         :processed-value 1
-                                                        :squared 1
-                                                        :halved 0.5}]})
+                                                        :squared         1
+                                                        :halved          0.5}]})
                 fork-result (aor/agent-result agent fork-invoke)]
             (is (= "calculation-complete" (:action fork-result)))
             (is (= {:base-value 1 :multiplier 1} (:original-input fork-result)))
@@ -84,7 +84,6 @@
                                                           :halved 0.0}]})]
             (is (= "calculation-complete" (:action fork-result)))
             (is (= 0 (:processed-value fork-result)))
-            (is (= false (:valid? fork-result))) ; Not valid because
-                                                 ; processed-value is not
-                                                 ; positive
+            ;; Not valid because processed-value is not positive
+            (is (= false (:valid? fork-result)))
           ))))))

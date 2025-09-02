@@ -1,6 +1,9 @@
 # Agent-o-rama Simple Examples
 
-This directory contains isolated examples demonstrating individual agent-o-rama features. Each example focuses on a specific feature or small set of related features, progressing from basic concepts to advanced patterns.
+This directory contains isolated examples demonstrating individual
+agent-o-rama features. Each example focuses on a specific feature or
+small set of related features, progressing from basic concepts to
+advanced patterns.
 
 ## Example Progression
 
@@ -25,7 +28,7 @@ This directory contains isolated examples demonstrating individual agent-o-rama 
 12. **`aggregation_agent`** - Fan-out/fan-in with agg-start-node and agg-node
 13. **`multi_agg_agent`** - Custom aggregation logic with multi-agg
 14. **`structured_langchain4j_agent`** - JSON structured output with LangChain4j
-15. **`streaming_langchain4j_agent`** - Real-time streaming with LangChain4j models  
+15. **`streaming_langchain4j_agent`** - Real-time streaming with LangChain4j models
 16. **`tools_agent`** - LangChain4j tools integration
 
 ### System Features
@@ -69,32 +72,6 @@ clj -M -m com.rpl.agent.cluster-agent
 clj -M:test
 ```
 
-### From the main project directory (alternative):
-
-```bash
-# Run specific example
-lein with-profile +dev run -m com.rpl.agent.basic-agent
-lein with-profile +dev run -m com.rpl.agent.multi-node-agent
-lein with-profile +dev run -m com.rpl.agent.async-agent
-lein with-profile +dev run -m com.rpl.agent.router-agent
-lein with-profile +dev run -m com.rpl.agent.agent-objects-agent
-lein with-profile +dev run -m com.rpl.agent.keyvalue-store-agent
-lein with-profile +dev run -m com.rpl.agent.document-store-agent
-lein with-profile +dev run -m com.rpl.agent.pstate-store-agent
-lein with-profile +dev run -m com.rpl.agent.streaming-agent
-lein with-profile +dev run -m com.rpl.agent.human-input-agent
-lein with-profile +dev run -m com.rpl.agent.aggregation-agent
-lein with-profile +dev run -m com.rpl.agent.multi-agg-agent
-lein with-profile +dev run -m com.rpl.agent.structured-langchain4j-agent
-lein with-profile +dev run -m com.rpl.agent.streaming-langchain4j-agent
-lein with-profile +dev run -m com.rpl.agent.tools-agent
-lein with-profile +dev run -m com.rpl.agent.forking-agent
-lein with-profile +dev run -m com.rpl.agent.dataset-agent
-lein with-profile +dev run -m com.rpl.agent.evaluator-agent
-lein with-profile +dev run -m com.rpl.agent.langchain4j-agent
-lein with-profile +dev run -m com.rpl.agent.ui-monitoring-agent
-lein with-profile +dev run -m com.rpl.agent.cluster-agent
-
 # Or from REPL
 lein with-profile +dev repl
 (require '[com.rpl.agent.basic-agent :as basic])
@@ -113,4 +90,5 @@ Examples are ordered to build understanding progressively:
 - **Advanced Patterns** (12-16): Complex execution and integration patterns
 - **System Features** (17-21): Full-system capabilities and cross-module features
 
-Each example includes detailed comments explaining the demonstrated features and their usage patterns.
+Each example includes detailed comments explaining the demonstrated
+features and their usage patterns.
