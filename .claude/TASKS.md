@@ -55,7 +55,7 @@ Include REFINE to refine the spec
 	  - Plan what content changes are needed to match the implementation
 	  - Make the changes
 
-- [ ] for each feature in agent-o-rama, ensure that we have a simple
+- [x] for each feature in agent-o-rama, ensure that we have a simple
       example of that feature, in isolation from any other concept if
       possible.
 
@@ -78,5 +78,14 @@ Include REFINE to refine the spec
       Put each example in simple-examples/clj/src/com/rpl/agent as a
       single namespace.  The namespace name must include the features that
 	  are used.
+
+- [ ] add a langchain streaming example to the simple-examples suite.  It
+      should go in the "Advanced Patterns" section of
+      @simple-examples/clj/README.md.
+	  - look at the other langchain simple examples for context
+	  - it should just demonstrate how when using a streaming model, you
+        just use aor/agent-stream to subscribe to the stream.
+	  - keep the example minimal.
+	  - remember to add a test (use a real streaming chat model)
 
 # Large
