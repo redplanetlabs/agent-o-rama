@@ -251,6 +251,99 @@
                      :component ($ CreateSnapshotForm {:form-id :create-snapshot
                                                        :from-snapshot-name from-snapshot-name})}])))
 
+ ;; =============================================================================
+;; TRY EVALUATOR MODAL
+;; =============================================================================
+
+(defui TryEvaluatorModal [{:keys [module-id example]}]
+  (let [;; State for the modal
+        [selected-evaluator set-selected-evaluator] (uix/use-state "")
+        [actual-output set-actual-output] (uix/use-state "")
+        [eval-state set-eval-state] (uix/use-state {:status :idle}) ; :idle, :loading, :success, :error
+
+        ;; Fetch available REGULAR evaluators for this module
+        {:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:evaluators module-id]
+          :sente-event [:evaluators/get-all {:module-id module-id
+                                             :filters {:types #{:regular}}}]
+          :enabled? (boolean module-id)})
+
+        evaluators (or data [])
+
+        handle-run-eval (fn []
+                          (set-eval-state {:status :loading})
+                          (sente/request!
+                           [:evaluators/try
+                            {:module-id module-id
+                             :name selected-evaluator
+                             :type :regular
+                             ;; We send the raw JSON strings; backend will parse
+                             :run-data {:input (js/JSON.stringify (clj->js (:input example)))
+                                        :referenceOutput (js/JSON.stringify (clj->js (:reference-output example)))
+                                        :output actual-output}}]
+                           10000
+                           (fn [reply]
+                             (if (:success reply)
+                               (set-eval-state {:status :success :data (:data reply)})
+                               (set-eval-state {:status :error :error (:error reply)})))))]
+
+    ($ :div.p-6.space-y-4
+       ;; 1. Context (Read-only)
+       ($ :div
+          ($ :h4.font-medium.text-gray-700 "Input")
+          ($ :pre.text-xs.bg-gray-100.p-2.rounded.mt-1.max-h-40.overflow-auto
+             (pretty-print-json (:input example))))
+       ($ :div
+          ($ :h4.font-medium.text-gray-700 "Reference Output")
+          ($ :pre.text-xs.bg-gray-100.p-2.rounded.mt-1.max-h-40.overflow-auto
+             (pretty-print-json (:reference-output example))))
+
+       ;; 2. Evaluator Selection
+       ($ :div
+          ($ :label.block.text-sm.font-medium.text-gray-700 {:htmlFor "eval-select"} "Evaluator")
+          (if loading?
+            ($ :div.text-sm.text-gray-500 "Loading evaluators...")
+            ($ :select#eval-select.mt-1.block.w-full.pl-3.pr-10.py-2.text-base.border-gray-300.focus:outline-none.focus:ring-indigo-500.focus:border-indigo-500.sm:text-sm.rounded-md
+               {:value selected-evaluator
+                :onChange #(set-selected-evaluator (.. % -target -value))}
+               ($ :option {:value ""} "Select an evaluator...")
+               (for [evaluator (sort-by :name evaluators)]
+                 ($ :option {:key (:name evaluator) :value (:name evaluator)}
+                    (:name evaluator))))))
+
+       ;; 3. Actual Output
+       ($ :div
+          ($ :label.block.text-sm.font-medium.text-gray-700 {:htmlFor "actual-output"} "Actual Output (JSON)")
+          ($ :textarea#actual-output.mt-1.block.w-full.shadow-sm.sm:text-sm.border-gray-300.rounded-md.font-mono
+             {:rows 8
+              :value actual-output
+              :onChange #(set-actual-output (.. % -target -value))
+              :placeholder "{\n  \"response\": \"Your agent's actual output here...\"\n}"}))
+
+       ;; 4. Actions & Result
+       ($ :div.flex.items-center.justify-between.mt-4
+          ($ :button.bg-blue-600.text-white.px-4.py-2.rounded-md.text-sm.font-medium.hover:bg-blue-700.disabled:bg-gray-400
+             {:onClick handle-run-eval
+              :disabled (or (= (:status eval-state) :loading)
+                            (str/blank? selected-evaluator)
+                            (str/blank? actual-output))}
+             (if (= (:status eval-state) :loading) "Running..." "Run Evaluation"))
+
+          ($ :button.text-sm.text-gray-600.hover:underline
+             {:onClick #(state/dispatch [:modal/hide])} "Cancel"))
+
+       ;; Result Display
+       (case (:status eval-state)
+         :loading ($ :div.mt-4.text-sm.text-gray-500 "Evaluating...")
+         :error ($ :div.mt-4.p-3.bg-red-50.border.border-red-200.rounded-md.text-red-700.text-sm
+                   "Error: " (:error eval-state))
+         :success ($ :div.mt-4
+                     ($ :h4.font-medium.text-gray-700 "Result")
+                     ($ :pre.text-xs.bg-green-50.p-2.rounded.mt-1.max-h-40.overflow-auto
+                        (pretty-print-json (:data eval-state))))
+         nil))))
+
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon]}]
   ($ :div
      {:className (str "group flex items-center justify-between w-full px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer "
@@ -461,11 +554,14 @@
                                      "Delete")
 
                                   ;; Try with evaluator option
+                                  ;; Try with evaluator option
                                   ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900.cursor-pointer
                                      {:onClick (fn []
                                                  (set-open-dropdown nil)
-                                                 ;; TODO: Implement evaluator functionality
-                                                 (println "Try with evaluator:" example-id))}
+                                                 ;; Show the Try Evaluator modal
+                                                 (state/dispatch [:modal/show :try-evaluator
+                                                                  {:title "Try with Evaluator"
+                                                                   :component ($ TryEvaluatorModal {:module-id module-id :example example})}]))}
                                      ($ PlayIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                      "Try with evaluator"))))))))))))))
 
