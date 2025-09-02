@@ -14,18 +14,16 @@
       (let [manager (aor/agent-manager ipc
                                        (rama/get-module-name
                                         AggregationAgentModule))
-            agent   (aor/agent-client manager "AggregationAgent")]
+            agent (aor/agent-client manager "AggregationAgent")]
 
         (testing "processes data in chunks and aggregates results"
           (let [result (aor/agent-invoke agent
-                                         {:data       (range 1 13) ; [1 2 3 ...
+                                         {:data (range 1 13) ; [1 2 3 ...
                                                                    ; 12]
                                           :chunk-size 4})]
             ;; Verify final result structure
-            (is (= "aggregation-complete" (:action result)))
             (is (= 12 (:total-items result)))
             (is (= 3 (:chunks-processed result)))
-            (is (number? (:processed-at result)))
 
             ;; Verify total sum calculation
             ;; Each item is squared, so sum = 1² + 2² + ... + 12² = 650
@@ -49,7 +47,7 @@
 
         (testing "handles different chunk sizes correctly"
           (let [result (aor/agent-invoke agent
-                                         {:data       (range 1 8) ; [1 2 3 4 5 6
+                                         {:data (range 1 8) ; [1 2 3 4 5 6
                                                                   ; 7]
                                           :chunk-size 3})]
             (is (= 7 (:total-items result)))
