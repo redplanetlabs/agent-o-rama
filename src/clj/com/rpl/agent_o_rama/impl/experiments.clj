@@ -264,6 +264,36 @@
       (aor-types/->AgentResult {:message "Failure on example" :throwable t} true)
     )))
 
+(defn evaluate!
+  [agent-node local-ds dataset-id name spec eval-name eval-fn input reference-output outputs]
+  (try
+    (let [results
+          (cond
+            (aor-types/RegularExperiment? spec)
+            (do
+              (assert (= 1 (count outputs)))
+              (eval-fn agent-node input reference-output (nth outputs 0)))
+
+            (aor-types/ComparativeExperiment? spec)
+            (eval-fn agent-node input reference-output outputs)
+
+            :else
+            (throw (h/ex-info "Unexpected experiment spec" {:type (class spec)})))]
+      (when-not (map? results)
+        (throw (h/ex-info "Evaluator did not return a map of results" {:return results})))
+      (store/pstate-transform!
+       [(keypath dataset-id :experiments name :results example-id :evals (termval results))]
+       local-ds
+       dataset-id))
+    (catch Throwable t
+      (store/pstate-transform!
+       [(keypath dataset-id :experiments name :results example-id)
+        (multi-path [:evals (keypath eval-name) NONE>]
+                    [:eval-failures (keypath eval-name) (termval (h/throwable->str t))])]
+       local-ds
+       dataset-id)
+    )))
+
 (defn define-experiments-agent!
   [topology]
   (->
@@ -370,7 +400,7 @@
     (c/node
      "evaluate"
      "finish"
-     (fn [agent-node {:keys [name dataset-id snapshot] :as experiment} example-ids]
+     (fn [agent-node {:keys [name dataset-id snapshot spec] :as experiment} example-ids]
        (with-retriever [agent-node experiment]
          [retriever]
          (let [eval-info  (all-evaluator-info retriever experiment)
@@ -391,20 +421,21 @@
                     [(keypath dataset-id :experiments name :results example-id)]
                     local-ds)]
                (when-not (selected-any? [MAP-VALS :failure? identity] agent-results)
-                 (doseq [[name eval-fn] evaluators
-                         :when (and (not (contains? curr-evals name))
-                                    (not (contains? eval-failures name)))]
-
-                   ;; TODO: <<<<>>>>
-                   ;;     - if spec is regular, than invoke with just the one reult
-                   ;;     - need to keep track of eval failures
-                   ;;       - don't record anything, and put eval failure string in :eval-failures
+                 (doseq [[eval-name eval-fn] evaluators
+                         :when (and (not (contains? curr-evals eval-name))
+                                    (not (contains? eval-failures eval-name)))]
+                   (evaluate! agent-node
+                              local-ds
+                              dataset-id
+                              name
+                              spec
+                              eval-name
+                              eval-fn
+                              input
+                              reference-output
+                              (vec (vals agent-results)))
                  ))))
-
-
-
-
-
+           (c/emit! agent-node "finish" nil)
          ))))
     (c/agg-node
      "finish"
