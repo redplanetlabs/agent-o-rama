@@ -127,13 +127,13 @@
              {:type "button"
               :onClick #(set-show-advanced! (not show-advanced?))}
              "Advanced Options"
-             ($ "svg"
+             ($ :svg
                 {:className (str "ml-2 h-4 w-4 transform transition-transform "
                                  (if show-advanced? "rotate-180" ""))
                  :fill "none"
                  :viewBox "0 0 24 24"
                  :stroke "currentColor"}
-                ($ "path"
+                ($ :path
                    {:strokeLinecap "round"
                     :strokeLinejoin "round"
                     :strokeWidth 2
@@ -162,7 +162,7 @@
                    :error (:error reference-output-json-path-field)
                    :placeholder "e.g., $.expected.answer"}))))
 
-       ($ forms/form-error {:error error}))))
+       #_ ($ forms/form-error {:error error}))))
 
 ;; =============================================================================
 ;; MODAL WORKFLOW
