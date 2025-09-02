@@ -78,4 +78,12 @@
                                                                        ;; macs
                                        [org.clojure/clojure "1.12.0"]
                                       ]}}
-  :plugins [[lein-exec "0.3.7"]])
+  :codox {:source-paths ["src/clj"]
+          :metadata     {:doc/format :markdown}
+          :output-path  "target/doc"
+          :namespaces   [com.rpl.agent-o-rama
+                         com.rpl.agent-o-rama.langchain4j
+                         com.rpl.agent-o-rama.store
+                         com.rpl.agent-o-rama.tools]}
+  :plugins [[lein-exec "0.3.7"]
+            [lein-codox "0.10.8"]])
