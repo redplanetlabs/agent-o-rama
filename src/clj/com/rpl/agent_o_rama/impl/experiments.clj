@@ -265,7 +265,8 @@
     )))
 
 (defn evaluate!
-  [agent-node local-ds dataset-id name spec eval-name eval-fn input reference-output outputs]
+  [agent-node local-ds dataset-id name spec eval-name eval-fn example-id input reference-output
+   outputs]
   (try
     (let [results
           (cond
@@ -294,6 +295,39 @@
        dataset-id)
     )))
 
+(def +concatv
+  (accumulator
+   (fn [v]
+     (path END (termval v)))
+   :init-fn
+   (constantly [])))
+
+(defn fetch-example-runs
+  [local-ds datasets name dataset-id snapshot example-ids]
+  (vec
+   (for [example-id example-ids
+         :let
+         [{:keys [input reference-output]}
+          (foreign-select-one
+           [(keypath dataset-id :snapshots snapshot example-id)]
+           datasets)
+
+          results
+          (store/pstate-select-one
+           [(keypath dataset-id
+                     :experiments
+                     name
+                     :results
+                     example-id
+                     :agent-results)]
+           local-ds)
+
+          outputs (select [MAP-VALS :val] results)]
+         :when      (not (selected-any? [MAP-VALS :failure? identity] results))]
+     (aor-types/->ExampleRunImpl input reference-output outputs)
+   )))
+
+;; TODO: <<<<>>>> depot append when inintializing experiment state needs to write start-time-millis
 (defn define-experiments-agent!
   [topology]
   (->
@@ -431,18 +465,39 @@
                               spec
                               eval-name
                               eval-fn
+                              example-id
                               input
                               reference-output
-                              (vec (vals agent-results)))
+                              (select [MAP-VALS :val] agent-results))
                  ))))
-           (c/emit! agent-node "finish" nil)
+           (c/emit! agent-node "finish" example-ids)
          ))))
     (c/agg-node
      "finish"
      nil
-     aggs/+vec-agg ; doesn't matter
-     (fn [agent-node _ experiment]
-         ;; TODO: <<<<>>>> run summary evaluators if appropriate
-         ;;   - similarly, needs to check and skip if already ran
-     ))
+     +concatv
+     (fn [agent-node example-ids {:keys [name dataset-id snapshot] :as experiment}]
+       (with-retriever [agent-node experiment]
+         [retriever]
+         (let [eval-info  (all-evaluator-info retriever experiment)
+               evaluators (relevant-evaluators agent-node eval-info #{:summary})
+               datasets   (datasets-pstate retriever)
+               local-ds   (local-datasets-store retriever)]
+           (when-not (empty? evaluators)
+             (let [example-runs
+                   (fetch-example-runs local-ds datasets name dataset-id snapshot example-ids)]
+               (doseq [[eval-name eval-fn] evaluators]
+                 ;; TODO: <<<<>>>> run summary evaluators if appropriate
+                 ;;   - similarly, needs to check and skip if already ran
+                 ;;   - input is list<ExampleRun>
+                 ; [(keypath dataset-id :experiments name :summary-evals)]
+                 ;;   - need ALL the example IDs
+               )))
+           (store/pstate-transform!
+            [(keypath dataset-id :experiments name :finish-time-millis)
+             (termval (h/current-time-millis))]
+            local-ds
+            dataset-id)
+           (c/result! agent-node :done)
+         ))))
   ))
