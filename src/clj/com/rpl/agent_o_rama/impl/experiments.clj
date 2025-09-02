@@ -154,13 +154,15 @@
                                (-> builders
                                    (get builder-name)
                                    :type)))]
-    (select [ALL
-             (pred relevant?)
-             (view #(get-evaluator agent-node
-                                   (:name %)
-                                   (:builder-name %)
-                                   (:builder-params %)))]
-            eval-info)))
+    (into {}
+          (select [ALL
+                   (pred relevant?)
+                   (view #(vector (:name %)
+                                  (get-evaluator agent-node
+                                                 (:name %)
+                                                 (:builder-name %)
+                                                 (:builder-params %))))]
+                  eval-info))))
 
 (defn handle-experiment-start
   [agent-node
@@ -333,7 +335,6 @@
                                    (foreign-select-one
                                     [(keypath dataset-id :snapshots snapshot example-id :input)]
                                     datasets))
-
                    initiates-vol (volatile! [])
                    results-vol   (volatile! [])]
                (dotimes [i num-targets]
@@ -341,7 +342,9 @@
                    (vswap! initiates-vol conj info)
                    (let [info ((nth initiate-fns i) input)]
                      (store/pstate-transform!
-                      [(keypath dataset-id :experiments name :results example-id :agent-initiates i)
+                      [(keypath dataset-id :experiments name :results example-id :agent-initiates)
+                       (nil->val (sorted-map))
+                       (keypath i)
                        (termval info)]
                       local-ds
                       dataset-id)
@@ -353,7 +356,9 @@
                    (let [result (agent-result-obj (nth clients i)
                                                   (:agent-invoke (nth @initiates-vol i)))]
                      (store/pstate-transform!
-                      [(keypath dataset-id :experiments name :results example-id :agent-results i)
+                      [(keypath dataset-id :experiments name :results example-id :agent-results)
+                       (nil->val (sorted-map))
+                       (keypath i)
                        (termval result)]
                       local-ds
                       dataset-id)
@@ -365,30 +370,40 @@
     (c/node
      "evaluate"
      "finish"
-     (fn [agent-node {:keys [name dataset-id] :as experiment} example-ids]
+     (fn [agent-node {:keys [name dataset-id snapshot] :as experiment} example-ids]
        (with-retriever [agent-node experiment]
          [retriever]
          (let [eval-info  (all-evaluator-info retriever experiment)
                evaluators (relevant-evaluators agent-node eval-info #{:regular :comparative})
                local-ds   (local-datasets-store retriever)
-               datasets   (datasets-pstate retriever)]
+               datasets   (datasets-pstate retriever)
+               local-ds   (local-datasets-store retriever)]
            (doseq [example-id example-ids]
+             (let [{:keys [input reference-output]}
+                   (foreign-select-one
+                    [(keypath dataset-id :snapshots snapshot example-id)]
+                    datasets)
 
-           )
-           ;; TODO: <<<<>>>>
-           ;;  - skip if already recorded results for this example ID
-           ;;     - how to store agent output vs. evaluators? probably different keys in PState so
-           ;;     UI can distinguish
-           ;;     - would be nice not to have to run agents multiple times if there's a node
-           ;;     failure
-           ;;     - seems like this node should initiate agent invokes, and should get results in
-           ;;     next node
-           ;;     - need to keep track of failures
+                   {curr-evals    :evals
+                    eval-failures :eval-failures
+                    agent-results :agent-results}
+                   (store/pstate-select-one
+                    [(keypath dataset-id :experiments name :results example-id)]
+                    local-ds)]
+               (when-not (selected-any? [MAP-VALS :failure? identity] agent-results)
+                 (doseq [[name eval-fn] evaluators
+                         :when (and (not (contains? curr-evals name))
+                                    (not (contains? eval-failures name)))]
 
-           ; (doseq [{:keys [builder-name builder-params]}]
-           ;
-           ;
-           ;   )
+                   ;; TODO: <<<<>>>>
+                   ;;     - if spec is regular, than invoke with just the one reult
+                   ;;     - need to keep track of eval failures
+                   ;;       - don't record anything, and put eval failure string in :eval-failures
+                 ))))
+
+
+
+
 
          ))))
     (c/agg-node
@@ -397,5 +412,6 @@
      aggs/+vec-agg ; doesn't matter
      (fn [agent-node _ experiment]
          ;; TODO: <<<<>>>> run summary evaluators if appropriate
+         ;;   - similarly, needs to check and skip if already ran
      ))
   ))

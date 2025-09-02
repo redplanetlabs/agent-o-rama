@@ -251,9 +251,10 @@
 
      :experiments
      (map-schema
+      ;; TODO: <<<>>>> should this be [UUID7, prefix] tuples instead so it sorted based on time
       String ; prefix-UUID7
       (fixed-keys-schema
-       ;; TODO: <<<<>>> maybe this shoudl be fixed keys schema
+       ;; TODO: <<<<>>> maybe this should be fixed keys schema
        ;;  - or just use flex serialization
        {:experiment-info StartExperiment
         :results         (map-schema
@@ -265,6 +266,7 @@
                                                                        :agent-invoke AgentInvoke})}
                             :agent-results   {Long Object}
                             :evals           {String {String Object}} ; eval-name->eval-key->result
+                            :eval-failures   {String String}
                            })
                           {:subindex? true})
        })
