@@ -150,7 +150,7 @@
      :validators {:input [forms/required forms/valid-json]
                   :output [forms/valid-json]}
      :submit-event [:dataset/add-example (-> config
-                                             (select-keys [:module-id :dataset-id :snapshot-name :on-success])
+                                             (select-keys [:module-id :dataset-id :snapshot-name])
                                              (assoc :form-id :example-form))]}
 
     :edit
@@ -160,7 +160,7 @@
        :validators {:input [forms/required forms/valid-json]
                     :output [forms/valid-json]}
        :submit-event [:dataset/edit-example (-> config
-                                                (select-keys [:module-id :dataset-id :snapshot-name :example-id :on-success])
+                                                (select-keys [:module-id :dataset-id :snapshot-name :example-id])
                                                 (assoc :form-id :example-form))]})))
 
 ;; Unified form component for both adding and editing examples
