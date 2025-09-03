@@ -635,8 +635,7 @@
  ;; Helper function to show edit dataset modal with centralized state
 (defn show-edit-dataset-modal!
   "Shows the edit dataset modal."
-  ([module-id dataset-id initial-name initial-description] (show-edit-dataset-modal! module-id dataset-id initial-name initial-description nil))
-  ([module-id dataset-id initial-name initial-description on-success]
+  [module-id dataset-id initial-name initial-description]
    (state/dispatch [:form/init :edit-dataset
                     (-> edit-dataset-form-spec
                         (assoc-in [:fields :name] initial-name)
@@ -649,7 +648,7 @@
                     {:title (str "Edit Dataset: " initial-name)
                      :form-id :edit-dataset
                      :submit-text "Save Changes"
-                     :component ($ EditDatasetForm {:form-id :edit-dataset})}])))
+                     :component ($ EditDatasetForm {:form-id :edit-dataset})}]))
 
 ;; Helper function to show add example modal with centralized state  
 
