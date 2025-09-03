@@ -79,7 +79,7 @@ Include REFINE to refine the spec
       single namespace.  The namespace name must include the features that
 	  are used.
 
-- [ ] add a langchain streaming example to the simple-examples suite.  It
+- [x] add a langchain streaming example to the simple-examples suite.  It
       should go in the "Advanced Patterns" section of
       @simple-examples/clj/README.md.
 	  - look at the other langchain simple examples for context
@@ -87,5 +87,13 @@ Include REFINE to refine the spec
         just use aor/agent-stream to subscribe to the stream.
 	  - keep the example minimal.
 	  - remember to add a test (use a real streaming chat model)
+
+- [x] move the `simple-examples` into the `examples` directory.  The
+      code and tests should move to the com.rpl.agent.basic parent
+      namespace, in the src, test trees respectively.
+
+	  Update the clj examples readme to integrate @simple-examples/clj/README.md
+
+	  check the deps.edn files too
 
 # Large
