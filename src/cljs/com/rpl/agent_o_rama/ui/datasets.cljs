@@ -261,32 +261,32 @@
         [actual-output set-actual-output] (uix/use-state "")
         [eval-state set-eval-state] (uix/use-state {:status :idle}) ; :idle, :loading, :success, :error
 
-        ;; Fetch available REGULAR evaluators for this module
+        ;; Fetch ALL available evaluators for this module (no type filtering)
         {:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:evaluators module-id]
-          :sente-event [:evaluators/get-all {:module-id module-id
-                                             :filters {:types #{:regular}}}]
+          :sente-event [:evaluators/get-all-instances {:module-id module-id}]
           :enabled? (boolean module-id)})
 
-        evaluators (or data [])
+        evaluators (or (:items data) []) ; Data is wrapped in :items by search query
 
         handle-run-eval (fn []
                           (set-eval-state {:status :loading})
-                          (sente/request!
-                           [:evaluators/try
-                            {:module-id module-id
-                             :name selected-evaluator
-                             :type :regular
-                             ;; We send the raw JSON strings; backend will parse
-                             :run-data {:input (js/JSON.stringify (clj->js (:input example)))
-                                        :referenceOutput (js/JSON.stringify (clj->js (:reference-output example)))
-                                        :output actual-output}}]
-                           10000
-                           (fn [reply]
-                             (if (:success reply)
-                               (set-eval-state {:status :success :data (:data reply)})
-                               (set-eval-state {:status :error :error (:error reply)})))))]
+                          (let [selected-spec (first (filter #(= (:name %) selected-evaluator) evaluators))]
+                            (sente/request!
+                             [:evaluators/try
+                              {:module-id module-id
+                               :name selected-evaluator
+                               :type (:type selected-spec) ; Pass the type dynamically
+                               ;; We send the raw JSON strings; backend will parse
+                               :run-data {:input (js/JSON.stringify (clj->js (:input example)))
+                                          :referenceOutput (js/JSON.stringify (clj->js (:reference-output example)))
+                                          :output actual-output}}]
+                             10000
+                             (fn [reply]
+                               (if (:success reply)
+                                 (set-eval-state {:status :success :data (:data reply)})
+                                 (set-eval-state {:status :error :error (:error reply)}))))))]
 
     ($ :div.p-6.space-y-4
        ;; 1. Context (Read-only)
@@ -299,19 +299,15 @@
           ($ :pre.text-xs.bg-gray-100.p-2.rounded.mt-1.max-h-40.overflow-auto
              (pretty-print-json (:reference-output example))))
 
-
-       ;; 2. Evaluator Selection
+       ;; 2. Evaluator Selection - IMPROVED
        ($ :div
           ($ :label.block.text-sm.font-medium.text-gray-700 {:htmlFor "eval-select"} "Evaluator")
-          (if loading?
-            ($ :div.text-sm.text-gray-500 "Loading evaluators...")
-            ($ :select#eval-select.mt-1.block.w-full.pl-3.pr-10.py-2.text-base.border-gray-300.focus:outline-none.focus:ring-indigo-500.focus:border-indigo-500.sm:text-sm.rounded-md
-               {:value selected-evaluator
-                :onChange #(set-selected-evaluator (.. % -target -value))}
-               ($ :option {:value ""} "Select an evaluator...")
-               (for [evaluator (sort-by :name evaluators)]
-                 ($ :option {:key (:name evaluator) :value (:name evaluator)}
-                    (:name evaluator))))))
+          (if error
+            ($ :div.text-sm.text-red-500 "Error: " (str error))
+            ($ EvaluatorDropdown {:evaluators evaluators
+                                  :selected-evaluator selected-evaluator
+                                  :on-select set-selected-evaluator
+                                  :loading? loading?})))
 
        ;; 3. Actual Output
        ($ :div
@@ -345,7 +341,7 @@
                         (pretty-print-json (:data eval-state))))
          nil))))
 
-(defui DropdownRow [{:keys [label selected? on-select delete-button action? icon]}]
+(defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content]}]
   ($ :div
      {:className (str "group flex items-center justify-between w-full px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer "
                       (cond
@@ -358,10 +354,74 @@
            (when icon icon)
            ($ :span.truncate {:className (when icon "ml-3")} label))
         ($ :div.flex.items-center.space-x-2
+           extra-content ; Support for additional content like badges
            (when selected? ($ :span "✓"))
            (when delete-button
              ($ :div {:onClick #(.stopPropagation %)}
                 delete-button))))))
+
+ ;; =============================================================================
+;; EVALUATOR TYPE HELPERS
+;; =============================================================================
+
+(defn get-evaluator-type-display [evaluator-type]
+  "Get human-readable display name for evaluator type"
+  (case evaluator-type
+    :regular "Regular"
+    :comparative "Comparative"
+    :summary "Summary"
+    (str evaluator-type)))
+
+(defn get-evaluator-type-badge-style [evaluator-type]
+  "Get CSS classes for evaluator type badge"
+  (case evaluator-type
+    :regular "bg-blue-100 text-blue-800"
+    :comparative "bg-green-100 text-green-800"
+    :summary "bg-purple-100 text-purple-800"
+    "bg-gray-100 text-gray-800"))
+
+ ;; =============================================================================
+;; EVALUATOR DROPDOWN COMPONENT
+;; =============================================================================
+
+(defui EvaluatorDropdown [{:keys [evaluators selected-evaluator on-select loading?]}]
+  (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
+        selected-spec (first (filter #(= (:name %) selected-evaluator) evaluators))
+        current-display-name (or (:name selected-spec) "Select an evaluator...")]
+
+    ;; Close dropdown when clicking outside
+    (uix/use-effect
+     (fn []
+       (let [handle-click #(when dropdown-open? (set-dropdown-open false))]
+         (.addEventListener js/document "click" handle-click)
+         #(.removeEventListener js/document "click" handle-click)))
+     [dropdown-open?])
+
+    ($ :div.relative.inline-block.text-left
+       ;; Main dropdown button
+       ($ :button.inline-flex.items-center.justify-between.w-full.px-3.py-2.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500.cursor-pointer
+          {:type "button"
+           :onClick (fn [e] (.stopPropagation e) (set-dropdown-open (not dropdown-open?)))
+           :disabled loading?}
+          ($ :span.truncate current-display-name)
+          ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
+
+       ;; Dropdown menu
+       (when dropdown-open?
+         ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50.max-h-60.overflow-y-auto
+            {:onClick #(.stopPropagation %)}
+            ($ :div.py-1
+               (when (empty? evaluators)
+                 ($ :div.px-4.py-2.text-sm.text-gray-500 "No evaluators found."))
+               (for [evaluator (sort-by :name evaluators)]
+                 ($ DropdownRow {:key (:name evaluator)
+                                 :label (:name evaluator)
+                                 :selected? (= selected-evaluator (:name evaluator))
+                                 :on-select #(do (on-select (:name evaluator)) (set-dropdown-open false))
+                                 :extra-content
+                                 ($ :span.inline-flex.px-2.py-1.text-xs.font-medium.rounded-full
+                                    {:className (get-evaluator-type-badge-style (:type evaluator))}
+                                    (get-evaluator-type-display (:type evaluator)))}))))))))
 
 (defui SnapshotManager [{:keys [module-id dataset-id selected-snapshot set-selected-snapshot]}]
   (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
