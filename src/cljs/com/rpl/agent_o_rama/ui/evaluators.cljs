@@ -268,8 +268,7 @@
   (let [type (:type instance-spec)
         description (:description instance-spec)
         builder-name (:builder-name instance-spec)
-        params (get-in instance-spec [:options :params] {})]
-   (println "instance-spec:" instance-spec)
+        params (:builder-params instance-spec {})]
 
     ($ :div.bg-white.border.rounded-lg.p-4.shadow-sm
        ($ :div.flex.justify-between.items-start.mb-3
@@ -291,12 +290,11 @@
             ($ :h4.text-sm.font-medium.text-gray-700.mb-2 "Parameters:")
             ($ :div.space-y-1
                (into []
-                     (for [[param-key param-spec] params]
+                     (for [[param-key param-value] params]
                        ($ :div.text-xs.text-gray-600
                           {:key (str param-key)}
                           ($ :span.font-medium (name param-key))
-                          (when-let [default (:default param-spec)]
-                            ($ :span.text-gray-500 " (default: " default ")"))))))))
+                          ($ :span.text-gray-500 ": " (str param-value))))))))
 
        ($ :div.flex.justify-end.gap-2
           ($ :button.text-sm.text-red-600.hover:text-red-800.cursor-pointer
