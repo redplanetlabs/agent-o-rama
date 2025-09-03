@@ -429,28 +429,28 @@
                                           (str "Invalid JSON: " (.-message e))]))))))
 
 (state/reg-event :dataset/create-snapshot
-                 (fn [db {:keys [module-id dataset-id from-snapshot-name snapshot-name on-success]}]
-                   ;; Set modal form to submitting state
-                   (state/dispatch [:db/set-value [:ui :modal :form :submitting?] true])
-                   (state/dispatch [:db/set-value [:ui :modal :form :error] nil])
+                 (fn [db {:keys [module-id dataset-id from-snapshot-name form-fields]}]
+                   ;; Extract form data
+                   (let [snapshot-name (get form-fields :snapshot-name "")]
 
-                   (sente/request!
-                    [:datasets/create-snapshot {:module-id module-id
-                                                :dataset-id dataset-id
-                                                :from-snapshot-name from-snapshot-name
-                                                :to-snapshot-name snapshot-name}]
-                    15000
-                    (fn [reply]
-                      (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
-                      (if (:success reply)
-                        (do
-                          (state/dispatch [:modal/hide])
-                          ;; Invalidate snapshot names query to trigger refetch
-                          (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}])
+                     ;; Set modal form to submitting state
+                     (state/dispatch [:db/set-value [:ui :modal :form :submitting?] true])
+                     (state/dispatch [:db/set-value [:ui :modal :form :error] nil])
 
-                          ;; Pass the created snapshot name to the success callback
-                          (when on-success (on-success snapshot-name)))
-                        (state/dispatch [:db/set-value [:ui :modal :form :error] (:error reply)]))))
+                     (sente/request!
+                      [:datasets/create-snapshot {:module-id module-id
+                                                  :dataset-id dataset-id
+                                                  :from-snapshot-name from-snapshot-name
+                                                  :to-snapshot-name snapshot-name}]
+                      15000
+                      (fn [reply]
+                        (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
+                        (if (:success reply)
+                          (do
+                            (state/dispatch [:modal/hide])
+                            ;; Invalidate snapshot names query to trigger refetch
+                            (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}]))
+                          (state/dispatch [:db/set-value [:ui :modal :form :error] (:error reply)])))))
                    nil))
 
  ;; =============================================================================
@@ -512,3 +512,4 @@
                               (state/dispatch [:query/invalidate {:query-key-pattern [:evaluators decoded-module-id]}])))
                           (state/dispatch [:form/set-error :create-evaluator (:error reply)])))))
                    nil))
+

@@ -234,20 +234,19 @@
 
 (defn show-create-snapshot-modal!
   "Shows the create snapshot modal."
-  ([module-id dataset-id from-snapshot-name] (show-create-snapshot-modal! module-id dataset-id from-snapshot-name nil))
-  ([module-id dataset-id from-snapshot-name on-success]
+  [module-id dataset-id from-snapshot-name]
    (state/dispatch [:form/init :create-snapshot
                     (-> create-snapshot-form-spec
                         (assoc :submit-event [:dataset/create-snapshot {:module-id module-id
                                                                         :dataset-id dataset-id
-                                                                        :from-snapshot-name from-snapshot-name
-                                                                        :on-success on-success}]))])
+                                                                        :from-snapshot-name from-snapshot-name}]))])
    (state/dispatch [:modal/show :create-snapshot
                     {:title "Create New Snapshot"
                      :form-id :create-snapshot
                      :submit-text "Create Snapshot"
                      :component ($ CreateSnapshotForm {:form-id :create-snapshot
-                                                       :from-snapshot-name from-snapshot-name})}])))
+                                                       :from-snapshot-name from-snapshot-name})}]))
+
 
  ;; =============================================================================
 ;; TRY EVALUATOR MODAL
