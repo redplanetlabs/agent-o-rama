@@ -39,7 +39,6 @@
 
                        (not (str/blank? reference-output-json-path))
                        (assoc :reference-output-json-path reference-output-json-path))]
-
     (aor/create-evaluator! manager name builder-name params description path-options)
     {:status :ok}))
 

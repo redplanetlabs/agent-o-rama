@@ -652,7 +652,7 @@
         :> *search-string-lower)
       (evals/all-evaluator-builders :> *builders)
       (<<ramafn %filter
-        [*name {:keys [*builder-name]}]
+        [*name {:keys [*builder-name] :as *info}]
         (select> [(keypath *builder-name) :type] *builders :> *type)
         (<<cond
          (case> (nil? *type))
@@ -667,7 +667,7 @@
           (:> nil)
 
          (default>)
-          (:> {:name *name :type *type})))
+         (:> (assoc *info :name *name :type *type))))
       (search-loop evals-pstate-sym
                    STAY
                    %filter

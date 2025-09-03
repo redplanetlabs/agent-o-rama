@@ -392,7 +392,17 @@
                  (let [submit-event (:submit-event form-state)
                        event-type (first submit-event)
                        event-data (second submit-event)
-                       full-event [event-type (merge event-data (:fields form-state))]]
+                       ;; Use deep merge to preserve nested structures like :params
+                       ;; Custom merge that properly handles nested parameter updates
+                       ;; Custom merge that properly handles nested parameter updates
+                       ;; Pass form fields and static event data separately - let the handler sort it out
+                       merged-data (assoc event-data :form-fields (:fields form-state))
+                       full-event [event-type merged-data]]
+                   ;; DEBUG: Log form submission data
+                   (println "FORM SUBMIT - Event type:" event-type)
+                   (println "FORM SUBMIT - Event data:" event-data)
+                   (println "FORM SUBMIT - Form fields:" (:fields form-state))
+                   (println "FORM SUBMIT - Merged data:" merged-data)
                    ;; Dispatch the actual business logic event
                    (dispatch full-event)))
                nil))) ; This handler only dispatches other events

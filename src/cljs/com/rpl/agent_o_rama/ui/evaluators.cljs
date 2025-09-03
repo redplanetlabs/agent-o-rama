@@ -163,7 +163,7 @@
                    :error (:error reference-output-json-path-field)
                    :placeholder "e.g., $.expected.answer"}))))
 
-       #_($ forms/form-error {:error error}))))
+       ($ forms/form-error {:error error}))))
 
 ;; =============================================================================
 ;; MODAL WORKFLOW
@@ -253,13 +253,6 @@
          (when on-success (on-success)))
        (state/dispatch [:form/set-error :create-evaluator (:error reply)])))))
 
- ;; Register the event handler (only if not already registered)
-(when-not (contains? @state/event-handlers :evaluators/create)
-  (state/reg-event :evaluators/create
-                   (fn [db event-data]
-                     (handle-create-evaluator! event-data)
-                     nil))) ; Return nil since we handle state updates manually
-
 ;; =============================================================================
 ;; EVALUATOR INSTANCES LIST
 ;; =============================================================================
@@ -290,11 +283,11 @@
             ($ :h4.text-sm.font-medium.text-gray-700.mb-2 "Parameters:")
             ($ :div.space-y-1
                (into []
-                     (for [[param-key param-value] params]
-                       ($ :div.text-xs.text-gray-600
+                     (for [[param-key param-value] (sort-by key params)]
+                       ($ :div.text-xs.text-gray-600.flex.justify-between.items-center
                           {:key (str param-key)}
                           ($ :span.font-medium (name param-key))
-                          ($ :span.text-gray-500 ": " (str param-value))))))))
+                          ($ :code.font-mono.bg-gray-100.px-2.py-0.5.rounded (str param-value))))))))
 
        ($ :div.flex.justify-end.gap-2
           ($ :button.text-sm.text-red-600.hover:text-red-800.cursor-pointer
