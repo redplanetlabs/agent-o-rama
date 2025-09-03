@@ -612,9 +612,7 @@
     ($ :div.p-6
        ;; Header
        ($ :div.flex.items-center.justify-between.mb-6
-          ($ :div
-             ($ :h1.text-2xl.font-bold.text-gray-900 "Datasets for " ($ :span.text-indigo-600 module-id))
-             ($ :p.mt-2.text-sm.text-gray-600 "Create and manage datasets for agent training and evaluation."))
+          ($ CircleStackIcon {:className "h-8 w-8 text-indigo-600"})
           ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer
              {:onClick #(show-create-dataset-modal! module-id-raw)}
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
