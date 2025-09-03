@@ -917,7 +917,8 @@
        (close! datasets-depot))
      aor-types/UnderlyingObjects
      (underlying-objects [this]
-       {:datasets-pstate         datasets-pstate
+       {:datasets-depot          datasets-depot
+        :datasets-pstate         datasets-pstate
         :evals-pstate            evals-pstate
         :datasets-page-query     datasets-page-query
         :search-examples-query   search-examples-query

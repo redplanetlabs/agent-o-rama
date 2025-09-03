@@ -225,13 +225,20 @@
   {UUID ; dataset-id
    (fixed-keys-schema
     {:props       (fixed-keys-schema
-                   ;; TODO: <<<<>>>> add cluster-conductor-host and module
-                   {:name              String
-                    :description       String
-                    :input-json-schema String
+                   {;; only set if local dataset
+                    :name               String
+                    :description        String
+                    :input-json-schema  String
                     :output-json-schema String
-                    :created-at        Long
-                    :modified-at       Long})
+
+                    ;; only set if remote dataset
+                    :cluster-conductor-host String
+                    :cluster-conductor-port Long
+                    :module-name        String
+
+                    ;; set for both
+                    :created-at         Long
+                    :modified-at        Long})
      :snapshots
      (map-schema
       String ; nil for latest
@@ -251,8 +258,7 @@
 
      :experiments
      (map-schema
-      ;; TODO: <<<>>>> should this be [UUID7, prefix] tuples instead so it sorted based on time
-      String ; prefix-UUID7
+      UUID
       (fixed-keys-schema
        ;; TODO: <<<<>>> maybe this should be fixed keys schema
        ;;  - or just use flex serialization

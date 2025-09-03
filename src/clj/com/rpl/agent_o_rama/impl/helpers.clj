@@ -316,3 +316,10 @@
      (path END (termval v)))
    :init-fn
    (constantly [])))
+
+(defn to-rama-connection-info
+  [host port]
+  (let [m {"conductor.host" host}]
+    (if port
+      (assoc m "conductor.port" port)
+      m)))
