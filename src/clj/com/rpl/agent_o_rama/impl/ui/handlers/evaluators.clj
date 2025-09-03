@@ -14,9 +14,9 @@
   [{:keys [manager]} uid]
   (foreign-invoke-query (:all-eval-builders-query (aor-types/underlying-objects manager))))
 
- ;; NEW: Handler to get all created evaluator instances
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/get-all-instances
   [{:keys [manager]} uid]
+  (def manager manager)
   (let [underlying-objects (aor-types/underlying-objects manager)
         evals-pstate (:evals-pstate underlying-objects)
         all-builders (foreign-invoke-query (:all-eval-builders-query underlying-objects))

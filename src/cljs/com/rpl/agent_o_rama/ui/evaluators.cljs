@@ -249,15 +249,16 @@
        (do
          (state/dispatch [:modal/hide])
          ;; Invalidate evaluators query to trigger refetch on the index page
-         (state/dispatch [:query/invalidate {:query-key-pattern [:evaluators module-id]}])
+         (state/dispatch [:query/invalidate {:query-key-pattern [:evaluator-instances module-id]}])
          (when on-success (on-success)))
        (state/dispatch [:form/set-error :create-evaluator (:error reply)])))))
 
- ;; Register the event handler
-(state/reg-event :evaluators/create
-                 (fn [db event-data]
-                   (handle-create-evaluator! event-data)
-                   nil)) ; Return nil since we handle state updates manually
+ ;; Register the event handler (only if not already registered)
+(when-not (contains? @state/event-handlers :evaluators/create)
+  (state/reg-event :evaluators/create
+                   (fn [db event-data]
+                     (handle-create-evaluator! event-data)
+                     nil))) ; Return nil since we handle state updates manually
 
 ;; =============================================================================
 ;; EVALUATOR INSTANCES LIST
@@ -318,7 +319,7 @@
   (let [{:keys [module-id]} (state/use-sub [:route :path-params])
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
-         {:query-key [:evaluators module-id]
+         {:query-key [:evaluator-instances module-id]
           :sente-event [:evaluators/get-all-instances {:module-id module-id}]
           :enabled? (boolean module-id)
           :refetch-interval-ms 5000})
