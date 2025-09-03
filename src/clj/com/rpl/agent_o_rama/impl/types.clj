@@ -395,7 +395,8 @@
   (experiment-targets [this] targets))
 
 
-(drp/defrecord+ StartExperiment
+;; since this is stored in a PState
+(drp/defrecord+ ^{:features {:nippy-8-byte-hash false}} StartExperiment
   [id :- UUID
    name :- String
 

@@ -260,8 +260,6 @@
      (map-schema
       UUID
       (fixed-keys-schema
-       ;; TODO: <<<<>>> maybe this should be fixed keys schema
-       ;;  - or just use flex serialization
        {:experiment-info       StartExperiment
         :experiment-invoke     AgentInvoke
         :start-time-millis     Long
