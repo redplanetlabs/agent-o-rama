@@ -58,7 +58,7 @@
             (into []
                   (for [[builder-name builder-spec] data]
                     (let [type (:type builder-spec)
-                          description (get-in builder-spec [:options :description] "No description available")]
+                          description (:description builder-spec "No description available")]
                       ($ :div.border.rounded-lg.p-4.cursor-pointer.hover:bg-gray-50.transition-colors
                          {:key builder-name
                           :onClick #(on-select {:name builder-name
@@ -162,7 +162,7 @@
                    :error (:error reference-output-json-path-field)
                    :placeholder "e.g., $.expected.answer"}))))
 
-       #_ ($ forms/form-error {:error error}))))
+       #_($ forms/form-error {:error error}))))
 
 ;; =============================================================================
 ;; MODAL WORKFLOW
@@ -227,17 +227,18 @@
 ;; EVALUATOR INSTANCES LIST
 ;; =============================================================================
 
-(defui EvaluatorCard [{:keys [evaluator on-delete]}]
-  (let [name (:name evaluator)
-        type (:type evaluator)
-        description (:description evaluator)
-        builder-name (:builder-name evaluator)]
+(defui EvaluatorCard [{:keys [evaluator-name evaluator-spec on-delete]}]
+  (let [type (:type evaluator-spec)
+        description (:description evaluator-spec)
+        params (get-in evaluator-spec [:options :params] {})]
 
     ($ :div.bg-white.border.rounded-lg.p-4.shadow-sm
        ($ :div.flex.justify-between.items-start.mb-3
           ($ :div
-             ($ :h3.font-medium.text-gray-900.mb-1 name)
-             ($ :p.text-sm.text-gray-600 builder-name))
+             ($ :h3.font-medium.text-gray-900.mb-1 evaluator-name)
+             (when (seq params)
+               ($ :p.text-sm.text-gray-500
+                  (str (count params) " parameter" (when (> (count params) 1) "s")))))
 
           ($ :div.flex.items-center.gap-2
              ($ :span.inline-flex.px-2.py-1.text-xs.font-medium.rounded-full
@@ -246,19 +247,32 @@
 
              ($ :div.relative
                 ($ :button.p-1.text-gray-400.hover:text-gray-600
-                   {:onClick #(println "Actions menu for" name)} ; TODO: Implement dropdown
+                   {:onClick #(println "Actions menu for" evaluator-name)} ; TODO: Implement dropdown
                    ($ EllipsisVerticalIcon {:className "h-5 w-5"})))))
 
        (when description
          ($ :p.text-sm.text-gray-600.mb-3 description))
 
+       ;; Show parameters if any
+       (when (seq params)
+         ($ :div.mb-3
+            ($ :h4.text-sm.font-medium.text-gray-700.mb-2 "Parameters:")
+            ($ :div.space-y-1
+               (into []
+                     (for [[param-key param-spec] params]
+                       ($ :div.text-xs.text-gray-600
+                          {:key (str param-key)}
+                          ($ :span.font-medium (name param-key))
+                          (when-let [default (:default param-spec)]
+                            ($ :span.text-gray-500 " (default: " default ")"))))))))
+
        ($ :div.flex.justify-end.gap-2
           ($ :button.text-sm.text-blue-600.hover:text-blue-800
-             {:onClick #(println "Try evaluator" name)} ; TODO: Implement try modal
+             {:onClick #(println "Try evaluator" evaluator-name)} ; TODO: Implement try modal
              "Try...")
 
           ($ :button.text-sm.text-red-600.hover:text-red-800
-             {:onClick #(on-delete name)}
+             {:onClick #(on-delete evaluator-name)}
              "Delete")))))
 
 ;; =============================================================================
@@ -319,8 +333,9 @@
          :else
          ($ :div.grid.gap-4.md:grid-cols-2.lg:grid-cols-3
             (into []
-                  (for [evaluator data]
+                  (for [[evaluator-name evaluator-spec] data]
                     ($ EvaluatorCard
-                       {:key (:name evaluator)
-                        :evaluator evaluator
+                       {:key evaluator-name
+                        :evaluator-name evaluator-name
+                        :evaluator-spec evaluator-spec
                         :on-delete handle-delete}))))))))
