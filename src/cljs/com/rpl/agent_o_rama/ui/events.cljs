@@ -302,13 +302,17 @@
                    nil))
 
 (state/reg-event :dataset/edit
-                 (fn [db {:keys [module-id dataset-id name description initial-name initial-description on-success]}]
-                   ;; Set modal form to submitting state
-                   (state/dispatch [:db/set-value [:ui :modal :form :submitting?] true])
-                   (state/dispatch [:db/set-value [:ui :modal :form :error] nil])
+                 (fn [db {:keys [module-id dataset-id initial-name initial-description form-fields]}]
+                   ;; Extract form data
+                   (let [name (get form-fields :name "")
+                         description (get form-fields :description "")]
 
-                   ;; Create promises for both API calls (name and description)
-                   (let [name-promise (js/Promise.
+                     ;; Set modal form to submitting state
+                     (state/dispatch [:db/set-value [:ui :modal :form :submitting?] true])
+                     (state/dispatch [:db/set-value [:ui :modal :form :error] nil])
+
+                     ;; Create promises for both API calls (name and description)
+                     (let [name-promise (js/Promise.
                                        (fn [resolve reject]
                                          (if (= name initial-name)
                                            (resolve {:success true}) ; Skip if unchanged
@@ -342,8 +346,8 @@
 
                          (.catch (fn [error]
                                    (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
-                                   (state/dispatch [:db/set-value [:ui :modal :form :error]
-                                                    (str "Failed to save: " error)])))))
+                                     (state/dispatch [:db/set-value [:ui :modal :form :error]
+                                                      (str "Failed to save: " error)]))))))
                    nil))
 
 (state/reg-event :dataset/add-example

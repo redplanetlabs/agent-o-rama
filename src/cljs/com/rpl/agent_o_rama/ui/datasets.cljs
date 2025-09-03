@@ -644,8 +644,7 @@
                         (assoc :submit-event [:dataset/edit {:module-id module-id
                                                              :dataset-id dataset-id
                                                              :initial-name initial-name
-                                                             :initial-description initial-description
-                                                             :on-success on-success}]))])
+                                                             :initial-description initial-description}]))])
    (state/dispatch [:modal/show :edit-dataset
                     {:title (str "Edit Dataset: " initial-name)
                      :form-id :edit-dataset
