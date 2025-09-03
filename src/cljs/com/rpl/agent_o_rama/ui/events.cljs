@@ -390,40 +390,43 @@
 
 
 (state/reg-event :dataset/edit-example
-                 (fn [db {:keys [module-id dataset-id snapshot-name example-id input output initial-input initial-output on-success]}]
-                   ;; Set modal form to submitting state
-                   (state/dispatch [:db/set-value [:ui :modal :form :submitting?] true])
-                   (state/dispatch [:db/set-value [:ui :modal :form :error] nil])
+                 (fn [db {:keys [module-id dataset-id snapshot-name example-id form-fields]}]
+                   ;; Extract form data
+                   (let [input (get form-fields :input "")
+                         output (get form-fields :output "")]
 
-                   ;; Client-side JSON validation for quick feedback
-                   (try
-                     (when-not (str/blank? input) (js/JSON.parse input))
-                     (when-not (str/blank? output) (js/JSON.parse output))
+                     ;; Set modal form to submitting state
+                     (state/dispatch [:db/set-value [:ui :modal :form :submitting?] true])
+                     (state/dispatch [:db/set-value [:ui :modal :form :error] nil])
 
-                     ;; If parsing succeeds, send to server
-                     (sente/request!
-                      [:datasets/edit-example {:module-id module-id
-                                               :dataset-id dataset-id
-                                               :snapshot-name snapshot-name
-                                               :example-id example-id
-                                               :input input
-                                               :output output}]
-                      10000
-                      (fn [reply]
-                        (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
-                        (if (:success reply)
-                          (do
-                            (state/dispatch [:modal/hide])
-                            ;; Invalidate dataset examples query to trigger refetch for this dataset & snapshot
-                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}]))
+                     ;; Client-side JSON validation for quick feedback
+                     (try
+                       (when-not (str/blank? input) (js/JSON.parse input))
+                       (when-not (str/blank? output) (js/JSON.parse output))
 
-                          (state/dispatch [:db/set-value [:ui :modal :form :error]
-                                           (or (:error reply) "An unknown server error occurred.")]))))
-                     (catch js/Error e
-                       (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
-                       (state/dispatch [:db/set-value [:ui :modal :form :error]
-                                        (str "Invalid JSON: " (.-message e))])))
-                   nil))
+                       ;; If parsing succeeds, send to server
+                       (sente/request!
+                        [:datasets/edit-example {:module-id module-id
+                                                 :dataset-id dataset-id
+                                                 :snapshot-name snapshot-name
+                                                 :example-id example-id
+                                                 :input input
+                                                 :output output}]
+                        10000
+                        (fn [reply]
+                          (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
+                          (if (:success reply)
+                            (do
+                              (state/dispatch [:modal/hide])
+                              ;; Invalidate dataset examples query to trigger refetch for this dataset & snapshot
+                              (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}]))
+
+                            (state/dispatch [:db/set-value [:ui :modal :form :error]
+                                             (or (:error reply) "An unknown server error occurred.")]))))
+                       (catch js/Error e
+                         (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
+                         (state/dispatch [:db/set-value [:ui :modal :form :error]
+                                          (str "Invalid JSON: " (.-message e))]))))))
 
 (state/reg-event :dataset/create-snapshot
                  (fn [db {:keys [module-id dataset-id from-snapshot-name snapshot-name on-success]}]
