@@ -470,9 +470,9 @@
                                                module-name
                                                (queries/multi-examples-name))
 
-        evals-depot             (foreign-depot cluster
+        global-actions-depot    (foreign-depot cluster
                                                module-name
-                                               (po/evaluators-depot-name))
+                                               (po/global-actions-depot-name))
         evals-pstate            (foreign-pstate
                                  cluster
                                  module-name
@@ -860,7 +860,7 @@
      (createEvaluator [this name builderName params description options]
        (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
              (foreign-append!
-              evals-depot
+              global-actions-depot
               (aor-types/->valid-AddEvaluator
                name
                builderName
@@ -875,7 +875,7 @@
        ))
      (removeEvaluator [this name]
        (foreign-append!
-        evals-depot
+        global-actions-depot
         (aor-types/->valid-RemoveEvaluator name)
        ))
      (searchEvaluators [this searchString]

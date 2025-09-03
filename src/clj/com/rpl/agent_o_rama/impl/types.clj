@@ -312,6 +312,8 @@
 
 ;; Evaluators
 
+(definterface EvaluatorEvent)
+
 (drp/defrecord+ AddEvaluator
   [name :- String
    builder-name :- String
@@ -320,10 +322,12 @@
    input-json-path :- (s/maybe String)
    output-json-path :- (s/maybe String)
    reference-output-json-path :- (s/maybe String)
-  ])
+  ]
+  EvaluatorEvent)
 
 (drp/defrecord+ RemoveEvaluator
-  [name :- String])
+  [name :- String]
+  EvaluatorEvent)
 
 (drp/defrecord+ ExampleRunImpl
   [input :- Object
@@ -335,6 +339,8 @@
   (getOutput [this] output))
 
 ;; Experiments
+
+(definterface ExperimentEvent)
 
 (defprotocol ExperimentInputSelector)
 
@@ -367,7 +373,6 @@
 (drp/defrecord+ ExperimentTarget
   [target-spec :- (s/protocol TargetSpec)
    input->args :- [String]])
-
 
 (defprotocol ExperimentSpec
   (experiment-targets [this]))
@@ -407,10 +412,12 @@
    spec :- (s/protocol ExperimentSpec)
 
    concurrency :- Long
-  ])
+  ]
+  ExperimentEvent)
 
 (drp/defrecord+ DeleteExperiment
-  [name :- String])
+  [name :- String]
+  ExperimentEvent)
 
 ;; Internal protocols
 

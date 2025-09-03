@@ -161,11 +161,6 @@
   (transform* [_this structure next-fn]
               (vswap! structure next-fn)
               structure))
-
-(defn throw!
-  [e]
-  (throw e))
-
 (defn into-map
   [arg]
   (into {} arg))

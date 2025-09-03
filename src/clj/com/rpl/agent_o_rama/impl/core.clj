@@ -5,6 +5,7 @@
    [clojure.set :as set]
    [com.rpl.agent-o-rama.impl.datasets :as datasets]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
+   [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.partitioner :as apart]
@@ -26,6 +27,8 @@
     AgentNodeExecutorTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     AggAckOp
+    EvaluatorEvent
+    ExperimentEvent
     NodeOp]
    [java.util.concurrent
     CompletableFuture]))
@@ -233,14 +236,12 @@
                                agent-graphs)
                    ))
 
-  (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))
-        datasets-depot-sym     (symbol (po/datasets-depot-name))
-        evaluators-depot-sym   (symbol (po/evaluators-depot-name))]
+  (let [pstate-write-depot-sym   (symbol (po/agent-pstate-write-depot-name))
+        datasets-depot-sym       (symbol (po/datasets-depot-name))
+        global-actions-depot-sym (symbol (po/global-actions-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
     (declare-depot* setup datasets-depot-sym (hash-by :dataset-id))
-    ;; TODO: <<<<>>>> can combine this with experiments by consuming here and using interfaces
-    ;; to distinguish eval vs. experiment types, and put impls for those in their namespaces
-    (declare-depot* setup evaluators-depot-sym :random {:global? true})
+    (declare-depot* setup global-actions-depot-sym :random {:global? true})
     (declare-pstate*
      stream-topology
      (symbol (po/datasets-task-global-name))
@@ -252,7 +253,7 @@
      {:global? true})
 
     (doseq [depot-sym [pstate-write-depot-sym datasets-depot-sym
-                       evaluators-depot-sym]]
+                       global-actions-depot-sym]]
       (set-launch-depot-dynamic-option!* setup
                                          depot-sym
                                          "depot.max.entries.per.partition"
@@ -277,8 +278,16 @@
      (source> datasets-depot-sym :> *data)
       (datasets/handle-datasets-op *data)
 
-     (source> evaluators-depot-sym :> *data)
-      (evals/handle-evaluators-op *data)
+     (source> global-actions-depot-sym :> *data)
+      (<<cond
+       (case> (instance? EvaluatorEvent *data))
+        (evals/handle-evaluators-op *data)
+
+       (case> (instance? ExperimentEvent *data))
+        (exp/handle-experiments-op *data)
+
+       (default>)
+        (throw! (h/ex-info "Unexpected global action type" {:type (class *data)})))
     ))
   (queries/declare-agent-get-names-query-topology topologies
                                                   (-> agent-graphs

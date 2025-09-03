@@ -322,7 +322,6 @@
      (aor-types/->ExampleRunImpl input reference-output outputs)
    )))
 
-;; TODO: <<<<>>>> depot append when inintializing experiment state needs to write start-time-millis
 (defn define-experiments-agent!
   [topology]
   (->
@@ -507,3 +506,10 @@
            (c/result! agent-node :done)
          ))))
   ))
+
+(deframaop handle-experiments-op
+  [*data]
+  ;; TODO: <<<<>>>>
+  ;; - depot append when inintializing experiment state needs to write start-time-millis
+
+)

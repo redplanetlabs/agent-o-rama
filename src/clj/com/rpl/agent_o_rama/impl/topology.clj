@@ -335,8 +335,8 @@
                   $$root
                   :> {:keys [*root-invoke-id *invoke-args *graph-version]})
    (<<if (nil? *invoke-args)
-     (h/throw! (h/ex-info "Forked agent ID does not exist"
-                          {:agent-id *agent-id})))
+     (throw! (h/ex-info "Forked agent ID does not exist"
+                        {:agent-id *agent-id})))
    (%affected-aggs *agent-task-id
                    *agent-id
                    (-> *invoke-id->new-args
@@ -357,9 +357,9 @@
                   $$root
                   :> *fork-graph-version)
    (<<if (not= *graph-version *fork-graph-version)
-     (h/throw! (h/ex-info "Cannot fork a run from an old version"
-                          {:current-version *fork-graph-version
-                           :old-version     *graph-version})))
+     (throw! (h/ex-info "Cannot fork a run from an old version"
+                        {:current-version *fork-graph-version
+                         :old-version     *graph-version})))
    (local-transform> [(keypath *fork-agent-id) (termval true)]
                      $$active)
    (local-transform> [(keypath *agent-id)

@@ -80,9 +80,9 @@
   []
   "*_agent-datasets-depot")
 
-(defn evaluators-depot-name
+(defn global-actions-depot-name
   []
-  "*_agent-evaluators-depot")
+  "*_agent-global-actions-depot")
 
 (defn agents-clients-name
   []
@@ -265,9 +265,9 @@
                                 ;; targets
                                 ;; - non-comparative experiment will have single one keyed at 0
                                 (fixed-keys-schema
-                                 {:agent-initiates {Long (fixed-keys-schema {:agent-name   String
-                                                                             :agent-invoke
-                                                                             AgentInvoke})}
+                                 {:agent-initiates {Long (fixed-keys-schema
+                                                          {:agent-name   String
+                                                           :agent-invoke AgentInvoke})}
                                   :agent-results   {Long Object}
                                   :evals           {String {String Object}} ; eval-name->eval-key->result
                                   :eval-failures   {String String}
