@@ -324,6 +324,9 @@
           :enabled? (boolean module-id)
           :refetch-interval-ms 5000})
 
+        ;; Destructure the response from the query
+        evaluators (get data :items [])
+
         handle-delete (uix/use-callback
                        (fn [evaluator-name]
                          (when (js/confirm (str "Are you sure you want to delete evaluator '" evaluator-name "'?"))
@@ -358,7 +361,7 @@
          ($ :div.text-red-500.text-center.py-8
             "Error loading evaluators: " error)
 
-         (empty? data)
+         (empty? evaluators) ; Check the extracted list
          ($ :div.text-center.py-12
             ($ BeakerIcon {:className "mx-auto h-12 w-12 text-gray-400 mb-4"})
             ($ :h3.text-lg.font-medium.text-gray-900.mb-2 "No evaluators yet")
@@ -371,9 +374,10 @@
          :else
          ($ :div.grid.gap-4.md:grid-cols-2.lg:grid-cols-3
             (into []
-                  (for [[evaluator-name evaluator-spec] data]
+                  ;; The loop now iterates over the list of evaluator maps
+                  (for [evaluator-spec evaluators]
                     ($ EvaluatorCard
-                       {:key evaluator-name
-                        :evaluator-name evaluator-name
+                       {:key (:name evaluator-spec)
+                        :evaluator-name (:name evaluator-spec)
                         :instance-spec evaluator-spec
                         :on-delete handle-delete}))))))))
