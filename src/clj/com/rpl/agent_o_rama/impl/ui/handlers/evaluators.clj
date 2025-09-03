@@ -30,35 +30,23 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/create
   [{:keys [manager module-id builder-name name description params input-json-path output-json-path reference-output-json-path]} uid]
-  (try
-    (let [options (cond-> {}
-                    (not (str/blank? description))
-                    (assoc :description description)
+  (let [path-options (cond-> {}
+                       (not (str/blank? input-json-path))
+                       (assoc :input-json-path input-json-path)
 
-                    (not (str/blank? input-json-path))
-                    (assoc :input-json-path input-json-path)
+                       (not (str/blank? output-json-path))
+                       (assoc :output-json-path output-json-path)
 
-                    (not (str/blank? output-json-path))
-                    (assoc :output-json-path output-json-path)
+                       (not (str/blank? reference-output-json-path))
+                       (assoc :reference-output-json-path reference-output-json-path))]
 
-                    (not (str/blank? reference-output-json-path))
-                    (assoc :reference-output-json-path reference-output-json-path)
-
-                    (seq params)
-                    (assoc :params params))]
-
-      (aor/create-evaluator! manager name builder-name params description options)
-      {:status :ok})
-    (catch Exception e
-      (throw (ex-info (.getMessage e) {:type :validation-error})))))
+    (aor/create-evaluator! manager name builder-name params description path-options)
+    {:status :ok}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/delete
   [{:keys [manager name]} uid]
-  (try
-    (aor/remove-evaluator! manager name)
-    {:status :ok}
-    (catch Exception e
-      (throw (ex-info (.getMessage e) {:type :validation-error})))))
+  (aor/remove-evaluator! manager name)
+  {:status :ok})
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/try
   [{:keys [manager name type run-data]} uid]
