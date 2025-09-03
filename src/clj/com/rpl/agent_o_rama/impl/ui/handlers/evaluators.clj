@@ -18,9 +18,13 @@
   [{:keys [manager]} uid]
   (def manager manager)
   (let [underlying-objects (aor-types/underlying-objects manager)
+        _ (def underlying-objects underlying-objects)
+        
         evals-pstate (:evals-pstate underlying-objects)
+        _ (def evals-pstate evals-pstate)
+        
         all-builders (foreign-invoke-query (:all-eval-builders-query underlying-objects))
-        all-instances (foreign-select-one STAY evals-pstate {:pkey 0})]
+        all-instances (foreign-select-one STAY evals-pstate)]
     ;; Enrich instances with builder info for the UI
     (reduce-kv
      (fn [acc instance-name instance-spec]
@@ -33,35 +37,29 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/create
   [{:keys [manager module-id builder-name name description params input-json-path output-json-path reference-output-json-path]} uid]
-  (try
-    (let [options (cond-> {}
-                    (not (str/blank? description))
-                    (assoc :description description)
+  (let [options (cond-> {}
+                  (not (str/blank? description))
+                  (assoc :description description)
 
-                    (not (str/blank? input-json-path))
-                    (assoc :input-json-path input-json-path)
+                  (not (str/blank? input-json-path))
+                  (assoc :input-json-path input-json-path)
 
-                    (not (str/blank? output-json-path))
-                    (assoc :output-json-path output-json-path)
+                  (not (str/blank? output-json-path))
+                  (assoc :output-json-path output-json-path)
 
-                    (not (str/blank? reference-output-json-path))
-                    (assoc :reference-output-json-path reference-output-json-path)
+                  (not (str/blank? reference-output-json-path))
+                  (assoc :reference-output-json-path reference-output-json-path)
 
-                    (seq params)
-                    (assoc :params params))]
+                  (seq params)
+                  (assoc :params params))]
 
-      (aor/create-evaluator! manager name builder-name params description options)
-      {:status :ok})
-    (catch Exception e
-      (throw (ex-info (.getMessage e) {:type :validation-error})))))
+    (aor/create-evaluator! manager name builder-name params description options)
+    {:status :ok}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/delete
   [{:keys [manager name]} uid]
-  (try
-    (aor/remove-evaluator! manager name)
-    {:status :ok}
-    (catch Exception e
-      (throw (ex-info (.getMessage e) {:type :validation-error})))))
+  (aor/remove-evaluator! manager name)
+  {:status :ok})
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/try
   [{:keys [manager name type run-data]} uid]
