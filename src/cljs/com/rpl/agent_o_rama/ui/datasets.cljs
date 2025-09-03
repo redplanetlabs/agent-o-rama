@@ -257,6 +257,10 @@
         [selected-evaluator set-selected-evaluator] (uix/use-state "")
         [actual-output set-actual-output] (uix/use-state "")
         [eval-state set-eval-state] (uix/use-state {:status :idle}) ; :idle, :loading, :success, :error
+        
+        ;; Editable input and reference output states (start with example values as proper JSON strings)
+        [input-data set-input-data] (uix/use-state (js/JSON.stringify (clj->js (:input example)) nil 2))
+        [reference-output-data set-reference-output-data] (uix/use-state (js/JSON.stringify (clj->js (:reference-output example)) nil 2))
 
         ;; Fetch ALL available evaluators for this module (no type filtering)
         {:keys [data loading? error]}
@@ -275,9 +279,9 @@
                               {:module-id module-id
                                :name selected-evaluator
                                :type (:type selected-spec) ; Pass the type dynamically
-                               ;; We send the raw JSON strings; backend will parse
-                               :run-data {:input (js/JSON.stringify (clj->js (:input example)))
-                                          :referenceOutput (js/JSON.stringify (clj->js (:reference-output example)))
+                               ;; We send the current editable values as raw JSON strings
+                               :run-data {:input input-data
+                                          :referenceOutput reference-output-data
                                           :output actual-output}}]
                              10000
                              (fn [reply]
@@ -286,15 +290,21 @@
                                  (set-eval-state {:status :error :error (:error reply)}))))))]
 
     ($ :div.p-6.space-y-4
-       ;; 1. Context (Read-only)
+       ;; 1. Context (Editable)
        ($ :div
-          ($ :h4.font-medium.text-gray-700 "Input")
-          ($ :pre.text-xs.bg-gray-100.p-2.rounded.mt-1.max-h-40.overflow-auto
-             (pretty-print-json (:input example))))
+          ($ :label.block.text-sm.font-medium.text-gray-700 {:htmlFor "input-data"} "Input (JSON)")
+          ($ :textarea#input-data.mt-1.block.w-full.shadow-sm.sm:text-sm.border-gray-300.rounded-md.font-mono
+             {:rows 6
+              :value input-data
+              :onChange #(set-input-data (.. % -target -value))
+              :placeholder "{\n  \"key\": \"value\"\n}"}))
        ($ :div
-          ($ :h4.font-medium.text-gray-700 "Reference Output")
-          ($ :pre.text-xs.bg-gray-100.p-2.rounded.mt-1.max-h-40.overflow-auto
-             (pretty-print-json (:reference-output example))))
+          ($ :label.block.text-sm.font-medium.text-gray-700 {:htmlFor "reference-output-data"} "Reference Output (JSON)")
+          ($ :textarea#reference-output-data.mt-1.block.w-full.shadow-sm.sm:text-sm.border-gray-300.rounded-md.font-mono
+             {:rows 6
+              :value reference-output-data
+              :onChange #(set-reference-output-data (.. % -target -value))
+              :placeholder "{\n  \"expected\": \"result\"\n}"}))
 
        ;; 2. Evaluator Selection - IMPROVED
        ($ :div
@@ -321,7 +331,9 @@
              {:onClick handle-run-eval
               :disabled (or (= (:status eval-state) :loading)
                             (str/blank? selected-evaluator)
-                            (str/blank? actual-output))}
+                            (str/blank? actual-output)
+                            (str/blank? input-data)
+                            (str/blank? reference-output-data))}
              (if (= (:status eval-state) :loading) "Running..." "Run Evaluation"))
 
           ($ :button.text-sm.text-gray-600.hover:underline
