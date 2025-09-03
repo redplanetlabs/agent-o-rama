@@ -5,6 +5,7 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [clojure.string :as str]))
 
@@ -223,22 +224,56 @@
                                   {:module-id module-id
                                    :on-success on-success})}]))
 
+(defn handle-create-evaluator!
+  "Handle the evaluators/create form submission"
+  [{:keys [module-id builder-name name description params
+           input-json-path output-json-path reference-output-json-path
+           on-success]}]
+  ;; Set modal form to submitting state
+  (state/dispatch [:form/set-submitting :create-evaluator true])
+  (state/dispatch [:form/set-error :create-evaluator nil])
+
+  (sente/request!
+   [:evaluators/create {:module-id module-id
+                        :builder-name builder-name
+                        :name name
+                        :description description
+                        :params params
+                        :input-json-path input-json-path
+                        :output-json-path output-json-path
+                        :reference-output-json-path reference-output-json-path}]
+   15000
+   (fn [reply]
+     (state/dispatch [:form/set-submitting :create-evaluator false])
+     (if (:success reply)
+       (do
+         (state/dispatch [:modal/hide])
+         ;; Invalidate evaluators query to trigger refetch on the index page
+         (state/dispatch [:query/invalidate {:query-key-pattern [:evaluators module-id]}])
+         (when on-success (on-success)))
+       (state/dispatch [:form/set-error :create-evaluator (:error reply)])))))
+
+ ;; Register the event handler
+(state/reg-event :evaluators/create
+                 (fn [db event-data]
+                   (handle-create-evaluator! event-data)
+                   nil)) ; Return nil since we handle state updates manually
+
 ;; =============================================================================
 ;; EVALUATOR INSTANCES LIST
 ;; =============================================================================
 
-(defui EvaluatorCard [{:keys [evaluator-name evaluator-spec on-delete]}]
-  (let [type (:type evaluator-spec)
-        description (:description evaluator-spec)
-        params (get-in evaluator-spec [:options :params] {})]
+(defui EvaluatorCard [{:keys [evaluator-name instance-spec on-delete]}]
+  (let [type (:type instance-spec)
+        description (:description instance-spec)
+        builder-name (:builder-name instance-spec)
+        params (get-in instance-spec [:options :params] {})]
 
     ($ :div.bg-white.border.rounded-lg.p-4.shadow-sm
        ($ :div.flex.justify-between.items-start.mb-3
           ($ :div
              ($ :h3.font-medium.text-gray-900.mb-1 evaluator-name)
-             (when (seq params)
-               ($ :p.text-sm.text-gray-500
-                  (str (count params) " parameter" (when (> (count params) 1) "s")))))
+             ($ :p.text-xs.text-gray-500 "Builder: " ($ :code.font-mono builder-name)))
 
           ($ :div.flex.items-center.gap-2
              ($ :span.inline-flex.px-2.py-1.text-xs.font-medium.rounded-full
@@ -291,9 +326,11 @@
         handle-delete (uix/use-callback
                        (fn [evaluator-name]
                          (when (js/confirm (str "Are you sure you want to delete evaluator '" evaluator-name "'?"))
-                           (queries/send-sente-event!
-                            [:evaluators/delete {:name evaluator-name}]
-                            {:on-success #(refetch)})))
+                           (sente/request! [:evaluators/delete {:name evaluator-name}] 15000
+                                           (fn [reply]
+                                             (if (:success reply)
+                                               (refetch)
+                                               (js/alert (str "Failed to delete evaluator: " (:error reply))))))))
                        [refetch])]
 
     ($ :div.p-6
@@ -337,5 +374,5 @@
                     ($ EvaluatorCard
                        {:key evaluator-name
                         :evaluator-name evaluator-name
-                        :evaluator-spec evaluator-spec
+                        :instance-spec evaluator-spec
                         :on-delete handle-delete}))))))))
