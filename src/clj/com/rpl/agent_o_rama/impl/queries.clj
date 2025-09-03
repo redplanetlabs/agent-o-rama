@@ -474,13 +474,20 @@
       (|origin)
     )))
 
+(defn all-evaluator-builders-without-builder-fns
+  []
+  (setval
+   [MAP-VALS :builder-fn]
+   NONE
+   (evals/all-evaluator-builders)))
+
 (defn declare-all-evaluator-builders-query-topology
   [topologies]
   (<<query-topology topologies
-    (all-evaluator-builders-name)
-    [:> *res]
-    (|origin)
-    (evals/all-evaluator-builders :> *res)))
+                    (all-evaluator-builders-name)
+                    [:> *res]
+                    (|origin)
+                    (all-evaluator-builders-without-builder-fns :> *res)))
 
 (defn evaluator-event
   [^CompletableFuture cf name eval-type builder-name builder-params params]
@@ -517,13 +524,13 @@
              :else
              (throw (h/ex-info "Invalid evaluator type"
                                {:type eval-type}))
-           ))
-        )
+             ))
+          )
         (catch Throwable t
           (.completeExceptionally cf t))
         (finally
           (anode/release-acquired-objects! fetcher)))
-    )))
+      )))
 
 (defn declare-try-evaluator-query-topology
   [topologies]

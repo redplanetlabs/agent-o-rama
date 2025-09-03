@@ -12,8 +12,6 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/get-all-instances
   [{:keys [manager]} uid]
-  (def manager manager)
-  (def module-id module-id)
   (foreign-invoke-query (:all-eval-builders-query (aor-types/underlying-objects manager))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/create
