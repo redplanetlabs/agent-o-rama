@@ -16,7 +16,12 @@
     AgentClient
     AgentNode]
    [com.rpl.agentorama.impl
-    AgentDeclaredObjectsTaskGlobal]))
+    AgentDeclaredObjectsTaskGlobal]
+   [com.rpl.agent_o_rama.impl.types
+    StartExperiment
+    UpdateExperimentName
+    DeleteExperiment]
+  ))
 
 (def EXPERIMENTER-NAME "_aor-experimenter")
 
@@ -528,7 +533,34 @@
 
 (deframaop handle-experiments-op
   [*data]
-  ;; TODO: <<<<>>>>
-  ;; - depot append when inintializing experiment state needs to write start-time-millis
+  (<<with-substitutions
+   [$$datasets (po/datasets-task-global)]
+   (<<subsource *data
+    (case> StartExperiment :> {:keys [*id *dataset-id]})
+     (|hash *dataset-id)
 
-)
+     ;; TODO: <<<<>>>>
+     ;; - write :start-time-millis and  :experiment-invoke
+     ;; - depot append to start the agent
+     ;;    - input is just *data
+     ;; - how to make sure doesn't start it twice?
+
+
+    (case> UpdateExperimentName :> {:keys [*id *dataset-id *name]})
+     (|hash *dataset-id)
+     (local-transform>
+      [(must *dataset-id :experiments *id :experiment-info)
+       :name
+       (termval *name)]
+      $$datasets)
+
+    (case> DeleteExperiment :> {:keys [*id *dataset-id]})
+     (|hash *dataset-id)
+     (local-transform>
+      [(must *dataset-id :experiments *id :results) NONE>]
+      $$datasets)
+     (|direct (ops/current-task-id))
+     (local-transform>
+      [(must *dataset-id :experiments *id) NONE>]
+      $$datasets)
+   )))

@@ -410,8 +410,16 @@
   ]
   ExperimentEvent)
 
+
+(drp/defrecord+ UpdateExperimentName
+  [id :- UUID
+   dataset-id :- UUID
+   name :- String]
+  ExperimentEvent)
+
 (drp/defrecord+ DeleteExperiment
-  [name :- String]
+  [id :- UUID
+   dataset-id :- UUID]
   ExperimentEvent)
 
 ;; Internal protocols
