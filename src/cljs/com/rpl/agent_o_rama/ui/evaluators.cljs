@@ -169,7 +169,7 @@
 ;; MODAL WORKFLOW
 ;; =============================================================================
 
-(defui CreateEvaluatorModal [{:keys [module-id on-success]}]
+(defui CreateEvaluatorModal [{:keys [module-id]}]
   (let [[step set-step!] (uix/use-state :select-builder)
         [selected-builder set-selected-builder!] (uix/use-state nil)
 
@@ -194,17 +194,15 @@
                                                      :validators {:name [forms/required]}
                                                      :submit-event [:evaluators/create
                                                                     {:module-id module-id
-                                                                     :builder-name (:name builder)
-                                                                     :on-success on-success}]}])
+                                                                     :builder-name (:name builder)}]}])
                                    ;; Update modal to show form with submit button
                                    (state/dispatch [:modal/show :create-evaluator
                                                     {:title (str "Create " (get-in builder [:spec :options :description] "Evaluator"))
                                                      :form-id :create-evaluator
                                                      :submit-text "Create Evaluator"
                                                      :component ($ CreateEvaluatorModal
-                                                                   {:module-id module-id
-                                                                    :on-success on-success})}])))
-                               [module-id on-success])]
+                                                                   {:module-id module-id})}])))
+                               [module-id])]
 
     (case step
       :select-builder
@@ -217,41 +215,11 @@
          {:form-id :create-evaluator
           :selected-builder selected-builder}))))
 
-(defn show-create-evaluator-modal! [module-id on-success]
+(defn show-create-evaluator-modal! [module-id]
   (state/dispatch [:modal/show :create-evaluator
                    {:title "Select Evaluator Builder"
                     :component ($ CreateEvaluatorModal
-                                  {:module-id module-id
-                                   :on-success on-success})}]))
-
-(defn handle-create-evaluator!
-  "Handle the evaluators/create form submission"
-  [{:keys [module-id builder-name name description params
-           input-json-path output-json-path reference-output-json-path
-           on-success]}]
-  ;; Set modal form to submitting state
-  (state/dispatch [:form/set-submitting :create-evaluator true])
-  (state/dispatch [:form/set-error :create-evaluator nil])
-
-  (sente/request!
-   [:evaluators/create {:module-id module-id
-                        :builder-name builder-name
-                        :name name
-                        :description description
-                        :params params
-                        :input-json-path input-json-path
-                        :output-json-path output-json-path
-                        :reference-output-json-path reference-output-json-path}]
-   15000
-   (fn [reply]
-     (state/dispatch [:form/set-submitting :create-evaluator false])
-     (if (:success reply)
-       (do
-         (state/dispatch [:modal/hide])
-         ;; Invalidate evaluators query to trigger refetch on the index page
-         (state/dispatch [:query/invalidate {:query-key-pattern [:evaluator-instances module-id]}])
-         (when on-success (on-success)))
-       (state/dispatch [:form/set-error :create-evaluator (:error reply)])))))
+                                  {:module-id module-id})}]))
 
 ;; =============================================================================
 ;; EVALUATOR INSTANCES LIST
@@ -328,7 +296,7 @@
              ($ BeakerIcon {:className "h-8 w-8 text-indigo-600"}))
 
           ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
-             {:onClick #(show-create-evaluator-modal! module-id refetch)}
+             {:onClick #(show-create-evaluator-modal! module-id)}
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Create Evaluator"))
 
@@ -348,7 +316,7 @@
             ($ :h3.text-lg.font-medium.text-gray-900.mb-2 "No evaluators yet")
             ($ :p.text-gray-500.mb-6 "Create your first evaluator to get started.")
             ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
-               {:onClick #(show-create-evaluator-modal! module-id refetch)}
+               {:onClick #(show-create-evaluator-modal! module-id)}
                ($ PlusIcon {:className "h-5 w-5 mr-2"})
                "Create Evaluator"))
 

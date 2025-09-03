@@ -96,14 +96,12 @@
                       ($ :li "Do not include " ($ :code.bg-blue-100.px-1.rounded "$schema") " or " ($ :code.bg-blue-100.px-1.rounded "$vocabulary") " keys - these are added automatically")))))))))
 
 (defn show-create-dataset-modal!
-  "Shows the create dataset modal. The refetch parameter is optional and kept for backward compatibility."
+  "Shows the create dataset modal."
   ([module-id-raw] (show-create-dataset-modal! module-id-raw nil))
   ([module-id-raw refetch]
    (state/dispatch [:form/init :create-dataset
                     (-> create-dataset-form-spec
-                        (assoc :submit-event [:dataset/create {:module-id module-id-raw
-                                                               :on-success refetch
-                                                               :form-id :create-dataset}]))])
+                        (assoc :submit-event [:dataset/create {:module-id module-id-raw}]))])
    (state/dispatch [:modal/show :create-dataset
                     {:title "Create New Dataset"
                      :form-id :create-dataset
@@ -235,7 +233,7 @@
        ($ forms/form-error {:error error}))))
 
 (defn show-create-snapshot-modal!
-  "Shows the create snapshot modal. The on-success parameter is optional and kept for backward compatibility."
+  "Shows the create snapshot modal."
   ([module-id dataset-id from-snapshot-name] (show-create-snapshot-modal! module-id dataset-id from-snapshot-name nil))
   ([module-id dataset-id from-snapshot-name on-success]
    (state/dispatch [:form/init :create-snapshot
@@ -636,7 +634,7 @@
 ;; =============================================================================
  ;; Helper function to show edit dataset modal with centralized state
 (defn show-edit-dataset-modal!
-  "Shows the edit dataset modal. The on-success parameter is optional and kept for backward compatibility."
+  "Shows the edit dataset modal."
   ([module-id dataset-id initial-name initial-description] (show-edit-dataset-modal! module-id dataset-id initial-name initial-description nil))
   ([module-id dataset-id initial-name initial-description on-success]
    (state/dispatch [:form/init :edit-dataset

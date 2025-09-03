@@ -259,8 +259,7 @@
                         (if (:success reply)
                           (do
                             (println "Config update success for" key)
-                            (state/dispatch [:db/set-value state-path {:submitting? false :error nil}])
-                            (when on-success (on-success)))
+                            (state/dispatch [:db/set-value state-path {:submitting? false :error nil}]))
                           (do
                             (js/console.error "Config update failed:" (:error reply))
                             (state/dispatch [:db/set-value state-path {:submitting? false :error (:error reply)}])
@@ -272,30 +271,34 @@
 ;; =============================================================================
 
 (state/reg-event :dataset/create
-                 (fn [db {:keys [module-id name description input-schema output-schema on-success]}]
-                   ;; Set modal form to submitting state
-                   (state/dispatch [:db/set-value [:ui :modal :form :submitting?] true])
-                   (state/dispatch [:db/set-value [:ui :modal :form :error] nil])
+                 (fn [db {:keys [module-id form-fields]}]
+                   ;; Extract form data
+                   (let [name (get form-fields :name "")
+                         description (get form-fields :description "")
+                         input-schema (get form-fields :input-schema "")
+                         output-schema (get form-fields :output-schema "")]
 
-                   (sente/request!
-                    [:datasets/create {:module-id module-id
-                                       :name name
-                                       :description description
-                                       :input-schema input-schema
-                                       :output-schema output-schema}]
-                    15000
-                    (fn [reply]
-                      (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
-                      (if (:success reply)
-                        (do
-                          (state/dispatch [:modal/hide])
-                          ;; Invalidate datasets query to trigger refetch
-                          ;; Need to decode module-id to match query key format
-                          (let [decoded-module-id (when module-id (common/url-decode module-id))]
-                            (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}]))
-                          ;; Keep backward compatibility for now
-                          (when on-success (on-success)))
-                        (state/dispatch [:db/set-value [:ui :modal :form :error] (:error reply)]))))
+                     ;; Set modal form to submitting state
+                     (state/dispatch [:db/set-value [:ui :modal :form :submitting?] true])
+                     (state/dispatch [:db/set-value [:ui :modal :form :error] nil])
+
+                     (sente/request!
+                      [:datasets/create {:module-id module-id
+                                         :name name
+                                         :description description
+                                         :input-schema input-schema
+                                         :output-schema output-schema}]
+                      15000
+                      (fn [reply]
+                        (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
+                        (if (:success reply)
+                          (do
+                            (state/dispatch [:modal/hide])
+                            ;; Invalidate datasets query to trigger refetch
+                            ;; Need to decode module-id to match query key format
+                            (let [decoded-module-id (when module-id (common/url-decode module-id))]
+                              (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}])))
+                          (state/dispatch [:db/set-value [:ui :modal :form :error] (:error reply)])))))
                    nil))
 
 (state/reg-event :dataset/edit
@@ -335,9 +338,8 @@
                                   ;; Need to decode module-id to match query key format
                                   (let [decoded-module-id (when module-id (common/url-decode module-id))]
                                     (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}])
-                                    (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-props decoded-module-id dataset-id]}]))
-                                  ;; Keep backward compatibility for now
-                                  (when on-success (on-success))))
+                                    (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-props decoded-module-id dataset-id]}]))))
+
                          (.catch (fn [error]
                                    (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
                                    (state/dispatch [:db/set-value [:ui :modal :form :error]
@@ -369,9 +371,8 @@
                           (do
                             (state/dispatch [:modal/hide])
                             ;; Invalidate dataset examples query to trigger refetch for this dataset & snapshot
-                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                            ;; Keep backward compatibility for now
-                            (when on-success (on-success)))
+                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}]))
+
                           (state/dispatch [:db/set-value [:ui :modal :form :error]
                                            (or (:error reply) "An unknown server error occurred.")]))))
                      (catch js/Error e
@@ -406,9 +407,8 @@
                           (do
                             (state/dispatch [:modal/hide])
                             ;; Invalidate dataset examples query to trigger refetch for this dataset & snapshot
-                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                            ;; Keep backward compatibility for now
-                            (when on-success (on-success)))
+                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}]))
+
                           (state/dispatch [:db/set-value [:ui :modal :form :error]
                                            (or (:error reply) "An unknown server error occurred.")]))))
                      (catch js/Error e
@@ -436,7 +436,7 @@
                           (state/dispatch [:modal/hide])
                           ;; Invalidate snapshot names query to trigger refetch
                           (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}])
-                          ;; Keep backward compatibility for now
+
                           ;; Pass the created snapshot name to the success callback
                           (when on-success (on-success snapshot-name)))
                         (state/dispatch [:db/set-value [:ui :modal :form :error] (:error reply)]))))
@@ -447,7 +447,7 @@
 ;; =============================================================================
 
 (state/reg-event :evaluators/create
-                 (fn [db {:keys [module-id builder-name on-success form-fields]}]
+                 (fn [db {:keys [module-id builder-name form-fields]}]
                    ;; Extract form data
                    (let [;; Extract basic fields
                          name (get form-fields :name "")
@@ -498,8 +498,6 @@
                             (state/dispatch [:modal/hide])
                             ;; Invalidate evaluators query to trigger refetch
                             (let [decoded-module-id (when module-id (common/url-decode module-id))]
-                              (state/dispatch [:query/invalidate {:query-key-pattern [:evaluators decoded-module-id]}]))
-                            ;; Keep backward compatibility for now
-                            (when on-success (on-success)))
+                              (state/dispatch [:query/invalidate {:query-key-pattern [:evaluators decoded-module-id]}])))
                           (state/dispatch [:form/set-error :create-evaluator (:error reply)])))))
                    nil))
