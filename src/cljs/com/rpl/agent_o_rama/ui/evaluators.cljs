@@ -330,7 +330,8 @@
         handle-delete (uix/use-callback
                        (fn [evaluator-name]
                          (when (js/confirm (str "Are you sure you want to delete evaluator '" evaluator-name "'?"))
-                           (sente/request! [:evaluators/delete {:name evaluator-name}] 15000
+                           (sente/request! [:evaluators/delete {:name evaluator-name
+                                                                :module-id module-id}] 15000
                                            (fn [reply]
                                              (if (:success reply)
                                                (refetch)

@@ -45,7 +45,6 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/delete
   [{:keys [manager name]} uid]
-  (def manager manager)
   (aor/remove-evaluator! manager name)
   {:status :ok})
 
