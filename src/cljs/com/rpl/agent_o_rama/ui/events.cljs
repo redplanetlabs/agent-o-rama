@@ -509,7 +509,7 @@
                             (state/dispatch [:modal/hide])
                             ;; Invalidate evaluators query to trigger refetch
                             (let [decoded-module-id (when module-id (common/url-decode module-id))]
-                              (state/dispatch [:query/invalidate {:query-key-pattern [:evaluators decoded-module-id]}])))
+                              (state/dispatch [:query/invalidate {:query-key-pattern [:evaluator-instances decoded-module-id]}])))
                           (state/dispatch [:form/set-error :create-evaluator (:error reply)])))))
                    nil))
 
