@@ -10,7 +10,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path]))
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/get-all-instances
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/get-all-builders
   [{:keys [manager]} uid]
   (foreign-invoke-query (:all-eval-builders-query (aor-types/underlying-objects manager))))
 
@@ -40,11 +40,8 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/delete
   [{:keys [manager name]} uid]
-  (try
-    (aor/remove-evaluator! manager name)
-    {:status :ok}
-    (catch Exception e
-      (throw (ex-info (.getMessage e) {:type :validation-error})))))
+  (aor/remove-evaluator! manager name)
+  {:status :ok})
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/try
   [{:keys [manager name type run-data]} uid]
