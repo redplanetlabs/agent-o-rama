@@ -342,10 +342,7 @@
        ;; Header
        ($ :div.flex.justify-between.items-center.mb-6
           ($ :div.flex.items-center.gap-3
-             ($ BeakerIcon {:className "h-8 w-8 text-indigo-600"})
-             ($ :h1.text-2xl.font-bold.text-gray-900
-                "Evaluators for "
-                ($ :span.text-indigo-600 (common/url-decode module-id))))
+             ($ BeakerIcon {:className "h-8 w-8 text-indigo-600"}))
 
           ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
              {:onClick #(show-create-evaluator-modal! module-id refetch)}
