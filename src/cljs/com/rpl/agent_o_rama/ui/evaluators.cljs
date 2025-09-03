@@ -269,6 +269,7 @@
         description (:description instance-spec)
         builder-name (:builder-name instance-spec)
         params (get-in instance-spec [:options :params] {})]
+   (println "instance-spec:" instance-spec)
 
     ($ :div.bg-white.border.rounded-lg.p-4.shadow-sm
        ($ :div.flex.justify-between.items-start.mb-3
@@ -279,12 +280,7 @@
           ($ :div.flex.items-center.gap-2
              ($ :span.inline-flex.px-2.py-1.text-xs.font-medium.rounded-full
                 {:className (get-evaluator-type-badge-style type)}
-                (get-evaluator-type-display type))
-
-             ($ :div.relative
-                ($ :button.p-1.text-gray-400.hover:text-gray-600
-                   {:onClick #(println "Actions menu for" evaluator-name)} ; TODO: Implement dropdown
-                   ($ EllipsisVerticalIcon {:className "h-5 w-5"})))))
+                (get-evaluator-type-display type))))
 
        (when description
          ($ :p.text-sm.text-gray-600.mb-3 description))
@@ -303,11 +299,7 @@
                             ($ :span.text-gray-500 " (default: " default ")"))))))))
 
        ($ :div.flex.justify-end.gap-2
-          ($ :button.text-sm.text-blue-600.hover:text-blue-800
-             {:onClick #(println "Try evaluator" evaluator-name)} ; TODO: Implement try modal
-             "Try...")
-
-          ($ :button.text-sm.text-red-600.hover:text-red-800
+          ($ :button.text-sm.text-red-600.hover:text-red-800.cursor-pointer
              {:onClick #(on-delete evaluator-name)}
              "Delete")))))
 
