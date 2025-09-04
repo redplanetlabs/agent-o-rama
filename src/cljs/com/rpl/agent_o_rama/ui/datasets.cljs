@@ -364,8 +364,10 @@
           :sente-event [:evaluators/get-all-instances {:module-id module-id}]
           :enabled? (boolean module-id)})
 
-        evaluators (get data :evaluators [])
+        evaluators (or (:items data) [])
+        _ (when (seq evaluators) (println "DEBUG: First evaluator:" (first evaluators)))
         summary-evaluators (filter #(= (:type %) :summary) evaluators)
+        _ (println "DEBUG: Summary evaluators count:" (count summary-evaluators))
 
         run-evaluation
         (fn []
@@ -382,7 +384,7 @@
                  (set-eval-state {:status :success :result (:result reply)})
                  (set-eval-state {:status :error :error (:error reply)}))))))]
 
-    ($ :div.space-y-4
+    ($ :div.space-y-4.p-6
        ;; Selected examples info
        ($ :div.bg-blue-50.p-4.rounded-md
           ($ :h4.text-sm.font-medium.text-blue-900 "Selected Examples")
