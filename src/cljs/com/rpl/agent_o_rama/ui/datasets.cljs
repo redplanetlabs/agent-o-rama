@@ -506,10 +506,6 @@
                          (fn [reply]
                            (if (:success reply)
                              (do
-                               ;; Invalidate dataset examples query to trigger refetch
-                               ;; Invalidate both the single example query and the main examples list
-                               ;; Invalidate dataset examples query to trigger refetch
-                               ;; Invalidate dataset examples query to trigger refetch
                                (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
                                (when on-delete-success (on-delete-success)))
                              (js/alert (str "Error deleting example: " (:error reply))))))))}
@@ -876,7 +872,7 @@
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Input")
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Reference Output")
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Tags")
-                ($ :th.relative.px-6.py-3 "Actions")))
+                ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Actions")))
           ($ :tbody.bg-white.divide-y.divide-gray-200
              (for [example examples]
                (let [example-id (:id example)
@@ -888,7 +884,7 @@
                          :onClick #(state/dispatch [:modal/show :example-viewer
                                                     {:title "Example Details"
                                                      :component ($ ExampleViewerModal
-                                                                   {:example-id (:id example)
+                                                                   {:example-id example-id
                                                                     :module-id module-id
                                                                     :dataset-id dataset-id
                                                                     :snapshot-name snapshot-name
