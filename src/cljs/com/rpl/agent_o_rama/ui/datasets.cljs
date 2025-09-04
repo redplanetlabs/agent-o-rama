@@ -520,7 +520,7 @@
   ;; Fetch the specific example data using dedicated endpoint
   (let [{:keys [data loading? error]}
         (queries/use-sente-query
-         {:query-key [:single-example module-id (s/keypath dataset-id) snapshot-name (s/keypath example-id)]
+         {:query-key [:single-example module-id dataset-id snapshot-name example-id]
           :sente-event [:datasets/get-example {:module-id module-id
                                                :dataset-id dataset-id
                                                :snapshot-name snapshot-name
@@ -748,7 +748,7 @@
 
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
-         {:query-key [:snapshot-names module-id (s/keypath dataset-id)]
+         {:query-key [:snapshot-names module-id dataset-id]
           :sente-event [:datasets/get-snapshot-names {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
 
@@ -1098,7 +1098,7 @@
         ;; 1. Fetch dataset properties, RENAMING keys to avoid collision
         {:keys [data loading? error refetch] :as props-query}
         (queries/use-sente-query
-         {:query-key [:dataset-props module-id (s/keypath dataset-id)]
+         {:query-key [:dataset-props module-id dataset-id]
           :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
 
@@ -1108,7 +1108,7 @@
         ;; 2. Fetch examples, also RENAMING keys
         {:keys [data loading? error refetch] :as examples-query}
         (queries/use-sente-query
-         {:query-key [:dataset-examples module-id (s/keypath dataset-id) selected-snapshot-name search-string]
+         {:query-key [:dataset-examples module-id dataset-id selected-snapshot-name search-string]
           :sente-event [:datasets/search-examples {:module-id module-id
                                                    :dataset-id dataset-id
                                                    :snapshot-name selected-snapshot-name
