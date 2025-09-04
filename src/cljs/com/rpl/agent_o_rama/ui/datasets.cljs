@@ -8,7 +8,8 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [reitit.frontend.easy :as rfe]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [com.rpl.specter :as s]))
 
 (def example-schema "{
   \"type\": \"object\",
@@ -506,70 +507,84 @@
                            (if (:success reply)
                              (do
                                ;; Invalidate dataset examples query to trigger refetch
-                               (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                               ;; Only hide modal if we're in horizontal layout (modal context)
-                               (when (not is-dropdown?)
-                                 (state/dispatch [:modal/hide]))
+                               ;; Invalidate both the single example query and the main examples list
+                               ;; Invalidate dataset examples query to trigger refetch
+                               ;; Invalidate dataset examples query to trigger refetch
+                               (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id) snapshot-name]}])
                                (when on-delete-success (on-delete-success)))
                              (js/alert (str "Error deleting example: " (:error reply))))))))}
           ($ TrashIcon {:className delete-icon-classes})
           "Delete"))))
 
-(defui ExampleViewerModal [{:keys [example module-id dataset-id snapshot-name on-delete-success]}]
-  (let [example-id (:id example)]
+(defui ExampleViewerModal [{:keys [example-id module-id dataset-id snapshot-name on-delete-success]}]
+  ;; Fetch the specific example data using dedicated endpoint
+  (let [{:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:single-example module-id (s/keypath dataset-id) snapshot-name (s/keypath example-id)]
+          :sente-event [:datasets/get-example {:module-id module-id
+                                               :dataset-id dataset-id
+                                               :snapshot-name snapshot-name
+                                               :example-id example-id}]
+          :enabled? (boolean (and module-id dataset-id example-id))})
 
-    ($ :div.p-6.space-y-6
-       ;; Header with action buttons
-       ($ :div.flex.items-center.justify-between
-          ($ :h3.text-lg.font-medium.text-gray-900 "Example Details")
-          ($ :div.flex.items-center.space-x-2
+        ;; Extract the example directly from the response
+        example (:example data)]
 
-             ($ ExampleActionButtons {:example example
-                                      :module-id module-id
-                                      :dataset-id dataset-id
-                                      :snapshot-name snapshot-name
-                                      :on-delete-success on-delete-success
-                                      :close-fn #(state/dispatch [:modal/hide])
-                                      :layout :horizontal})))
+    (cond
+      loading? ($ :div.p-6 "Loading example details...")
+      error ($ :div.p-6.text-red-500 "Error loading example details")
+      (not example) ($ :div.p-6.text-gray-500 "Example not found")
+      :else
+      ($ :div.p-6.space-y-6
+         ;; Header with action buttons
+         ($ :div.flex.items-center.justify-between
+            ($ :h3.text-lg.font-medium.text-gray-900 "Example Details")
+            ($ :div.flex.items-center.space-x-2
+               ($ ExampleActionButtons {:example example
+                                        :module-id module-id
+                                        :dataset-id dataset-id
+                                        :snapshot-name snapshot-name
+                                        :on-delete-success on-delete-success
+                                        :close-fn #(state/dispatch [:modal/hide])
+                                        :layout :horizontal})))
 
-       ;; Example content
-       ($ :div.space-y-4
-          ;; Input section
-          ($ :div
-             ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Input")
-             ($ :div.bg-gray-50.rounded-md.p-4.border
-                ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
-                   (if (string? (:input example))
-                     (:input example)
-                     (js/JSON.stringify (clj->js (:input example)) nil 2)))))
-
-          ;; Reference Output section
-          ($ :div
-             ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Reference Output")
-             ($ :div.bg-gray-50.rounded-md.p-4.border
-                (if (:reference-output example)
+         ;; Example content
+         ($ :div.space-y-4
+            ;; Input section
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Input")
+               ($ :div.bg-gray-50.rounded-md.p-4.border
                   ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
-                     (if (string? (:reference-output example))
-                       (:reference-output example)
-                       (js/JSON.stringify (clj->js (:reference-output example)) nil 2)))
-                  ($ :div.text-sm.text-gray-500.italic "No reference output"))))
+                     (if (string? (:input example))
+                       (:input example)
+                       (js/JSON.stringify (clj->js (:input example)) nil 2)))))
 
-          ;; Tags section
-          ;; Tags section
-          ($ :div
-             ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tags")
-             ($ :div.bg-gray-50.rounded-md.p-4.border
-                ($ TagInput {:tags (:tags example)
-                             :module-id module-id
-                             :dataset-id dataset-id
-                             :snapshot-name snapshot-name
-                             :example-id example-id})))
+            ;; Reference Output section
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Reference Output")
+               ($ :div.bg-gray-50.rounded-md.p-4.border
+                  (if (:reference-output example)
+                    ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
+                       (if (string? (:reference-output example))
+                         (:reference-output example)
+                         (js/JSON.stringify (clj->js (:reference-output example)) nil 2)))
+                    ($ :div.text-sm.text-gray-500.italic "No reference output"))))
 
-          ;; Example ID (for reference)
-          ($ :div
-             ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Example ID")
-             ($ :div.bg-gray-50.rounded-md.p-2.border
-                ($ :code.text-xs.text-gray-600 (str example-id))))))))
+            ;; Tags section
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tags")
+               ($ :div.bg-gray-50.rounded-md.p-4.border
+                  ($ TagInput {:tags (:tags example)
+                               :module-id module-id
+                               :dataset-id dataset-id
+                               :snapshot-name snapshot-name
+                               :example-id example-id})))
+
+            ;; Example ID (for reference)
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Example ID")
+               ($ :div.bg-gray-50.rounded-md.p-2.border
+                  ($ :code.text-xs.text-gray-600 (str example-id)))))))))
 
 (defui TagInput [{:keys [tags module-id dataset-id snapshot-name example-id on-tags-change]}]
   (let [[input-value set-input-value] (uix/use-state "")
@@ -590,8 +605,10 @@
                               (if (:success reply)
                                 (do
                                   (set-input-value "")
-                                  ;; Invalidate query to refresh data
-                                  (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                  ;; Invalidate both the single example query and the main examples list
+                                  ;; Invalidate both the single example query and the main examples list
+                                  (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id (s/keypath dataset-id) snapshot-name (s/keypath example-id)]}])
+                                  (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id) snapshot-name]}])
                                   (when on-tags-change (on-tags-change)))
                                 (js/alert (str "Error adding tag: " (:error reply))))))))
 
@@ -606,8 +623,10 @@
                              (fn [reply]
                                (if (:success reply)
                                  (do
-                                   ;; Invalidate query to refresh data
-                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                   ;; Invalidate both the single example query and the main examples list
+                                   ;; Invalidate both the single example query and the main examples list
+                                   (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id (s/keypath dataset-id) snapshot-name (s/keypath example-id)]}])
+                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id) snapshot-name]}])
                                    (when on-tags-change (on-tags-change)))
                                  (js/alert (str "Error removing tag: " (:error reply)))))))
 
@@ -731,7 +750,7 @@
 
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
-         {:query-key [:snapshot-names module-id dataset-id]
+         {:query-key [:snapshot-names module-id (s/keypath dataset-id)]
           :sente-event [:datasets/get-snapshot-names {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
 
@@ -758,7 +777,7 @@
                                  (when (= selected-snapshot snapshot-name)
                                    (set-selected-snapshot "")) ;; Reset view to latest if deleting current
                                  ;; Invalidate snapshot names query to trigger refetch
-                                 (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}]))
+                                 (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id (s/keypath dataset-id)]}]))
                                (js/alert (str "Error deleting snapshot: " (:error reply))))))))
 
         handle-select (fn [snapshot-name]
@@ -871,7 +890,7 @@
                          :onClick #(state/dispatch [:modal/show :example-viewer
                                                     {:title "Example Details"
                                                      :component ($ ExampleViewerModal
-                                                                   {:example example
+                                                                   {:example-id (:id example)
                                                                     :module-id module-id
                                                                     :dataset-id dataset-id
                                                                     :snapshot-name snapshot-name
@@ -1081,7 +1100,7 @@
         ;; 1. Fetch dataset properties, RENAMING keys to avoid collision
         {:keys [data loading? error refetch] :as props-query}
         (queries/use-sente-query
-         {:query-key [:dataset-props module-id dataset-id]
+         {:query-key [:dataset-props module-id (s/keypath dataset-id)]
           :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
 
@@ -1091,7 +1110,7 @@
         ;; 2. Fetch examples, also RENAMING keys
         {:keys [data loading? error refetch] :as examples-query}
         (queries/use-sente-query
-         {:query-key [:dataset-examples module-id dataset-id selected-snapshot-name search-string]
+         {:query-key [:dataset-examples module-id (s/keypath dataset-id) selected-snapshot-name search-string]
           :sente-event [:datasets/search-examples {:module-id module-id
                                                    :dataset-id dataset-id
                                                    :snapshot-name selected-snapshot-name
