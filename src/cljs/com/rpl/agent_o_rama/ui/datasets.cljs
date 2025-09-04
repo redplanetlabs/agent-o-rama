@@ -520,11 +520,11 @@
   ;; Fetch the specific example data using dedicated endpoint
   (let [{:keys [data loading? error]}
         (queries/use-sente-query
-         {:query-key [:single-example module-id dataset-id snapshot-name example-id]
+         {:query-key [:single-example module-id dataset-id snapshot-name (str example-id)]
           :sente-event [:datasets/get-example {:module-id module-id
                                                :dataset-id dataset-id
                                                :snapshot-name snapshot-name
-                                               :example-id example-id}]
+                                               :example-id (str example-id)}]
           :enabled? (boolean (and module-id dataset-id example-id))})
 
         ;; Extract the example directly from the response
@@ -606,7 +606,7 @@
                                 (do
                                   (set-input-value "")
                                   ;; Invalidate both the single example query and the main examples list
-                                  (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name example-id]}])
+                                  (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
                                   (when on-tags-change (on-tags-change)))
                                 (js/alert (str "Error adding tag: " (:error reply))))))))
@@ -623,7 +623,7 @@
                                (if (:success reply)
                                  (do
                                    ;; Invalidate both the single example query and the main examples list
-                                   (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name example-id]}])
+                                   (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
                                    (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
                                    (when on-tags-change (on-tags-change)))
                                  (js/alert (str "Error removing tag: " (:error reply)))))))
