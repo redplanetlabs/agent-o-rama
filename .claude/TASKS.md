@@ -96,4 +96,7 @@ Include REFINE to refine the spec
 
 	  check the deps.edn files too
 
+- [ ] update the aggregation-agent example to show the return value of
+      agg-start node being passed as last arg to agg-node
+
 # Large
