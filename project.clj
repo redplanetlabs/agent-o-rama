@@ -50,11 +50,9 @@
                         :source-paths      ["src/clj"
                                             "src/cljs"
                                             "resource"
-                                            "examples/clj/src"
-                                            "simple-examples/clj/src"]
+                                            "examples/clj/src"]
                         :test-paths        ["test/clj"
-                                            "examples/clj/test"
-                                            "simple-examples/clj/test"]
+                                            "examples/clj/test"]
                         :java-source-paths ["src/java" "test/java"]
                         :dependencies
                         [[org.clojure/clojure "1.12.0"]
