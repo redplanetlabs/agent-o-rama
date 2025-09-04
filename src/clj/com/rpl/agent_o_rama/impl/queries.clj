@@ -4,6 +4,7 @@
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
+   [com.rpl.agent-o-rama.impl.datasets :as datasets]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -79,6 +80,10 @@
 (defn search-experiments-name
   []
   "_aor-search-experiments")
+
+(defn experiment-results-name
+  []
+  "_aor-experiment-results")
 
 (defn- to-pqueue
   [coll]
@@ -674,9 +679,6 @@
       (hash-map :items *items :pagination-params *page-key :> *res)
     )))
 
-
-(def MISSING-EXAMPLE ::missing-example)
-
 ;; - filters can contain:
 ;;    - :search-string, which matches against the experiment name or ID
 ;;    - :type which is either com.rpl.agent_o_rama.impl.types.RegularExperiment or
@@ -737,24 +739,107 @@
       (hash-map :items *items :pagination-params *page-key :> *res)
     )))
 
-;; TODO: <<<>>>
-;;  - fetch experiment results query topology
-;;    - needs to handle source data being missing
-;;       - need a MISSING sentinel for UI to use
-;;    - return start/finish times, and name
-;;    - fetch evals for all examples
-;;    - fetch summary evals
-;;    - fetch experiment info for num-repetitions / concurrency
-;;
+(defn is-remote-dataset?
+  [{:keys [module-name]}]
+  (some? module-name))
 
-;; TODO: <<<<>>>>
+(defn example-fetch-batch-size
+  []
+  500)
+
+(defn merge-examples-to-results
+  [results-map example-id->example]
+  (transform
+   MAP-VALS
+   (fn [{:keys [example-id] :as m}]
+     (if-let [example (get example-id->example example-id)]
+       (assoc m
+        :input (:input example)
+        :reference-output (:reference-output example))
+       (assoc m :missing-example? true)
+     ))
+   results-map))
+
+(defn fetch-remote-examples
+  [remote-params query-path]
+  (let [cf (h/mk-completable-future)]
+    (anode/submit-virtual-task!
+     nil
+     (fn []
+       (try
+         (datasets/with-datasets-pstate
+          remote-params
+          [datasets]
+          (.complete cf (foreign-select-one query-path datasets))
+         )
+         (catch Throwable t
+           (.completeExceptionally cf t)
+         ))
+     ))
+    cf))
+
 ;; - returns {:items [{<all the info in values of :experiments in datasets PState, with
-    ;; examples
+;; examples
 ;; hydrated with example input/reference-output into the keys :input, :reference-output}
 ;;                    ...]
 ;;            :pagination-params <next-key>}
-;;    - if example is missing from the dataset (e.g. it was deleted), it is replaced with the
-;;    sentinel keyword MISSING-EXAMPLE
+;;    - if example is missing from the dataset (e.g. it was deleted), it won't have :input or
+;;    :reference-output and will instead have the key :missing-example? set to true
+(defn declare-experiment-results-query-topology
+  [topologies]
+  (let [datasets-pstate-sym (symbol (po/datasets-task-global-name))]
+    (<<query-topology topologies
+      (experiment-results-name)
+      [*dataset-id *experiment-id :> *res]
+      (|hash *dataset-id)
+      (local-select> [(keypath *dataset-id)
+                      :props
+                      (submap [:cluster-conductor-host :cluster-conductor-port :module-name])]
+                     datasets-pstate-sym
+                     :> *remote-params)
+      (local-select> [(keypath *dataset-id :experiments *experiment-id)
+                      (submap [:experiment-info
+                               :experiment-invoke
+                               :start-time-millis
+                               :finish-time-millis
+                               :summary-evals
+                               :summary-eval-failures])]
+                     datasets-pstate-sym
+                     :> *experiment-props)
+      (local-select> [(keypath *dataset-id :experiments *experiment-id :results)
+                      (subselect ALL)]
+                     datasets-pstate-sym
+                     {:allow-yield? true}
+                     :> *results-tuples)
+      (into {} *results-tuples :> *results-map)
+      (select> [(subselect MAP-VALS :example-id) (view set)] *results-map :> *example-ids)
+      (example-fetch-batch-size :> *batch-size)
+      (partition *batch-size *batch-size [] *example-ids :> *chunks)
+      (select> [:experiment-info :snapshot] *experiment-props :> *snapshot)
+      (loop<- [*m {}
+               *chunks (seq *chunks)
+               :> *example-id->example]
+        (yield-if-overtime)
+        (<<if (nil? *chunks)
+          (:> *m)
+         (else>)
+          (first *chunks :> *chunk)
+          (apply multi-path (mapv keypath *chunk) :> *example-paths)
+          (path> (subselect (keypath *dataset-id :snapshots *snapshot)
+                            *example-paths)
+                 :> *query-path)
+          (<<if (is-remote-dataset? *remote-params)
+            (fetch-remote-examples *remote-params *query-path :> *examples)
+           (else>)
+            (local-select> *query-path datasets-pstate-sym :> *examples))
+          (mapv *chunk *examples :> *pairs)
+          (continue> (into *m *pairs) (next *chunks))
+        ))
+      (assoc *experiment-props
+       :results (merge-examples-to-results *results-map *example-id->example)
+       :> *res)
+      (|origin))))
+
 
 ;; direct queries on PStates
 

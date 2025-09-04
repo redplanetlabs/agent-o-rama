@@ -301,6 +301,7 @@
   (queries/declare-try-evaluator-query-topology topologies)
   (queries/declare-search-evaluators-query-topology topologies)
   (queries/declare-search-experiments-query-topology topologies)
+  (queries/declare-experiment-results-query-topology topologies)
   (doseq [[agent-name agent-graph] agent-graphs]
     (define-agent! agent-name
                    setup

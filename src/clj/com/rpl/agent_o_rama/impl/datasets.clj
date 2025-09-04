@@ -308,28 +308,39 @@
           apath
           )]]]))
 
+(defmacro with-datasets-pstate
+  [remote-params [datasets-sym] & body]
+  `(let [{host# :cluster-conductor-host port# :cluster-conductor-port module-name# :module-name}
+         ~remote-params
+
+         declared-objects-tg# (po/agent-declared-objects-task-global)
+
+         retriever# (if host#
+                      (open-cluster-manager (h/to-rama-connection-info host# port#))
+                      (.getClusterRetriever declared-objects-tg#))]
+     (try
+       (let [~datasets-sym (foreign-pstate retriever# module-name# (po/datasets-task-global-name))]
+         ~@body)
+       (finally
+         (when host#
+           (close! retriever#))
+       ))))
+
 (defn verify-remote-dataset
-  [{:keys [dataset-id cluster-conductor-host cluster-conductor-port module-name]}]
+  [{:keys [dataset-id cluster-conductor-host cluster-conductor-port module-name] :as params}]
   (if (and (some? cluster-conductor-port) (nil? cluster-conductor-host))
     "Cannot set conductor port without setting conductor host"
-    (let [declared-objects-tg (po/agent-declared-objects-task-global)
-          retriever (if cluster-conductor-host
-                      (open-cluster-manager (h/to-rama-connection-info cluster-conductor-host
-                                                                       cluster-conductor-port))
-                      (.getClusterRetriever declared-objects-tg))]
-      (try
-        (let [datasets (foreign-pstate retriever module-name (po/datasets-task-global-name))
-              exists?  (foreign-select-one [(keypath dataset-id) :props :name (view some?)]
-                                           datasets)]
-          (when-not exists?
-            (throw (h/ex-info "Remote dataset does not exist in specified module" {})))
-          nil)
-        (catch Throwable t
-          (str "Failed to connect to remote dataset %s" (h/throwable->str t)))
-        (finally
-          (when cluster-conductor-host
-            (close! retriever))))
-    )))
+    (try
+      (with-datasets-pstate
+       params
+       [datasets]
+       (let [exists? (foreign-select-one [(keypath dataset-id) :props :name (view some?)]
+                                         datasets)]
+         (when-not exists?
+           (throw (h/ex-info "Remote dataset does not exist in specified module" {})))
+         nil))
+      (catch Throwable t
+        (str "Failed to connect to remote dataset %s" (h/throwable->str t))))))
 
 (deframaop handle-datasets-op
   [{:keys [*dataset-id] :as *data}]

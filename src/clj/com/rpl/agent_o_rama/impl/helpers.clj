@@ -296,7 +296,7 @@
   (JsonPath/compile json-path (into-array Predicate [])))
 
 (defn mk-completable-future
-  []
+  ^CompletableFuture []
   (CompletableFuture.))
 
 (defn cf-get
