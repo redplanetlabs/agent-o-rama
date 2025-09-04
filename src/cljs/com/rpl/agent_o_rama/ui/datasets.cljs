@@ -1184,7 +1184,7 @@
                                        " selected"))
                                ($ :span.text-sm.text-gray-500 "No examples selected")))
                           ($ :div.flex.items-center.space-x-2
-                             ($ :button.px-3.py-1.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed
+                             ($ :button.px-3.py-1.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                                 {:disabled (empty? selected-example-ids)
                                  :onClick #(when (seq selected-example-ids)
                                              (state/dispatch [:modal/show :try-summary-evaluator
