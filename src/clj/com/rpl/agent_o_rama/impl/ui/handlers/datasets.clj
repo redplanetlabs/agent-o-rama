@@ -120,3 +120,21 @@
     (catch com.fasterxml.jackson.core.JsonParseException e
       (throw (ex-info (str "Invalid JSON provided: " (.getOriginalMessage e))
                       {:field (if (str/includes? (.getMessage e) "input") :input :output)})))))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-tag
+  [{:keys [manager dataset-id snapshot-name example-id tag]} uid]
+  (aor/add-dataset-example-tag! manager
+                                dataset-id
+                                example-id
+                                tag
+                                {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)})
+  {:status :ok})
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/remove-tag
+  [{:keys [manager dataset-id snapshot-name example-id tag]} uid]
+  (aor/remove-dataset-example-tag! manager
+                                   dataset-id
+                                   example-id
+                                   tag
+                                   {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)})
+  {:status :ok})

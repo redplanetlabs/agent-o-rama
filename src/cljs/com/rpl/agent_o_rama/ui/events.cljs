@@ -313,39 +313,39 @@
 
                      ;; Create promises for both API calls (name and description)
                      (let [name-promise (js/Promise.
-                                       (fn [resolve reject]
-                                         (if (= name initial-name)
-                                           (resolve {:success true}) ; Skip if unchanged
-                                           (sente/request!
-                                            [:datasets/set-name {:module-id module-id
-                                                                 :dataset-id dataset-id
-                                                                 :name name}]
-                                            5000
-                                            #(if (:success %) (resolve %) (reject (:error %)))))))
-                         desc-promise (js/Promise.
-                                       (fn [resolve reject]
-                                         (if (= description initial-description)
-                                           (resolve {:success true}) ; Skip if unchanged
-                                           (sente/request!
-                                            [:datasets/set-description {:module-id module-id
-                                                                        :dataset-id dataset-id
-                                                                        :description description}]
-                                            5000
-                                            #(if (:success %) (resolve %) (reject (:error %)))))))]
+                                         (fn [resolve reject]
+                                           (if (= name initial-name)
+                                             (resolve {:success true}) ; Skip if unchanged
+                                             (sente/request!
+                                              [:datasets/set-name {:module-id module-id
+                                                                   :dataset-id dataset-id
+                                                                   :name name}]
+                                              5000
+                                              #(if (:success %) (resolve %) (reject (:error %)))))))
+                           desc-promise (js/Promise.
+                                         (fn [resolve reject]
+                                           (if (= description initial-description)
+                                             (resolve {:success true}) ; Skip if unchanged
+                                             (sente/request!
+                                              [:datasets/set-description {:module-id module-id
+                                                                          :dataset-id dataset-id
+                                                                          :description description}]
+                                              5000
+                                              #(if (:success %) (resolve %) (reject (:error %)))))))]
 
                      ;; Wait for both requests to complete
-                     (-> (.all js/Promise [name-promise desc-promise])
-                         (.then (fn [_]
-                                  (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
-                                  (state/dispatch [:modal/hide])
+                       (-> (.all js/Promise [name-promise desc-promise])
+                           (.then (fn [_]
+                                    (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
+                                    (state/dispatch [:modal/hide])
                                   ;; Invalidate both datasets list and dataset properties
                                   ;; Need to decode module-id to match query key format
-                                  (let [decoded-module-id (when module-id (common/url-decode module-id))]
-                                    (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}])
-                                    (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-props decoded-module-id dataset-id]}]))))
+                                    (let [decoded-module-id (when module-id (common/url-decode module-id))]
+                                      (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}])
+                                      (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-props decoded-module-id dataset-id]}]))))
 
-                         (.catch (fn [error]
-                                   (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
+                           (.catch (fn [error]
+                                     (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
                                      (state/dispatch [:db/set-value [:ui :modal :form :error]
                                                       (str "Failed to save: " error)]))))))
                    nil))
@@ -387,7 +387,6 @@
                          (state/dispatch [:db/set-value [:ui :modal :form :error]
                                           (str "Invalid JSON: " (.-message e))]))))
                    nil))
-
 
 (state/reg-event :dataset/edit-example
                  (fn [db {:keys [module-id dataset-id snapshot-name example-id form-fields]}]
@@ -451,6 +450,18 @@
                             ;; Invalidate snapshot names query to trigger refetch
                             (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}]))
                           (state/dispatch [:db/set-value [:ui :modal :form :error] (:error reply)])))))
+                   nil))
+
+(state/reg-event :datasets/add-tag
+                 (fn [db {:keys [module-id dataset-id snapshot-name example-id tag]}]
+                   ;; This event is handled by the TagInput component directly
+                   ;; No state management needed here since we use query invalidation
+                   nil))
+
+(state/reg-event :datasets/remove-tag
+                 (fn [db {:keys [module-id dataset-id snapshot-name example-id tag]}]
+                   ;; This event is handled by the TagInput component directly
+                   ;; No state management needed here since we use query invalidation
                    nil))
 
  ;; =============================================================================

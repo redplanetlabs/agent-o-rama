@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.datasets
   (:require
    [uix.core :as uix :refer [defui defhook $]]
-   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon]]
+   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon XMarkIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.sente :as sente]
@@ -555,23 +555,94 @@
                   ($ :div.text-sm.text-gray-500.italic "No reference output"))))
 
           ;; Tags section
+          ;; Tags section
           ($ :div
              ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tags")
              ($ :div.bg-gray-50.rounded-md.p-4.border
-                (let [tags (:tags example)]
-                  (if (and tags (seq tags))
-                    ($ :div.flex.flex-wrap.gap-2
-                       (for [tag (sort (map name tags))]
-                         ($ :span.inline-flex.items-center.px-2.5.py-0.5.rounded-full.text-xs.font-medium.bg-blue-100.text-blue-800
-                            {:key tag}
-                            tag)))
-                    ($ :div.text-sm.text-gray-500.italic "No tags")))))
+                ($ TagInput {:tags (:tags example)
+                             :module-id module-id
+                             :dataset-id dataset-id
+                             :snapshot-name snapshot-name
+                             :example-id example-id})))
 
           ;; Example ID (for reference)
           ($ :div
              ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Example ID")
              ($ :div.bg-gray-50.rounded-md.p-2.border
                 ($ :code.text-xs.text-gray-600 (str example-id))))))))
+
+(defui TagInput [{:keys [tags module-id dataset-id snapshot-name example-id on-tags-change]}]
+  (let [[input-value set-input-value] (uix/use-state "")
+        [is-adding set-is-adding] (uix/use-state false)
+
+        handle-add-tag (fn [tag-name]
+                         (when-not (or (str/blank? tag-name) (contains? (set (map name tags)) tag-name))
+                           (set-is-adding true)
+                           (sente/request!
+                            [:datasets/add-tag {:module-id module-id
+                                                :dataset-id dataset-id
+                                                :snapshot-name snapshot-name
+                                                :example-id example-id
+                                                :tag tag-name}]
+                            10000
+                            (fn [reply]
+                              (set-is-adding false)
+                              (if (:success reply)
+                                (do
+                                  (set-input-value "")
+                                  ;; Invalidate query to refresh data
+                                  (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                  (when on-tags-change (on-tags-change)))
+                                (js/alert (str "Error adding tag: " (:error reply))))))))
+
+        handle-remove-tag (fn [tag-name]
+                            (sente/request!
+                             [:datasets/remove-tag {:module-id module-id
+                                                    :dataset-id dataset-id
+                                                    :snapshot-name snapshot-name
+                                                    :example-id example-id
+                                                    :tag tag-name}]
+                             10000
+                             (fn [reply]
+                               (if (:success reply)
+                                 (do
+                                   ;; Invalidate query to refresh data
+                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                   (when on-tags-change (on-tags-change)))
+                                 (js/alert (str "Error removing tag: " (:error reply)))))))
+
+        handle-key-press (fn [e]
+                           (when (= (.-key e) "Enter")
+                             (.preventDefault e)
+                             (let [trimmed-value (str/trim input-value)]
+                               (when-not (str/blank? trimmed-value)
+                                 (handle-add-tag trimmed-value)))))]
+
+    ($ :div
+       ;; Existing tags as pills
+       (if (and tags (seq tags))
+         ($ :div.flex.flex-wrap.gap-2.mb-3
+            (for [tag (sort (map name tags))]
+              ($ :span.inline-flex.items-center.px-2.5.py-0.5.rounded-full.text-xs.font-medium.bg-blue-100.text-blue-800
+                 {:key tag}
+                 tag
+                 ($ :button.ml-1.inline-flex.items-center.justify-center.w-4.h-4.rounded-full.text-blue-400.hover:bg-blue-200.hover:text-blue-600.focus:outline-none
+                    {:onClick #(handle-remove-tag tag)
+                     :title (str "Remove " tag)}
+                    ($ XMarkIcon {:className "w-3 h-3"})))))
+         ($ :div.text-sm.text-gray-500.italic.mb-3 "No tags"))
+
+       ;; Input field for adding new tags
+       ($ :div.flex.items-center.space-x-2
+          ($ :input.flex-1.px-3.py-2.text-sm.border.border-gray-300.rounded-md.focus:outline-none.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
+             {:type "text"
+              :placeholder "Add a tag and press Enter..."
+              :value input-value
+              :onChange #(set-input-value (.. % -target -value))
+              :onKeyPress handle-key-press
+              :disabled is-adding})
+          (when is-adding
+            ($ :div.text-sm.text-gray-500 "Adding..."))))))
 
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content]}]
   ($ :div
