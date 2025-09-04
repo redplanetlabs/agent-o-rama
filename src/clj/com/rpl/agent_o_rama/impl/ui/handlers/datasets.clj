@@ -144,9 +144,6 @@
   (let [{:keys [search-examples-query]} (aor-types/underlying-objects manager)]
     ;; Use the search query with a filter for the specific example ID
     ;; This will return a single example in the results
-    (def serach-examples-query serach-examples-query)
-    (def dataset-id dataset-id)
-    (def example-id example-id)
     (let [result (foreign-invoke-query search-examples-query
                                        dataset-id
                                        (when-not (str/blank? snapshot-name) snapshot-name)

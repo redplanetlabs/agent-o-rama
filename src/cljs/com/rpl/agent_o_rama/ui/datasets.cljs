@@ -510,7 +510,7 @@
                                ;; Invalidate both the single example query and the main examples list
                                ;; Invalidate dataset examples query to trigger refetch
                                ;; Invalidate dataset examples query to trigger refetch
-                               (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id) snapshot-name]}])
+                               (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
                                (when on-delete-success (on-delete-success)))
                              (js/alert (str "Error deleting example: " (:error reply))))))))}
           ($ TrashIcon {:className delete-icon-classes})
@@ -606,9 +606,8 @@
                                 (do
                                   (set-input-value "")
                                   ;; Invalidate both the single example query and the main examples list
-                                  ;; Invalidate both the single example query and the main examples list
-                                  (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id (s/keypath dataset-id) snapshot-name (s/keypath example-id)]}])
-                                  (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id) snapshot-name]}])
+                                  (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name example-id]}])
+                                  (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
                                   (when on-tags-change (on-tags-change)))
                                 (js/alert (str "Error adding tag: " (:error reply))))))))
 
@@ -624,9 +623,8 @@
                                (if (:success reply)
                                  (do
                                    ;; Invalidate both the single example query and the main examples list
-                                   ;; Invalidate both the single example query and the main examples list
-                                   (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id (s/keypath dataset-id) snapshot-name (s/keypath example-id)]}])
-                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id) snapshot-name]}])
+                                   (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name example-id]}])
+                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
                                    (when on-tags-change (on-tags-change)))
                                  (js/alert (str "Error removing tag: " (:error reply)))))))
 
@@ -777,7 +775,7 @@
                                  (when (= selected-snapshot snapshot-name)
                                    (set-selected-snapshot "")) ;; Reset view to latest if deleting current
                                  ;; Invalidate snapshot names query to trigger refetch
-                                 (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id (s/keypath dataset-id)]}]))
+                                 (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}]))
                                (js/alert (str "Error deleting snapshot: " (:error reply))))))))
 
         handle-select (fn [snapshot-name]
