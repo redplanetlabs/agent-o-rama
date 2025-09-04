@@ -534,17 +534,27 @@
 (deframaop handle-experiments-op
   [*data]
   (<<with-substitutions
-   [$$datasets (po/datasets-task-global)]
+   [$$datasets (po/datasets-task-global)
+    *agent-depot (po/agent-depot-task-global)]
    (<<subsource *data
     (case> StartExperiment :> {:keys [*id *dataset-id]})
      (|hash *dataset-id)
-
-     ;; TODO: <<<<>>>>
-     ;; - write :start-time-millis and  :experiment-invoke
-     ;; - depot append to start the agent
-     ;;    - input is just *data
-     ;; - how to make sure doesn't start it twice?
-
+     (h/current-time-millis :> *start-time-millis)
+     (aor-types/->valid-AgentInitiate [*data] *start-time-millis :> *initiate)
+     (local-transform>
+      [(keypath *dataset-id) :experiments *id :start-time-millis (termval *start-time-millis)]
+      $$datasets)
+     (|direct (ops/current-task-id))
+     (depot-partition-append!
+      *agent-depot
+      *initiate
+      :ack
+      :> *ack-return)
+     (get *ack-return aor-types/AGENTS-TOPOLOGY-NAME :> [*agent-task-id *agent-id])
+     (aor-types/->AgentInvokeImpl *agent-task-id *agent-id :> *agent-invoke)
+     (local-transform>
+      [(keypath *dataset-id) :experiments *id :experiment-invoke (termval *agent-invoke)]
+      $$datasets)
 
     (case> UpdateExperimentName :> {:keys [*id *dataset-id *name]})
      (|hash *dataset-id)
