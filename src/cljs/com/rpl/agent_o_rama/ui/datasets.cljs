@@ -647,7 +647,7 @@
                                                            :example-ids-on-page all-on-page-ids
                                                            :select-all? (not all-selected?)}])}))
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Input")
-                ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Output")
+                ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Reference Output")
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Tags")
                 ($ :th.relative.px-6.py-3)))
           ($ :tbody.bg-white.divide-y.divide-gray-200
@@ -680,7 +680,14 @@
                                          (str (subs output-str 0 97) "...")
                                          output-str)]
                          ($ :span {:title output-str :className "cursor-help"} (or truncated "—"))))
-                    ($ :td.px-6.py-4.whitespace-nowrap.text-sm.text-gray-500 (str (:tags example)))
+                    ($ :td.px-6.py-4.whitespace-nowrap.text-sm.text-gray-500
+                       (let [tags (:tags example)]
+                         (if (and tags (seq tags))
+                           (->> tags
+                                (map name) ; Convert keywords to strings
+                                (sort) ; Sort alphabetically
+                                (clojure.string/join ", ")) ; Join with commas
+                           ($ :span.italic "no tags"))))
                     ($ :td.px-6.py-4.whitespace-nowrap.text-right.text-sm.font-medium
                        ($ :div.relative.inline-block.text-left
                           ;; Three dots button
@@ -1069,9 +1076,7 @@
                                                                              {:module-id module-id
                                                                               :dataset-id dataset-id
                                                                               :selected-example-ids selected-example-ids})}]))}
-                                (if (seq selected-example-ids)
-                                  (str "Evaluate Selected (" (count selected-example-ids) ")")
-                                  "Evaluate Selected"))
+                                "Try summary evaluator")
                              ($ :button.px-3.py-1.text-sm.text-gray-600.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed
                                 {:disabled (empty? selected-example-ids)
                                  :onClick #(when (seq selected-example-ids)
