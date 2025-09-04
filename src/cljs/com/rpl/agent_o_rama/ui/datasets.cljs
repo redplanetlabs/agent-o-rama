@@ -247,10 +247,6 @@
                     :component ($ CreateSnapshotForm {:form-id :create-snapshot
                                                       :from-snapshot-name from-snapshot-name})}]))
 
-;; =============================================================================
-;; TRY EVALUATOR MODAL
-;; =============================================================================
-
 (defui TryEvaluatorModal [{:keys [module-id example]}]
   (let [;; State for the modal
         [selected-evaluator set-selected-evaluator] (uix/use-state "")
@@ -348,10 +344,6 @@
                      ($ :pre.text-xs.bg-green-50.p-2.rounded.mt-1.max-h-40.overflow-auto
                         (pretty-print-json (:data eval-state))))
          nil))))
-
- ;; =============================================================================
-;; TRY SUMMARY EVALUATOR MODAL
-;; =============================================================================
 
 (defui TrySummaryEvaluatorModal [{:keys [module-id dataset-id selected-example-ids]}]
   (let [[selected-evaluator set-selected-evaluator] (uix/use-state "")
@@ -1202,7 +1194,7 @@
                                                                               :dataset-id dataset-id
                                                                               :selected-example-ids selected-example-ids})}]))}
                                 "Try summary evaluator")
-                             ($ :button.px-3.py-1.text-sm.text-gray-600.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed
+                             ($ :button.px-3.py-1.text-sm.text-gray-600.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                                 {:disabled (empty? selected-example-ids)
                                  :onClick #(when (seq selected-example-ids)
                                              (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}]))}
