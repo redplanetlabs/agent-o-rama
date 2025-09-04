@@ -76,9 +76,8 @@
   [{:keys [manager name dataset-id example-ids]} uid]
   (let [underlying-objects (aor-types/underlying-objects manager)
         multi-examples-query (:multi-examples-query underlying-objects)]
-
     ;; Fetch the full example data for the given example IDs
-    (let [examples-map (foreign-invoke-query multi-examples-query dataset-id "" (vec example-ids))
+    (let [examples-map (foreign-invoke-query multi-examples-query dataset-id nil (vec example-ids))
           ;; Convert the examples map to a list of ExampleRun objects
           example-runs (mapv (fn [example-id]
                                (let [example-data (get examples-map example-id)]

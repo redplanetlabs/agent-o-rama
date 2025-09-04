@@ -365,24 +365,22 @@
           :enabled? (boolean module-id)})
 
         evaluators (or (:items data) [])
-        _ (when (seq evaluators) (println "DEBUG: First evaluator:" (first evaluators)))
         summary-evaluators (filter #(= (:type %) :summary) evaluators)
-        _ (println "DEBUG: Summary evaluators count:" (count summary-evaluators))
 
         run-evaluation
         (fn []
           (when-not (str/blank? selected-evaluator)
             (set-eval-state {:status :loading})
             (sente/request!
-             [:evaluators/try-summary {:manager module-id
+             [:evaluators/try-summary {:module-id module-id
                                        :name selected-evaluator
                                        :dataset-id dataset-id
                                        :example-ids (vec selected-example-ids)}]
              30000 ; 30 second timeout for batch operations
              (fn [reply]
                (if (:success reply)
-                 (set-eval-state {:status :success :result (:result reply)})
-                 (set-eval-state {:status :error :error (:error reply)}))))))]
+                 (set-eval-state {:status :success :result (:data reply)})
+                 (set-eval-state {:status :error :error reply}))))))]
 
     ($ :div.space-y-4.p-6
        ;; Selected examples info
@@ -411,7 +409,7 @@
 
        ;; Run button
        ($ :div.flex.justify-end
-          ($ :button.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed
+          ($ :button.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
              {:disabled (or (str/blank? selected-evaluator)
                             (= (:status eval-state) :loading))
               :onClick run-evaluation}
