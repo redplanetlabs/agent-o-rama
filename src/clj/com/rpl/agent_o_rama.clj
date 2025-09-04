@@ -447,51 +447,55 @@
                               {:module-name module-name}))
           ))
 
-        datasets-depot          (foreign-depot cluster
-                                               module-name
-                                               (po/datasets-depot-name))
-        datasets-pstate         (foreign-pstate
-                                 cluster
-                                 module-name
-                                 (po/datasets-task-global-name))
-        datasets-page-query     (foreign-query
-                                 cluster
-                                 module-name
-                                 (queries/get-datasets-page-query-name))
-        datasets-search-query   (foreign-query
-                                 cluster
-                                 module-name
-                                 (queries/search-datasets-name))
+        datasets-depot           (foreign-depot cluster
+                                                module-name
+                                                (po/datasets-depot-name))
+        datasets-pstate          (foreign-pstate
+                                  cluster
+                                  module-name
+                                  (po/datasets-task-global-name))
+        datasets-page-query      (foreign-query
+                                  cluster
+                                  module-name
+                                  (queries/get-datasets-page-query-name))
+        datasets-search-query    (foreign-query
+                                  cluster
+                                  module-name
+                                  (queries/search-datasets-name))
 
-        search-examples-query   (foreign-query cluster
-                                               module-name
-                                               (queries/search-examples-name))
-        multi-examples-query    (foreign-query cluster
-                                               module-name
-                                               (queries/multi-examples-name))
+        search-examples-query    (foreign-query cluster
+                                                module-name
+                                                (queries/search-examples-name))
+        multi-examples-query     (foreign-query cluster
+                                                module-name
+                                                (queries/multi-examples-name))
 
-        global-actions-depot    (foreign-depot cluster
-                                               module-name
-                                               (po/global-actions-depot-name))
-        evals-pstate            (foreign-pstate
-                                 cluster
-                                 module-name
-                                 (po/evaluators-task-global-name))
+        global-actions-depot     (foreign-depot cluster
+                                                module-name
+                                                (po/global-actions-depot-name))
+        evals-pstate             (foreign-pstate
+                                  cluster
+                                  module-name
+                                  (po/evaluators-task-global-name))
 
-        try-eval-query          (foreign-query
-                                 cluster
-                                 module-name
-                                 (queries/try-evaluator-name))
+        try-eval-query           (foreign-query
+                                  cluster
+                                  module-name
+                                  (queries/try-evaluator-name))
 
-        all-eval-builders-query (foreign-query
-                                 cluster
-                                 module-name
-                                 (queries/all-evaluator-builders-name))
+        all-eval-builders-query  (foreign-query
+                                  cluster
+                                  module-name
+                                  (queries/all-evaluator-builders-name))
 
-        search-evals-query      (foreign-query
-                                 cluster
-                                 module-name
-                                 (queries/search-evaluators-name))]
+        search-evals-query       (foreign-query
+                                  cluster
+                                  module-name
+                                  (queries/search-evaluators-name))
+        search-experiments-query (foreign-query
+                                  cluster
+                                  module-name
+                                  (queries/search-experiments-name))]
     (reify
      AgentManager
      (getAgentNames [this]
@@ -917,15 +921,16 @@
        (close! datasets-depot))
      aor-types/UnderlyingObjects
      (underlying-objects [this]
-       {:datasets-depot          datasets-depot
-        :datasets-pstate         datasets-pstate
-        :evals-pstate            evals-pstate
-        :global-actions-depot    global-actions-depot
-        :datasets-page-query     datasets-page-query
-        :search-examples-query   search-examples-query
-        :multi-examples-query    multi-examples-query
-        :all-eval-builders-query all-eval-builders-query
-        :search-evals-query      search-evals-query
+       {:datasets-depot           datasets-depot
+        :datasets-pstate          datasets-pstate
+        :evals-pstate             evals-pstate
+        :global-actions-depot     global-actions-depot
+        :datasets-page-query      datasets-page-query
+        :search-examples-query    search-examples-query
+        :multi-examples-query     multi-examples-query
+        :all-eval-builders-query  all-eval-builders-query
+        :search-evals-query       search-evals-query
+        :search-experiments-query search-experiments-query
        }))))
 
 (defn agent-client
