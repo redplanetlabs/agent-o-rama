@@ -441,6 +441,107 @@
 ;; EXAMPLE VIEWER MODAL
 ;; =============================================================================
 
+;; =============================================================================
+;; EXAMPLE ACTION BUTTONS HELPER
+;; =============================================================================
+
+(defn example-action-buttons
+  "Returns a React fragment with example action buttons for reuse in modal and dropdown contexts"
+  [{:keys [example module-id dataset-id snapshot-name on-delete-success close-fn layout]}]
+  (let [example-id (:id example)]
+    ($ :<>
+       ;; Edit button/option
+       (if (= layout :dropdown)
+         ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900.cursor-pointer
+            {:onClick (fn []
+                        (when close-fn (close-fn))
+                        (show-example-modal! :edit
+                                             {:module-id module-id
+                                              :dataset-id dataset-id
+                                              :snapshot-name snapshot-name
+                                              :example-id example-id
+                                              :initial-input (:input example)
+                                              :initial-output (:reference-output example)}))}
+            ($ PencilIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
+            "Edit")
+         ($ :button.inline-flex.items-center.px-3.py-1.text-sm.text-gray-700.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500
+            {:onClick (fn []
+                        (when close-fn (close-fn))
+                        (show-example-modal! :edit
+                                             {:module-id module-id
+                                              :dataset-id dataset-id
+                                              :snapshot-name snapshot-name
+                                              :example-id example-id
+                                              :initial-input (:input example)
+                                              :initial-output (:reference-output example)}))}
+            ($ PencilIcon {:className "mr-2 h-4 w-4"})
+            "Edit"))
+
+       ;; Try with evaluator button/option
+       (if (= layout :dropdown)
+         ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900.cursor-pointer
+            {:onClick (fn []
+                        (when close-fn (close-fn))
+                        ;; Show the Try Evaluator modal
+                        (state/dispatch [:modal/show :try-evaluator
+                                         {:title "Try with Evaluator"
+                                          :component ($ TryEvaluatorModal {:module-id module-id :example example})}]))}
+            ($ PlayIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
+            "Try with evaluator")
+         ($ :button.inline-flex.items-center.px-3.py-1.text-sm.text-white.bg-blue-600.border.border-transparent.rounded-md.hover:bg-blue-700.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500
+            {:onClick (fn []
+                        (when close-fn (close-fn))
+                        ;; Show the Try Evaluator modal
+                        (state/dispatch [:modal/show :try-evaluator
+                                         {:title "Try with Evaluator"
+                                          :component ($ TryEvaluatorModal {:module-id module-id :example example})}]))}
+            ($ PlayIcon {:className "mr-2 h-4 w-4"})
+            "Try with evaluator"))
+
+       ;; Delete button/option
+       (if (= layout :dropdown)
+         ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-red-100.hover:text-red-800.cursor-pointer
+            {:onClick (fn []
+                        (when close-fn (close-fn))
+                        (when (js/confirm "Are you sure you want to delete this example?")
+                          (sente/request!
+                           [:datasets/delete-example
+                            {:module-id module-id
+                             :dataset-id dataset-id
+                             :snapshot-name snapshot-name
+                             :example-id example-id}]
+                           10000
+                           (fn [reply]
+                             (if (:success reply)
+                               (do
+                                 ;; Invalidate dataset examples query to trigger refetch
+                                 (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                 (when on-delete-success (on-delete-success)))
+                               (js/alert (str "Error deleting example: " (:error reply))))))))}
+            ($ TrashIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-red-500"})
+            "Delete")
+         ($ :button.inline-flex.items-center.px-3.py-1.text-sm.text-red-700.bg-white.border.border-red-300.rounded-md.hover:bg-red-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-red-500
+            {:onClick (fn []
+                        (when close-fn (close-fn))
+                        (when (js/confirm "Are you sure you want to delete this example?")
+                          (sente/request!
+                           [:datasets/delete-example
+                            {:module-id module-id
+                             :dataset-id dataset-id
+                             :snapshot-name snapshot-name
+                             :example-id example-id}]
+                           10000
+                           (fn [reply]
+                             (if (:success reply)
+                               (do
+                                 ;; Invalidate dataset examples query to trigger refetch
+                                 (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                 (state/dispatch [:modal/hide])
+                                 (when on-delete-success (on-delete-success)))
+                               (js/alert (str "Error deleting example: " (:error reply))))))))}
+            ($ TrashIcon {:className "mr-2 h-4 w-4"})
+            "Delete")))))
+
 (defui ExampleViewerModal [{:keys [example module-id dataset-id snapshot-name on-delete-success]}]
   (let [example-id (:id example)]
 
@@ -449,52 +550,14 @@
        ($ :div.flex.items-center.justify-between
           ($ :h3.text-lg.font-medium.text-gray-900 "Example Details")
           ($ :div.flex.items-center.space-x-2
-             ;; Edit button
-             ($ :button.inline-flex.items-center.px-3.py-1.text-sm.text-gray-700.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500
-                {:onClick (fn []
-                            (state/dispatch [:modal/hide])
-                            (show-example-modal! :edit
-                                                 {:module-id module-id
-                                                  :dataset-id dataset-id
-                                                  :snapshot-name snapshot-name
-                                                  :example-id example-id
-                                                  :initial-input (:input example)
-                                                  :initial-output (:reference-output example)}))}
-                ($ PencilIcon {:className "mr-2 h-4 w-4"})
-                "Edit")
 
-             ;; Try with evaluator button
-             ($ :button.inline-flex.items-center.px-3.py-1.text-sm.text-white.bg-blue-600.border.border-transparent.rounded-md.hover:bg-blue-700.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500
-                {:onClick (fn []
-                            (state/dispatch [:modal/hide])
-                            ;; Show the Try Evaluator modal
-                            (state/dispatch [:modal/show :try-evaluator
-                                             {:title "Try with Evaluator"
-                                              :component ($ TryEvaluatorModal {:module-id module-id :example example})}]))}
-                ($ PlayIcon {:className "mr-2 h-4 w-4"})
-                "Try with evaluator")
-
-             ;; Delete button
-             ($ :button.inline-flex.items-center.px-3.py-1.text-sm.text-red-700.bg-white.border.border-red-300.rounded-md.hover:bg-red-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-red-500
-                {:onClick (fn []
-                            (when (js/confirm "Are you sure you want to delete this example?")
-                              (sente/request!
-                               [:datasets/delete-example
-                                {:module-id module-id
-                                 :dataset-id dataset-id
-                                 :snapshot-name snapshot-name
-                                 :example-id example-id}]
-                               10000
-                               (fn [reply]
-                                 (if (:success reply)
-                                   (do
-                                     ;; Invalidate dataset examples query to trigger refetch
-                                     (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                                     (state/dispatch [:modal/hide])
-                                     (when on-delete-success (on-delete-success)))
-                                   (js/alert (str "Error deleting example: " (:error reply))))))))}
-                ($ TrashIcon {:className "mr-2 h-4 w-4"})
-                "Delete")))
+             (example-action-buttons {:example example
+                                      :module-id module-id
+                                      :dataset-id dataset-id
+                                      :snapshot-name snapshot-name
+                                      :on-delete-success on-delete-success
+                                      :close-fn #(state/dispatch [:modal/hide])
+                                      :layout :horizontal})))
 
        ;; Example content
        ($ :div.space-y-4
@@ -816,52 +879,13 @@
                             ($ :div.origin-top-right.absolute.right-0.mt-2.w-48.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
                                {:onClick #(.stopPropagation %)}
                                ($ :div.py-1
-                                  ;; Edit option
-                                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900.cursor-pointer
-                                     {:onClick (fn []
-                                                 (set-open-dropdown nil)
-                                                 (show-example-modal! :edit
-                                                                      {:module-id module-id
-                                                                       :dataset-id dataset-id
-                                                                       :snapshot-name snapshot-name
-                                                                       :example-id example-id
-                                                                       :initial-input (:input example)
-                                                                       :initial-output (:reference-output example)}))}
-                                     ($ PencilIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
-                                     "Edit")
-
-                                  ;; Delete option
-                                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-red-100.hover:text-red-800.cursor-pointer
-                                     {:onClick (fn []
-                                                 (set-open-dropdown nil)
-                                                 (when (js/confirm "Are you sure you want to delete this example?")
-                                                   (sente/request!
-                                                    [:datasets/delete-example
-                                                     {:module-id module-id
-                                                      :dataset-id dataset-id
-                                                      :snapshot-name snapshot-name
-                                                      :example-id example-id}]
-                                                    10000
-                                                    (fn [reply]
-                                                      (if (:success reply)
-                                                        (do
-                                                          ;; Invalidate dataset examples query to trigger refetch
-                                                          (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                                                          (when on-delete-success (on-delete-success)))
-                                                        (js/alert (str "Error deleting example: " (:error reply))))))))}
-                                     ($ TrashIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-red-500"})
-                                     "Delete")
-
-                                  ;; Try with evaluator option
-                                  ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900.cursor-pointer
-                                     {:onClick (fn []
-                                                 (set-open-dropdown nil)
-                                                 ;; Show the Try Evaluator modal
-                                                 (state/dispatch [:modal/show :try-evaluator
-                                                                  {:title "Try with Evaluator"
-                                                                   :component ($ TryEvaluatorModal {:module-id module-id :example example})}]))}
-                                     ($ PlayIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
-                                     "Try with evaluator"))))))))))))))
+                                  (example-action-buttons {:example example
+                                                           :module-id module-id
+                                                           :dataset-id dataset-id
+                                                           :snapshot-name snapshot-name
+                                                           :on-delete-success on-delete-success
+                                                           :close-fn #(set-open-dropdown nil)
+                                                           :layout :dropdown}))))))))))))))
 
 (defn get-dataset-path [module-id dataset-id]
   (rfe/href :module/dataset-detail
@@ -1169,7 +1193,6 @@
                                 ($ PlusIcon {:className "h-4 w-4 mr-2"})
                                 "Add Example"))))
 
-                    ;; Action bar for selected examples
                     ;; Action bar - always visible
                     ($ :div.bg-gray-50.border-b.border-gray-200.px-6.py-3
                        ($ :div.flex.items-center.justify-between
