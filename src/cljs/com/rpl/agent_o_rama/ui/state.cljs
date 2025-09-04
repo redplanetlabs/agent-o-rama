@@ -51,7 +51,8 @@
                 :form {:submitting? false
                        :error nil}}
         :hitl {:responses {} ;; Keyed by invoke-id -> response text
-               :submitting {}}}
+               :submitting {}}
+        :datasets {:selected-examples {}}} ;; Keyed by dataset-id -> set of example-ids 
    :sente {:connected? false
            :connection-state {}}
    :session {:user-id nil
@@ -451,3 +452,22 @@
   ([specter-path]
    (js/console.log "Value at path" specter-path ":"
                    (clj->js (s/select-one specter-path @app-db)))))
+
+ ;; Dataset selection event handlers
+(reg-event :datasets/toggle-selection
+           (fn [db {:keys [dataset-id example-id]}]
+             [:ui :datasets :selected-examples dataset-id
+              (s/terminal #(if (contains? % example-id)
+                             (disj % example-id)
+                             (conj (or % #{}) example-id)))]))
+
+(reg-event :datasets/toggle-all-selection
+           (fn [db {:keys [dataset-id example-ids-on-page select-all?]}]
+             [:ui :datasets :selected-examples dataset-id
+              (s/terminal #(if select-all?
+                             (into (or % #{}) example-ids-on-page)
+                             (apply disj (or % #{}) example-ids-on-page)))]))
+
+(reg-event :datasets/clear-selection
+           (fn [db {:keys [dataset-id]}]
+             [:ui :datasets :selected-examples (s/terminal #(dissoc % dataset-id))]))

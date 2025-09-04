@@ -235,20 +235,19 @@
 (defn show-create-snapshot-modal!
   "Shows the create snapshot modal."
   [module-id dataset-id from-snapshot-name]
-   (state/dispatch [:form/init :create-snapshot
-                    (-> create-snapshot-form-spec
-                        (assoc :submit-event [:dataset/create-snapshot {:module-id module-id
-                                                                        :dataset-id dataset-id
-                                                                        :from-snapshot-name from-snapshot-name}]))])
-   (state/dispatch [:modal/show :create-snapshot
-                    {:title "Create New Snapshot"
-                     :form-id :create-snapshot
-                     :submit-text "Create Snapshot"
-                     :component ($ CreateSnapshotForm {:form-id :create-snapshot
-                                                       :from-snapshot-name from-snapshot-name})}]))
+  (state/dispatch [:form/init :create-snapshot
+                   (-> create-snapshot-form-spec
+                       (assoc :submit-event [:dataset/create-snapshot {:module-id module-id
+                                                                       :dataset-id dataset-id
+                                                                       :from-snapshot-name from-snapshot-name}]))])
+  (state/dispatch [:modal/show :create-snapshot
+                   {:title "Create New Snapshot"
+                    :form-id :create-snapshot
+                    :submit-text "Create Snapshot"
+                    :component ($ CreateSnapshotForm {:form-id :create-snapshot
+                                                      :from-snapshot-name from-snapshot-name})}]))
 
-
- ;; =============================================================================
+;; =============================================================================
 ;; TRY EVALUATOR MODAL
 ;; =============================================================================
 
@@ -257,7 +256,7 @@
         [selected-evaluator set-selected-evaluator] (uix/use-state "")
         [actual-output set-actual-output] (uix/use-state "")
         [eval-state set-eval-state] (uix/use-state {:status :idle}) ; :idle, :loading, :success, :error
-        
+
         ;; Editable input and reference output states (start with example values as proper JSON strings)
         [input-data set-input-data] (uix/use-state (js/JSON.stringify (clj->js (:input example)) nil 2))
         [reference-output-data set-reference-output-data] (uix/use-state (js/JSON.stringify (clj->js (:reference-output example)) nil 2))
@@ -349,6 +348,94 @@
                      ($ :pre.text-xs.bg-green-50.p-2.rounded.mt-1.max-h-40.overflow-auto
                         (pretty-print-json (:data eval-state))))
          nil))))
+
+ ;; =============================================================================
+;; TRY SUMMARY EVALUATOR MODAL
+;; =============================================================================
+
+(defui TrySummaryEvaluatorModal [{:keys [module-id dataset-id selected-example-ids]}]
+  (let [[selected-evaluator set-selected-evaluator] (uix/use-state "")
+        [eval-state set-eval-state] (uix/use-state {:status :idle}) ; :idle, :loading, :success, :error
+
+        ;; Fetch evaluators (only summary type)
+        {:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:evaluators module-id]
+          :sente-event [:evaluators/get-all-instances {:module-id module-id}]
+          :enabled? (boolean module-id)})
+
+        evaluators (get data :evaluators [])
+        summary-evaluators (filter #(= (:type %) :summary) evaluators)
+
+        run-evaluation
+        (fn []
+          (when-not (str/blank? selected-evaluator)
+            (set-eval-state {:status :loading})
+            (sente/request!
+             [:evaluators/try-summary {:manager module-id
+                                       :name selected-evaluator
+                                       :dataset-id dataset-id
+                                       :example-ids (vec selected-example-ids)}]
+             30000 ; 30 second timeout for batch operations
+             (fn [reply]
+               (if (:success reply)
+                 (set-eval-state {:status :success :result (:result reply)})
+                 (set-eval-state {:status :error :error (:error reply)}))))))]
+
+    ($ :div.space-y-4
+       ;; Selected examples info
+       ($ :div.bg-blue-50.p-4.rounded-md
+          ($ :h4.text-sm.font-medium.text-blue-900 "Selected Examples")
+          ($ :p.text-sm.text-blue-700 (str "Running summary evaluation on " (count selected-example-ids) " examples")))
+
+       ;; Evaluator selection
+       ($ :div
+          ($ :label.block.text-sm.font-medium.text-gray-700 "Select Summary Evaluator")
+          (cond
+            loading? ($ :div.text-sm.text-gray-500 "Loading evaluators...")
+            error ($ :div.text-sm.text-red-500 "Error loading evaluators")
+            (empty? summary-evaluators)
+            ($ :div.text-sm.text-yellow-600 "No summary evaluators found. Create one first.")
+            :else
+            ($ :select.mt-1.block.w-full.px-3.py-2.border.border-gray-300.rounded-md.shadow-sm.focus:outline-none.focus:ring-indigo-500.focus:border-indigo-500.sm:text-sm
+               {:value selected-evaluator
+                :onChange #(set-selected-evaluator (.. % -target -value))}
+               ($ :option {:value ""} "Select an evaluator...")
+               (for [evaluator summary-evaluators]
+                 ($ :option {:key (:name evaluator) :value (:name evaluator)}
+                    (str (:name evaluator)
+                         (when (:description evaluator)
+                           (str " - " (:description evaluator)))))))))
+
+       ;; Run button
+       ($ :div.flex.justify-end
+          ($ :button.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed
+             {:disabled (or (str/blank? selected-evaluator)
+                            (= (:status eval-state) :loading))
+              :onClick run-evaluation}
+             (if (= (:status eval-state) :loading)
+               "Running..."
+               "Run Evaluation")))
+
+       ;; Results section
+       (when (not= (:status eval-state) :idle)
+         ($ :div.mt-6.border-t.pt-4
+            (case (:status eval-state)
+              :loading
+              ($ :div.text-center.py-4
+                 ($ :div.text-sm.text-gray-600 "Running summary evaluation..."))
+
+              :success
+              ($ :div
+                 ($ :h4.text-lg.font-medium.text-green-700.mb-2 "Evaluation Results")
+                 ($ :div.bg-green-50.p-4.rounded-md
+                    ($ :pre.text-sm.text-green-800.whitespace-pre-wrap
+                       (js/JSON.stringify (clj->js (:result eval-state)) nil 2))))
+
+              :error
+              ($ :div.bg-red-50.p-4.rounded-md
+                 ($ :h4.text-sm.font-medium.text-red-800 "Error")
+                 ($ :p.text-sm.text-red-700 (:error eval-state)))))))))
 
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content]}]
   ($ :div
@@ -531,7 +618,11 @@
                                   :delete-button nil}))))))))
 
 (defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success]}]
-  (let [[open-dropdown set-open-dropdown] (uix/use-state nil)]
+  (let [[open-dropdown set-open-dropdown] (uix/use-state nil)
+        selected-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
+        all-on-page-ids (set (map :id examples))
+        all-selected? (and (seq all-on-page-ids)
+                           (clojure.set/subset? all-on-page-ids selected-ids))]
 
     ;; Close dropdown when clicking outside
     (uix/use-effect
@@ -547,6 +638,14 @@
        ($ :table.min-w-full.divide-y.divide-gray-200
           ($ :thead.bg-gray-50
              ($ :tr
+                ;; Checkbox column header
+                ($ :th.px-4.py-3.text-left
+                   ($ :input {:type "checkbox"
+                              :checked all-selected?
+                              :onChange #(state/dispatch [:datasets/toggle-all-selection
+                                                          {:dataset-id dataset-id
+                                                           :example-ids-on-page all-on-page-ids
+                                                           :select-all? (not all-selected?)}])}))
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Input")
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Output")
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Tags")
@@ -554,8 +653,17 @@
           ($ :tbody.bg-white.divide-y.divide-gray-200
              (for [example examples]
                (let [example-id (:id example)
-                     is-open? (= open-dropdown example-id)]
-                 ($ :tr {:key example-id}
+                     is-open? (= open-dropdown example-id)
+                     is-selected? (contains? selected-ids example-id)]
+                 ($ :tr {:key example-id
+                         :className (when is-selected? "bg-blue-50")}
+                    ;; Checkbox column
+                    ($ :td.px-4.py-4
+                       ($ :input {:type "checkbox"
+                                  :checked is-selected?
+                                  :onChange #(state/dispatch [:datasets/toggle-selection
+                                                              {:dataset-id dataset-id
+                                                               :example-id example-id}])}))
                     ($ :td.px-6.py-4.whitespace-nowrap.text-sm.font-mono
                        (let [input-str (if (string? (:input example))
                                          (:input example)
@@ -624,7 +732,6 @@
                                      "Delete")
 
                                   ;; Try with evaluator option
-                                  ;; Try with evaluator option
                                   ($ :button.group.flex.items-center.w-full.px-4.py-2.text-sm.text-gray-700.hover:bg-gray-100.hover:text-gray-900.cursor-pointer
                                      {:onClick (fn []
                                                  (set-open-dropdown nil)
@@ -647,19 +754,19 @@
 (defn show-edit-dataset-modal!
   "Shows the edit dataset modal."
   [module-id dataset-id initial-name initial-description]
-   (state/dispatch [:form/init :edit-dataset
-                    (-> edit-dataset-form-spec
-                        (assoc-in [:fields :name] initial-name)
-                        (assoc-in [:fields :description] initial-description)
-                        (assoc :submit-event [:dataset/edit {:module-id module-id
-                                                             :dataset-id dataset-id
-                                                             :initial-name initial-name
-                                                             :initial-description initial-description}]))])
-   (state/dispatch [:modal/show :edit-dataset
-                    {:title (str "Edit Dataset: " initial-name)
-                     :form-id :edit-dataset
-                     :submit-text "Save Changes"
-                     :component ($ EditDatasetForm {:form-id :edit-dataset})}]))
+  (state/dispatch [:form/init :edit-dataset
+                   (-> edit-dataset-form-spec
+                       (assoc-in [:fields :name] initial-name)
+                       (assoc-in [:fields :description] initial-description)
+                       (assoc :submit-event [:dataset/edit {:module-id module-id
+                                                            :dataset-id dataset-id
+                                                            :initial-name initial-name
+                                                            :initial-description initial-description}]))])
+  (state/dispatch [:modal/show :edit-dataset
+                   {:title (str "Edit Dataset: " initial-name)
+                    :form-id :edit-dataset
+                    :submit-text "Save Changes"
+                    :component ($ EditDatasetForm {:form-id :edit-dataset})}]))
 
 ;; Helper function to show add example modal with centralized state  
 
@@ -760,6 +867,9 @@
         {:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
         decoded-module-id (when module-id (common/url-decode module-id))
 
+        ;; Get selected examples for this dataset
+        selected-example-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
+
         ;; State for selected tab
         [active-tab set-active-tab] (uix/use-state "examples")
 
@@ -804,6 +914,12 @@
         examples (get examples-response :examples)]
 
         ;; --- END OF FIX ---
+
+    ;; Clear selections when dataset changes
+    (uix/use-effect
+     (fn []
+       #(state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}]))
+     [dataset-id])
 
     ($ :div.h-full.flex.flex-col
        (cond
@@ -931,6 +1047,28 @@
                                                                  :snapshot-name selected-snapshot-name})}
                                 ($ PlusIcon {:className "h-4 w-4 mr-2"})
                                 "Add Example"))))
+
+                    ;; Action bar for selected examples
+                    (when (seq selected-example-ids)
+                      ($ :div.bg-blue-50.border-b.border-blue-200.px-6.py-3
+                         ($ :div.flex.items-center.justify-between
+                            ($ :div.flex.items-center.space-x-4
+                               ($ :span.text-sm.font-medium.text-blue-900
+                                  (str (count selected-example-ids) " example"
+                                       (when (> (count selected-example-ids) 1) "s")
+                                       " selected")))
+                            ($ :div.flex.items-center.space-x-2
+                               ($ :button.px-3.py-1.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700
+                                  {:onClick #(state/dispatch [:modal/show :try-summary-evaluator
+                                                              {:title "Run Summary Evaluation"
+                                                               :component ($ TrySummaryEvaluatorModal
+                                                                             {:module-id module-id
+                                                                              :dataset-id dataset-id
+                                                                              :selected-example-ids selected-example-ids})}])}
+                                  (str "Evaluate Selected (" (count selected-example-ids) ")"))
+                               ($ :button.px-3.py-1.text-sm.text-gray-600.border.border-gray-300.rounded-md.hover:bg-gray-50
+                                  {:onClick #(state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])}
+                                  "Clear Selection")))))
 
                     ;; Examples Content
                     ($ :div.flex-1.overflow-hidden
