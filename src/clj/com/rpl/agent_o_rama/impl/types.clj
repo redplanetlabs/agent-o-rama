@@ -407,6 +407,7 @@
 
    spec :- (s/protocol ExperimentSpec)
 
+   num-repetitions :- Long
    concurrency :- Long
   ]
   ExperimentEvent)

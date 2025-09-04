@@ -265,12 +265,13 @@
         :start-time-millis     Long
         :finish-time-millis    Long
         :results               (map-schema
-                                UUID ; example ID
+                                Long ; result ID
                                 ;; - agent invokes/results are keyed by their index in experiment
                                 ;; targets
                                 ;; - non-comparative experiment will have single one keyed at 0
                                 (fixed-keys-schema
-                                 {:agent-initiates {Long (fixed-keys-schema
+                                 {:example-id      UUID
+                                  :agent-initiates {Long (fixed-keys-schema
                                                           {:agent-name   String
                                                            :agent-invoke AgentInvoke})}
                                   :agent-results   {Long Object}

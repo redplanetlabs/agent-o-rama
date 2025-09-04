@@ -143,7 +143,7 @@
                       datasets)
 
       (aor-types/ExampleIdsSelector? selector)
-      (:example-ids selector)
+      (vec (:example-ids selector))
 
       :else
       (throw (h/ex-info "Unexpected dataset selector type" {:type (class selector)}))
@@ -318,9 +318,9 @@
     )))
 
 (defn fetch-example-runs
-  [local-ds datasets id dataset-id snapshot example-ids]
+  [local-ds datasets id dataset-id snapshot result+example-ids]
   (vec
-   (for [example-id example-ids
+   (for [[result-id example-id] result+example-ids
          :let
          [{:keys [input reference-output]}
           (foreign-select-one
@@ -333,12 +333,12 @@
                      :experiments
                      id
                      :results
-                     example-id
+                     result-id
                      :agent-results)]
            local-ds)
 
           outputs (select [MAP-VALS :val] results)]
-         :when      (not (selected-any? [MAP-VALS :failure? identity] results))]
+         :when (not (selected-any? [MAP-VALS :failure? identity] results))]
      (aor-types/->ExampleRunImpl input reference-output outputs)
    )))
 
@@ -359,14 +359,17 @@
      "root"
      "initiate"
      (fn [agent-node
-          {:keys [dataset-id snapshot selector concurrency]
+          {:keys [dataset-id snapshot selector concurrency num-repetitions]
            :as   experiment}
           remote-info]
        (with-retriever [agent-node experiment remote-info]
          [retriever]
          (let [datasets    (datasets-pstate retriever)
                example-ids (retrieve-all-examples-ids datasets dataset-id snapshot selector)
-               chunks      (h/split-into-n concurrency example-ids)]
+               result+example-ids (vec (for [i (range 0 (* num-repetitions (count example-ids)))]
+                                         [i (nth example-ids (mod i (count example-ids)))]))
+               chunks
+               (h/split-into-n concurrency result+example-ids)]
            (doseq [c chunks]
              (when-not (empty? c)
                (c/emit! agent-node "invoke" experiment remote-info c)))
@@ -378,7 +381,7 @@
      (fn [^AgentNode agent-node
           {:keys [id dataset-id snapshot spec] :as experiment}
           remote-info
-          example-ids]
+          result+example-ids]
        (with-retriever [agent-node experiment remote-info]
          [retriever]
          (let [datasets     (datasets-pstate retriever)
@@ -408,10 +411,10 @@
                     )))
                 targets
                 clients)]
-           (doseq [example-id example-ids]
-             (let [{:keys [agent-initiates agent-results]}
+           (doseq [[result-id example-id] result+example-ids]
+             (let [{:keys [agent-initiates agent-results] :as currm}
                    (store/pstate-select-one
-                    [(keypath dataset-id :experiments id :results example-id)]
+                    [(keypath dataset-id :experiments id :results result-id)]
                     local-ds)
                    input         (when (< (count agent-initiates) (count targets))
                                    (foreign-select-one
@@ -419,12 +422,18 @@
                                     datasets))
                    initiates-vol (volatile! [])
                    results-vol   (volatile! [])]
+               (when-not (some? (:example-id currm))
+                 (store/pstate-transform!
+                  [(keypath dataset-id :experiments id :results result-id :example-id)
+                   (termval example-id)]
+                  local-ds
+                  dataset-id))
                (dotimes [i num-targets]
                  (if-let [info (get agent-initiates i)]
                    (vswap! initiates-vol conj info)
                    (let [info ((nth initiate-fns i) input)]
                      (store/pstate-transform!
-                      [(keypath dataset-id :experiments id :results example-id :agent-initiates)
+                      [(keypath dataset-id :experiments id :results result-id :agent-initiates)
                        (nil->val (sorted-map))
                        (keypath i)
                        (termval info)]
@@ -438,7 +447,7 @@
                    (let [result (agent-result-obj (nth clients i)
                                                   (:agent-invoke (nth @initiates-vol i)))]
                      (store/pstate-transform!
-                      [(keypath dataset-id :experiments id :results example-id :agent-results)
+                      [(keypath dataset-id :experiments id :results result-id :agent-results)
                        (nil->val (sorted-map))
                        (keypath i)
                        (termval result)]
@@ -447,12 +456,15 @@
                      (vswap! results-vol conj result)
                    )))
              ))
-           (c/emit! agent-node "evaluate" experiment remote-info example-ids)
+           (c/emit! agent-node "evaluate" experiment remote-info result+example-ids)
          ))))
     (c/node
      "evaluate"
      "finish"
-     (fn [agent-node {:keys [id dataset-id snapshot spec] :as experiment} remote-info example-ids]
+     (fn [agent-node
+          {:keys [id dataset-id snapshot spec] :as experiment}
+          remote-info
+          result+example-ids]
        (with-retriever [agent-node experiment remote-info]
          [retriever]
          (let [eval-info  (all-evaluator-info retriever experiment)
@@ -460,7 +472,7 @@
                local-ds   (local-datasets-store retriever)
                datasets   (datasets-pstate retriever)
                local-ds   (local-datasets-store retriever)]
-           (doseq [example-id example-ids]
+           (doseq [[result-id example-id] result+example-ids]
              (let [{:keys [input reference-output]}
                    (foreign-select-one
                     [(keypath dataset-id :snapshots snapshot example-id)]
@@ -470,7 +482,7 @@
                     eval-failures :eval-failures
                     agent-results :agent-results}
                    (store/pstate-select-one
-                    [(keypath dataset-id :experiments id :results example-id)]
+                    [(keypath dataset-id :experiments id :results result-id)]
                     local-ds)]
                (when-not (selected-any? [MAP-VALS :failure? identity] agent-results)
                  (doseq [[eval-name eval-fn] evaluators
@@ -479,7 +491,7 @@
                    (evaluate! local-ds
                               dataset-id
                               eval-name
-                              (keypath dataset-id :experiments id :results example-id)
+                              (keypath dataset-id :experiments id :results result-id)
                               :evals
                               :eval-failures
                               #(non-summary-evaluate!
@@ -490,13 +502,15 @@
                                 reference-output
                                 (select [MAP-VALS :val] agent-results)))
                  ))))
-           (c/emit! agent-node "finish" example-ids)
+           (c/emit! agent-node "finish" result+example-ids)
          ))))
     (c/agg-node
      "finish"
      nil
      h/+concatv
-     (fn [agent-node example-ids [{:keys [id dataset-id snapshot] :as experiment} remote-info]]
+     (fn [agent-node
+          result+example-ids
+          [{:keys [id dataset-id snapshot] :as experiment} remote-info]]
        (with-retriever [agent-node experiment remote-info]
          [retriever]
          (let [eval-info  (all-evaluator-info retriever experiment)
@@ -505,7 +519,7 @@
                local-ds   (local-datasets-store retriever)]
            (when-not (empty? evaluators)
              (let [example-runs
-                   (fetch-example-runs local-ds datasets id dataset-id snapshot example-ids)
+                   (fetch-example-runs local-ds datasets id dataset-id snapshot result+example-ids)
 
                    {curr-evals :summary-evals curr-failures :summary-eval-failures}
                    (store/pstate-select-one [(keypath dataset-id :experiments id)
