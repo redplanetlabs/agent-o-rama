@@ -1049,26 +1049,34 @@
                                 "Add Example"))))
 
                     ;; Action bar for selected examples
-                    (when (seq selected-example-ids)
-                      ($ :div.bg-blue-50.border-b.border-blue-200.px-6.py-3
-                         ($ :div.flex.items-center.justify-between
-                            ($ :div.flex.items-center.space-x-4
-                               ($ :span.text-sm.font-medium.text-blue-900
+                    ;; Action bar - always visible
+                    ($ :div.bg-gray-50.border-b.border-gray-200.px-6.py-3
+                       ($ :div.flex.items-center.justify-between
+                          ($ :div.flex.items-center.space-x-4
+                             (if (seq selected-example-ids)
+                               ($ :span.text-sm.font-medium.text-gray-900
                                   (str (count selected-example-ids) " example"
                                        (when (> (count selected-example-ids) 1) "s")
-                                       " selected")))
-                            ($ :div.flex.items-center.space-x-2
-                               ($ :button.px-3.py-1.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700
-                                  {:onClick #(state/dispatch [:modal/show :try-summary-evaluator
+                                       " selected"))
+                               ($ :span.text-sm.text-gray-500 "No examples selected")))
+                          ($ :div.flex.items-center.space-x-2
+                             ($ :button.px-3.py-1.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed
+                                {:disabled (empty? selected-example-ids)
+                                 :onClick #(when (seq selected-example-ids)
+                                             (state/dispatch [:modal/show :try-summary-evaluator
                                                               {:title "Run Summary Evaluation"
                                                                :component ($ TrySummaryEvaluatorModal
                                                                              {:module-id module-id
                                                                               :dataset-id dataset-id
-                                                                              :selected-example-ids selected-example-ids})}])}
-                                  (str "Evaluate Selected (" (count selected-example-ids) ")"))
-                               ($ :button.px-3.py-1.text-sm.text-gray-600.border.border-gray-300.rounded-md.hover:bg-gray-50
-                                  {:onClick #(state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])}
-                                  "Clear Selection")))))
+                                                                              :selected-example-ids selected-example-ids})}]))}
+                                (if (seq selected-example-ids)
+                                  (str "Evaluate Selected (" (count selected-example-ids) ")")
+                                  "Evaluate Selected"))
+                             ($ :button.px-3.py-1.text-sm.text-gray-600.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed
+                                {:disabled (empty? selected-example-ids)
+                                 :onClick #(when (seq selected-example-ids)
+                                             (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}]))}
+                                "Clear Selection"))))
 
                     ;; Examples Content
                     ($ :div.flex-1.overflow-hidden
