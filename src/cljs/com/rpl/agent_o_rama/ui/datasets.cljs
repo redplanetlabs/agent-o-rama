@@ -783,13 +783,16 @@
           ($ :thead.bg-gray-50
              ($ :tr
                 ;; Checkbox column header
-                ($ :th.px-4.py-3.text-left
+                ;; Checkbox column header - entire cell is clickable
+                ($ :th.px-4.py-3.text-left.cursor-pointer.hover:bg-blue-100
+                   {:onClick #(state/dispatch [:datasets/toggle-all-selection
+                                               {:dataset-id dataset-id
+                                                :example-ids-on-page all-on-page-ids
+                                                :select-all? (not all-selected?)}])}
                    ($ :input {:type "checkbox"
                               :checked all-selected?
-                              :onChange #(state/dispatch [:datasets/toggle-all-selection
-                                                          {:dataset-id dataset-id
-                                                           :example-ids-on-page all-on-page-ids
-                                                           :select-all? (not all-selected?)}])}))
+                              :readOnly true ; Make it read-only since cell handles the click
+                              :className "pointer-events-none"}))
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Input")
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Reference Output")
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Tags")
@@ -811,13 +814,17 @@
                                                                     :snapshot-name snapshot-name
                                                                     :on-delete-success on-delete-success})}])}
                     ;; Checkbox column - prevent row click when clicking checkbox
-                    ($ :td.px-4.py-4
+                    ;; Checkbox column - entire cell is clickable
+                    ($ :td.px-4.py-4.cursor-pointer.hover:bg-blue-100
+                       {:onClick (fn [e]
+                                   (.stopPropagation e) ; Prevent row click
+                                   (state/dispatch [:datasets/toggle-selection
+                                                    {:dataset-id dataset-id
+                                                     :example-id example-id}]))}
                        ($ :input {:type "checkbox"
                                   :checked is-selected?
-                                  :onClick #(.stopPropagation %) ; Prevent row click
-                                  :onChange #(state/dispatch [:datasets/toggle-selection
-                                                              {:dataset-id dataset-id
-                                                               :example-id example-id}])}))
+                                  :readOnly true ; Make it read-only since cell handles the click
+                                  :className "pointer-events-none"}))
                     ;; Input column
                     ($ :td.px-6.py-4.whitespace-nowrap.text-sm.font-mono
                        (let [input-str (if (string? (:input example))
