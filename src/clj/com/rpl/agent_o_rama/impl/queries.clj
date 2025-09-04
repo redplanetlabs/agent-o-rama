@@ -76,6 +76,10 @@
   []
   "_aor-search-evaluators")
 
+(defn search-experiments-name
+  []
+  "_aor-search-experiments")
+
 (defn- to-pqueue
   [coll]
   (reduce conj PersistentQueue/EMPTY coll))
@@ -603,6 +607,7 @@
           (and>
            (some? *search-string-lower)
            (and>
+            (not (h/contains-string? (str/lower-case (str *id))))
             (not (h/contains-string? (str/lower-case (str (or> *input "")))
                                       *search-string-lower))
             (not (h/contains-string? (str/lower-case
@@ -636,8 +641,8 @@
     (<<query-topology topologies
       (search-evaluators-name)
       [*filters *limit *next-key :> *res]
-      (identity *filters :> {:keys [*types *search-string]})
       (|direct 0)
+      (identity *filters :> {:keys [*types *search-string]})
       (ifexpr (some? *search-string)
         (str/lower-case *search-string)
         :> *search-string-lower)
@@ -669,6 +674,87 @@
       (hash-map :items *items :pagination-params *page-key :> *res)
     )))
 
+
+(def MISSING-EXAMPLE ::missing-example)
+
+;; - filters can contain:
+;;    - :search-string, which matches against the experiment name or ID
+;;    - :type which is either com.rpl.agent_o_rama.impl.types.RegularExperiment or
+;;      com.rpl.agent_o_rama.impl.types.ComparativeExperiment class
+;;    - :times, which is vector of maps containing {:pred , :value}
+;;       - :pred is 2-arity function (use either < or >)
+;;       - :value is the millis timestamp to compare against in millis
+;;       - {:pred < :value 100} will result only in experiments started before timestamp 100
+;; - limit is approximate, it will return at least that amount and up to twice
+;; that amount
+;; - returns {:items [{:experiment-info <StartExperiment type> :experiment-invoke ...
+;; :start-time-millis ... :finish-time-millis ...}
+;;                    ...]
+;;            :pagination-params <next-key>}
+(defn declare-search-experiments-query-topology
+  [topologies]
+  (let [datasets-pstate-sym (symbol (po/datasets-task-global-name))]
+    (<<query-topology topologies
+      (search-experiments-name)
+      [*dataset-id *filters *limit *next-key :> *res]
+      (|hash *dataset-id)
+      (identity *filters :> {:keys [*type *search-string *times]})
+      (ifexpr (some? *search-string)
+        (str/lower-case *search-string)
+        :> *search-string-lower)
+      (<<ramafn %filter
+        [*id {:keys [*start-time-millis *experiment-info] :as *m}]
+        (<<ramafn %matches-time-spec?
+          [{:keys [*pred *value]}]
+          (:> (h/invoke *pred *start-time-millis *value)))
+        (get *experiment-info :name :> *name)
+        (get *experiment-info :spec :> *spec)
+        (<<cond
+         (case> (and> (some? *type) (not (instance? *spec *type))))
+          (:> nil)
+
+         (case> (and> (some? *search-string-lower)
+                      (not (h/contains-string? (str/lower-case (str *id))
+                                                *search-string-lower))
+                      (not (h/contains-string? (str/lower-case *name)
+                                                *search-string-lower))))
+          (:> nil)
+
+         (case> (not (every? %matches-time-spec? *times)))
+          (:> nil)
+
+         (default>)
+          (:> (submap *m
+                      [:experiment-info :experiment-invoke :start-time-millis
+                       :finish-time-millis]))))
+      (search-loop datasets-pstate-sym
+                   (keypath *dataset-id :experiments)
+                   %filter
+                   *limit
+                   *next-key
+                   :> *items *page-key)
+      (|origin)
+      (hash-map :items *items :pagination-params *page-key :> *res)
+    )))
+
+;; TODO: <<<>>>
+;;  - fetch experiment results query topology
+;;    - needs to handle source data being missing
+;;       - need a MISSING sentinel for UI to use
+;;    - return start/finish times, and name
+;;    - fetch evals for all examples
+;;    - fetch summary evals
+;;    - fetch experiment info for num-repetitions / concurrency
+;;
+
+;; TODO: <<<<>>>>
+;; - returns {:items [{<all the info in values of :experiments in datasets PState, with
+    ;; examples
+;; hydrated with example input/reference-output into the keys :input, :reference-output}
+;;                    ...]
+;;            :pagination-params <next-key>}
+;;    - if example is missing from the dataset (e.g. it was deleted), it is replaced with the
+;;    sentinel keyword MISSING-EXAMPLE
 
 ;; direct queries on PStates
 

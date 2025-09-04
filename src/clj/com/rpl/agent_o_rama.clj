@@ -920,6 +920,7 @@
        {:datasets-depot          datasets-depot
         :datasets-pstate         datasets-pstate
         :evals-pstate            evals-pstate
+        :global-actions-depot    global-actions-depot
         :datasets-page-query     datasets-page-query
         :search-examples-query   search-examples-query
         :multi-examples-query    multi-examples-query
