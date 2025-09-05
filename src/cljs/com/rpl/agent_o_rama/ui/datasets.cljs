@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.datasets
   (:require
    [uix.core :as uix :refer [defui defhook $]]
-   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon XMarkIcon InformationCircleIcon]]
+   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon XMarkIcon LockClosedIcon InformationCircleIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.sente :as sente]
@@ -573,96 +573,99 @@
                   ($ :code.text-xs.text-gray-600 (str example-id)))))))))
 
 (defui TagInput [{:keys [tags module-id dataset-id snapshot-name example-id on-tags-change read-only?]}] ;; Add read-only?
-    (let [[input-value set-input-value] (uix/use-state "")
-          [is-adding set-is-adding] (uix/use-state false)
+  (let [[input-value set-input-value] (uix/use-state "")
+        [is-adding set-is-adding] (uix/use-state false)
 
-          handle-add-tag (fn [tag-name]
-                           (when-not (or (str/blank? tag-name) (contains? (set (map name tags)) tag-name))
-                             (set-is-adding true)
-                             (sente/request!
-                              [:datasets/add-tag {:module-id module-id
-                                                  :dataset-id dataset-id
-                                                  :snapshot-name snapshot-name
-                                                  :example-id example-id
-                                                  :tag tag-name}]
-                              10000
-                              (fn [reply]
-                                (set-is-adding false)
-                                (if (:success reply)
-                                  (do
-                                    (set-input-value "")
+        handle-add-tag (fn [tag-name]
+                         (when-not (or (str/blank? tag-name) (contains? (set (map name tags)) tag-name))
+                           (set-is-adding true)
+                           (sente/request!
+                            [:datasets/add-tag {:module-id module-id
+                                                :dataset-id dataset-id
+                                                :snapshot-name snapshot-name
+                                                :example-id example-id
+                                                :tag tag-name}]
+                            10000
+                            (fn [reply]
+                              (set-is-adding false)
+                              (if (:success reply)
+                                (do
+                                  (set-input-value "")
                                   ;; Invalidate both the single example query and the main examples list
-                                    (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
-                                    (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                                    (when on-tags-change (on-tags-change)))
-                                  (js/alert (str "Error adding tag: " (:error reply))))))))
+                                  (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
+                                  (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                  (when on-tags-change (on-tags-change)))
+                                (js/alert (str "Error adding tag: " (:error reply))))))))
 
-          handle-remove-tag (fn [tag-name]
-                              (sente/request!
-                               [:datasets/remove-tag {:module-id module-id
-                                                      :dataset-id dataset-id
-                                                      :snapshot-name snapshot-name
-                                                      :example-id example-id
-                                                      :tag tag-name}]
-                               10000
-                               (fn [reply]
-                                 (if (:success reply)
-                                   (do
+        handle-remove-tag (fn [tag-name]
+                            (sente/request!
+                             [:datasets/remove-tag {:module-id module-id
+                                                    :dataset-id dataset-id
+                                                    :snapshot-name snapshot-name
+                                                    :example-id example-id
+                                                    :tag tag-name}]
+                             10000
+                             (fn [reply]
+                               (if (:success reply)
+                                 (do
                                    ;; Invalidate both the single example query and the main examples list
-                                     (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
-                                     (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                                     (when on-tags-change (on-tags-change)))
-                                   (js/alert (str "Error removing tag: " (:error reply)))))))
+                                   (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
+                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                   (when on-tags-change (on-tags-change)))
+                                 (js/alert (str "Error removing tag: " (:error reply)))))))
 
-          handle-key-press (fn [e]
-                             (when (= (.-key e) "Enter")
-                               (.preventDefault e)
-                               (let [trimmed-value (str/trim input-value)]
-                                 (when-not (str/blank? trimmed-value)
-                                   (handle-add-tag trimmed-value)))))]
+        handle-key-press (fn [e]
+                           (when (= (.-key e) "Enter")
+                             (.preventDefault e)
+                             (let [trimmed-value (str/trim input-value)]
+                               (when-not (str/blank? trimmed-value)
+                                 (handle-add-tag trimmed-value)))))]
 
-      ($ :div
+    ($ :div
        ;; Existing tags as pills
-         (if (and tags (seq tags))
-           ($ :div.flex.flex-wrap.gap-2.mb-3
-              (for [tag (sort (map name tags))]
-                ($ :span.inline-flex.items-center.px-2.5.py-0.5.rounded-full.text-xs.font-medium.bg-blue-100.text-blue-800
-                   {:key tag}
-                   tag
-                   (when-not read-only? ;; Only show remove button if not read-only
-                     ($ :button.ml-1.inline-flex.items-center.justify-center.w-4.h-4.rounded-full.text-blue-400.hover:bg-blue-200.hover:text-blue-600.focus:outline-none
-                        {:onClick #(handle-remove-tag tag)
-                         :title (str "Remove " tag)}
-                        ($ XMarkIcon {:className "w-3 h-3"}))))))
-           ($ :div.text-sm.text-gray-500.italic.mb-3 "No tags"))
+       (if (and tags (seq tags))
+         ($ :div.flex.flex-wrap.gap-2.mb-3
+            (for [tag (sort (map name tags))]
+              ($ :span.inline-flex.items-center.px-2.5.py-0.5.rounded-full.text-xs.font-medium.bg-blue-100.text-blue-800
+                 {:key tag}
+                 tag
+                 (when-not read-only? ;; Only show remove button if not read-only
+                   ($ :button.ml-1.inline-flex.items-center.justify-center.w-4.h-4.rounded-full.text-blue-400.hover:bg-blue-200.hover:text-blue-600.focus:outline-none
+                      {:onClick #(handle-remove-tag tag)
+                       :title (str "Remove " tag)}
+                      ($ XMarkIcon {:className "w-3 h-3"}))))))
+         ($ :div.text-sm.text-gray-500.italic.mb-3 "No tags"))
 
        ;; Input field for adding new tags
-         (when-not read-only? ;; Only show input field if not read-only
-           ($ :div.flex.items-center.space-x-2
-              ($ :input.flex-1.px-3.py-2.text-sm.border.border-gray-300.rounded-md.focus:outline-none.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
-                 {:type "text"
-                  :placeholder "Add a tag and press Enter..."
-                  :value input-value
-                  :onChange #(set-input-value (.. % -target -value))
-                  :onKeyPress handle-key-press
-                  :disabled is-adding})
-              (when is-adding
-                ($ :div.text-sm.text-gray-500 "Adding...")))))))
+       (when-not read-only? ;; Only show input field if not read-only
+         ($ :div.flex.items-center.space-x-2
+            ($ :input.flex-1.px-3.py-2.text-sm.border.border-gray-300.rounded-md.focus:outline-none.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
+               {:type "text"
+                :placeholder "Add a tag and press Enter..."
+                :value input-value
+                :onChange #(set-input-value (.. % -target -value))
+                :onKeyPress handle-key-press
+                :disabled is-adding})
+            (when is-adding
+              ($ :div.text-sm.text-gray-500 "Adding...")))))))
 
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content]}]
-  ($ :div
-     ($ :button.flex.items-center.justify-between.w-full.px-4.py-2.text-sm.text-left.hover:bg-gray-100.focus:outline-none.focus:bg-gray-100.cursor-pointer
+  ($ :div.flex.items-center.justify-between.w-full.px-4.py-2.text-sm.hover:bg-gray-100.group
+     {:className (when selected? "bg-blue-50 text-blue-700")}
+     ;; Main clickable area (not a button to avoid nesting)
+     ($ :div.flex.items-center.flex-1.cursor-pointer
         {:onClick (fn [e]
                     (.stopPropagation e)
-                    (when on-select (on-select)))
-         :className (when selected? "bg-blue-50 text-blue-700")}
-        ($ :div.flex.items-center.flex-1
-           (when icon ($ :div.mr-2 icon))
-           ($ :span.truncate label)
-           (when selected? ($ :span.ml-2.text-xs.text-blue-600 "✓")))
-        (when (and delete-button (not action?))
-          ($ :div.ml-2 delete-button)))
-     (when extra-content extra-content)))
+                    (when on-select (on-select)))}
+        (when icon ($ :div.mr-2 icon))
+        ($ :span.truncate label)
+        (when selected? ($ :span.ml-2.text-xs.text-blue-600 "✓")))
+     ;; Delete button area (separate from main click area)
+     (when (and delete-button (not action?))
+       ($ :div.ml-2 delete-button))
+     ;; Extra content
+     (when extra-content
+       ($ :div extra-content))))
 
 ;; =============================================================================
 ;; EVALUATOR UTILITIES
@@ -930,7 +933,7 @@
                        ;; Conditionally render actions
                        (if is-read-only?
                          ($ :div.flex.justify-center.items-center
-                            ($ :div {:className "h-5 w-5 text-gray-400" :title "This snapshot is read-only"} "Read only"))
+                            ($ LockClosedIcon {:className "h-5 w-5 text-gray-400" :title "This snapshot is read-only"}))
                          ($ :div.relative.inline-block.text-left
                             ;; Three dots button - prevent row click when clicking
                             ($ :button.inline-flex.items-center.justify-center.w-8.h-8.rounded-full.text-gray-400.hover:text-gray-600.hover:bg-gray-100.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500.cursor-pointer
@@ -1272,7 +1275,7 @@
                     ;; Add read-only banner
                     (when is-read-only?
                       ($ :div.bg-yellow-100.border-b.border-yellow-200.px-6.py-2.text-sm.text-yellow-800.flex.items-center.gap-2
-                         ($ :div {:className "h-4 w-4"} "Read only")
+                         ($ LockClosedIcon {:className "h-4 w-4"})
                          ($ :span ($ :b "Read-only:") " You are viewing an immutable snapshot. Editing is disabled.")))
 
                     ;; Action bar - always visible
