@@ -189,11 +189,11 @@ test.describe('Dataset example crud', () => {
     // Submit Add Example form - find the button within the modal
     await modal.getByRole('button', { name: 'Add Example' }).click();
 
-    // Verify the example appears in the table (look for unique id text)
-    await expect(page.getByText(exampleId1)).toBeVisible({ timeout: 30000 });
+    // Verify the example appears in the table by looking for the input column specifically
+    await expect(page.locator('table tbody tr').filter({ hasText: exampleId1 })).toBeVisible({ timeout: 30000 });
 
     // Open the Example Viewer modal by clicking on the example row
-    await page.getByText(exampleId1).first().click();
+    await page.locator('table tbody tr').filter({ hasText: exampleId1 }).click();
     await expect(page.getByText('Example Details')).toBeVisible({ timeout: 30000 });
 
     // Start listening for confirm dialogs for destructive actions
@@ -206,8 +206,8 @@ test.describe('Dataset example crud', () => {
     await page.getByLabel('Input (JSON)').fill(JSON.stringify(updatedInput, null, 2));
     await page.getByRole('button', { name: 'Save Changes' }).click();
 
-    // Verify the updated content is visible in the viewer
-    await expect(page.getByText(exampleId2)).toBeVisible({ timeout: 30000 });
+    // Verify the updated content is visible in the viewer modal
+    await expect(page.locator('[role="dialog"]').getByText(exampleId2)).toBeVisible({ timeout: 30000 });
 
     // Add a tag
     const tagName = `e2e-tag-${randomUUID()}`;
@@ -227,8 +227,8 @@ test.describe('Dataset example crud', () => {
     // Close the viewer if still open
     await page.keyboard.press('Escape');
 
-    // Verify the example is gone from the list
-    await expect(page.getByText(exampleId2)).not.toBeVisible({ timeout: 30000 });
+    // Verify the example is gone from the table
+    await expect(page.locator('table tbody tr').filter({ hasText: exampleId2 })).not.toBeVisible({ timeout: 30000 });
 
     // Cleanup: go back to dataset list and delete the dataset
     await page.goBack();
