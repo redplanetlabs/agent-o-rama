@@ -79,7 +79,8 @@
   [{:keys [manager dataset-id from-snapshot-name to-snapshot-name]} uid]
   (let [from-name (when-not (str/blank? from-snapshot-name) from-snapshot-name)]
     (aor/snapshot-dataset! manager dataset-id from-name to-snapshot-name)
-    {:status :ok}))
+    ;; Return the name of the created snapshot on success
+    {:status :ok :snapshot-name to-snapshot-name}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/delete-snapshot
   [{:keys [manager dataset-id snapshot-name]} uid]

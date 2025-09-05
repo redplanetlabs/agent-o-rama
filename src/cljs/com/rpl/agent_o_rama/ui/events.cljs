@@ -429,7 +429,7 @@
                    nil))
 
 (state/reg-event :dataset/create-snapshot
-                 (fn [db {:keys [module-id dataset-id from-snapshot-name form-fields]}]
+                 (fn [db {:keys [module-id dataset-id from-snapshot-name form-fields on-success]}] ;; Add on-success
                    ;; Extract form data
                    (let [snapshot-name (get form-fields :snapshot-name "")]
 
@@ -448,6 +448,9 @@
                         (if (:success reply)
                           (do
                             (state/dispatch [:modal/hide])
+                            ;; If an on-success callback is provided, call it with the new snapshot name
+                            (when on-success
+                              (on-success (get-in reply [:data :snapshot-name])))
                             ;; Invalidate snapshot names query to trigger refetch
                             (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}]))
                           (state/dispatch [:db/set-value [:ui :modal :form :error] (:error reply)])))))
