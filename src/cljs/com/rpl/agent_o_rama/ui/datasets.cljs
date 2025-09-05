@@ -144,25 +144,13 @@
  ;; Unified form specification for both adding and editing examples
 ;; The dynamic parts (initial fields, submit event) will be added at runtime
  ;; Function to create form specification for both adding and editing examples
-(defn example-form-spec [mode config]
-  (case mode
-    :create
-    {:fields {:input "" :output ""}
-     :validators {:input [forms/required forms/valid-json]
-                  :output [forms/valid-json]}
-     :submit-event [:dataset/add-example (-> config
-                                             (select-keys [:module-id :dataset-id :snapshot-name])
-                                             (assoc :form-id :example-form))]}
-
-    :edit
-    (let [{:keys [initial-input initial-output]} config]
-      {:fields {:input (if initial-input (js/JSON.stringify (clj->js initial-input) nil 2) "")
-                :output (if initial-output (js/JSON.stringify (clj->js initial-output) nil 2) "")}
-       :validators {:input [forms/required forms/valid-json]
-                    :output [forms/valid-json]}
-       :submit-event [:dataset/edit-example (-> config
-                                                (select-keys [:module-id :dataset-id :snapshot-name :example-id])
-                                                (assoc :form-id :example-form))]})))
+(defn example-form-spec [config]
+  {:fields {:input "" :output ""}
+   :validators {:input [forms/required forms/valid-json]
+                :output [forms/valid-json]}
+   :submit-event [:dataset/add-example (-> config
+                                           (select-keys [:module-id :dataset-id :snapshot-name])
+                                           (assoc :form-id :example-form))]})
 
 ;; Unified form component for both adding and editing examples
 (defui ExampleForm [{:keys [form-id]}]
@@ -189,20 +177,15 @@
                             :class-name "font-mono"})
        ($ forms/form-error {:error error}))))
 
-(defn show-example-modal!
-  "Initializes and shows a modal for either creating or editing an example.
-   - mode: :create or :edit
-   - config: A map of parameters for the operation."
-  [mode config]
+(defn show-add-example-modal!
+  "Initializes and shows a modal for creating a new example."
+  [config]
   (let [form-id :example-form
-        form-spec (example-form-spec mode config)
-        {:keys [title submit-text]} (case mode
-                                      :create {:title "Add Example" :submit-text "Add Example"}
-                                      :edit {:title "Edit Example" :submit-text "Save Changes"})]
-
+        form-spec (example-form-spec config)
+        title "Add Example"
+        submit-text "Add Example"]
     ;; Initialize the centralized form state
     (state/dispatch [:form/init form-id form-spec])
-
     ;; Show the modal
     (state/dispatch [:modal/show form-id
                      {:title title
@@ -464,18 +447,19 @@
         delete-icon-classes (if is-dropdown? "mr-3 h-4 w-4 text-gray-400 group-hover:text-red-500" "mr-2 h-4 w-4")]
 
     ($ :<>
-       ;; Edit button
+       ;; Edit button - Now opens the modern EditableExampleModal
        ($ :button
           {:className edit-btn-classes
            :onClick (fn []
                       (when close-fn (close-fn))
-                      (show-example-modal! :edit
-                                           {:module-id module-id
-                                            :dataset-id dataset-id
-                                            :snapshot-name snapshot-name
-                                            :example-id actual-example-id
-                                            :initial-input (:input example)
-                                            :initial-output (:reference-output example)}))}
+                      (state/dispatch [:modal/show :example-viewer
+                                       {:title "Example Details"
+                                        :component ($ EditableExampleModal
+                                                      {:example-id actual-example-id
+                                                       :module-id module-id
+                                                       :dataset-id dataset-id
+                                                       :snapshot-name snapshot-name
+                                                       :on-delete-success on-delete-success})}]))}
           ($ PencilIcon {:className edit-icon-classes})
           "Edit")
 
@@ -539,11 +523,12 @@
                                     ;; Create updated example with the new field value
                                     updated-example (assoc current-example field-key (js->clj parsed-value :keywordize-keys true))]
                                 (sente/request!
-                                 [:datasets/update-example
+                                 [:datasets/edit-example ;; Unify on a single event name for clarity
                                   {:module-id module-id
                                    :dataset-id dataset-id
                                    :snapshot-name snapshot-name
                                    :example-id example-id
+                                   ;; Send the full, updated object. The backend will handle the fields.
                                    :input (:input updated-example)
                                    :reference-output (:reference-output updated-example)}]
                                  10000
@@ -1371,10 +1356,10 @@
                           ;; Right side - Add Example button
                           ($ :div.flex.items-center.space-x-4
                              ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer
-                                {:onClick #(show-example-modal! :create
-                                                                {:module-id module-id
-                                                                 :dataset-id dataset-id
-                                                                 :snapshot-name selected-snapshot-name})}
+                                {:onClick #(show-add-example-modal! ;; <-- Use renamed function
+                                             {:module-id module-id
+                                              :dataset-id dataset-id
+                                              :snapshot-name selected-snapshot-name})}
                                 ($ PlusIcon {:className "h-4 w-4 mr-2"})
                                 "Add Example"))))
 

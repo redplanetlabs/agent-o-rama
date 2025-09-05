@@ -93,34 +93,38 @@
                                example-id
                                {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}))
 
+;; This is the new, unified handler. It accepts structured data directly.
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/edit-example
-  [{:keys [manager dataset-id snapshot-name example-id input output]} uid]
+  [{:keys [manager dataset-id snapshot-name example-id input reference-output]} uid]
   (try
-    ;; Input/Output from the UI will be JSON strings. We must parse them.
-    (let [parsed-input (when-not (str/blank? input) (j/read-value input))
-          parsed-output (when-not (str/blank? output) (j/read-value output))
-          snapshot-opts {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}]
+    (let [snapshot-opts {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}]
+      ;; The data is already parsed by the time it gets here.
+      ;; We just need to dispatch the updates.
+      ;; The `aor/set-dataset-example-*` functions correctly handle nil values if a field wasn't changed.
 
-      ;; Update input if provided
-      (when parsed-input
-        (aor/set-dataset-example-input! manager
-                                        dataset-id
-                                        example-id
-                                        parsed-input
-                                        snapshot-opts))
+      (aor/set-dataset-example-input! manager
+                                      dataset-id
+                                      example-id
+                                      input
+                                      snapshot-opts)
 
-      ;; Update reference output if provided
-      (when parsed-output
-        (aor/set-dataset-example-reference-output! manager
-                                                   dataset-id
-                                                   example-id
-                                                   parsed-output
-                                                   snapshot-opts))
+      (aor/set-dataset-example-reference-output! manager
+                                                 dataset-id
+                                                 example-id
+                                                 reference-output
+                                                 snapshot-opts)
 
       {:status :ok})
-    (catch com.fasterxml.jackson.core.JsonParseException e
-      (throw (ex-info (str "Invalid JSON provided: " (.getOriginalMessage e))
-                      {:field (if (str/includes? (.getMessage e) "input") :input :output)})))))
+    (catch Exception e
+      ;; Catch schema validation errors from the backend and forward them
+      (throw (ex-info (str "Failed to update example: " (.getMessage e))
+                      {:dataset-id dataset-id :example-id example-id})))))
+
+;; This adds the missing handler for the new inline editing flow.
+;; It simply calls the unified :datasets/edit-example handler.
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/update-example
+  [ev-msg uid]
+  ((get-method com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/edit-example) ev-msg uid))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-tag
   [{:keys [manager dataset-id snapshot-name example-id tag]} uid]
@@ -148,7 +152,7 @@
                                              dataset-id
                                              (when-not (str/blank? snapshot-name) snapshot-name)
                                              [example-id])
-          example      (get examples-map example-id)]
+          example (get examples-map example-id)]
       (if example
         {:status :ok :example example}
         {:status :error :error "Example not found"}))))
