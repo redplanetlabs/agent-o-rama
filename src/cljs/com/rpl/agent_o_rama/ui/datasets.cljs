@@ -650,22 +650,28 @@
               ($ :div.text-sm.text-gray-500 "Adding...")))))))
 
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content]}]
-  ($ :div.flex.items-center.justify-between.w-full.px-4.py-2.text-sm.hover:bg-gray-100.group
-     {:className (when selected? "bg-blue-50 text-blue-700")}
-     ;; Main clickable area (not a button to avoid nesting)
-     ($ :div.flex.items-center.flex-1.cursor-pointer
+  ($ :div.cursor-pointer
+     ;; Main clickable area
+     ($ :div.flex.items-center.justify-between.w-full.px-4.py-2.text-sm.cursor-pointer.hover:bg-gray-100.focus:bg-gray-100.
         {:onClick (fn [e]
                     (.stopPropagation e)
-                    (when on-select (on-select)))}
-        (when icon ($ :div.mr-2 icon))
-        ($ :span.truncate label)
-        (when selected? ($ :span.ml-2.text-xs.text-blue-600 "✓")))
-     ;; Delete button area (separate from main click area)
-     (when (and delete-button (not action?))
-       ($ :div.ml-2 delete-button))
-     ;; Extra content
-     (when extra-content
-       ($ :div extra-content))))
+                    (when on-select (on-select)))
+         :className (cond
+                      selected? "bg-blue-50 text-blue-700"
+                      action? "text-blue-600 hover:bg-blue-50"
+                      :else "text-gray-700")}
+        
+        ($ :div.flex.items-center.flex-1.p-1
+           (when icon ($ :div.mr-3 icon))
+           ($ :span.truncate label)
+           (when selected? ($ :span.ml-2.text-xs.text-blue-600 "✓")))
+        
+        ;; Delete button area (separate from main click area to avoid nesting)
+        (when (and delete-button (not action?))
+          ($ :div.ml-2
+             {:onClick #(.stopPropagation %)} ;; Prevent triggering the row click
+             delete-button)))
+     (when extra-content extra-content)))
 
 ;; =============================================================================
 ;; EVALUATOR UTILITIES
