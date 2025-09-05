@@ -296,9 +296,13 @@ test.describe('Dataset snapshot dropdown', () => {
     await modal.getByLabel('New Snapshot Name').fill(snapshotName);
     await modal.getByRole('button', { name: 'Create Snapshot' }).click();
 
-    // Re-open dropdown and select the newly created snapshot
-    await snapshotButton.click();
-    await expect(page.getByText(snapshotName)).toBeVisible({ timeout: 30000 });
+    // Wait for modal to close (create finished), reacquire and open fresh dropdown
+    await expect(modal).toBeHidden({ timeout: 30000 });
+    const latestButtonFresh = page.getByRole('button', { name: 'Latest (Working Copy)' }).first();
+    await expect(latestButtonFresh).toBeEnabled({ timeout: 30000 });
+    await latestButtonFresh.click();
+    // Wait for the newly created snapshot option to appear in the dropdown
+    await page.getByText(snapshotName).waitFor({ state: 'visible', timeout: 30000 });
     await page.getByText(snapshotName).click();
 
     // Verify the button now shows the selected snapshot
