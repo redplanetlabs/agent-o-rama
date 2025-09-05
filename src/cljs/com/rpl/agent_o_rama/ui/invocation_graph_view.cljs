@@ -133,6 +133,8 @@
                            handle-cancel)}
 
           ($ :div {:className "bg-white rounded-lg shadow-xl w-full max-w-5xl overflow-hidden mx-4 my-8 flex flex-col max-h-screen"
+                   :role "dialog"
+                   :aria-modal "true"
                    :onClick (fn [e]
                               (.preventDefault e)
                               (.stopPropagation e))}

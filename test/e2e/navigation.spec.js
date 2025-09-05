@@ -173,16 +173,21 @@ test.describe('Dataset example crud', () => {
     // Open Add Example modal
     await addExampleHeaderButton.click();
 
+    // Wait for modal to appear and locate it
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible({ timeout: 10000 });
+
     // Create a unique example
     const exampleId1 = randomUUID();
     const exampleInput = { message: 'hello-from-e2e', id: exampleId1 };
     const exampleOutput = { expected: true, id: exampleId1 };
 
-    await page.getByLabel('Input (JSON)').fill(JSON.stringify(exampleInput, null, 2));
-    await page.getByLabel('Reference Output (JSON, Optional)').fill(JSON.stringify(exampleOutput, null, 2));
+    // Fill form fields within the modal
+    await modal.getByLabel('Input (JSON)').fill(JSON.stringify(exampleInput, null, 2));
+    await modal.getByLabel('Reference Output (JSON, Optional)').fill(JSON.stringify(exampleOutput, null, 2));
 
-    // Submit Add Example form (modal overlay should ensure we hit the modal button)
-    await page.getByRole('button', { name: 'Add Example' }).click();
+    // Submit Add Example form - find the button within the modal
+    await modal.getByRole('button', { name: 'Add Example' }).click();
 
     // Verify the example appears in the table (look for unique id text)
     await expect(page.getByText(exampleId1)).toBeVisible({ timeout: 30000 });
