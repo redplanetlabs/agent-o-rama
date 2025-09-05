@@ -86,6 +86,7 @@
            (fn [fetcher example-runs]
              {"res" (reduce
                      (fn [res {:keys [input reference-output output]}]
+                       ;; TODO: <<<<>>>> getting ["50"] here for output
                        (+ res
                           (count-or-num input)
                           (count-or-num reference-output)

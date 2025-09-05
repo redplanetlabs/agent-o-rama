@@ -343,7 +343,13 @@
 
           outputs (select [MAP-VALS :val] results)]
          :when (not (selected-any? [MAP-VALS :failure? identity] results))]
-     (aor-types/->ExampleRunImpl input reference-output outputs)
+     (do
+       (when-not (= 1 (count outputs))
+         (throw
+          (h/ex-info
+           "Outputs when fetching example runs unexpectedly does not contain exactly one value"
+           {:outputs outputs})))
+       (aor-types/->ExampleRunImpl input reference-output (nth outputs 0)))
    )))
 
 (defn define-experiments-agent!
@@ -566,7 +572,7 @@
      (local-transform>
       [(keypath *dataset-id :experiments *id)
        (multi-path [:start-time-millis (termval *start-time-millis)]
-                   [:experiment-info *data])]
+                   [:experiment-info (termval *data)])]
       $$datasets)
      (ops/current-task-id :> *task-id)
      (|direct *task-id)
