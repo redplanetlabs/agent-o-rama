@@ -440,8 +440,9 @@
 
 (defui ExampleActionButtons
   "Returns a React fragment with example action buttons for reuse in modal and dropdown contexts"
-  [{:keys [example module-id dataset-id snapshot-name on-delete-success close-fn layout]}]
-  (let [example-id (:id example)
+  [{:keys [example example-id module-id dataset-id snapshot-name on-delete-success close-fn layout]}]
+  (let [;; Use the explicitly passed example-id if provided, otherwise extract from example
+        actual-example-id (or example-id (:id example))
         is-dropdown? (= layout :dropdown)
 
         ;; Define style functions for each button type
@@ -472,7 +473,7 @@
                                            {:module-id module-id
                                             :dataset-id dataset-id
                                             :snapshot-name snapshot-name
-                                            :example-id example-id
+                                            :example-id actual-example-id
                                             :initial-input (:input example)
                                             :initial-output (:reference-output example)}))}
           ($ PencilIcon {:className edit-icon-classes})
@@ -501,7 +502,7 @@
                           {:module-id module-id
                            :dataset-id dataset-id
                            :snapshot-name snapshot-name
-                           :example-id example-id}]
+                           :example-id actual-example-id}]
                          10000
                          (fn [reply]
                            (if (:success reply)
@@ -537,6 +538,7 @@
             ($ :h3.text-lg.font-medium.text-gray-900 "Example Details")
             ($ :div.flex.items-center.space-x-2
                ($ ExampleActionButtons {:example example
+                                        :example-id example-id
                                         :module-id module-id
                                         :dataset-id dataset-id
                                         :snapshot-name snapshot-name
