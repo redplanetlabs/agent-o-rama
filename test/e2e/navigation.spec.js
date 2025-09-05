@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { randomUUID } from 'crypto';
 
 test.describe('Agent-O-Rama Navigation', () => {
 
@@ -67,11 +68,17 @@ test.describe('Agent-O-Rama Navigation to Datasets', () => {
 
     await newDatasetButton.click();
     // fill in the forms
-    await page.getByLabel('Name').fill('Test Dataset');
+    const datasetName = `Test Dataset ${randomUUID()}`;
+    await page.getByLabel('Name').fill(datasetName);
     await page.getByLabel('Description').fill('Test Description');
     await page.getByLabel('Input JSON Schema').fill('{}');
     await page.getByLabel('Output JSON Schema').fill('{}');
     await page.getByRole('button', { name: 'Create Dataset' }).click();
 
+    // find the created datset in the invalidated/requeried table
+    // the tilte is in an h3 tag
+    // might be multiple from previous runs, so we need to find the one that is not loading
+    await expect(page.getByRole('heading', { name: datasetName })).toBeVisible({ timeout: 30000 });
+    console.log('Successfully verified created dataset.');
   });
 });
