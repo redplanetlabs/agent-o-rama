@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
 
-test.describe('Agent-O-Rama Navigation', () => {
+test.describe('research agent module exists', () => {
 
   test('should load the homepage and navigate to an agent detail page', async ({ page }) => {
     // Step 1: Go to the application's base URL.
@@ -28,7 +28,7 @@ test.describe('Agent-O-Rama Navigation', () => {
   });
 });
 
-test.describe('Agent-O-Rama Navigation to Datasets', () => {
+test.describe('Dataset crud', () => {
 
   test('should load the homepage and navigate to an agent detail page', async ({ page }) => {
     // Step 1: Go to the application's base URL.
