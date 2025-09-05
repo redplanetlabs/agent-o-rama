@@ -199,20 +199,30 @@ test.describe('Dataset example crud', () => {
     // Start listening for confirm dialogs for destructive actions
     page.on('dialog', dialog => dialog.accept());
 
-    // Edit the example
-    // TODO test edit from the ... menu, not just the dialog box menu
-    await page.getByRole('button', { name: 'Edit' }).first().click();
+    // Edit the example using inline editing
+    // Find the Input field's edit button and click it
+    const inputEditButton = page.locator('[role="dialog"]').getByRole('button', { name: 'Edit' }).first();
+    await expect(inputEditButton).toBeVisible({ timeout: 30000 });
+    await inputEditButton.click();
+
+    // Wait for the textarea to appear and be editable
+    const inputTextarea = page.locator('[role="dialog"]').locator('textarea').first();
+    await expect(inputTextarea).toBeVisible({ timeout: 30000 });
+
+    // Clear and fill with new content
     const exampleId2 = randomUUID();
     const updatedInput = { message: 'updated-from-e2e', id: exampleId2 };
-    await page.getByLabel('Input (JSON)').fill(JSON.stringify(updatedInput, null, 2));
-    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await inputTextarea.fill(JSON.stringify(updatedInput, null, 2));
 
-    // After editing and saving, the modal closes completely
-    // We need to reopen the Example Details modal by clicking the table row again
-    await page.locator('table tbody tr').filter({ hasText: exampleId2 }).click();
-    await expect(page.getByText('Example Details')).toBeVisible({ timeout: 30000 });
+    // Click the Save button for this field
+    const saveButton = page.locator('[role="dialog"]').getByRole('button', { name: 'Save' }).first();
+    await expect(saveButton).toBeVisible({ timeout: 30000 });
+    await saveButton.click();
 
-    // Verify the updated content is visible in the details modal
+    // Wait for the save to complete and the field to return to view mode
+    await expect(inputTextarea).not.toBeVisible({ timeout: 30000 });
+
+    // Verify the updated content is visible in the details modal (should show in the view mode)
     await expect(page.locator('[role="dialog"]').getByText(exampleId2)).toBeVisible({ timeout: 30000 });
 
     // Add a tag (tags are only available in the Details modal, not the Edit modal)
