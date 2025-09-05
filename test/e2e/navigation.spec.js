@@ -255,6 +255,96 @@ test.describe('Dataset example crud', () => {
   });
 });
 
+test.describe('Inline editing validation', () => {
+
+  test('should validate inline editing behavior with proper JSON formatting', async ({ page }) => {
+    // Setup: Navigate to dataset detail page
+    await page.goto('/');
+    await expect(page).toHaveTitle(/Agent-o-rama/);
+
+    const agentName = 'com.rpl.agent.research-agent/ResearchAgentModule:researcher';
+    const agentLink = page.getByText(agentName);
+    await expect(agentLink).toBeVisible({ timeout: 30000 });
+    await agentLink.click();
+
+    const datasetsLink = page.getByText('Datasets & Experiments');
+    await expect(datasetsLink).toBeVisible({ timeout: 30000 });
+    await datasetsLink.click();
+
+    // Create a test dataset
+    const newDatasetButton = page.getByText('New Dataset');
+    await newDatasetButton.click();
+    
+    const datasetName = `Inline Edit Test ${randomUUID()}`;
+    await page.getByLabel('Name').fill(datasetName);
+    await page.getByLabel('Description').fill('Testing inline editing');
+    await page.getByLabel('Input JSON Schema').fill('{}');
+    await page.getByLabel('Output JSON Schema').fill('{}');
+    await page.getByRole('button', { name: 'Create Dataset' }).click();
+
+    await expect(page.getByRole('heading', { name: datasetName })).toBeVisible({ timeout: 30000 });
+    await page.getByRole('link', { name: datasetName }).first().click();
+
+    // Add an example with a string value to test JSON formatting
+    const addExampleButton = page.getByRole('button', { name: 'Add Example' });
+    await addExampleButton.click();
+
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible({ timeout: 10000 });
+
+    // Create example with string values that need proper JSON formatting
+    const stringInput = "hello world";
+    const stringOutput = "goodbye world";
+    
+    await modal.getByLabel('Input (JSON)').fill(`"${stringInput}"`);
+    await modal.getByLabel('Reference Output (JSON, Optional)').fill(`"${stringOutput}"`);
+    await modal.getByRole('button', { name: 'Add Example' }).click();
+
+    // Open the example details
+    await page.locator('table tbody tr').filter({ hasText: stringInput }).click();
+    await expect(page.getByText('Example Details')).toBeVisible({ timeout: 30000 });
+
+    // Test inline editing of Input field
+    const inputEditButton = page.locator('[role="dialog"]').getByRole('button', { name: 'Edit' }).first();
+    await inputEditButton.click();
+
+    const inputTextarea = page.locator('[role="dialog"]').locator('textarea').first();
+    await expect(inputTextarea).toBeVisible({ timeout: 30000 });
+
+    // Verify the textarea is initialized with properly formatted JSON (with quotes)
+    const textareaValue = await inputTextarea.inputValue();
+    console.log('Textarea initialized with:', textareaValue);
+    
+    // The value should be properly formatted JSON with quotes around the string
+    expect(textareaValue).toContain('"hello world"');
+
+    // Edit the value
+    const newStringInput = "updated hello world";
+    await inputTextarea.fill(`"${newStringInput}"`);
+
+    // Save the changes
+    const saveButton = page.locator('[role="dialog"]').getByRole('button', { name: 'Save' }).first();
+    await saveButton.click();
+
+    // Wait for save to complete
+    await expect(inputTextarea).not.toBeVisible({ timeout: 30000 });
+
+    // Verify the change is reflected in the UI
+    await expect(page.locator('[role="dialog"]').getByText(newStringInput)).toBeVisible({ timeout: 30000 });
+
+    // Test that the change is also reflected in the main table (query invalidation)
+    await page.locator('[role="dialog"]').getByRole('button', { name: '×' }).click(); // Close modal
+    await expect(page.locator('table tbody tr').filter({ hasText: newStringInput })).toBeVisible({ timeout: 30000 });
+
+    // Cleanup
+    page.on('dialog', dialog => dialog.accept());
+    await page.goBack();
+    const deleteButton = page.getByRole('heading', { name: datasetName }).locator('..').locator('..').getByTitle('Delete Dataset');
+    await deleteButton.click();
+    await expect(page.getByRole('heading', { name: datasetName })).not.toBeVisible({ timeout: 30000 });
+  });
+});
+
 test.describe('Dataset snapshot dropdown', () => {
 
   test('create/select/delete snapshot via dropdown', async ({ page }) => {
