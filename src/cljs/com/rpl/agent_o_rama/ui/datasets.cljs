@@ -504,7 +504,10 @@
         [error set-error!] (uix/use-state nil)
 
         handle-edit-click (fn []
-                            (set-edit-value! (pretty-print-json value))
+                            ;; Always use JSON.stringify to ensure proper JSON formatting with quotes
+                            (set-edit-value! (if (some? value)
+                                               (js/JSON.stringify (clj->js value) nil 2)
+                                               ""))
                             (set-editing! true)
                             (set-error! nil))
 
@@ -523,12 +526,11 @@
                                     ;; Create updated example with the new field value
                                     updated-example (assoc current-example field-key (js->clj parsed-value :keywordize-keys true))]
                                 (sente/request!
-                                 [:datasets/edit-example ;; Unify on a single event name for clarity
+                                 [:datasets/edit-example 
                                   {:module-id module-id
                                    :dataset-id dataset-id
                                    :snapshot-name snapshot-name
                                    :example-id example-id
-                                   ;; Send the full, updated object. The backend will handle the fields.
                                    :input (:input updated-example)
                                    :reference-output (:reference-output updated-example)}]
                                  10000
@@ -538,6 +540,9 @@
                                      (do
                                        (set-editing! false)
                                        (set-edit-value! "")
+                                       ;; Invalidate both the single example query and the main examples list
+                                       (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
+                                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
                                        (when on-save (on-save)))
                                      (set-error! (str "Error saving: " (:error reply)))))))
                               (catch js/Error e
@@ -606,7 +611,7 @@
       ($ :div.p-6.space-y-6
          ;; --- Header with Delete Button ---
          ($ :div.flex.items-center.justify-between
-            ($ :h3.text-lg.font-medium.text-gray-900 "Example Details")
+            ($ :div)
             ($ :button
                {:className "inline-flex items-center px-3 py-1 text-sm text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 cursor-pointer"
                 :onClick (fn []
