@@ -425,7 +425,8 @@
                        (catch js/Error e
                          (state/dispatch [:db/set-value [:ui :modal :form :submitting?] false])
                          (state/dispatch [:db/set-value [:ui :modal :form :error]
-                                          (str "Invalid JSON: " (.-message e))]))))))
+                                          (str "Invalid JSON: " (.-message e))]))))
+                   nil))
 
 (state/reg-event :dataset/create-snapshot
                  (fn [db {:keys [module-id dataset-id from-snapshot-name form-fields]}]
