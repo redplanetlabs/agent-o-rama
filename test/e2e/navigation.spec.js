@@ -112,7 +112,7 @@ test.describe('Dataset crud', () => {
 
 test.describe('Dataset example crud', () => {
 
-  test('should load the homepage and navigate to an agent detail page', async ({ page }) => {
+  test('example CRUD flow: add, view, edit, tag, delete', async ({ page }) => {
     // Step 1: Go to the application's base URL.
     await page.goto('/');
 
@@ -163,5 +163,74 @@ test.describe('Dataset example crud', () => {
     await expect(page.getByRole('heading', { name: datasetName })).toBeVisible({ timeout: 30000 });
     console.log('Successfully verified created dataset.');
 
+    // Navigate to dataset detail page by clicking the dataset link
+    await page.getByRole('link', { name: datasetName }).first().click();
+
+    // Wait for the dataset detail page controls to appear
+    const addExampleHeaderButton = page.getByRole('button', { name: 'Add Example' });
+    await expect(addExampleHeaderButton).toBeVisible({ timeout: 30000 });
+
+    // Open Add Example modal
+    await addExampleHeaderButton.click();
+
+    // Create a unique example
+    const exampleId1 = randomUUID();
+    const exampleInput = { message: 'hello-from-e2e', id: exampleId1 };
+    const exampleOutput = { expected: true, id: exampleId1 };
+
+    await page.getByLabel('Input (JSON)').fill(JSON.stringify(exampleInput, null, 2));
+    await page.getByLabel('Reference Output (JSON, Optional)').fill(JSON.stringify(exampleOutput, null, 2));
+
+    // Submit Add Example form (modal overlay should ensure we hit the modal button)
+    await page.getByRole('button', { name: 'Add Example' }).click();
+
+    // Verify the example appears in the table (look for unique id text)
+    await expect(page.getByText(exampleId1)).toBeVisible({ timeout: 30000 });
+
+    // Open the Example Viewer modal by clicking on the example row
+    await page.getByText(exampleId1).first().click();
+    await expect(page.getByText('Example Details')).toBeVisible({ timeout: 30000 });
+
+    // Start listening for confirm dialogs for destructive actions
+    page.on('dialog', dialog => dialog.accept());
+
+    // Edit the example
+    await page.getByRole('button', { name: 'Edit' }).first().click();
+    const exampleId2 = randomUUID();
+    const updatedInput = { message: 'updated-from-e2e', id: exampleId2 };
+    await page.getByLabel('Input (JSON)').fill(JSON.stringify(updatedInput, null, 2));
+    await page.getByRole('button', { name: 'Save Changes' }).click();
+
+    // Verify the updated content is visible in the viewer
+    await expect(page.getByText(exampleId2)).toBeVisible({ timeout: 30000 });
+
+    // Add a tag
+    const tagName = `e2e-tag-${randomUUID()}`;
+    const tagInput = page.getByPlaceholder('Add a tag and press Enter...');
+    await expect(tagInput).toBeVisible({ timeout: 30000 });
+    await tagInput.fill(tagName);
+    await page.keyboard.press('Enter');
+    await expect(page.getByText(tagName)).toBeVisible({ timeout: 30000 });
+
+    // Remove the tag
+    await page.getByRole('button', { name: `Remove ${tagName}` }).click();
+    await expect(page.getByText(tagName)).not.toBeVisible({ timeout: 30000 });
+
+    // Delete the example
+    await page.getByRole('button', { name: 'Delete' }).click();
+
+    // Close the viewer if still open
+    await page.keyboard.press('Escape');
+
+    // Verify the example is gone from the list
+    await expect(page.getByText(exampleId2)).not.toBeVisible({ timeout: 30000 });
+
+    // Cleanup: go back to dataset list and delete the dataset
+    await page.goBack();
+    const deleteButton = page.getByRole('heading', { name: datasetName }).locator('..').locator('..').getByTitle('Delete Dataset');
+    await expect(deleteButton).toBeVisible({ timeout: 30000 });
+    await deleteButton.click();
+    await expect(page.getByRole('heading', { name: datasetName })).not.toBeVisible({ timeout: 30000 });
+    console.log('Successfully cleaned up dataset.');
   });
 });
