@@ -535,7 +535,6 @@
       ($ :div.p-6.space-y-6
          ;; Header with action buttons
          ($ :div.flex.items-center.justify-between
-            ($ :h3.text-lg.font-medium.text-gray-900 "Example Details")
             ($ :div.flex.items-center.space-x-2
                ($ ExampleActionButtons {:example example
                                         :example-id example-id

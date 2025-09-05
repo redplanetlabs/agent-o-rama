@@ -220,11 +220,13 @@ test.describe('Dataset example crud', () => {
     await expect(tagInput).toBeVisible({ timeout: 30000 });
     await tagInput.fill(tagName);
     await page.keyboard.press('Enter');
-    await expect(page.getByText(tagName)).toBeVisible({ timeout: 30000 });
+    // Target the tag specifically within the modal dialog to avoid strict mode violation
+    await expect(page.locator('[role="dialog"]').getByText(tagName)).toBeVisible({ timeout: 30000 });
 
     // Remove the tag
     await page.getByRole('button', { name: `Remove ${tagName}` }).click();
-    await expect(page.getByText(tagName)).not.toBeVisible({ timeout: 30000 });
+    // Also target the tag removal check specifically within the modal dialog
+    await expect(page.locator('[role="dialog"]').getByText(tagName)).not.toBeVisible({ timeout: 30000 });
 
     // Delete the example
     await page.getByRole('button', { name: 'Delete' }).click();
