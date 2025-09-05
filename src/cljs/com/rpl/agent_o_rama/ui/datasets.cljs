@@ -903,23 +903,21 @@
                                   :readOnly true ; Make it read-only since cell handles the click
                                   :className "pointer-events-none"}))
                     ;; Input column
-                    ($ :td.px-6.py-4.whitespace-nowrap.text-sm.font-mono
+                    ;; Input column
+                    ($ :td.px-6.py-4.text-sm.font-mono.max-w-xs
                        (let [input-str (if (string? (:input example))
                                          (:input example)
-                                         (js/JSON.stringify (clj->js (:input example)) nil 2))
-                             truncated (if (> (count input-str) 100)
-                                         (str (subs input-str 0 97) "...")
-                                         input-str)]
-                         ($ :span {:title input-str :className "cursor-help"} truncated)))
+                                         (js/JSON.stringify (clj->js (:input example)) nil 2))]
+                         ($ :div.truncate.cursor-help {:title input-str} input-str)))
                     ;; Reference Output column
-                    ($ :td.px-6.py-4.whitespace-nowrap.text-sm.font-mono
+                    ;; Reference Output column
+                    ($ :td.px-6.py-4.text-sm.font-mono.max-w-xs
                        (let [output-str (if (string? (:reference-output example))
                                           (:reference-output example)
-                                          (js/JSON.stringify (clj->js (:reference-output example)) nil 2))
-                             truncated (if (> (count output-str) 100)
-                                         (str (subs output-str 0 97) "...")
-                                         output-str)]
-                         ($ :span {:title output-str :className "cursor-help"} (or truncated "—"))))
+                                          (js/JSON.stringify (clj->js (:reference-output example)) nil 2))]
+                         (if output-str
+                           ($ :div.truncate.cursor-help {:title output-str} output-str)
+                           ($ :span "—"))))
                     ;; Tags column
                     ($ :td.px-6.py-4.whitespace-nowrap.text-sm.text-gray-500
                        (let [tags (:tags example)]
