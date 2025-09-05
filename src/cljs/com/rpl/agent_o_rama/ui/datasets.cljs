@@ -570,9 +570,9 @@
             ($ :div
                ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Example ID")
                ($ :div.bg-gray-50.rounded-md.p-2.border
-                  ($ :code.text-xs.text-gray-600 (str example-id))))))))
+                  ($ :code.text-xs.text-gray-600 (str example-id)))))))))
 
-  (defui TagInput [{:keys [tags module-id dataset-id snapshot-name example-id on-tags-change read-only?]}] ;; Add read-only?
+(defui TagInput [{:keys [tags module-id dataset-id snapshot-name example-id on-tags-change read-only?]}] ;; Add read-only?
     (let [[input-value set-input-value] (uix/use-state "")
           [is-adding set-is-adding] (uix/use-state false)
 
@@ -649,423 +649,423 @@
               (when is-adding
                 ($ :div.text-sm.text-gray-500 "Adding...")))))))
 
-  (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content]}]
-    ($ :div
-       ($ :button.flex.items-center.justify-between.w-full.px-4.py-2.text-sm.text-left.hover:bg-gray-100.focus:outline-none.focus:bg-gray-100.cursor-pointer
-          {:onClick (fn [e]
-                      (.stopPropagation e)
-                      (when on-select (on-select)))
-           :className (when selected? "bg-blue-50 text-blue-700")}
-          ($ :div.flex.items-center.flex-1
-             (when icon ($ :div.mr-2 icon))
-             ($ :span.truncate label)
-             (when selected? ($ :span.ml-2.text-xs.text-blue-600 "✓")))
-          (when (and delete-button (not action?))
-            ($ :div.ml-2 delete-button)))
-       (when extra-content extra-content)))
+(defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content]}]
+  ($ :div
+     ($ :button.flex.items-center.justify-between.w-full.px-4.py-2.text-sm.text-left.hover:bg-gray-100.focus:outline-none.focus:bg-gray-100.cursor-pointer
+        {:onClick (fn [e]
+                    (.stopPropagation e)
+                    (when on-select (on-select)))
+         :className (when selected? "bg-blue-50 text-blue-700")}
+        ($ :div.flex.items-center.flex-1
+           (when icon ($ :div.mr-2 icon))
+           ($ :span.truncate label)
+           (when selected? ($ :span.ml-2.text-xs.text-blue-600 "✓")))
+        (when (and delete-button (not action?))
+          ($ :div.ml-2 delete-button)))
+     (when extra-content extra-content)))
 
 ;; =============================================================================
 ;; EVALUATOR UTILITIES
 ;; =============================================================================
 
-  (defn get-evaluator-type-display [evaluator-type]
-    (case evaluator-type
-      :llm-as-judge "LLM as Judge"
-      :simple-string-match "String Match"
-      :json-field-match "JSON Field Match"
-      :custom-function "Custom Function"
-      (str evaluator-type)))
+(defn get-evaluator-type-display [evaluator-type]
+  (case evaluator-type
+    :llm-as-judge "LLM as Judge"
+    :simple-string-match "String Match"
+    :json-field-match "JSON Field Match"
+    :custom-function "Custom Function"
+    (str evaluator-type)))
 
-  (defn get-evaluator-type-badge-style [evaluator-type]
-    (case evaluator-type
-      :llm-as-judge "bg-purple-100 text-purple-800"
-      :simple-string-match "bg-green-100 text-green-800"
-      :json-field-match "bg-blue-100 text-blue-800"
-      :custom-function "bg-orange-100 text-orange-800"
-      "bg-gray-100 text-gray-800"))
+(defn get-evaluator-type-badge-style [evaluator-type]
+  (case evaluator-type
+    :llm-as-judge "bg-purple-100 text-purple-800"
+    :simple-string-match "bg-green-100 text-green-800"
+    :json-field-match "bg-blue-100 text-blue-800"
+    :custom-function "bg-orange-100 text-orange-800"
+    "bg-gray-100 text-gray-800"))
 
-  (defui EvaluatorDropdown [{:keys [evaluators on-select selected-evaluator]}]
-    (let [[open? set-open] (uix/use-state false)]
+(defui EvaluatorDropdown [{:keys [evaluators on-select selected-evaluator]}]
+  (let [[open? set-open] (uix/use-state false)]
 
     ;; Close dropdown when clicking outside
-      (uix/use-effect
-       (fn []
-         (let [handle-click (fn [e]
-                              (when open?
-                                (set-open false)))]
-           (.addEventListener js/document "click" handle-click)
-           #(.removeEventListener js/document "click" handle-click)))
-       [open?])
+    (uix/use-effect
+     (fn []
+       (let [handle-click (fn [e]
+                            (when open?
+                              (set-open false)))]
+         (.addEventListener js/document "click" handle-click)
+         #(.removeEventListener js/document "click" handle-click)))
+     [open?])
 
-      ($ :div.relative.inline-block.text-left
+    ($ :div.relative.inline-block.text-left
        ;; Main dropdown button
-         ($ :button.inline-flex.items-center.justify-between.w-64.px-3.py-2.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500.cursor-pointer
-            {:onClick (fn [e]
-                        (.stopPropagation e)
-                        (set-open (not open?)))}
-            ($ :span.truncate
-               (if selected-evaluator
-                 (:name selected-evaluator)
-                 "Select evaluator..."))
-            ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
+       ($ :button.inline-flex.items-center.justify-between.w-64.px-3.py-2.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500.cursor-pointer
+          {:onClick (fn [e]
+                      (.stopPropagation e)
+                      (set-open (not open?)))}
+          ($ :span.truncate
+             (if selected-evaluator
+               (:name selected-evaluator)
+               "Select evaluator..."))
+          ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
 
        ;; Dropdown menu
-         (when open?
-           ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
-              {:onClick #(.stopPropagation %)}
-              ($ :div.py-1
+       (when open?
+         ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
+            {:onClick #(.stopPropagation %)}
+            ($ :div.py-1
                ;; Default option
-                 ($ DropdownRow {:label "Select evaluator..."
-                                 :selected? (nil? selected-evaluator)
-                                 :on-select #(do
-                                               (set-open false)
-                                               (on-select nil))
-                                 :delete-button nil})
+               ($ DropdownRow {:label "Select evaluator..."
+                               :selected? (nil? selected-evaluator)
+                               :on-select #(do
+                                             (set-open false)
+                                             (on-select nil))
+                               :delete-button nil})
 
                ;; Evaluator options
-                 (for [evaluator evaluators]
-                   ($ DropdownRow {:key (:id evaluator)
-                                   :label (:name evaluator)
-                                   :selected? (= (:id selected-evaluator) (:id evaluator))
-                                   :on-select #(do
-                                                 (set-open false)
-                                                 (on-select evaluator))
-                                   :delete-button nil
-                                   :extra-content ($ :div.px-4.pb-2.text-xs.text-gray-500
-                                                     ($ :span.inline-flex.items-center.px-2.py-0.5.rounded-full.text-xs.font-medium
-                                                        {:className (get-evaluator-type-badge-style (:type evaluator))}
-                                                        (get-evaluator-type-display (:type evaluator))))}))))))))
+               (for [evaluator evaluators]
+                 ($ DropdownRow {:key (:id evaluator)
+                                 :label (:name evaluator)
+                                 :selected? (= (:id selected-evaluator) (:id evaluator))
+                                 :on-select #(do
+                                               (set-open false)
+                                               (on-select evaluator))
+                                 :delete-button nil
+                                 :extra-content ($ :div.px-4.pb-2.text-xs.text-gray-500
+                                                   ($ :span.inline-flex.items-center.px-2.py-0.5.rounded-full.text-xs.font-medium
+                                                      {:className (get-evaluator-type-badge-style (:type evaluator))}
+                                                      (get-evaluator-type-display (:type evaluator))))}))))))))
 
 ;; =============================================================================
 ;; SNAPSHOT MANAGER
 ;; =============================================================================
 
-  (defui SnapshotManager [{:keys [module-id dataset-id selected-snapshot set-selected-snapshot]}]
-    (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
+(defui SnapshotManager [{:keys [module-id dataset-id selected-snapshot set-selected-snapshot]}]
+  (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
 
-          {:keys [data loading? error refetch]}
-          (queries/use-sente-query
-           {:query-key [:snapshot-names module-id dataset-id]
-            :sente-event [:datasets/get-snapshot-names {:module-id module-id :dataset-id dataset-id}]
-            :enabled? (boolean (and module-id dataset-id))})
+        {:keys [data loading? error refetch]}
+        (queries/use-sente-query
+         {:query-key [:snapshot-names module-id dataset-id]
+          :sente-event [:datasets/get-snapshot-names {:module-id module-id :dataset-id dataset-id}]
+          :enabled? (boolean (and module-id dataset-id))})
 
-          snapshot-names (or (sort data) [])
+        snapshot-names (or (sort data) [])
 
-          handle-create (fn []
-                          (set-dropdown-open false)
+        handle-create (fn []
+                        (set-dropdown-open false)
                         ;; Pass the setter function as a callback
-                          (show-create-snapshot-modal! module-id
-                                                       dataset-id
-                                                       selected-snapshot
-                                                       set-selected-snapshot))
+                        (show-create-snapshot-modal! module-id
+                                                     dataset-id
+                                                     selected-snapshot
+                                                     set-selected-snapshot))
 
-          handle-delete (fn [snapshot-name]
-                          (set-dropdown-open false)
-                          (when (js/confirm (str "Are you sure you want to delete snapshot '" snapshot-name "'?"))
-                            (sente/request!
-                             [:datasets/delete-snapshot {:module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name}]
-                             10000
-                             (fn [reply]
-                               (if (:success reply)
-                                 (do
-                                   (when (= selected-snapshot snapshot-name)
-                                     (set-selected-snapshot "")) ;; Reset view to latest if deleting current
+        handle-delete (fn [snapshot-name]
+                        (set-dropdown-open false)
+                        (when (js/confirm (str "Are you sure you want to delete snapshot '" snapshot-name "'?"))
+                          (sente/request!
+                           [:datasets/delete-snapshot {:module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name}]
+                           10000
+                           (fn [reply]
+                             (if (:success reply)
+                               (do
+                                 (when (= selected-snapshot snapshot-name)
+                                   (set-selected-snapshot "")) ;; Reset view to latest if deleting current
                                  ;; Invalidate snapshot names query to trigger refetch
-                                   (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}]))
-                                 (js/alert (str "Error deleting snapshot: " (:error reply))))))))
+                                 (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}]))
+                               (js/alert (str "Error deleting snapshot: " (:error reply))))))))
 
-          handle-select (fn [snapshot-name]
-                          (set-dropdown-open false)
-                          (set-selected-snapshot snapshot-name))
+        handle-select (fn [snapshot-name]
+                        (set-dropdown-open false)
+                        (set-selected-snapshot snapshot-name))
 
-          current-display-name (if (str/blank? selected-snapshot)
-                                 "Latest (Working Copy)"
-                                 selected-snapshot)]
+        current-display-name (if (str/blank? selected-snapshot)
+                               "Latest (Working Copy)"
+                               selected-snapshot)]
 
     ;; Close dropdown when clicking outside
-      (uix/use-effect
-       (fn []
-         (let [handle-click (fn [e]
-                              (when dropdown-open?
-                                (set-dropdown-open false)))]
-           (.addEventListener js/document "click" handle-click)
-           #(.removeEventListener js/document "click" handle-click)))
-       [dropdown-open?])
+    (uix/use-effect
+     (fn []
+       (let [handle-click (fn [e]
+                            (when dropdown-open?
+                              (set-dropdown-open false)))]
+         (.addEventListener js/document "click" handle-click)
+         #(.removeEventListener js/document "click" handle-click)))
+     [dropdown-open?])
 
-      ($ :div.flex.items-center.space-x-2
-         ($ :div.relative.inline-block.text-left
+    ($ :div.flex.items-center.space-x-2
+       ($ :div.relative.inline-block.text-left
           ;; Main dropdown button
-            ($ :button.inline-flex.items-center.justify-between.w-64.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500.cursor-pointer
-               {:onClick (fn [e]
-                           (.stopPropagation e)
-                           (let [is-opening (not dropdown-open?)]
-                             (set-dropdown-open is-opening)
-                             (when is-opening (refetch))))
-                :disabled loading?}
-               ($ :span.truncate current-display-name)
-               ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
+          ($ :button.inline-flex.items-center.justify-between.w-64.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500.cursor-pointer
+             {:onClick (fn [e]
+                         (.stopPropagation e)
+                         (let [is-opening (not dropdown-open?)]
+                           (set-dropdown-open is-opening)
+                           (when is-opening (refetch))))
+              :disabled loading?}
+             ($ :span.truncate current-display-name)
+             ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
 
           ;; Dropdown menu
-            (when dropdown-open?
-              ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
-                 {:onClick #(.stopPropagation %)}
-                 ($ :div.py-1
+          (when dropdown-open?
+            ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
+               {:onClick #(.stopPropagation %)}
+               ($ :div.py-1
                   ;; Latest option
-                    ($ DropdownRow {:label "Latest (Working Copy)"
-                                    :selected? (str/blank? selected-snapshot)
-                                    :on-select #(handle-select "")
-                                    :delete-button nil})
+                  ($ DropdownRow {:label "Latest (Working Copy)"
+                                  :selected? (str/blank? selected-snapshot)
+                                  :on-select #(handle-select "")
+                                  :delete-button nil})
 
                   ;; Named snapshots
-                    (for [name snapshot-names]
-                      ($ DropdownRow {:key name
-                                      :label name
-                                      :selected? (= selected-snapshot name)
-                                      :on-select #(handle-select name)
-                                      :delete-button ($ :button.text-red-600.hover:text-red-800.p-1.rounded.hover:bg-red-100
-                                                        {:onClick (fn [e]
-                                                                    (.stopPropagation e)
-                                                                    (handle-delete name))
-                                                         :title (str "Delete " name)}
-                                                        ($ TrashIcon {:className "h-3 w-3"}))}))
+                  (for [name snapshot-names]
+                    ($ DropdownRow {:key name
+                                    :label name
+                                    :selected? (= selected-snapshot name)
+                                    :on-select #(handle-select name)
+                                    :delete-button ($ :button.text-red-600.hover:text-red-800.p-1.rounded.hover:bg-red-100
+                                                      {:onClick (fn [e]
+                                                                  (.stopPropagation e)
+                                                                  (handle-delete name))
+                                                       :title (str "Delete " name)}
+                                                      ($ TrashIcon {:className "h-3 w-3"}))}))
 
                   ;; Divider
-                    ($ :div.border-t.border-gray-100.my-1)
+                  ($ :div.border-t.border-gray-100.my-1)
 
                   ;; New snapshot action
-                    ($ DropdownRow {:label "New snapshot"
-                                    :action? true
-                                    :on-select handle-create
-                                    :icon ($ PlusIcon {:className "h-4 w-4"})
-                                    :delete-button nil}))))))))
+                  ($ DropdownRow {:label "New snapshot"
+                                  :action? true
+                                  :on-select handle-create
+                                  :icon ($ PlusIcon {:className "h-4 w-4"})
+                                  :delete-button nil}))))))))
 
-  (defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success is-read-only?]}] ;; Add is-read-only?
-    (let [[open-dropdown set-open-dropdown] (uix/use-state nil)
-          selected-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
-          all-on-page-ids (set (map :id examples))
-          all-selected? (and (seq all-on-page-ids)
-                             (clojure.set/subset? all-on-page-ids selected-ids))]
+(defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success is-read-only?]}] ;; Add is-read-only?
+  (let [[open-dropdown set-open-dropdown] (uix/use-state nil)
+        selected-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
+        all-on-page-ids (set (map :id examples))
+        all-selected? (and (seq all-on-page-ids)
+                           (clojure.set/subset? all-on-page-ids selected-ids))]
 
     ;; Close dropdown when clicking outside
-      (uix/use-effect
-       (fn []
-         (let [handle-click (fn [e]
-                              (when open-dropdown
-                                (set-open-dropdown nil)))]
-           (.addEventListener js/document "click" handle-click)
-           #(.removeEventListener js/document "click" handle-click)))
-       [open-dropdown])
+    (uix/use-effect
+     (fn []
+       (let [handle-click (fn [e]
+                            (when open-dropdown
+                              (set-open-dropdown nil)))]
+         (.addEventListener js/document "click" handle-click)
+         #(.removeEventListener js/document "click" handle-click)))
+     [open-dropdown])
 
-      ($ :div.mt-4.overflow-visible
-         ($ :table.min-w-full.divide-y.divide-gray-200
-            ($ :thead.bg-gray-50
-               ($ :tr
+    ($ :div.mt-4.overflow-visible
+       ($ :table.min-w-full.divide-y.divide-gray-200
+          ($ :thead.bg-gray-50
+             ($ :tr
                 ;; Checkbox column header - entire cell is clickable
-                  ($ :th.px-4.py-3.text-left.cursor-pointer.hover:bg-blue-100
-                     {:onClick #(state/dispatch [:datasets/toggle-all-selection
-                                                 {:dataset-id dataset-id
-                                                  :example-ids-on-page all-on-page-ids
-                                                  :select-all? (not all-selected?)}])}
-                     ($ :input {:type "checkbox"
-                                :checked all-selected?
-                                :readOnly true ; Make it read-only since cell handles the click
-                                :className "pointer-events-none"}))
-                  ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Input")
-                  ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Reference Output")
-                  ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Tags")
-                  ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Actions")))
-            ($ :tbody.bg-white.divide-y.divide-gray-200
-               (for [example examples]
-                 (let [example-id (:id example)
-                       is-open? (= open-dropdown example-id)
-                       is-selected? (contains? selected-ids example-id)]
-                   ($ :tr {:key example-id
-                           :className (str (when is-selected? "bg-blue-50 ")
-                                           "hover:bg-gray-50 cursor-pointer")
-                           :onClick #(state/dispatch [:modal/show :example-viewer
-                                                      {:title "Example Details"
-                                                       :component ($ EditableExampleModal
-                                                                     {:example-id example-id
-                                                                      :module-id module-id
-                                                                      :dataset-id dataset-id
-                                                                      :snapshot-name snapshot-name
-                                                                      :on-delete-success on-delete-success
-                                                                      :is-read-only? is-read-only?})}])} ;; Pass read-only state
+                ($ :th.px-4.py-3.text-left.cursor-pointer.hover:bg-blue-100
+                   {:onClick #(state/dispatch [:datasets/toggle-all-selection
+                                               {:dataset-id dataset-id
+                                                :example-ids-on-page all-on-page-ids
+                                                :select-all? (not all-selected?)}])}
+                   ($ :input {:type "checkbox"
+                              :checked all-selected?
+                              :readOnly true ; Make it read-only since cell handles the click
+                              :className "pointer-events-none"}))
+                ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Input")
+                ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Reference Output")
+                ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Tags")
+                ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Actions")))
+          ($ :tbody.bg-white.divide-y.divide-gray-200
+             (for [example examples]
+               (let [example-id (:id example)
+                     is-open? (= open-dropdown example-id)
+                     is-selected? (contains? selected-ids example-id)]
+                 ($ :tr {:key example-id
+                         :className (str (when is-selected? "bg-blue-50 ")
+                                         "hover:bg-gray-50 cursor-pointer")
+                         :onClick #(state/dispatch [:modal/show :example-viewer
+                                                    {:title "Example Details"
+                                                     :component ($ EditableExampleModal
+                                                                   {:example-id example-id
+                                                                    :module-id module-id
+                                                                    :dataset-id dataset-id
+                                                                    :snapshot-name snapshot-name
+                                                                    :on-delete-success on-delete-success
+                                                                    :is-read-only? is-read-only?})}])} ;; Pass read-only state
                     ;; Checkbox column - entire cell is clickable
-                      ($ :td.px-4.py-4.cursor-pointer.hover:bg-blue-100
-                         {:onClick (fn [e]
-                                     (.stopPropagation e) ; Prevent row click
-                                     (state/dispatch [:datasets/toggle-selection
-                                                      {:dataset-id dataset-id
-                                                       :example-id example-id}]))}
-                         ($ :input {:type "checkbox"
-                                    :checked is-selected?
-                                    :readOnly true ; Make it read-only since cell handles the click
-                                    :className "pointer-events-none"}))
+                    ($ :td.px-4.py-4.cursor-pointer.hover:bg-blue-100
+                       {:onClick (fn [e]
+                                   (.stopPropagation e) ; Prevent row click
+                                   (state/dispatch [:datasets/toggle-selection
+                                                    {:dataset-id dataset-id
+                                                     :example-id example-id}]))}
+                       ($ :input {:type "checkbox"
+                                  :checked is-selected?
+                                  :readOnly true ; Make it read-only since cell handles the click
+                                  :className "pointer-events-none"}))
                     ;; Input column
-                      ($ :td.px-6.py-4.text-sm.font-mono.max-w-xs
-                         (let [input-str (if (string? (:input example))
-                                           (:input example)
-                                           (js/JSON.stringify (clj->js (:input example)) nil 2))]
-                           ($ :div.truncate.cursor-help {:title input-str} input-str)))
+                    ($ :td.px-6.py-4.text-sm.font-mono.max-w-xs
+                       (let [input-str (if (string? (:input example))
+                                         (:input example)
+                                         (js/JSON.stringify (clj->js (:input example)) nil 2))]
+                         ($ :div.truncate.cursor-help {:title input-str} input-str)))
                     ;; Reference Output column
-                      ($ :td.px-6.py-4.text-sm.font-mono.max-w-xs
-                         (let [output-str (if (string? (:reference-output example))
-                                            (:reference-output example)
-                                            (js/JSON.stringify (clj->js (:reference-output example)) nil 2))]
-                           (if output-str
-                             ($ :div.truncate.cursor-help {:title output-str} output-str)
-                             ($ :span "—"))))
+                    ($ :td.px-6.py-4.text-sm.font-mono.max-w-xs
+                       (let [output-str (if (string? (:reference-output example))
+                                          (:reference-output example)
+                                          (js/JSON.stringify (clj->js (:reference-output example)) nil 2))]
+                         (if output-str
+                           ($ :div.truncate.cursor-help {:title output-str} output-str)
+                           ($ :span "—"))))
                     ;; Tags column
-                      ($ :td.px-6.py-4.whitespace-nowrap.text-sm.text-gray-500
-                         (let [tags (:tags example)]
-                           (if (and tags (seq tags))
-                             (->> tags
-                                  (map name) ; Convert keywords to strings
-                                  (sort) ; Sort alphabetically
-                                  (clojure.string/join ", ")) ; Join with commas
-                             ($ :span.italic "no tags"))))
+                    ($ :td.px-6.py-4.whitespace-nowrap.text-sm.text-gray-500
+                       (let [tags (:tags example)]
+                         (if (and tags (seq tags))
+                           (->> tags
+                                (map name) ; Convert keywords to strings
+                                (sort) ; Sort alphabetically
+                                (clojure.string/join ", ")) ; Join with commas
+                           ($ :span.italic "no tags"))))
                     ;; Actions column
-                      ($ :td.px-6.py-4.whitespace-nowrap.text-right.text-sm.font-medium
+                    ($ :td.px-6.py-4.whitespace-nowrap.text-right.text-sm.font-medium
                        ;; Conditionally render actions
-                         (if is-read-only?
-                           ($ :div.flex.justify-center.items-center
-                              ($ :div {:className "h-5 w-5 text-gray-400" :title "This snapshot is read-only"} "Read only"))
-                           ($ :div.relative.inline-block.text-left
+                       (if is-read-only?
+                         ($ :div.flex.justify-center.items-center
+                            ($ :div {:className "h-5 w-5 text-gray-400" :title "This snapshot is read-only"} "Read only"))
+                         ($ :div.relative.inline-block.text-left
                             ;; Three dots button - prevent row click when clicking
-                              ($ :button.inline-flex.items-center.justify-center.w-8.h-8.rounded-full.text-gray-400.hover:text-gray-600.hover:bg-gray-100.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500.cursor-pointer
-                                 {:onClick (fn [e]
-                                             (.stopPropagation e) ; Prevent row click
-                                             (set-open-dropdown (if is-open? nil example-id)))}
-                                 ($ EllipsisVerticalIcon {:className "h-5 w-5"}))
+                            ($ :button.inline-flex.items-center.justify-center.w-8.h-8.rounded-full.text-gray-400.hover:text-gray-600.hover:bg-gray-100.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500.cursor-pointer
+                               {:onClick (fn [e]
+                                           (.stopPropagation e) ; Prevent row click
+                                           (set-open-dropdown (if is-open? nil example-id)))}
+                               ($ EllipsisVerticalIcon {:className "h-5 w-5"}))
 
                             ;; Dropdown menu
-                              (when is-open?
-                                ($ :div.origin-top-right.absolute.right-0.mt-2.w-48.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
-                                   {:onClick #(.stopPropagation %)}
-                                   ($ :div.py-1
+                            (when is-open?
+                              ($ :div.origin-top-right.absolute.right-0.mt-2.w-48.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
+                                 {:onClick #(.stopPropagation %)}
+                                 ($ :div.py-1
                                     ;; Try with evaluator button
-                                      ($ :button
-                                         {:className "group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
-                                          :onClick (fn [e]
-                                                     (.stopPropagation e)
-                                                     (set-open-dropdown nil) ; Close dropdown
+                                    ($ :button
+                                       {:className "group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
+                                        :onClick (fn [e]
+                                                   (.stopPropagation e)
+                                                   (set-open-dropdown nil) ; Close dropdown
                                                    ;; Show the Try Evaluator modal
-                                                     (state/dispatch [:modal/show :try-evaluator
-                                                                      {:title "Try with Evaluator"
-                                                                       :component ($ TryEvaluatorModal {:module-id module-id :example example})}]))}
-                                         ($ PlayIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
-                                         "Try with evaluator")
+                                                   (state/dispatch [:modal/show :try-evaluator
+                                                                    {:title "Try with Evaluator"
+                                                                     :component ($ TryEvaluatorModal {:module-id module-id :example example})}]))}
+                                       ($ PlayIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
+                                       "Try with evaluator")
                                     ;; Delete button
-                                      ($ :button
-                                         {:className "group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-red-100 hover:text-red-800 cursor-pointer"
-                                          :onClick (fn [e]
-                                                     (.stopPropagation e)
-                                                     (set-open-dropdown nil) ; Close dropdown
-                                                     (when (js/confirm "Are you sure you want to delete this example?")
-                                                       (sente/request!
-                                                        [:datasets/delete-example
-                                                         {:module-id module-id
-                                                          :dataset-id dataset-id
-                                                          :snapshot-name snapshot-name
-                                                          :example-id example-id}]
-                                                        10000
-                                                        (fn [reply]
-                                                          (if (:success reply)
-                                                            (do
-                                                              (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                                                              (when on-delete-success (on-delete-success)))
-                                                            (js/alert (str "Error deleting example: " (:error reply))))))))}
-                                         ($ TrashIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-red-500"})
-                                         "Delete")))))))))))))))
+                                    ($ :button
+                                       {:className "group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-red-100 hover:text-red-800 cursor-pointer"
+                                        :onClick (fn [e]
+                                                   (.stopPropagation e)
+                                                   (set-open-dropdown nil) ; Close dropdown
+                                                   (when (js/confirm "Are you sure you want to delete this example?")
+                                                     (sente/request!
+                                                      [:datasets/delete-example
+                                                       {:module-id module-id
+                                                        :dataset-id dataset-id
+                                                        :snapshot-name snapshot-name
+                                                        :example-id example-id}]
+                                                      10000
+                                                      (fn [reply]
+                                                        (if (:success reply)
+                                                          (do
+                                                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                                            (when on-delete-success (on-delete-success)))
+                                                          (js/alert (str "Error deleting example: " (:error reply))))))))}
+                                       ($ TrashIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-red-500"})
+                                       "Delete")))))))))))))))
 
-  (defn get-dataset-path [module-id dataset-id]
-    (rfe/href :module/dataset-detail
-              {:module-id (common/url-encode module-id)
-               :dataset-id dataset-id}))
+(defn get-dataset-path [module-id dataset-id]
+  (rfe/href :module/dataset-detail
+            {:module-id (common/url-encode module-id)
+             :dataset-id dataset-id}))
 
-  (defn show-edit-dataset-modal! [module-id dataset-id initial-name initial-description]
-    (state/dispatch [:form/init :edit-dataset
-                     (-> edit-dataset-form-spec
-                         (assoc :submit-event [:dataset/edit {:module-id module-id
-                                                              :dataset-id dataset-id
-                                                              :initial-name initial-name
-                                                              :initial-description initial-description}]))])
-    (state/dispatch [:modal/show :edit-dataset
-                     {:title "Edit Dataset"
-                      :form-id :edit-dataset
-                      :submit-text "Save Changes"
-                      :component ($ EditDatasetForm {:form-id :edit-dataset
-                                                     :initial-name initial-name
-                                                     :initial-description initial-description})}]))
+(defn show-edit-dataset-modal! [module-id dataset-id initial-name initial-description]
+  (state/dispatch [:form/init :edit-dataset
+                   (-> edit-dataset-form-spec
+                       (assoc :submit-event [:dataset/edit {:module-id module-id
+                                                            :dataset-id dataset-id
+                                                            :initial-name initial-name
+                                                            :initial-description initial-description}]))])
+  (state/dispatch [:modal/show :edit-dataset
+                   {:title "Edit Dataset"
+                    :form-id :edit-dataset
+                    :submit-text "Save Changes"
+                    :component ($ EditDatasetForm {:form-id :edit-dataset
+                                                   :initial-name initial-name
+                                                   :initial-description initial-description})}]))
 
 ;; =============================================================================
 ;; MAIN DATASETS INDEX PAGE
 ;; =============================================================================
 
-  (defui datasets-index []
-    (let [{:keys [module-id]} (state/use-sub [:route :path-params])
-          decoded-module-id (when module-id (common/url-decode module-id))
+(defui datasets-index []
+  (let [{:keys [module-id]} (state/use-sub [:route :path-params])
+        decoded-module-id (when module-id (common/url-decode module-id))
 
-          {:keys [data loading? error]}
-          (queries/use-sente-query
-           {:query-key [:datasets decoded-module-id]
-            :sente-event [:datasets/get-all {:module-id decoded-module-id
-                                             :pagination nil}]
-            :enabled? (boolean decoded-module-id)})
+        {:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:datasets decoded-module-id]
+          :sente-event [:datasets/get-all {:module-id decoded-module-id
+                                           :pagination nil}]
+          :enabled? (boolean decoded-module-id)})
 
-          datasets (:datasets data)]
+        datasets (:datasets data)]
 
-      ($ :div.h-full.flex.flex-col
+    ($ :div.h-full.flex.flex-col
        ;; Header
-         ($ :div.bg-white.shadow.sm:rounded-lg.mb-6
-            ($ :div.px-4.py-5.sm:p-6
-               ($ :div.flex.items-center.justify-between
-                  ($ :div
-                     ($ :h1.text-2xl.font-bold.text-gray-900 "Datasets")
-                     ($ :p.mt-1.text-sm.text-gray-600 "Manage your training and evaluation datasets"))
-                  ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.text-sm.font-medium.rounded-md.shadow-sm.text-white.bg-indigo-600.hover:bg-indigo-700.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500.cursor-pointer
-                     {:onClick #(show-create-dataset-modal! decoded-module-id)}
-                     ($ PlusIcon {:className "h-4 w-4 mr-2"})
-                     "Create Dataset"))))
+       ($ :div.bg-white.shadow.sm:rounded-lg.mb-6
+          ($ :div.px-4.py-5.sm:p-6
+             ($ :div.flex.items-center.justify-between
+                ($ :div
+                   ($ :h1.text-2xl.font-bold.text-gray-900 "Datasets")
+                   ($ :p.mt-1.text-sm.text-gray-600 "Manage your training and evaluation datasets"))
+                ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.text-sm.font-medium.rounded-md.shadow-sm.text-white.bg-indigo-600.hover:bg-indigo-700.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500.cursor-pointer
+                   {:onClick #(show-create-dataset-modal! decoded-module-id)}
+                   ($ PlusIcon {:className "h-4 w-4 mr-2"})
+                   "Create Dataset"))))
 
        ;; Content
-         ($ :div.flex-1.overflow-hidden
-            (cond
-              loading? ($ :div.flex.items-center.justify-center.h-full
-                          ($ :div "Loading datasets..."))
-              error ($ :div.flex.items-center.justify-center.h-full
-                       ($ :div.text-red-500 "Error loading datasets"))
-              (empty? datasets) ($ :div.flex.items-center.justify-center.h-full
-                                   ($ :div.text-center.text-gray-500
-                                      ($ CircleStackIcon {:className "mx-auto h-12 w-12 text-gray-400"})
-                                      ($ :h3.mt-2.text-sm.font-medium.text-gray-900 "No datasets")
-                                      ($ :p.mt-1.text-sm.text-gray-500 "Get started by creating a new dataset.")
-                                      ($ :div.mt-6
-                                         ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.shadow-sm.text-sm.font-medium.rounded-md.text-white.bg-indigo-600.hover:bg-indigo-700.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500.cursor-pointer
-                                            {:onClick #(show-create-dataset-modal! decoded-module-id)}
-                                            ($ PlusIcon {:className "h-4 w-4 mr-2"})
-                                            "Create Dataset"))))
-              :else ($ :div.bg-white.shadow.overflow-hidden.sm:rounded-md
-                       ($ :ul.divide-y.divide-gray-200
-                          (for [dataset datasets]
-                            ($ :li {:key (:id dataset)}
-                               ($ :a.block.hover:bg-gray-50.cursor-pointer
-                                  {:href (get-dataset-path decoded-module-id (:id dataset))}
-                                  ($ :div.px-4.py-4.sm:px-6
-                                     ($ :div.flex.items-center.justify-between
-                                        ($ :div.flex-1.min-w-0
-                                           ($ :p.text-sm.font-medium.text-indigo-600.truncate (:name dataset))
-                                           (when (:description dataset)
-                                             ($ :p.mt-1.text-sm.text-gray-500.truncate (:description dataset))))
-                                        ($ :div.ml-2.flex-shrink-0.flex
-                                           ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-gray-700.cursor-pointer
-                                              {:onClick (fn [e]
-                                                          (.preventDefault e)
-                                                          (.stopPropagation e)
-                                                          (show-edit-dataset-modal! decoded-module-id (:id dataset) (:name dataset) (:description dataset)))}
-                                              ($ PencilIcon {:className "h-4 w-4 mr-1"})
-                                              "Edit")))))))))))))))
+       ($ :div.flex-1.overflow-hidden
+          (cond
+            loading? ($ :div.flex.items-center.justify-center.h-full
+                        ($ :div "Loading datasets..."))
+            error ($ :div.flex.items-center.justify-center.h-full
+                     ($ :div.text-red-500 "Error loading datasets"))
+            (empty? datasets) ($ :div.flex.items-center.justify-center.h-full
+                                 ($ :div.text-center.text-gray-500
+                                    ($ CircleStackIcon {:className "mx-auto h-12 w-12 text-gray-400"})
+                                    ($ :h3.mt-2.text-sm.font-medium.text-gray-900 "No datasets")
+                                    ($ :p.mt-1.text-sm.text-gray-500 "Get started by creating a new dataset.")
+                                    ($ :div.mt-6
+                                       ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.shadow-sm.text-sm.font-medium.rounded-md.text-white.bg-indigo-600.hover:bg-indigo-700.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500.cursor-pointer
+                                          {:onClick #(show-create-dataset-modal! decoded-module-id)}
+                                          ($ PlusIcon {:className "h-4 w-4 mr-2"})
+                                          "Create Dataset"))))
+            :else ($ :div.bg-white.shadow.overflow-hidden.sm:rounded-md
+                     ($ :ul.divide-y.divide-gray-200
+                        (for [dataset datasets]
+                          ($ :li {:key (:id dataset)}
+                             ($ :a.block.hover:bg-gray-50.cursor-pointer
+                                {:href (get-dataset-path decoded-module-id (:id dataset))}
+                                ($ :div.px-4.py-4.sm:px-6
+                                   ($ :div.flex.items-center.justify-between
+                                      ($ :div.flex-1.min-w-0
+                                         ($ :p.text-sm.font-medium.text-indigo-600.truncate (:name dataset))
+                                         (when (:description dataset)
+                                           ($ :p.mt-1.text-sm.text-gray-500.truncate (:description dataset))))
+                                      ($ :div.ml-2.flex-shrink-0.flex
+                                         ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-gray-700.cursor-pointer
+                                            {:onClick (fn [e]
+                                                        (.preventDefault e)
+                                                        (.stopPropagation e)
+                                                        (show-edit-dataset-modal! decoded-module-id (:id dataset) (:name dataset) (:description dataset)))}
+                                            ($ PencilIcon {:className "h-4 w-4 mr-1"})
+                                            "Edit"))))))))))))))
 
 ;; =============================================================================
 ;; PRETTY PRINT UTILITY
@@ -1133,7 +1133,7 @@
 
         examples (get examples-response :examples)]
 
-        ;; --- END OF FIX ---
+    ;; --- END OF FIX ---
 
     ;; Clear selections when dataset changes
     (uix/use-effect
