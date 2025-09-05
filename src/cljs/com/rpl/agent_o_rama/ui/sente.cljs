@@ -25,9 +25,7 @@
 ;; 3. Define the Sente event router for the client
 (defmulti -event-msg-handler :id)
 
-(defn event-msg-handler [ev-msg]
-  (println "RECEIVED SENTE EVENT:" ev-msg)
-  (-event-msg-handler ev-msg))
+(defn event-msg-handler [ev-msg] (-event-msg-handler ev-msg))
 
 (defmethod -event-msg-handler :default [{:as ev-msg :keys [id ?data]}]
   (.log js/console (str "Unhandled Sente event: " id) ?data))
@@ -72,7 +70,10 @@
    (request! event-vec timeout-ms nil))
   ([event-vec timeout-ms callback]
    (println "SENDING SENTE EVENT:" event-vec timeout-ms callback)
-   (chsk-send! event-vec timeout-ms callback)))
+   (chsk-send! event-vec timeout-ms
+    (fn [reply]
+      (println "SENTE EVENT REPLY:" reply)
+      (callback reply)))))
 
 (defn push!
   "Send a one-way message to the server (no response expected)."
