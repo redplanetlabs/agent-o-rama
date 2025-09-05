@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "shadow-cljs": "3.0.5"
   },
   "dependencies": {

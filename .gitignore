@@ -36,3 +36,7 @@ CLAUDE.md
 
 # clojure-mcp
 .clojure-mcp/code_index.txt
+
+# playwright
+test-results/
+playwright-report/
