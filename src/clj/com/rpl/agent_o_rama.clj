@@ -7,6 +7,7 @@
    [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
+   [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.multi-agg :as ma]
@@ -182,6 +183,7 @@
        (when @defined?-vol
          (throw (h/ex-info "Agents topology already defined" {})))
        (vreset! defined?-vol true)
+       (exp/define-experiments-agent! this)
        (i/define-agents!
         setup
         topologies
@@ -574,7 +576,8 @@
               agent-depot
               (aor-types/->AgentInitiate
                (vec args)
-               (h/current-time-millis)))
+               (h/current-time-millis)
+               nil))
              (h/cf-function [{[agent-task-id agent-id]
                               aor-types/AGENTS-TOPOLOGY-NAME}]
                (aor-types/->AgentInvokeImpl agent-task-id agent-id)

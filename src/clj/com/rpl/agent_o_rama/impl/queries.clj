@@ -832,7 +832,7 @@
             (fetch-remote-examples *remote-params *query-path :> *examples)
            (else>)
             (local-select> *query-path datasets-pstate-sym :> *examples))
-          (mapv *chunk *examples :> *pairs)
+          (mapv vector *chunk *examples :> *pairs)
           (continue> (into *m *pairs) (next *chunks))
         ))
       (assoc *experiment-props

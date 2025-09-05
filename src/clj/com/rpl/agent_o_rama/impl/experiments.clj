@@ -5,8 +5,10 @@
    [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.clojure :as c]
+   [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.store :as store]
    [com.rpl.rama.aggs :as aggs]
@@ -35,7 +37,9 @@
 
 (defn get-evaluator-builders
   [agent-node]
-  (.getEvaluatorBuilders ^AgentDeclaredObjectsTaskGlobal (anode/get-declared-objects agent-node)))
+  (merge
+   evals/BUILT-IN
+   (.getEvaluatorBuilders ^AgentDeclaredObjectsTaskGlobal (anode/get-declared-objects agent-node))))
 
 (defn get-evaluator
   [agent-node name builder-name params]
@@ -123,7 +127,7 @@
       (nil? info)
       {:problem "Could not find associated builder" :builder-name builder-name}
 
-      (not (contains? (valid-evaluator-types spec)) (:type info))
+      (not (contains? (valid-evaluator-types spec) (:type info)))
       {:problem         "Evaluator type does not match experiment"
        :experiment-type (class spec)
        :evaluator-type  (:type info)})))
@@ -357,7 +361,7 @@
      ))
     (c/agg-start-node
      "root"
-     "initiate"
+     "invoke"
      (fn [agent-node
           {:keys [dataset-id snapshot selector concurrency num-repetitions]
            :as   experiment}
@@ -488,6 +492,8 @@
                  (doseq [[eval-name eval-fn] evaluators
                          :when (and (not (contains? curr-evals eval-name))
                                     (not (contains? eval-failures eval-name)))]
+                   ;; TODO: <<<<>>>> this isn't using json paths to convert
+                   ;; input/reference-output/output
                    (evaluate! local-ds
                               dataset-id
                               eval-name
@@ -528,6 +534,8 @@
                (doseq [[eval-name eval-fn] evaluators
                        :when (and (not (contains? curr-evals eval-name))
                                   (not (contains? curr-failures eval-name)))]
+                 ;; TODO: <<<<>>>> this isn't using json paths to convert
+                 ;; input/reference-output/output
                  (evaluate! local-ds
                             dataset-id
                             eval-name
@@ -549,26 +557,32 @@
   [*data]
   (<<with-substitutions
    [$$datasets (po/datasets-task-global)
-    *agent-depot (po/agent-depot-task-global)]
+    *agent-depot (po/agent-depot-task-global EXPERIMENTER-NAME)
+    $$id-gen (po/agent-id-gen-task-global EXPERIMENTER-NAME)]
    (<<subsource *data
     (case> StartExperiment :> {:keys [*id *dataset-id]})
      (|hash *dataset-id)
      (h/current-time-millis :> *start-time-millis)
-     (aor-types/->valid-AgentInitiate [*data] *start-time-millis :> *initiate)
      (local-transform>
-      [(keypath *dataset-id) :experiments *id :start-time-millis (termval *start-time-millis)]
+      [(keypath *dataset-id :experiments *id)
+       (multi-path [:start-time-millis (termval *start-time-millis)]
+                   [:experiment-info *data])]
       $$datasets)
-     (|direct (ops/current-task-id))
+     (ops/current-task-id :> *task-id)
+     (|direct *task-id)
+     ;; have to do it this way since cannot do :ack on the depot append since it's running as part
+     ;; of the same stream topology
+     (at/gen-id $$id-gen :> *agent-invoke-id)
+     (aor-types/->valid-AgentInitiate [*data] *start-time-millis *agent-invoke-id :> *initiate)
      (depot-partition-append!
       *agent-depot
       *initiate
-      :ack
-      :> *ack-return)
-     (get *ack-return aor-types/AGENTS-TOPOLOGY-NAME :> [*agent-task-id *agent-id])
-     (aor-types/->AgentInvokeImpl *agent-task-id *agent-id :> *agent-invoke)
+      :append-ack)
+     (aor-types/->AgentInvokeImpl *task-id *agent-invoke-id :> *agent-invoke)
      (local-transform>
-      [(keypath *dataset-id) :experiments *id :experiment-invoke (termval *agent-invoke)]
+      [(keypath *dataset-id :experiments *id :experiment-invoke) (termval *agent-invoke)]
       $$datasets)
+     (ack-return> *agent-invoke)
 
     (case> UpdateExperimentName :> {:keys [*id *dataset-id *name]})
      (|hash *dataset-id)
