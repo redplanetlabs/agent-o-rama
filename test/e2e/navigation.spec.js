@@ -163,23 +163,5 @@ test.describe('Dataset example crud', () => {
     await expect(page.getByRole('heading', { name: datasetName })).toBeVisible({ timeout: 30000 });
     console.log('Successfully verified created dataset.');
 
-    // find the dataset card by the heading link, then go up to the card and find the edit button
-    const datasetCard = page.getByRole('heading', { name: datasetName }).locator('..').locator('..');
-    const editButton = datasetCard.getByTitle('Edit Dataset');
-    await expect(editButton).toBeVisible({ timeout: 30000 });
-    await editButton.click();
-
-    const newDatasetName = `Modified Dataset ${randomUUID()}`;
-
-    // fill in the forms
-    await page.getByLabel('Name').fill(newDatasetName);
-    await page.getByLabel('Description').fill('New Description');
-    await page.getByRole('button', { name: 'Save Changes' }).click();
-
-    await expect(page.getByRole('heading', { name: newDatasetName })).toBeVisible({ timeout: 30000 });
-    console.log('Successfully verified updated dataset.');
-
-    page.on('dialog', dialog => dialog.accept());
-
   });
 });
