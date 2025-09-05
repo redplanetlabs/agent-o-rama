@@ -112,8 +112,7 @@
         (queries/use-sente-query
          {:query-key [:module-agents module-id]
           :sente-event [:agents/get-for-module {:module-id module-id}]
-          :enabled? (boolean module-id)
-          :refetch-interval-ms 5000})]
+          :enabled? (boolean module-id)})]
     ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2
        (when-not collapsed?
          ($ :div.px-3.text-xs.font-semibold.text-gray-500 "MODULE"))
