@@ -26,6 +26,7 @@
 (defmulti -event-msg-handler :id)
 
 (defn event-msg-handler [ev-msg]
+  (println "RECEIVED SENTE EVENT:" ev-msg)
   (-event-msg-handler ev-msg))
 
 (defmethod -event-msg-handler :default [{:as ev-msg :keys [id ?data]}]
@@ -70,6 +71,7 @@
   ([event-vec timeout-ms]
    (request! event-vec timeout-ms nil))
   ([event-vec timeout-ms callback]
+   (println "SENDING SENTE EVENT:" event-vec timeout-ms callback)
    (chsk-send! event-vec timeout-ms callback)))
 
 (defn push!
