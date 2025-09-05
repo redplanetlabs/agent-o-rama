@@ -200,6 +200,7 @@ test.describe('Dataset example crud', () => {
     page.on('dialog', dialog => dialog.accept());
 
     // Edit the example
+    // TODO test edit from the ... menu, not just the dialog box menu
     await page.getByRole('button', { name: 'Edit' }).first().click();
     const exampleId2 = randomUUID();
     const updatedInput = { message: 'updated-from-e2e', id: exampleId2 };
@@ -230,9 +231,6 @@ test.describe('Dataset example crud', () => {
 
     // Delete the example
     await page.getByRole('button', { name: 'Delete' }).click();
-
-    // Close the viewer if still open
-    await page.keyboard.press('Escape');
 
     // Verify the example is gone from the table
     await expect(page.locator('table tbody tr').filter({ hasText: exampleId2 })).not.toBeVisible({ timeout: 30000 });
