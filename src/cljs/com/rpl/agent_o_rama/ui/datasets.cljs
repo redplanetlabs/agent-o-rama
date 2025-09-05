@@ -799,7 +799,9 @@
           ($ :button.inline-flex.items-center.justify-between.w-64.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500.cursor-pointer
              {:onClick (fn [e]
                          (.stopPropagation e)
-                         (set-dropdown-open (not dropdown-open?)))
+                         (let [is-opening (not dropdown-open?)]
+                           (set-dropdown-open is-opening)
+                           (when is-opening (refetch))))
               :disabled loading?}
              ($ :span.truncate current-display-name)
              ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))

@@ -11,8 +11,9 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-all
   [{:keys [manager pagination]} uid]
+  ;; TODO search will use different query
   (let [datasets-page-query (:datasets-page-query (aor-types/underlying-objects manager))]
-    (foreign-invoke-query datasets-page-query 100 pagination)))
+    (foreign-invoke-query datasets-page-query 1000 pagination)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-props
   [{:keys [manager dataset-id]} uid]
@@ -25,7 +26,7 @@
                                         {:description (when-not (str/blank? description) description)
                                          :input-json-schema (when-not (str/blank? input-schema) input-schema)
                                          :output-json-schema (when-not (str/blank? output-schema) output-schema)})]
-    {:status :ok, :dataset-id dataset-id}))
+    {:status :ok :dataset-id dataset-id}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/set-name
   [{:keys [manager dataset-id name]} uid]
@@ -77,6 +78,11 @@
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/create-snapshot
   [{:keys [manager dataset-id from-snapshot-name to-snapshot-name]} uid]
   (let [from-name (when-not (str/blank? from-snapshot-name) from-snapshot-name)]
+    (def manager manager)
+    (def dataset-id dataset-id)
+    (def from-snapshot-name from-snapshot-name)
+    (def from-name from-name)
+    (def to-snapshot-name to-snapshot-name)
     (aor/snapshot-dataset! manager dataset-id from-name to-snapshot-name)
     {:status :ok}))
 
