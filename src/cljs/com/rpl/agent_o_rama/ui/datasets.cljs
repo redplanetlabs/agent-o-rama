@@ -520,7 +520,7 @@
           :sente-event [:datasets/get-example {:module-id module-id
                                                :dataset-id dataset-id
                                                :snapshot-name snapshot-name
-                                               :example-id (str example-id)}]
+                                               :example-id example-id}]
           :enabled? (boolean (and module-id dataset-id example-id))})
 
         ;; Extract the example directly from the response

@@ -141,16 +141,13 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-example
   [{:keys [manager dataset-id snapshot-name example-id]} uid]
-  (let [{:keys [search-examples-query]} (aor-types/underlying-objects manager)]
-    ;; Use the search query with a filter for the specific example ID
-    ;; This will return a single example in the results
-    (let [result (foreign-invoke-query search-examples-query
-                                       dataset-id
-                                       (when-not (str/blank? snapshot-name) snapshot-name)
-                                       {:example-id example-id} ; Filter by example ID
-                                       1 ; Limit to 1 result
-                                       nil)] ; No pagination
-      ;; Extract the first (and only) example from the results
-      (if-let [example (first (:examples result))]
+  (let [{:keys [multi-examples-query]} (aor-types/underlying-objects manager)]
+    ;; Fetch by exact ID to avoid search filtering and ordering issues
+    (let [examples-map (foreign-invoke-query multi-examples-query
+                                             dataset-id
+                                             (when-not (str/blank? snapshot-name) snapshot-name)
+                                             [example-id])
+          example      (get examples-map example-id)]
+      (if example
         {:status :ok :example example}
         {:status :error :error "Example not found"}))))
