@@ -244,3 +244,81 @@ test.describe('Dataset example crud', () => {
     console.log('Successfully cleaned up dataset.');
   });
 });
+
+test.describe('Dataset snapshot dropdown', () => {
+
+  test('create/select/delete snapshot via dropdown', async ({ page }) => {
+    await page.goto('/');
+
+    await expect(page).toHaveTitle(/Agent-o-rama/);
+
+    const agentName = 'com.rpl.agent.research-agent/ResearchAgentModule:researcher';
+    const agentLink = page.getByText(agentName);
+    await expect(agentLink).toBeVisible({ timeout: 30000 });
+    await agentLink.click();
+
+    await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule.*/i);
+
+    const datasetsLink = page.getByText('Datasets & Experiments');
+    await expect(datasetsLink).toBeVisible({ timeout: 30000 });
+    await datasetsLink.click();
+
+    await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule\/datasets.*/i);
+
+    const newDatasetButton = page.getByText('New Dataset');
+    await expect(newDatasetButton).toBeVisible({ timeout: 30000 });
+    await newDatasetButton.click();
+
+    const datasetName = `Snapshot Test Dataset ${randomUUID()}`;
+    await page.getByLabel('Name').fill(datasetName);
+    await page.getByLabel('Description').fill('Snapshot dropdown e2e');
+    await page.getByLabel('Input JSON Schema').fill('{}');
+    await page.getByLabel('Output JSON Schema').fill('{}');
+    await page.getByRole('button', { name: 'Create Dataset' }).click();
+
+    await expect(page.getByRole('heading', { name: datasetName })).toBeVisible({ timeout: 30000 });
+
+    await page.getByRole('link', { name: datasetName }).first().click();
+
+    // Ensure Examples tab controls are visible and snapshot dropdown shows Latest
+    await expect(page.getByText('Snapshot:')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole('button', { name: 'Latest (Working Copy)' }).first()).toBeVisible({ timeout: 30000 });
+
+    // Open dropdown and create new snapshot
+    const snapshotButton = page.getByRole('button', { name: 'Latest (Working Copy)' }).first();
+    await snapshotButton.click();
+    await page.getByText('New snapshot').click();
+
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible({ timeout: 10000 });
+
+    const snapshotName = `snap-${randomUUID()}`;
+    await modal.getByLabel('New Snapshot Name').fill(snapshotName);
+    await modal.getByRole('button', { name: 'Create Snapshot' }).click();
+
+    // Re-open dropdown and select the newly created snapshot
+    await snapshotButton.click();
+    await expect(page.getByText(snapshotName)).toBeVisible({ timeout: 30000 });
+    await page.getByText(snapshotName).click();
+
+    // Verify the button now shows the selected snapshot
+    await expect(page.getByRole('button', { name: snapshotName })).toBeVisible({ timeout: 30000 });
+
+    // Delete the snapshot via dropdown delete control
+    page.on('dialog', dialog => dialog.accept());
+    const selectedSnapshotButton = page.getByRole('button', { name: snapshotName }).first();
+    await selectedSnapshotButton.click();
+    await expect(page.getByTitle(`Delete ${snapshotName}`)).toBeVisible({ timeout: 30000 });
+    await page.getByTitle(`Delete ${snapshotName}`).click();
+
+    // After deletion, the dropdown should return to Latest (Working Copy)
+    await expect(page.getByRole('button', { name: 'Latest (Working Copy)' }).first()).toBeVisible({ timeout: 30000 });
+
+    // Cleanup: go back and delete dataset
+    await page.goBack();
+    const deleteButton = page.getByRole('heading', { name: datasetName }).locator('..').locator('..').getByTitle('Delete Dataset');
+    await expect(deleteButton).toBeVisible({ timeout: 30000 });
+    await deleteButton.click();
+    await expect(page.getByRole('heading', { name: datasetName })).not.toBeVisible({ timeout: 30000 });
+  });
+});
