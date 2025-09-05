@@ -513,11 +513,95 @@
           ($ TrashIcon {:className delete-icon-classes})
           "Delete"))))
 
-(defui EditableExampleModal [{:keys [example-id module-id dataset-id snapshot-name on-delete-success]}]
-  (let [;; Local state to manage the mode: :view or :edit
-        [mode set-mode!] (uix/use-state :view)
+(defui EditableField [{:keys [label value field-key example-id module-id dataset-id snapshot-name on-save current-example]}]
+  (let [[editing? set-editing!] (uix/use-state false)
+        [edit-value set-edit-value!] (uix/use-state "")
+        [saving? set-saving!] (uix/use-state false)
+        [error set-error!] (uix/use-state nil)
 
-        ;; Fetch the specific example data
+        handle-edit-click (fn []
+                            (set-edit-value! (pretty-print-json value))
+                            (set-editing! true)
+                            (set-error! nil))
+
+        handle-cancel-click (fn []
+                              (set-editing! false)
+                              (set-edit-value! "")
+                              (set-error! nil))
+
+        handle-save-click (fn [current-example]
+                            (set-saving! true)
+                            (set-error! nil)
+                            (try
+                              (let [parsed-value (if (str/blank? edit-value)
+                                                   nil
+                                                   (js/JSON.parse edit-value))
+                                    ;; Create updated example with the new field value
+                                    updated-example (assoc current-example field-key (js->clj parsed-value :keywordize-keys true))]
+                                (sente/request!
+                                 [:datasets/update-example
+                                  {:module-id module-id
+                                   :dataset-id dataset-id
+                                   :snapshot-name snapshot-name
+                                   :example-id example-id
+                                   :input (:input updated-example)
+                                   :reference-output (:reference-output updated-example)}]
+                                 10000
+                                 (fn [reply]
+                                   (set-saving! false)
+                                   (if (:success reply)
+                                     (do
+                                       (set-editing! false)
+                                       (set-edit-value! "")
+                                       (when on-save (on-save)))
+                                     (set-error! (str "Error saving: " (:error reply)))))))
+                              (catch js/Error e
+                                (set-saving! false)
+                                (set-error! (str "Invalid JSON: " (.-message e))))))]
+
+    ($ :div
+       ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 label)
+       (if editing?
+         ;; Edit mode
+         ($ :div.space-y-2
+            ($ :textarea
+               {:className "w-full p-3 border border-gray-300 rounded-md font-mono text-sm"
+                :rows 8
+                :value edit-value
+                :onChange #(set-edit-value! (.. % -target -value))
+                :disabled saving?})
+            (when error
+              ($ :div.text-sm.text-red-600 error))
+            ($ :div.flex.items-center.space-x-2
+               ($ :button
+                  {:className "inline-flex items-center px-3 py-1 text-sm text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                   :onClick #(handle-save-click current-example)
+                   :disabled saving?}
+                  (when saving?
+                    ($ :svg.animate-spin.-ml-1.mr-2.h-4.w-4.text-white
+                       {:fill "none" :viewBox "0 0 24 24"}
+                       ($ :circle.opacity-25 {:cx "12" :cy "12" :r "10" :stroke "currentColor" :strokeWidth "4"})
+                       ($ :path.opacity-75 {:fill "currentColor" :d "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"})))
+                  (if saving? "Saving..." "Save"))
+               ($ :button
+                  {:className "inline-flex items-center px-3 py-1 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer"
+                   :onClick handle-cancel-click
+                   :disabled saving?}
+                  "Cancel")))
+         ;; View mode
+         ($ :div.bg-gray-50.rounded-md.p-4.border.relative.group
+            ($ :button
+               {:className "absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center px-2 py-1 text-xs text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer"
+                :onClick handle-edit-click}
+               ($ PencilIcon {:className "mr-1 h-3 w-3"})
+               "Edit")
+            (if value
+              ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono.pr-16
+                 (pretty-print-json value))
+              ($ :div.text-sm.text-gray-500.italic "No value")))))))
+
+(defui EditableExampleModal [{:keys [example-id module-id dataset-id snapshot-name on-delete-success]}]
+  (let [;; Fetch the specific example data
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
          {:query-key [:single-example module-id dataset-id snapshot-name (str example-id)]
@@ -527,43 +611,7 @@
                                                :example-id example-id}]
           :enabled? (boolean (and module-id dataset-id example-id))})
 
-        example (:example data)
-
-        ;; Integrate with our centralized form state
-        form-id :example-form
-        {:keys [valid? submitting? error form-error]} (forms/use-centralized-form form-id)
-        input-field (forms/use-form-field form-id :input)
-        output-field (forms/use-form-field form-id :output)
-
-        ;; --- Event Handlers ---
-        handle-edit-click (fn []
-                            (show-example-modal! :edit
-                                                 {:module-id module-id
-                                                  :dataset-id dataset-id
-                                                  :snapshot-name snapshot-name
-                                                  :example-id example-id
-                                                  :initial-input (:input example)
-                                                  :initial-output (:reference-output example)})
-                            (set-mode! :edit))
-
-        handle-cancel-click (fn []
-                              (state/dispatch [:form/clear form-id])
-                              (set-mode! :view))
-
-        handle-save-click (fn []
-                            (state/dispatch [:form/submit form-id]))]
-
-    ;; This effect handles the transition back to :view mode after a successful save
-    (uix/use-effect
-     (let [prev-submitting (uix/use-ref submitting?)]
-       (fn []
-         (when (and @prev-submitting (not submitting?) (not form-error))
-            ;; Submission just finished successfully
-           (refetch) ; Refetch the latest data for the view
-           (set-mode! :view)
-           (state/dispatch [:form/clear form-id]))
-         (reset! prev-submitting submitting?)))
-     [submitting? form-error])
+        example (:example data)]
 
     (cond
       loading? ($ :div.p-6 "Loading example details...")
@@ -571,69 +619,62 @@
       (not example) ($ :div.p-6.text-gray-500 "Example not found")
       :else
       ($ :div.p-6.space-y-6
-         ;; --- Header with Action Buttons ---
+         ;; --- Header with Delete Button ---
          ($ :div.flex.items-center.justify-between
-            (if (= mode :view)
-              ;; VIEW MODE ACTIONS
-              ($ :div.flex.items-center.space-x-2
-                 ($ :button
-                    {:className "inline-flex items-center px-3 py-1 text-sm text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
-                     :onClick handle-edit-click}
-                    ($ PencilIcon {:className "mr-2 h-4 w-4"})
-                    "Edit")
-                 ($ :button
-                    {:className "inline-flex items-center px-3 py-1 text-sm text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 cursor-pointer"
-                     :onClick (fn []
-                                (when (js/confirm "Are you sure you want to delete this example?")
-                                  (state/dispatch [:modal/hide]) ; Close modal before deleting
-                                  (sente/request!
-                                   [:datasets/delete-example
-                                    {:module-id module-id, :dataset-id dataset-id, :snapshot-name snapshot-name, :example-id example-id}]
-                                   10000
-                                   (fn [reply]
-                                     (if (:success reply)
-                                       (do
-                                         (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                                         (when on-delete-success (on-delete-success)))
-                                       (js/alert (str "Error deleting example: " (:error reply))))))))}
-                    ($ TrashIcon {:className "mr-2 h-4 w-4"})
-                    "Delete"))
-              ;; EDIT MODE ACTIONS
-              ($ forms/form-actions {:on-cancel handle-cancel-click
-                                     :on-submit handle-save-click
-                                     :submit-text "Save Changes"
-                                     :submitting? submitting?
-                                     :disabled? (or (not valid?) submitting?)})))
+            ($ :h3.text-lg.font-medium.text-gray-900 "Example Details")
+            ($ :button
+               {:className "inline-flex items-center px-3 py-1 text-sm text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 cursor-pointer"
+                :onClick (fn []
+                           (when (js/confirm "Are you sure you want to delete this example?")
+                             (state/dispatch [:modal/hide]) ; Close modal before deleting
+                             (sente/request!
+                              [:datasets/delete-example
+                               {:module-id module-id, :dataset-id dataset-id, :snapshot-name snapshot-name, :example-id example-id}]
+                              10000
+                              (fn [reply]
+                                (if (:success reply)
+                                  (do
+                                    (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                    (when on-delete-success (on-delete-success)))
+                                  (js/alert (str "Error deleting example: " (:error reply))))))))}
+               ($ TrashIcon {:className "mr-2 h-4 w-4"})
+               "Delete"))
 
-         ;; --- Main Content (Conditional) ---
-         (if (= mode :view)
-           ;; VIEW MODE CONTENT
-           ($ :div.space-y-4
-              ($ :div
-                 ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Input")
-                 ($ :div.bg-gray-50.rounded-md.p-4.border
-                    ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
-                       (pretty-print-json (:input example)))))
-              ($ :div
-                 ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Reference Output")
-                 ($ :div.bg-gray-50.rounded-md.p-4.border
-                    (if (:reference-output example)
-                      ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
-                         (pretty-print-json (:reference-output example)))
-                      ($ :div.text-sm.text-gray-500.italic "No reference output"))))
-              ($ :div
-                 ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tags")
-                 ($ :div.bg-gray-50.rounded-md.p-4.border
-                    ($ TagInput {:tags (:tags example) :module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name :example-id example-id})))
-              ($ :div
-                 ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Example ID")
-                 ($ :div.bg-gray-50.rounded-md.p-2.border
-                    ($ :code.text-xs.text-gray-600 (str example-id)))))
-           ;; EDIT MODE CONTENT
-           ($ :div.space-y-4
-              ($ forms/form-field {:label "Input (JSON)", :type :textarea, :value (:value input-field), :on-change (:on-change input-field), :error (:error input-field), :rows 12, :class-name "font-mono"})
-              ($ forms/form-field {:label "Reference Output (JSON, Optional)", :type :textarea, :value (:value output-field), :on-change (:on-change output-field), :error (:error output-field), :rows 12, :class-name "font-mono"})
-              ($ forms/form-error {:error form-error})))))))
+         ;; --- Editable Fields ---
+         ($ :div.space-y-6
+            ;; Input field
+            ($ EditableField {:label "Input"
+                              :value (:input example)
+                              :field-key :input
+                              :example-id example-id
+                              :module-id module-id
+                              :dataset-id dataset-id
+                              :snapshot-name snapshot-name
+                              :on-save refetch
+                              :current-example example})
+
+            ;; Reference Output field
+            ($ EditableField {:label "Reference Output"
+                              :value (:reference-output example)
+                              :field-key :reference-output
+                              :example-id example-id
+                              :module-id module-id
+                              :dataset-id dataset-id
+                              :snapshot-name snapshot-name
+                              :on-save refetch
+                              :current-example example})
+
+            ;; Tags section (keep as is for now)
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tags")
+               ($ :div.bg-gray-50.rounded-md.p-4.border
+                  ($ TagInput {:tags (:tags example) :module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name :example-id example-id})))
+
+            ;; Example ID (read-only)
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Example ID")
+               ($ :div.bg-gray-50.rounded-md.p-2.border
+                  ($ :code.text-xs.text-gray-600 (str example-id)))))))))
 
 (defui TagInput [{:keys [tags module-id dataset-id snapshot-name example-id on-tags-change]}]
   (let [[input-value set-input-value] (uix/use-state "")

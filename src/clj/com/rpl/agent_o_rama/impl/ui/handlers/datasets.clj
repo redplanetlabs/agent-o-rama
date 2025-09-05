@@ -78,11 +78,6 @@
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/create-snapshot
   [{:keys [manager dataset-id from-snapshot-name to-snapshot-name]} uid]
   (let [from-name (when-not (str/blank? from-snapshot-name) from-snapshot-name)]
-    (def manager manager)
-    (def dataset-id dataset-id)
-    (def from-snapshot-name from-snapshot-name)
-    (def from-name from-name)
-    (def to-snapshot-name to-snapshot-name)
     (aor/snapshot-dataset! manager dataset-id from-name to-snapshot-name)
     {:status :ok}))
 
