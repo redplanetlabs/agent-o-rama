@@ -513,9 +513,12 @@
           ($ TrashIcon {:className delete-icon-classes})
           "Delete"))))
 
-(defui ExampleViewerModal [{:keys [example-id module-id dataset-id snapshot-name on-delete-success]}]
-  ;; Fetch the specific example data using dedicated endpoint
-  (let [{:keys [data loading? error]}
+(defui EditableExampleModal [{:keys [example-id module-id dataset-id snapshot-name on-delete-success]}]
+  (let [;; Local state to manage the mode: :view or :edit
+        [mode set-mode!] (uix/use-state :view)
+
+        ;; Fetch the specific example data
+        {:keys [data loading? error refetch]}
         (queries/use-sente-query
          {:query-key [:single-example module-id dataset-id snapshot-name (str example-id)]
           :sente-event [:datasets/get-example {:module-id module-id
@@ -524,8 +527,43 @@
                                                :example-id example-id}]
           :enabled? (boolean (and module-id dataset-id example-id))})
 
-        ;; Extract the example directly from the response
-        example (:example data)]
+        example (:example data)
+
+        ;; Integrate with our centralized form state
+        form-id :example-form
+        {:keys [valid? submitting? error form-error]} (forms/use-centralized-form form-id)
+        input-field (forms/use-form-field form-id :input)
+        output-field (forms/use-form-field form-id :output)
+
+        ;; --- Event Handlers ---
+        handle-edit-click (fn []
+                            (show-example-modal! :edit
+                                                 {:module-id module-id
+                                                  :dataset-id dataset-id
+                                                  :snapshot-name snapshot-name
+                                                  :example-id example-id
+                                                  :initial-input (:input example)
+                                                  :initial-output (:reference-output example)})
+                            (set-mode! :edit))
+
+        handle-cancel-click (fn []
+                              (state/dispatch [:form/clear form-id])
+                              (set-mode! :view))
+
+        handle-save-click (fn []
+                            (state/dispatch [:form/submit form-id]))]
+
+    ;; This effect handles the transition back to :view mode after a successful save
+    (uix/use-effect
+     (let [prev-submitting (uix/use-ref submitting?)]
+       (fn []
+         (when (and @prev-submitting (not submitting?) (not form-error))
+            ;; Submission just finished successfully
+           (refetch) ; Refetch the latest data for the view
+           (set-mode! :view)
+           (state/dispatch [:form/clear form-id]))
+         (reset! prev-submitting submitting?)))
+     [submitting? form-error])
 
     (cond
       loading? ($ :div.p-6 "Loading example details...")
@@ -533,55 +571,69 @@
       (not example) ($ :div.p-6.text-gray-500 "Example not found")
       :else
       ($ :div.p-6.space-y-6
-         ;; Header with action buttons
+         ;; --- Header with Action Buttons ---
          ($ :div.flex.items-center.justify-between
-            ($ :div.flex.items-center.space-x-2
-               ($ ExampleActionButtons {:example example
-                                        :example-id example-id
-                                        :module-id module-id
-                                        :dataset-id dataset-id
-                                        :snapshot-name snapshot-name
-                                        :on-delete-success on-delete-success
-                                        :close-fn #(state/dispatch [:modal/hide])
-                                        :layout :horizontal})))
+            (if (= mode :view)
+              ;; VIEW MODE ACTIONS
+              ($ :div.flex.items-center.space-x-2
+                 ($ :button
+                    {:className "inline-flex items-center px-3 py-1 text-sm text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
+                     :onClick handle-edit-click}
+                    ($ PencilIcon {:className "mr-2 h-4 w-4"})
+                    "Edit")
+                 ($ :button
+                    {:className "inline-flex items-center px-3 py-1 text-sm text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 cursor-pointer"
+                     :onClick (fn []
+                                (when (js/confirm "Are you sure you want to delete this example?")
+                                  (state/dispatch [:modal/hide]) ; Close modal before deleting
+                                  (sente/request!
+                                   [:datasets/delete-example
+                                    {:module-id module-id, :dataset-id dataset-id, :snapshot-name snapshot-name, :example-id example-id}]
+                                   10000
+                                   (fn [reply]
+                                     (if (:success reply)
+                                       (do
+                                         (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                         (when on-delete-success (on-delete-success)))
+                                       (js/alert (str "Error deleting example: " (:error reply))))))))}
+                    ($ TrashIcon {:className "mr-2 h-4 w-4"})
+                    "Delete"))
+              ;; EDIT MODE ACTIONS
+              ($ forms/form-actions {:on-cancel handle-cancel-click
+                                     :on-submit handle-save-click
+                                     :submit-text "Save Changes"
+                                     :submitting? submitting?
+                                     :disabled? (or (not valid?) submitting?)})))
 
-         ;; Example content
-         ($ :div.space-y-4
-            ;; Input section
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Input")
-               ($ :div.bg-gray-50.rounded-md.p-4.border
-                  ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
-                     (if (string? (:input example))
-                       (:input example)
-                       (js/JSON.stringify (clj->js (:input example)) nil 2)))))
-
-            ;; Reference Output section
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Reference Output")
-               ($ :div.bg-gray-50.rounded-md.p-4.border
-                  (if (:reference-output example)
+         ;; --- Main Content (Conditional) ---
+         (if (= mode :view)
+           ;; VIEW MODE CONTENT
+           ($ :div.space-y-4
+              ($ :div
+                 ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Input")
+                 ($ :div.bg-gray-50.rounded-md.p-4.border
                     ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
-                       (if (string? (:reference-output example))
-                         (:reference-output example)
-                         (js/JSON.stringify (clj->js (:reference-output example)) nil 2)))
-                    ($ :div.text-sm.text-gray-500.italic "No reference output"))))
-
-            ;; Tags section
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tags")
-               ($ :div.bg-gray-50.rounded-md.p-4.border
-                  ($ TagInput {:tags (:tags example)
-                               :module-id module-id
-                               :dataset-id dataset-id
-                               :snapshot-name snapshot-name
-                               :example-id example-id})))
-
-            ;; Example ID (for reference)
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Example ID")
-               ($ :div.bg-gray-50.rounded-md.p-2.border
-                  ($ :code.text-xs.text-gray-600 (str example-id)))))))))
+                       (pretty-print-json (:input example)))))
+              ($ :div
+                 ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Reference Output")
+                 ($ :div.bg-gray-50.rounded-md.p-4.border
+                    (if (:reference-output example)
+                      ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
+                         (pretty-print-json (:reference-output example)))
+                      ($ :div.text-sm.text-gray-500.italic "No reference output"))))
+              ($ :div
+                 ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tags")
+                 ($ :div.bg-gray-50.rounded-md.p-4.border
+                    ($ TagInput {:tags (:tags example) :module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name :example-id example-id})))
+              ($ :div
+                 ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Example ID")
+                 ($ :div.bg-gray-50.rounded-md.p-2.border
+                    ($ :code.text-xs.text-gray-600 (str example-id)))))
+           ;; EDIT MODE CONTENT
+           ($ :div.space-y-4
+              ($ forms/form-field {:label "Input (JSON)", :type :textarea, :value (:value input-field), :on-change (:on-change input-field), :error (:error input-field), :rows 12, :class-name "font-mono"})
+              ($ forms/form-field {:label "Reference Output (JSON, Optional)", :type :textarea, :value (:value output-field), :on-change (:on-change output-field), :error (:error output-field), :rows 12, :class-name "font-mono"})
+              ($ forms/form-error {:error form-error})))))))
 
 (defui TagInput [{:keys [tags module-id dataset-id snapshot-name example-id on-tags-change]}]
   (let [[input-value set-input-value] (uix/use-state "")
@@ -886,7 +938,7 @@
                                          "hover:bg-gray-50 cursor-pointer")
                          :onClick #(state/dispatch [:modal/show :example-viewer
                                                     {:title "Example Details"
-                                                     :component ($ ExampleViewerModal
+                                                     :component ($ EditableExampleModal
                                                                    {:example-id example-id
                                                                     :module-id module-id
                                                                     :dataset-id dataset-id
@@ -944,13 +996,40 @@
                             ($ :div.origin-top-right.absolute.right-0.mt-2.w-48.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
                                {:onClick #(.stopPropagation %)}
                                ($ :div.py-1
-                                  ($ ExampleActionButtons {:example example
-                                                           :module-id module-id
-                                                           :dataset-id dataset-id
-                                                           :snapshot-name snapshot-name
-                                                           :on-delete-success on-delete-success
-                                                           :close-fn #(set-open-dropdown nil)
-                                                           :layout :dropdown}))))))))))))))
+                                  ;; Try with evaluator button
+                                  ($ :button
+                                     {:className "group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
+                                      :onClick (fn [e]
+                                                 (.stopPropagation e)
+                                                 (set-open-dropdown nil) ; Close dropdown
+                                                 ;; Show the Try Evaluator modal
+                                                 (state/dispatch [:modal/show :try-evaluator
+                                                                  {:title "Try with Evaluator"
+                                                                   :component ($ TryEvaluatorModal {:module-id module-id :example example})}]))}
+                                     ($ PlayIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
+                                     "Try with evaluator")
+                                  ;; Delete button
+                                  ($ :button
+                                     {:className "group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-red-100 hover:text-red-800 cursor-pointer"
+                                      :onClick (fn [e]
+                                                 (.stopPropagation e)
+                                                 (set-open-dropdown nil) ; Close dropdown
+                                                 (when (js/confirm "Are you sure you want to delete this example?")
+                                                   (sente/request!
+                                                    [:datasets/delete-example
+                                                     {:module-id module-id
+                                                      :dataset-id dataset-id
+                                                      :snapshot-name snapshot-name
+                                                      :example-id example-id}]
+                                                    10000
+                                                    (fn [reply]
+                                                      (if (:success reply)
+                                                        (do
+                                                          (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                                          (when on-delete-success (on-delete-success)))
+                                                        (js/alert (str "Error deleting example: " (:error reply))))))))}
+                                     ($ TrashIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-red-500"})
+                                     "Delete"))))))))))))))
 
 (defn get-dataset-path [module-id dataset-id]
   (rfe/href :module/dataset-detail
