@@ -87,7 +87,7 @@ test.describe('Agent-O-Rama Navigation to Datasets', () => {
     await expect(editButton).toBeVisible({ timeout: 30000 });
     await editButton.click();
 
-    const newDatasetName = `New Dataset ${randomUUID()}`;
+    const newDatasetName = `Modified Dataset ${randomUUID()}`;
 
     // fill in the forms
     await page.getByLabel('Name').fill(newDatasetName);
@@ -96,5 +96,16 @@ test.describe('Agent-O-Rama Navigation to Datasets', () => {
 
     await expect(page.getByRole('heading', { name: newDatasetName })).toBeVisible({ timeout: 30000 });
     console.log('Successfully verified updated dataset.');
+
+    page.on('dialog', dialog => dialog.accept());
+
+    // get the delete button scoped to the card containing this dataset name
+    const deleteButton = page.getByRole('heading', { name: newDatasetName }).locator('..').locator('..').getByTitle('Delete Dataset');
+    await expect(deleteButton).toBeVisible({ timeout: 30000 });
+    await deleteButton.click();
+
+    // wait for the dataset to be deleted
+    await expect(page.getByRole('heading', { name: newDatasetName })).not.toBeVisible({ timeout: 30000 });
+    console.log('Successfully verified deleted dataset.');
   });
 });
