@@ -206,10 +206,15 @@ test.describe('Dataset example crud', () => {
     await page.getByLabel('Input (JSON)').fill(JSON.stringify(updatedInput, null, 2));
     await page.getByRole('button', { name: 'Save Changes' }).click();
 
-    // Verify the updated content is visible in the viewer modal
+    // After editing and saving, the modal closes completely
+    // We need to reopen the Example Details modal by clicking the table row again
+    await page.locator('table tbody tr').filter({ hasText: exampleId2 }).click();
+    await expect(page.getByText('Example Details')).toBeVisible({ timeout: 30000 });
+
+    // Verify the updated content is visible in the details modal
     await expect(page.locator('[role="dialog"]').getByText(exampleId2)).toBeVisible({ timeout: 30000 });
 
-    // Add a tag
+    // Add a tag (tags are only available in the Details modal, not the Edit modal)
     const tagName = `e2e-tag-${randomUUID()}`;
     const tagInput = page.getByPlaceholder('Add a tag and press Enter...');
     await expect(tagInput).toBeVisible({ timeout: 30000 });
