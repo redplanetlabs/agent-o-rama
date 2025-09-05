@@ -1059,7 +1059,7 @@
             :else ($ :div.bg-white.shadow.overflow-hidden.sm:rounded-md
                      ($ :ul.divide-y.divide-gray-200
                         (for [dataset datasets]
-                          ($ :li {:key (:id dataset)}
+                          ($ :li {:key (:dataset-id dataset)}
                              ($ :a.block.hover:bg-gray-50.cursor-pointer
                                 {:href (get-dataset-path decoded-module-id (:id dataset))}
                                 ($ :div.px-4.py-4.sm:px-6

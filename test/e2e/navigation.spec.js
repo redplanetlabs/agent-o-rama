@@ -62,7 +62,7 @@ test.describe('Dataset crud', () => {
     await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule\/datasets.*/i);
     console.log('Successfully verified datasets page.');
 
-    const newDatasetButton = page.getByText('New Dataset');
+    const newDatasetButton = page.getByRole('button', { name: 'Create Dataset' }).first();
     await expect(newDatasetButton).toBeVisible({ timeout: 30000 });
     console.log('Successfully verified new dataset button.');
 
@@ -73,7 +73,7 @@ test.describe('Dataset crud', () => {
     await page.getByLabel('Description').fill('Test Description');
     await page.getByLabel('Input JSON Schema').fill('{}');
     await page.getByLabel('Output JSON Schema').fill('{}');
-    await page.getByRole('button', { name: 'Create Dataset' }).click();
+    await page.locator('[role="dialog"]').getByRole('button', { name: 'Create Dataset' }).click();
 
     // find the created datset in the invalidated/requeried table
     // the tilte is in an h3 tag
@@ -144,7 +144,7 @@ test.describe('Dataset example crud', () => {
     await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule\/datasets.*/i);
     console.log('Successfully verified datasets page.');
 
-    const newDatasetButton = page.getByText('New Dataset');
+    const newDatasetButton = page.getByRole('button', { name: 'Create Dataset' }).first();
     await expect(newDatasetButton).toBeVisible({ timeout: 30000 });
     console.log('Successfully verified new dataset button.');
 
@@ -155,7 +155,7 @@ test.describe('Dataset example crud', () => {
     await page.getByLabel('Description').fill('Test Description');
     await page.getByLabel('Input JSON Schema').fill('{}');
     await page.getByLabel('Output JSON Schema').fill('{}');
-    await page.getByRole('button', { name: 'Create Dataset' }).click();
+    await page.locator('[role="dialog"]').getByRole('button', { name: 'Create Dataset' }).click();
 
     // find the created datset in the invalidated/requeried table
     // the tilte is in an h3 tag
@@ -272,7 +272,7 @@ test.describe('Inline editing validation', () => {
     await datasetsLink.click();
 
     // Create a test dataset
-    const newDatasetButton = page.getByText('New Dataset');
+    const newDatasetButton = page.getByRole('button', { name: 'Create Dataset' }).first();
     await newDatasetButton.click();
     
     const datasetName = `Inline Edit Test ${randomUUID()}`;
@@ -280,7 +280,7 @@ test.describe('Inline editing validation', () => {
     await page.getByLabel('Description').fill('Testing inline editing');
     await page.getByLabel('Input JSON Schema').fill('{}');
     await page.getByLabel('Output JSON Schema').fill('{}');
-    await page.getByRole('button', { name: 'Create Dataset' }).click();
+    await page.locator('[role="dialog"]').getByRole('button', { name: 'Create Dataset' }).click();
 
     await expect(page.getByRole('heading', { name: datasetName })).toBeVisible({ timeout: 30000 });
     await page.getByRole('link', { name: datasetName }).first().click();
@@ -365,7 +365,7 @@ test.describe('Dataset snapshot dropdown', () => {
 
     await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule\/datasets.*/i);
 
-    const newDatasetButton = page.getByText('New Dataset');
+    const newDatasetButton = page.getByRole('button', { name: 'Create Dataset' }).first();
     await expect(newDatasetButton).toBeVisible({ timeout: 30000 });
     await newDatasetButton.click();
 
@@ -374,8 +374,11 @@ test.describe('Dataset snapshot dropdown', () => {
     await page.getByLabel('Description').fill('Snapshot dropdown e2e');
     await page.getByLabel('Input JSON Schema').fill('{}');
     await page.getByLabel('Output JSON Schema').fill('{}');
-    await page.getByRole('button', { name: 'Create Dataset' }).click();
+    await page.locator('[role="dialog"]').getByRole('button', { name: 'Create Dataset' }).click();
 
+    // Wait for modal to close
+    await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 30000 });
+    
     await expect(page.getByRole('heading', { name: datasetName })).toBeVisible({ timeout: 30000 });
 
     await page.getByRole('link', { name: datasetName }).first().click();
@@ -417,16 +420,18 @@ test.describe('Dataset snapshot dropdown', () => {
     await snapshotModal.getByLabel('New Snapshot Name').fill(snapshotName);
     await snapshotModal.getByRole('button', { name: 'Create Snapshot' }).click();
 
-    // Wait for modal to close (create finished), then open dropdown and select the new snapshot
+    // Wait for modal to close (create finished), then verify auto-select behavior
     await expect(snapshotModal).toBeHidden({ timeout: 30000 });
-    const latestButtonFresh = page.getByRole('button', { name: 'Latest (Working Copy)' }).first();
-    await expect(latestButtonFresh).toBeEnabled({ timeout: 30000 });
-    await latestButtonFresh.click();
-    await expect(page.getByText(snapshotName)).toBeVisible({ timeout: 30000 });
-    await page.getByText(snapshotName).click();
-
-    // Verify the button now shows the selected snapshot
+    
+    // NEW: Verify the snapshot is automatically selected (auto-select feature)
     await expect(page.getByRole('button', { name: snapshotName })).toBeVisible({ timeout: 30000 });
+    
+    // NEW: Verify read-only banner appears when viewing the snapshot
+    await expect(page.getByText('Read-only: You are viewing an immutable snapshot. Editing is disabled.')).toBeVisible({ timeout: 10000 });
+    
+    // NEW: Verify Add Example button is disabled in read-only mode
+    const addExampleButtonReadOnly = page.getByRole('button', { name: 'Add Example' });
+    await expect(addExampleButtonReadOnly).toBeDisabled({ timeout: 10000 });
 
     // Delete the snapshot via dropdown delete control
     page.on('dialog', dialog => dialog.accept());
