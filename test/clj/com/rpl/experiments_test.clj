@@ -24,7 +24,7 @@
   (if (string? v) (count v) v))
 
 
-(defn wait-experiment-finished
+(defn wait-experiment-finished!
   [exp-client agent-invoke]
   (let [res (aor/agent-result exp-client agent-invoke)]
     (when-not (= res :done)
@@ -120,9 +120,15 @@
                         "100"
                         "50"))))))
            ))
-         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (bind ds-module
+           (aor/agentmodule
+            [topology]))
+         (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+         (rtest/launch-module! ipc ds-module {:tasks 2 :threads 2})
          (bind module-name (get-module-name module))
+         (bind ds-module-name (get-module-name ds-module))
          (bind manager (aor/agent-manager ipc module-name))
+         (bind ds-manager (aor/agent-manager ipc ds-module-name))
          (bind exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME))
          (bind global-actions-depot
            (foreign-depot ipc module-name (po/global-actions-depot-name)))
@@ -198,7 +204,7 @@
              2
              2)))
 
-         (wait-experiment-finished exp-client exp-invoke)
+         (wait-experiment-finished! exp-client exp-invoke)
          (bind res (foreign-invoke-query results ds-id1 exp1))
          (is (aor-types/StartExperiment? (:experiment-info res)))
          (is (> (:finish-time-millis res) (:start-time-millis res)))
