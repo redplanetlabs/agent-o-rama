@@ -355,6 +355,8 @@
        (aor-types/->ExampleRunImpl input reference-output (nth outputs 0)))
    )))
 
+(defn hook:running-invoke-node [result+example-ids])
+
 (defn define-experiments-agent!
   [topology]
   (->
@@ -395,6 +397,7 @@
           {:keys [id dataset-id snapshot spec] :as experiment}
           remote-info
           result+example-ids]
+       (hook:running-invoke-node result+example-ids)
        (with-retriever [agent-node experiment remote-info]
          [retriever]
          (let [datasets     (datasets-pstate retriever)
