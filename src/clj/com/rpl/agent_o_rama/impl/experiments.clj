@@ -12,7 +12,8 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.store :as store]
    [com.rpl.rama.aggs :as aggs]
-   [com.rpl.rama.ops :as ops])
+   [com.rpl.rama.ops :as ops]
+   [jsonista.core :as j])
   (:import
    [com.rpl.agentorama
     AgentClient
@@ -273,12 +274,28 @@
               true))))
       ))))
 
+(defn resolve-input-spec
+  [spec input]
+  (cond
+    (string? spec)
+    (if (str/starts-with? spec "$")
+      (if (str/starts-with? spec "$$")
+        (subs spec 1)               ; "$$..." → "$..."
+        (h/read-json-path input spec))
+      spec)
+
+    (vector? spec)
+    (mapv #(resolve-input-spec % input) spec)
+
+    (map? spec)
+    (transform MAP-VALS #(resolve-input-spec % input) spec)
+
+    :else spec))
+
+
 (defn convert-input->args
-  [input compiled-input->args]
-  (mapv
-   (fn [p]
-     (h/read-compiled-json-path input p))
-   compiled-input->args))
+  [input parsed-input->args]
+  (mapv #(resolve-input-spec % input) parsed-input->args))
 
 (defn agent-result-obj
   [client agent-invoke]
@@ -411,11 +428,10 @@
                initiate-fns
                (mapv
                 (fn [{:keys [target-spec input->args]} client]
-                  (let [agent-name (:agent-name target-spec)
-                        compiled-input->args (mapv h/compile-json-path input->args)
-                       ]
+                  (let [agent-name         (:agent-name target-spec)
+                        parsed-input->args (mapv j/read-value input->args)]
                     (fn [input]
-                      (let [args (convert-input->args input compiled-input->args)]
+                      (let [args (convert-input->args input parsed-input->args)]
                         {:agent-name   agent-name
                          :agent-invoke
                          (if (aor-types/AgentTarget? target-spec)

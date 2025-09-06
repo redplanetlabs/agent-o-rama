@@ -295,8 +295,8 @@
          ;; TODO: <<<<>>>>
          ;;  - create local and remote datasets
          ;;    - remote one shouldn't have any agents
-         ;;  - test search and all filter types
-         ;;     - easier in another test with experiments that run without any examples
+         ;;  - more complicated input->args
+         ;;     - [{"a": "$.a", "b": "$$.a"}, "abc"]
          ;;  - test experiment with node
          ;;     - comparative with mixed
          ;;     - regular experiment
@@ -306,7 +306,7 @@
          ;;    - specific example IDs
          ;;    - specific tag
          ;;  - test remote evaluators
-         ;;  - running regular exp with comparative evaluator
+         ;;  - running regular experiment with comparative evaluator
          ;;  - running comparative experiment with regular or summary evaluator
 
         )))))
@@ -314,5 +314,23 @@
 (deftest failures-test
          ;; TODO: <<<<>>>>>
          ;;  - agent failures
+         ;;  - node execution failures
          ;;  - regular, comparative, and summary eval failures
+)
+
+(deftest experimenter-agent-failures-test
+         ;; TODO: <<<<>>>>
+         ;; - doesn't retry things it succeeded on after failures
+         ;;   - agent/node invokes
+         ;;   - regular/comparative evaluators
+         ;;   - summary evaluators
+         ;; - put hook in to cause failure of the experimenter agent in all of those nodes after at
+         ;; least one has succeeded
+)
+
+(deftest search-experiments-test
+         ;; TODO: <<<<>>>>
+         ;;  - test search and all filter types
+         ;;     - easier in another test with experiments that run without any examples
+
 )
