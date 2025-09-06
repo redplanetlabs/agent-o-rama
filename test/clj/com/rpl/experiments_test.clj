@@ -199,6 +199,7 @@
      (bind res (foreign-invoke-query results ds-id1 exp1))
      (is (aor-types/StartExperiment? (:experiment-info res)))
      (is (> (:finish-time-millis res) (:start-time-millis res)))
+     (is (aor-types/AgentInvokeImpl? (:experiment-invoke res)))
 
      (is
       (trace-matches?
