@@ -103,12 +103,15 @@
                 (aor/new-agent "foo")
                 (aor/node
                  "start"
-                 "end"
-                 (fn [agent-node input]
-                   (let [v (count-or-num input)]
-                     (aor/emit! agent-node "end" :ignore v)
-                     (aor/emit! agent-node "end" :keep (inc v))
-                     (aor/emit! agent-node "end" :ignore v))))
+                 ["end" "a"]
+                 (fn [agent-node action & inputs]
+                   (if (= action "counts")
+                     (let [v (reduce + 0 (mapv count-or-num inputs))]
+                       (aor/emit! agent-node "end" :ignore v)
+                       (aor/emit! agent-node "end" :keep (inc v))
+                       (aor/emit! agent-node "end" :ignore v))
+                     (aor/emit! agent-node "end2" (get (nth inputs 0) "a") (get (nth inputs 1) "b"))
+                   )))
                 (aor/node
                  "end"
                  nil
@@ -118,7 +121,21 @@
                       agent-node
                       (if (= 17 input)
                         "100"
-                        "50"))))))
+                        "50")))))
+                (aor/node
+                 "end2"
+                 nil
+                 (fn [agent-node a b]
+                   (aor/result! agent-node (+ a b))))
+                (aor/node
+                 "a"
+                 ["end" "a"]
+                 (fn [agent-node arg1 arg2 arg3]
+                   (aor/emit! agent-node "end" (str arg1 "-" arg2 "-" arg3))
+                   (aor/emit! agent-node "a" (str arg1 "-" arg3))
+                   (aor/emit! agent-node "end" (str arg1 "!"))
+                 ))
+            )
            ))
          (bind ds-module
            (aor/agentmodule
@@ -150,8 +167,11 @@
          (aor/create-evaluator! manager "cmin" "compare-min" {} "")
          (aor/create-evaluator! manager "cmax" "compare-min" {} "")
 
+         (aor/create-evaluator! ds-manager "rc3" "aor/conciseness" {"threshold" "3"} "")
+
          (bind ds-id1 (aor/create-dataset! manager "Dataset 1"))
          (bind ds-id2 (aor/create-dataset! manager "Dataset 2"))
+         (bind remote-ds (aor/create-dataset! ds-manager "Dataset 3"))
 
          (bind add-example-and-wait!
            (fn [& args]
@@ -182,6 +202,21 @@
           "aa"
           {:reference-output "bbbbb"})
 
+
+         (add-example-and-wait!
+          ds-manager
+          remote-ds
+          {"a" 1 "b" "abc"}
+          {:reference-output "1234567"})
+         (add-example-and-wait!
+          ds-manager
+          remote-ds
+          {"a" 2 "b" "123456789"})
+         (add-example-and-wait!
+          ds-manager
+          remote-ds
+          {"a" 3 "b" "."})
+
          (bind exp1 (h/random-uuid7))
          (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
            (foreign-append!
@@ -199,7 +234,7 @@
              (aor-types/->valid-RegularExperiment
               (aor-types/->valid-ExperimentTarget
                (aor-types/->valid-AgentTarget "foo")
-               ["\"$\""]
+               ["\"counts\"" "$"]
               ))
              2
              2)))
@@ -295,6 +330,11 @@
          (is (every? aor-types/AgentInvokeImpl?
                      (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
 
+
+         ;; TODO: <<<<>>>>
+         ;;  - do comparative experiment between node and agent on remote dataset
+         ;;   - need evals with custom path to parse the outputs...
+         ;;     - need same output structure between agent and node
 
          ; (clojure.pprint/pprint res)
 

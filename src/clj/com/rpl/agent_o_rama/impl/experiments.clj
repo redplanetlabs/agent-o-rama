@@ -274,6 +274,13 @@
               true))))
       ))))
 
+(defn parse-input-spec
+  [s]
+  (j/read-value
+   (if (and (str/starts-with? s "$") (not (str/starts-with? s "$$")))
+     (str "\"" s "\"")
+     s)))
+
 (defn resolve-input-spec
   [spec input]
   (cond
@@ -291,7 +298,6 @@
     (transform MAP-VALS #(resolve-input-spec % input) spec)
 
     :else spec))
-
 
 (defn convert-input->args
   [input parsed-input->args]
@@ -429,7 +435,7 @@
                (mapv
                 (fn [{:keys [target-spec input->args]} client]
                   (let [agent-name         (:agent-name target-spec)
-                        parsed-input->args (mapv j/read-value input->args)]
+                        parsed-input->args (mapv parse-input-spec input->args)]
                     (fn [input]
                       (let [args (convert-input->args input parsed-input->args)]
                         {:agent-name   agent-name
