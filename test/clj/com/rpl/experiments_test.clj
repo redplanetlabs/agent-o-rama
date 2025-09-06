@@ -193,7 +193,7 @@
              (aor-types/->valid-RegularExperiment
               (aor-types/->valid-ExperimentTarget
                (aor-types/->valid-AgentTarget "foo")
-               ["$"]
+               ["\"$\""]
               ))
              2
              2)))
