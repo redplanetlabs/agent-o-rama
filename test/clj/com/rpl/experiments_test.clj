@@ -195,9 +195,8 @@
                (aor-types/->valid-AgentTarget "foo")
                ["$"]
               ))
-             1
+             2
              2)))
-
 
          (wait-experiment-finished exp-client exp-invoke)
          (bind res (foreign-invoke-query results ds-id1 exp1))
@@ -205,12 +204,12 @@
          (is (> (:finish-time-millis res) (:start-time-millis res)))
          (is (aor-types/AgentInvokeImpl? (:experiment-invoke res)))
          (is (= 2 (count @example-id-chunks-atom)))
-         (is (every? #(= 2 %) @example-id-chunks-atom))
+         (is (every? #(= 4 %) @example-id-chunks-atom))
 
          (is
           (trace-matches?
            res
-           {:summary-evals {"mycount" {"res" 4} "mysum" {"res" 55}}
+           {:summary-evals {"mycount" {"res" 8} "mysum" {"res" 110}}
             :summary-eval-failures nil
             :results
             {0
@@ -248,20 +247,56 @@
               :agent-results    {0 {:val "50" :failure? false}}
               :evals            {"mylen" {"len" 9} "concise2" {"concise?" true}}
               :input            "aa"
-              :reference-output "bbbbb"}}}
-          ))
+              :reference-output "bbbbb"}
+             4
+             {:example-id       !eid0
+              :agent-initiates
+              {0
+               {:agent-name "foo"}}
+              :agent-results    {0 {:val "50" :failure? false}}
+              :evals            {"mylen" {"len" 20} "concise2" {"concise?" true}}
+              :input            "abcdefg"
+              :reference-output "aaaaaaaaaaa"}
+             5
+             {:example-id       !eid1
+              :agent-initiates
+              {0
+               {:agent-name "foo"}}
+              :agent-results    {0 {:val "50" :failure? false}}
+              :evals            {"mylen" {"len" 6} "concise2" {"concise?" true}}
+              :input            "ab"
+              :reference-output ".."}
+             6
+             {:example-id       !eid2
+              :agent-initiates
+              {0
+               {:agent-name "foo"}}
+              :agent-results    {0 {:val "100" :failure? false}}
+              :evals            {"mylen" {"len" 20} "concise2" {"concise?" false}}
+              :input            "123456789abcdefg"
+              :reference-output "."}
+             7
+             {:example-id       !eid3
+              :agent-initiates
+              {0
+               {:agent-name "foo"}}
+              :agent-results    {0 {:val "50" :failure? false}}
+              :evals            {"mylen" {"len" 9} "concise2" {"concise?" true}}
+              :input            "aa"
+              :reference-output "bbbbb"}
+            }}))
 
          (is (every? aor-types/AgentInvokeImpl?
                      (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
 
 
-         (clojure.pprint/pprint res)
+         ; (clojure.pprint/pprint res)
 
          ;; TODO: <<<<>>>>
          ;;  - create local and remote datasets
          ;;    - remote one shouldn't have any agents
-         ;;  - test num-repetitions
          ;;  - test search and all filter types
+         ;;     - easier in another test with experiments that run without any examples
          ;;  - test experiment with node
          ;;     - comparative with mixed
          ;;     - regular experiment
