@@ -15,7 +15,8 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.test-common :as tc]))
+   [com.rpl.test-common :as tc]
+   [meander.epsilon :as m]))
 
 
 (defn count-or-num
@@ -111,14 +112,9 @@
                (when (= command :keep)
                  (aor/result!
                   agent-node
-                  (cond (= 0 input)
-                        "100"
-
-                        (= 1 input)
-                        "10"
-
-                        :else
-                        "50"))))))
+                  (if (= 17 input)
+                    "100"
+                    "50"))))))
        ))
      (rtest/launch-module! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
@@ -134,9 +130,9 @@
        (foreign-query ipc module-name (queries/experiment-results-name)))
 
      (aor/create-evaluator! manager
-                            "concise5"
+                            "concise2"
                             "aor/conciseness"
-                            {"threshold" "5"}
+                            {"threshold" "2"}
                             "")
      (aor/create-evaluator! manager "mylen" "len" {} "")
      (aor/create-evaluator! manager "mysum" "sum-sizes" {} "")
@@ -147,25 +143,30 @@
      (bind ds-id1 (aor/create-dataset! manager "Dataset 1"))
      (bind ds-id2 (aor/create-dataset! manager "Dataset 2"))
 
-     (aor/add-dataset-example!
+     (bind add-example-and-wait!
+       (fn [& args]
+         (Thread/sleep 2)
+         (apply aor/add-dataset-example! args)))
+
+     (add-example-and-wait!
       manager
       ds-id1
       "abcdefg"
       {:reference-output "aaaaaaaaaaa"
        :tags #{"tag1" "tag2"}})
-     (aor/add-dataset-example!
+     (add-example-and-wait!
       manager
       ds-id1
       "ab"
       {:reference-output ".."
        :tags #{"tag1"}})
-     (aor/add-dataset-example!
+     (add-example-and-wait!
       manager
       ds-id1
       "123456789abcdefg"
       {:reference-output "."
        :tags #{"tag1"}})
-     (aor/add-dataset-example!
+     (add-example-and-wait!
       manager
       ds-id1
       "aa"
@@ -182,7 +183,7 @@
          nil
          nil
          [(aor-types/->valid-EvaluatorSelector "mylen" false)
-          (aor-types/->valid-EvaluatorSelector "concise5" false)
+          (aor-types/->valid-EvaluatorSelector "concise2" false)
           (aor-types/->valid-EvaluatorSelector "mycount" false)
           (aor-types/->valid-EvaluatorSelector "mysum" false)]
          (aor-types/->valid-RegularExperiment
@@ -195,8 +196,59 @@
 
 
      (wait-experiment-finished exp-client exp-invoke)
-     (clojure.pprint/pprint
-      (foreign-invoke-query results ds-id1 exp1))
+     (bind res (foreign-invoke-query results ds-id1 exp1))
+     (is (aor-types/StartExperiment? (:experiment-info res)))
+     (is (> (:finish-time-millis res) (:start-time-millis res)))
+
+     (is
+      (trace-matches?
+       res
+       {:summary-evals {"mycount" {"res" 4} "mysum" {"res" 55}}
+        :summary-eval-failures nil
+        :results
+        {0
+         {:example-id       !eid0
+          :agent-initiates
+          {0
+           {:agent-name "foo"}}
+          :agent-results    {0 {:val "50" :failure? false}}
+          :evals            {"mylen" {"len" 20} "concise2" {"concise?" true}}
+          :input            "abcdefg"
+          :reference-output "aaaaaaaaaaa"}
+         1
+         {:example-id       !eid1
+          :agent-initiates
+          {0
+           {:agent-name "foo"}}
+          :agent-results    {0 {:val "50" :failure? false}}
+          :evals            {"mylen" {"len" 6} "concise2" {"concise?" true}}
+          :input            "ab"
+          :reference-output ".."}
+         2
+         {:example-id       !eid2
+          :agent-initiates
+          {0
+           {:agent-name "foo"}}
+          :agent-results    {0 {:val "100" :failure? false}}
+          :evals            {"mylen" {"len" 20} "concise2" {"concise?" false}}
+          :input            "123456789abcdefg"
+          :reference-output "."}
+         3
+         {:example-id       !eid3
+          :agent-initiates
+          {0
+           {:agent-name "foo"}}
+          :agent-results    {0 {:val "50" :failure? false}}
+          :evals            {"mylen" {"len" 9} "concise2" {"concise?" true}}
+          :input            "aa"
+          :reference-output "bbbbb"}}}
+      ))
+
+     (is (every? aor-types/AgentInvokeImpl?
+                 (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
+
+
+     (clojure.pprint/pprint res)
 
      ;; TODO: <<<<>>>> wait for experiment to be done by checking for finish-time-millis
      ;;  - check experiment results with query topology

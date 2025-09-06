@@ -117,11 +117,11 @@
         (throw (h/ex-info "Unexpected experiment spec" {:type (class spec)}))))
 
 (defn validate-evaluator
-  [agent-node spec {:keys [builder-name] :as evaluator}]
+  [agent-node spec {:keys [retrieval-failed? builder-name] :as evaluator}]
   (let [builders (get-evaluator-builders agent-node)
         info     (get builders builder-name)]
     (cond
-      (nil? evaluator)
+      retrieval-failed?
       {:problem "Evaluator does not exist"}
 
       (nil? info)
@@ -162,7 +162,10 @@
        (if-let [m (foreign-select-one (keypath name) (if remote? ds-evals local-evals))]
          (assoc m
           :name name
-          :remote? remote?)))
+          :remote? remote?)
+         {:retrieval-failed? true
+          :name    name
+          :remote? remote?}))
      evaluators)))
 
 (defn relevant-evaluators
