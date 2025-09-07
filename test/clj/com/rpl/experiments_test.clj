@@ -75,6 +75,15 @@
                     (select-any [INDEXED-VALS (selected? LAST (pred= m)) FIRST] outputs)
                     "input"      input
                     "ref-output" ref-output}))))
+            (aor/declare-comparative-evaluator-builder
+             topology
+             "identity-compare"
+             ""
+             (fn [params]
+               (fn [fetcher input ref-output outputs]
+                 {"outputs"    outputs
+                  "input"      input
+                  "ref-output" ref-output})))
             (aor/declare-summary-evaluator-builder
              topology
              "count"
@@ -91,7 +100,6 @@
                (fn [fetcher example-runs]
                  {"res" (reduce
                          (fn [res {:keys [input reference-output output]}]
-                           ;; TODO: <<<<>>>> getting ["50"] here for output
                            (+ res
                               (count-or-num input)
                               (count-or-num reference-output)
@@ -103,14 +111,14 @@
                 (aor/new-agent "foo")
                 (aor/node
                  "start"
-                 ["end" "a"]
+                 ["end" "end2" "a"]
                  (fn [agent-node action & inputs]
                    (if (= action "counts")
                      (let [v (reduce + 0 (mapv count-or-num inputs))]
                        (aor/emit! agent-node "end" :ignore v)
                        (aor/emit! agent-node "end" :keep (inc v))
                        (aor/emit! agent-node "end" :ignore v))
-                     (aor/emit! agent-node "end2" (get (nth inputs 0) "a") (get (nth inputs 1) "b"))
+                     (aor/emit! agent-node "end2" (nth inputs 0) (nth inputs 1))
                    )))
                 (aor/node
                  "end"
@@ -126,13 +134,16 @@
                  "end2"
                  nil
                  (fn [agent-node a b]
-                   (aor/result! agent-node (+ a b))))
+                   (aor/result!
+                    agent-node
+                    [{"node" "xyz"
+                      "args" [(+ a b)]}])))
                 (aor/node
                  "a"
                  ["end" "a"]
-                 (fn [agent-node arg1 arg2 arg3]
-                   (aor/emit! agent-node "end" (str arg1 "-" arg2 "-" arg3))
-                   (aor/emit! agent-node "a" (str arg1 "-" arg3))
+                 (fn [agent-node arg1 arg2]
+                   (aor/emit! agent-node "end" (+ arg1 arg2 3))
+                   (aor/emit! agent-node "a" (str arg1 "+" arg2))
                    (aor/emit! agent-node "end" (str arg1 "!"))
                  ))
             )
@@ -166,6 +177,15 @@
          (aor/create-evaluator! manager "mycount" "count" {} "")
          (aor/create-evaluator! manager "cmin" "compare-min" {} "")
          (aor/create-evaluator! manager "cmax" "compare-min" {} "")
+         (aor/create-evaluator! manager
+                                "identity-compare"
+                                "identity-compare"
+                                {}
+                                ""
+                                {:input-json-path  "$.a"
+                                 :output-json-path "$[0].args"
+                                 :reference-output-json-path "$[1]"
+                                })
 
          (aor/create-evaluator! ds-manager "rc3" "aor/conciseness" {"threshold" "3"} "")
 
@@ -206,23 +226,24 @@
          (add-example-and-wait!
           ds-manager
           remote-ds
-          {"a" 1 "b" "abc"}
-          {:reference-output "1234567"})
+          {"a" 1 "b" 10}
+          {:reference-output ["1234567" "89"]})
          (add-example-and-wait!
           ds-manager
           remote-ds
-          {"a" 2 "b" "123456789"})
+          {"a" 2 "b" 100})
          (add-example-and-wait!
           ds-manager
           remote-ds
-          {"a" 3 "b" "."})
+          {"a" 3 "b" 1000}
+          {:reference-output ["abcdefg" "hijklmnop"]})
 
-         (bind exp1 (h/random-uuid7))
+         (bind exp-id (h/random-uuid7))
          (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
            (foreign-append!
             global-actions-depot
             (aor-types/->valid-StartExperiment
-             exp1
+             exp-id
              "My experiment"
              ds-id1
              nil
@@ -240,12 +261,13 @@
              2)))
 
          (wait-experiment-finished! exp-client exp-invoke)
-         (bind res (foreign-invoke-query results ds-id1 exp1))
+         (bind res (foreign-invoke-query results ds-id1 exp-id))
          (is (aor-types/StartExperiment? (:experiment-info res)))
          (is (> (:finish-time-millis res) (:start-time-millis res)))
          (is (aor-types/AgentInvokeImpl? (:experiment-invoke res)))
          (is (= 2 (count @example-id-chunks-atom)))
          (is (every? #(= 4 %) @example-id-chunks-atom))
+
 
          (is
           (trace-matches?
@@ -331,29 +353,126 @@
                      (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
 
 
-         ;; TODO: <<<<>>>>
-         ;;  - do comparative experiment between node and agent on remote dataset
-         ;;   - need evals with custom path to parse the outputs...
-         ;;     - need same output structure between agent and node
 
+         ;; TODO: <<<<>>>> do invalid adds and verify errors
+         ;;   - including with conductor host
+
+         (aor-types/add-remote-dataset-internal manager remote-ds nil nil ds-module-name)
+         ;; TODO: <<<<>>>> handle input/output/ref-output json paths for summary evals
+
+
+         (reset! example-id-chunks-atom [])
+         (bind exp-id (h/random-uuid7))
+         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+           (foreign-append!
+            global-actions-depot
+            (aor-types/->valid-StartExperiment
+             exp-id
+             "My experiment 2"
+             remote-ds
+             nil
+             nil
+             [(aor-types/->valid-EvaluatorSelector "identity-compare" false)]
+             (aor-types/->valid-ComparativeExperiment
+              [(aor-types/->valid-ExperimentTarget
+                (aor-types/->valid-NodeTarget "foo" "a")
+                ["$.a" "$.b"])
+               (aor-types/->valid-ExperimentTarget
+                (aor-types/->valid-AgentTarget "foo")
+                ["\"other\"" "$.a" "$.b"])])
+             1
+             2)))
+
+         (wait-experiment-finished! exp-client exp-invoke)
+         (bind res (foreign-invoke-query results remote-ds exp-id))
+         (is (aor-types/StartExperiment? (:experiment-info res)))
+         (is (> (:finish-time-millis res) (:start-time-millis res)))
+         (is (aor-types/AgentInvokeImpl? (:experiment-invoke res)))
+         (is (= 2 (count @example-id-chunks-atom)))
+         (is (= #{2 1} (set @example-id-chunks-atom)))
+
+         (is
+          (trace-matches?
+           res
+           {:summary-evals nil
+            :summary-eval-failures nil
+            :results
+            {0
+             {:example-id       !eid1
+              :agent-initiates
+              {0
+               {:agent-name "_aor-experimenter"}
+               1
+               {:agent-name "foo"}}
+              :agent-results
+              {0
+               {:val
+                [{"node" "end" "args" [14]}
+                 {"node" "a" "args" ["1+10"]}
+                 {"node" "end" "args" ["1!"]}]
+                :failure? false}
+               1 {:val [{"node" "xyz" "args" [11]}] :failure? false}}
+              :evals
+              {"identity-compare"
+               {"outputs" [[14] [11]] "input" 1 "ref-output" "89"}}
+              :input            {"a" 1 "b" 10}
+              :reference-output ["1234567" "89"]}
+             1
+             {:example-id       !eid2
+              :agent-initiates
+              {0
+               {:agent-name "_aor-experimenter"}
+               1
+               {:agent-name "foo"}}
+              :agent-results
+              {0
+               {:val
+                [{"node" "end" "args" [105]}
+                 {"node" "a" "args" ["2+100"]}
+                 {"node" "end" "args" ["2!"]}]
+                :failure? false}
+               1 {:val [{"node" "xyz" "args" [102]}] :failure? false}}
+              :evals
+              {"identity-compare"
+               {"outputs" [[105] [102]] "input" 2 "ref-output" nil}}
+              :input            {"a" 2 "b" 100}
+              :reference-output nil}
+             2
+             {:example-id       !eid3
+              :agent-initiates
+              {0
+               {:agent-name "_aor-experimenter"}
+               1
+               {:agent-name "foo"}}
+              :agent-results
+              {0
+               {:val
+                [{"node" "end" "args" [1006]}
+                 {"node" "a" "args" ["3+1000"]}
+                 {"node" "end" "args" ["3!"]}]
+                :failure? false}
+               1 {:val [{"node" "xyz" "args" [1003]}] :failure? false}}
+              :evals
+              {"identity-compare"
+               {"outputs" [[1006] [1003]] "input" 3 "ref-output" "hijklmnop"}}
+              :input            {"a" 3 "b" 1000}
+              :reference-output ["abcdefg" "hijklmnop"]}}}
+          ))
+         (is (every? aor-types/AgentInvokeImpl?
+                     (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
          ; (clojure.pprint/pprint res)
 
+
          ;; TODO: <<<<>>>>
-         ;;  - create local and remote datasets
-         ;;    - remote one shouldn't have any agents
-         ;;  - more complicated input->args
-         ;;     - [{"a": "$.a", "b": "$$.a"}, "abc"]
-         ;;  - test experiment with node
-         ;;     - comparative with mixed
-         ;;     - regular experiment
-         ;;     - node failure propagates correctly
+         ;;  - test experiment with node doing aor/result!
+         ;;  - test summary eval with custom input/ref-output/output json paths
          ;;  - test all different selection types:
          ;;    - specific snapshot
          ;;    - specific example IDs
          ;;    - specific tag
          ;;  - test remote evaluators
-         ;;  - running regular experiment with comparative evaluator
-         ;;  - running comparative experiment with regular or summary evaluator
+         ;;  - error running regular experiment with comparative evaluator
+         ;;  - error running comparative experiment with regular or summary evaluator
 
         )))))
 

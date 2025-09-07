@@ -453,6 +453,9 @@
   (stream-specific-internal [this agent-invoke node node-invoke-id callback-fn])
   (stream-all-internal [this agent-invoke node callback-fn]))
 
+(defprotocol AgentManagerInternal
+  (add-remote-dataset-internal [this dataset-id cluster-conductor-host cluster-conductor-port
+                                module-name]))
 
 ;; Configs
 

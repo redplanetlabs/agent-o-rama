@@ -926,6 +926,18 @@
         {"exampleRuns" exampleRuns}))
      (close [this]
        (close! datasets-depot))
+     aor-types/AgentManagerInternal
+     (add-remote-dataset-internal
+       [this dataset-id cluster-conductor-host cluster-conductor-port module-name]
+       (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
+             (foreign-append!
+              datasets-depot
+              (aor-types/->valid-AddRemoteDataset dataset-id
+                                                  cluster-conductor-host
+                                                  cluster-conductor-port
+                                                  module-name))]
+         (when error
+           (throw (h/ex-info "Error creating dataset" {:info error})))))
      aor-types/UnderlyingObjects
      (underlying-objects [this]
        {:datasets-depot            datasets-depot

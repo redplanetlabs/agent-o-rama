@@ -761,13 +761,14 @@
    results-map))
 
 (defn fetch-remote-examples
-  [remote-params query-path]
+  [declared-objects-tg remote-params query-path]
   (let [cf (h/mk-completable-future)]
     (anode/submit-virtual-task!
      nil
      (fn []
        (try
          (datasets/with-datasets-pstate
+          declared-objects-tg
           remote-params
           [datasets]
           (.complete cf (foreign-select-one query-path datasets))
@@ -825,11 +826,15 @@
          (else>)
           (first *chunks :> *chunk)
           (apply multi-path (mapv keypath *chunk) :> *example-paths)
-          (path> (subselect (keypath *dataset-id :snapshots *snapshot)
-                            *example-paths)
+          (path> (keypath *dataset-id :snapshots *snapshot)
+                 (subselect *example-paths)
                  :> *query-path)
           (<<if (is-remote-dataset? *remote-params)
-            (fetch-remote-examples *remote-params *query-path :> *examples)
+            (fetch-remote-examples (po/agent-declared-objects-task-global)
+                                   *remote-params
+                                   *query-path
+                                   :> *examples-cf)
+            (completable-future> *examples-cf :> *examples)
            (else>)
             (local-select> *query-path datasets-pstate-sym :> *examples))
           (mapv vector *chunk *examples :> *pairs)

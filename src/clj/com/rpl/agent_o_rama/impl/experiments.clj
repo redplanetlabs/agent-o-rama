@@ -181,10 +181,15 @@
           (select [ALL
                    (pred relevant?)
                    (view #(vector (:name %)
-                                  (get-evaluator agent-node
-                                                 (:name %)
-                                                 (:builder-name %)
-                                                 (:builder-params %))))]
+                                  (merge (select-keys %
+                                                      [:input-json-path
+                                                       :reference-output-json-path
+                                                       :output-json-path])
+                                         {:eval-fn
+                                          (get-evaluator agent-node
+                                                         (:name %)
+                                                         (:builder-name %)
+                                                         (:builder-params %))})))]
                   eval-info))))
 
 (defn handle-experiment-start
@@ -252,7 +257,7 @@
             (reify
              AgentNode
              (emit [this node args]
-               (vswap! emits-vol conj [{"node" node "args" (vec args)}]))
+               (vswap! emits-vol conj {"node" node "args" (vec args)}))
              (result [this arg]
                (vreset! result-vol {:result arg}))
              (getStore [this name]
@@ -378,6 +383,13 @@
        (aor-types/->ExampleRunImpl input reference-output (nth outputs 0)))
    )))
 
+(defn maybe-get-json-path
+  [jp v]
+  (when v
+    (if jp
+      (h/read-json-path v jp)
+      v)))
+
 (defn hook:running-invoke-node [result+example-ids])
 
 (defn define-experiments-agent!
@@ -429,7 +441,9 @@
                num-targets  (count targets)
                clients      (mapv
                              (fn [{:keys [target-spec]}]
-                               (.getAgentClient agent-node (:agent-name target-spec)))
+                               (if (aor-types/AgentTarget? target-spec)
+                                 (.getAgentClient agent-node (:agent-name target-spec))
+                                 (.getAgentClient agent-node EXPERIMENTER-NAME)))
                              targets)
                initiate-fns
                (mapv
@@ -438,15 +452,15 @@
                         parsed-input->args (mapv parse-input-spec input->args)]
                     (fn [input]
                       (let [args (convert-input->args input parsed-input->args)]
-                        {:agent-name   agent-name
-                         :agent-invoke
-                         (if (aor-types/AgentTarget? target-spec)
-                           (apply c/agent-initiate client args)
-                           (c/agent-initiate client
-                                             {:agent-name agent-name
-                                              :node       (:node target-spec)
-                                              :args       args}))})
-                    )))
+                        (if (aor-types/AgentTarget? target-spec)
+                          {:agent-name   agent-name
+                           :agent-invoke (apply c/agent-initiate client args)}
+                          {:agent-name   EXPERIMENTER-NAME
+                           :agent-invoke (c/agent-initiate client
+                                                           {:agent-name agent-name
+                                                            :node       (:node target-spec)
+                                                            :args       args})})
+                      ))))
                 targets
                 clients)]
            (doseq [[result-id example-id] result+example-ids]
@@ -523,11 +537,13 @@
                     [(keypath dataset-id :experiments id :results result-id)]
                     local-ds)]
                (when-not (selected-any? [MAP-VALS :failure? identity] agent-results)
-                 (doseq [[eval-name eval-fn] evaluators
+                 (doseq [[eval-name
+                          {:keys [eval-fn input-json-path reference-output-json-path
+                                  output-json-path]}]
+                         evaluators
+
                          :when (and (not (contains? curr-evals eval-name))
                                     (not (contains? eval-failures eval-name)))]
-                   ;; TODO: <<<<>>>> this isn't using json paths to convert
-                   ;; input/reference-output/output
                    (evaluate! local-ds
                               dataset-id
                               eval-name
@@ -538,9 +554,12 @@
                                 agent-node
                                 spec
                                 eval-fn
-                                input
-                                reference-output
-                                (select [MAP-VALS :val] agent-results)))
+                                (maybe-get-json-path input-json-path input)
+                                (maybe-get-json-path reference-output-json-path reference-output)
+                                (select [MAP-VALS
+                                         :val
+                                         (view (fn [v] (maybe-get-json-path output-json-path v)))]
+                                        agent-results)))
                  ))))
            (c/emit! agent-node "finish" result+example-ids)
          ))))
@@ -565,7 +584,7 @@
                    (store/pstate-select-one [(keypath dataset-id :experiments id)
                                              (submap [:summary-evals :summary-eval-failures])]
                                             local-ds)]
-               (doseq [[eval-name eval-fn] evaluators
+               (doseq [[eval-name {:keys [eval-fn]}] evaluators
                        :when (and (not (contains? curr-evals eval-name))
                                   (not (contains? curr-failures eval-name)))]
                  ;; TODO: <<<<>>>> this isn't using json paths to convert

@@ -31,6 +31,8 @@
    [com.rpl.agentorama
     AddDatasetExampleOptions
     AgentManager]
+   [com.rpl.agentorama.impl
+    AgentDeclaredObjectsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     AddDatasetExample
     AddDatasetExampleTag
@@ -308,16 +310,18 @@
           apath
           )]]]))
 
+(defn get-cluster-retriever
+  [^AgentDeclaredObjectsTaskGlobal declared-objects-tg]
+  (.getClusterRetriever declared-objects-tg))
+
 (defmacro with-datasets-pstate
-  [remote-params [datasets-sym] & body]
+  [declared-objects-tg remote-params [datasets-sym] & body]
   `(let [{host# :cluster-conductor-host port# :cluster-conductor-port module-name# :module-name}
          ~remote-params
 
-         declared-objects-tg# (po/agent-declared-objects-task-global)
-
          retriever# (if host#
                       (open-cluster-manager (h/to-rama-connection-info host# port#))
-                      (.getClusterRetriever declared-objects-tg#))]
+                      (get-cluster-retriever ~declared-objects-tg))]
      (try
        (let [~datasets-sym (foreign-pstate retriever# module-name# (po/datasets-task-global-name))]
          ~@body)
@@ -332,6 +336,7 @@
     "Cannot set conductor port without setting conductor host"
     (try
       (with-datasets-pstate
+       (po/agent-declared-objects-task-global)
        params
        [datasets]
        (let [exists? (foreign-select-one [(keypath dataset-id) :props :name (view some?)]
