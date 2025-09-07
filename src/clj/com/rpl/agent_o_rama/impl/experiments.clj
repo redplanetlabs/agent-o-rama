@@ -145,14 +145,14 @@
                        ALL
                        (selected? LAST :tags (view contains? tag) identity)
                        FIRST]
-                      datasets)
+                      datasets))
 
-      (aor-types/ExampleIdsSelector? selector)
-      (vec (:example-ids selector))
+    (aor-types/ExampleIdsSelector? selector)
+    (vec (:example-ids selector))
 
-      :else
-      (throw (h/ex-info "Unexpected dataset selector type" {:type (class selector)}))
-    )))
+    :else
+    (throw (h/ex-info "Unexpected dataset selector type" {:type (class selector)}))
+  ))
 
 (defn all-evaluator-info
   [retriever {:keys [evaluators]}]

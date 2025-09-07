@@ -278,6 +278,288 @@
           {"a" 3 "b" 1000}
           {:reference-output ["abcdefg" "hijklmnop"]})
 
+         ; (bind exp-id (h/random-uuid7))
+         ; (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         ;   (foreign-append!
+         ;    global-actions-depot
+         ;    (aor-types/->valid-StartExperiment
+         ;     exp-id
+         ;     "My experiment"
+         ;     ds-id1
+         ;     nil
+         ;     nil
+         ;     [(aor-types/->valid-EvaluatorSelector "mylen" false)
+         ;      (aor-types/->valid-EvaluatorSelector "concise2" false)
+         ;      (aor-types/->valid-EvaluatorSelector "mycount" false)
+         ;      (aor-types/->valid-EvaluatorSelector "mysum" false)]
+         ;     (aor-types/->valid-RegularExperiment
+         ;      (aor-types/->valid-ExperimentTarget
+         ;       (aor-types/->valid-AgentTarget "foo")
+         ;       ["\"counts\"" "$"]
+         ;      ))
+         ;     2
+         ;     2)))
+         ;
+         ; (wait-experiment-finished! exp-client exp-invoke)
+         ; (bind res (foreign-invoke-query results ds-id1 exp-id))
+         ; (is (aor-types/StartExperiment? (:experiment-info res)))
+         ; (is (> (:finish-time-millis res) (:start-time-millis res)))
+         ; (is (aor-types/AgentInvokeImpl? (:experiment-invoke res)))
+         ; (is (= 2 (count @example-id-chunks-atom)))
+         ; (is (every? #(= 4 %) @example-id-chunks-atom))
+         ;
+         ;
+         ; (is
+         ;  (trace-matches?
+         ;   res
+         ;   {:summary-evals {"mycount" {"res" 8} "mysum" {"res" 110}}
+         ;    :summary-eval-failures nil
+         ;    :results
+         ;    {0
+         ;     {:example-id       !eid0
+         ;      :agent-initiates
+         ;      {0
+         ;       {:agent-name "foo"}}
+         ;      :agent-results    {0 {:val "50" :failure? false}}
+         ;      :evals            {"mylen" {"len" 20} "concise2" {"concise?" true}}
+         ;      :input            "abcdefg"
+         ;      :reference-output "aaaaaaaaaaa"}
+         ;     1
+         ;     {:example-id       !eid1
+         ;      :agent-initiates
+         ;      {0
+         ;       {:agent-name "foo"}}
+         ;      :agent-results    {0 {:val "50" :failure? false}}
+         ;      :evals            {"mylen" {"len" 6} "concise2" {"concise?" true}}
+         ;      :input            "ab"
+         ;      :reference-output ".."}
+         ;     2
+         ;     {:example-id       !eid2
+         ;      :agent-initiates
+         ;      {0
+         ;       {:agent-name "foo"}}
+         ;      :agent-results    {0 {:val "100" :failure? false}}
+         ;      :evals            {"mylen" {"len" 20} "concise2" {"concise?" false}}
+         ;      :input            "123456789abcdefg"
+         ;      :reference-output "."}
+         ;     3
+         ;     {:example-id       !eid3
+         ;      :agent-initiates
+         ;      {0
+         ;       {:agent-name "foo"}}
+         ;      :agent-results    {0 {:val "50" :failure? false}}
+         ;      :evals            {"mylen" {"len" 9} "concise2" {"concise?" true}}
+         ;      :input            "aa"
+         ;      :reference-output "bbbbb"}
+         ;     4
+         ;     {:example-id       !eid0
+         ;      :agent-initiates
+         ;      {0
+         ;       {:agent-name "foo"}}
+         ;      :agent-results    {0 {:val "50" :failure? false}}
+         ;      :evals            {"mylen" {"len" 20} "concise2" {"concise?" true}}
+         ;      :input            "abcdefg"
+         ;      :reference-output "aaaaaaaaaaa"}
+         ;     5
+         ;     {:example-id       !eid1
+         ;      :agent-initiates
+         ;      {0
+         ;       {:agent-name "foo"}}
+         ;      :agent-results    {0 {:val "50" :failure? false}}
+         ;      :evals            {"mylen" {"len" 6} "concise2" {"concise?" true}}
+         ;      :input            "ab"
+         ;      :reference-output ".."}
+         ;     6
+         ;     {:example-id       !eid2
+         ;      :agent-initiates
+         ;      {0
+         ;       {:agent-name "foo"}}
+         ;      :agent-results    {0 {:val "100" :failure? false}}
+         ;      :evals            {"mylen" {"len" 20} "concise2" {"concise?" false}}
+         ;      :input            "123456789abcdefg"
+         ;      :reference-output "."}
+         ;     7
+         ;     {:example-id       !eid3
+         ;      :agent-initiates
+         ;      {0
+         ;       {:agent-name "foo"}}
+         ;      :agent-results    {0 {:val "50" :failure? false}}
+         ;      :evals            {"mylen" {"len" 9} "concise2" {"concise?" true}}
+         ;      :input            "aa"
+         ;      :reference-output "bbbbb"}
+         ;    }}))
+         ;
+         ; (is (every? aor-types/AgentInvokeImpl?
+         ;             (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
+         ;
+         ; ;; test:
+         ; ;;   - comparative experiment
+         ; ;;   - node with emits
+         ; ;;   - JSON paths for regular evaluators
+         ; (reset! example-id-chunks-atom [])
+         ; (bind exp-id (h/random-uuid7))
+         ; (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         ;   (foreign-append!
+         ;    global-actions-depot
+         ;    (aor-types/->valid-StartExperiment
+         ;     exp-id
+         ;     "My experiment 2"
+         ;     remote-ds
+         ;     nil
+         ;     nil
+         ;     [(aor-types/->valid-EvaluatorSelector "identity-compare" false)]
+         ;     (aor-types/->valid-ComparativeExperiment
+         ;      [(aor-types/->valid-ExperimentTarget
+         ;        (aor-types/->valid-NodeTarget "foo" "a")
+         ;        ["$.a" "$.b"])
+         ;       (aor-types/->valid-ExperimentTarget
+         ;        (aor-types/->valid-AgentTarget "foo")
+         ;        ["\"other\"" "$.a" "$.b"])])
+         ;     1
+         ;     2)))
+         ;
+         ; (wait-experiment-finished! exp-client exp-invoke)
+         ; (bind res (foreign-invoke-query results remote-ds exp-id))
+         ; (is (aor-types/StartExperiment? (:experiment-info res)))
+         ; (is (> (:finish-time-millis res) (:start-time-millis res)))
+         ; (is (aor-types/AgentInvokeImpl? (:experiment-invoke res)))
+         ; (is (= 2 (count @example-id-chunks-atom)))
+         ; (is (= #{2 1} (set @example-id-chunks-atom)))
+         ;
+         ; (is
+         ;  (trace-matches?
+         ;   res
+         ;   {:summary-evals nil
+         ;    :summary-eval-failures nil
+         ;    :results
+         ;    {0
+         ;     {:example-id       !eid1
+         ;      :agent-initiates
+         ;      {0
+         ;       {:agent-name "_aor-experimenter"}
+         ;       1
+         ;       {:agent-name "foo"}}
+         ;      :agent-results
+         ;      {0
+         ;       {:val
+         ;        [{"node" "end" "args" [14]}
+         ;         {"node" "a" "args" ["1+10"]}
+         ;         {"node" "end" "args" ["1!"]}]
+         ;        :failure? false}
+         ;       1 {:val [{"node" "xyz" "args" [11]}] :failure? false}}
+         ;      :evals
+         ;      {"identity-compare"
+         ;       {"outputs" [[14] [11]] "input" 1 "ref-output" "89"}}
+         ;      :input            {"a" 1 "b" 10}
+         ;      :reference-output ["1234567" "89"]}
+         ;     1
+         ;     {:example-id       !eid2
+         ;      :agent-initiates
+         ;      {0
+         ;       {:agent-name "_aor-experimenter"}
+         ;       1
+         ;       {:agent-name "foo"}}
+         ;      :agent-results
+         ;      {0
+         ;       {:val
+         ;        [{"node" "end" "args" [105]}
+         ;         {"node" "a" "args" ["2+100"]}
+         ;         {"node" "end" "args" ["2!"]}]
+         ;        :failure? false}
+         ;       1 {:val [{"node" "xyz" "args" [102]}] :failure? false}}
+         ;      :evals
+         ;      {"identity-compare"
+         ;       {"outputs" [[105] [102]] "input" 2 "ref-output" nil}}
+         ;      :input            {"a" 2 "b" 100}
+         ;      :reference-output nil}
+         ;     2
+         ;     {:example-id       !eid3
+         ;      :agent-initiates
+         ;      {0
+         ;       {:agent-name "_aor-experimenter"}
+         ;       1
+         ;       {:agent-name "foo"}}
+         ;      :agent-results
+         ;      {0
+         ;       {:val
+         ;        [{"node" "end" "args" [1006]}
+         ;         {"node" "a" "args" ["3+1000"]}
+         ;         {"node" "end" "args" ["3!"]}]
+         ;        :failure? false}
+         ;       1 {:val [{"node" "xyz" "args" [1003]}] :failure? false}}
+         ;      :evals
+         ;      {"identity-compare"
+         ;       {"outputs" [[1006] [1003]] "input" 3 "ref-output" "hijklmnop"}}
+         ;      :input            {"a" 3 "b" 1000}
+         ;      :reference-output ["abcdefg" "hijklmnop"]}}}
+         ;  ))
+         ; (is (every? aor-types/AgentInvokeImpl?
+         ;             (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
+         ;
+         ;
+         ; ;; test:
+         ; ;;   - node using aor/result!
+         ; ;;   - remote evaluator
+         ; ;;   - summary eval with custom json paths
+         ; (bind exp-id (h/random-uuid7))
+         ; (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         ;   (foreign-append!
+         ;    global-actions-depot
+         ;    (aor-types/->valid-StartExperiment
+         ;     exp-id
+         ;     "My experiment 3"
+         ;     remote-ds
+         ;     nil
+         ;     nil
+         ;     [(aor-types/->valid-EvaluatorSelector "rc3" true)
+         ;      (aor-types/->valid-EvaluatorSelector "sum-with-paths" false)]
+         ;     (aor-types/->valid-RegularExperiment
+         ;      (aor-types/->valid-ExperimentTarget
+         ;       (aor-types/->valid-NodeTarget "foo" "b")
+         ;       ["\"$.a\"" "$.b"]
+         ;      ))
+         ;     1
+         ;     2)))
+         ;
+         ; (wait-experiment-finished! exp-client exp-invoke)
+         ; (bind res (foreign-invoke-query results remote-ds exp-id))
+         ; (is
+         ;  (trace-matches?
+         ;   res
+         ;   {:summary-evals {"sum-with-paths" {"res" 1136}}
+         ;    :summary-eval-failures nil
+         ;    :results
+         ;    {0
+         ;     {:example-id       !eid1
+         ;      :agent-initiates
+         ;      {0
+         ;       {:agent-name "_aor-experimenter"}}
+         ;      :agent-results    {0 {:val {"a" "110"} :failure? false}}
+         ;      :evals            {"rc3" {"concise?" true}}
+         ;      :input            {"a" 1 "b" 10}
+         ;      :reference-output ["1234567" "89"]}
+         ;     1
+         ;     {:example-id       !eid2
+         ;      :agent-initiates
+         ;      {0
+         ;       {:agent-name "_aor-experimenter"}}
+         ;      :agent-results    {0 {:val {"a" "2100"} :failure? false}}
+         ;      :evals            {"rc3" {"concise?" false}}
+         ;      :input            {"a" 2 "b" 100}
+         ;      :reference-output nil}
+         ;     2
+         ;     {:example-id       !eid3
+         ;      :agent-initiates
+         ;      {0
+         ;       {:agent-name "_aor-experimenter"}}
+         ;      :agent-results    {0 {:val {"a" "31000"} :failure? false}}
+         ;      :evals            {"rc3" {"concise?" false}}
+         ;      :input            {"a" 3 "b" 1000}
+         ;      :reference-output ["abcdefg" "hijklmnop"]}}}
+         ;  ))
+
+
+         ;; test selecting specific tag
          (bind exp-id (h/random-uuid7))
          (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
            (foreign-append!
@@ -287,282 +569,53 @@
              "My experiment"
              ds-id1
              nil
-             nil
-             [(aor-types/->valid-EvaluatorSelector "mylen" false)
-              (aor-types/->valid-EvaluatorSelector "concise2" false)
-              (aor-types/->valid-EvaluatorSelector "mycount" false)
-              (aor-types/->valid-EvaluatorSelector "mysum" false)]
-             (aor-types/->valid-RegularExperiment
-              (aor-types/->valid-ExperimentTarget
-               (aor-types/->valid-AgentTarget "foo")
-               ["\"counts\"" "$"]
-              ))
-             2
-             2)))
-
-         (wait-experiment-finished! exp-client exp-invoke)
-         (bind res (foreign-invoke-query results ds-id1 exp-id))
-         (is (aor-types/StartExperiment? (:experiment-info res)))
-         (is (> (:finish-time-millis res) (:start-time-millis res)))
-         (is (aor-types/AgentInvokeImpl? (:experiment-invoke res)))
-         (is (= 2 (count @example-id-chunks-atom)))
-         (is (every? #(= 4 %) @example-id-chunks-atom))
-
-
-         (is
-          (trace-matches?
-           res
-           {:summary-evals {"mycount" {"res" 8} "mysum" {"res" 110}}
-            :summary-eval-failures nil
-            :results
-            {0
-             {:example-id       !eid0
-              :agent-initiates
-              {0
-               {:agent-name "foo"}}
-              :agent-results    {0 {:val "50" :failure? false}}
-              :evals            {"mylen" {"len" 20} "concise2" {"concise?" true}}
-              :input            "abcdefg"
-              :reference-output "aaaaaaaaaaa"}
-             1
-             {:example-id       !eid1
-              :agent-initiates
-              {0
-               {:agent-name "foo"}}
-              :agent-results    {0 {:val "50" :failure? false}}
-              :evals            {"mylen" {"len" 6} "concise2" {"concise?" true}}
-              :input            "ab"
-              :reference-output ".."}
-             2
-             {:example-id       !eid2
-              :agent-initiates
-              {0
-               {:agent-name "foo"}}
-              :agent-results    {0 {:val "100" :failure? false}}
-              :evals            {"mylen" {"len" 20} "concise2" {"concise?" false}}
-              :input            "123456789abcdefg"
-              :reference-output "."}
-             3
-             {:example-id       !eid3
-              :agent-initiates
-              {0
-               {:agent-name "foo"}}
-              :agent-results    {0 {:val "50" :failure? false}}
-              :evals            {"mylen" {"len" 9} "concise2" {"concise?" true}}
-              :input            "aa"
-              :reference-output "bbbbb"}
-             4
-             {:example-id       !eid0
-              :agent-initiates
-              {0
-               {:agent-name "foo"}}
-              :agent-results    {0 {:val "50" :failure? false}}
-              :evals            {"mylen" {"len" 20} "concise2" {"concise?" true}}
-              :input            "abcdefg"
-              :reference-output "aaaaaaaaaaa"}
-             5
-             {:example-id       !eid1
-              :agent-initiates
-              {0
-               {:agent-name "foo"}}
-              :agent-results    {0 {:val "50" :failure? false}}
-              :evals            {"mylen" {"len" 6} "concise2" {"concise?" true}}
-              :input            "ab"
-              :reference-output ".."}
-             6
-             {:example-id       !eid2
-              :agent-initiates
-              {0
-               {:agent-name "foo"}}
-              :agent-results    {0 {:val "100" :failure? false}}
-              :evals            {"mylen" {"len" 20} "concise2" {"concise?" false}}
-              :input            "123456789abcdefg"
-              :reference-output "."}
-             7
-             {:example-id       !eid3
-              :agent-initiates
-              {0
-               {:agent-name "foo"}}
-              :agent-results    {0 {:val "50" :failure? false}}
-              :evals            {"mylen" {"len" 9} "concise2" {"concise?" true}}
-              :input            "aa"
-              :reference-output "bbbbb"}
-            }}))
-
-         (is (every? aor-types/AgentInvokeImpl?
-                     (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
-
-         ;; test:
-         ;;   - comparative experiment
-         ;;   - node with emits
-         ;;   - JSON paths for regular evaluators
-         (reset! example-id-chunks-atom [])
-         (bind exp-id (h/random-uuid7))
-         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
-           (foreign-append!
-            global-actions-depot
-            (aor-types/->valid-StartExperiment
-             exp-id
-             "My experiment 2"
-             remote-ds
-             nil
-             nil
-             [(aor-types/->valid-EvaluatorSelector "identity-compare" false)]
-             (aor-types/->valid-ComparativeExperiment
-              [(aor-types/->valid-ExperimentTarget
-                (aor-types/->valid-NodeTarget "foo" "a")
-                ["$.a" "$.b"])
-               (aor-types/->valid-ExperimentTarget
-                (aor-types/->valid-AgentTarget "foo")
-                ["\"other\"" "$.a" "$.b"])])
-             1
-             2)))
-
-         (wait-experiment-finished! exp-client exp-invoke)
-         (bind res (foreign-invoke-query results remote-ds exp-id))
-         (is (aor-types/StartExperiment? (:experiment-info res)))
-         (is (> (:finish-time-millis res) (:start-time-millis res)))
-         (is (aor-types/AgentInvokeImpl? (:experiment-invoke res)))
-         (is (= 2 (count @example-id-chunks-atom)))
-         (is (= #{2 1} (set @example-id-chunks-atom)))
-
-         (is
-          (trace-matches?
-           res
-           {:summary-evals nil
-            :summary-eval-failures nil
-            :results
-            {0
-             {:example-id       !eid1
-              :agent-initiates
-              {0
-               {:agent-name "_aor-experimenter"}
-               1
-               {:agent-name "foo"}}
-              :agent-results
-              {0
-               {:val
-                [{"node" "end" "args" [14]}
-                 {"node" "a" "args" ["1+10"]}
-                 {"node" "end" "args" ["1!"]}]
-                :failure? false}
-               1 {:val [{"node" "xyz" "args" [11]}] :failure? false}}
-              :evals
-              {"identity-compare"
-               {"outputs" [[14] [11]] "input" 1 "ref-output" "89"}}
-              :input            {"a" 1 "b" 10}
-              :reference-output ["1234567" "89"]}
-             1
-             {:example-id       !eid2
-              :agent-initiates
-              {0
-               {:agent-name "_aor-experimenter"}
-               1
-               {:agent-name "foo"}}
-              :agent-results
-              {0
-               {:val
-                [{"node" "end" "args" [105]}
-                 {"node" "a" "args" ["2+100"]}
-                 {"node" "end" "args" ["2!"]}]
-                :failure? false}
-               1 {:val [{"node" "xyz" "args" [102]}] :failure? false}}
-              :evals
-              {"identity-compare"
-               {"outputs" [[105] [102]] "input" 2 "ref-output" nil}}
-              :input            {"a" 2 "b" 100}
-              :reference-output nil}
-             2
-             {:example-id       !eid3
-              :agent-initiates
-              {0
-               {:agent-name "_aor-experimenter"}
-               1
-               {:agent-name "foo"}}
-              :agent-results
-              {0
-               {:val
-                [{"node" "end" "args" [1006]}
-                 {"node" "a" "args" ["3+1000"]}
-                 {"node" "end" "args" ["3!"]}]
-                :failure? false}
-               1 {:val [{"node" "xyz" "args" [1003]}] :failure? false}}
-              :evals
-              {"identity-compare"
-               {"outputs" [[1006] [1003]] "input" 3 "ref-output" "hijklmnop"}}
-              :input            {"a" 3 "b" 1000}
-              :reference-output ["abcdefg" "hijklmnop"]}}}
-          ))
-         (is (every? aor-types/AgentInvokeImpl?
-                     (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
-
-
-         ;; test:
-         ;;   - node using aor/result!
-         ;;   - remote evaluator
-         ;;   - summary eval with custom json paths
-         (bind exp-id (h/random-uuid7))
-         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
-           (foreign-append!
-            global-actions-depot
-            (aor-types/->valid-StartExperiment
-             exp-id
-             "My experiment 3"
-             remote-ds
-             nil
-             nil
-             [(aor-types/->valid-EvaluatorSelector "rc3" true)
-              (aor-types/->valid-EvaluatorSelector "sum-with-paths" false)]
+             (aor-types/->valid-TagSelector "tag1")
+             [(aor-types/->valid-EvaluatorSelector "mycount" false)]
              (aor-types/->valid-RegularExperiment
               (aor-types/->valid-ExperimentTarget
                (aor-types/->valid-NodeTarget "foo" "b")
-               ["\"$.a\"" "$.b"]
+               ["$" "\"!\""]
               ))
              1
-             2)))
-
+             3)))
          (wait-experiment-finished! exp-client exp-invoke)
-         (bind res (foreign-invoke-query results remote-ds exp-id))
+         (bind res (foreign-invoke-query results ds-id1 exp-id))
          (is
           (trace-matches?
            res
-           {:summary-evals {"sum-with-paths" {"res" 1136}}
+           {:summary-evals {"mycount" {"res" 3}}
             :summary-eval-failures nil
-            :results
-            {0
-             {:example-id       !eid1
-              :agent-initiates
-              {0
-               {:agent-name "_aor-experimenter"}}
-              :agent-results    {0 {:val {"a" "110"} :failure? false}}
-              :evals            {"rc3" {"concise?" true}}
-              :input            {"a" 1 "b" 10}
-              :reference-output ["1234567" "89"]}
-             1
-             {:example-id       !eid2
-              :agent-initiates
-              {0
-               {:agent-name "_aor-experimenter"}}
-              :agent-results    {0 {:val {"a" "2100"} :failure? false}}
-              :evals            {"rc3" {"concise?" false}}
-              :input            {"a" 2 "b" 100}
-              :reference-output nil}
-             2
-             {:example-id       !eid3
-              :agent-initiates
-              {0
-               {:agent-name "_aor-experimenter"}}
-              :agent-results    {0 {:val {"a" "31000"} :failure? false}}
-              :evals            {"rc3" {"concise?" false}}
-              :input            {"a" 3 "b" 1000}
-              :reference-output ["abcdefg" "hijklmnop"]}}}
+            :results       {0
+                            {:example-id       !eid1
+                             :agent-initiates
+                             {0
+                              {:agent-name "_aor-experimenter"}}
+                             :agent-results    {0 {:val {"a" "abcdefg!"} :failure? false}}
+                             :input            "abcdefg"
+                             :reference-output "aaaaaaaaaaa"}
+                            1
+                            {:example-id       !eid2
+                             :agent-initiates
+                             {0
+                              {:agent-name "_aor-experimenter"}}
+                             :agent-results    {0 {:val {"a" "ab!"} :failure? false}}
+                             :input            "ab"
+                             :reference-output ".."}
+                            2
+                            {:example-id       !eid3
+                             :agent-initiates
+                             {0
+                              {:agent-name "_aor-experimenter"}}
+                             :agent-results
+                             {0 {:val {"a" "123456789abcdefg!"} :failure? false}}
+                             :input            "123456789abcdefg"
+                             :reference-output "."}}}
           ))
 
          ;; TODO: <<<<>>>>
          ;;  - test all different selection types:
          ;;    - specific snapshot
          ;;    - specific example IDs
-         ;;    - specific tag
          ;;  - error running regular experiment with comparative evaluator
          ;;  - error running comparative experiment with regular or summary evaluator
 
@@ -590,6 +643,6 @@
 (deftest search-experiments-test
          ;; TODO: <<<<>>>>
          ;;  - test search and all filter types
-         ;;     - easier in another test with experiments that run without any examples
+         ;;     - run experiments without any examples
 
 )
