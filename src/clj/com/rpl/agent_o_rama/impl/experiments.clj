@@ -584,11 +584,22 @@
                    (store/pstate-select-one [(keypath dataset-id :experiments id)
                                              (submap [:summary-evals :summary-eval-failures])]
                                             local-ds)]
-               (doseq [[eval-name {:keys [eval-fn]}] evaluators
+               (doseq [[eval-name
+                        {:keys [eval-fn input-json-path reference-output-json-path
+                                output-json-path]}]
+                       evaluators
+
                        :when (and (not (contains? curr-evals eval-name))
-                                  (not (contains? curr-failures eval-name)))]
-                 ;; TODO: <<<<>>>> this isn't using json paths to convert
-                 ;; input/reference-output/output
+                                  (not (contains? curr-failures eval-name)))
+                       :let [example-runs
+                             (multi-transform
+                              [ALL
+                               (multi-path
+                                [:input (term #(maybe-get-json-path input-json-path %))]
+                                [:reference-output
+                                 (term #(maybe-get-json-path reference-output-json-path %))]
+                                [:output (term #(maybe-get-json-path output-json-path %))])]
+                              example-runs)]]
                  (evaluate! local-ds
                             dataset-id
                             eval-name
