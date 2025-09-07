@@ -223,7 +223,7 @@
                       :problems eval-problems})
 
           (foreign-select-one
-           [(keypath dataset-id) (view nil?)]
+           [(keypath dataset-id) :props (view nil?)]
            datasets)
           (c/result! agent-node {:error "Dataset does not exist"})
 

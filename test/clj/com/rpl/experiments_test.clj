@@ -16,7 +16,11 @@
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
    [com.rpl.test-common :as tc]
-   [meander.epsilon :as m]))
+   [meander.epsilon :as m])
+  (:import
+   [com.rpl.agent_o_rama.impl.types
+    ComparativeExperiment
+    RegularExperiment]))
 
 
 (defn count-or-num
@@ -30,7 +34,6 @@
 
     :else
     v))
-
 
 (defn wait-experiment-finished!
   [exp-client agent-invoke]
@@ -59,30 +62,6 @@
                               (count-or-num ref-output))]
                    {"len" len}
                  ))))
-            (aor/declare-comparative-evaluator-builder
-             topology
-             "compare-min"
-             ""
-             (fn [params]
-               (fn [fetcher input ref-output outputs]
-                 (let [outputs (mapv parse-long outputs)
-                       m       (apply min outputs)]
-                   {"res"
-                    (select-any [INDEXED-VALS (selected? LAST (pred= m)) FIRST] outputs)
-                    "input"      input
-                    "ref-output" ref-output}))))
-            (aor/declare-comparative-evaluator-builder
-             topology
-             "compare-max"
-             ""
-             (fn [params]
-               (fn [fetcher input ref-output outputs]
-                 (let [outputs (mapv parse-long outputs)
-                       m       (apply max outputs)]
-                   {"res"
-                    (select-any [INDEXED-VALS (selected? LAST (pred= m)) FIRST] outputs)
-                    "input"      input
-                    "ref-output" ref-output}))))
             (aor/declare-comparative-evaluator-builder
              topology
              "identity-compare"
@@ -189,8 +168,6 @@
          (aor/create-evaluator! manager "mylen" "len" {} "")
          (aor/create-evaluator! manager "mysum" "sum-sizes" {} "")
          (aor/create-evaluator! manager "mycount" "count" {} "")
-         (aor/create-evaluator! manager "cmin" "compare-min" {} "")
-         (aor/create-evaluator! manager "cmax" "compare-min" {} "")
          (aor/create-evaluator! manager
                                 "identity-compare"
                                 "identity-compare"
@@ -218,7 +195,6 @@
                                 {:output-json-path "$.a"})
 
          (bind ds-id1 (aor/create-dataset! manager "Dataset 1"))
-         (bind ds-id2 (aor/create-dataset! manager "Dataset 2"))
          (bind remote-ds (aor/create-dataset! ds-manager "Dataset 3"))
          (aor-types/add-remote-dataset-internal manager remote-ds nil nil ds-module-name)
 
@@ -699,10 +675,174 @@
           ))
 
 
-         ;; TODO: <<<<>>>>
-         ;;  - error running regular experiment with comparative evaluator
-         ;;  - error running comparative experiment with regular or summary evaluator
+         ;; test error running experiment with non-existent node
+         (bind exp-id (h/random-uuid7))
+         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+           (foreign-append!
+            global-actions-depot
+            (aor-types/->valid-StartExperiment
+             exp-id
+             "My experiment"
+             ds-id1
+             "mysnap"
+             nil
+             [(aor-types/->valid-EvaluatorSelector "mycount" false)
+              (aor-types/->valid-EvaluatorSelector "concise2" false)]
+             (aor-types/->valid-RegularExperiment
+              (aor-types/->valid-ExperimentTarget
+               (aor-types/->valid-NodeTarget "foo" "notanode")
+               ["$"]
+              ))
+             1
+             100)))
+         (wait-experiment-finished! exp-client exp-invoke)
+         (bind res (foreign-invoke-query results ds-id1 exp-id))
+         (is
+          (trace-matches?
+           res
+           {:summary-evals {"mycount" {"res" 0}}
+            :summary-eval-failures nil
+            :results
+            {0
+             {:example-id       !eid0
+              :agent-initiates
+              {0
+               {:agent-name "_aor-experimenter"}}
+              :agent-results
+              {0
+               {:val      {:message "Node does not exist" :node "notanode"}
+                :failure? true}}
+              :input            "abcdefg"
+              :reference-output "aaaaaaaaaaa"}}}
+          ))
 
+
+         ;; test with non-existent dataset
+         (bind exp-id (h/random-uuid7))
+         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+           (foreign-append!
+            global-actions-depot
+            (aor-types/->valid-StartExperiment
+             exp-id
+             "My experiment"
+             (h/random-uuid7)
+             nil
+             nil
+             [(aor-types/->valid-EvaluatorSelector "mycount" false)]
+             (aor-types/->valid-RegularExperiment
+              (aor-types/->valid-ExperimentTarget
+               (aor-types/->valid-NodeTarget "foo" "a")
+               ["$" "$"]
+              ))
+             1
+             2)))
+         (try
+           (wait-experiment-finished! exp-client exp-invoke)
+           (is false)
+           (catch Exception e
+             (is (= (ex-data e) {:res {:error "Dataset does not exist"}}))
+           ))
+
+         ;; test with non-existent snapshot
+         (bind exp-id (h/random-uuid7))
+         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+           (foreign-append!
+            global-actions-depot
+            (aor-types/->valid-StartExperiment
+             exp-id
+             "My experiment"
+             ds-id1
+             "notasnapshot"
+             nil
+             [(aor-types/->valid-EvaluatorSelector "mycount" false)]
+             (aor-types/->valid-RegularExperiment
+              (aor-types/->valid-ExperimentTarget
+               (aor-types/->valid-NodeTarget "foo" "a")
+               ["$" "$"]
+              ))
+             1
+             2)))
+         (try
+           (wait-experiment-finished! exp-client exp-invoke)
+           (is false)
+           (catch Exception e
+             (is (= (ex-data e) {:res {:error "Snapshot does not exist or has no examples"}}))
+           ))
+
+
+         ;; test error running regular experiment with comparative evaluator
+         (bind exp-id (h/random-uuid7))
+         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+           (foreign-append!
+            global-actions-depot
+            (aor-types/->valid-StartExperiment
+             exp-id
+             "My experiment"
+             ds-id1
+             nil
+             nil
+             [(aor-types/->valid-EvaluatorSelector "identity-compare" false)]
+             (aor-types/->valid-RegularExperiment
+              (aor-types/->valid-ExperimentTarget
+               (aor-types/->valid-NodeTarget "foo" "a")
+               ["$" "$"]
+              ))
+             1
+             100)))
+         (try
+           (wait-experiment-finished! exp-client exp-invoke)
+           (is false)
+           (catch Exception e
+             (is (= (ex-data e)
+                    {:res {:error    "Problem with one or more evaluators"
+                           :problems [{:problem         "Evaluator type does not match experiment"
+                                       :experiment-type RegularExperiment
+                                       :evaluator-type  :comparative
+                                       :name            "identity-compare"
+                                       :remote?         false}]}}))
+           ))
+
+
+         ;; test error running comparative experiment with regular evaluator
+         (bind exp-id (h/random-uuid7))
+         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+           (foreign-append!
+            global-actions-depot
+            (aor-types/->valid-StartExperiment
+             exp-id
+             "My experiment 2"
+             remote-ds
+             nil
+             nil
+             [(aor-types/->valid-EvaluatorSelector "mylen" false)
+              (aor-types/->valid-EvaluatorSelector "identity-compare" false)
+              (aor-types/->valid-EvaluatorSelector "mycount" false)]
+             (aor-types/->valid-ComparativeExperiment
+              [(aor-types/->valid-ExperimentTarget
+                (aor-types/->valid-NodeTarget "foo" "a")
+                ["$.a" "$.b"])
+               (aor-types/->valid-ExperimentTarget
+                (aor-types/->valid-AgentTarget "foo")
+                ["\"other\"" "$.a" "$.b"])])
+             1
+             2)))
+         (try
+           (wait-experiment-finished! exp-client exp-invoke)
+           (is false)
+           (catch Exception e
+             (is (= (ex-data e)
+                    {:res {:error    "Problem with one or more evaluators"
+                           :problems [{:problem         "Evaluator type does not match experiment"
+                                       :experiment-type ComparativeExperiment
+                                       :evaluator-type  :regular
+                                       :name            "mylen"
+                                       :remote?         false}
+                                      {:problem         "Evaluator type does not match experiment"
+                                       :experiment-type ComparativeExperiment
+                                       :evaluator-type  :summary
+                                       :name            "mycount"
+                                       :remote?         false}]}}))
+           ))
         )))))
 
 (deftest execution-failures-test
