@@ -221,8 +221,17 @@
          (bind ds-id2 (aor/create-dataset! manager "Dataset 2"))
          (bind remote-ds (aor/create-dataset! ds-manager "Dataset 3"))
          (aor-types/add-remote-dataset-internal manager remote-ds nil nil ds-module-name)
-         ;; TODO: <<<<>>>> do invalid adds and verify errors
-         ;;   - including with conductor host
+
+         (is (thrown?
+              Exception
+              (aor-types/add-remote-dataset-internal manager remote-ds nil nil "notamodule")))
+         (is (thrown?
+              Exception
+              (aor-types/add-remote-dataset-internal manager remote-ds nil 1234 ds-module-name)))
+         (is
+          (thrown?
+           Exception
+           (aor-types/add-remote-dataset-internal manager remote-ds "a.b.c.d" nil ds-module-name)))
 
          (bind add-example-and-wait!
            (fn [& args]
@@ -561,7 +570,7 @@
 
         )))))
 
-(deftest failures-test
+(deftest execution-failures-test
          ;; TODO: <<<<>>>>>
          ;;  - agent failures
          ;;  - node execution failures

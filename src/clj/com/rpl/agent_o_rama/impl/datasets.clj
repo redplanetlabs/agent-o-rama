@@ -345,7 +345,7 @@
            (throw (h/ex-info "Remote dataset does not exist in specified module" {})))
          nil))
       (catch Throwable t
-        (str "Failed to connect to remote dataset %s" (h/throwable->str t))))))
+        (format "Failed to connect to remote dataset %s" (h/throwable->str t))))))
 
 (deframaop handle-datasets-op
   [{:keys [*dataset-id] :as *data}]
