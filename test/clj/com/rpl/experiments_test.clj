@@ -21,7 +21,15 @@
 
 (defn count-or-num
   [v]
-  (if (string? v) (count v) v))
+  (cond
+    (nil? v)
+    0
+
+    (string? v)
+    (count v)
+
+    :else
+    v))
 
 
 (defn wait-experiment-finished!
@@ -111,7 +119,7 @@
                 (aor/new-agent "foo")
                 (aor/node
                  "start"
-                 ["end" "end2" "a"]
+                 ["end" "end2" "a" "b"]
                  (fn [agent-node action & inputs]
                    (if (= action "counts")
                      (let [v (reduce + 0 (mapv count-or-num inputs))]
@@ -145,6 +153,12 @@
                    (aor/emit! agent-node "end" (+ arg1 arg2 3))
                    (aor/emit! agent-node "a" (str arg1 "+" arg2))
                    (aor/emit! agent-node "end" (str arg1 "!"))
+                 ))
+                (aor/node
+                 "b"
+                 nil
+                 (fn [agent-node arg1 arg2]
+                   (aor/result! agent-node {"a" (str arg1 arg2)})
                  ))
             )
            ))
@@ -186,12 +200,29 @@
                                  :output-json-path "$[0].args"
                                  :reference-output-json-path "$[1]"
                                 })
+         (aor/create-evaluator! manager
+                                "sum-with-paths"
+                                "sum-sizes"
+                                {}
+                                ""
+                                {:input-json-path  "$.b"
+                                 :output-json-path "$.a"
+                                 :reference-output-json-path "$[0]"
+                                })
 
-         (aor/create-evaluator! ds-manager "rc3" "aor/conciseness" {"threshold" "3"} "")
+         (aor/create-evaluator! ds-manager
+                                "rc3"
+                                "aor/conciseness"
+                                {"threshold" "3"}
+                                ""
+                                {:output-json-path "$.a"})
 
          (bind ds-id1 (aor/create-dataset! manager "Dataset 1"))
          (bind ds-id2 (aor/create-dataset! manager "Dataset 2"))
          (bind remote-ds (aor/create-dataset! ds-manager "Dataset 3"))
+         (aor-types/add-remote-dataset-internal manager remote-ds nil nil ds-module-name)
+         ;; TODO: <<<<>>>> do invalid adds and verify errors
+         ;;   - including with conductor host
 
          (bind add-example-and-wait!
            (fn [& args]
@@ -352,15 +383,10 @@
          (is (every? aor-types/AgentInvokeImpl?
                      (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
 
-
-
-         ;; TODO: <<<<>>>> do invalid adds and verify errors
-         ;;   - including with conductor host
-
-         (aor-types/add-remote-dataset-internal manager remote-ds nil nil ds-module-name)
-         ;; TODO: <<<<>>>> handle input/output/ref-output json paths for summary evals
-
-
+         ;; test:
+         ;;   - comparative experiment
+         ;;   - node with emits
+         ;;   - JSON paths for regular evaluators
          (reset! example-id-chunks-atom [])
          (bind exp-id (h/random-uuid7))
          (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
@@ -460,19 +486,78 @@
           ))
          (is (every? aor-types/AgentInvokeImpl?
                      (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
-         ; (clojure.pprint/pprint res)
 
+
+         ;; test:
+         ;;   - node using aor/result!
+         ;;   - remote evaluator
+         ;;   - summary eval with custom json paths
+         (bind exp-id (h/random-uuid7))
+         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+           (foreign-append!
+            global-actions-depot
+            (aor-types/->valid-StartExperiment
+             exp-id
+             "My experiment 3"
+             remote-ds
+             nil
+             nil
+             [(aor-types/->valid-EvaluatorSelector "rc3" true)
+              (aor-types/->valid-EvaluatorSelector "sum-with-paths" false)]
+             (aor-types/->valid-RegularExperiment
+              (aor-types/->valid-ExperimentTarget
+               (aor-types/->valid-NodeTarget "foo" "b")
+               ["\"$.a\"" "$.b"]
+              ))
+             1
+             2)))
+
+         (wait-experiment-finished! exp-client exp-invoke)
+         (bind res (foreign-invoke-query results remote-ds exp-id))
+         (is
+          (trace-matches?
+           res
+           {:summary-evals {"sum-with-paths" {"res" 1136}}
+            :summary-eval-failures nil
+            :results
+            {0
+             {:example-id       !eid1
+              :agent-initiates
+              {0
+               {:agent-name "_aor-experimenter"}}
+              :agent-results    {0 {:val {"a" "110"} :failure? false}}
+              :evals            {"rc3" {"concise?" true}}
+              :input            {"a" 1 "b" 10}
+              :reference-output ["1234567" "89"]}
+             1
+             {:example-id       !eid2
+              :agent-initiates
+              {0
+               {:agent-name "_aor-experimenter"}}
+              :agent-results    {0 {:val {"a" "2100"} :failure? false}}
+              :evals            {"rc3" {"concise?" false}}
+              :input            {"a" 2 "b" 100}
+              :reference-output nil}
+             2
+             {:example-id       !eid3
+              :agent-initiates
+              {0
+               {:agent-name "_aor-experimenter"}}
+              :agent-results    {0 {:val {"a" "31000"} :failure? false}}
+              :evals            {"rc3" {"concise?" false}}
+              :input            {"a" 3 "b" 1000}
+              :reference-output ["abcdefg" "hijklmnop"]}}}
+          ))
 
          ;; TODO: <<<<>>>>
-         ;;  - test experiment with node doing aor/result!
-         ;;  - test summary eval with custom input/ref-output/output json paths
          ;;  - test all different selection types:
          ;;    - specific snapshot
          ;;    - specific example IDs
          ;;    - specific tag
-         ;;  - test remote evaluators
          ;;  - error running regular experiment with comparative evaluator
          ;;  - error running comparative experiment with regular or summary evaluator
+
+         ; (clojure.pprint/pprint res)
 
         )))))
 
