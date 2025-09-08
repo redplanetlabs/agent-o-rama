@@ -436,14 +436,14 @@
                  ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
                     ($ :div.py-1
                        (for [evaluator evaluators]
-                         ($ DropdownRow {:key (:name evaluator)
-                                         :label (:name evaluator)
-                                         :selected? (= (:name selected-evaluator) (:name evaluator))
-                                         :on-select #(do (set-selected-evaluator evaluator) (set-dropdown-open false))
-                                         :extra-content ($ :div.px-4.pb-2.text-xs.text-gray-500
-                                                           ($ :span.inline-flex.items-center.px-2.py-0.5.rounded-full.text-xs.font-medium
-                                                              {:className (get-evaluator-type-badge-style (:type evaluator))}
-                                                              (get-evaluator-type-display (:type evaluator))))}))))))))
+                         ($ datasets/DropdownRow {:key (:name evaluator)
+                                                  :label (:name evaluator)
+                                                  :selected? (= (:name selected-evaluator) (:name evaluator))
+                                                  :on-select #(do (set-selected-evaluator evaluator) (set-dropdown-open false))
+                                                  :extra-content ($ :div.px-4.pb-2.text-xs.text-gray-500
+                                                                    ($ :span.inline-flex.items-center.px-2.py-0.5.rounded-full.text-xs.font-medium
+                                                                       {:className (get-evaluator-type-badge-style (:type evaluator))}
+                                                                       (get-evaluator-type-display (:type evaluator))))}))))))))
 
        ;; 2. Example Input (read-only) - only for single mode
        (when (= mode :single)

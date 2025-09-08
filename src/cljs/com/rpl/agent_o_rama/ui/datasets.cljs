@@ -7,10 +7,10 @@
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
+   [com.rpl.agent-o-rama.ui.datasets-forms :as datasets-forms]
    [reitit.frontend.easy :as rfe]
    [clojure.string :as str]
    [com.rpl.specter :as s]))
-
 
 ;; =============================================================================
 ;; EXAMPLE ACTIONS AND EDITING
@@ -129,7 +129,7 @@
                  "Edit"))
             (if value
               ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono.pr-16
-                 (pretty-print-json value))
+                 (datasets-forms/pretty-print-json value))
               ($ :div.text-sm.text-gray-500.italic "No value")))))))
 
 (defui EditableExampleModal [{:keys [example-id module-id dataset-id snapshot-name on-delete-success is-read-only?]}] ;; Add is-read-only?
@@ -203,7 +203,7 @@
             ($ :div
                ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tags")
                ($ :div.bg-gray-50.rounded-md.p-4.border
-                  ($ TagInput {:tags (:tags example) :module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name :example-id example-id :read-only? is-read-only?}))) ;; Pass read-only state
+                  ($ datasets-forms/TagInput {:tags (:tags example) :module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name :example-id example-id :read-only? is-read-only?}))) ;; Pass read-only state
 
             ;; Example ID (read-only)
             ($ :div
@@ -403,10 +403,10 @@
         handle-create (fn []
                         (set-dropdown-open false)
                         ;; Pass the setter function as a callback
-                        (show-create-snapshot-modal! module-id
-                                                     dataset-id
-                                                     selected-snapshot
-                                                     set-selected-snapshot))
+                        (datasets-forms/show-create-snapshot-modal! module-id
+                                                                    dataset-id
+                                                                    selected-snapshot
+                                                                    set-selected-snapshot))
 
         handle-delete (fn [snapshot-name]
                         (set-dropdown-open false)
@@ -614,10 +614,10 @@
                                                    ;; Show the new unified modal in :single mode
                                                    (state/dispatch [:modal/show :run-evaluator
                                                                     {:title "Try Evaluator on Example"
-                                                                     :component ($ RunEvaluatorModal {:module-id module-id
-                                                                                                      :dataset-id dataset-id
-                                                                                                      :mode :single
-                                                                                                      :example example})}]))}
+                                                                     :component ($ datasets-forms/RunEvaluatorModal {:module-id module-id
+                                                                                                                     :dataset-id dataset-id
+                                                                                                                     :mode :single
+                                                                                                                     :example example})}]))}
                                        ($ PlayIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                        "Try with evaluator")
                                     ;; Delete button
@@ -650,7 +650,7 @@
 
 (defn show-edit-dataset-modal! [module-id dataset-id initial-name initial-description]
   (state/dispatch [:form/init :edit-dataset
-                   (-> edit-dataset-form-spec
+                   (-> datasets-forms/edit-dataset-form-spec
                        (assoc :submit-event [:dataset/edit {:module-id module-id
                                                             :dataset-id dataset-id
                                                             :initial-name initial-name
@@ -659,9 +659,9 @@
                    {:title "Edit Dataset"
                     :form-id :edit-dataset
                     :submit-text "Save Changes"
-                    :component ($ EditDatasetForm {:form-id :edit-dataset
-                                                   :initial-name initial-name
-                                                   :initial-description initial-description})}]))
+                    :component ($ datasets-forms/EditDatasetForm {:form-id :edit-dataset
+                                                                  :initial-name initial-name
+                                                                  :initial-description initial-description})}]))
 
 ;; =============================================================================
 ;; MAIN DATASETS INDEX PAGE
@@ -687,7 +687,7 @@
              ($ CircleStackIcon {:className "h-8 w-8 text-indigo-600"}))
 
           ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
-             {:onClick #(show-create-dataset-modal! decoded-module-id)}
+             {:onClick #(datasets-forms/show-create-dataset-modal! decoded-module-id)}
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Create Dataset"))
 
@@ -701,7 +701,7 @@
             ($ :h3.text-lg.font-medium.text-gray-900.mb-2 "No datasets yet")
             ($ :p.text-gray-500.mb-6 "Create your first dataset to get started.")
             ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
-               {:onClick #(show-create-dataset-modal! decoded-module-id)}
+               {:onClick #(datasets-forms/show-create-dataset-modal! decoded-module-id)}
                ($ PlusIcon {:className "h-5 w-5 mr-2"})
                "Create Dataset"))
          :else
@@ -944,7 +944,7 @@
                           ;; Right side - Add Example button
                           ($ :div.flex.items-center.space-x-4
                              ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer.disabled:bg-gray-400.disabled:cursor-not-allowed
-                                {:onClick #(show-add-example-modal!
+                                {:onClick #(datasets-forms/show-add-example-modal!
                                             {:module-id module-id
                                              :dataset-id dataset-id
                                              :snapshot-name selected-snapshot-name})
@@ -975,10 +975,10 @@
                                              ;; Show the new unified modal in :multi mode
                                              (state/dispatch [:modal/show :run-evaluator
                                                               {:title "Run Summary Evaluation"
-                                                               :component ($ RunEvaluatorModal {:module-id module-id
-                                                                                                :dataset-id dataset-id
-                                                                                                :mode :multi
-                                                                                                :selected-example-ids selected-example-ids})}]))}
+                                                               :component ($ datasets-forms/RunEvaluatorModal {:module-id module-id
+                                                                                                               :dataset-id dataset-id
+                                                                                                               :mode :multi
+                                                                                                               :selected-example-ids selected-example-ids})}]))}
                                 "Try summary evaluator")
                              ($ :button.px-3.py-1.text-sm.text-gray-600.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                                 {:disabled (empty? selected-example-ids)

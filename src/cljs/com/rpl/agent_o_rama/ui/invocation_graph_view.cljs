@@ -895,8 +895,8 @@
 
         all-edges (concat real-edges implicit-edges)]
 
-    (.setDefaultEdgeLabel g (fn [] #js {}))
-    (.setGraph g #js {})
+    (.setDefaultEdgeLabel ^js g (fn [] #js {}))
+    (.setGraph ^js g #js {})
 
     (doseq [edge all-edges] (.setEdge g (:source edge) (:target edge)))
     (doseq [node nodes]
