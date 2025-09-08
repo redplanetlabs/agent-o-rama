@@ -1239,14 +1239,6 @@
                       :onClick #(set-active-tab "experiments")}
                      "Experiments")
 
-                  ;; Comparative Experiments Tab
-                  ($ :button
-                     {:className (common/cn "py-2 px-1 border-b-2 font-medium text-sm cursor-pointer"
-                                            {"border-indigo-500 text-indigo-600" (= active-tab "comparative-experiments")
-                                             "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "comparative-experiments")})
-                      :onClick #(set-active-tab "comparative-experiments")}
-                     "Comparative Experiments")
-
                   ;; Examples Tab
                   ($ :button
                      {:className (common/cn "py-2 px-1 border-b-2 font-medium text-sm cursor-pointer"
@@ -1262,11 +1254,6 @@
                  ($ :div.flex.items-center.justify-center.h-full
                     ($ :div.text-center.text-gray-500
                        ($ :p "Experiments functionality coming soon.")))
-
-                 "comparative-experiments"
-                 ($ :div.flex.items-center.justify-center.h-full
-                    ($ :div.text-center.text-gray-500
-                       ($ :p "Comparative experiments functionality coming soon.")))
 
                  "examples"
                  ($ :div.h-full.flex.flex-col
