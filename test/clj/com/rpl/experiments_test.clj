@@ -869,6 +869,13 @@
                (if (some #(= "a!" %) outputs)
                  (throw (ex-info "fail" {}))
                  {"res" outputs}))))
+          (aor/declare-comparative-evaluator-builder
+           topology
+           "ccount"
+           ""
+           (fn [params]
+             (fn [fetcher input ref-output outputs]
+               {"res" (count outputs)})))
           (aor/declare-summary-evaluator-builder
            topology
            "sfail"
@@ -933,6 +940,7 @@
        (aor/create-evaluator! manager "cfail" "cfail" {} "")
        (aor/create-evaluator! manager "sfail" "sfail" {} "")
        (aor/create-evaluator! manager "mycount" "count" {} "")
+       (aor/create-evaluator! manager "ccount" "ccount" {} "")
 
        (bind exp-id (h/random-uuid7))
        (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
@@ -1104,8 +1112,62 @@
         ))
 
 
-       ;; TODO: <<<<>>>>>
-       ;;  - regular, comparative, and summary eval failures
+       (bind exp-id (h/random-uuid7))
+       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (foreign-append!
+          global-actions-depot
+          (aor-types/->valid-StartExperiment
+           exp-id
+           "My experiment"
+           ds-id1
+           nil
+           (aor-types/->valid-TagSelector "t")
+           [(aor-types/->valid-EvaluatorSelector "cfail" false)
+            (aor-types/->valid-EvaluatorSelector "ccount" false)]
+           (aor-types/->valid-ComparativeExperiment
+            [(aor-types/->valid-ExperimentTarget
+              (aor-types/->valid-AgentTarget "foo")
+              ["$"])
+             (aor-types/->valid-ExperimentTarget
+              (aor-types/->valid-NodeTarget "foo" "a")
+              ["$"])])
+           1
+           2)))
+       (wait-experiment-finished! exp-client exp-invoke)
+       (bind res (foreign-invoke-query results ds-id1 exp-id))
+       (is
+        (trace-matches?
+         res
+         {:summary-evals nil
+          :summary-eval-failures nil
+          :results
+          {0
+           {:example-id       !eid0
+            :agent-initiates
+            {0
+             {:agent-name "foo"}
+             1
+             {:agent-name "_aor-experimenter"}}
+            :agent-results
+            {0 {:val "a!" :failure? false} 1 {:val "a?" :failure? false}}
+            :evals            {"ccount" {"res" 2}}
+            :eval-failures
+            {"cfail" !ex1}
+            :input            "a"
+            :reference-output nil}
+           1
+           {:example-id       !eid1
+            :agent-initiates
+            {0
+             {:agent-name "foo"}
+             1
+             {:agent-name "_aor-experimenter"}}
+            :agent-results
+            {0 {:val "b!" :failure? false} 1 {:val "b?" :failure? false}}
+            :evals            {"cfail" {"res" ["b!" "b?"]} "ccount" {"res" 2}}
+            :input            "b"
+            :reference-output nil}}}
+        ))
       ))))
 
 (deftest experimenter-agent-failures-test
