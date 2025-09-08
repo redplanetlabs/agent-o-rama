@@ -310,7 +310,7 @@
          ($ :div.text-red-500.text-center.py-8
             "Error loading evaluators: " error)
 
-         (empty? evaluators) ; Check the extracted list
+         (empty? evaluators)
          ($ :div.text-center.py-12
             ($ BeakerIcon {:className "mx-auto h-12 w-12 text-gray-400 mb-4"})
             ($ :h3.text-lg.font-medium.text-gray-900.mb-2 "No evaluators yet")
@@ -321,12 +321,40 @@
                "Create Evaluator"))
 
          :else
-         ($ :div.grid.gap-4.md:grid-cols-2.lg:grid-cols-3
-            (into []
-                  ;; The loop now iterates over the list of evaluator maps
-                  (for [evaluator-spec evaluators]
-                    ($ EvaluatorCard
-                       {:key (:name evaluator-spec)
-                        :evaluator-name (:name evaluator-spec)
-                        :instance-spec evaluator-spec
-                        :on-delete handle-delete}))))))))
+         ($ :div {:className (:container common/table-classes)}
+            ($ :table {:className (:table common/table-classes)}
+               ($ :thead {:className (:thead common/table-classes)}
+                  ($ :tr
+                     ($ :th {:className (:th common/table-classes)} "Name")
+                     ($ :th {:className (:th common/table-classes)} "Builder")
+                     ($ :th {:className (:th common/table-classes)} "Type")
+                     ($ :th {:className (:th common/table-classes)} "Parameters")
+                     ($ :th {:className (:th common/table-classes)} "Actions")))
+               ($ :tbody
+                  (into []
+                        (for [spec evaluators]
+                          (let [evaluator-name (:name spec)
+                                type (:type spec)
+                                builder-name (:builder-name spec)
+                                params (:builder-params spec {})]
+                            ($ :tr {:key evaluator-name :className "hover:bg-gray-50"}
+                               ($ :td {:className (:td common/table-classes)} evaluator-name)
+                               ($ :td {:className (:td common/table-classes)}
+                                  ($ :code.font-mono.text-xs.text-gray-600 builder-name))
+                               ($ :td {:className (:td common/table-classes)}
+                                  ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
+                                     {:className (get-evaluator-type-badge-style type)}
+                                     (get-evaluator-type-display type)))
+                               ($ :td {:className (:td common/table-classes)}
+                                  (if (seq params)
+                                    ($ :div.text-xs.text-gray-600
+                                       (into []
+                                             (->> (sort-by key params)
+                                                  (map (fn [[k v]]
+                                                         ($ :span.mr-2 {:key (str k)}
+                                                            ($ :span.font-medium (name k)) ": " (str v)))))))
+                                    ($ :span.text-xs.text-gray-400.italic "—")))
+                               ($ :td {:className (:td-right common/table-classes)}
+                                  ($ :button.text-sm.text-red-600.hover:text-red-800.cursor-pointer
+                                     {:onClick #(handle-delete evaluator-name)}
+                                     "Delete")))))))))))))

@@ -102,6 +102,27 @@
      [])
     is-visible))
 
+(defn cn
+  "Concatenate class names. Accepts strings, sequences, and maps of class->boolean."
+  [& parts]
+  (->> parts
+       (mapcat (fn [p]
+                 (cond
+                   (string? p) [p]
+                   (sequential? p) (remove str/blank? p)
+                   (map? p) (for [[k v] p :when v] (name k))
+                   :else [])))
+       (remove str/blank?)
+       (str/join " ")))
+
+(def table-classes
+  {:container "bg-white shadow sm:rounded-md overflow-auto"
+   :table "min-w-full divide-y divide-gray-200"
+   :thead "bg-gray-50"
+   :th "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+   :td "px-6 py-4 text-sm text-gray-900"
+   :td-right "px-6 py-4 whitespace-nowrap text-right text-sm font-medium"})
+
 (defui spinner [{:keys [size]}]
   (let [size-class (case size
                      :small "h-3 w-3"
