@@ -12,13 +12,15 @@ test.describe('research agent module exists', () => {
 
     // Step 3: Wait for an agent link to be visible on the page.
     // The UI fetches this data asynchronously, so Playwright's auto-waiting is essential here.
-    // We'll look for an agent from your examples.
-    const agentName = 'com.rpl.agent.research-agent/ResearchAgentModule:researcher';
-    const agentLink = page.getByText(agentName);
+    // We'll look for an agent from your examples - now in table format with separate columns.
+    const moduleName = 'com.rpl.agent.research-agent';
+    const agentName = 'ResearchAgentModule';
+    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
+    const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
 
     // Wait up to 30 seconds for the agent to appear. The first load can be slow.
     await expect(agentLink).toBeVisible({ timeout: 30000 });
-    console.log(`Found agent: ${agentName}`);
+    console.log(`Found agent: ${moduleName}:${agentName}`);
 
     // Step 4: Click the agent link to navigate.
     await agentLink.click();
@@ -39,13 +41,15 @@ test.describe('Dataset crud', () => {
 
     // Step 3: Wait for an agent link to be visible on the page.
     // The UI fetches this data asynchronously, so Playwright's auto-waiting is essential here.
-    // We'll look for an agent from your examples.
-    const agentName = 'com.rpl.agent.research-agent/ResearchAgentModule:researcher';
-    const agentLink = page.getByText(agentName);
+    // We'll look for an agent from your examples - now in table format with separate columns.
+    const moduleName = 'com.rpl.agent.research-agent';
+    const agentName = 'ResearchAgentModule';
+    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
+    const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
 
     // Wait up to 30 seconds for the agent to appear. The first load can be slow.
     await expect(agentLink).toBeVisible({ timeout: 30000 });
-    console.log(`Found agent: ${agentName}`);
+    console.log(`Found agent: ${moduleName}:${agentName}`);
 
     // Step 4: Click the agent link to navigate.
     await agentLink.click();
@@ -81,9 +85,14 @@ test.describe('Dataset crud', () => {
     await expect(page.getByText(datasetName)).toBeVisible({ timeout: 30000 });
     console.log('Successfully verified created dataset.');
 
-    // find the dataset card by the heading link, then go up to the card and find the edit button
-    const datasetCard = page.getByText(datasetName).locator('..').locator('..');
-    const editButton = datasetCard.getByRole('button', { name: 'Edit' });
+    // find the dataset row in the table and locate the edit button
+    // First try to find by exact text, then fallback to partial text matching
+    let datasetRow = page.locator('table tbody tr').filter({ hasText: datasetName });
+    if (!(await datasetRow.isVisible({ timeout: 5000 }))) {
+      // Try partial matching if exact match fails
+      datasetRow = page.locator('table tbody tr').filter({ hasText: datasetName.split(' ')[0] });
+    }
+    const editButton = datasetRow.locator('button').filter({ hasText: 'Edit' });
     await expect(editButton).toBeVisible({ timeout: 30000 });
     await editButton.click();
 
@@ -99,8 +108,13 @@ test.describe('Dataset crud', () => {
 
     page.on('dialog', dialog => dialog.accept());
 
-    // get the delete button scoped to the card containing this dataset name
-    const deleteButton = page.getByText(newDatasetName).locator('..').locator('..').getByRole('button', { name: 'Delete' });
+    // get the delete button scoped to the table row containing this dataset name
+    let deleteRow = page.locator('table tbody tr').filter({ hasText: newDatasetName });
+    if (!(await deleteRow.isVisible({ timeout: 5000 }))) {
+      // Try partial matching if exact match fails
+      deleteRow = page.locator('table tbody tr').filter({ hasText: newDatasetName.split(' ')[0] });
+    }
+    const deleteButton = deleteRow.locator('button').filter({ hasText: 'Delete' });
     await expect(deleteButton).toBeVisible({ timeout: 30000 });
     await deleteButton.click();
 
@@ -121,13 +135,15 @@ test.describe('Dataset example crud', () => {
 
     // Step 3: Wait for an agent link to be visible on the page.
     // The UI fetches this data asynchronously, so Playwright's auto-waiting is essential here.
-    // We'll look for an agent from your examples.
-    const agentName = 'com.rpl.agent.research-agent/ResearchAgentModule:researcher';
-    const agentLink = page.getByText(agentName);
+    // We'll look for an agent from your examples - now in table format with separate columns.
+    const moduleName = 'com.rpl.agent.research-agent';
+    const agentName = 'ResearchAgentModule';
+    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
+    const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
 
     // Wait up to 30 seconds for the agent to appear. The first load can be slow.
     await expect(agentLink).toBeVisible({ timeout: 30000 });
-    console.log(`Found agent: ${agentName}`);
+    console.log(`Found agent: ${moduleName}:${agentName}`);
 
     // Step 4: Click the agent link to navigate.
     await agentLink.click();
@@ -247,7 +263,8 @@ test.describe('Dataset example crud', () => {
 
     // Cleanup: go back to dataset list and delete the dataset
     await page.goBack();
-    const deleteButton = page.getByText(datasetName).locator('..').locator('..').getByRole('button', { name: 'Delete' });
+
+    const deleteButton = page.locator('table tbody tr').filter({ hasText: datasetName }).locator('button').filter({ hasText: 'Delete' });
     await expect(deleteButton).toBeVisible({ timeout: 30000 });
     await deleteButton.click();
     await expect(page.getByText(datasetName)).not.toBeVisible({ timeout: 30000 });
@@ -262,8 +279,10 @@ test.describe('Inline editing validation', () => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Agent-o-rama/);
 
-    const agentName = 'com.rpl.agent.research-agent/ResearchAgentModule:researcher';
-    const agentLink = page.getByText(agentName);
+    const moduleName = 'com.rpl.agent.research-agent';
+    const agentName = 'ResearchAgentModule';
+    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
+    const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
     await expect(agentLink).toBeVisible({ timeout: 30000 });
     await agentLink.click();
 
@@ -339,7 +358,8 @@ test.describe('Inline editing validation', () => {
     // Cleanup
     page.on('dialog', dialog => dialog.accept());
     await page.goBack();
-    const deleteButton = page.getByText(datasetName).locator('..').locator('..').getByRole('button', { name: 'Delete' });
+
+    const deleteButton = page.locator('table tbody tr').filter({ hasText: datasetName }).locator('button').filter({ hasText: 'Delete' });
     await deleteButton.click();
     await expect(page.getByText(datasetName)).not.toBeVisible({ timeout: 30000 });
   });
@@ -352,8 +372,10 @@ test.describe('Dataset snapshot dropdown', () => {
 
     await expect(page).toHaveTitle(/Agent-o-rama/);
 
-    const agentName = 'com.rpl.agent.research-agent/ResearchAgentModule:researcher';
-    const agentLink = page.getByText(agentName);
+    const moduleName = 'com.rpl.agent.research-agent';
+    const agentName = 'ResearchAgentModule';
+    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
+    const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
     await expect(agentLink).toBeVisible({ timeout: 30000 });
     await agentLink.click();
 
@@ -445,7 +467,8 @@ test.describe('Dataset snapshot dropdown', () => {
 
     // Cleanup: go back and delete dataset
     await page.goBack();
-    const deleteButton = page.getByText(datasetName).locator('..').locator('..').getByRole('button', { name: 'Delete' });
+
+    const deleteButton = page.locator('table tbody tr').filter({ hasText: datasetName }).locator('button').filter({ hasText: 'Delete' });
     await expect(deleteButton).toBeVisible({ timeout: 30000 });
     await deleteButton.click();
     await expect(page.getByText(datasetName)).not.toBeVisible({ timeout: 30000 });
