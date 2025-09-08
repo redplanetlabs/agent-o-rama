@@ -360,8 +360,10 @@
 
 (defui RunEvaluatorModal [{:keys [module-id dataset-id mode example selected-example-ids]}]
   (let [[selected-evaluator set-selected-evaluator] (uix/use-state nil)
-        [output set-output] (uix/use-state "") ; For :regular type
-        [outputs set-outputs] (uix/use-state [""]) ; For :comparative type
+        ;; Separate input state from result state
+        [model-output-input set-model-output-input] (uix/use-state "") ; For :regular type user input
+        [model-outputs-input set-model-outputs-input] (uix/use-state [{:id (random-uuid) :value ""}]) ; For :comparative type user input
+        [evaluation-result set-evaluation-result] (uix/use-state nil) ; For evaluator results
         [error set-error] (uix/use-state nil)
         [loading? set-loading] (uix/use-state false)
         [dropdown-open? set-dropdown-open] (uix/use-state false)
@@ -390,10 +392,10 @@
                        (let [run-data (case evaluator-type
                                         :regular {:input (js/JSON.stringify (clj->js (:input example)))
                                                   :referenceOutput (js/JSON.stringify (clj->js (:reference-output example)))
-                                                  :output output}
+                                                  :output model-output-input}
                                         :comparative {:input (js/JSON.stringify (clj->js (:input example)))
                                                       :referenceOutput (js/JSON.stringify (clj->js (:reference-output example)))
-                                                      :outputs outputs}
+                                                      :outputs (mapv :value model-outputs-input)}
                                         :summary {:dataset-id dataset-id
                                                   :example-ids selected-example-ids})]
                          (sente/request!
@@ -405,8 +407,14 @@
                           (fn [reply]
                             (set-loading false)
                             (if (:success reply)
-                              (set-output (:data reply))
+                              (set-evaluation-result (:data reply))
                               (set-error (:error reply))))))))]
+
+    ;; Clear evaluation result when evaluator changes
+    (uix/use-effect
+     (fn []
+       (set-evaluation-result nil))
+     [selected-evaluator])
 
     ;; Close dropdown when clicking outside
     (uix/use-effect
@@ -468,21 +476,27 @@
            ($ :div
               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Model Output (JSON)")
               ($ :textarea.w-full.p-3.border.border-gray-300.rounded-md.font-mono.text-sm
-                 {:rows 3, :placeholder "{\"result\": \"...\"}", :value output, :onChange #(set-output (.. % -target -value))}))
+                 {:rows 3, :placeholder "{\"result\": \"...\"}", :value model-output-input, :onChange #(set-model-output-input (.. % -target -value))}))
 
            :comparative
            ($ :div
               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Model Outputs (One valid JSON per line)")
-              (doall (for [[i out-val] (map-indexed vector outputs)]
-                       ($ :div.flex.items-center.gap-2.mb-2 {:key i}
+              (doall (for [output-item model-outputs-input]
+                       ($ :div.flex.items-center.gap-2.mb-2 {:key (:id output-item)}
                           ($ :textarea.flex-1.p-2.border.border-gray-300.rounded-md.font-mono.text-xs
                              {:rows 1
-                              :value out-val
-                              :onChange #(set-outputs (assoc outputs i (.. % -target -value)))})
+                              :value (:value output-item)
+                              :onChange #(set-model-outputs-input
+                                          (mapv (fn [item]
+                                                  (if (= (:id item) (:id output-item))
+                                                    (assoc item :value (.. % -target -value))
+                                                    item))
+                                                model-outputs-input))})
                           ($ :button.text-red-500.hover:text-red-700
-                             {:onClick #(set-outputs (vec (concat (subvec outputs 0 i) (subvec outputs (inc i)))))}
+                             {:onClick #(set-model-outputs-input
+                                         (filterv (fn [item] (not= (:id item) (:id output-item))) model-outputs-input))}
                              ($ XMarkIcon {:className "h-4 w-4"})))))
-              ($ :button.text-sm.text-blue-600.hover:underline {:onClick #(set-outputs (conj outputs ""))} "Add another output"))
+              ($ :button.text-sm.text-blue-600.hover:underline {:onClick #(set-model-outputs-input (conj model-outputs-input {:id (random-uuid) :value ""}))} "Add another output"))
 
            :summary
            ($ :div.p-4.bg-blue-50.border.border-blue-200.rounded-md
@@ -499,8 +513,8 @@
              (if loading? "Running..." "Run Evaluator")))
 
        (when error ($ :div.p-4.bg-red-50.border.border-red-200.rounded-md ($ :p.text-sm.text-red-700 error)))
-       (when output
+       (when evaluation-result
          ($ :div
             ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Evaluator Result")
             ($ :div.bg-green-50.rounded-md.p-4.border.border-green-200
-               ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono (js/JSON.stringify (clj->js output) nil 2))))))))
+               ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono (js/JSON.stringify (clj->js evaluation-result) nil 2))))))))
