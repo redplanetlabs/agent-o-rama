@@ -179,7 +179,13 @@
         reference-output-json-path-field (forms/use-form-field form-id :reference-output-json-path)
         [show-advanced? set-show-advanced!] (uix/use-state false)
 
-        builder-params (get-in selected-builder [:spec :options :params] {})]
+        builder-params (get-in selected-builder [:spec :options :params] {})
+        builder-options (get-in selected-builder [:spec :options] {})
+
+        ;; Determine visibility based on flags, defaulting to true
+        show-input-path? (get builder-options :input-path? true)
+        show-output-path? (get builder-options :output-path? true)
+        show-ref-output-path? (get builder-options :reference-output-path? true)]
 
     ($ forms/form
        ;; Static fields
@@ -219,47 +225,51 @@
                           :error param-error
                           :placeholder param-description}))))))
 
-       ;; Advanced options (collapsible)
-       ($ :div.mt-6.pt-4.border-t
-          ($ :button.flex.items-center.text-sm.font-medium.text-gray-700.hover:text-gray-900
-             {:type "button"
-              :onClick #(set-show-advanced! (not show-advanced?))}
-             "Advanced Options"
-             ($ :svg
-                {:className (common/cn
-                             "ml-2 h-4 w-4 transform transition-transform"
-                             {"rotate-180" show-advanced?})
-                 :fill "none"
-                 :viewBox "0 0 24 24"
-                 :stroke "currentColor"}
-                ($ :path
-                   {:strokeLinecap "round"
-                    :strokeLinejoin "round"
-                    :strokeWidth 2
-                    :d "M19 9l-7 7-7-7"})))
+       ;; Advanced options (collapsible) - only show if any JSONPath fields are enabled
+       (when (or show-input-path? show-output-path? show-ref-output-path?)
+         ($ :div.mt-6.pt-4.border-t
+            ($ :button.flex.items-center.text-sm.font-medium.text-gray-700.hover:text-gray-900
+               {:type "button"
+                :onClick #(set-show-advanced! (not show-advanced?))}
+               "Advanced Options"
+               ($ :svg
+                  {:className (common/cn
+                               "ml-2 h-4 w-4 transform transition-transform"
+                               {"rotate-180" show-advanced?})
+                   :fill "none"
+                   :viewBox "0 0 24 24"
+                   :stroke "currentColor"}
+                  ($ :path
+                     {:strokeLinecap "round"
+                      :strokeLinejoin "round"
+                      :strokeWidth 2
+                      :d "M19 9l-7 7-7-7"})))
 
-          (when show-advanced?
-            ($ :div.mt-4.space-y-4
-               ($ forms/form-field
-                  {:label ($ :div.flex.items-center.gap-2 "Input JSON Path" ($ JsonPathTooltip))
-                   :value (:value input-json-path-field)
-                   :on-change (:on-change input-json-path-field)
-                   :error (:error input-json-path-field)
-                   :placeholder "e.g., $.input.text"})
+            (when show-advanced?
+              ($ :div.mt-4.space-y-4
+                 (when show-input-path?
+                   ($ forms/form-field
+                      {:label ($ :div.flex.items-center.gap-2 "Input JSON Path" ($ JsonPathTooltip))
+                       :value (:value input-json-path-field)
+                       :on-change (:on-change input-json-path-field)
+                       :error (:error input-json-path-field)
+                       :placeholder "e.g., $.input.text"}))
 
-               ($ forms/form-field
-                  {:label ($ :div.flex.items-center.gap-2 "Output JSON Path" ($ JsonPathTooltip))
-                   :value (:value output-json-path-field)
-                   :on-change (:on-change output-json-path-field)
-                   :error (:error output-json-path-field)
-                   :placeholder "e.g., $.output.result"})
+                 (when show-output-path?
+                   ($ forms/form-field
+                      {:label ($ :div.flex.items-center.gap-2 "Output JSON Path" ($ JsonPathTooltip))
+                       :value (:value output-json-path-field)
+                       :on-change (:on-change output-json-path-field)
+                       :error (:error output-json-path-field)
+                       :placeholder "e.g., $.output.result"}))
 
-               ($ forms/form-field
-                  {:label ($ :div.flex.items-center.gap-2 "Reference Output JSON Path" ($ JsonPathTooltip))
-                   :value (:value reference-output-json-path-field)
-                   :on-change (:on-change reference-output-json-path-field)
-                   :error (:error reference-output-json-path-field)
-                   :placeholder "e.g., $.expected.answer"})))))))
+                 (when show-ref-output-path?
+                   ($ forms/form-field
+                      {:label ($ :div.flex.items-center.gap-2 "Reference Output JSON Path" ($ JsonPathTooltip))
+                       :value (:value reference-output-json-path-field)
+                       :on-change (:on-change reference-output-json-path-field)
+                       :error (:error reference-output-json-path-field)
+                       :placeholder "e.g., $.expected.answer"})))))))))
 
 ;; =============================================================================
 ;; MODAL WORKFLOW
@@ -391,7 +401,7 @@
           ($ :div.flex.items-center.gap-3
              ($ BeakerIcon {:className "h-8 w-8 text-indigo-600"}))
 
-          ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
+          ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
              {:onClick #(show-create-evaluator-modal! module-id)}
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Create Evaluator"))
