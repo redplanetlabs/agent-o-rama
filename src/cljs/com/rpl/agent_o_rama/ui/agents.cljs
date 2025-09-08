@@ -49,33 +49,37 @@
                            :human-request? (:human-request? invoke)})))))
 
 (defui index []
-  ;; The entire complex useEffect is replaced by this single line!
   (let [{:keys [data loading? error]}
         (queries/use-sente-query {:query-key [:agents]
                                   :sente-event [:agents/get-all]
                                   :refetch-interval-ms 2000})]
 
     (cond
-      ;; Still loading initial data
       loading? ($ :div.flex.justify-center.items-center.py-8
                   ($ :div.text-gray-500 "Loading agents via Sente..."))
-      ;; Request errored
       error ($ :div.flex.justify-center.items-center.py-8
                ($ :div.text-red-500 "Error loading agents: " error))
-      ;; No agents returned from the API
       (empty? data) ($ :div.flex.justify-center.items-center.py-8
                        ($ :div.text-gray-500 "No agents found"))
       :else ($ :div.p-4
-               (for [agent data
-                     :let [url (str "/agents/" (common/url-encode (:module-id agent)) "/agent/" (common/url-encode (:agent-name agent)))]]
-                 ($ :div.p-4.transition-colors.duration-150.hover:bg-gray-200.bg-gray-100.m-4 {:key url}
-                    ($ :a {:href url}
-                       ($ :div.flex.items-center.group
-                          ($ :div.flex-1
-                             ($ :div.text-lg.font-medium.text-indigo-600.group-hover:text-indigo-800
-                                ($ :div (common/url-decode (:module-id agent)) ":" (common/url-decode (:agent-name agent))))
-                             ($ :div.mt-1.text-sm.text-gray-500.group-hover:text-gray-700
-                                "View agent details"))))))))))
+               ($ :div {:className (:container common/table-classes)}
+                  ($ :table {:className (:table common/table-classes)}
+                     ($ :thead {:className (:thead common/table-classes)}
+                        ($ :tr
+                           ($ :th {:className (:th common/table-classes)} "Module")
+                           ($ :th {:className (:th common/table-classes)} "Agent")
+                           ($ :th {:className (:th common/table-classes)} "Link")))
+                     ($ :tbody
+                        (into []
+                              (for [agent data
+                                    :let [module (common/url-decode (:module-id agent))
+                                          agent-name (common/url-decode (:agent-name agent))
+                                          href (str "/agents/" (common/url-encode (:module-id agent)) "/agent/" (common/url-encode (:agent-name agent)))]]
+                                ($ :tr {:key href :className "hover:bg-gray-50"}
+                                   ($ :td {:className (:td common/table-classes)} module)
+                                   ($ :td {:className (:td common/table-classes)} agent-name)
+                                   ($ :td {:className (:td common/table-classes)}
+                                      ($ :a.text-indigo-600.hover:text-indigo-800 {:href href} "Open"))))))))))))
 
 (defui invocations []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
