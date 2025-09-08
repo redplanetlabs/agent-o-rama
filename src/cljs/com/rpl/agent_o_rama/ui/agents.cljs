@@ -75,7 +75,11 @@
                                     :let [module (common/url-decode (:module-id agent))
                                           agent-name (common/url-decode (:agent-name agent))
                                           href (str "/agents/" (common/url-encode (:module-id agent)) "/agent/" (common/url-encode (:agent-name agent)))]]
-                                ($ :tr {:key href :className "hover:bg-gray-50"}
+                                ($ :tr {:key href :className "hover:bg-gray-50 cursor-pointer"
+                                        :onClick (fn [_]
+                                                   (rfe/push-state :agent/detail
+                                                                   {:module-id (:module-id agent)
+                                                                    :agent-name (:agent-name agent)}))}
                                    ($ :td {:className (:td common/table-classes)} module)
                                    ($ :td {:className (:td common/table-classes)} agent-name)
                                    ($ :td {:className (:td common/table-classes)}
