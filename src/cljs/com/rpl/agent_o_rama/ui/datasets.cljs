@@ -1006,7 +1006,7 @@
 ;; MAIN DATASETS INDEX PAGE
 ;; =============================================================================
 
-(defui datasets-index []
+(defui index []
   (let [{:keys [module-id]} (state/use-sub [:route :path-params])
         decoded-module-id (when module-id (common/url-decode module-id))
 
@@ -1111,7 +1111,7 @@
 ;; DATASET DETAIL PAGE
 ;; =============================================================================
 
-(defui dataset-detail []
+(defui detail []
   (let [;; Get IDs from route
         {:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
         decoded-module-id (when module-id (common/url-decode module-id))
@@ -1357,6 +1357,3 @@
                     ($ :div.text-center.text-gray-500
                        ($ :p "Unknown tab selected."))))))
          :else ($ :div.p-6 "No data available.")))))
-
-(def index datasets-index)
-(def detail dataset-detail)
