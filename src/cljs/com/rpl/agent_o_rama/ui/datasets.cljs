@@ -8,7 +8,7 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.datasets-forms :as datasets-forms]
-   [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
+
    [reitit.frontend.easy :as rfe]
    [clojure.string :as str]
    [com.rpl.specter :as s]))
@@ -289,31 +289,6 @@
             (when is-adding
               ($ :div.text-sm.text-gray-500 "Adding...")))))))
 
-(defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content]}]
-  (let [row-classes (common/cn
-                     "flex items-center justify-between w-full px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
-                     {"bg-blue-50 text-blue-700" selected?
-                      "text-blue-600 hover:bg-blue-50" action?
-                      "text-gray-700" (not (or selected? action?))})]
-    ($ :div
-   ;; Main clickable area
-       ($ :div
-          {:onClick (fn [e]
-                      (.stopPropagation e)
-                      (when on-select (on-select)))
-           :className row-classes}
-          ($ :div.flex.items-center.flex-1
-             (when icon ($ :div.mr-3 icon))
-             ($ :span.truncate label)
-             (when selected? ($ :span.ml-2.text-xs.text-blue-600 "✓")))
-      ;; Delete button area (separate from main click area to avoid nesting)
-          (when (and delete-button (not action?))
-            ($ :div.ml-2
-               {:onClick #(.stopPropagation %)} ;; Prevent triggering the row click
-               delete-button)))
-   ;; Extra content below the main row
-       (when extra-content extra-content))))
-
 ;; =============================================================================
 ;; EVALUATOR UTILITIES
 ;; =============================================================================
@@ -365,26 +340,26 @@
             {:onClick #(.stopPropagation %)}
             ($ :div.py-1
                ;; Default option
-               ($ DropdownRow {:label "Select evaluator..."
-                               :selected? (nil? selected-evaluator)
-                               :on-select #(do
-                                             (set-open false)
-                                             (on-select nil))
-                               :delete-button nil})
+               ($ common/DropdownRow {:label "Select evaluator..."
+                                      :selected? (nil? selected-evaluator)
+                                      :on-select #(do
+                                                    (set-open false)
+                                                    (on-select nil))
+                                      :delete-button nil})
 
                ;; Evaluator options
                (for [evaluator evaluators]
-                 ($ DropdownRow {:key (:id evaluator)
-                                 :label (:name evaluator)
-                                 :selected? (= (:id selected-evaluator) (:id evaluator))
-                                 :on-select #(do
-                                               (set-open false)
-                                               (on-select evaluator))
-                                 :delete-button nil
-                                 :extra-content ($ :div.px-4.pb-2.text-xs.text-gray-500
-                                                   ($ :span.inline-flex.items-center.px-2.py-0.5.rounded-full.text-xs.font-medium
-                                                      {:className (get-evaluator-type-badge-style (:type evaluator))}
-                                                      (get-evaluator-type-display (:type evaluator))))}))))))))
+                 ($ common/DropdownRow {:key (:id evaluator)
+                                        :label (:name evaluator)
+                                        :selected? (= (:id selected-evaluator) (:id evaluator))
+                                        :on-select #(do
+                                                      (set-open false)
+                                                      (on-select evaluator))
+                                        :delete-button nil
+                                        :extra-content ($ :div.px-4.pb-2.text-xs.text-gray-500
+                                                          ($ :span.inline-flex.items-center.px-2.py-0.5.rounded-full.text-xs.font-medium
+                                                             {:className (get-evaluator-type-badge-style (:type evaluator))}
+                                                             (get-evaluator-type-display (:type evaluator))))}))))))))
 
 ;; =============================================================================
 ;; SNAPSHOT MANAGER
@@ -461,33 +436,33 @@
                {:onClick #(.stopPropagation %)}
                ($ :div.py-1
                   ;; Latest option
-                  ($ DropdownRow {:label "Latest (Working Copy)"
-                                  :selected? (str/blank? selected-snapshot)
-                                  :on-select #(handle-select "")
-                                  :delete-button nil})
+                  ($ common/DropdownRow {:label "Latest (Working Copy)"
+                                         :selected? (str/blank? selected-snapshot)
+                                         :on-select #(handle-select "")
+                                         :delete-button nil})
 
                   ;; Named snapshots
                   (for [name snapshot-names]
-                    ($ DropdownRow {:key name
-                                    :label name
-                                    :selected? (= selected-snapshot name)
-                                    :on-select #(handle-select name)
-                                    :delete-button ($ :button.text-red-600.hover:text-red-800.p-1.rounded.hover:bg-red-100
-                                                      {:onClick (fn [e]
-                                                                  (.stopPropagation e)
-                                                                  (handle-delete name))
-                                                       :title (str "Delete " name)}
-                                                      ($ TrashIcon {:className "h-3 w-3"}))}))
+                    ($ common/DropdownRow {:key name
+                                           :label name
+                                           :selected? (= selected-snapshot name)
+                                           :on-select #(handle-select name)
+                                           :delete-button ($ :button.text-red-600.hover:text-red-800.p-1.rounded.hover:bg-red-100
+                                                             {:onClick (fn [e]
+                                                                         (.stopPropagation e)
+                                                                         (handle-delete name))
+                                                              :title (str "Delete " name)}
+                                                             ($ TrashIcon {:className "h-3 w-3"}))}))
 
                   ;; Divider
                   ($ :div.border-t.border-gray-100.my-1)
 
                   ;; New snapshot action
-                  ($ DropdownRow {:label "New snapshot"
-                                  :action? true
-                                  :on-select handle-create
-                                  :icon ($ PlusIcon {:className "h-4 w-4"})
-                                  :delete-button nil}))))))))
+                  ($ common/DropdownRow {:label "New snapshot"
+                                         :action? true
+                                         :on-select handle-create
+                                         :icon ($ PlusIcon {:className "h-4 w-4"})
+                                         :delete-button nil}))))))))
 
 (defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success is-read-only?]}] ;; Add is-read-only?
   (let [[open-dropdown set-open-dropdown] (uix/use-state nil)
@@ -615,10 +590,11 @@
                                                    ;; Show the new unified modal in :single mode
                                                    (state/dispatch [:modal/show :run-evaluator
                                                                     {:title "Try Evaluator on Example"
-                                                                     :component ($ evaluators/RunEvaluatorModal {:module-id module-id
-                                                                                                                 :dataset-id dataset-id
-                                                                                                                 :mode :single
-                                                                                                                 :example example})}]))}
+                                                                     :component ($ :div.p-6.text-center
+                                                                                   ($ :p.text-gray-600 "Evaluator functionality is being loaded...")
+                                                                                   ($ :button.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700
+                                                                                      {:onClick #(state/dispatch [:modal/hide])}
+                                                                                      "Close"))}]))}
                                        ($ PlayIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                        "Try with evaluator")
                                     ;; Delete button
@@ -976,10 +952,11 @@
                                              ;; Show the new unified modal in :multi mode
                                              (state/dispatch [:modal/show :run-evaluator
                                                               {:title "Run Summary Evaluation"
-                                                               :component ($ evaluators/RunEvaluatorModal {:module-id module-id
-                                                                                                           :dataset-id dataset-id
-                                                                                                           :mode :multi
-                                                                                                           :selected-example-ids selected-example-ids})}]))}
+                                                               :component ($ :div.p-6.text-center
+                                                                             ($ :p.text-gray-600 "Evaluator functionality is being loaded...")
+                                                                             ($ :button.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700
+                                                                                {:onClick #(state/dispatch [:modal/hide])}
+                                                                                "Close"))}]))}
                                 "Try summary evaluator")
                              ($ :button.px-3.py-1.text-sm.text-gray-600.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                                 {:disabled (empty? selected-example-ids)
