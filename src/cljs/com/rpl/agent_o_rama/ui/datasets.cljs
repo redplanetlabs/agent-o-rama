@@ -136,13 +136,13 @@
                             :on-change (:on-change input-field)
                             :error (:error input-field)
                             :required? true
-                            :multiline? true
+                            :type :textarea
                             :placeholder "{\"prompt\": \"Hello world\"}"})
-       ($ forms/form-field {:label "Reference Output (JSON)"
+       ($ forms/form-field {:label "Reference Output (JSON, Optional)"
                             :value (:value output-field)
                             :on-change (:on-change output-field)
                             :error (:error output-field)
-                            :multiline? true
+                            :type :textarea
                             :placeholder "{\"response\": \"Hello there!\"}"})
        ($ forms/form-error {:error error}))))
 
