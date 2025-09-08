@@ -71,21 +71,3 @@
 
       :summary
       (eval-fn manager name (:exampleRuns run-data)))))
-
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/try-summary
-  [{:keys [manager name dataset-id example-ids]} uid]
-  (let [underlying-objects (aor-types/underlying-objects manager)
-        multi-examples-query (:multi-examples-query underlying-objects)]
-    ;; Fetch the full example data for the given example IDs
-    (let [examples-map (foreign-invoke-query multi-examples-query dataset-id nil (vec example-ids))
-          ;; Convert the examples map to a list of ExampleRun objects
-          example-runs (mapv (fn [example-id]
-                               (let [example-data (get examples-map example-id)]
-                                 (aor/mk-example-run
-                                  (:input example-data)
-                                  (:reference-output example-data)
-                                  nil))) ; No actual output for summary evaluation
-                             example-ids)]
-
-      ;; Call the summary evaluator with the list of example runs
-      (aor/try-summary-evaluator manager name example-runs))))
