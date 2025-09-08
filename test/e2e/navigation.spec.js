@@ -482,3 +482,72 @@ test.describe('Dataset snapshot dropdown', () => {
     await expect(page.getByText(datasetName)).not.toBeVisible({ timeout: 30000 });
   });
 });
+
+test.describe('Form Validation and Error Handling', () => {
+
+  test('should display a backend validation error on the create dataset form', async ({ page }) => {
+    // 1. SETUP: Navigate to the datasets page
+    await page.goto('/');
+    await expect(page).toHaveTitle(/Agent-o-rama/);
+
+    // Find the agent using the same pattern as existing tests
+    const moduleName = 'com.rpl.agent.research-agent';
+    const agentName = 'ResearchAgentModule';
+    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
+    const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
+
+    await expect(agentLink).toBeVisible({ timeout: 30000 });
+    await agentLink.click();
+
+    const datasetsLink = page.getByText('Datasets & Experiments');
+    await expect(datasetsLink).toBeVisible({ timeout: 30000 });
+    await datasetsLink.click();
+
+    await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule\/datasets.*/i);
+    console.log('Successfully navigated to datasets page.');
+
+    // 2. ACTION: Open the modal and submit an invalid form
+    const newDatasetButton = page.getByRole('button', { name: 'Create Dataset' }).first();
+    await newDatasetButton.click();
+
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible();
+
+    // Fill in valid data for required fields
+    const datasetName = `Invalid Schema Test ${randomUUID()}`;
+    await modal.getByLabel('Name').fill(datasetName);
+    await modal.getByLabel('Description').fill('This form submission should fail.');
+
+    // INTENTIONALLY provide an invalid JSON schema, just like in your bug report
+    await modal.getByLabel('Input JSON Schema').fill('[]');
+
+    // Find and click the submit button
+    const submitButton = modal.getByRole('button', { name: 'Create Dataset' });
+    await submitButton.click();
+
+    // 3. ASSERTION: Verify the UI handles the error correctly
+    
+    // A) Check that the form stops spinning. The button should become enabled again.
+    // Playwright's `not.toBeDisabled` will wait for the submission to finish.
+    await expect(submitButton).not.toBeDisabled({ timeout: 10000 });
+    console.log('Submit button is no longer disabled.');
+
+    // B) Check that the modal is still visible.
+    await expect(modal).toBeVisible();
+    console.log('Modal remained open after failed submission.');
+
+    // C) Check that the specific backend error message is displayed within the modal.
+    // We use a regular expression to make the test robust against minor text changes.
+    const errorMessage = modal.getByText(/Invalid JSON schema:.*array found, \[object, boolean\] expected/i);
+    await expect(errorMessage).toBeVisible();
+    console.log('Backend error message is visible to the user.');
+    
+    // D) (Optional but good) Verify we haven't been navigated away
+    await expect(page).toHaveURL(/\/datasets/);
+    console.log('Page URL did not change.');
+
+    // Cleanup: Close the modal
+    await modal.getByRole('button', { name: '×' }).click();
+    await expect(modal).not.toBeVisible();
+  });
+});
