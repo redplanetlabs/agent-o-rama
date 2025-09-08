@@ -863,7 +863,7 @@
        ($ :table.min-w-full.divide-y.divide-gray-200
           ($ :thead.bg-gray-50
              ($ :tr
-                ;; Checkbox column header - entire cell is clickable
+      ;; Checkbox column header - entire cell is clickable
                 ($ :th.px-4.py-3.text-left.cursor-pointer.hover:bg-blue-100
                    {:onClick #(state/dispatch [:datasets/toggle-all-selection
                                                {:dataset-id dataset-id
@@ -876,6 +876,8 @@
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Input")
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Reference Output")
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Tags")
+                ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Created")
+                ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Modified")
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Actions")))
           ($ :tbody.bg-white.divide-y.divide-gray-200
              (for [example examples]
@@ -920,6 +922,7 @@
                            ($ :div.truncate.cursor-help {:title output-str} output-str)
                            ($ :span "—"))))
                     ;; Tags column
+                    ;; Tags column
                     ($ :td.px-6.py-4.whitespace-nowrap.text-sm.text-gray-500
                        (let [tags (:tags example)]
                          (if (and tags (seq tags))
@@ -928,6 +931,13 @@
                                 (sort) ; Sort alphabetically
                                 (clojure.string/join ", ")) ; Join with commas
                            ($ :span.italic "no tags"))))
+;; Created timestamp column
+                    ($ :td.px-6.py-4.text-sm.text-gray-600
+                       (common/format-timestamp (:created-at example)))
+;; Modified timestamp column
+                    ($ :td.px-6.py-4.text-sm.text-gray-600
+                       (common/format-timestamp (:modified-at example)))
+;; Actions column 
                     ;; Actions column
                     ($ :td.px-6.py-4.whitespace-nowrap.text-right.text-sm.font-medium
                        ;; Conditionally render actions
@@ -1053,6 +1063,8 @@
                      ($ :tr
                         ($ :th {:className (:th common/table-classes)} "Name")
                         ($ :th {:className (:th common/table-classes)} "Description")
+                        ($ :th {:className (:th common/table-classes)} "Created")
+                        ($ :th {:className (:th common/table-classes)} "Modified")
                         ($ :th {:className (:th common/table-classes)} "Actions")))
                   ($ :tbody
                      (into []
@@ -1073,6 +1085,10 @@
                                    (if (seq (str desc))
                                      ($ :span.text-sm.text-gray-600.desc.truncate {:title desc} desc)
                                      ($ :span.text-sm.text-gray-400.italic "—")))
+                                ($ :td {:className (:td common/table-classes)}
+                                   ($ :span.text-sm.text-gray-600 (common/format-timestamp (:created-at dataset))))
+                                ($ :td {:className (:td common/table-classes)}
+                                   ($ :span.text-sm.text-gray-600 (common/format-timestamp (:modified-at dataset))))
                                 ($ :td {:className (:td-right common/table-classes)}
                                    ($ :div.flex.items-center.space-x-2
                                       ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-gray-700.cursor-pointer
