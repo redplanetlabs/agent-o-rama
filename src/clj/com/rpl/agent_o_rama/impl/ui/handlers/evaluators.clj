@@ -47,27 +47,43 @@
   (aor/remove-evaluator! manager name)
   {:status :ok})
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/try
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/run
   [{:keys [manager name type run-data]} uid]
   (let [eval-fn (case type
                   :regular aor/try-evaluator
                   :comparative aor/try-comparative-evaluator
                   :summary aor/try-summary-evaluator
                   (throw (ex-info "Invalid evaluator type" {:type type})))
-        ;; The data from the UI is JSON strings, we need to parse them on the backend
+
+        ;; Parse JSON strings from run-data where necessary
         parsed-input (when-let [input (:input run-data)]
                        (j/read-value input))
         parsed-ref-output (when-let [ref-output (:referenceOutput run-data)]
                             (j/read-value ref-output))
         parsed-output (when-let [output (:output run-data)]
-                        (j/read-value output))]
+                        (j/read-value output))
+        ;; For comparative, outputs is already a cljs vector of strings
+        parsed-outputs (when-let [outputs (:outputs run-data)]
+                         (mapv j/read-value outputs))]
 
     (case type
       :regular
       (eval-fn manager name parsed-input parsed-ref-output parsed-output)
 
       :comparative
-      (eval-fn manager name parsed-input parsed-ref-output (:outputs run-data))
+      (eval-fn manager name parsed-input parsed-ref-output parsed-outputs)
 
       :summary
-      (eval-fn manager name (:exampleRuns run-data)))))
+      (let [underlying-objects (aor-types/underlying-objects manager)
+            multi-examples-query (:multi-examples-query underlying-objects)
+            dataset-id (:dataset-id run-data)
+            example-ids (:example-ids run-data)
+            examples-map (foreign-invoke-query multi-examples-query dataset-id nil (vec example-ids))
+            example-runs (mapv (fn [example-id]
+                                 (let [example-data (get examples-map example-id)]
+                                   (aor/mk-example-run
+                                    (:input example-data)
+                                    (:reference-output example-data)
+                                    nil))) ; Actual output is not available for summary
+                               example-ids)]
+        (eval-fn manager name example-runs)))))
