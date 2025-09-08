@@ -129,8 +129,9 @@
               :onClick #(set-show-advanced! (not show-advanced?))}
              "Advanced Options"
              ($ :svg
-                {:className (str "ml-2 h-4 w-4 transform transition-transform "
-                                 (if show-advanced? "rotate-180" ""))
+                {:className (common/cn
+                             "ml-2 h-4 w-4 transform transition-transform"
+                             {"rotate-180" show-advanced?})
                  :fill "none"
                  :viewBox "0 0 24 24"
                  :stroke "currentColor"}

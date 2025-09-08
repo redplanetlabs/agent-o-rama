@@ -1036,7 +1036,7 @@
                                                                                ["ring-4" "ring-blue-400" "ring-opacity-75" "shadow-2xl" "transform" "scale-105"]
                                                                                ["shadow-lg"])
                                                            common-classes ["p-3" "rounded-md" "transition-all" "duration-200"]
-                                                           node-className (str/join " " (concat base-classes selection-classes common-classes))
+                                                           node-className (common/cn base-classes selection-classes common-classes)
                                                            has-human-request (:human-request data)
                                                            has-exceptions (seq (:exceptions data))]
                                                        ($ :div {:className "relative"}

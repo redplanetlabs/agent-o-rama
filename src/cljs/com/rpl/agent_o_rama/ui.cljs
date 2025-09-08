@@ -75,13 +75,12 @@
 (defui nav-link [{:keys [href location collapsed? title children]}]
   (let [is-active? (or (= location href)
                        (and (not= href "/") (.startsWith location href)))
-        link-classes (str "flex items-center rounded-md transition-colors text-sm font-medium "
-                          (if collapsed?
-                            "justify-center p-2 w-10 h-10"
-                            "px-3 py-2")
-                          (if is-active?
-                            " bg-gray-300 text-gray-900"
-                            " hover:bg-gray-200 text-gray-700"))]
+        link-classes (common/cn
+                      "flex items-center rounded-md transition-colors text-sm font-medium"
+                      {"justify-center p-2 w-10 h-10" collapsed?
+                       "px-3 py-2" (not collapsed?)}
+                      {"bg-gray-300 text-gray-900" is-active?
+                       "hover:bg-gray-200 text-gray-700" (not is-active?)})]
     ($ :a {:href href :className link-classes :title (when collapsed? title)}
        (if collapsed?
          (first children) ; Only show the icon when collapsed
@@ -164,8 +163,9 @@
         [collapsed? set-collapsed] (common/use-local-storage "sidebar-collapsed?" false)
         toggle-collapsed #(set-collapsed (not collapsed?))]
 
-    ($ :div {:className (str "h-screen flex flex-col bg-gray-100 transition-all duration-300 "
-                             (if collapsed? "w-16" "w-64"))}
+    ($ :div {:className (common/cn
+                         "h-screen flex flex-col bg-gray-100 transition-all duration-300"
+                         {"w-16" collapsed?, "w-64" (not collapsed?)})}
        ;; Header (no changes here)
        ($ :div.flex.items-center.justify-between.p-4.border-b.border-gray-200.overflow-hidden
           (when-not collapsed?

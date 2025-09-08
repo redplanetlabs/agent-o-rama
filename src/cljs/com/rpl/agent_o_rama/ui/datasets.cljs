@@ -647,11 +647,11 @@
               ($ :div.text-sm.text-gray-500 "Adding...")))))))
 
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content]}]
-  (let [row-classes (str "flex items-center justify-between w-full px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 focus:bg-gray-100 "
-                         (cond
-                           selected? "bg-blue-50 text-blue-700"
-                           action? "text-blue-600 hover:bg-blue-50"
-                           :else "text-gray-700"))]
+  (let [row-classes (common/cn
+                     "flex items-center justify-between w-full px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
+                     {"bg-blue-50 text-blue-700" selected?
+                      "text-blue-600 hover:bg-blue-50" action?
+                      "text-gray-700" (not (or selected? action?))})]
     ($ :div
        ;; Main clickable area
        ($ :div
