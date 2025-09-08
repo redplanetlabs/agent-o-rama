@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.evaluators
   (:require
    [uix.core :as uix :refer [defui $]]
-   ["@heroicons/react/24/outline" :refer [PlusIcon BeakerIcon TrashIcon EllipsisVerticalIcon ChevronDownIcon XMarkIcon]]
+   ["@heroicons/react/24/outline" :refer [PlusIcon BeakerIcon TrashIcon EllipsisVerticalIcon ChevronDownIcon XMarkIcon InformationCircleIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
@@ -10,7 +10,68 @@
    [clojure.string :as str]))
 
 ;; =============================================================================
-;; HELPER FUNCTIONS
+;; NEW: EVALUATOR DETAILS MODAL
+;; =============================================================================
+
+(defui DetailItem [{:keys [label children]}]
+  ($ :div.py-3.sm:grid.sm:grid-cols-3.sm:gap-4.sm:px-0
+     ($ :dt.text-sm.font-medium.leading-6.text-gray-900 label)
+     ($ :dd.mt-1.text-sm.leading-6.text-gray-700.sm:col-span-2.sm:mt-0
+        children)))
+
+(defui EvaluatorDetailsModal [{:keys [spec]}]
+  (let [{:keys [name type description builder-name builder-params
+                input-json-path output-json-path reference-output-json-path]} spec]
+    ($ :div.p-6.text-sm
+       ($ :dl.divide-y.divide-gray-100
+          ($ DetailItem {:label "Name"} ($ :span.font-mono name))
+          ($ DetailItem {:label "Description"} (if (str/blank? description) ($ :span.italic.text-gray-500 "No description") description))
+          ($ DetailItem {:label "Builder"} ($ :code.font-mono.bg-gray-100.px-2.py-1.rounded builder-name))
+          ($ DetailItem {:label "Type"}
+             ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
+                {:className (get-evaluator-type-badge-style type)}
+                (get-evaluator-type-display type)))
+
+          (when (seq builder-params)
+            ($ DetailItem {:label "Parameters"}
+               ($ :div.bg-gray-50.p-2.rounded-md.border
+                  (for [[k v] (sort-by key builder-params)]
+                    ($ :div.flex.justify-between.font-mono.text-xs {:key (str k)}
+                       ($ :span.text-gray-600 (clojure.core/name k))
+                       ($ :span.text-gray-800 (str v)))))))
+
+          ($ DetailItem {:label "Input JSONPath"}
+             (if (str/blank? input-json-path)
+               ($ :span.italic.text-gray-500 "Not configured")
+               ($ :code.font-mono.bg-gray-100.px-2.py-1.rounded input-json-path)))
+          ($ DetailItem {:label "Output JSONPath"}
+             (if (str/blank? output-json-path)
+               ($ :span.italic.text-gray-500 "Not configured")
+               ($ :code.font-mono.bg-gray-100.px-2.py-1.rounded output-json-path)))
+          ($ DetailItem {:label "Reference Output JSONPath"}
+             (if (str/blank? reference-output-json-path)
+               ($ :span.italic.text-gray-500 "Not configured")
+               ($ :code.font-mono.bg-gray-100.px-2.py-1.rounded reference-output-json-path)))))))
+
+(defn show-evaluator-details-modal! [spec]
+  (state/dispatch [:modal/show :evaluator-details
+                   {:title (str "Evaluator Details: " (:name spec))
+                    :component ($ EvaluatorDetailsModal {:spec spec})}]))
+
+;; =============================================================================
+;; JSONPATH TOOLTIP COMPONENT
+;; =============================================================================
+
+(defui JsonPathTooltip []
+  ($ :div.relative.flex.items-center.group
+     ($ InformationCircleIcon {:className "h-4 w-4 text-gray-400 group-hover:text-blue-500"})
+     ($ :div.absolute.bottom-full.mb-2.w-64.bg-gray-800.text-white.text-xs.rounded.py-2.px-3.opacity-0.group-hover:opacity-100.transition-opacity.pointer-events-none.z-10
+        "A JSONPath expression to extract a value from the input/output JSON object."
+        ($ :br)
+        ($ :a.text-blue-300.hover:underline
+           {:href "https://en.wikipedia.org/wiki/JSONPath" :target "_blank" :rel "noopener noreferrer"}
+           "Learn more on Wikipedia."))))
+
 ;; =============================================================================
 
 (defn get-evaluator-type-badge-style [type]
@@ -144,21 +205,21 @@
           (when show-advanced?
             ($ :div.mt-4.space-y-4
                ($ forms/form-field
-                  {:label "Input JSON Path"
+                  {:label ($ :div.flex.items-center.gap-2 "Input JSON Path" ($ JsonPathTooltip))
                    :value (:value input-json-path-field)
                    :on-change (:on-change input-json-path-field)
                    :error (:error input-json-path-field)
                    :placeholder "e.g., $.input.text"})
 
                ($ forms/form-field
-                  {:label "Output JSON Path"
+                  {:label ($ :div.flex.items-center.gap-2 "Output JSON Path" ($ JsonPathTooltip))
                    :value (:value output-json-path-field)
                    :on-change (:on-change output-json-path-field)
                    :error (:error output-json-path-field)
                    :placeholder "e.g., $.output.result"})
 
                ($ forms/form-field
-                  {:label "Reference Output JSON Path"
+                  {:label ($ :div.flex.items-center.gap-2 "Reference Output JSON Path" ($ JsonPathTooltip))
                    :value (:value reference-output-json-path-field)
                    :on-change (:on-change reference-output-json-path-field)
                    :error (:error reference-output-json-path-field)
@@ -325,37 +386,36 @@
                ($ :thead {:className (:thead common/table-classes)}
                   ($ :tr
                      ($ :th {:className (:th common/table-classes)} "Name")
+                     ($ :th {:className (:th common/table-classes)} "Description")
                      ($ :th {:className (:th common/table-classes)} "Builder")
                      ($ :th {:className (:th common/table-classes)} "Type")
-                     ($ :th {:className (:th common/table-classes)} "Parameters")
                      ($ :th {:className (:th common/table-classes)} "Actions")))
                ($ :tbody
                   (into []
                         (for [spec evaluators]
                           (let [evaluator-name (:name spec)
                                 type (:type spec)
-                                builder-name (:builder-name spec)
-                                params (:builder-params spec {})]
-                            ($ :tr {:key evaluator-name :className "hover:bg-gray-50"}
+                                description (:description spec)
+                                builder-name (:builder-name spec)]
+                            ($ :tr {:key evaluator-name
+                                    :className "hover:bg-gray-50 cursor-pointer"
+                                    :onClick #(show-evaluator-details-modal! spec)}
                                ($ :td {:className (:td common/table-classes)} evaluator-name)
+                               ($ :td {:className (common/cn (:td common/table-classes) "max-w-sm truncate")}
+                                  (if (str/blank? description)
+                                    ($ :span.italic.text-gray-400 "—")
+                                    description))
                                ($ :td {:className (:td common/table-classes)}
                                   ($ :code.font-mono.text-xs.text-gray-600 builder-name))
                                ($ :td {:className (:td common/table-classes)}
                                   ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
                                      {:className (get-evaluator-type-badge-style type)}
                                      (get-evaluator-type-display type)))
-                               ($ :td {:className (:td common/table-classes)}
-                                  (if (seq params)
-                                    ($ :div.text-xs.text-gray-600
-                                       (into []
-                                             (->> (sort-by key params)
-                                                  (map (fn [[k v]]
-                                                         ($ :span.mr-2 {:key (str k)}
-                                                            ($ :span.font-medium (name k)) ": " (str v)))))))
-                                    ($ :span.text-xs.text-gray-400.italic "—")))
                                ($ :td {:className (:td-right common/table-classes)}
                                   ($ :button.text-sm.text-red-600.hover:text-red-800.cursor-pointer
-                                     {:onClick #(handle-delete evaluator-name)}
+                                     {:onClick (fn [e]
+                                                 (.stopPropagation e) ; Prevent row click
+                                                 (handle-delete evaluator-name))}
                                      "Delete")))))))))))))
 
 (defui RunEvaluatorModal [{:keys [module-id dataset-id mode example selected-example-ids]}]
