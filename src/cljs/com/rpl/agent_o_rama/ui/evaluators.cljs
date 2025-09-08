@@ -65,28 +65,44 @@
 (defui JsonPathTooltip []
   (let [[open? set-open!] (uix/use-state false)
         [timeout-id set-timeout-id!] (uix/use-state nil)
-        [is-hovering? set-is-hovering!] (uix/use-state false)
+        hovering-ref (uix/use-ref false)
+
+        clear-close! (fn []
+                       (when timeout-id
+                         (js/clearTimeout timeout-id)
+                         (set-timeout-id! nil)))
 
         schedule-close (fn schedule-close []
                          (println "schedule close")
-                         (when timeout-id
-                           (js/clearTimeout timeout-id))
-                         (let [new-timeout (js/setTimeout #(if is-hovering?
-                                                             (schedule-close)
-                                                             (set-open! false)) 100)]
+                         (clear-close!)
+                         (let [new-timeout (js/setTimeout (fn []
+                                                            (if (.-current hovering-ref)
+                                                              (schedule-close)
+                                                              (do (set-open! false)
+                                                                  (set-timeout-id! nil))))
+                                                          100)]
                            (set-timeout-id! new-timeout)))]
 
     ($ :div.relative.inline-flex.items-center
        ($ InformationCircleIcon {:className "h-4 w-4 text-gray-400 hover:text-blue-500 cursor-help"
                                  :onClick (fn [] (set-open! (not open?)))
                                  :tabIndex 0
-                                 :onMouseEnter (fn [] (println "onMouseEnter1") (set-open! true))
-                                 :onMouseLeave (fn [] (println "onMouseLeave1") (schedule-close))})
+                                 :onMouseEnter (fn [] (println "onMouseEnter1")
+                                                 (set! (.-current hovering-ref) true)
+                                                 (clear-close!)
+                                                 (set-open! true))
+                                 :onMouseLeave (fn [] (println "onMouseLeave1")
+                                                 (set! (.-current hovering-ref) false)
+                                                 (schedule-close))})
        (when open?
          ($ :div.absolute.bottom-full.mb-2.w-64.bg-gray-800.text-white.text-xs.rounded.py-2.px-3.shadow-lg.z-50
-            {:onMouseEnter (fn [] (println "onMouseEnter2") (set-is-hovering! true))
-             :onMouseLeave (fn [] (println "onMouseLeave2") (set-is-hovering! false))}
-            "A JSONPath expression to extract a value from the input/output JSON object."
+            {:onMouseEnter (fn [] (println "onMouseEnter2")
+                             (set! (.-current hovering-ref) true)
+                             (clear-close!))
+             :onMouseLeave (fn [] (println "onMouseLeave2")
+                             (set! (.-current hovering-ref) false)
+                             (schedule-close))}
+            "A JSONPath expression to extract a value from the JSON object."
             ($ :br)
             ($ :a.text-blue-300.hover:underline.cursor-pointer
                {:onClick #(js/window.open "https://en.wikipedia.org/wiki/JSONPath" "_blank")}
