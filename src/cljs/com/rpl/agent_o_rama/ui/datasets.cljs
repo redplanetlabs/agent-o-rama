@@ -8,7 +8,7 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.datasets-forms :as datasets-forms]
-
+   [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    [reitit.frontend.easy :as rfe]
    [clojure.string :as str]
    [com.rpl.specter :as s]))
@@ -589,11 +589,10 @@
                                                    ;; Show the new unified modal in :single mode
                                                    (state/dispatch [:modal/show :run-evaluator
                                                                     {:title "Try Evaluator on Example"
-                                                                     :component ($ :div.p-6.text-center
-                                                                                   ($ :p.text-gray-600 "Evaluator functionality is being loaded...")
-                                                                                   ($ :button.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700
-                                                                                      {:onClick (fn [] (state/dispatch [:modal/hide]))}
-                                                                                      "Close"))}]))}
+                                                                     :component ($ evaluators/RunEvaluatorModal {:module-id module-id
+                                                                                                                 :dataset-id dataset-id
+                                                                                                                 :mode :single
+                                                                                                                 :example example})}]))}
                                        ($ PlayIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                        "Try with evaluator")
                                     ;; Delete button
@@ -951,11 +950,10 @@
                                              ;; Show the new unified modal in :multi mode
                                              (state/dispatch [:modal/show :run-evaluator
                                                               {:title "Run Summary Evaluation"
-                                                               :component ($ :div.p-6.text-center
-                                                                             ($ :p.text-gray-600 "Evaluator functionality is being loaded...")
-                                                                             ($ :button.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700
-                                                                                {:onClick (fn [] (state/dispatch [:modal/hide]))}
-                                                                                "Close"))}]))}
+                                                               :component ($ evaluators/RunEvaluatorModal {:module-id module-id
+                                                                                                           :dataset-id dataset-id
+                                                                                                           :mode :multi
+                                                                                                           :selected-example-ids selected-example-ids})}]))}
                                 "Try summary evaluator")
                              ($ :button.px-3.py-1.text-sm.text-gray-600.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                                 {:disabled (empty? selected-example-ids)
