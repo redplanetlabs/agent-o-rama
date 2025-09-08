@@ -143,13 +143,17 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
   // Select the regular evaluator
   await modal.getByText(regularEvalName).click();
 
+  // Wait for the modal to update with the evaluator-specific fields
+  await expect(modal.getByText('Model Output (JSON)')).toBeVisible({ timeout: 5000 });
+  const outputField = modal.getByPlaceholder('{"result": "..."}');
+
   // Test with a passing value
-  await modal.getByLabel('Model Output (JSON)').fill('"pass"');
+  await outputField.fill('"pass"');
   await modal.getByRole('button', { name: 'Run Evaluator' }).click();
   await expect(modal.getByText(/"concise\?":\s*true/)).toBeVisible();
 
   // Test with a failing value
-  await modal.getByLabel('Model Output (JSON)').fill('"this string is definitely too long"');
+  await outputField.fill('"this string is definitely too long"');
   await modal.getByRole('button', { name: 'Run Evaluator' }).click();
   await expect(modal.getByText(/"concise\?":\s*false/)).toBeVisible();
 
