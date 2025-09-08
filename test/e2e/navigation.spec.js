@@ -261,8 +261,10 @@ test.describe('Dataset example crud', () => {
     // Verify the example is gone from the table
     await expect(page.locator('table tbody tr').filter({ hasText: exampleId2 })).not.toBeVisible({ timeout: 30000 });
 
-    // Cleanup: go back to dataset list and delete the dataset
-    await page.goBack();
+    // Cleanup: navigate back via sidebar link
+    const datasetsLinkBack3 = page.getByText('Datasets & Experiments');
+    await expect(datasetsLinkBack3).toBeVisible({ timeout: 30000 });
+    await datasetsLinkBack3.click();
 
     const deleteButton = page.locator('table tbody tr').filter({ hasText: datasetName }).locator('button').filter({ hasText: 'Delete' });
     await expect(deleteButton).toBeVisible({ timeout: 30000 });
@@ -357,8 +359,12 @@ test.describe('Inline editing validation', () => {
 
     // Cleanup
     page.on('dialog', dialog => dialog.accept());
-    await page.goBack();
-
+    
+    // Navigate back via sidebar link instead of history
+    const datasetsLinkBack2 = page.getByText('Datasets & Experiments');
+    await expect(datasetsLinkBack2).toBeVisible({ timeout: 30000 });
+    await datasetsLinkBack2.click();
+    
     const deleteButton = page.locator('table tbody tr').filter({ hasText: datasetName }).locator('button').filter({ hasText: 'Delete' });
     await deleteButton.click();
     await expect(page.getByText(datasetName)).not.toBeVisible({ timeout: 30000 });
@@ -465,9 +471,11 @@ test.describe('Dataset snapshot dropdown', () => {
     // After deletion, the dropdown should return to Latest (Working Copy)
     await expect(page.getByRole('button', { name: 'Latest (Working Copy)' }).first()).toBeVisible({ timeout: 30000 });
 
-    // Cleanup: go back and delete dataset
-    await page.goBack();
-
+    // Cleanup: navigate back via sidebar link
+    const datasetsLinkBack3 = page.getByText('Datasets & Experiments');
+    await expect(datasetsLinkBack3).toBeVisible({ timeout: 30000 });
+    await datasetsLinkBack3.click();
+    
     const deleteButton = page.locator('table tbody tr').filter({ hasText: datasetName }).locator('button').filter({ hasText: 'Delete' });
     await expect(deleteButton).toBeVisible({ timeout: 30000 });
     await deleteButton.click();

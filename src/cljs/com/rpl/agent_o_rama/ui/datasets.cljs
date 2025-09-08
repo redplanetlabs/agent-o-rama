@@ -988,7 +988,7 @@
 
 (defn get-dataset-path [module-id dataset-id]
   (rfe/href :module/dataset-detail
-            {:module-id (common/url-encode module-id)
+            {:module-id module-id
              :dataset-id dataset-id}))
 
 (defn show-edit-dataset-modal! [module-id dataset-id initial-name initial-description]
