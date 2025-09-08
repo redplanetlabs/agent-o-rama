@@ -121,7 +121,21 @@
         handle-cancel (fn []
                         (when has-form?
                           (state/dispatch [:form/clear form-id]))
-                        (state/dispatch [:modal/hide]))]
+                        (state/dispatch [:modal/hide]))
+
+        ;; Handle Escape key
+        handle-keydown (fn [e]
+                         (when (= (.-key e) "Escape")
+                           (.preventDefault e)
+                           (handle-cancel)))]
+
+    ;; Add Escape key listener when modal is active
+    (uix/use-effect
+     (fn []
+       (when active
+         (.addEventListener js/document "keydown" handle-keydown)
+         #(.removeEventListener js/document "keydown" handle-keydown)))
+     [active])
 
     (when active
       (createPortal
