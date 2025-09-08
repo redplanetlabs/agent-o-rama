@@ -162,9 +162,7 @@
                    :value (:value reference-output-json-path-field)
                    :on-change (:on-change reference-output-json-path-field)
                    :error (:error reference-output-json-path-field)
-                   :placeholder "e.g., $.expected.answer"}))))
-
-       ($ forms/form-error {:error error}))))
+                   :placeholder "e.g., $.expected.answer"})))))))
 
 ;; =============================================================================
 ;; MODAL WORKFLOW

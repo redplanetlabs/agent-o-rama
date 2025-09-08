@@ -58,8 +58,7 @@
                             :value (:value output-schema-field)
                             :on-change (:on-change output-schema-field)
                             :error (:error output-schema-field)
-                            :placeholder example-schema})
-       ($ forms/form-error {:error error}))))
+                            :placeholder example-schema}))))
 
 (defn show-create-dataset-modal!
   "Shows the create dataset modal."
@@ -108,11 +107,10 @@
                             :error (:error name-field)
                             :required? true})
        ($ forms/form-field {:label "Description"
+                            :type :textarea
                             :value (:value description-field)
                             :on-change (:on-change description-field)
-                            :error (:error description-field)
-                            :type :textarea})
-       ($ forms/form-error {:error error}))))
+                            :error (:error description-field)}))))
 
 ;; =============================================================================
 ;; MODALS FOR EXAMPLES
@@ -143,8 +141,7 @@
                             :on-change (:on-change output-field)
                             :error (:error output-field)
                             :type :textarea
-                            :placeholder "{\"response\": \"Hello there!\"}"})
-       ($ forms/form-error {:error error}))))
+                            :placeholder "{\"response\": \"Hello there!\"}"}))))
 
 (defn show-add-example-modal! [config]
   (state/dispatch [:form/init :add-example
@@ -178,8 +175,7 @@
                             :value (:value snapshot-name-field)
                             :on-change (:on-change snapshot-name-field)
                             :error (:error snapshot-name-field)
-                            :required? true})
-       ($ forms/form-error {:error error}))))
+                            :required? true}))))
 
 (defn show-create-snapshot-modal!
   "Shows the create snapshot modal and accepts an on-success callback."
