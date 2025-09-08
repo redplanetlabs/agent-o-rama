@@ -53,21 +53,22 @@
                             :error (:error name-field)
                             :required? true})
        ($ forms/form-field {:label "Description"
+                            :type :textarea
                             :value (:value description-field)
                             :on-change (:on-change description-field)
-                            :error (:error description-field)
-                            :multiline? true})
+                            :error (:error description-field) })
        ($ forms/form-field {:label "Input JSON Schema"
+                            :type :textarea
                             :value (:value input-schema-field)
                             :on-change (:on-change input-schema-field)
                             :error (:error input-schema-field)
-                            :placeholder example-schema
-                            :multiline? true})
+                            :placeholder example-schema })
        ($ forms/form-field {:label "Output JSON Schema"
+                            :type :textarea
                             :value (:value output-schema-field)
                             :on-change (:on-change output-schema-field)
                             :error (:error output-schema-field)
-                            :multiline? true})
+                            :placeholder example-schema})
        ($ forms/form-error {:error error}))))
 
 (defn show-create-dataset-modal!
