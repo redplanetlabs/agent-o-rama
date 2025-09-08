@@ -40,15 +40,15 @@
                        ($ :span.text-gray-600 (clojure.core/name k))
                        ($ :span.text-gray-800 (str v)))))))
 
-          ($ DetailItem {:label "Input JSONPath"}
+          ($ DetailItem {:label ($ :div.flex.items-center.gap-2 "Input JSONPath" ($ JsonPathTooltip))}
              (if (str/blank? input-json-path)
                ($ :span.italic.text-gray-500 "Not configured")
                ($ :code.font-mono.bg-gray-100.px-2.py-1.rounded input-json-path)))
-          ($ DetailItem {:label "Output JSONPath"}
+          ($ DetailItem {:label ($ :div.flex.items-center.gap-2 "Output JSONPath" ($ JsonPathTooltip))}
              (if (str/blank? output-json-path)
                ($ :span.italic.text-gray-500 "Not configured")
                ($ :code.font-mono.bg-gray-100.px-2.py-1.rounded output-json-path)))
-          ($ DetailItem {:label "Reference Output JSONPath"}
+          ($ DetailItem {:label ($ :div.flex.items-center.gap-2 "Reference Output JSONPath" ($ JsonPathTooltip))}
              (if (str/blank? reference-output-json-path)
                ($ :span.italic.text-gray-500 "Not configured")
                ($ :code.font-mono.bg-gray-100.px-2.py-1.rounded reference-output-json-path)))))))
@@ -63,14 +63,24 @@
 ;; =============================================================================
 
 (defui JsonPathTooltip []
-  ($ :div.relative.flex.items-center.group
-     ($ InformationCircleIcon {:className "h-4 w-4 text-gray-400 group-hover:text-blue-500"})
-     ($ :div.absolute.bottom-full.mb-2.w-64.bg-gray-800.text-white.text-xs.rounded.py-2.px-3.opacity-0.group-hover:opacity-100.transition-opacity.pointer-events-none.z-10
-        "A JSONPath expression to extract a value from the input/output JSON object."
-        ($ :br)
-        ($ :a.text-blue-300.hover:underline
-           {:href "https://en.wikipedia.org/wiki/JSONPath" :target "_blank" :rel "noopener noreferrer"}
-           "Learn more on Wikipedia."))))
+  (let [[open? set-open!] (uix/use-state false)]
+    ($ :div.relative.inline-flex.items-center
+       {:onMouseEnter #(set-open! true)
+        :onMouseLeave #(set-open! false)}
+       ($ InformationCircleIcon {:className "h-4 w-4 text-gray-400 hover:text-blue-500 cursor-help"
+                                 :onClick #(set-open! (not open?))
+                                 :tabIndex 0
+                                 :onFocus #(set-open! true)
+                                 :onBlur #(set-open! false)})
+       (when open?
+         ($ :div.absolute.bottom-full.mb-2.w-64.bg-gray-800.text-white.text-xs.rounded.py-2.px-3.shadow-lg.z-50
+            {:onMouseEnter #(set-open! true)
+             :onMouseLeave #(set-open! false)}
+            "A JSONPath expression to extract a value from the input/output JSON object."
+            ($ :br)
+            ($ :a.text-blue-300.hover:underline
+               {:href "https://en.wikipedia.org/wiki/JSONPath" :target "_blank" :rel "noopener noreferrer"}
+               "Learn more on Wikipedia."))))))
 
 ;; =============================================================================
 
