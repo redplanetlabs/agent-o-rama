@@ -28,16 +28,6 @@
 ;; =============================================================================
 ;; MODAL FOR CREATING DATASETS
 ;; =============================================================================
- ;; Form specification co-located with component
-(def create-dataset-form-spec
-  {:fields {:name ""
-            :description ""
-            :input-schema ""
-            :output-schema ""}
-   :validators {:name [forms/required]
-                :input-schema [forms/valid-json]
-                :output-schema [forms/valid-json]}
-   :submit-event [:dataset/create]})
 
 (defui CreateDatasetForm [{:keys [form-id]}]
   (let [{:keys [error]} (forms/use-centralized-form form-id)
@@ -56,13 +46,13 @@
                             :type :textarea
                             :value (:value description-field)
                             :on-change (:on-change description-field)
-                            :error (:error description-field) })
+                            :error (:error description-field)})
        ($ forms/form-field {:label "Input JSON Schema"
                             :type :textarea
                             :value (:value input-schema-field)
                             :on-change (:on-change input-schema-field)
                             :error (:error input-schema-field)
-                            :placeholder example-schema })
+                            :placeholder example-schema})
        ($ forms/form-field {:label "Output JSON Schema"
                             :type :textarea
                             :value (:value output-schema-field)
@@ -75,8 +65,14 @@
   "Shows the create dataset modal."
   [module-id]
   (state/dispatch [:form/init :create-dataset
-                   (-> create-dataset-form-spec
-                       (assoc :submit-event [:dataset/create {:module-id module-id}]))])
+                   {:fields {:name ""
+                             :description ""
+                             :input-schema ""
+                             :output-schema ""}
+                    :validators {:name [forms/required]
+                                 :input-schema [forms/valid-json]
+                                 :output-schema [forms/valid-json]}
+                    :submit-event [:dataset/create {:module-id module-id}]}])
   (state/dispatch [:modal/show :create-dataset
                    {:title "Create New Dataset"
                     :form-id :create-dataset
