@@ -111,7 +111,7 @@
                             :value (:value description-field)
                             :on-change (:on-change description-field)
                             :error (:error description-field)
-                            :multiline? true})
+                            :type :textarea})
        ($ forms/form-error {:error error}))))
 
 ;; =============================================================================
@@ -1061,7 +1061,7 @@
                                 {:href (get-dataset-path decoded-module-id (:dataset-id dataset))}
                                 ($ :div.px-4.py-4.sm:px-6
                                    ($ :div.flex.items-center.justify-between
-                                      ($ :div.flex-1.min-w-0
+                                      ($ :div.flex-1.min-w-0.max-w-lg
                                          ($ :p.text-sm.font-medium.text-indigo-600.truncate (:name dataset))
                                          (when (:description dataset)
                                            ($ :p.mt-1.text-sm.text-gray-500.truncate (:description dataset))))
