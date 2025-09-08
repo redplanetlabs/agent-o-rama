@@ -1040,7 +1040,7 @@
                    "Create Dataset"))))
 
        ;; Content
-       ($ :div.flex-1.overflow-hidden
+       ($ :div.flex-1
           (cond
             loading? ($ :div.flex.items-center.justify-center.h-full
                         ($ :div "Loading datasets..."))
@@ -1056,7 +1056,7 @@
                                           {:onClick #(show-create-dataset-modal! decoded-module-id)}
                                           ($ PlusIcon {:className "h-4 w-4 mr-2"})
                                           "Create Dataset"))))
-            :else ($ :div.bg-white.shadow.overflow-hidden.sm:rounded-md
+            :else ($ :div.bg-white.shadow.sm:rounded-md.overflow-auto
                      ($ :ul.divide-y.divide-gray-200
                         (for [dataset datasets]
                           ($ :li {:key (:dataset-id dataset)}
@@ -1250,7 +1250,7 @@
                      "Examples")))
 
             ;; Tab Content Section (main content)
-            ($ :div.flex-1.overflow-hidden
+            ($ :div.flex-1.min-h-0
                (case active-tab
                  "experiments"
                  ($ :div.flex.items-center.justify-center.h-full
