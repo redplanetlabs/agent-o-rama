@@ -286,7 +286,7 @@
                                              (if (:success reply)
                                                (refetch)
                                                (js/alert (str "Failed to delete evaluator: " (:error reply))))))))
-                       [refetch])]
+                       [module-id refetch])]
 
     ($ :div.p-6
        ;; Header

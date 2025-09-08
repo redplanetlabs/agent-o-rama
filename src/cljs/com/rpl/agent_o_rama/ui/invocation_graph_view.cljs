@@ -898,9 +898,9 @@
     (.setDefaultEdgeLabel ^js g (fn [] #js {}))
     (.setGraph ^js g #js {})
 
-    (doseq [edge all-edges] (.setEdge g (:source edge) (:target edge)))
+    (doseq [edge all-edges] (.setEdge ^js g (:source edge) (:target edge)))
     (doseq [node nodes]
-      (.setNode g (:id node) (clj->js (merge node {:width 170 :height 40}))))
+      (.setNode ^js g (:id node) (clj->js (merge node {:width 170 :height 40}))))
 
     (Dagre/layout g)
 

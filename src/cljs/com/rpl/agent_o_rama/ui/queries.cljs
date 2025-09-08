@@ -44,7 +44,7 @@
                                                                                :error (or (:error reply)
                                                                                           (when (= reply :chsk/closed) "Connection closed")
                                                                                           "Request failed")}])))))
-                    [query-key-str sente-event-str timeout-ms])]
+                    [sente-event query-key query-key-str sente-event-str timeout-ms])]
 
     ;; Effect for initial fetch and polling setup
     (uix/use-effect
@@ -71,7 +71,7 @@
          (state/dispatch [:db/set-value (into state-path [:should-refetch?]) false])
          ;; Then refetch the data
          (fetch-data)))
-     [(:should-refetch? query-state) connected? enabled? page-is-visible? fetch-data])
+     [state-path query-state (:should-refetch? query-state) connected? enabled? page-is-visible? fetch-data])
 
     ;; Return the result map including the refetch function
     (let [default-state {:data nil :status nil :error nil :fetching? false}

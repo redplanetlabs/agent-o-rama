@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.datasets-forms :as datasets-forms]
+   [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    [reitit.frontend.easy :as rfe]
    [clojure.string :as str]
    [com.rpl.specter :as s]))
@@ -129,7 +130,7 @@
                  "Edit"))
             (if value
               ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono.pr-16
-                 (datasets-forms/pretty-print-json value))
+                 (pretty-print-json value))
               ($ :div.text-sm.text-gray-500.italic "No value")))))))
 
 (defui EditableExampleModal [{:keys [example-id module-id dataset-id snapshot-name on-delete-success is-read-only?]}] ;; Add is-read-only?
@@ -203,7 +204,7 @@
             ($ :div
                ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tags")
                ($ :div.bg-gray-50.rounded-md.p-4.border
-                  ($ datasets-forms/TagInput {:tags (:tags example) :module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name :example-id example-id :read-only? is-read-only?}))) ;; Pass read-only state
+                  ($ TagInput {:tags (:tags example) :module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name :example-id example-id :read-only? is-read-only?}))) ;; Pass read-only state
 
             ;; Example ID (read-only)
             ($ :div
@@ -614,10 +615,10 @@
                                                    ;; Show the new unified modal in :single mode
                                                    (state/dispatch [:modal/show :run-evaluator
                                                                     {:title "Try Evaluator on Example"
-                                                                     :component ($ datasets-forms/RunEvaluatorModal {:module-id module-id
-                                                                                                                     :dataset-id dataset-id
-                                                                                                                     :mode :single
-                                                                                                                     :example example})}]))}
+                                                                     :component ($ evaluators/RunEvaluatorModal {:module-id module-id
+                                                                                                                 :dataset-id dataset-id
+                                                                                                                 :mode :single
+                                                                                                                 :example example})}]))}
                                        ($ PlayIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                        "Try with evaluator")
                                     ;; Delete button
@@ -975,10 +976,10 @@
                                              ;; Show the new unified modal in :multi mode
                                              (state/dispatch [:modal/show :run-evaluator
                                                               {:title "Run Summary Evaluation"
-                                                               :component ($ datasets-forms/RunEvaluatorModal {:module-id module-id
-                                                                                                               :dataset-id dataset-id
-                                                                                                               :mode :multi
-                                                                                                               :selected-example-ids selected-example-ids})}]))}
+                                                               :component ($ evaluators/RunEvaluatorModal {:module-id module-id
+                                                                                                           :dataset-id dataset-id
+                                                                                                           :mode :multi
+                                                                                                           :selected-example-ids selected-example-ids})}]))}
                                 "Try summary evaluator")
                              ($ :button.px-3.py-1.text-sm.text-gray-600.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                                 {:disabled (empty? selected-example-ids)

@@ -128,7 +128,7 @@
                (state/dispatch [:invocations/reset])
                (fetch-invocations {} false))
              (constantly nil))
-           [module-id agent-name connected?])
+           [fetch-invocations module-id agent-name connected?])
 
         load-more (fn []
                     (when (and has-more? (not loading?) pagination-params)
