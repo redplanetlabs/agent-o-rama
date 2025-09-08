@@ -649,7 +649,7 @@
                       "text-blue-600 hover:bg-blue-50" action?
                       "text-gray-700" (not (or selected? action?))})]
     ($ :div
-       ;; Main clickable area
+   ;; Main clickable area
        ($ :div
           {:onClick (fn [e]
                       (.stopPropagation e)
@@ -659,12 +659,12 @@
              (when icon ($ :div.mr-3 icon))
              ($ :span.truncate label)
              (when selected? ($ :span.ml-2.text-xs.text-blue-600 "✓")))
-          ;; Delete button area (separate from main click area to avoid nesting)
+      ;; Delete button area (separate from main click area to avoid nesting)
           (when (and delete-button (not action?))
             ($ :div.ml-2
                {:onClick #(.stopPropagation %)} ;; Prevent triggering the row click
                delete-button)))
-       ;; Extra content below the main row
+   ;; Extra content below the main row
        (when extra-content extra-content))))
 
 ;; =============================================================================
@@ -883,8 +883,8 @@
                      is-open? (= open-dropdown example-id)
                      is-selected? (contains? selected-ids example-id)]
                  ($ :tr {:key example-id
-                         :className (str (when is-selected? "bg-blue-50 ")
-                                         "hover:bg-gray-50 cursor-pointer")
+                         :className (common/cn "hover:bg-gray-50 cursor-pointer"
+                                               {"bg-blue-50" is-selected?})
                          :onClick #(state/dispatch [:modal/show :example-viewer
                                                     {:title "Example Details"
                                                      :component ($ EditableExampleModal
@@ -1232,26 +1232,26 @@
             ($ :div.bg-white.border-b.border-gray-200
                ($ :nav.flex.space-x-8.px-6 {:aria-label "Tabs"}
                   ;; Experiments Tab
-                  ($ :button.py-4.px-1.border-b-2.font-medium.text-sm.cursor-pointer
-                     {:className (if (= active-tab "experiments")
-                                   "cursor-pointer border-indigo-500 text-indigo-600"
-                                   "cursor-pointer border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300")
+                  ($ :button
+                     {:className (common/cn "py-2 px-1 border-b-2 font-medium text-sm cursor-pointer"
+                                            {"border-indigo-500 text-indigo-600" (= active-tab "experiments")
+                                             "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "experiments")})
                       :onClick #(set-active-tab "experiments")}
                      "Experiments")
 
                   ;; Comparative Experiments Tab
-                  ($ :button.py-4.px-1.border-b-2.font-medium.text-sm.cursor-pointer
-                     {:className (if (= active-tab "comparative-experiments")
-                                   "cursor-pointer border-indigo-500 text-indigo-600"
-                                   "cursor-pointer border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300")
+                  ($ :button
+                     {:className (common/cn "py-2 px-1 border-b-2 font-medium text-sm cursor-pointer"
+                                            {"border-indigo-500 text-indigo-600" (= active-tab "comparative-experiments")
+                                             "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "comparative-experiments")})
                       :onClick #(set-active-tab "comparative-experiments")}
                      "Comparative Experiments")
 
                   ;; Examples Tab
-                  ($ :button.py-4.px-1.border-b-2.font-medium.text-sm.cursor-pointer
-                     {:className (if (= active-tab "examples")
-                                   "cursor-pointer border-indigo-500 text-indigo-600"
-                                   "cursor-pointer border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300")
+                  ($ :button
+                     {:className (common/cn "py-2 px-1 border-b-2 font-medium text-sm cursor-pointer"
+                                            {"border-indigo-500 text-indigo-600" (= active-tab "examples")
+                                             "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "examples")})
                       :onClick #(set-active-tab "examples")}
                      "Examples")))
 
