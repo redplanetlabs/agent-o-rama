@@ -1068,14 +1068,28 @@
                                          ($ :p.text-sm.font-medium.text-indigo-600.truncate (:name dataset))
                                          (when (:description dataset)
                                            ($ :p.mt-1.text-sm.text-gray-500.truncate (:description dataset))))
-                                      ($ :div.ml-2.flex-shrink-0.flex
+                                      ($ :div.ml-2.flex-shrink-0.flex.space-x-2
                                          ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-gray-700.cursor-pointer
                                             {:onClick (fn [e]
                                                         (.preventDefault e)
                                                         (.stopPropagation e)
                                                         (show-edit-dataset-modal! decoded-module-id (:dataset-id dataset) (:name dataset) (:description dataset)))}
                                             ($ PencilIcon {:className "h-4 w-4 mr-1"})
-                                            "Edit"))))))))))))))
+                                            "Edit")
+                                         ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
+                                            {:onClick (fn [e]
+                                                        (.preventDefault e)
+                                                        (.stopPropagation e)
+                                                        (when (js/confirm (str "Are you sure you want to delete dataset '" (:name dataset) "'? This action cannot be undone."))
+                                                          (sente/request!
+                                                           [:datasets/delete {:module-id decoded-module-id :dataset-id (:dataset-id dataset)}]
+                                                           10000
+                                                           (fn [reply]
+                                                             (if (:success reply)
+                                                               (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}])
+                                                               (js/alert (str "Error deleting dataset: " (:error reply))))))))}
+                                            ($ TrashIcon {:className "h-4 w-4 mr-1"})
+                                            "Delete"))))))))))))))
 
 ;; =============================================================================
 ;; PRETTY PRINT UTILITY
