@@ -932,12 +932,14 @@
                                 (clojure.string/join ", ")) ; Join with commas
                            ($ :span.italic "no tags"))))
 ;; Created timestamp column
+                    ;; Created timestamp column
                     ($ :td.px-6.py-4.text-sm.text-gray-600
-                       (common/format-timestamp (:created-at example)))
+                       {:title (common/format-timestamp (:created-at example))}
+                       (common/format-relative-time (:created-at example)))
 ;; Modified timestamp column
                     ($ :td.px-6.py-4.text-sm.text-gray-600
-                       (common/format-timestamp (:modified-at example)))
-;; Actions column 
+                       {:title (common/format-timestamp (:modified-at example))}
+                       (common/format-relative-time (:modified-at example)))
                     ;; Actions column
                     ($ :td.px-6.py-4.whitespace-nowrap.text-right.text-sm.font-medium
                        ;; Conditionally render actions
@@ -1029,89 +1031,88 @@
 
         datasets (:datasets data)]
 
-    ($ :div.h-full.flex.flex-col
-       ($ :div.bg-white.shadow.sm:rounded-lg.mb-6
-          ($ :div.px-4.py-5.sm:p-6
-             ($ :div.flex.items-center.justify-between
-                ($ :div
-                   ($ :h1.text-2xl.font-bold.text-gray-900 "Datasets")
-                   ($ :p.mt-1.text-sm.text-gray-600 "Manage your training and evaluation datasets"))
-                ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.text-sm.font-medium.rounded-md.shadow-sm.text-white.bg-indigo-600.hover:bg-indigo-700.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500.cursor-pointer
-                   {:onClick #(show-create-dataset-modal! decoded-module-id)}
-                   ($ PlusIcon {:className "h-4 w-4 mr-2"})
-                   "Create Dataset"))))
+    ($ :div.p-6
+       ;; Header
+       ($ :div.flex.justify-between.items-center.mb-6
+          ($ :div.flex.items-center.gap-3
+             ($ CircleStackIcon {:className "h-8 w-8 text-indigo-600"}))
 
-       ($ :div.flex-1
-          (cond
-            loading? ($ :div.flex.items-center.justify-center.h-full ($ :div "Loading datasets..."))
-            error ($ :div.flex.items-center.justify-center.h-full ($ :div.text-red-500 "Error loading datasets"))
-            (empty? datasets)
-            ($ :div.flex.items-center.justify-center.h-full
-               ($ :div.text-center.text-gray-500
-                  ($ CircleStackIcon {:className "mx-auto h-12 w-12 text-gray-400"})
-                  ($ :h3.mt-2.text-sm.font-medium.text-gray-900 "No datasets")
-                  ($ :p.mt-1.text-sm.text-gray-500 "Get started by creating a new dataset.")
-                  ($ :div.mt-6
-                     ($ :button.inline-flex.items-center.px-4.py-2.border.border-transparent.shadow-sm.text-sm.font-medium.rounded-md.text-white.bg-indigo-600.hover:bg-indigo-700.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500.cursor-pointer
-                        {:onClick #(show-create-dataset-modal! decoded-module-id)}
-                        ($ PlusIcon {:className "h-4 w-4 mr-2"})
-                        "Create Dataset"))))
-            :else
-            ($ :div {:className (:container common/table-classes)}
-               ($ :table {:className (:table common/table-classes)}
-                  ($ :thead {:className (:thead common/table-classes)}
-                     ($ :tr
-                        ($ :th {:className (:th common/table-classes)} "Name")
-                        ($ :th {:className (:th common/table-classes)} "Description")
-                        ($ :th {:className (:th common/table-classes)} "Created")
-                        ($ :th {:className (:th common/table-classes)} "Modified")
-                        ($ :th {:className (:th common/table-classes)} "Actions")))
-                  ($ :tbody
-                     (into []
-                           (for [dataset datasets
-                                 :let [name (:name dataset)
-                                       desc (:description dataset)
-                                       dsid (:dataset-id dataset)
-                                       href (get-dataset-path decoded-module-id dsid)]]
-                             ($ :tr {:key dsid
-                                     :className "hover:bg-gray-50 cursor-pointer"
-                                     :onClick (fn [_]
-                                                (rfe/push-state :module/dataset-detail
-                                                                {:module-id decoded-module-id
-                                                                 :dataset-id dsid}))}
-                                ($ :td {:className (:td common/table-classes)}
-                                   ($ :a.text-indigo-600.hover:text-indigo-800 {:href href} name))
-                                ($ :td {:className (:td common/table-classes)}
-                                   (if (seq (str desc))
-                                     ($ :span.text-sm.text-gray-600.desc.truncate {:title desc} desc)
-                                     ($ :span.text-sm.text-gray-400.italic "—")))
-                                ($ :td {:className (:td common/table-classes)}
-                                   ($ :span.text-sm.text-gray-600 (common/format-timestamp (:created-at dataset))))
-                                ($ :td {:className (:td common/table-classes)}
-                                   ($ :span.text-sm.text-gray-600 (common/format-timestamp (:modified-at dataset))))
-                                ($ :td {:className (:td-right common/table-classes)}
-                                   ($ :div.flex.items-center.space-x-2
-                                      ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-gray-700.cursor-pointer
-                                         {:onClick (fn [e]
-                                                     (.preventDefault e)
-                                                     (.stopPropagation e)
-                                                     (show-edit-dataset-modal! decoded-module-id dsid name desc))}
-                                         ($ PencilIcon {:className "h-4 w-4 mr-1"})
-                                         "Edit")
-                                      ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
-                                         {:onClick (fn [e]
-                                                     (.preventDefault e)
-                                                     (.stopPropagation e)
-                                                     (when (js/confirm (str "Are you sure you want to delete dataset '" name "'? This action cannot be undone."))
-                                                       (sente/request!
-                                                        [:datasets/delete {:module-id decoded-module-id :dataset-id dsid}]
-                                                        10000
-                                                        (fn [reply]
-                                                          (if (:success reply)
-                                                            (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}])
-                                                            (js/alert (str "Error deleting dataset: " (:error reply))))))))}
-                                         ($ TrashIcon {:className "h-4 w-4 mr-1"})
-                                         "Delete"))))))))))))))
+          ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
+             {:onClick #(show-create-dataset-modal! decoded-module-id)}
+             ($ PlusIcon {:className "h-5 w-5 mr-2"})
+             "Create Dataset"))
+
+       ;; Content
+       (cond
+         loading? ($ :div.flex.items-center.justify-center.h-full ($ :div "Loading datasets..."))
+         error ($ :div.flex.items-center.justify-center.h-full ($ :div.text-red-500 "Error loading datasets"))
+         (empty? datasets)
+         ($ :div.text-center.py-12
+            ($ CircleStackIcon {:className "mx-auto h-12 w-12 text-gray-400 mb-4"})
+            ($ :h3.text-lg.font-medium.text-gray-900.mb-2 "No datasets yet")
+            ($ :p.text-gray-500.mb-6 "Create your first dataset to get started.")
+            ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
+               {:onClick #(show-create-dataset-modal! decoded-module-id)}
+               ($ PlusIcon {:className "h-5 w-5 mr-2"})
+               "Create Dataset"))
+         :else
+         ($ :div {:className (:container common/table-classes)}
+            ($ :table {:className (:table common/table-classes)}
+               ($ :thead {:className (:thead common/table-classes)}
+                  ($ :tr
+                     ($ :th {:className (:th common/table-classes)} "Name")
+                     ($ :th {:className (:th common/table-classes)} "Description")
+                     ($ :th {:className (:th common/table-classes)} "Created")
+                     ($ :th {:className (:th common/table-classes)} "Modified")
+                     ($ :th {:className (:th common/table-classes)} "Actions")))
+               ($ :tbody
+                  (into []
+                        (for [dataset datasets
+                              :let [name (:name dataset)
+                                    desc (:description dataset)
+                                    dsid (:dataset-id dataset)
+                                    href (get-dataset-path decoded-module-id dsid)]]
+                          ($ :tr {:key dsid
+                                  :className "hover:bg-gray-50 cursor-pointer"
+                                  :onClick (fn [_]
+                                             (rfe/push-state :module/dataset-detail
+                                                             {:module-id decoded-module-id
+                                                              :dataset-id dsid}))}
+                             ($ :td {:className (:td common/table-classes)}
+                                ($ :a.text-indigo-600.hover:text-indigo-800 {:href href} name))
+                             ($ :td {:className (:td common/table-classes)}
+                                (if (seq (str desc))
+                                  ($ :span.text-sm.text-gray-600.desc.truncate {:title desc} desc)
+                                  ($ :span.text-sm.text-gray-400.italic "—")))
+                             ($ :td {:className (:td common/table-classes)}
+                                ($ :span.text-sm.text-gray-600 {:title (common/format-timestamp (:created-at dataset))}
+                                   (common/format-relative-time (:created-at dataset))))
+                             ($ :td {:className (:td common/table-classes)}
+                                ($ :span.text-sm.text-gray-600 {:title (common/format-timestamp (:modified-at dataset))}
+                                   (common/format-relative-time (:modified-at dataset))))
+                             ($ :td {:className (:td-right common/table-classes)}
+                                ($ :div.flex.items-center.space-x-2
+                                   ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-gray-700.cursor-pointer
+                                      {:onClick (fn [e]
+                                                  (.preventDefault e)
+                                                  (.stopPropagation e)
+                                                  (show-edit-dataset-modal! decoded-module-id dsid name desc))}
+                                      ($ PencilIcon {:className "h-4 w-4 mr-1"})
+                                      "Edit")
+                                   ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
+                                      {:onClick (fn [e]
+                                                  (.preventDefault e)
+                                                  (.stopPropagation e)
+                                                  (when (js/confirm (str "Are you sure you want to delete dataset '" name "'? This action cannot be undone."))
+                                                    (sente/request!
+                                                     [:datasets/delete {:module-id decoded-module-id :dataset-id dsid}]
+                                                     10000
+                                                     (fn [reply]
+                                                       (if (:success reply)
+                                                         (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}])
+                                                         (js/alert (str "Error deleting dataset: " (:error reply))))))))}
+                                      ($ TrashIcon {:className "h-4 w-4 mr-1"})
+                                      "Delete")))))))))))))
 
 ;; =============================================================================
 ;; PRETTY PRINT UTILITY
