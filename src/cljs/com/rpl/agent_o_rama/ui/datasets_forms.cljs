@@ -216,18 +216,30 @@
    :validators {:tag-name [forms/required]}
    :submit-event [:dataset/remove-tag-from-selected]})
 
-(defui RemoveTagForm [{:keys [form-id]}]
+(defui RemoveTagForm [{:keys [form-id selected-examples]}]
   (let [{:keys [error]} (forms/use-centralized-form form-id)
-        tag-name-field (forms/use-form-field form-id :tag-name)]
+        tag-name-field (forms/use-form-field form-id :tag-name)
+
+        ;; Get all unique tags from selected examples
+        all-tags (->> selected-examples
+                      (mapcat :tags)
+                      (map name) ; Convert keywords to strings
+                      (distinct)
+                      (sort))]
 
     ($ forms/form
-       ($ forms/form-field {:label "Tag to remove"
-                            :value (:value tag-name-field)
-                            :on-change (:on-change tag-name-field)
-                            :error (:error tag-name-field)
-                            :required? true}))))
+       ($ :div
+          ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tag to remove")
+          ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.focus:outline-none.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
+             {:value (:value tag-name-field)
+              :onChange #((:on-change tag-name-field) (.. % -target -value))}
+             ($ :option {:value ""} "Select a tag to remove...")
+             (for [tag all-tags]
+               ($ :option {:key tag :value tag} tag)))
+          (when (:error tag-name-field)
+            ($ :div.text-sm.text-red-600.mt-1 (:error tag-name-field)))))))
 
-(defn show-remove-tag-modal! [module-id dataset-id snapshot-name example-ids]
+(defn show-remove-tag-modal! [module-id dataset-id snapshot-name example-ids selected-examples]
   (state/dispatch [:form/init :remove-tag-from-selected
                    (-> remove-tag-form-spec
                        (assoc :submit-event [:dataset/remove-tag-from-selected
@@ -239,7 +251,8 @@
                    {:title (str "Remove Tag from " (count example-ids) " Examples")
                     :form-id :remove-tag-from-selected
                     :submit-text "Remove Tag"
-                    :component ($ RemoveTagForm {:form-id :remove-tag-from-selected})}]))
+                    :component ($ RemoveTagForm {:form-id :remove-tag-from-selected
+                                                 :selected-examples selected-examples})}]))
 
 (defn handle-delete-selected! [module-id dataset-id snapshot-name example-ids]
   (when (js/confirm (str "Are you sure you want to delete " (count example-ids) " selected examples? This action cannot be undone."))

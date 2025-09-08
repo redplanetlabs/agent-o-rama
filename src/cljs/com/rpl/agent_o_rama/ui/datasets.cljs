@@ -467,8 +467,11 @@
 ;; CONTEXTUAL ACTION BAR
 ;; =============================================================================
 
-(defui ContextualActionBar [{:keys [module-id dataset-id snapshot-name selected-example-ids is-read-only?]}]
-  (let [example-count (count selected-example-ids)]
+(defui ContextualActionBar [{:keys [module-id dataset-id snapshot-name selected-example-ids examples is-read-only?]}]
+  (let [example-count (count selected-example-ids)
+        ;; Filter examples to get only the selected ones
+        selected-examples (filter #(contains? selected-example-ids (:id %)) examples)]
+
     ($ :div.bg-gray-50.border-b.border-gray-200.px-6.py-3
        ($ :div.flex.items-center.justify-between
           ;; Left side - Selection info and clear button
@@ -476,12 +479,7 @@
              ($ :span.text-sm.font-medium.text-gray-900
                 (str example-count " example"
                      (when (> example-count 1) "s")
-                     " selected"))
-             ;; Clear selection as a small link
-             ($ :button.text-sm.text-blue-600.hover:underline
-                {:onClick #(state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])}
-                "Clear selection"))
-
+                     " selected")))
           ;; Right side - Action buttons
           ($ :div.flex.items-center.space-x-2
              ;; Add Tag button
@@ -496,7 +494,7 @@
              ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                 {:disabled is-read-only?
                  :onClick #(when-not is-read-only?
-                             (datasets-forms/show-remove-tag-modal! module-id dataset-id snapshot-name selected-example-ids))
+                             (datasets-forms/show-remove-tag-modal! module-id dataset-id snapshot-name selected-example-ids selected-examples))
                  :title (when is-read-only? "Cannot remove tags from a read-only snapshot.")}
                 "Remove Tag...")
 
@@ -996,6 +994,7 @@
                                               :dataset-id dataset-id
                                               :snapshot-name selected-snapshot-name
                                               :selected-example-ids selected-example-ids
+                                              :examples examples
                                               :is-read-only? is-read-only?})
                       ($ :div.h-10)) ;; Placeholder to maintain layout height 
 
