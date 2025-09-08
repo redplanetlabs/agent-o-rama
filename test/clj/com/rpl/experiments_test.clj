@@ -851,6 +851,40 @@
        (bind module
          (aor/agentmodule
           [topology]
+          (aor/declare-evaluator-builder
+           topology
+           "rfail"
+           ""
+           (fn [params]
+             (fn [fetcher input ref-output output]
+               (if (= output "a!")
+                 (throw (ex-info "fail" {}))
+                 {"res" output}))))
+          (aor/declare-comparative-evaluator-builder
+           topology
+           "cfail"
+           ""
+           (fn [params]
+             (fn [fetcher input ref-output outputs]
+               (if (some #(= "a!" %) outputs)
+                 (throw (ex-info "fail" {}))
+                 {"res" outputs}))))
+          (aor/declare-summary-evaluator-builder
+           topology
+           "sfail"
+           ""
+           (fn [params]
+             (fn [fetcher example-runs]
+               (throw (ex-info "fail" {}))
+             )))
+          (aor/declare-summary-evaluator-builder
+           topology
+           "count"
+           ""
+           (fn [params]
+             (fn [fetcher example-runs]
+               {"res" (count example-runs)}
+             )))
           (-> topology
               (aor/new-agent "foo")
               (aor/node
@@ -895,6 +929,10 @@
                               "aor/conciseness"
                               {"threshold" "2"}
                               "")
+       (aor/create-evaluator! manager "rfail" "rfail" {} "")
+       (aor/create-evaluator! manager "cfail" "cfail" {} "")
+       (aor/create-evaluator! manager "sfail" "sfail" {} "")
+       (aor/create-evaluator! manager "mycount" "count" {} "")
 
        (bind exp-id (h/random-uuid7))
        (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
@@ -1010,6 +1048,62 @@
             :input            "fail-node"
             :reference-output nil}}}
         ))
+
+
+       (add-example-and-wait! manager ds-id1 "b" {:tags #{"t"}})
+       (bind exp-id (h/random-uuid7))
+       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (foreign-append!
+          global-actions-depot
+          (aor-types/->valid-StartExperiment
+           exp-id
+           "My experiment"
+           ds-id1
+           nil
+           (aor-types/->valid-TagSelector "t")
+           [(aor-types/->valid-EvaluatorSelector "concise2" false)
+            (aor-types/->valid-EvaluatorSelector "rfail" false)
+            (aor-types/->valid-EvaluatorSelector "sfail" false)
+            (aor-types/->valid-EvaluatorSelector "mycount" false)]
+           (aor-types/->valid-RegularExperiment
+            (aor-types/->valid-ExperimentTarget
+             (aor-types/->valid-AgentTarget "foo")
+             ["$"]
+            ))
+           1
+           2)))
+       (wait-experiment-finished! exp-client exp-invoke)
+       (bind res (foreign-invoke-query results ds-id1 exp-id))
+       (is
+        (trace-matches?
+         res
+         {:summary-evals {"mycount" {"res" 2}}
+          :summary-eval-failures
+          {"sfail" !ex1}
+          :results
+          {0
+           {:example-id       !eid0
+            :agent-initiates
+            {0
+             {:agent-name "foo"}}
+            :agent-results    {0 {:val "a!" :failure? false}}
+            :evals            {"concise2" {"concise?" true}}
+            :eval-failures
+            {"rfail" !ex2}
+            :input            "a"
+            :reference-output nil}
+           1
+           {:example-id       !eid1
+            :agent-initiates
+            {0
+             {:agent-name "foo"}}
+            :agent-results    {0 {:val "b!" :failure? false}}
+            :evals            {"concise2" {"concise?" true} "rfail" {"res" "b!"}}
+            :input            "b"
+            :reference-output nil}}}
+        ))
+
+
        ;; TODO: <<<<>>>>>
        ;;  - regular, comparative, and summary eval failures
       ))))
