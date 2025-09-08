@@ -51,7 +51,7 @@
          "No evaluator builders available for this module.")
 
       :else
-      ($ :div.space-y-4
+      ($ :div.p-6.space-y-4
          ($ :p.text-sm.text-gray-600.mb-4
             "Select an evaluator builder to configure:")
 
@@ -60,7 +60,7 @@
                   (for [[builder-name builder-spec] data]
                     (let [type (:type builder-spec)
                           description (:description builder-spec "No description available")]
-                      ($ :div.border.rounded-lg.p-4.cursor-pointer.hover:bg-gray-50.transition-colors
+                      ($ :div.bg-white.rounded-lg.p-4.cursor-pointer.hover:bg-gray-50.hover:shadow-md.transition-all.duration-200.border.border-gray-100.shadow-sm
                          {:key builder-name
                           :onClick #(on-select {:name builder-name
                                                 :spec builder-spec})}
