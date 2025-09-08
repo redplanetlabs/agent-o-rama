@@ -95,30 +95,33 @@
         loading? (state/use-sub [:invocations :loading?])
         connected? (state/use-sub [:sente :connected?])
 
-        ;; Fetch function that handles the entire flow
-        fetch-invocations (fn [pagination append?]
-                            (state/dispatch [:invocations/set-loading true])
-                            (sente/request!
-                             [:invocations/get-page {:module-id module-id
-                                                     :agent-name agent-name
-                                                     :pagination pagination}]
-                             5000
-                             (fn [reply]
-                               (state/dispatch [:invocations/set-loading false])
-                               (when (:success reply)
-                                 (let [data (:data reply)
-                                       new-invokes (:agent-invokes data)
-                                       new-pagination (:pagination-params data)
-                                       has-more? (and new-pagination
-                                                      (not (empty? new-pagination))
-                                                      (some (fn [[_ item-id]] (not (nil? item-id)))
-                                                            new-pagination))]
-                                   (if append?
-                                     (state/dispatch [:invocations/append new-invokes])
-                                     (state/dispatch [:db/set-value [:invocations :all-invokes] new-invokes]))
-                                   (state/dispatch [:invocations/set-pagination
-                                                    {:pagination-params (when has-more? new-pagination)
-                                                     :has-more? has-more?}]))))))
+        ;; Fetch function that handles the entire flow - memoized with use-callback
+        fetch-invocations (uix/use-callback
+                           (fn [pagination append?]
+                             (state/dispatch [:invocations/set-loading true])
+                             (sente/request!
+                              [:invocations/get-page {:module-id module-id
+                                                      :agent-name agent-name
+                                                      :pagination pagination}]
+                              5000
+                              (fn [reply]
+                                (state/dispatch [:invocations/set-loading false])
+                                (when (:success reply)
+                                  (let [data (:data reply)
+                                        new-invokes (:agent-invokes data)
+                                        new-pagination (:pagination-params data)
+                                        has-more? (and new-pagination
+                                                       (not (empty? new-pagination))
+                                                       (some (fn [[_ item-id]] (not (nil? item-id)))
+                                                             new-pagination))]
+                                    (if append?
+                                      (state/dispatch [:invocations/append new-invokes])
+                                      (state/dispatch [:db/set-value [:invocations :all-invokes] new-invokes]))
+                                    (state/dispatch [:invocations/set-pagination
+                                                     {:pagination-params (when has-more? new-pagination)
+                                                      :has-more? has-more?}]))))))
+                            ;; Dependencies for use-callback - only recreate when module-id or agent-name changes
+                           [module-id agent-name])
 
         ;; Initial load - fetch first page when connected
         _ (uix/use-effect
@@ -128,7 +131,8 @@
                (state/dispatch [:invocations/reset])
                (fetch-invocations {} false))
              (constantly nil))
-           [fetch-invocations module-id agent-name connected?])
+           ;; Simplified dependencies - fetch-invocations is now stable and will change when module-id/agent-name change
+           [fetch-invocations connected?])
 
         load-more (fn []
                     (when (and has-more? (not loading?) pagination-params)
