@@ -197,49 +197,54 @@
 ;; MODALS FOR EVALUATORS
 ;; =============================================================================
 
-(defui TryEvaluatorModal [{:keys [module-id example]}]
+(defui RunEvaluatorModal [{:keys [module-id dataset-id mode example selected-example-ids]}]
   (let [[selected-evaluator set-selected-evaluator] (uix/use-state nil)
-        [output set-output] (uix/use-state "") ; For regular evaluator
-        [outputs set-outputs] (uix/use-state [""]) ; For comparative evaluator
+        [output set-output] (uix/use-state "") ; For :regular type
+        [outputs set-outputs] (uix/use-state [""]) ; For :comparative type
         [error set-error] (uix/use-state nil)
         [loading? set-loading] (uix/use-state false)
         [dropdown-open? set-dropdown-open] (uix/use-state false)
 
-        ;; Fetch evaluators for this module
+        ;; Fetch all evaluator instances
         {:keys [data evaluators-loading? evaluators-error]}
         (queries/use-sente-query
          {:query-key [:evaluator-instances module-id]
           :sente-event [:evaluators/get-all-instances {:module-id module-id}]
           :enabled? (boolean module-id)})
 
-        ;; Filter for relevant evaluator types
-        evaluators (filter #(#{:regular :comparative} (:type %)) (or (:items data) []))
+        ;; Filter evaluators based on the modal's mode (:single or :multi)
+        evaluators (filter
+                    (if (= mode :single)
+                      #(#{:regular :comparative} (:type %))
+                      #(= :summary (:type %)))
+                    (or (:items data) []))
 
-        is-comparative? (= :comparative (:type selected-evaluator))
+        evaluator-type (:type selected-evaluator)
 
         handle-run (fn []
                      (when selected-evaluator
                        (set-loading true)
                        (set-error nil)
 
-                       ;; Build run-data based on type
-                       (let [run-data (if is-comparative?
-                                        {:input (js/JSON.stringify (clj->js (:input example)))
-                                         :referenceOutput (js/JSON.stringify (clj->js (:reference-output example)))
-                                         :outputs outputs}
-                                        {:input (js/JSON.stringify (clj->js (:input example)))
-                                         :referenceOutput (js/JSON.stringify (clj->js (:reference-output example)))
-                                         :output output})]
+                       (let [run-data (case evaluator-type
+                                        :regular {:input (js/JSON.stringify (clj->js (:input example)))
+                                                  :referenceOutput (js/JSON.stringify (clj->js (:reference-output example)))
+                                                  :output output}
+                                        :comparative {:input (js/JSON.stringify (clj->js (:input example)))
+                                                      :referenceOutput (js/JSON.stringify (clj->js (:reference-output example)))
+                                                      :outputs outputs}
+                                        :summary {:dataset-id dataset-id
+                                                  :example-ids selected-example-ids})]
                          (sente/request!
                           [:evaluators/run {:module-id module-id
                                             :name (:name selected-evaluator)
-                                            :type (:type selected-evaluator)
+                                            :type evaluator-type
                                             :run-data run-data}]
-                          30000
+                          60000 ; Generous timeout
                           (fn [reply]
                             (set-loading false)
                             (if (:success reply)
-                              (set-output (:data reply)) ;; Output is always a single map
+                              (set-output (:data reply))
                               (set-error (:error reply))))))))]
 
     ;; Close dropdown when clicking outside
@@ -253,13 +258,13 @@
      [dropdown-open?])
 
     ($ :div.p-6.space-y-6
-       ;; Dropdown using DropdownRow
+       ;; 1. Evaluator Selection Dropdown
        ($ :div
           ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Select Evaluator")
           (cond
             evaluators-loading? ($ :div.text-sm.text-gray-500 "Loading evaluators...")
             evaluators-error ($ :div.text-sm.text-red-600 "Error loading evaluators")
-            (empty? evaluators) ($ :div.text-sm.text-gray-500 "No regular or comparative evaluators available.")
+            (empty? evaluators) ($ :div.text-sm.text-gray-500 (if (= mode :single) "No regular or comparative evaluators available." "No summary evaluators available."))
             :else
             ($ :div.relative
                ($ :button.inline-flex.items-center.justify-between.w-full.px-3.py-2.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50
@@ -270,7 +275,7 @@
                  ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
                     ($ :div.py-1
                        (for [evaluator evaluators]
-                         ($ DropdownRow {:key (str "eval-" (:name evaluator))
+                         ($ DropdownRow {:key (:name evaluator)
                                          :label (:name evaluator)
                                          :selected? (= (:name selected-evaluator) (:name evaluator))
                                          :on-select #(do (set-selected-evaluator evaluator) (set-dropdown-open false))
@@ -279,155 +284,65 @@
                                                               {:className (get-evaluator-type-badge-style (:type evaluator))}
                                                               (get-evaluator-type-display (:type evaluator))))}))))))))
 
-       ;; Example Input (read-only)
-       ($ :div
-          ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Input")
-          ($ :div.bg-gray-50.rounded-md.p-4.border
-             ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
-                (js/JSON.stringify (clj->js (:input example)) nil 2))))
+       ;; 2. Example Input (read-only) - only for single mode
+       (when (= mode :single)
+         ($ :div
+            ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Input")
+            ($ :div.bg-gray-50.rounded-md.p-4.border
+               ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
+                  (js/JSON.stringify (clj->js (:input example)) nil 2)))))
 
-       ;; Reference Output (read-only)
-       (when (:reference-output example)
+       ;; 3. Reference Output (read-only) - only for single mode
+       (when (and (= mode :single) (:reference-output example))
          ($ :div
             ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Reference Output")
             ($ :div.bg-gray-50.rounded-md.p-4.border
                ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
                   (js/JSON.stringify (clj->js (:reference-output example)) nil 2)))))
 
-       ;; Conditional output fields
-       (if is-comparative?
-         ($ :div
-            ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Model Outputs (JSON, one per line)")
-            ($ :textarea.w-full.p-3.border.border-gray-300.rounded-md.font-mono.text-sm
-               {:rows 5
-                :placeholder "[\"output1\", \"output2\"]"
-                :value (str/join "\n" outputs)
-                :onChange #(set-outputs (vec (str/split-lines (.. % -target -value))))}))
-         ($ :div
-            ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Model Output (JSON)")
-            ($ :textarea.w-full.p-3.border.border-gray-300.rounded-md.font-mono.text-sm
-               {:rows 3
-                :placeholder "{\"result\": \"...\"}"
-                :value output
-                :onChange #(set-output (.. % -target -value))})))
+       ;; 4. Dynamic UI based on selection and mode
+       (when selected-evaluator
+         (case evaluator-type
+           :regular
+           ($ :div
+              ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Model Output (JSON)")
+              ($ :textarea.w-full.p-3.border.border-gray-300.rounded-md.font-mono.text-sm
+                 {:rows 3, :placeholder "{\"result\": \"...\"}", :value output, :onChange #(set-output (.. % -target -value))}))
 
-       ;; Run Button
+           :comparative
+           ($ :div
+              ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Model Outputs (One valid JSON per line)")
+              (doall (for [[i out-val] (map-indexed vector outputs)]
+                       ($ :div.flex.items-center.gap-2.mb-2 {:key i}
+                          ($ :textarea.flex-1.p-2.border.border-gray-300.rounded-md.font-mono.text-xs
+                             {:rows 1
+                              :value out-val
+                              :onChange #(set-outputs (assoc outputs i (.. % -target -value)))})
+                          ($ :button.text-red-500.hover:text-red-700
+                             {:onClick #(set-outputs (vec (concat (subvec outputs 0 i) (subvec outputs (inc i)))))}
+                             ($ XMarkIcon {:className "h-4 w-4"})))))
+              ($ :button.text-sm.text-blue-600.hover:underline {:onClick #(set-outputs (conj outputs ""))} "Add another output"))
+
+           :summary
+           ($ :div.p-4.bg-blue-50.border.border-blue-200.rounded-md
+              ($ :h4.text-sm.font-medium.text-blue-800
+                 (str "This will run the summary evaluator '" (:name selected-evaluator) "' on "
+                      (count selected-example-ids) " selected examples.")))
+
+           nil))
+
+       ;; 5. Run Button and Output
        ($ :div.flex.justify-center
           ($ :button.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
-             {:onClick handle-run
-              :disabled (or (not selected-evaluator) loading?)}
+             {:onClick handle-run, :disabled (or (not selected-evaluator) loading?)}
              (if loading? "Running..." "Run Evaluator")))
 
-       ;; Error Display
-       (when error
-         ($ :div.p-4.bg-red-50.border.border-red-200.rounded-md
-            ($ :h4.text-sm.font-medium.text-red-800 "Error")
-            ($ :p.text-sm.text-red-700.mt-1 error)))
-
-       ;; Output Display
+       (when error ($ :div.p-4.bg-red-50.border.border-red-200.rounded-md ($ :p.text-sm.text-red-700 error)))
        (when output
          ($ :div
-            ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Evaluator Output")
+            ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Evaluator Result")
             ($ :div.bg-green-50.rounded-md.p-4.border.border-green-200
-               ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
-                  (js/JSON.stringify (clj->js output) nil 2))))))))
-
-(defui TrySummaryEvaluatorModal [{:keys [module-id dataset-id selected-example-ids]}]
-  (let [[selected-evaluator set-selected-evaluator] (uix/use-state nil)
-        [output set-output] (uix/use-state nil)
-        [error set-error] (uix/use-state nil)
-        [loading? set-loading] (uix/use-state false)
-        [dropdown-open? set-dropdown-open] (uix/use-state false)
-
-        ;; Fetch evaluators for this module
-        {:keys [data evaluators-loading? evaluators-error]}
-        (queries/use-sente-query
-         {:query-key [:evaluator-instances module-id]
-          :sente-event [:evaluators/get-all-instances {:module-id module-id}]
-          :enabled? (boolean module-id)})
-
-        ;; Filter for summary evaluators only
-        evaluators (filter #(= :summary (:type %)) (or (:items data) []))
-
-        handle-run (fn []
-                     (when selected-evaluator
-                       (set-loading true)
-                       (set-error nil)
-                       (set-output nil)
-
-                       ;; Call the new unified Sente handler
-                       (sente/request!
-                        [:evaluators/run {:module-id module-id
-                                          :name (:name selected-evaluator)
-                                          :type :summary
-                                          :run-data {:dataset-id dataset-id
-                                                     :example-ids (vec selected-example-ids)}}]
-                        60000 ; Longer timeout for summary evaluations
-                        (fn [reply]
-                          (set-loading false)
-                          (if (:success reply)
-                            (set-output (:data reply))
-                            (set-error (:error reply)))))))]
-
-    ;; Close dropdown when clicking outside
-    (uix/use-effect
-     (fn []
-       (let [handle-click (fn [e]
-                            (when dropdown-open?
-                              (set-dropdown-open false)))]
-         (.addEventListener js/document "click" handle-click)
-         #(.removeEventListener js/document "click" handle-click)))
-     [dropdown-open?])
-
-    ($ :div.p-6.space-y-6
-       ;; Dropdown using DropdownRow
-       ($ :div
-          ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Select Summary Evaluator")
-          (cond
-            evaluators-loading? ($ :div.text-sm.text-gray-500 "Loading evaluators...")
-            evaluators-error ($ :div.text-sm.text-red-600 "Error loading evaluators")
-            (empty? evaluators) ($ :div.text-sm.text-gray-500 "No summary evaluators available.")
-            :else
-            ($ :div.relative
-               ($ :button.inline-flex.items-center.justify-between.w-full.px-3.py-2.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50
-                  {:onClick #(set-dropdown-open (not dropdown-open?))}
-                  ($ :span.truncate (or (:name selected-evaluator) "Choose an evaluator..."))
-                  ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
-               (when dropdown-open?
-                 ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
-                    ($ :div.py-1
-                       (for [evaluator evaluators]
-                         ($ DropdownRow {:key (str "summary-eval-" (:name evaluator))
-                                         :label (:name evaluator)
-                                         :selected? (= (:name selected-evaluator) (:name evaluator))
-                                         :on-select #(do (set-selected-evaluator evaluator) (set-dropdown-open false))}))))))))
-
-       ;; Selected Examples Info
-       ($ :div.p-4.bg-blue-50.border.border-blue-200.rounded-md
-          ($ :h4.text-sm.font-medium.text-blue-800
-             (str "Running on " (count selected-example-ids) " selected example"
-                  (when (> (count selected-example-ids) 1) "s"))))
-
-       ;; Run Button
-       ($ :div.flex.justify-center
-          ($ :button.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
-             {:onClick handle-run
-              :disabled (or (not selected-evaluator) loading?)}
-             (if loading? "Running..." "Run Summary Evaluation")))
-
-       ;; Error Display
-       (when error
-         ($ :div.p-4.bg-red-50.border.border-red-200.rounded-md
-            ($ :h4.text-sm.font-medium.text-red-800 "Error")
-            ($ :p.text-sm.text-red-700.mt-1 error)))
-
-       ;; Output Display
-       (when output
-         ($ :div
-            ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Summary Results")
-            ($ :div.bg-green-50.rounded-md.p-4.border.border-green-200
-               ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
-                  (js/JSON.stringify (clj->js output) nil 2))))))))
+               ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono (js/JSON.stringify (clj->js output) nil 2))))))))
 
 ;; =============================================================================
 ;; EXAMPLE ACTIONS AND EDITING
@@ -1028,10 +943,13 @@
                                         :onClick (fn [e]
                                                    (.stopPropagation e)
                                                    (set-open-dropdown nil) ; Close dropdown
-                                                   ;; Show the Try Evaluator modal
-                                                   (state/dispatch [:modal/show :try-evaluator
-                                                                    {:title "Try with Evaluator"
-                                                                     :component ($ TryEvaluatorModal {:module-id module-id :example example})}]))}
+                                                   ;; Show the new unified modal in :single mode
+                                                   (state/dispatch [:modal/show :run-evaluator
+                                                                    {:title "Try Evaluator on Example"
+                                                                     :component ($ RunEvaluatorModal {:module-id module-id
+                                                                                                      :dataset-id dataset-id
+                                                                                                      :mode :single
+                                                                                                      :example example})}]))}
                                        ($ PlayIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                        "Try with evaluator")
                                     ;; Delete button
@@ -1386,12 +1304,13 @@
                              ($ :button.px-3.py-1.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                                 {:disabled (empty? selected-example-ids)
                                  :onClick #(when (seq selected-example-ids)
-                                             (state/dispatch [:modal/show :try-summary-evaluator
+                                             ;; Show the new unified modal in :multi mode
+                                             (state/dispatch [:modal/show :run-evaluator
                                                               {:title "Run Summary Evaluation"
-                                                               :component ($ TrySummaryEvaluatorModal
-                                                                             {:module-id module-id
-                                                                              :dataset-id dataset-id
-                                                                              :selected-example-ids selected-example-ids})}]))}
+                                                               :component ($ RunEvaluatorModal {:module-id module-id
+                                                                                                :dataset-id dataset-id
+                                                                                                :mode :multi
+                                                                                                :selected-example-ids selected-example-ids})}]))}
                                 "Try summary evaluator")
                              ($ :button.px-3.py-1.text-sm.text-gray-600.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                                 {:disabled (empty? selected-example-ids)
