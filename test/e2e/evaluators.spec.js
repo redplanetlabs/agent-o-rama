@@ -193,9 +193,11 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
 
   // --- Test :summary evaluator ---
   console.log('Testing :summary evaluator...');
-  // Select the two examples for the F1 score
-  await page.locator('table tbody tr').filter({ hasText: '+' }).locator('input[type="checkbox"]').check();
-  await page.locator('table tbody tr').filter({ hasText: '-' }).locator('input[type="checkbox"]').check();
+  // Select the two examples for the F1 score (click the checkbox cell - input is readOnly)
+  const plusRow = page.locator('table tbody tr').filter({ hasText: '+' });
+  await plusRow.locator('td').first().click();
+  const minusRow = page.locator('table tbody tr').filter({ hasText: '-' });
+  await minusRow.locator('td').first().click();
 
   await page.getByRole('button', { name: 'Try summary evaluator' }).click();
 
