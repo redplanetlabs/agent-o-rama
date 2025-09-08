@@ -78,12 +78,12 @@ test.describe('Dataset crud', () => {
     // find the created datset in the invalidated/requeried table
     // the tilte is in an h3 tag
     // might be multiple from previous runs, so we need to find the one that is not loading
-    await expect(page.getByRole('heading', { name: datasetName })).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(datasetName)).toBeVisible({ timeout: 30000 });
     console.log('Successfully verified created dataset.');
 
     // find the dataset card by the heading link, then go up to the card and find the edit button
-    const datasetCard = page.getByRole('heading', { name: datasetName }).locator('..').locator('..');
-    const editButton = datasetCard.getByTitle('Edit Dataset');
+    const datasetCard = page.getByText(datasetName).locator('..').locator('..');
+    const editButton = datasetCard.getByRole('button', { name: 'Edit' });
     await expect(editButton).toBeVisible({ timeout: 30000 });
     await editButton.click();
 
@@ -94,18 +94,18 @@ test.describe('Dataset crud', () => {
     await page.getByLabel('Description').fill('New Description');
     await page.getByRole('button', { name: 'Save Changes' }).click();
 
-    await expect(page.getByRole('heading', { name: newDatasetName })).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(newDatasetName)).toBeVisible({ timeout: 30000 });
     console.log('Successfully verified updated dataset.');
 
     page.on('dialog', dialog => dialog.accept());
 
     // get the delete button scoped to the card containing this dataset name
-    const deleteButton = page.getByRole('heading', { name: newDatasetName }).locator('..').locator('..').getByTitle('Delete Dataset');
+    const deleteButton = page.getByText(newDatasetName).locator('..').locator('..').getByRole('button', { name: 'Delete' });
     await expect(deleteButton).toBeVisible({ timeout: 30000 });
     await deleteButton.click();
 
     // wait for the dataset to be deleted
-    await expect(page.getByRole('heading', { name: newDatasetName })).not.toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(newDatasetName)).not.toBeVisible({ timeout: 30000 });
     console.log('Successfully verified deleted dataset.');
   });
 });
@@ -160,7 +160,7 @@ test.describe('Dataset example crud', () => {
     // find the created datset in the invalidated/requeried table
     // the tilte is in an h3 tag
     // might be multiple from previous runs, so we need to find the one that is not loading
-    await expect(page.getByRole('heading', { name: datasetName })).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(datasetName)).toBeVisible({ timeout: 30000 });
     console.log('Successfully verified created dataset.');
 
     // Navigate to dataset detail page by clicking the dataset link
@@ -247,10 +247,10 @@ test.describe('Dataset example crud', () => {
 
     // Cleanup: go back to dataset list and delete the dataset
     await page.goBack();
-    const deleteButton = page.getByRole('heading', { name: datasetName }).locator('..').locator('..').getByTitle('Delete Dataset');
+    const deleteButton = page.getByText(datasetName).locator('..').locator('..').getByRole('button', { name: 'Delete' });
     await expect(deleteButton).toBeVisible({ timeout: 30000 });
     await deleteButton.click();
-    await expect(page.getByRole('heading', { name: datasetName })).not.toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(datasetName)).not.toBeVisible({ timeout: 30000 });
     console.log('Successfully cleaned up dataset.');
   });
 });
@@ -282,7 +282,7 @@ test.describe('Inline editing validation', () => {
     await page.getByLabel('Output JSON Schema').fill('{}');
     await page.locator('[role="dialog"]').getByRole('button', { name: 'Create Dataset' }).click();
 
-    await expect(page.getByRole('heading', { name: datasetName })).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(datasetName)).toBeVisible({ timeout: 30000 });
     await page.getByRole('link', { name: datasetName }).first().click();
 
     // Add an example with a string value to test JSON formatting
@@ -339,9 +339,9 @@ test.describe('Inline editing validation', () => {
     // Cleanup
     page.on('dialog', dialog => dialog.accept());
     await page.goBack();
-    const deleteButton = page.getByRole('heading', { name: datasetName }).locator('..').locator('..').getByTitle('Delete Dataset');
+    const deleteButton = page.getByText(datasetName).locator('..').locator('..').getByRole('button', { name: 'Delete' });
     await deleteButton.click();
-    await expect(page.getByRole('heading', { name: datasetName })).not.toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(datasetName)).not.toBeVisible({ timeout: 30000 });
   });
 });
 
@@ -379,7 +379,7 @@ test.describe('Dataset snapshot dropdown', () => {
     // Wait for modal to close
     await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 30000 });
     
-    await expect(page.getByRole('heading', { name: datasetName })).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(datasetName)).toBeVisible({ timeout: 30000 });
 
     await page.getByRole('link', { name: datasetName }).first().click();
 
@@ -445,9 +445,9 @@ test.describe('Dataset snapshot dropdown', () => {
 
     // Cleanup: go back and delete dataset
     await page.goBack();
-    const deleteButton = page.getByRole('heading', { name: datasetName }).locator('..').locator('..').getByTitle('Delete Dataset');
+    const deleteButton = page.getByText(datasetName).locator('..').locator('..').getByRole('button', { name: 'Delete' });
     await expect(deleteButton).toBeVisible({ timeout: 30000 });
     await deleteButton.click();
-    await expect(page.getByRole('heading', { name: datasetName })).not.toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(datasetName)).not.toBeVisible({ timeout: 30000 });
   });
 });

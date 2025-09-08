@@ -1062,7 +1062,7 @@
                                 ($ :div.px-4.py-4.sm:px-6
                                    ($ :div.flex.items-center.justify-between
                                       ($ :div.flex-1.min-w-0.max-w-lg
-                                         ($ :p.text-sm.font-medium.text-indigo-600.truncate (:name dataset))
+                                         ($ :h3.text-sm.font-medium.text-indigo-600.truncate (:name dataset))
                                          (when (:description dataset)
                                            ($ :p.mt-1.text-sm.text-gray-500.truncate (:description dataset))))
                                       ($ :div.ml-2.flex-shrink-0.flex.space-x-2
