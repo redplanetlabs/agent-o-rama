@@ -1061,7 +1061,7 @@
                         (for [dataset datasets]
                           ($ :li {:key (:dataset-id dataset)}
                              ($ :a.block.hover:bg-gray-50.cursor-pointer
-                                {:href (get-dataset-path decoded-module-id (:id dataset))}
+                                {:href (get-dataset-path decoded-module-id (:dataset-id dataset))}
                                 ($ :div.px-4.py-4.sm:px-6
                                    ($ :div.flex.items-center.justify-between
                                       ($ :div.flex-1.min-w-0
@@ -1073,7 +1073,7 @@
                                             {:onClick (fn [e]
                                                         (.preventDefault e)
                                                         (.stopPropagation e)
-                                                        (show-edit-dataset-modal! decoded-module-id (:id dataset) (:name dataset) (:description dataset)))}
+                                                        (show-edit-dataset-modal! decoded-module-id (:dataset-id dataset) (:name dataset) (:description dataset)))}
                                             ($ PencilIcon {:className "h-4 w-4 mr-1"})
                                             "Edit"))))))))))))))
 
