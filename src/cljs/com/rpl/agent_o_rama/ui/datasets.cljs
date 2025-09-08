@@ -16,7 +16,6 @@
 ;; =============================================================================
 ;; EXAMPLE ACTIONS AND EDITING
 ;; =============================================================================
-
 (defui ExampleActionButtons [{:keys [example-id module-id dataset-id snapshot-name on-delete-success]}]
   (let [delete-icon-classes "mr-2 h-4 w-4 text-gray-400 group-hover:text-red-500"]
 
@@ -593,7 +592,7 @@
                                                                      :component ($ :div.p-6.text-center
                                                                                    ($ :p.text-gray-600 "Evaluator functionality is being loaded...")
                                                                                    ($ :button.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700
-                                                                                      {:onClick #(state/dispatch [:modal/hide])}
+                                                                                      {:onClick (fn [] (state/dispatch [:modal/hide]))}
                                                                                       "Close"))}]))}
                                        ($ PlayIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                        "Try with evaluator")
@@ -955,7 +954,7 @@
                                                                :component ($ :div.p-6.text-center
                                                                              ($ :p.text-gray-600 "Evaluator functionality is being loaded...")
                                                                              ($ :button.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700
-                                                                                {:onClick #(state/dispatch [:modal/hide])}
+                                                                                {:onClick (fn [] (state/dispatch [:modal/hide]))}
                                                                                 "Close"))}]))}
                                 "Try summary evaluator")
                              ($ :button.px-3.py-1.text-sm.text-gray-600.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer

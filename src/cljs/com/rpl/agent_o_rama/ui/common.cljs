@@ -144,12 +144,26 @@
            :d "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"}))))
 
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content]}]
-  ($ :div.px-4.py-2.text-sm.cursor-pointer.hover:bg-gray-100
-     {:onClick on-select}
-     ($ :div.flex.items-center.justify-between
-        ($ :div.flex.items-center
-           (when icon ($ :div.mr-3 icon))
-           ($ :span.text-gray-900 label))
-        (when selected?
-          ($ :div.text-blue-600 "✓"))))
-  (when extra-content extra-content))
+  (let [row-classes (cn
+                     "flex items-center justify-between w-full px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
+                     {"bg-blue-50 text-blue-700" selected?
+                      "text-blue-600 hover:bg-blue-50" action?
+                      "text-gray-700" (not (or selected? action?))})]
+    ($ :div
+       ;; Main clickable area
+       ($ :div
+          {:onClick (fn [e]
+                      (.stopPropagation e)
+                      (when on-select (on-select)))
+           :className row-classes}
+          ($ :div.flex.items-center.flex-1
+             (when icon ($ :div.mr-3 icon))
+             ($ :span.truncate label)
+             (when selected? ($ :span.ml-2.text-xs.text-blue-600 "✓")))
+          ;; Delete button area (separate from main click area to avoid nesting)
+          (when (and delete-button (not action?))
+            ($ :div.ml-2
+               {:onClick #(.stopPropagation %)} ;; Prevent triggering the row click
+               delete-button)))
+       ;; Extra content below the main row
+       (when extra-content extra-content))))
