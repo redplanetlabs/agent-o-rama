@@ -7,6 +7,7 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
@@ -153,10 +154,7 @@
          (bind exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME))
          (bind global-actions-depot
            (foreign-depot ipc module-name (po/global-actions-depot-name)))
-         (bind datasets
-           (foreign-pstate ipc module-name (po/datasets-task-global-name)))
-         (bind search
-           (foreign-query ipc module-name (queries/search-experiments-name)))
+
          (bind results
            (foreign-query ipc module-name (queries/experiment-results-name)))
 
@@ -846,11 +844,175 @@
         )))))
 
 (deftest execution-failures-test
-         ;; TODO: <<<<>>>>>
-         ;;  - agent failures
-         ;;  - node execution failures
-         ;;  - regular, comparative, and summary eval failures
-)
+  (with-redefs
+    [anode/log-node-error (fn [& args])]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (-> topology
+              (aor/new-agent "foo")
+              (aor/node
+               "start"
+               "a"
+               (fn [agent-node arg]
+                 (if (= arg "fail-agent")
+                   (throw (ex-info "fail" {}))
+                   (aor/result! agent-node (str arg "!")))
+               ))
+              (aor/node
+               "a"
+               nil
+               (fn [agent-node arg]
+                 (if (= arg "fail-node")
+                   (throw (ex-info "fail" {}))
+                   (aor/result! agent-node (str arg "?")))
+               ))
+          )))
+       (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind manager (aor/agent-manager ipc module-name))
+       (bind exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME))
+       (bind global-actions-depot
+         (foreign-depot ipc module-name (po/global-actions-depot-name)))
+       (bind results
+         (foreign-query ipc module-name (queries/experiment-results-name)))
+
+       (bind add-example-and-wait!
+         (fn [& args]
+           (Thread/sleep 2)
+           (apply aor/add-dataset-example! args)))
+
+       (bind ds-id1 (aor/create-dataset! manager "Dataset 1"))
+
+       (add-example-and-wait! manager ds-id1 "a" {:tags #{"t"}})
+       (add-example-and-wait! manager ds-id1 "fail-agent")
+       (add-example-and-wait! manager ds-id1 "fail-node")
+
+       (aor/create-evaluator! manager
+                              "concise2"
+                              "aor/conciseness"
+                              {"threshold" "2"}
+                              "")
+
+       (bind exp-id (h/random-uuid7))
+       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (foreign-append!
+          global-actions-depot
+          (aor-types/->valid-StartExperiment
+           exp-id
+           "My experiment"
+           ds-id1
+           nil
+           nil
+           [(aor-types/->valid-EvaluatorSelector "concise2" false)]
+           (aor-types/->valid-RegularExperiment
+            (aor-types/->valid-ExperimentTarget
+             (aor-types/->valid-AgentTarget "foo")
+             ["$"]
+            ))
+           1
+           2)))
+       (wait-experiment-finished! exp-client exp-invoke)
+       (bind res (foreign-invoke-query results ds-id1 exp-id))
+       (is
+        (trace-matches?
+         res
+         {:summary-evals nil
+          :summary-eval-failures nil
+          :results
+          {0
+           {:example-id       !eid0
+            :agent-initiates
+            {0
+             {:agent-name "foo"}}
+            :agent-results    {0 {:val "a!" :failure? false}}
+            :evals            {"concise2" {"concise?" true}}
+            :input            "a"
+            :reference-output nil}
+           1
+           {:example-id       !eid1
+            :agent-initiates
+            {0
+             {:agent-name "foo"}}
+            :agent-results
+            {0 {:val {:message "Failure on example"} :failure? true}}
+            :input            "fail-agent"
+            :reference-output nil}
+           2
+           {:example-id       !eid2
+            :agent-initiates
+            {0
+             {:agent-name "foo"}}
+            :agent-results    {0 {:val "fail-node!" :failure? false}}
+            :evals            {"concise2" {"concise?" false}}
+            :input            "fail-node"
+            :reference-output nil}}}
+        ))
+
+       (bind exp-id (h/random-uuid7))
+       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (foreign-append!
+          global-actions-depot
+          (aor-types/->valid-StartExperiment
+           exp-id
+           "My experiment"
+           ds-id1
+           nil
+           nil
+           [(aor-types/->valid-EvaluatorSelector "concise2" false)]
+           (aor-types/->valid-RegularExperiment
+            (aor-types/->valid-ExperimentTarget
+             (aor-types/->valid-NodeTarget "foo" "a")
+             ["$"]
+            ))
+           1
+           2)))
+       (wait-experiment-finished! exp-client exp-invoke)
+       (bind res (foreign-invoke-query results ds-id1 exp-id))
+       (is
+        (trace-matches?
+         res
+         {:summary-evals nil
+          :summary-eval-failures nil
+          :results
+          {0
+           {:example-id       !eid0
+            :agent-initiates
+            {0
+             {:agent-name "_aor-experimenter"}}
+            :agent-results    {0 {:val "a?" :failure? false}}
+            :evals            {"concise2" {"concise?" true}}
+            :input            "a"
+            :reference-output nil}
+           1
+           {:example-id       !eid1
+            :agent-initiates
+            {0
+             {:agent-name "_aor-experimenter"}}
+            :agent-results    {0 {:val "fail-agent?" :failure? false}}
+            :evals            {"concise2" {"concise?" false}}
+            :input            "fail-agent"
+            :reference-output nil}
+           2
+           {:example-id       !eid2
+            :agent-initiates
+            {0
+             {:agent-name "_aor-experimenter"}}
+            :agent-results
+            {0
+             {:val
+              {:message "Failure executing node"
+               :node    "a"
+               :args    ["fail-node"]}
+              :failure? true}}
+            :input            "fail-node"
+            :reference-output nil}}}
+        ))
+       ;; TODO: <<<<>>>>>
+       ;;  - regular, comparative, and summary eval failures
+      ))))
 
 (deftest experimenter-agent-failures-test
          ;; TODO: <<<<>>>>
@@ -866,5 +1028,7 @@
          ;; TODO: <<<<>>>>
          ;;  - test search and all filter types
          ;;     - run experiments without any examples
+         ; (bind search
+         ;   (foreign-query ipc module-name (queries/search-experiments-name)))
 
 )
