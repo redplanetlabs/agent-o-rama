@@ -463,6 +463,63 @@
                                          :icon ($ PlusIcon {:className "h-4 w-4"})
                                          :delete-button nil}))))))))
 
+;; =============================================================================
+;; CONTEXTUAL ACTION BAR
+;; =============================================================================
+
+(defui ContextualActionBar [{:keys [module-id dataset-id snapshot-name selected-example-ids is-read-only?]}]
+  (let [example-count (count selected-example-ids)]
+    ($ :div.bg-gray-50.border-b.border-gray-200.px-6.py-3
+       ($ :div.flex.items-center.justify-between
+          ;; Left side - Selection info and clear button
+          ($ :div.flex.items-center.space-x-4
+             ($ :span.text-sm.font-medium.text-gray-900
+                (str example-count " example"
+                     (when (> example-count 1) "s")
+                     " selected"))
+             ;; Clear selection as a small link
+             ($ :button.text-sm.text-blue-600.hover:underline
+                {:onClick #(state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])}
+                "Clear selection"))
+
+          ;; Right side - Action buttons
+          ($ :div.flex.items-center.space-x-2
+             ;; Add Tag button
+             ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
+                {:disabled is-read-only?
+                 :onClick #(when-not is-read-only?
+                             (datasets-forms/show-add-tag-modal! module-id dataset-id snapshot-name selected-example-ids))
+                 :title (when is-read-only? "Cannot add tags to a read-only snapshot.")}
+                "Add Tag...")
+
+             ;; Remove Tag button
+             ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
+                {:disabled is-read-only?
+                 :onClick #(when-not is-read-only?
+                             (datasets-forms/show-remove-tag-modal! module-id dataset-id snapshot-name selected-example-ids))
+                 :title (when is-read-only? "Cannot remove tags from a read-only snapshot.")}
+                "Remove Tag...")
+
+             ;; Try Summary Evaluator button
+             ($ :button.px-3.py-1.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
+                {:onClick #(when (seq selected-example-ids)
+                             ;; Show the new unified modal in :multi mode
+                             (state/dispatch [:modal/show :run-evaluator
+                                              {:title "Run Summary Evaluation"
+                                               :component ($ evaluators/RunEvaluatorModal {:module-id module-id
+                                                                                           :dataset-id dataset-id
+                                                                                           :mode :multi
+                                                                                           :selected-example-ids selected-example-ids})}]))}
+                "Try summary evaluator")
+
+             ;; Delete Selected button
+             ($ :button.px-3.py-1.text-sm.bg-red-600.text-white.rounded-md.hover:bg-red-700.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
+                {:disabled is-read-only?
+                 :onClick #(when-not is-read-only?
+                             (datasets-forms/handle-delete-selected! module-id dataset-id snapshot-name selected-example-ids))
+                 :title (when is-read-only? "Cannot delete examples from a read-only snapshot.")}
+                "Delete Selected"))))))
+
 (defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success is-read-only?]}] ;; Add is-read-only?
   (let [[open-dropdown set-open-dropdown] (uix/use-state nil)
         selected-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
@@ -934,32 +991,13 @@
                          ($ :span ($ :b "Read-only:") " You are viewing an immutable snapshot. Editing is disabled.")))
 
                     ;; Action bar - always visible
-                    ($ :div.bg-gray-50.border-b.border-gray-200.px-6.py-3
-                       ($ :div.flex.items-center.justify-between
-                          ($ :div.flex.items-center.space-x-4
-                             (if (seq selected-example-ids)
-                               ($ :span.text-sm.font-medium.text-gray-900
-                                  (str (count selected-example-ids) " example"
-                                       (when (> (count selected-example-ids) 1) "s")
-                                       " selected"))
-                               ($ :span.text-sm.text-gray-500 "No examples selected")))
-                          ($ :div.flex.items-center.space-x-2
-                             ($ :button.px-3.py-1.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
-                                {:disabled (empty? selected-example-ids)
-                                 :onClick #(when (seq selected-example-ids)
-                                             ;; Show the new unified modal in :multi mode
-                                             (state/dispatch [:modal/show :run-evaluator
-                                                              {:title "Run Summary Evaluation"
-                                                               :component ($ evaluators/RunEvaluatorModal {:module-id module-id
-                                                                                                           :dataset-id dataset-id
-                                                                                                           :mode :multi
-                                                                                                           :selected-example-ids selected-example-ids})}]))}
-                                "Try summary evaluator")
-                             ($ :button.px-3.py-1.text-sm.text-gray-600.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
-                                {:disabled (empty? selected-example-ids)
-                                 :onClick #(when (seq selected-example-ids)
-                                             (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}]))}
-                                "Clear Selection"))))
+                    (if (seq selected-example-ids)
+                      ($ ContextualActionBar {:module-id module-id
+                                              :dataset-id dataset-id
+                                              :snapshot-name selected-snapshot-name
+                                              :selected-example-ids selected-example-ids
+                                              :is-read-only? is-read-only?})
+                      ($ :div.h-10)) ;; Placeholder to maintain layout height 
 
                     ;; Examples Content
                     ($ :div.flex-1.overflow-hidden

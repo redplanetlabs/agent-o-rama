@@ -157,3 +157,36 @@
       (if example
         {:status :ok :example example}
         {:status :error :error "Example not found"}))))
+
+;; =============================================================================
+;; BULK OPERATION HANDLERS
+;; =============================================================================
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-tag-to-examples
+  [{:keys [manager dataset-id snapshot-name example-ids tag]} uid]
+  (doseq [example-id example-ids]
+    (aor/add-dataset-example-tag! manager
+                                  dataset-id
+                                  example-id
+                                  tag
+                                  {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}))
+  {:status :ok})
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/remove-tag-from-examples
+  [{:keys [manager dataset-id snapshot-name example-ids tag]} uid]
+  (doseq [example-id example-ids]
+    (aor/remove-dataset-example-tag! manager
+                                     dataset-id
+                                     example-id
+                                     tag
+                                     {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}))
+  {:status :ok})
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/delete-examples
+  [{:keys [manager dataset-id snapshot-name example-ids]} uid]
+  (doseq [example-id example-ids]
+    (aor/remove-dataset-example! manager
+                                 dataset-id
+                                 example-id
+                                 {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}))
+  {:status :ok})
