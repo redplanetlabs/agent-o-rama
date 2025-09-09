@@ -96,9 +96,11 @@ Include REFINE to refine the spec
 
 	  check the deps.edn files too
 
-- [ ] Create user guide documentation in markdown format in
-      dev/user-guide/.  You can use multiple files.  This guide is
-      intended for human users of agent-o-rama.
+- [x] Create a new user guide documentation in markdown format in
+      @dev/user-guide/ (do not touch the existing @doc/userguide.md,
+      which is meant for AI context) .  You can use multiple files under
+      @dev/user-guide/.  This guide is intended for human users of
+      agent-o-rama.
 
       There should be an Introduction, covering what agent-o-rama is.
 
