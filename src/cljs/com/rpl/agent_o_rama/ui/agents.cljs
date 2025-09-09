@@ -67,8 +67,7 @@
                      ($ :thead {:className (:thead common/table-classes)}
                         ($ :tr
                            ($ :th {:className (:th common/table-classes)} "Module")
-                           ($ :th {:className (:th common/table-classes)} "Agent")
-                           ($ :th {:className (:th common/table-classes)} "Link")))
+                           ($ :th {:className (:th common/table-classes)} "Agent")))
                      ($ :tbody
                         (into []
                               (for [agent data
@@ -81,9 +80,7 @@
                                                                    {:module-id (:module-id agent)
                                                                     :agent-name (:agent-name agent)}))}
                                    ($ :td {:className (:td common/table-classes)} module)
-                                   ($ :td {:className (:td common/table-classes)} agent-name)
-                                   ($ :td {:className (:td common/table-classes)}
-                                      ($ :a.text-indigo-600.hover:text-indigo-800 {:href href} "Open"))))))))))))
+                                   ($ :td {:className (:td common/table-classes)} agent-name)))))))))))
 
 (defui invocations []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
