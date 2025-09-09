@@ -533,11 +533,6 @@
                                    cluster
                                    module-name
                                    (po/agent-root-task-global-name agentName))
-             streaming-pstate     (foreign-pstate
-                                   cluster
-                                   module-name
-                                   (po/agent-streaming-results-task-global-name
-                                    agentName))
              graph-history-pstate (foreign-pstate
                                    cluster
                                    module-name
@@ -715,21 +710,21 @@
           aor-types/AgentClientInternal
           (stream-internal [this agent-invoke node callback-fn]
             (iclient/agent-stream-impl
-             streaming-pstate
+             root-pstate
              agent-invoke
              node
              callback-fn))
           (stream-specific-internal [this agent-invoke node node-invoke-id
                                      callback-fn]
             (iclient/agent-stream-specific-impl
-             streaming-pstate
+             root-pstate
              agent-invoke
              node
              node-invoke-id
              callback-fn))
           (stream-all-internal [this agent-invoke node callback-fn]
             (iclient/agent-stream-all-impl
-             streaming-pstate
+             root-pstate
              agent-invoke
              node
              callback-fn))
@@ -739,7 +734,6 @@
              :agent-config-depot   agent-config-depot
              :config-pstate        config-pstate
              :root-pstate          root-pstate
-             :streaming-pstate     streaming-pstate
              :graph-history-pstate graph-history-pstate
              :tracing-query        tracing-query
              :invokes-page-query   invokes-page-query

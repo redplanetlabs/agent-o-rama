@@ -74,8 +74,7 @@
   [*agent-name *agent-task-id *agent-id *retry-num *invoke-id *agg-invoke-id
    *emits *fork-context]
   (<<with-substitutions
-   [$$root (po/agent-root-task-global *agent-name)
-    $$streaming (po/agent-streaming-results-task-global *agent-name)]
+   [$$root (po/agent-root-task-global *agent-name)]
    (anchor> <root>)
    (ops/explode *emits
                 :> {:keys [*invoke-id *fork-invoke-id *target-task-id
@@ -137,11 +136,12 @@
        (finished-streaming-chunk :> *finished-streaming-chunk)
        (local-transform>
         [(keypath *agent-id)
+         :streaming
          MAP-VALS
          :all
          AFTER-ELEM
          (termval *finished-streaming-chunk)]
-        $$streaming))
+        $$root))
    )
 
    (unify> <regular-emit> <agg-ack-emit>)
@@ -754,8 +754,7 @@
            *streaming-index
            *value]}]
   (<<with-substitutions
-   [$$root (po/agent-root-task-global *agent-name)
-    $$streaming (po/agent-streaming-results-task-global *agent-name)]
+   [$$root (po/agent-root-task-global *agent-name)]
    (hook:processing-streaming *node *streaming-index *value)
    (local-select> [(keypath *agent-id) :retry-num (pred= *retry-num)] $$root)
    ;; this ensures idempotence
@@ -769,7 +768,7 @@
     *value
     :> *chunk)
    (local-transform>
-    [(keypath *agent-id *node)
+    [(keypath *agent-id :streaming *node)
      (selected?
       :invokes
       (keypath *invoke-id)
@@ -778,7 +777,7 @@
      (multi-path
       [:all AFTER-ELEM (termval *chunk)]
       [:invokes (keypath *invoke-id) (termval *streaming-index)])]
-    $$streaming)
+    $$root)
   ))
 
 (defn- complete-human-future!
@@ -1097,7 +1096,6 @@
    [$$root (po/agent-root-task-global *agent-name)
     $$root-count (po/agent-root-count-task-global *agent-name)
     $$nodes (po/agent-node-task-global *agent-name)
-    $$streaming (po/agent-streaming-results-task-global *agent-name)
     $$gc (po/agent-gc-invokes-task-global *agent-name)
     *gc-valid-depot (po/agent-gc-valid-invokes-depot-task-global *agent-name)]
    (anode/read-config *agent-name
@@ -1121,13 +1119,13 @@
        (filter> (some? *result))
        (local-transform> [(keypath *agent-id)
                           (multi-path [:forks NONE>]
-                                      [:human-requests NONE>])]
+                                      [:human-requests NONE>]
+                                      [:streaming
+                                       (multi-path [:all NONE>]
+                                                   [:invokes NONE>])])]
                          $$root)
-       (local-transform> [(keypath *agent-id)
-                          MAP-VALS
-                          (multi-path [:all NONE>]
-                                      [:invokes NONE>])]
-                         $$streaming)
+       (|direct *agent-task-id)
+       (local-transform> [(keypath *agent-id) :streaming NONE>] $$root)
        (|direct *agent-task-id)
        ;; rare possibility it ticks again while partitioning and tries to delete
        ;; same elements concurrently
@@ -1139,7 +1137,6 @@
                                     :append-ack))
          (local-transform> [(keypath *root-invoke-id) (termval nil)] $$gc)
          (local-transform> [(keypath *agent-id) NONE>] $$root)
-         (local-transform> [(keypath *agent-id) NONE>] $$streaming)
          (local-transform> (term dec) $$root-count))))
    (local-select> MAP-KEYS $$gc {:allow-yield? true} :> *invoke-id)
    (local-select> [(keypath *invoke-id)]

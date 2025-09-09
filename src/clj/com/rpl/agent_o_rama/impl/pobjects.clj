@@ -114,6 +114,15 @@
                           {:parent-agent-id Long
                            :fork-context    ForkContext})
      :forks              (set-schema Long {:subindex? true}) ; agent ids
+     :streaming          (map-schema
+                          String           ; node name
+                          (fixed-keys-schema
+                           {:all     (vector-schema StreamingChunk {:subindex? true})
+                            :invokes (map-schema
+                                      UUID ; invoke-id
+                                      Long ; index
+                                      {:subindex? true})})
+                          {:subindex? true})
     })})
 
 (defn agent-root-count-task-global-name
@@ -141,22 +150,6 @@
 
 (def AGENT-GC-ROOT-INVOKES-PSTATE-SCHEMA
   {UUID Object})
-
-(defn agent-streaming-results-task-global-name
-  [agent-name]
-  (str "$$_agent-streaming-" agent-name))
-
-(def AGENT-STREAMING-PSTATE-SCHEMA
-  {Long ; agent ID
-   (map-schema
-    String           ; node name
-    (fixed-keys-schema
-     {:all     (vector-schema StreamingChunk {:subindex? true})
-      :invokes (map-schema
-                UUID ; invoke-id
-                Long ; index
-                {:subindex? true})})
-    {:subindex? true})})
 
 (defn agent-node-task-global-name
   [agent-name]
@@ -364,11 +357,6 @@
 (defn agent-gc-invokes-task-global
   [name]
   (this-module-pobject-task-global (agent-gc-invokes-task-global-name name)))
-
-(defn agent-streaming-results-task-global
-  [name]
-  (this-module-pobject-task-global (agent-streaming-results-task-global-name
-                                    name)))
 
 (defn agent-node-task-global
   [name]
