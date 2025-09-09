@@ -612,7 +612,7 @@
           (and>
            (some? *search-string-lower)
            (and>
-            (not (h/contains-string? (str/lower-case (str *id))))
+            (not (h/contains-string? (str/lower-case (str *id)) *search-string-lower))
             (not (h/contains-string? (str/lower-case (str (or> *input "")))
                                       *search-string-lower))
             (not (h/contains-string? (str/lower-case

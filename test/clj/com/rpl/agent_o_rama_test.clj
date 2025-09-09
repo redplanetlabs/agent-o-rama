@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.core :as i]
+   [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
@@ -2109,7 +2110,7 @@
          (bind module-name (get-module-name module))
 
          (bind agent-manager (aor/agent-manager ipc module-name))
-         (is (= #{"foo" "bar"} (aor/agent-names agent-manager)))
+         (is (= #{"foo" "bar" exp/EXPERIMENTER-NAME} (aor/agent-names agent-manager)))
 
          (bind foo (aor/agent-client agent-manager "foo"))
          (bind bar (aor/agent-client agent-manager "bar"))
