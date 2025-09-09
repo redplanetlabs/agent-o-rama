@@ -1274,9 +1274,9 @@
             (let [c (atom 0)]
               (fn [arg]
                 (when (= arg target)
-                  (swap! c inc))
-                (when (= n @c)
-                  (throw (ex-info "fail" {}))))))))
+                  (swap! c inc)
+                  (when (= n @c)
+                    (throw (ex-info "fail" {})))))))))
 
 
        (reset-handlers!)
@@ -1344,14 +1344,146 @@
             :reference-output nil}}}
         ))
 
+       (reset-handlers!)
+       (reset! RUNS [])
+       (fail-on-n-arg! :eval "reg2" 2)
+       (fail-on-n-arg! :summary "count2" 1)
+       (bind exp-id (h/random-uuid7))
+       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (foreign-append!
+          global-actions-depot
+          (aor-types/->valid-StartExperiment
+           exp-id
+           "My experiment"
+           ds-id1
+           nil
+           nil
+           [(aor-types/->valid-EvaluatorSelector "reg" false)
+            (aor-types/->valid-EvaluatorSelector "reg2" false)
+            (aor-types/->valid-EvaluatorSelector "count" false)
+            (aor-types/->valid-EvaluatorSelector "count2" false)]
+           (aor-types/->valid-RegularExperiment
+            (aor-types/->valid-ExperimentTarget
+             (aor-types/->valid-AgentTarget "foo")
+             ["$"]))
+           1
+           1)))
+       (wait-experiment-finished! exp-client exp-invoke)
+       (bind res (foreign-invoke-query results ds-id1 exp-id))
+       (is (= {:agent 3 :eval-r 6 :eval-s 2}
+              (->> @RUNS
+                   (group-by identity)
+                   (transform MAP-VALS count))))
+       (is
+        (trace-matches?
+         res
+         {:summary-evals {"count" {"res" 3} "count2" {"res" 3}}
+          :summary-eval-failures nil
+          :results
+          {0
+           {:example-id       !eid0
+            :agent-initiates
+            {0
+             {:agent-name "foo"}}
+            :agent-results    {0 {:val "aa!" :failure? false}}
+            :evals            {"reg" {"res" "aa!"} "reg2" {"res" "aa!"}}
+            :input            "aa"
+            :reference-output nil}
+           1
+           {:example-id       !eid1
+            :agent-initiates
+            {0
+             {:agent-name "foo"}}
+            :agent-results    {0 {:val "bb!" :failure? false}}
+            :evals            {"reg" {"res" "bb!"} "reg2" {"res" "bb!"}}
+            :input            "bb"
+            :reference-output nil}
+           2
+           {:example-id       !eid2
+            :agent-initiates
+            {0
+             {:agent-name "foo"}}
+            :agent-results    {0 {:val "cc!" :failure? false}}
+            :evals            {"reg" {"res" "cc!"} "reg2" {"res" "cc!"}}
+            :input            "cc"
+            :reference-output nil}}}
+        ))
+
 
        (reset-handlers!)
-
-
-       ;; TODO: <<<<>>>>
-       ;; - doesn't retry things it succeeded on after failures
-       ;;   - regular/comparative evaluators
-       ;;   - summary evaluators
+       (reset! RUNS [])
+       (fail-on-n-arg! :initiate 1 2)
+       (fail-on-n-arg! :eval "ccount2" 2)
+       (bind exp-id (h/random-uuid7))
+       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (foreign-append!
+          global-actions-depot
+          (aor-types/->valid-StartExperiment
+           exp-id
+           "My experiment"
+           ds-id1
+           nil
+           nil
+           [(aor-types/->valid-EvaluatorSelector "ccount" false)
+            (aor-types/->valid-EvaluatorSelector "ccount2" false)]
+           (aor-types/->valid-ComparativeExperiment
+            [(aor-types/->valid-ExperimentTarget
+              (aor-types/->valid-AgentTarget "foo")
+              ["$"])
+             (aor-types/->valid-ExperimentTarget
+              (aor-types/->valid-AgentTarget "foo")
+              ["$"])])
+           1
+           1)))
+       (wait-experiment-finished! exp-client exp-invoke)
+       (bind res (foreign-invoke-query results ds-id1 exp-id))
+       (is (= {:agent 6 :eval-c 6}
+              (->> @RUNS
+                   (group-by identity)
+                   (transform MAP-VALS count))))
+       (is
+        (trace-matches?
+         res
+         {:summary-evals nil
+          :summary-eval-failures nil
+          :results
+          {0
+           {:example-id       !eid0
+            :agent-initiates
+            {0
+             {:agent-name "foo"}
+             1
+             {:agent-name "foo"}}
+            :agent-results
+            {0 {:val "aa!" :failure? false} 1 {:val "aa!" :failure? false}}
+            :evals            {"ccount" {"res" 2} "ccount2" {"res" 2}}
+            :input            "aa"
+            :reference-output nil}
+           1
+           {:example-id       !eid1
+            :agent-initiates
+            {0
+             {:agent-name "foo"}
+             1
+             {:agent-name "foo"}}
+            :agent-results
+            {0 {:val "bb!" :failure? false} 1 {:val "bb!" :failure? false}}
+            :evals            {"ccount" {"res" 2} "ccount2" {"res" 2}}
+            :input            "bb"
+            :reference-output nil}
+           2
+           {:example-id       !eid2
+            :agent-initiates
+            {0
+             {:agent-name "foo"}
+             1
+             {:agent-name "foo"}}
+            :agent-results
+            {0 {:val "cc!" :failure? false} 1 {:val "cc!" :failure? false}}
+            :evals            {"ccount" {"res" 2} "ccount2" {"res" 2}}
+            :input            "cc"
+            :reference-output nil}}}
+        ))
       ))))
 
 (deftest search-experiments-test
