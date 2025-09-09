@@ -805,42 +805,25 @@
       (str json-data))))
 
 ;; =============================================================================
-;; DATASET DETAIL PAGE
+;; DATASET DETAIL EXAMPLES TAB COMPONENT
 ;; =============================================================================
 
-(defui detail []
-  (let [;; Get IDs from route
-        {:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
+(defui detail-examples [{:keys [match]}]
+  (let [{:keys [module-id dataset-id]} (get-in match [:path-params])
         decoded-module-id (when module-id (common/url-decode module-id))
 
         ;; Get selected examples for this dataset
         selected-example-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
 
-        ;; State for selected tab
-        [active-tab set-active-tab] (uix/use-state "examples")
-
         ;; State for selected snapshot and info panel
         [selected-snapshot-name set-selected-snapshot-name] (uix/use-state "")
-        [show-info? set-show-info] (uix/use-state false)
-        is-read-only? (not (str/blank? selected-snapshot-name)) ;; DERIVED STATE FOR IMMUTABILITY
+        is-read-only? (not (str/blank? selected-snapshot-name))
 
         ;; State for search string
         [search-string set-search-string] (uix/use-state "")
 
-        ;; --- START OF FIX ---
-
-        ;; 1. Fetch dataset properties, RENAMING keys to avoid collision
-        {:keys [data loading? error refetch] :as props-query}
-        (queries/use-sente-query
-         {:query-key [:dataset-props module-id dataset-id]
-          :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
-          :enabled? (boolean (and module-id dataset-id))})
-
-        ;; Rename destructured keys for clarity
-        {dataset-props :data, props-loading? :loading?, props-error :error, props-refetch :refetch} props-query
-
-        ;; 2. Fetch examples, also RENAMING keys
-        {:keys [data loading? error refetch] :as examples-query}
+        ;; Fetch examples
+        {:keys [data loading? error refetch]}
         (queries/use-sente-query
          {:query-key [:dataset-examples module-id dataset-id selected-snapshot-name search-string]
           :sente-event [:datasets/search-examples {:module-id module-id
@@ -852,15 +835,7 @@
                                                    :pagination nil}]
           :enabled? (boolean (and module-id dataset-id))})
 
-        ;; Rename destructured keys for clarity
-        {examples-response :data, examples-loading? :loading?, examples-error :error, examples-refetch :refetch} examples-query
-
-        ;; 3. Use the correctly named variables
-        dataset dataset-props ;; Correctly assign dataset properties
-
-        examples (get examples-response :examples)]
-
-    ;; --- END OF FIX ---
+        examples (get data :examples)]
 
     ;; Clear selections when dataset changes
     (uix/use-effect
@@ -869,10 +844,103 @@
      [dataset-id])
 
     ($ :div.h-full.flex.flex-col
+       ;; Examples Tab Header with Controls
+       ($ :div.bg-gray-50.border-b.border-gray-200.px-6.py-4
+          ($ :div.flex.items-center.justify-between
+             ;; Left side - Snapshot Manager and Search
+             ($ :div.flex.items-center.space-x-4
+                ($ :span.text-sm.font-medium.text-gray-700 "Snapshot:")
+                ($ SnapshotManager {:module-id module-id
+                                    :dataset-id dataset-id
+                                    :selected-snapshot selected-snapshot-name
+                                    :set-selected-snapshot set-selected-snapshot-name})
+
+                ;; Search input field
+                ($ :input.ml-4.px-3.py-1.border.border-gray-300.rounded-md.text-sm
+                   {:type "text"
+                    :placeholder "Search examples..."
+                    :value search-string
+                    :onChange #(set-search-string (.. % -target -value))}))
+
+             ;; Right side - Add Example button
+             ($ :div.flex.items-center.space-x-4
+                ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer.disabled:bg-gray-400.disabled:cursor-not-allowed
+                   {:onClick #(datasets-forms/show-add-example-modal!
+                               {:module-id module-id
+                                :dataset-id dataset-id
+                                :snapshot-name selected-snapshot-name})
+                    :disabled is-read-only?
+                    :title (when is-read-only? "Cannot add examples to a read-only snapshot.")}
+                   ($ PlusIcon {:className "h-4 w-4 mr-2"})
+                   "Add Example"))))
+       ;; Add read-only banner
+       (when is-read-only?
+         ($ :div.bg-yellow-100.border-b.border-yellow-200.px-6.py-2.text-sm.text-yellow-800.flex.items-center.gap-2
+            ($ LockClosedIcon {:className "h-4 w-4"})
+            ($ :span ($ :b "Read-only:") " You are viewing an immutable snapshot. Editing is disabled.")))
+
+       ;; Action bar - always visible
+       (if (seq selected-example-ids)
+         ($ ContextualActionBar {:module-id module-id
+                                 :dataset-id dataset-id
+                                 :snapshot-name selected-snapshot-name
+                                 :selected-example-ids selected-example-ids
+                                 :examples examples
+                                 :is-read-only? is-read-only?})
+         ($ :div.h-10)) ;; Placeholder to maintain layout height 
+
+       ;; Examples Content
+       ($ :div.flex-1.overflow-hidden
+          ($ :div.h-full.flex.flex-col
+             ($ :div.flex-1.overflow-hidden
+                (cond
+                  loading? ($ :div.flex.items-center.justify-center.h-full
+                              ($ :div "Loading examples..."))
+                  error ($ :div.flex.items-center.justify-center.h-full
+                           ($ :div.text-red-500 "Error loading examples."))
+                  (empty? examples) ($ :div.flex.items-center.justify-center.h-full
+                                       ($ :div.text-center.text-gray-500
+                                          ($ :p "No examples yet.")
+                                          ($ :p.text-sm.mt-1 "Click 'Add Example' to get started.")))
+                  :else ($ :div.h-full.overflow-auto
+                           ($ ExamplesList {:examples examples
+                                            :module-id module-id
+                                            :dataset-id dataset-id
+                                            :snapshot-name selected-snapshot-name
+                                            :is-read-only? is-read-only?})))))))))
+
+;; =============================================================================
+;; DATASET DETAIL LAYOUT COMPONENT
+;; =============================================================================
+
+(defui detail [{:keys [match]}]
+  (let [child-view (get-in match [:data :view])
+        {:keys [module-id dataset-id]} (get-in match [:path-params])
+        decoded-module-id (when module-id (common/url-decode module-id))
+        route-name (get-in match [:data :name])
+
+        ;; Determine active tab based on route name
+        active-tab (if (str/includes? (name route-name) "experiments")
+                     "experiments"
+                     "examples")
+
+        ;; State for info panel
+        [show-info? set-show-info] (uix/use-state false)
+
+        ;; Fetch dataset properties for the header
+        {:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:dataset-props module-id dataset-id]
+          :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
+          :enabled? (boolean (and module-id dataset-id))})
+
+        dataset data]
+
+    ($ :div.h-full.flex.flex-col
        (cond
-         props-loading? ($ :div.p-6 "Loading dataset details...") ;; Use props-loading?
-         props-error ($ :div.p-6 "Error: " props-error) ;; Use props-error
-         dataset ;; This will now correctly be the props data object
+         loading? ($ :div.p-6 "Loading dataset details...")
+         error ($ :div.p-6 "Error: " error)
+         dataset
          ($ :div.h-full.flex.flex-col
             ;; Header Bar
             ($ :div.bg-white.px-6.py-4
@@ -925,101 +993,28 @@
                                  ($ :div.text-xs.bg-gray-100.p-2.rounded.text-gray-500.italic
                                     "Schema: nil")))))))))
 
-            ;; Tab Navigation
+            ;; Tab Navigation (NOW USES href LINKS)
             ($ :div.bg-white.border-b.border-gray-200
                ($ :nav.flex.space-x-8.px-6 {:aria-label "Tabs"}
                   ;; Experiments Tab
-                  ($ :button
-                     {:className (common/cn "py-2 px-1 border-b-2 font-medium text-sm cursor-pointer"
+                  ($ :a
+                     {:className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
                                             {"border-indigo-500 text-indigo-600" (= active-tab "experiments")
                                              "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "experiments")})
-                      :onClick #(set-active-tab "experiments")}
+                      :href (rfe/href :module/dataset-detail.experiments {:module-id module-id :dataset-id dataset-id})}
                      "Experiments")
 
                   ;; Examples Tab
-                  ($ :button
-                     {:className (common/cn "py-2 px-1 border-b-2 font-medium text-sm cursor-pointer"
+                  ($ :a
+                     {:className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
                                             {"border-indigo-500 text-indigo-600" (= active-tab "examples")
                                              "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "examples")})
-                      :onClick #(set-active-tab "examples")}
+                      :href (rfe/href :module/dataset-detail.examples {:module-id module-id :dataset-id dataset-id})}
                      "Examples")))
 
-            ;; Tab Content Section (main content)
+            ;; Tab Content (rendered by child routes)
             ($ :div.flex-1.min-h-0
-               (case active-tab
-                 "experiments"
-                 ($ experiments/index {:module-id decoded-module-id
-                                       :dataset-id dataset-id})
-
-                 "examples"
-                 ($ :div.h-full.flex.flex-col
-                    ;; Examples Tab Header with Controls
-                    ($ :div.bg-gray-50.border-b.border-gray-200.px-6.py-4
-                       ($ :div.flex.items-center.justify-between
-                          ;; Left side - Snapshot Manager and Search
-                          ($ :div.flex.items-center.space-x-4
-                             ($ :span.text-sm.font-medium.text-gray-700 "Snapshot:")
-                             ($ SnapshotManager {:module-id module-id
-                                                 :dataset-id dataset-id
-                                                 :selected-snapshot selected-snapshot-name
-                                                 :set-selected-snapshot set-selected-snapshot-name})
-
-                             ;; Search input field
-                             ($ :input.ml-4.px-3.py-1.border.border-gray-300.rounded-md.text-sm
-                                {:type "text"
-                                 :placeholder "Search examples..."
-                                 :value search-string
-                                 :onChange #(set-search-string (.. % -target -value))}))
-
-                          ;; Right side - Add Example button
-                          ($ :div.flex.items-center.space-x-4
-                             ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer.disabled:bg-gray-400.disabled:cursor-not-allowed
-                                {:onClick #(datasets-forms/show-add-example-modal!
-                                            {:module-id module-id
-                                             :dataset-id dataset-id
-                                             :snapshot-name selected-snapshot-name})
-                                 :disabled is-read-only?
-                                 :title (when is-read-only? "Cannot add examples to a read-only snapshot.")}
-                                ($ PlusIcon {:className "h-4 w-4 mr-2"})
-                                "Add Example"))))
-                    ;; Add read-only banner
-                    (when is-read-only?
-                      ($ :div.bg-yellow-100.border-b.border-yellow-200.px-6.py-2.text-sm.text-yellow-800.flex.items-center.gap-2
-                         ($ LockClosedIcon {:className "h-4 w-4"})
-                         ($ :span ($ :b "Read-only:") " You are viewing an immutable snapshot. Editing is disabled.")))
-
-                    ;; Action bar - always visible
-                    (if (seq selected-example-ids)
-                      ($ ContextualActionBar {:module-id module-id
-                                              :dataset-id dataset-id
-                                              :snapshot-name selected-snapshot-name
-                                              :selected-example-ids selected-example-ids
-                                              :examples examples
-                                              :is-read-only? is-read-only?})
-                      ($ :div.h-10)) ;; Placeholder to maintain layout height 
-
-                    ;; Examples Content
-                    ($ :div.flex-1.overflow-hidden
-                       ($ :div.h-full.flex.flex-col
-                          ($ :div.flex-1.overflow-hidden
-                             (cond
-                               examples-loading? ($ :div.flex.items-center.justify-center.h-full
-                                                    ($ :div "Loading examples..."))
-                               examples-error ($ :div.flex.items-center.justify-center.h-full
-                                                 ($ :div.text-red-500 "Error loading examples."))
-                               (empty? examples) ($ :div.flex.items-center.justify-center.h-full
-                                                    ($ :div.text-center.text-gray-500
-                                                       ($ :p "No examples yet.")
-                                                       ($ :p.text-sm.mt-1 "Click 'Add Example' to get started.")))
-                               :else ($ :div.h-full.overflow-auto
-                                        ($ ExamplesList {:examples examples
-                                                         :module-id module-id
-                                                         :dataset-id dataset-id
-                                                         :snapshot-name selected-snapshot-name
-                                                         :is-read-only? is-read-only?})))))))
-
-                 ;; Default case
-                 ($ :div.flex.items-center.justify-center.h-full
-                    ($ :div.text-center.text-gray-500
-                       ($ :p "Unknown tab selected."))))))
-         :else ($ :div.p-6 "No data available.")))))
+               (if child-view
+                 ($ child-view {:match match}) ;; Render the child view!
+                 ($ :div.p-4 "Select a tab"))))
+         :else ($ :div.p-6 "Dataset not found.")))))

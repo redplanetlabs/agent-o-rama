@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.ui.config-page :as config-page]
    [com.rpl.agent-o-rama.ui.datasets :as datasets]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
+   [com.rpl.agent-o-rama.ui.experiments.index :as experiments]
    ;; Replace wouter with reitit
    [reitit.core :as r]
    [reitit.frontend :as rf]
@@ -38,7 +39,14 @@
      ;; Module-level routes with literal segments FIRST
      ["/datasets"
       ["" {:name :module/datasets, :view datasets/index}]
-      ["/:dataset-id" {:name :module/dataset-detail, :view datasets/detail}]]
+      ["/:dataset-id"
+       ;; Parent route for dataset detail layout
+       {:name :module/dataset-detail}
+       ;; Default child route - redirects to examples
+       ["" {:name :module/dataset-detail.index, :view datasets/detail-examples}]
+       ;; Explicit child routes for tabs
+       ["/examples" {:name :module/dataset-detail.examples, :view datasets/detail-examples}]
+       ["/experiments" {:name :module/dataset-detail.experiments, :view experiments/index}]]]
      ["/evaluations" {:name :module/evaluations, :view evaluators/index}]
      ;; Agent routes with prefix to avoid conflicts
      ["/agent/:agent-name"
@@ -281,22 +289,29 @@
              breadcrumb-items))))))
 
 ;; =============================================================================
+;; ROUTER COMPONENT FOR NESTED ROUTES
+;; =============================================================================
+
+(defui RouterComponent []
+  (let [match (state/use-sub [:route])
+        view (get-in match [:data :view])]
+    (if view
+      ($ view {:match match}) ;; Pass the whole match down to components
+      ;; 404 component
+      ($ :div.p-8.text-center "Route not found"))))
+
+;; =============================================================================
 ;; MAIN APP COMPONENT
 ;; =============================================================================
 
 (defui app []
-  (let [match (state/use-sub [:route])
-        view (get-in match [:data :view])]
-    ($ :div.flex.h-screen.bg-gray-50
-       ($ sidebar-nav)
-       ($ :div.flex-1.flex.flex-col.min-h-0
-          ($ breadcrumb)
-          ($ :div.flex-1.overflow-auto
-             (if view
-               ($ view)
-               ;; 404 component
-               ($ :div.p-8.text-center "Route not found")))
-          ($ global-modal-component)))))
+  ($ :div.flex.h-screen.bg-gray-50
+     ($ sidebar-nav)
+     ($ :div.flex-1.flex.flex-col.min-h-0
+        ($ breadcrumb)
+        ($ :div.flex-1.overflow-auto
+           ($ RouterComponent))
+        ($ global-modal-component))))
 
 (defn init []
   (sente/init!)
