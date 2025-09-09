@@ -21,7 +21,9 @@
   (:import
    [com.rpl.agent_o_rama.impl.types
     ComparativeExperiment
-    RegularExperiment]))
+    RegularExperiment]
+   [com.rpl.rama.helpers
+    TopologyUtils]))
 
 (defn count-or-num
   [v]
@@ -1530,18 +1532,18 @@
      (bind run-experiment!
        (fn [exp]
          (let [exp-id (h/random-uuid7)
-
                {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
-               (foreign-append! global-actions-depot exp)]
+               (foreign-append! global-actions-depot (assoc exp :id exp-id))]
            (wait-experiment-finished! exp-client exp-invoke)
+           (TopologyUtils/advanceSimTime 1000)
            exp-id
          )))
 
      (bind run-regular!
        (fn [desc]
          (run-experiment!
-          (aor-types/->valid-StartExperiment
-           exp-id
+          (aor-types/->StartExperiment
+           nil
            desc
            ds-id1
            nil
@@ -1558,8 +1560,8 @@
      (bind run-comparative!
        (fn [desc]
          (run-experiment!
-          (aor-types/->valid-StartExperiment
-           exp-id
+          (aor-types/->StartExperiment
+           nil
            desc
            ds-id1
            nil
@@ -1577,14 +1579,19 @@
        ))
 
      (bind exp-id1 (run-comparative! "hello world"))
-     (TopologyUtils/advanceSimTime 1000)
      (bind exp-id2 (run-regular! "hello you"))
-     (TopologyUtils/advanceSimTime 1000)
      (bind exp-id3 (run-comparative! "what is rama"))
-     (TopologyUtils/advanceSimTime 1000)
      (bind exp-id4 (run-comparative! "hello"))
-     (TopologyUtils/advanceSimTime 1000)
      (bind exp-id5 (run-regular! "rama"))
+     (bind exp-id6 (run-regular! "rama hello"))
+     (bind exp-id7 (run-regular! "world hello"))
+     (bind exp-id8 (run-regular! "what"))
+     (bind exp-id9 (run-regular! "a b c"))
+     (bind exp-id10 (run-regular! "hello hello"))
+
+     (bind res (foreign-invoke-query search ds-id1 {} 2 nil))
+
+     (clojure.pprint/pprint res)
 
      ;; TODO: <<<<>>>>
      ;;  - test search and all filter types

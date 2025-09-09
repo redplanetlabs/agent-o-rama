@@ -555,28 +555,38 @@
 
 
 (deframaop search-loop
-  [$$p *map-path %filter *limit *next-key]
+  [$$p *map-path %filter *limit *next-key *reverse?]
   (ramafn> %filter)
   (volatile! [] :> *results)
   (loop<- [*next-key *next-key
            :> *page-key]
     (yield-if-overtime)
-    (local-select>
-     [*map-path
-      (sorted-map-range-from *next-key {:inclusive? false :max-amt *limit})]
-     $$p
-     :> *m)
+    (<<if *reverse?
+      (<<if (nil? *next-key)
+        (sorted-map-range-to-end *limit :> *range-nav)
+       (else>)
+        (sorted-map-range-to *next-key {:inclusive? false :max-amt *limit} :> *range-nav))
+     (else>)
+      (sorted-map-range-from *next-key {:inclusive? false :max-amt *limit} :> *range-nav))
+    (local-select> [*map-path *range-nav] $$p :> *m)
     (<<atomic
-      (ops/explode *m :> [*id *info])
-      (%filter *id *info :> *assoc-map)
+      (<<if *reverse?
+        (rseq (vec *m) :> *seq)
+       (else>)
+        (seq *m :> *seq))
+      (ops/explode *seq :> [*id *info])
+      (%filter *id *info :> *assoc-map *dissoc-keys)
       (<<if (some? *assoc-map)
-        (conj-vol! *results (merge *info *assoc-map))))
+        (conj-vol! *results (merge (into {} (apply dissoc *info *dissoc-keys)) *assoc-map))))
     (<<cond
      (case> (< (count *m) *limit))
       (:> nil)
 
      (case> (>= (count @*results) *limit))
-      (:> (h/last-key *m))
+      (<<if *reverse?
+        (:> (h/first-key *m))
+       (else>)
+        (:> (h/last-key *m)))
 
      (default>)
       (continue> (h/last-key *m))))
@@ -603,10 +613,10 @@
         [*id {:keys [*input *reference-output *source *tags]}]
         (<<cond
          (case> (and> (some? *search-tag) (not (contains? *tags *search-tag))))
-          (:> nil)
+          (:> nil nil)
 
          (case> (and> (some? *search-source) (not= *source *search-source)))
-          (:> nil)
+          (:> nil nil)
 
          (case>
           (and>
@@ -618,15 +628,16 @@
             (not (h/contains-string? (str/lower-case
                                       (str (or> *reference-output "")))
                                       *search-string-lower)))))
-          (:> nil)
+          (:> nil nil)
 
          (default>)
-          (:> {:id *id})))
+          (:> {:id *id} nil)))
       (search-loop datasets-sym
                    (keypath *dataset-id :snapshots *snapshot)
                    %filter
                    *limit
                    *next-key
+                   false
                    :> *items *page-key)
       (|origin)
       (hash-map :examples *items :pagination-params *page-key :> *res)
@@ -657,23 +668,24 @@
         (select> [(keypath *builder-name) :type] *builders :> *type)
         (<<cond
          (case> (nil? *type))
-          (:> nil)
+          (:> nil nil)
 
          (case> (and> (some? *types) (not (contains? *types *type))))
-          (:> nil)
+          (:> nil nil)
 
          (case> (and> (some? *search-string-lower)
                       (not (h/contains-string? (str/lower-case *name)
                                                 *search-string-lower))))
-          (:> nil)
+          (:> nil nil)
 
          (default>)
-          (:> {:name *name :type *type})))
+          (:> {:name *name :type *type} nil)))
       (search-loop evals-pstate-sym
                    STAY
                    %filter
                    *limit
                    *next-key
+                   false
                    :> *items *page-key)
       (|origin)
       (hash-map :items *items :pagination-params *page-key :> *res)
@@ -713,27 +725,26 @@
         (get *experiment-info :spec :> *spec)
         (<<cond
          (case> (and> (some? *type) (not (instance? *spec *type))))
-          (:> nil)
+          (:> nil nil)
 
          (case> (and> (some? *search-string-lower)
                       (not (h/contains-string? (str/lower-case (str *id))
                                                 *search-string-lower))
                       (not (h/contains-string? (str/lower-case *name)
                                                 *search-string-lower))))
-          (:> nil)
+          (:> nil nil)
 
          (case> (not (every? %matches-time-spec? *times)))
-          (:> nil)
+          (:> nil nil)
 
          (default>)
-          (:> (submap *m
-                      [:experiment-info :experiment-invoke :start-time-millis
-                       :finish-time-millis]))))
+          (:> {} [:results])))
       (search-loop datasets-pstate-sym
                    (keypath *dataset-id :experiments)
                    %filter
                    *limit
                    *next-key
+                   true
                    :> *items *page-key)
       (|origin)
       (hash-map :items *items :pagination-params *page-key :> *res)

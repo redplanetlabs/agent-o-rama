@@ -275,6 +275,7 @@
   (when-not (string? v)
     "value must be a string"))
 
+(defn first-key [^java.util.SortedMap m] (.firstKey m))
 (defn last-key [^java.util.SortedMap m] (.lastKey m))
 
 (defn contains-string?
