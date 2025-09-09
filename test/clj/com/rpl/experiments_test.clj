@@ -371,8 +371,12 @@
          (is (every? aor-types/AgentInvokeImpl?
                      (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
 
-         ;; TODO: <<<<>>>> verify finish-time >= start-time for every example
-         ;;   - also verify for failed example
+
+         (doseq [{:keys [start-time-millis finish-time-millis]}
+                 (select [:results MAP-VALS :agent-results MAP-VALS] res)]
+           (is (number? start-time-millis))
+           (is (number? finish-time-millis))
+           (is (>= finish-time-millis start-time-millis)))
 
          ;; test:
          ;;   - comparative experiment
@@ -717,8 +721,11 @@
               :input            "abcdefg"
               :reference-output "aaaaaaaaaaa"}}}
           ))
-         ;; TODO: <<<<>>> verify start/finish time for failed example
-
+         (doseq [{:keys [start-time-millis finish-time-millis]}
+                 (select [:results MAP-VALS :agent-results MAP-VALS] res)]
+           (is (number? start-time-millis))
+           (is (number? finish-time-millis))
+           (is (>= finish-time-millis start-time-millis)))
 
          ;; test with non-existent dataset
          (bind exp-id (h/random-uuid7))
@@ -997,7 +1004,12 @@
             :reference-output nil}}}
         ))
 
-       ;; TODO: <<<<>>>> verify start/finish times for failed example
+       ;; verify have start/finish times for failed example
+       (doseq [{:keys [start-time-millis finish-time-millis]}
+               (select [:results MAP-VALS :agent-results MAP-VALS] res)]
+         (is (number? start-time-millis))
+         (is (number? finish-time-millis))
+         (is (>= finish-time-millis start-time-millis)))
 
        (bind exp-id (h/random-uuid7))
        (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
