@@ -1164,6 +1164,43 @@
             :input            "b"
             :reference-output nil}}}
         ))
+
+       ;; verify behavior when example is missing
+       (bind a-id (select-any [:results (keypath 0) :example-id] res))
+       (aor/remove-dataset-example! manager ds-id1 a-id)
+       (bind res (foreign-invoke-query results ds-id1 exp-id))
+       (is
+        (trace-matches?
+         res
+         {:summary-evals nil
+          :summary-eval-failures nil
+          :results
+          {0
+           {:example-id       !eid0
+            :agent-initiates
+            {0
+             {:agent-name "foo"}
+             1
+             {:agent-name "_aor-experimenter"}}
+            :agent-results
+            {0 {:val "a!" :failure? false} 1 {:val "a?" :failure? false}}
+            :evals            {"ccount" {"res" 2}}
+            :eval-failures
+            {"cfail" !ex1}
+            :missing-example? true}
+           1
+           {:example-id       !eid1
+            :agent-initiates
+            {0
+             {:agent-name "foo"}
+             1
+             {:agent-name "_aor-experimenter"}}
+            :agent-results
+            {0 {:val "b!" :failure? false} 1 {:val "b?" :failure? false}}
+            :evals            {"cfail" {"res" ["b!" "b?"]} "ccount" {"res" 2}}
+            :input            "b"
+            :reference-output nil}}}
+        ))
       ))))
 
 (def RUNS)
