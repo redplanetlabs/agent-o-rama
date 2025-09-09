@@ -39,14 +39,9 @@
      ;; Module-level routes with literal segments FIRST
      ["/datasets"
       ["" {:name :module/datasets, :view datasets/index}]
-      ["/:dataset-id"
-       ;; Parent route for dataset detail layout
-       {:name :module/dataset-detail}
-       ;; Default child route - redirects to examples
-       ["" {:name :module/dataset-detail.index, :view datasets/detail-examples}]
-       ;; Explicit child routes for tabs
-       ["/examples" {:name :module/dataset-detail.examples, :view datasets/detail-examples}]
-       ["/experiments" {:name :module/dataset-detail.experiments, :view experiments/index}]]]
+      ["/:dataset-id" {:name :module/dataset-detail, :view datasets/detail}]
+      ["/:dataset-id/examples" {:name :module/dataset-detail.examples, :view datasets/detail-examples}]
+      ["/:dataset-id/experiments" {:name :module/dataset-detail.experiments, :view experiments/index}]]
      ["/evaluations" {:name :module/evaluations, :view evaluators/index}]
      ;; Agent routes with prefix to avoid conflicts
      ["/agent/:agent-name"
