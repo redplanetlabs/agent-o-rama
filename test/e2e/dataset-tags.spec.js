@@ -133,7 +133,11 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
 
     // --- 5. SELECT EXAMPLES AND REMOVE TAG A ---
     console.log('--- Testing Remove Tag A ---');
-    // Examples 1 and 3 should still be selected
+    // Examples 1 and 3 should still be selected from the previous step
+    // But let's make sure they are selected before proceeding
+    await row1.locator('td').first().click();
+    await row3.locator('td').first().click();
+
     await page.getByRole('button', { name: 'Remove Tag...' }).click();
     await expect(tagModal).toBeVisible();
 
