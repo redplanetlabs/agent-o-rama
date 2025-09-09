@@ -267,7 +267,10 @@
                                   :agent-initiates {Long (fixed-keys-schema
                                                           {:agent-name   String
                                                            :agent-invoke AgentInvoke})}
-                                  :agent-results   {Long Object}
+                                  :agent-results   {Long (fixed-keys-schema
+                                                          {:result Object
+                                                           :start-time-millis Long
+                                                           :finish-time-millis Long})}
                                   :evals           {String {String Object}} ; eval-name->eval-key->result
                                   :eval-failures   {String String}
                                  })

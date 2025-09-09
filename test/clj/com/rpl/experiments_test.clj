@@ -299,7 +299,7 @@
               :agent-initiates
               {0
                {:agent-name "foo"}}
-              :agent-results    {0 {:val "50" :failure? false}}
+              :agent-results    {0 {:result {:val "50" :failure? false}}}
               :evals            {"mylen" {"len" 20} "concise2" {"concise?" true}}
               :input            "abcdefg"
               :reference-output "aaaaaaaaaaa"}
@@ -308,7 +308,7 @@
               :agent-initiates
               {0
                {:agent-name "foo"}}
-              :agent-results    {0 {:val "50" :failure? false}}
+              :agent-results    {0 {:result {:val "50" :failure? false}}}
               :evals            {"mylen" {"len" 6} "concise2" {"concise?" true}}
               :input            "ab"
               :reference-output ".."}
@@ -317,7 +317,7 @@
               :agent-initiates
               {0
                {:agent-name "foo"}}
-              :agent-results    {0 {:val "100" :failure? false}}
+              :agent-results    {0 {:result {:val "100" :failure? false}}}
               :evals            {"mylen" {"len" 20} "concise2" {"concise?" false}}
               :input            "123456789abcdefg"
               :reference-output "."}
@@ -326,7 +326,7 @@
               :agent-initiates
               {0
                {:agent-name "foo"}}
-              :agent-results    {0 {:val "50" :failure? false}}
+              :agent-results    {0 {:result {:val "50" :failure? false}}}
               :evals            {"mylen" {"len" 9} "concise2" {"concise?" true}}
               :input            "aa"
               :reference-output "bbbbb"}
@@ -335,7 +335,7 @@
               :agent-initiates
               {0
                {:agent-name "foo"}}
-              :agent-results    {0 {:val "50" :failure? false}}
+              :agent-results    {0 {:result {:val "50" :failure? false}}}
               :evals            {"mylen" {"len" 20} "concise2" {"concise?" true}}
               :input            "abcdefg"
               :reference-output "aaaaaaaaaaa"}
@@ -344,7 +344,7 @@
               :agent-initiates
               {0
                {:agent-name "foo"}}
-              :agent-results    {0 {:val "50" :failure? false}}
+              :agent-results    {0 {:result {:val "50" :failure? false}}}
               :evals            {"mylen" {"len" 6} "concise2" {"concise?" true}}
               :input            "ab"
               :reference-output ".."}
@@ -353,7 +353,7 @@
               :agent-initiates
               {0
                {:agent-name "foo"}}
-              :agent-results    {0 {:val "100" :failure? false}}
+              :agent-results    {0 {:result {:val "100" :failure? false}}}
               :evals            {"mylen" {"len" 20} "concise2" {"concise?" false}}
               :input            "123456789abcdefg"
               :reference-output "."}
@@ -362,7 +362,7 @@
               :agent-initiates
               {0
                {:agent-name "foo"}}
-              :agent-results    {0 {:val "50" :failure? false}}
+              :agent-results    {0 {:result {:val "50" :failure? false}}}
               :evals            {"mylen" {"len" 9} "concise2" {"concise?" true}}
               :input            "aa"
               :reference-output "bbbbb"}
@@ -370,6 +370,9 @@
 
          (is (every? aor-types/AgentInvokeImpl?
                      (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
+
+         ;; TODO: <<<<>>>> verify finish-time >= start-time for every example
+         ;;   - also verify for failed example
 
          ;; test:
          ;;   - comparative experiment
@@ -420,12 +423,12 @@
                {:agent-name "foo"}}
               :agent-results
               {0
-               {:val
-                [{"node" "end" "args" [14]}
-                 {"node" "a" "args" ["1+10"]}
-                 {"node" "end" "args" ["1!"]}]
-                :failure? false}
-               1 {:val [{"node" "xyz" "args" [11]}] :failure? false}}
+               {:result {:val
+                         [{"node" "end" "args" [14]}
+                          {"node" "a" "args" ["1+10"]}
+                          {"node" "end" "args" ["1!"]}]
+                         :failure? false}}
+               1 {:result {:val [{"node" "xyz" "args" [11]}] :failure? false}}}
               :evals
               {"identity-compare"
                {"outputs" [[14] [11]] "input" 1 "ref-output" "89"}}
@@ -440,12 +443,12 @@
                {:agent-name "foo"}}
               :agent-results
               {0
-               {:val
-                [{"node" "end" "args" [105]}
-                 {"node" "a" "args" ["2+100"]}
-                 {"node" "end" "args" ["2!"]}]
-                :failure? false}
-               1 {:val [{"node" "xyz" "args" [102]}] :failure? false}}
+               {:result {:val
+                         [{"node" "end" "args" [105]}
+                          {"node" "a" "args" ["2+100"]}
+                          {"node" "end" "args" ["2!"]}]
+                         :failure? false}}
+               1 {:result {:val [{"node" "xyz" "args" [102]}] :failure? false}}}
               :evals
               {"identity-compare"
                {"outputs" [[105] [102]] "input" 2 "ref-output" nil}}
@@ -460,12 +463,12 @@
                {:agent-name "foo"}}
               :agent-results
               {0
-               {:val
-                [{"node" "end" "args" [1006]}
-                 {"node" "a" "args" ["3+1000"]}
-                 {"node" "end" "args" ["3!"]}]
-                :failure? false}
-               1 {:val [{"node" "xyz" "args" [1003]}] :failure? false}}
+               {:result {:val
+                         [{"node" "end" "args" [1006]}
+                          {"node" "a" "args" ["3+1000"]}
+                          {"node" "end" "args" ["3!"]}]
+                         :failure? false}}
+               1 {:result {:val [{"node" "xyz" "args" [1003]}] :failure? false}}}
               :evals
               {"identity-compare"
                {"outputs" [[1006] [1003]] "input" 3 "ref-output" "hijklmnop"}}
@@ -513,7 +516,7 @@
               :agent-initiates
               {0
                {:agent-name "_aor-experimenter"}}
-              :agent-results    {0 {:val {"a" "110"} :failure? false}}
+              :agent-results    {0 {:result {:val {"a" "110"} :failure? false}}}
               :evals            {"rc3" {"concise?" true}}
               :input            {"a" 1 "b" 10}
               :reference-output ["1234567" "89"]}
@@ -522,7 +525,7 @@
               :agent-initiates
               {0
                {:agent-name "_aor-experimenter"}}
-              :agent-results    {0 {:val {"a" "2100"} :failure? false}}
+              :agent-results    {0 {:result {:val {"a" "2100"} :failure? false}}}
               :evals            {"rc3" {"concise?" false}}
               :input            {"a" 2 "b" 100}
               :reference-output nil}
@@ -531,7 +534,7 @@
               :agent-initiates
               {0
                {:agent-name "_aor-experimenter"}}
-              :agent-results    {0 {:val {"a" "31000"} :failure? false}}
+              :agent-results    {0 {:result {:val {"a" "31000"} :failure? false}}}
               :evals            {"rc3" {"concise?" false}}
               :input            {"a" 3 "b" 1000}
               :reference-output ["abcdefg" "hijklmnop"]}}}
@@ -569,7 +572,7 @@
                              :agent-initiates
                              {0
                               {:agent-name "_aor-experimenter"}}
-                             :agent-results    {0 {:val {"a" "abcdefg!"} :failure? false}}
+                             :agent-results    {0 {:result {:val {"a" "abcdefg!"} :failure? false}}}
                              :input            "abcdefg"
                              :reference-output "aaaaaaaaaaa"}
                             1
@@ -577,7 +580,7 @@
                              :agent-initiates
                              {0
                               {:agent-name "_aor-experimenter"}}
-                             :agent-results    {0 {:val {"a" "ab!"} :failure? false}}
+                             :agent-results    {0 {:result {:val {"a" "ab!"} :failure? false}}}
                              :input            "ab"
                              :reference-output ".."}
                             2
@@ -586,7 +589,7 @@
                              {0
                               {:agent-name "_aor-experimenter"}}
                              :agent-results
-                             {0 {:val {"a" "123456789abcdefg!"} :failure? false}}
+                             {0 {:result {:val {"a" "123456789abcdefg!"} :failure? false}}}
                              :input            "123456789abcdefg"
                              :reference-output "."}}}
           ))
@@ -623,7 +626,7 @@
               :agent-initiates
               {0
                {:agent-name "_aor-experimenter"}}
-              :agent-results    {0 {:val {"a" "abcdefg!!!"} :failure? false}}
+              :agent-results    {0 {:result {:val {"a" "abcdefg!!!"} :failure? false}}}
               :input            "abcdefg"
               :reference-output "aaaaaaaaaaa"}
              1
@@ -631,7 +634,7 @@
               :agent-initiates
               {0
                {:agent-name "_aor-experimenter"}}
-              :agent-results    {0 {:val {"a" "aa!!!"} :failure? false}}
+              :agent-results    {0 {:result {:val {"a" "aa!!!"} :failure? false}}}
               :input            "aa"
               :reference-output "bbbbb"}}}
           ))
@@ -668,7 +671,7 @@
               :agent-initiates
               {0
                {:agent-name "_aor-experimenter"}}
-              :agent-results    {0 {:val {"a" "abcdefg!!!"} :failure? false}}
+              :agent-results    {0 {:result {:val {"a" "abcdefg!!!"} :failure? false}}}
               :input            "abcdefg"
               :reference-output "aaaaaaaaaaa"}}}
           ))
@@ -709,11 +712,12 @@
                {:agent-name "_aor-experimenter"}}
               :agent-results
               {0
-               {:val      {:message "Node does not exist" :node "notanode"}
-                :failure? true}}
+               {:result {:val      {:message "Node does not exist" :node "notanode"}
+                         :failure? true}}}
               :input            "abcdefg"
               :reference-output "aaaaaaaaaaa"}}}
           ))
+         ;; TODO: <<<<>>> verify start/finish time for failed example
 
 
          ;; test with non-existent dataset
@@ -969,7 +973,7 @@
             :agent-initiates
             {0
              {:agent-name "foo"}}
-            :agent-results    {0 {:val "a!" :failure? false}}
+            :agent-results    {0 {:result {:val "a!" :failure? false}}}
             :evals            {"concise2" {"concise?" true}}
             :input            "a"
             :reference-output nil}
@@ -979,7 +983,7 @@
             {0
              {:agent-name "foo"}}
             :agent-results
-            {0 {:val {:message "Failure on example"} :failure? true}}
+            {0 {:result {:val {:message "Failure on example"} :failure? true}}}
             :input            "fail-agent"
             :reference-output nil}
            2
@@ -987,11 +991,13 @@
             :agent-initiates
             {0
              {:agent-name "foo"}}
-            :agent-results    {0 {:val "fail-node!" :failure? false}}
+            :agent-results    {0 {:result {:val "fail-node!" :failure? false}}}
             :evals            {"concise2" {"concise?" false}}
             :input            "fail-node"
             :reference-output nil}}}
         ))
+
+       ;; TODO: <<<<>>>> verify start/finish times for failed example
 
        (bind exp-id (h/random-uuid7))
        (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
@@ -1024,7 +1030,7 @@
             :agent-initiates
             {0
              {:agent-name "_aor-experimenter"}}
-            :agent-results    {0 {:val "a?" :failure? false}}
+            :agent-results    {0 {:result {:val "a?" :failure? false}}}
             :evals            {"concise2" {"concise?" true}}
             :input            "a"
             :reference-output nil}
@@ -1033,7 +1039,7 @@
             :agent-initiates
             {0
              {:agent-name "_aor-experimenter"}}
-            :agent-results    {0 {:val "fail-agent?" :failure? false}}
+            :agent-results    {0 {:result {:val "fail-agent?" :failure? false}}}
             :evals            {"concise2" {"concise?" false}}
             :input            "fail-agent"
             :reference-output nil}
@@ -1044,11 +1050,11 @@
              {:agent-name "_aor-experimenter"}}
             :agent-results
             {0
-             {:val
-              {:message "Failure executing node"
-               :node    "a"
-               :args    ["fail-node"]}
-              :failure? true}}
+             {:result {:val
+                       {:message "Failure executing node"
+                        :node    "a"
+                        :args    ["fail-node"]}
+                       :failure? true}}}
             :input            "fail-node"
             :reference-output nil}}}
         ))
@@ -1090,7 +1096,7 @@
             :agent-initiates
             {0
              {:agent-name "foo"}}
-            :agent-results    {0 {:val "a!" :failure? false}}
+            :agent-results    {0 {:result {:val "a!" :failure? false}}}
             :evals            {"concise2" {"concise?" true}}
             :eval-failures
             {"rfail" !ex2}
@@ -1101,7 +1107,7 @@
             :agent-initiates
             {0
              {:agent-name "foo"}}
-            :agent-results    {0 {:val "b!" :failure? false}}
+            :agent-results    {0 {:result {:val "b!" :failure? false}}}
             :evals            {"concise2" {"concise?" true} "rfail" {"res" "b!"}}
             :input            "b"
             :reference-output nil}}}
@@ -1145,7 +1151,8 @@
              1
              {:agent-name "_aor-experimenter"}}
             :agent-results
-            {0 {:val "a!" :failure? false} 1 {:val "a?" :failure? false}}
+            {0 {:result {:val "a!" :failure? false}}
+             1 {:result {:val "a?" :failure? false}}}
             :evals            {"ccount" {"res" 2}}
             :eval-failures
             {"cfail" !ex1}
@@ -1159,7 +1166,8 @@
              1
              {:agent-name "_aor-experimenter"}}
             :agent-results
-            {0 {:val "b!" :failure? false} 1 {:val "b?" :failure? false}}
+            {0 {:result {:val "b!" :failure? false}}
+             1 {:result {:val "b?" :failure? false}}}
             :evals            {"cfail" {"res" ["b!" "b?"]} "ccount" {"res" 2}}
             :input            "b"
             :reference-output nil}}}
@@ -1183,7 +1191,8 @@
              1
              {:agent-name "_aor-experimenter"}}
             :agent-results
-            {0 {:val "a!" :failure? false} 1 {:val "a?" :failure? false}}
+            {0 {:result {:val "a!" :failure? false}}
+             1 {:result {:val "a?" :failure? false}}}
             :evals            {"ccount" {"res" 2}}
             :eval-failures
             {"cfail" !ex1}
@@ -1196,7 +1205,8 @@
              1
              {:agent-name "_aor-experimenter"}}
             :agent-results
-            {0 {:val "b!" :failure? false} 1 {:val "b?" :failure? false}}
+            {0 {:result {:val "b!" :failure? false}}
+             1 {:result {:val "b?" :failure? false}}}
             :evals            {"cfail" {"res" ["b!" "b?"]} "ccount" {"res" 2}}
             :input            "b"
             :reference-output nil}}}
@@ -1359,7 +1369,7 @@
             :agent-initiates
             {0
              {:agent-name "foo"}}
-            :agent-results    {0 {:val "aa!" :failure? false}}
+            :agent-results    {0 {:result {:val "aa!" :failure? false}}}
             :evals            {"reg" {"res" "aa!"} "reg2" {"res" "aa!"}}
             :input            "aa"
             :reference-output nil}
@@ -1368,7 +1378,7 @@
             :agent-initiates
             {0
              {:agent-name "foo"}}
-            :agent-results    {0 {:val "bb!" :failure? false}}
+            :agent-results    {0 {:result {:val "bb!" :failure? false}}}
             :evals            {"reg" {"res" "bb!"} "reg2" {"res" "bb!"}}
             :input            "bb"
             :reference-output nil}
@@ -1377,7 +1387,7 @@
             :agent-initiates
             {0
              {:agent-name "foo"}}
-            :agent-results    {0 {:val "cc!" :failure? false}}
+            :agent-results    {0 {:result {:val "cc!" :failure? false}}}
             :evals            {"reg" {"res" "cc!"} "reg2" {"res" "cc!"}}
             :input            "cc"
             :reference-output nil}}}
@@ -1424,7 +1434,7 @@
             :agent-initiates
             {0
              {:agent-name "foo"}}
-            :agent-results    {0 {:val "aa!" :failure? false}}
+            :agent-results    {0 {:result {:val "aa!" :failure? false}}}
             :evals            {"reg" {"res" "aa!"} "reg2" {"res" "aa!"}}
             :input            "aa"
             :reference-output nil}
@@ -1433,7 +1443,7 @@
             :agent-initiates
             {0
              {:agent-name "foo"}}
-            :agent-results    {0 {:val "bb!" :failure? false}}
+            :agent-results    {0 {:result {:val "bb!" :failure? false}}}
             :evals            {"reg" {"res" "bb!"} "reg2" {"res" "bb!"}}
             :input            "bb"
             :reference-output nil}
@@ -1442,7 +1452,7 @@
             :agent-initiates
             {0
              {:agent-name "foo"}}
-            :agent-results    {0 {:val "cc!" :failure? false}}
+            :agent-results    {0 {:result {:val "cc!" :failure? false}}}
             :evals            {"reg" {"res" "cc!"} "reg2" {"res" "cc!"}}
             :input            "cc"
             :reference-output nil}}}
@@ -1494,7 +1504,8 @@
              1
              {:agent-name "foo"}}
             :agent-results
-            {0 {:val "aa!" :failure? false} 1 {:val "aa!" :failure? false}}
+            {0 {:result {:val "aa!" :failure? false}}
+             1 {:result {:val "aa!" :failure? false}}}
             :evals            {"ccount" {"res" 2} "ccount2" {"res" 2}}
             :input            "aa"
             :reference-output nil}
@@ -1506,7 +1517,8 @@
              1
              {:agent-name "foo"}}
             :agent-results
-            {0 {:val "bb!" :failure? false} 1 {:val "bb!" :failure? false}}
+            {0 {:result {:val "bb!" :failure? false}}
+             1 {:result {:val "bb!" :failure? false}}}
             :evals            {"ccount" {"res" 2} "ccount2" {"res" 2}}
             :input            "bb"
             :reference-output nil}
@@ -1518,7 +1530,8 @@
              1
              {:agent-name "foo"}}
             :agent-results
-            {0 {:val "cc!" :failure? false} 1 {:val "cc!" :failure? false}}
+            {0 {:result {:val "cc!" :failure? false}}
+             1 {:result {:val "cc!" :failure? false}}}
             :evals            {"ccount" {"res" 2} "ccount2" {"res" 2}}
             :input            "cc"
             :reference-output nil}}}

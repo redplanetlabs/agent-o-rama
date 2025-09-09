@@ -372,8 +372,8 @@
                      :agent-results)]
            local-ds)
 
-          outputs (select [MAP-VALS :val] results)]
-         :when (not (selected-any? [MAP-VALS :failure? identity] results))]
+          outputs (select [MAP-VALS :result :val] results)]
+         :when (not (selected-any? [MAP-VALS :result :failure? identity] results))]
      (do
        (when-not (= 1 (count outputs))
          (throw
@@ -476,8 +476,7 @@
                                    (foreign-select-one
                                     [(keypath dataset-id :snapshots snapshot example-id :input)]
                                     datasets))
-                   initiates-vol (volatile! [])
-                   results-vol   (volatile! [])]
+                   initiates-vol (volatile! [])]
                (when-not (some? (:example-id currm))
                  (store/pstate-transform!
                   [(keypath dataset-id :experiments id :results result-id :example-id)
@@ -500,18 +499,31 @@
                    )))
                (dotimes [i num-targets]
                  (hook:result-target i)
-                 (if-let [result (get agent-results i)]
-                   (vswap! results-vol conj result)
-                   (let [result (agent-result-obj (nth clients i)
-                                                  (:agent-invoke (nth @initiates-vol i)))]
+                 (if (nil? (get agent-results i))
+                   (let [client (nth clients i)
+
+                         {:keys [task-id agent-invoke-id] :as agent-invoke}
+                         (:agent-invoke (nth @initiates-vol i))
+
+                         result (agent-result-obj client agent-invoke)
+                         root   (:root-pstate (aor-types/underlying-objects client))
+                         ;; transferring timings allows it to persist even if underlying trace gets
+                         ;; GC'd
+                         {:keys [start-time-millis finish-time-millis]}
+                         (foreign-select-one
+                          [(keypath agent-invoke-id)
+                           (submap [:start-time-millis :finish-time-millis])]
+                          root
+                          {:pkey task-id})]
                      (store/pstate-transform!
                       [(keypath dataset-id :experiments id :results result-id :agent-results)
                        (nil->val (sorted-map))
                        (keypath i)
-                       (termval result)]
+                       (termval {:result result
+                                 :start-time-millis start-time-millis
+                                 :finish-time-millis finish-time-millis})]
                       local-ds
                       dataset-id)
-                     (vswap! results-vol conj result)
                    )))
              ))
            (c/emit! agent-node "evaluate" experiment remote-info result+example-ids)
@@ -542,7 +554,7 @@
                    (store/pstate-select-one
                     [(keypath dataset-id :experiments id :results result-id)]
                     local-ds)]
-               (when-not (selected-any? [MAP-VALS :failure? identity] agent-results)
+               (when-not (selected-any? [MAP-VALS :result :failure? identity] agent-results)
                  (doseq [[eval-name
                           {:keys [eval-fn input-json-path reference-output-json-path
                                   output-json-path]}]
@@ -564,6 +576,7 @@
                                 (maybe-get-json-path input-json-path input)
                                 (maybe-get-json-path reference-output-json-path reference-output)
                                 (select [MAP-VALS
+                                         :result
                                          :val
                                          (view (fn [v] (maybe-get-json-path output-json-path v)))]
                                         agent-results)))
