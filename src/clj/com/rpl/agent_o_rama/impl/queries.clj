@@ -683,9 +683,9 @@
 ;;    - :search-string, which matches against the experiment name or ID
 ;;    - :type which is either com.rpl.agent_o_rama.impl.types.RegularExperiment or
 ;;      com.rpl.agent_o_rama.impl.types.ComparativeExperiment class
-;;    - :times, which is vector of maps containing {:pred , :value}
+;;    - :times, which is vector of maps containing {:pred <fn>, :value <value>}
 ;;       - :pred is 2-arity function (use either <= or >=)
-;;       - :value is the millis timestamp to compare against in millis
+;;       - :value is the millis timestamp to compare against
 ;;       - {:pred < :value 100} will result only in experiments started before timestamp 100
 ;; - limit is approximate, it will return at least that amount and up to twice
 ;; that amount

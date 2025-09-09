@@ -391,6 +391,10 @@
       v)))
 
 (defn hook:running-invoke-node [result+example-ids])
+(defn hook:initiate-target [i])
+(defn hook:result-target [i])
+(defn hook:do-eval [eval-name])
+(defn hook:do-summary-eval [eval-name])
 
 (defn define-experiments-agent!
   [topology]
@@ -481,6 +485,7 @@
                   local-ds
                   dataset-id))
                (dotimes [i num-targets]
+                 (hook:initiate-target i)
                  (if-let [info (get agent-initiates i)]
                    (vswap! initiates-vol conj info)
                    (let [info ((nth initiate-fns i) input)]
@@ -494,6 +499,7 @@
                      (vswap! initiates-vol conj info)
                    )))
                (dotimes [i num-targets]
+                 (hook:result-target i)
                  (if-let [result (get agent-results i)]
                    (vswap! results-vol conj result)
                    (let [result (agent-result-obj (nth clients i)
@@ -544,6 +550,7 @@
 
                          :when (and (not (contains? curr-evals eval-name))
                                     (not (contains? eval-failures eval-name)))]
+                   (hook:do-eval eval-name)
                    (evaluate! local-ds
                               dataset-id
                               eval-name
@@ -600,6 +607,7 @@
                                  (term #(maybe-get-json-path reference-output-json-path %))]
                                 [:output (term #(maybe-get-json-path output-json-path %))])]
                               example-runs)]]
+                 (hook:do-summary-eval eval-name)
                  (evaluate! local-ds
                             dataset-id
                             eval-name

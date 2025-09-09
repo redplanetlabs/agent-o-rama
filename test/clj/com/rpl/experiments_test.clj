@@ -23,7 +23,6 @@
     ComparativeExperiment
     RegularExperiment]))
 
-
 (defn count-or-num
   [v]
   (cond
@@ -35,6 +34,11 @@
 
     :else
     v))
+
+(defn add-example-and-wait!
+  [& args]
+  (Thread/sleep 2)
+  (apply aor/add-dataset-example! args))
 
 (defn wait-experiment-finished!
   [exp-client agent-invoke]
@@ -206,11 +210,6 @@
           (thrown?
            Exception
            (aor-types/add-remote-dataset-internal manager remote-ds "a.b.c.d" nil ds-module-name)))
-
-         (bind add-example-and-wait!
-           (fn [& args]
-             (Thread/sleep 2)
-             (apply aor/add-dataset-example! args)))
 
          (add-example-and-wait!
           manager
@@ -920,11 +919,6 @@
        (bind results
          (foreign-query ipc module-name (queries/experiment-results-name)))
 
-       (bind add-example-and-wait!
-         (fn [& args]
-           (Thread/sleep 2)
-           (apply aor/add-dataset-example! args)))
-
        (bind ds-id1 (aor/create-dataset! manager "Dataset 1"))
 
        (add-example-and-wait! manager ds-id1 "a" {:tags #{"t"}})
@@ -1170,20 +1164,203 @@
         ))
       ))))
 
+(def RUNS)
+(def HANDLER-FNS)
+
 (deftest experimenter-agent-failures-test
-         ;; TODO: <<<<>>>>
-         ;; - doesn't retry things it succeeded on after failures
-         ;;   - agent/node invokes
-         ;;   - regular/comparative evaluators
-         ;;   - summary evaluators
-         ;; - put hook in to cause failure of the experimenter agent in all of those nodes after at
-         ;; least one has succeeded
-)
+  (with-redefs [RUNS (atom [])
+                HANDLER-FNS (atom {})
+
+                exp/hook:initiate-target
+                (fn [i]
+                  ((get @HANDLER-FNS :initiate) i))
+
+                exp/hook:result-target
+                (fn [i]
+                  ((get @HANDLER-FNS :result) i))
+
+                exp/hook:do-eval
+                (fn [eval-name]
+                  ((get @HANDLER-FNS :eval) eval-name))
+
+                exp/hook:do-summary-eval
+                (fn [eval-name]
+                  ((get @HANDLER-FNS :summary) eval-name))
+
+                anode/log-node-error (fn [& args])]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (aor/declare-evaluator-builder
+           topology
+           "reg"
+           ""
+           (fn [params]
+             (fn [fetcher input ref-output output]
+               (swap! RUNS conj :eval-r)
+               {"res" output})))
+          (aor/declare-comparative-evaluator-builder
+           topology
+           "ccount"
+           ""
+           (fn [params]
+             (fn [fetcher input ref-output outputs]
+               (swap! RUNS conj :eval-c)
+               {"res" (count outputs)})))
+          (aor/declare-summary-evaluator-builder
+           topology
+           "count"
+           ""
+           (fn [params]
+             (fn [fetcher example-runs]
+               (swap! RUNS conj :eval-s)
+               {"res" (count example-runs)}
+             )))
+          (-> topology
+              (aor/new-agent "foo")
+              (aor/node
+               "start"
+               nil
+               (fn [agent-node arg]
+                 (swap! RUNS conj :agent)
+                 (aor/result! agent-node (str arg "!")))
+              ))))
+       (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind manager (aor/agent-manager ipc module-name))
+       (bind exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME))
+       (bind global-actions-depot
+         (foreign-depot ipc module-name (po/global-actions-depot-name)))
+       (bind results
+         (foreign-query ipc module-name (queries/experiment-results-name)))
+
+       (bind ds-id1 (aor/create-dataset! manager "Dataset 1"))
+       (add-example-and-wait! manager ds-id1 "aa")
+       (add-example-and-wait! manager ds-id1 "bb")
+       (add-example-and-wait! manager ds-id1 "cc")
+
+       (aor/create-evaluator! manager "reg" "reg" {} "")
+       (aor/create-evaluator! manager "reg2" "reg" {} "")
+       (aor/create-evaluator! manager "ccount" "ccount" {} "")
+       (aor/create-evaluator! manager "ccount2" "ccount" {} "")
+       (aor/create-evaluator! manager "count" "count" {} "")
+       (aor/create-evaluator! manager "count2" "count" {} "")
+
+       (bind reset-handlers!
+         (fn []
+           (reset! HANDLER-FNS {:initiate (constantly nil)
+                                :result   (constantly nil)
+                                :eval     (constantly nil)
+                                :summary  (constantly nil)})))
+       (bind handler!
+         (fn [k afn]
+           (swap! HANDLER-FNS assoc k afn)))
+
+       (bind fail-on-n!
+         (fn [k n]
+           (handler!
+            k
+            (let [c (atom 0)]
+              (fn [_]
+                (when (= n (swap! c inc))
+                  (throw (ex-info "fail" {}))))))))
+
+       (bind fail-on-n-arg!
+         (fn [k target n]
+           (handler!
+            k
+            (let [c (atom 0)]
+              (fn [arg]
+                (when (= arg target)
+                  (swap! c inc))
+                (when (= n @c)
+                  (throw (ex-info "fail" {}))))))))
+
+
+       (reset-handlers!)
+       (fail-on-n! :initiate 2)
+       (fail-on-n! :result 2)
+       (bind exp-id (h/random-uuid7))
+       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (foreign-append!
+          global-actions-depot
+          (aor-types/->valid-StartExperiment
+           exp-id
+           "My experiment"
+           ds-id1
+           nil
+           nil
+           [(aor-types/->valid-EvaluatorSelector "reg" false)
+            (aor-types/->valid-EvaluatorSelector "reg2" false)
+            (aor-types/->valid-EvaluatorSelector "count" false)
+            (aor-types/->valid-EvaluatorSelector "count2" false)]
+           (aor-types/->valid-RegularExperiment
+            (aor-types/->valid-ExperimentTarget
+             (aor-types/->valid-AgentTarget "foo")
+             ["$"]))
+           1
+           1)))
+       (wait-experiment-finished! exp-client exp-invoke)
+       (bind res (foreign-invoke-query results ds-id1 exp-id))
+       (is (= {:agent 3 :eval-r 6 :eval-s 2}
+              (->> @RUNS
+                   (group-by identity)
+                   (transform MAP-VALS count))))
+
+       (is
+        (trace-matches?
+         res
+         {:summary-evals {"count" {"res" 3} "count2" {"res" 3}}
+          :summary-eval-failures nil
+          :results
+          {0
+           {:example-id       !eid0
+            :agent-initiates
+            {0
+             {:agent-name "foo"}}
+            :agent-results    {0 {:val "aa!" :failure? false}}
+            :evals            {"reg" {"res" "aa!"} "reg2" {"res" "aa!"}}
+            :input            "aa"
+            :reference-output nil}
+           1
+           {:example-id       !eid1
+            :agent-initiates
+            {0
+             {:agent-name "foo"}}
+            :agent-results    {0 {:val "bb!" :failure? false}}
+            :evals            {"reg" {"res" "bb!"} "reg2" {"res" "bb!"}}
+            :input            "bb"
+            :reference-output nil}
+           2
+           {:example-id       !eid2
+            :agent-initiates
+            {0
+             {:agent-name "foo"}}
+            :agent-results    {0 {:val "cc!" :failure? false}}
+            :evals            {"reg" {"res" "cc!"} "reg2" {"res" "cc!"}}
+            :input            "cc"
+            :reference-output nil}}}
+        ))
+
+
+       (reset-handlers!)
+
+
+       ;; TODO: <<<<>>>>
+       ;; - doesn't retry things it succeeded on after failures
+       ;;   - regular/comparative evaluators
+       ;;   - summary evaluators
+      ))))
 
 (deftest search-experiments-test
          ;; TODO: <<<<>>>>
          ;;  - test search and all filter types
          ;;     - run experiments without any examples
+         ;;     - search string
+         ;;     - experiment type
+         ;;     - time filters
          ; (bind search
          ;   (foreign-query ipc module-name (queries/search-experiments-name)))
 
