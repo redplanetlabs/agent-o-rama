@@ -60,6 +60,13 @@
 
 (defonce app-db (atom initial-db))
 
+;; TODO disable with shado-cljs, for performance
+(add-watch app-db :console-logger
+           (fn [key atom old-state new-state]
+             ;; This runs on EVERY state change
+             (aset js/window "db" (clj->js new-state {:keyword-fn (fn [k] (str/replace (name k) "-" "_"))}
+             ))))
+
 ;; =============================================================================
 ;; EVENT SYSTEM
 ;; =============================================================================
