@@ -3,6 +3,7 @@ package com.rpl.agentorama.impl;
 import java.io.IOException;
 
 import com.rpl.agentorama.*;
+import com.rpl.rama.cluster.ClusterManagerBase;
 import com.rpl.rama.integration.*;
 
 import clojure.lang.*;
@@ -14,25 +15,37 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   Map<String, Map<String, Object>> _builders;
   Map<String, Map<Keyword, Object>> _evaluatorBuilders;
   Map<String, List<String>> _agentsInfo;
+  Map<String, Object> _agentGraphs;
 
   Map<String, WorkerManagedResource> _objects;
   Map<String, List> _evaluators;
   String _thisModuleName;
   WorkerManagedResource<Map<String, AgentClient>> _agents;
+  ClusterManagerBase _clusterRetriever;
 
 
   // agents is localName -> [moduleName, agentName] (nil for local module)
   public AgentDeclaredObjectsTaskGlobal(
     Map<String, Map<String, Object>> builders,
     Map<String, Map<Keyword, Object>> evaluatorBuilders,
-    Map<String, List<String>> agentsInfo) {
+    Map<String, List<String>> agentsInfo,
+    Map<String, Object> agentGraphs) {
     _builders = builders;
     _evaluatorBuilders = evaluatorBuilders;
     _agentsInfo = agentsInfo;
+    _agentGraphs = agentGraphs;
+  }
+
+  public String getThisModuleName() {
+    return _thisModuleName;
   }
 
   public Map getEvaluatorBuilders() {
     return _evaluatorBuilders;
+  }
+
+  public Map getAgentGraphs() {
+    return _agentGraphs;
   }
 
   public IFn getEvaluator(String name, String builderName, Map<String, Object> params) {
@@ -90,6 +103,10 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     }
   }
 
+  public ClusterManagerBase getClusterRetriever() {
+    return _clusterRetriever;
+  }
+
   private static Object makeObject(String name, IFn afn, AgentObjectSetup setup, boolean autoTracing) {
     Object o = afn.invoke(setup);
     return autoTracing ? AORHelpers.WRAP_AGENT_OBJECT.invoke(name, o) : o;
@@ -99,6 +116,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   public void prepareForTask(int taskId, TaskGlobalContext context) {
     _thisModuleName = context.getModuleInstanceInfo().getModuleName();
     _evaluators = new ConcurrentHashMap();
+    _clusterRetriever = context.getClusterRetriever();
 
     _objects = new HashMap();
     for(String name: _builders.keySet()) {

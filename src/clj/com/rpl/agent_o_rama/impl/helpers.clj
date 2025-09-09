@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.impl.helpers
   (:refer-clojure :exclude [ex-info])
-  (:use [com.rpl.rama.path])
+  (:use [com.rpl.rama]
+        [com.rpl.rama.path])
   (:require
    [clojure.set :as set]
    [clojure.string :as str]
@@ -160,11 +161,6 @@
   (transform* [_this structure next-fn]
               (vswap! structure next-fn)
               structure))
-
-(defn throw!
-  [e]
-  (throw e))
-
 (defn into-map
   [arg]
   (into {} arg))
@@ -279,6 +275,7 @@
   (when-not (string? v)
     "value must be a string"))
 
+(defn first-key [^java.util.SortedMap m] (.firstKey m))
 (defn last-key [^java.util.SortedMap m] (.lastKey m))
 
 (defn contains-string?
@@ -291,10 +288,39 @@
                  ^String json-path
                  ^"[Lcom.jayway.jsonpath.Predicate;" (into-array Predicate [])))
 
+(defn read-compiled-json-path
+  [^Object obj ^JsonPath compiled]
+  (.read compiled obj))
+
 (defn compile-json-path
   [^String json-path]
   (JsonPath/compile json-path (into-array Predicate [])))
 
 (defn mk-completable-future
-  []
+  ^CompletableFuture []
   (CompletableFuture.))
+
+(defn cf-get
+  [^CompletableFuture cf]
+  (.get cf))
+
+(defn split-into-n
+  [n coll]
+  (let [rows (partition-all n coll)
+        pad  (map #(take n (concat % (repeat nil))) rows)
+        cols (apply map vector pad)]
+    (mapv (comp vec #(remove nil? %)) cols)))
+
+(def +concatv
+  (accumulator
+   (fn [v]
+     (path END (termval v)))
+   :init-fn
+   (constantly [])))
+
+(defn to-rama-connection-info
+  [host port]
+  (let [m {"conductor.host" host}]
+    (if port
+      (assoc m "conductor.port" port)
+      m)))

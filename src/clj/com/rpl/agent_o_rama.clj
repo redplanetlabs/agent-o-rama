@@ -4,8 +4,10 @@
   (:require
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.client :as iclient]
+   [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
+   [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.multi-agg :as ma]
@@ -181,6 +183,7 @@
        (when @defined?-vol
          (throw (h/ex-info "Agents topology already defined" {})))
        (vreset! defined?-vol true)
+       (exp/define-experiments-agent! this)
        (i/define-agents!
         setup
         topologies
@@ -338,19 +341,19 @@
 
 (defn new-agent
   [agents-topology name]
-  (i/new-agent agents-topology name))
+  (c/new-agent agents-topology name))
 
 (defn node
   [agent-graph name output-nodes-spec node-fn]
-  (i/node agent-graph name output-nodes-spec node-fn))
+  (c/node agent-graph name output-nodes-spec node-fn))
 
 (defn agg-start-node
   [agent-graph name output-nodes-spec node-fn]
-  (i/agg-start-node agent-graph name output-nodes-spec node-fn))
+  (c/agg-start-node agent-graph name output-nodes-spec node-fn))
 
 (defn agg-node
   [agent-graph name output-nodes-spec agg node-fn]
-  (i/agg-node agent-graph name output-nodes-spec agg node-fn))
+  (c/agg-node agent-graph name output-nodes-spec agg node-fn))
 
 (defn set-update-mode
   [^AgentGraph agent-graph mode]
@@ -382,11 +385,11 @@
 
 (defn emit!
   [agent-node node & args]
-  (apply i/emit! agent-node node args))
+  (apply c/emit! agent-node node args))
 
 (defn result!
   [agent-node val]
-  (i/result! agent-node val))
+  (c/result! agent-node val))
 
 (defn get-store
   [^AgentNode agent-node name]
@@ -446,51 +449,59 @@
                               {:module-name module-name}))
           ))
 
-        datasets-depot          (foreign-depot cluster
-                                               module-name
-                                               (po/datasets-depot-name))
-        datasets-pstate         (foreign-pstate
-                                 cluster
-                                 module-name
-                                 (po/datasets-task-global-name))
-        datasets-page-query     (foreign-query
-                                 cluster
-                                 module-name
-                                 (queries/get-datasets-page-query-name))
-        datasets-search-query   (foreign-query
-                                 cluster
-                                 module-name
-                                 (queries/search-datasets-name))
+        datasets-depot            (foreign-depot cluster
+                                                 module-name
+                                                 (po/datasets-depot-name))
+        datasets-pstate           (foreign-pstate
+                                   cluster
+                                   module-name
+                                   (po/datasets-task-global-name))
+        datasets-page-query       (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/get-datasets-page-query-name))
+        datasets-search-query     (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/search-datasets-name))
 
-        search-examples-query   (foreign-query cluster
-                                               module-name
-                                               (queries/search-examples-name))
-        multi-examples-query    (foreign-query cluster
-                                               module-name
-                                               (queries/multi-examples-name))
+        search-examples-query     (foreign-query cluster
+                                                 module-name
+                                                 (queries/search-examples-name))
+        multi-examples-query      (foreign-query cluster
+                                                 module-name
+                                                 (queries/multi-examples-name))
 
-        evals-depot             (foreign-depot cluster
-                                               module-name
-                                               (po/evaluators-depot-name))
-        evals-pstate            (foreign-pstate
-                                 cluster
-                                 module-name
-                                 (po/evaluators-task-global-name))
+        global-actions-depot      (foreign-depot cluster
+                                                 module-name
+                                                 (po/global-actions-depot-name))
+        evals-pstate              (foreign-pstate
+                                   cluster
+                                   module-name
+                                   (po/evaluators-task-global-name))
 
-        try-eval-query          (foreign-query
-                                 cluster
-                                 module-name
-                                 (queries/try-evaluator-name))
+        try-eval-query            (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/try-evaluator-name))
 
-        all-eval-builders-query (foreign-query
-                                 cluster
-                                 module-name
-                                 (queries/all-evaluator-builders-name))
+        all-eval-builders-query   (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/all-evaluator-builders-name))
 
-        search-evals-query      (foreign-query
-                                 cluster
-                                 module-name
-                                 (queries/search-evaluators-name))]
+        search-evals-query        (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/search-evaluators-name))
+        search-experiments-query  (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/search-experiments-name))
+        experiments-results-query (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/experiment-results-name))]
     (reify
      AgentManager
      (getAgentNames [this]
@@ -522,11 +533,6 @@
                                    cluster
                                    module-name
                                    (po/agent-root-task-global-name agentName))
-             streaming-pstate     (foreign-pstate
-                                   cluster
-                                   module-name
-                                   (po/agent-streaming-results-task-global-name
-                                    agentName))
              graph-history-pstate (foreign-pstate
                                    cluster
                                    module-name
@@ -565,7 +571,8 @@
               agent-depot
               (aor-types/->AgentInitiate
                (vec args)
-               (h/current-time-millis)))
+               (h/current-time-millis)
+               nil))
              (h/cf-function [{[agent-task-id agent-id]
                               aor-types/AGENTS-TOPOLOGY-NAME}]
                (aor-types/->AgentInvokeImpl agent-task-id agent-id)
@@ -630,6 +637,14 @@
                       (i/mk-failure-exception result exceptions))
                      (.complete cf (:val result))))
                ))))
+
+          (isAgentInvokeComplete [this agent-invoke]
+            (let [agent-task-id (.getTaskId agent-invoke)
+                  agent-id      (.getAgentInvokeId agent-invoke)]
+              (foreign-select-one [(keypath agent-id) :result (view some?)]
+                                  root-pstate
+                                  {:pkey agent-task-id})))
+
           (stream [this agent-invoke node]
             (.stream this agent-invoke node nil))
           (stream [this agent-invoke node stream-callback]
@@ -703,21 +718,21 @@
           aor-types/AgentClientInternal
           (stream-internal [this agent-invoke node callback-fn]
             (iclient/agent-stream-impl
-             streaming-pstate
+             root-pstate
              agent-invoke
              node
              callback-fn))
           (stream-specific-internal [this agent-invoke node node-invoke-id
                                      callback-fn]
             (iclient/agent-stream-specific-impl
-             streaming-pstate
+             root-pstate
              agent-invoke
              node
              node-invoke-id
              callback-fn))
           (stream-all-internal [this agent-invoke node callback-fn]
             (iclient/agent-stream-all-impl
-             streaming-pstate
+             root-pstate
              agent-invoke
              node
              callback-fn))
@@ -727,7 +742,6 @@
              :agent-config-depot   agent-config-depot
              :config-pstate        config-pstate
              :root-pstate          root-pstate
-             :streaming-pstate     streaming-pstate
              :graph-history-pstate graph-history-pstate
              :tracing-query        tracing-query
              :invokes-page-query   invokes-page-query
@@ -859,7 +873,7 @@
      (createEvaluator [this name builderName params description options]
        (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
              (foreign-append!
-              evals-depot
+              global-actions-depot
               (aor-types/->valid-AddEvaluator
                name
                builderName
@@ -874,7 +888,7 @@
        ))
      (removeEvaluator [this name]
        (foreign-append!
-        evals-depot
+        global-actions-depot
         (aor-types/->valid-RemoveEvaluator name)
        ))
      (searchEvaluators [this searchString]
@@ -914,15 +928,31 @@
         {"exampleRuns" exampleRuns}))
      (close [this]
        (close! datasets-depot))
+     aor-types/AgentManagerInternal
+     (add-remote-dataset-internal
+       [this dataset-id cluster-conductor-host cluster-conductor-port module-name]
+       (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
+             (foreign-append!
+              datasets-depot
+              (aor-types/->valid-AddRemoteDataset dataset-id
+                                                  cluster-conductor-host
+                                                  cluster-conductor-port
+                                                  module-name))]
+         (when error
+           (throw (h/ex-info "Error creating dataset" {:info error})))))
      aor-types/UnderlyingObjects
      (underlying-objects [this]
-       {:datasets-pstate         datasets-pstate
-        :evals-pstate            evals-pstate
-        :datasets-page-query     datasets-page-query
-        :search-examples-query   search-examples-query
-        :multi-examples-query    multi-examples-query
-        :all-eval-builders-query all-eval-builders-query
-        :search-evals-query      search-evals-query
+       {:datasets-depot            datasets-depot
+        :datasets-pstate           datasets-pstate
+        :evals-pstate              evals-pstate
+        :global-actions-depot      global-actions-depot
+        :datasets-page-query       datasets-page-query
+        :search-examples-query     search-examples-query
+        :multi-examples-query      multi-examples-query
+        :all-eval-builders-query   all-eval-builders-query
+        :search-evals-query        search-evals-query
+        :search-experiments-query  search-experiments-query
+        :experiments-results-query experiments-results-query
        }))))
 
 (defn agent-client
@@ -942,12 +972,12 @@
   (.invokeAsync agent-client (into-array Object args)))
 
 (defn agent-initiate
-  ^AgentInvoke [^AgentClient agent-client & args]
-  (.initiate agent-client (into-array Object args)))
+  ^AgentInvoke [agent-client & args]
+  (apply c/agent-initiate agent-client args))
 
 (defn agent-initiate-async
-  ^CompletableFuture [^AgentClient agent-client & args]
-  (.initiateAsync agent-client (into-array Object args)))
+  ^CompletableFuture [agent-client & args]
+  (apply c/agent-initiate-async agent-client args))
 
 (defn agent-fork
   [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
@@ -982,12 +1012,16 @@
   (instance? HumanInputRequest obj))
 
 (defn agent-result
-  [^AgentClient agent-client agent-invoke]
-  (.result agent-client agent-invoke))
+  [agent-client agent-invoke]
+  (c/agent-result agent-client agent-invoke))
 
 (defn agent-result-async
-  ^CompletableFuture [^AgentClient agent-client agent-invoke]
-  (.resultAsync agent-client agent-invoke))
+  ^CompletableFuture [agent-client agent-invoke]
+  (c/agent-result-async agent-client agent-invoke))
+
+(defn agent-invoke-complete?
+  [^AgentClient agent-client agent-invoke]
+  (.isAgentInvokeComplete agent-client agent-invoke))
 
 (defn agent-stream
   (^AgentStream [^AgentClient agent-client agent-invoke node]

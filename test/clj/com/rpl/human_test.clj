@@ -86,8 +86,9 @@
                            root-pstate
                            {:pkey agent-task-id1}))
 
-
+     (is (not (aor/agent-invoke-complete? foo inv1)))
      (bind h (aor/agent-next-step foo inv1))
+     (is (not (aor/agent-invoke-complete? foo inv1)))
      (aor/agent-next-step foo inv2)
      (is (instance? HumanInputRequest h))
      (is (condition-attained? (= 3
@@ -217,6 +218,7 @@
      (aor/provide-human-input foo r1 "aa")
      (aor/provide-human-input foo r2 "bb")
      (bind h (aor/agent-next-step foo inv1))
+     (is (not (aor/agent-invoke-complete? foo inv1)))
      (is (= "GHI bb" (:prompt h)))
      (aor/provide-human-input foo h "blah")
 
@@ -230,6 +232,7 @@
      (is (instance? AgentComplete r))
      (is (= expected (:result r)))
      (is (= expected (aor/agent-result foo inv1)))
+     (is (aor/agent-invoke-complete? foo inv1))
 
 
      (bind page

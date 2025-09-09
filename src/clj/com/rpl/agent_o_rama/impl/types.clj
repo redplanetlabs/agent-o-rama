@@ -51,6 +51,7 @@
 (drp/defrecord+ AgentInitiate
   [args :- [s/Any]
    time-millis :- Long
+   forced-agent-invoke-id :- (s/maybe Long)
   ])
 
 (drp/defrecord+ AgentResult
@@ -253,6 +254,13 @@
    output-json-schema :- (s/maybe String)
   ])
 
+(drp/defrecord+ AddRemoteDataset
+  [dataset-id :- UUID
+   cluster-conductor-host :- (s/maybe String)
+   cluster-conductor-port :- (s/maybe Long)
+   module-name :- String
+  ])
+
 (drp/defrecord+ UpdateDatasetProperty
   [dataset-id :- UUID
    key :- clojure.lang.Keyword
@@ -312,6 +320,8 @@
 
 ;; Evaluators
 
+(definterface EvaluatorEvent)
+
 (drp/defrecord+ AddEvaluator
   [name :- String
    builder-name :- String
@@ -320,10 +330,12 @@
    input-json-path :- (s/maybe String)
    output-json-path :- (s/maybe String)
    reference-output-json-path :- (s/maybe String)
-  ])
+  ]
+  EvaluatorEvent)
 
 (drp/defrecord+ RemoveEvaluator
-  [name :- String])
+  [name :- String]
+  EvaluatorEvent)
 
 (drp/defrecord+ ExampleRunImpl
   [input :- Object
@@ -333,6 +345,85 @@
   (getInput [this] input)
   (getReferenceOutput [this] reference-output)
   (getOutput [this] output))
+
+;; Experiments
+
+(definterface ExperimentEvent)
+
+(defprotocol ExperimentInputSelector)
+
+(drp/defrecord+ TagSelector
+  [tag :- String]
+  ExperimentInputSelector)
+
+(drp/defrecord+ ExampleIdsSelector
+  [example-ids :- [UUID]]
+  ExperimentInputSelector)
+
+
+(drp/defrecord+ EvaluatorSelector
+  [name :- String
+   remote? :- Boolean])
+
+
+(defprotocol TargetSpec)
+
+(drp/defrecord+ AgentTarget
+  [agent-name :- String]
+  TargetSpec)
+
+(drp/defrecord+ NodeTarget
+  [agent-name :- String
+   node :- String]
+  TargetSpec)
+
+
+(drp/defrecord+ ExperimentTarget
+  [target-spec :- (s/protocol TargetSpec)
+   input->args :- [String]])
+
+(defprotocol ExperimentSpec
+  (experiment-targets [this]))
+
+(drp/defrecord+ RegularExperiment
+  [target :- ExperimentTarget]
+  ExperimentSpec
+  (experiment-targets [this] [target]))
+
+(drp/defrecord+ ComparativeExperiment
+  [targets :- [ExperimentTarget]]
+  ExperimentSpec
+  (experiment-targets [this] targets))
+
+
+;; since this is stored in a PState
+(drp/defrecord+ ^{:features {:nippy-8-byte-hash false}} StartExperiment
+  [id :- UUID
+   name :- String
+
+   dataset-id :- UUID
+   snapshot :- (s/maybe String)
+   selector :- (s/maybe (s/protocol ExperimentInputSelector))
+   evaluators :- [EvaluatorSelector]
+
+   spec :- (s/protocol ExperimentSpec)
+
+   num-repetitions :- Long
+   concurrency :- Long
+  ]
+  ExperimentEvent)
+
+
+(drp/defrecord+ UpdateExperimentName
+  [id :- UUID
+   dataset-id :- UUID
+   name :- String]
+  ExperimentEvent)
+
+(drp/defrecord+ DeleteExperiment
+  [id :- UUID
+   dataset-id :- UUID]
+  ExperimentEvent)
 
 ;; Internal protocols
 
@@ -362,6 +453,9 @@
   (stream-specific-internal [this agent-invoke node node-invoke-id callback-fn])
   (stream-all-internal [this agent-invoke node callback-fn]))
 
+(defprotocol AgentManagerInternal
+  (add-remote-dataset-internal [this dataset-id cluster-conductor-host cluster-conductor-port
+                                module-name]))
 
 ;; Configs
 

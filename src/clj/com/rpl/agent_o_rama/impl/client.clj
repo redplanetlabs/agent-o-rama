@@ -30,7 +30,7 @@
 
 (defn- agent-stream-all-impl*
   ^AgentStreamByInvoke
-  [streaming-pstate ^AgentInvoke agent-invoke node callback-fn]
+  [root-pstate ^AgentInvoke agent-invoke node callback-fn]
   (let [agent-task-id  (.getTaskId agent-invoke)
         agent-id       (.getAgentInvokeId agent-invoke)
         results-vol    (volatile! {})
@@ -120,10 +120,10 @@
 
         ps
         (foreign-proxy
-         [(keypath agent-id node :all)
+         [(keypath agent-id :streaming node :all)
           (srange-dynamic h/start-index
                           h/srange-dynamic-end-index)]
-         streaming-pstate
+         root-pstate
          {:pkey        agent-task-id
           :callback-fn pcallback-fn})]
     (locking ps-vol
@@ -143,9 +143,9 @@
      (deref [this] (.get this)))))
 
 (defn agent-stream-all-impl
-  [streaming-pstate agent-invoke node callback-fn]
+  [root-pstate agent-invoke node callback-fn]
   (agent-stream-all-impl*
-   streaming-pstate
+   root-pstate
    agent-invoke
    node
    (when callback-fn
@@ -157,12 +157,12 @@
                     finished?)))))
 
 (defn agent-stream-impl
-  [streaming-pstate agent-invoke node callback-fn]
+  [root-pstate agent-invoke node callback-fn]
   (let [first-invoke-id-vol (volatile! nil)
         done-vol (volatile! false)
         delegate
         (agent-stream-all-impl*
-         streaming-pstate
+         root-pstate
          agent-invoke
          node
          (fn [invoke-id->chunks invoke-id->new-chunks reset-invoke-ids
@@ -201,11 +201,11 @@
   ))
 
 (defn agent-stream-specific-impl
-  [streaming-pstate agent-invoke node node-invoke-id callback-fn]
+  [root-pstate agent-invoke node node-invoke-id callback-fn]
   (let [done-vol (volatile! false)
         delegate
         (agent-stream-all-impl*
-         streaming-pstate
+         root-pstate
          agent-invoke
          node
          (fn [invoke-id->chunks invoke-id->new-chunks reset-invoke-ids

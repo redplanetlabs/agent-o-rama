@@ -5,6 +5,7 @@
    [clojure.set :as set]
    [com.rpl.agent-o-rama.impl.datasets :as datasets]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
+   [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.partitioner :as apart]
@@ -19,14 +20,15 @@
     AgentFailedException
     AgentInvoke
     AgentNode
-    AgentObjectOptions$Impl
-    AgentsTopology]
+    AgentObjectOptions$Impl]
    [com.rpl.agentorama.impl
     RamaClientsTaskGlobal
     AgentDeclaredObjectsTaskGlobal
     AgentNodeExecutorTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     AggAckOp
+    EvaluatorEvent
+    ExperimentEvent
     NodeOp]
    [java.util.concurrent
     CompletableFuture]))
@@ -60,10 +62,6 @@
                     :random
                     {:global? true})
 
-    (declare-object* setup
-                     (symbol (po/agent-graph-task-global-name agent-name))
-                     (graph/resolve-agent-graph agent-graph))
-
     (declare-pstate*
      stream-topology
      (symbol (po/agent-root-task-global-name agent-name))
@@ -83,11 +81,6 @@
      stream-topology
      (symbol (po/agent-gc-invokes-task-global-name agent-name))
      po/AGENT-GC-ROOT-INVOKES-PSTATE-SCHEMA
-     {:key-partitioner apart/task-id-key-partitioner})
-    (declare-pstate*
-     stream-topology
-     (symbol (po/agent-streaming-results-task-global-name agent-name))
-     po/AGENT-STREAMING-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
     (declare-pstate*
      stream-topology
@@ -232,14 +225,18 @@
                    (AgentDeclaredObjectsTaskGlobal.
                     declared-objects
                     evaluator-builders
-                    (mk-agents-info agent-graphs mirror-agents)))
+                    (mk-agents-info agent-graphs mirror-agents)
+                    (transform MAP-VALS
+                               graph/resolve-agent-graph
+                               agent-graphs)
+                   ))
 
-  (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))
-        datasets-depot-sym     (symbol (po/datasets-depot-name))
-        evaluators-depot-sym   (symbol (po/evaluators-depot-name))]
+  (let [pstate-write-depot-sym   (symbol (po/agent-pstate-write-depot-name))
+        datasets-depot-sym       (symbol (po/datasets-depot-name))
+        global-actions-depot-sym (symbol (po/global-actions-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
     (declare-depot* setup datasets-depot-sym (hash-by :dataset-id))
-    (declare-depot* setup evaluators-depot-sym :random {:global? true})
+    (declare-depot* setup global-actions-depot-sym :random {:global? true})
     (declare-pstate*
      stream-topology
      (symbol (po/datasets-task-global-name))
@@ -251,7 +248,7 @@
      {:global? true})
 
     (doseq [depot-sym [pstate-write-depot-sym datasets-depot-sym
-                       evaluators-depot-sym]]
+                       global-actions-depot-sym]]
       (set-launch-depot-dynamic-option!* setup
                                          depot-sym
                                          "depot.max.entries.per.partition"
@@ -276,8 +273,16 @@
      (source> datasets-depot-sym :> *data)
       (datasets/handle-datasets-op *data)
 
-     (source> evaluators-depot-sym :> *data)
-      (evals/handle-evaluators-op *data)
+     (source> global-actions-depot-sym :> *data)
+      (<<cond
+       (case> (instance? EvaluatorEvent *data))
+        (evals/handle-evaluators-op *data)
+
+       (case> (instance? ExperimentEvent *data))
+        (exp/handle-experiments-op *data)
+
+       (default>)
+        (throw! (h/ex-info "Unexpected global action type" {:type (class *data)})))
     ))
   (queries/declare-agent-get-names-query-topology topologies
                                                   (-> agent-graphs
@@ -290,6 +295,8 @@
   (queries/declare-all-evaluator-builders-query-topology topologies)
   (queries/declare-try-evaluator-query-topology topologies)
   (queries/declare-search-evaluators-query-topology topologies)
+  (queries/declare-search-experiments-query-topology topologies)
+  (queries/declare-experiment-results-query-topology topologies)
   (doseq [[agent-name agent-graph] agent-graphs]
     (define-agent! agent-name
                    setup
@@ -372,40 +379,3 @@
        )))
     ret
   ))
-
-(defn new-agent
-  [^AgentsTopology agents-topology name]
-  (.newAgent agents-topology name))
-
-(defn node
-  [agent-graph name output-nodes-spec node-fn]
-  (graph/internal-add-node!
-   agent-graph
-   name
-   output-nodes-spec
-   (aor-types/->Node node-fn)))
-
-(defn agg-start-node
-  [agent-graph name output-nodes-spec node-fn]
-  (graph/internal-add-node!
-   agent-graph
-   name
-   output-nodes-spec
-   (aor-types/->NodeAggStart node-fn nil)))
-
-(defn agg-node
-  [agent-graph name output-nodes-spec agg node-fn]
-  (graph/internal-add-agg-node!
-   agent-graph
-   name
-   output-nodes-spec
-   agg
-   node-fn))
-
-(defn emit!
-  [^AgentNode agent-node node & args]
-  (.emit agent-node node (into-array Object args)))
-
-(defn result!
-  [^AgentNode agent-node val]
-  (.result agent-node val))

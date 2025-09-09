@@ -390,17 +390,12 @@ Here are the sections to reflect on for writing: %s")
   (loop [res (aor/get-human-input agent-node prompt)]
     (cond (= res "yes") true
           (= res "no") false
-          :else (recur (aor/get-human-input agent-node
-                                            "Please answer 'yes' or 'no'.")))))
+          :else (recur (aor/get-human-input agent-node "Please answer 'yes' or 'no'.")))))
 
 (aor/defagentmodule ResearchAgentModule
   [topology]
-  (aor/declare-agent-object topology
-                            "openai-api-key"
-                            (System/getenv "OPENAI_API_KEY"))
-  (aor/declare-agent-object topology
-                            "tavily-api-key"
-                            (System/getenv "TAVILY_API_KEY"))
+  (aor/declare-agent-object topology "openai-api-key" (System/getenv "OPENAI_API_KEY"))
+  (aor/declare-agent-object topology "tavily-api-key" (System/getenv "TAVILY_API_KEY"))
   (aor/declare-agent-object-builder
    topology
    "openai"
@@ -431,8 +426,7 @@ Here are the sections to reflect on for writing: %s")
      (fn [agent-node human-feedback options]
        (let [{:strs [topic max-analysts max-turns] :as options}
              (merge {"max-analysts" 4 "max-turns" 2} options)
-             ;; - JSON schemas not supported by streaming model, so have to use
-             ;; non-streaming here
+             ;; - JSON schemas not supported by streaming model, so have to use non-streaming here
              openai (aor/get-agent-object agent-node "openai-non-streaming")
              res    (-> openai
                         (chat-and-get-text
@@ -444,10 +438,7 @@ Here are the sections to reflect on for writing: %s")
                                              "analysts"
                                              ANALYST-RESPONSE-SCHEMA)}))
                         (j/read-value STR-MAPPER))]
-         (aor/emit! agent-node
-                    "feedback"
-                    (get res "analysts")
-                    options)
+         (aor/emit! agent-node "feedback" (get res "analysts") options)
        )))
     (aor/node
      "feedback"
@@ -459,8 +450,7 @@ Here are the sections to reflect on for writing: %s")
           (str
            "Do you have any feedback on this set of analysts? Answer 'yes' or 'no'.\n\n"
            (str/join "\n" (mapv str analysts))))
-         (let [feedback (aor/get-human-input agent-node
-                                             "What is your feedback?")]
+         (let [feedback (aor/get-human-input agent-node "What is your feedback?")]
            (aor/emit! agent-node "create-analysts" feedback options))
          (aor/emit! agent-node "questions" analysts options))))
     (aor/agg-start-node
@@ -468,11 +458,7 @@ Here are the sections to reflect on for writing: %s")
      "generate-question"
      (fn [agent-node analysts {:strs [topic max-turns] :as config}]
        (doseq [analyst analysts]
-         (aor/emit! agent-node
-                    "generate-question"
-                    (analyst-persona analyst)
-                    []
-                    max-turns))
+         (aor/emit! agent-node "generate-question" (analyst-persona analyst) [] max-turns))
        config))
     (aor/agg-start-node
      "generate-question"
@@ -526,10 +512,7 @@ Here are the sections to reflect on for writing: %s")
        (let [openai       (aor/get-agent-object agent-node "openai")
              context      (str/join "\n---\n" searches)
              instr        (answer-instructions persona context)
-             answer       (chat-and-get-text openai
-                                             (concat [(SystemMessage. instr)]
-                                                     messages))
-
+             answer       (chat-and-get-text openai (concat [(SystemMessage. instr)] messages))
              new-messages (conj messages (UserMessage. "expert" answer))
              num-turns    (count
                            (filter
@@ -538,16 +521,8 @@ Here are the sections to reflect on for writing: %s")
                                    (= "expert" (.name ^UserMessage m))))
                             new-messages))]
          (if (>= num-turns max-turns)
-           (aor/emit! agent-node
-                      "write-section"
-                      persona
-                      new-messages
-                      context)
-           (aor/emit! agent-node
-                      "generate-question"
-                      persona
-                      new-messages
-                      max-turns))
+           (aor/emit! agent-node "write-section" persona new-messages context)
+           (aor/emit! agent-node "generate-question" persona new-messages max-turns))
        )))
     (aor/node
      "write-section"
@@ -560,10 +535,8 @@ Here are the sections to reflect on for writing: %s")
                         openai
                         (concat
                          [(SystemMessage. instr)]
-                         [(UserMessage. (str "Here is the interview:\n"
-                                             interview))
-                          (UserMessage. (str "Here are the sources:\n"
-                                             context))]))]
+                         [(UserMessage. (str "Here is the interview:\n" interview))
+                          (UserMessage. (str "Here are the sources:\n" context))]))]
          (aor/emit! agent-node "agg-sections" section)
        )))
     (aor/agg-node
@@ -589,8 +562,7 @@ Here are the sections to reflect on for writing: %s")
                      openai
                      (concat
                       [(SystemMessage. instr)]
-                      [(UserMessage.
-                        "Write a report based upon these memos.")]))]
+                      [(UserMessage. "Write a report based upon these memos.")]))]
          (aor/emit! agent-node "finish-report" "report" text)
        )))
     (aor/node
@@ -603,8 +575,7 @@ Here are the sections to reflect on for writing: %s")
                      openai
                      (concat
                       [(SystemMessage. instr)]
-                      [(UserMessage.
-                        "Write the report introduction")]))]
+                      [(UserMessage. "Write the report introduction")]))]
          (aor/emit! agent-node "finish-report" "intro" text)
        )))
     (aor/node
@@ -617,8 +588,7 @@ Here are the sections to reflect on for writing: %s")
                      openai
                      (concat
                       [(SystemMessage. instr)]
-                      [(UserMessage.
-                        "Write the report conclusion")]))]
+                      [(UserMessage. "Write the report conclusion")]))]
          (aor/emit! agent-node "finish-report" "conclusion" text)
        )))
     (aor/agg-node
@@ -638,7 +608,7 @@ Here are the sections to reflect on for writing: %s")
        )))
   ))
 
-(defn run-research-agent
+(defn run-agent
   []
   (with-open [ipc (rtest/create-ipc)
               ui  (aor/start-ui ipc)]
@@ -662,6 +632,3 @@ Here are the sections to reflect on for writing: %s")
             (recur (aor/agent-next-step researcher inv)))
           (println (:result step))))
     )))
-
-(comment
-  (run-research-agent))

@@ -31,9 +31,12 @@
    [com.rpl.agentorama
     AddDatasetExampleOptions
     AgentManager]
+   [com.rpl.agentorama.impl
+    AgentDeclaredObjectsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     AddDatasetExample
     AddDatasetExampleTag
+    AddRemoteDataset
     CreateDataset
     DatasetSnapshot
     DestroyDataset
@@ -307,12 +310,51 @@
           apath
           )]]]))
 
+(defn get-cluster-retriever
+  [^AgentDeclaredObjectsTaskGlobal declared-objects-tg]
+  (.getClusterRetriever declared-objects-tg))
+
+(defmacro with-datasets-pstate
+  [declared-objects-tg remote-params [datasets-sym] & body]
+  `(let [{host# :cluster-conductor-host port# :cluster-conductor-port module-name# :module-name}
+         ~remote-params
+
+         retriever# (if host#
+                      (open-cluster-manager (h/to-rama-connection-info host# port#))
+                      (get-cluster-retriever ~declared-objects-tg))]
+     (try
+       (let [~datasets-sym (foreign-pstate retriever# module-name# (po/datasets-task-global-name))]
+         ~@body)
+       (finally
+         (when host#
+           (close! retriever#))
+       ))))
+
+(defn verify-remote-dataset
+  [{:keys [dataset-id cluster-conductor-host cluster-conductor-port module-name] :as params}]
+  (if (and (some? cluster-conductor-port) (nil? cluster-conductor-host))
+    "Cannot set conductor port without setting conductor host"
+    (try
+      (with-datasets-pstate
+       (po/agent-declared-objects-task-global)
+       params
+       [datasets]
+       (let [exists? (foreign-select-one [(keypath dataset-id) :props :name (view some?)]
+                                         datasets)]
+         (when-not exists?
+           (throw (h/ex-info "Remote dataset does not exist in specified module" {})))
+         nil))
+      (catch Throwable t
+        (format "Failed to connect to remote dataset %s" (h/throwable->str t))))))
+
 (deframaop handle-datasets-op
   [{:keys [*dataset-id] :as *data}]
   (<<with-substitutions
    [$$datasets (po/datasets-task-global)]
    (local-select> [(keypath *dataset-id) :props] $$datasets :> *props)
-   (filter> (or> (instance? CreateDataset *data) (some? *props)))
+   (filter> (or> (instance? CreateDataset *data)
+                 (instance? AddRemoteDataset *data)
+                 (some? *props)))
    (<<subsource *data
     (case> CreateDataset
            :> {:keys [*name *description *input-json-schema
@@ -328,6 +370,22 @@
                                   :created-at        *current-time-millis
                                   :modified-at       *current-time-millis})]
                        $$datasets)
+
+    (case> AddRemoteDataset
+           :> {:keys [*cluster-conductor-host *cluster-conductor-port *module-name]})
+     (verify-remote-dataset *data :> *error)
+     (<<if *error
+       (ack-return> *error)
+      (else>)
+       (h/current-time-millis :> *current-time-millis)
+       (local-transform> [(keypath *dataset-id)
+                          :props
+                          (termval {:cluster-conductor-host *cluster-conductor-host
+                                    :cluster-conductor-port *cluster-conductor-port
+                                    :module-name *module-name
+                                    :created-at  *current-time-millis
+                                    :modified-at *current-time-millis})]
+                         $$datasets))
 
     (case> UpdateDatasetProperty :> {:keys [*key *value]})
      (update-dataset! $$datasets
@@ -482,3 +540,15 @@
                 ))))))
       (.acquire sem 100)
       nil)))
+
+(defn create-remote-dataset!
+  [datasets-depot dataset-id cluster-conductor-host cluster-conductor-port module-name]
+  (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
+        (foreign-append!
+         datasets-depot
+         (aor-types/->valid-AddRemoteDataset dataset-id
+                                             cluster-conductor-host
+                                             cluster-conductor-port
+                                             module-name))]
+    (when error
+      (throw (h/ex-info "Error creating remote dataset" {:info error})))))

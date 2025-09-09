@@ -26,24 +26,16 @@
   (subvec v (- (count v) 3)))
 
 (defn all-agent-invs-fn
-  [root-pstate streaming-pstate num-tasks]
+  [root-pstate num-tasks]
   (fn []
     (into #{}
-          (concat
-           (apply concat
-            (for [i (range num-tasks)]
-              (foreign-select
-               [MAP-KEYS (view #(aor-types/->AgentInvokeImpl i %))]
-               root-pstate
-               {:pkey i})
-            ))
-           (apply concat
-            (for [i (range num-tasks)]
-              (foreign-select
-               [MAP-KEYS (view #(aor-types/->AgentInvokeImpl i %))]
-               streaming-pstate
-               {:pkey i})
-            ))))))
+          (apply concat
+           (for [i (range num-tasks)]
+             (foreign-select
+              [MAP-KEYS (view #(aor-types/->AgentInvokeImpl i %))]
+              root-pstate
+              {:pkey i})
+           )))))
 
 (defn all-node-ids-fn
   [node-pstate num-tasks]
@@ -137,10 +129,6 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-root-task-global-name "foo")))
-         (bind streaming-pstate
-           (foreign-pstate ipc
-                           module-name
-                           (po/agent-streaming-results-task-global-name "foo")))
          (bind root-count-pstate
            (foreign-pstate ipc
                            module-name
@@ -168,7 +156,7 @@
              )))
 
          (bind all-agent-invs
-           (all-agent-invs-fn root-pstate streaming-pstate 4))
+           (all-agent-invs-fn root-pstate 4))
          (bind all-node-ids (all-node-ids-fn node-pstate 4))
          (bind [trace-node-ids non-gc-trace-node-ids]
            (trace-node-ids-fns root-pstate traces-query))
@@ -340,10 +328,6 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-root-task-global-name "foo")))
-         (bind streaming-pstate
-           (foreign-pstate ipc
-                           module-name
-                           (po/agent-streaming-results-task-global-name "foo")))
          (bind root-count-pstate
            (foreign-pstate ipc
                            module-name
@@ -362,7 +346,7 @@
                           (queries/tracing-query-name "foo")))
 
          (bind all-agent-invs
-           (all-agent-invs-fn root-pstate streaming-pstate 4))
+           (all-agent-invs-fn root-pstate 4))
          (bind all-node-ids (all-node-ids-fn node-pstate 4))
          (bind [trace-node-ids non-gc-trace-node-ids]
            (trace-node-ids-fns root-pstate traces-query))
@@ -504,10 +488,6 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-root-task-global-name "foo")))
-         (bind streaming-pstate
-           (foreign-pstate ipc
-                           module-name
-                           (po/agent-streaming-results-task-global-name "foo")))
          (bind root-count-pstate
            (foreign-pstate ipc
                            module-name
@@ -522,7 +502,7 @@
                           (queries/tracing-query-name "foo")))
 
          (bind all-agent-invs
-           (all-agent-invs-fn root-pstate streaming-pstate 4))
+           (all-agent-invs-fn root-pstate 4))
          (bind all-node-ids (all-node-ids-fn node-pstate 4))
          (bind [trace-node-ids non-gc-trace-node-ids]
            (trace-node-ids-fns root-pstate traces-query))

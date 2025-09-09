@@ -30,6 +30,8 @@ public interface AgentClient extends Closeable {
   <T> T result(AgentInvoke invoke);
   <T> CompletableFuture<T> resultAsync(AgentInvoke invoke);
 
+  boolean isAgentInvokeComplete(AgentInvoke invoke);
+
   AgentStream stream(AgentInvoke invoke, String node);
   <T> AgentStream stream(AgentInvoke invoke, String node, StreamCallback<T> callback);
   AgentStream streamSpecific(AgentInvoke invoke, String node, UUID nodeInvokeId);

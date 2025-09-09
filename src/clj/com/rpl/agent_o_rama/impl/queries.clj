@@ -4,6 +4,7 @@
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
+   [com.rpl.agent-o-rama.impl.datasets :as datasets]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -75,6 +76,14 @@
 (defn search-evaluators-name
   []
   "_aor-search-evaluators")
+
+(defn search-experiments-name
+  []
+  "_aor-search-experiments")
+
+(defn experiment-results-name
+  []
+  "_aor-experiment-results")
 
 (defn- to-pqueue
   [coll]
@@ -360,13 +369,12 @@
 
 (defn declare-get-current-graph
   [topologies agent-name]
-  (let [agent-graph-sym (symbol (po/agent-graph-task-global-name agent-name))]
-    (<<query-topology topologies
-      (agent-get-current-graph-name agent-name)
-      [:> *res]
-      (|origin)
-      (graph/graph->historical-graph-info agent-graph-sym :> *res)
-    )))
+  (<<query-topology topologies
+    (agent-get-current-graph-name agent-name)
+    [:> *res]
+    (|origin)
+    (graph/graph->historical-graph-info (po/agent-graph-task-global agent-name) :> *res)
+  ))
 
 ;; Datasets
 
@@ -410,13 +418,6 @@
       :props
       :name))
 
-(def +concat
-  (accumulator
-   (fn [v]
-     (path END (termval v)))
-   :init-fn
-   (constantly [])))
-
 (defn contains-string?-pred
   [substring]
   (fn [s]
@@ -452,7 +453,7 @@
           (continue> (h/last-key *m) *new-results)
         ))
       (|origin)
-      (+concat *l :> *items)
+      (h/+concatv *l :> *items)
       (into {} (take *limit *items) :> *res)
     )))
 
@@ -476,18 +477,31 @@
 
 (defn all-evaluator-builders-without-builder-fns
   []
+<<<<<<< HEAD
   (setval
    [MAP-VALS :builder-fn]
    NONE
    (evals/all-evaluator-builders)))
+=======
+  (setval [MAP-VALS :builder-fn]
+          NONE
+          (evals/all-evaluator-builders)))
+>>>>>>> master
 
 (defn declare-all-evaluator-builders-query-topology
   [topologies]
   (<<query-topology topologies
+<<<<<<< HEAD
                     (all-evaluator-builders-name)
                     [:> *res]
                     (|origin)
                     (all-evaluator-builders-without-builder-fns :> *res)))
+=======
+    (all-evaluator-builders-name)
+    [:> *res]
+    (|origin)
+    (all-evaluator-builders-without-builder-fns :> *res)))
+>>>>>>> master
 
 (defn evaluator-event
   [^CompletableFuture cf name eval-type builder-name builder-params params]
@@ -554,32 +568,43 @@
   (vswap! v conj item))
 
 
+(defn next-search-key
+  [m reverse?]
+  (if reverse? (h/first-key m) (h/last-key m)))
+
 (deframaop search-loop
-  [$$p *map-path %filter *limit *next-key]
+  [$$p *map-path %filter *limit *next-key *reverse?]
   (ramafn> %filter)
   (volatile! [] :> *results)
   (loop<- [*next-key *next-key
            :> *page-key]
     (yield-if-overtime)
-    (local-select>
-     [*map-path
-      (sorted-map-range-from *next-key {:inclusive? false :max-amt *limit})]
-     $$p
-     :> *m)
+    (<<if *reverse?
+      (<<if (nil? *next-key)
+        (sorted-map-range-to-end *limit :> *range-nav)
+       (else>)
+        (sorted-map-range-to *next-key {:inclusive? false :max-amt *limit} :> *range-nav))
+     (else>)
+      (sorted-map-range-from *next-key {:inclusive? false :max-amt *limit} :> *range-nav))
+    (local-select> [*map-path *range-nav] $$p :> *m)
     (<<atomic
-      (ops/explode *m :> [*id *info])
-      (%filter *id *info :> *assoc-map)
+      (<<if *reverse?
+        (rseq (vec *m) :> *seq)
+       (else>)
+        (seq *m :> *seq))
+      (ops/explode *seq :> [*id *info])
+      (%filter *id *info :> *assoc-map *dissoc-keys)
       (<<if (some? *assoc-map)
-        (conj-vol! *results (merge *info *assoc-map))))
+        (conj-vol! *results (merge (into {} (apply dissoc *info *dissoc-keys)) *assoc-map))))
     (<<cond
      (case> (< (count *m) *limit))
       (:> nil)
 
      (case> (>= (count @*results) *limit))
-      (:> (h/last-key *m))
+      (:> (next-search-key *m *reverse?))
 
      (default>)
-      (continue> (h/last-key *m))))
+      (continue> (next-search-key *m *reverse?))))
   (:> @*results *page-key))
 
 ;; accepts filters :source, :tag, and search-string (looks for match within
@@ -603,29 +628,31 @@
         [*id {:keys [*input *reference-output *source *tags]}]
         (<<cond
          (case> (and> (some? *search-tag) (not (contains? *tags *search-tag))))
-          (:> nil)
+          (:> nil nil)
 
          (case> (and> (some? *search-source) (not= *source *search-source)))
-          (:> nil)
+          (:> nil nil)
 
          (case>
           (and>
            (some? *search-string-lower)
            (and>
+            (not (h/contains-string? (str/lower-case (str *id)) *search-string-lower))
             (not (h/contains-string? (str/lower-case (str (or> *input "")))
                                       *search-string-lower))
             (not (h/contains-string? (str/lower-case
                                       (str (or> *reference-output "")))
                                       *search-string-lower)))))
-          (:> nil)
+          (:> nil nil)
 
          (default>)
-          (:> {:id *id})))
+          (:> {:id *id} nil)))
       (search-loop datasets-sym
                    (keypath *dataset-id :snapshots *snapshot)
                    %filter
                    *limit
                    *next-key
+                   false
                    :> *items *page-key)
       (|origin)
       (hash-map :examples *items :pagination-params *page-key :> *res)
@@ -645,8 +672,8 @@
     (<<query-topology topologies
       (search-evaluators-name)
       [*filters *limit *next-key :> *res]
-      (identity *filters :> {:keys [*types *search-string]})
       (|direct 0)
+      (identity *filters :> {:keys [*types *search-string]})
       (ifexpr (some? *search-string)
         (str/lower-case *search-string)
         :> *search-string-lower)
@@ -656,27 +683,193 @@
         (select> [(keypath *builder-name) :type] *builders :> *type)
         (<<cond
          (case> (nil? *type))
-          (:> nil)
+          (:> nil nil)
 
          (case> (and> (some? *types) (not (contains? *types *type))))
-          (:> nil)
+          (:> nil nil)
 
          (case> (and> (some? *search-string-lower)
                       (not (h/contains-string? (str/lower-case *name)
                                                 *search-string-lower))))
-          (:> nil)
+          (:> nil nil)
 
          (default>)
-         (:> (assoc *info :name *name :type *type))))
+          (:> (assoc *info :name *name :type *type))))
       (search-loop evals-pstate-sym
                    STAY
                    %filter
                    *limit
                    *next-key
+                   false
                    :> *items *page-key)
       (|origin)
       (hash-map :items *items :pagination-params *page-key :> *res)
     )))
+
+;; - filters can contain:
+;;    - :search-string, which matches against the experiment name or ID
+;;    - :type which is either com.rpl.agent_o_rama.impl.types.RegularExperiment or
+;;      com.rpl.agent_o_rama.impl.types.ComparativeExperiment class
+;;    - :times, which is vector of maps containing {:pred <fn>, :value <value>}
+;;       - :pred is 2-arity function (use either <= or >=)
+;;       - :value is the millis timestamp to compare against
+;;       - {:pred < :value 100} will result only in experiments started before timestamp 100
+;; - limit is approximate, it will return at least that amount and up to twice
+;; that amount
+;; - returns {:items [{:experiment-info <StartExperiment type> :experiment-invoke ...
+;; :start-time-millis ... :finish-time-millis ...}
+;;                    ...]
+;;            :pagination-params <next-key>}
+(defn declare-search-experiments-query-topology
+  [topologies]
+  (let [datasets-pstate-sym (symbol (po/datasets-task-global-name))]
+    (<<query-topology topologies
+      (search-experiments-name)
+      [*dataset-id *filters *limit *next-key :> *res]
+      (|hash *dataset-id)
+      (identity *filters :> {:keys [*type *search-string *times]})
+      (ifexpr (some? *search-string)
+        (str/lower-case *search-string)
+        :> *search-string-lower)
+      (<<ramafn %filter
+        [*id {:keys [*start-time-millis *experiment-info] :as *m}]
+        (<<ramafn %matches-time-spec?
+          [{:keys [*pred *value]}]
+          (:> (h/invoke *pred *start-time-millis *value)))
+        (get *experiment-info :name :> *name)
+        (get *experiment-info :spec :> *spec)
+        (<<cond
+         (case> (and> (some? *type) (not (instance? *type *spec))))
+          (:> nil nil)
+
+         (case> (and> (some? *search-string-lower)
+                      (not (h/contains-string? (str/lower-case (str *id))
+                                                *search-string-lower))
+                      (not (h/contains-string? (str/lower-case *name)
+                                                *search-string-lower))))
+          (:> nil nil)
+
+         (case> (not (every? %matches-time-spec? *times)))
+          (:> nil nil)
+
+         (default>)
+          (:> {} [:results])))
+      (search-loop datasets-pstate-sym
+                   (keypath *dataset-id :experiments)
+                   %filter
+                   *limit
+                   *next-key
+                   true
+                   :> *items *page-key)
+      (|origin)
+      (hash-map :items *items :pagination-params *page-key :> *res)
+    )))
+
+(defn is-remote-dataset?
+  [{:keys [module-name]}]
+  (some? module-name))
+
+(defn example-fetch-batch-size
+  []
+  500)
+
+(defn merge-examples-to-results
+  [results-map example-id->example]
+  (transform
+   MAP-VALS
+   (fn [{:keys [example-id] :as m}]
+     (if-let [example (get example-id->example example-id)]
+       (assoc m
+        :input (:input example)
+        :reference-output (:reference-output example))
+       (assoc m :missing-example? true)
+     ))
+   results-map))
+
+(defn fetch-remote-examples
+  [declared-objects-tg remote-params query-path]
+  (let [cf (h/mk-completable-future)]
+    (anode/submit-virtual-task!
+     nil
+     (fn []
+       (try
+         (datasets/with-datasets-pstate
+          declared-objects-tg
+          remote-params
+          [datasets]
+          (.complete cf (foreign-select-one query-path datasets))
+         )
+         (catch Throwable t
+           (.completeExceptionally cf t)
+         ))
+     ))
+    cf))
+
+;; - returns {:items [{<all the info in values of :experiments in datasets PState, with
+;; examples
+;; hydrated with example input/reference-output into the keys :input, :reference-output}
+;;                    ...]
+;;            :pagination-params <next-key>}
+;;    - if example is missing from the dataset (e.g. it was deleted), it won't have :input or
+;;    :reference-output and will instead have the key :missing-example? set to true
+(defn declare-experiment-results-query-topology
+  [topologies]
+  (let [datasets-pstate-sym (symbol (po/datasets-task-global-name))]
+    (<<query-topology topologies
+      (experiment-results-name)
+      [*dataset-id *experiment-id :> *res]
+      (|hash *dataset-id)
+      (local-select> [(keypath *dataset-id)
+                      :props
+                      (submap [:cluster-conductor-host :cluster-conductor-port :module-name])]
+                     datasets-pstate-sym
+                     :> *remote-params)
+      (local-select> [(keypath *dataset-id :experiments *experiment-id)
+                      (submap [:experiment-info
+                               :experiment-invoke
+                               :start-time-millis
+                               :finish-time-millis
+                               :summary-evals
+                               :summary-eval-failures])]
+                     datasets-pstate-sym
+                     :> *experiment-props)
+      (local-select> [(keypath *dataset-id :experiments *experiment-id :results)
+                      (subselect ALL)]
+                     datasets-pstate-sym
+                     {:allow-yield? true}
+                     :> *results-tuples)
+      (into {} *results-tuples :> *results-map)
+      (select> [(subselect MAP-VALS :example-id) (view set)] *results-map :> *example-ids)
+      (example-fetch-batch-size :> *batch-size)
+      (partition *batch-size *batch-size [] *example-ids :> *chunks)
+      (select> [:experiment-info :snapshot] *experiment-props :> *snapshot)
+      (loop<- [*m {}
+               *chunks (seq *chunks)
+               :> *example-id->example]
+        (yield-if-overtime)
+        (<<if (nil? *chunks)
+          (:> *m)
+         (else>)
+          (first *chunks :> *chunk)
+          (apply multi-path (mapv keypath *chunk) :> *example-paths)
+          (path> (keypath *dataset-id :snapshots *snapshot)
+                 (subselect *example-paths)
+                 :> *query-path)
+          (<<if (is-remote-dataset? *remote-params)
+            (fetch-remote-examples (po/agent-declared-objects-task-global)
+                                   *remote-params
+                                   *query-path
+                                   :> *examples-cf)
+            (completable-future> *examples-cf :> *examples)
+           (else>)
+            (local-select> *query-path datasets-pstate-sym :> *examples))
+          (mapv vector *chunk *examples :> *pairs)
+          (continue> (into *m *pairs) (next *chunks))
+        ))
+      (assoc *experiment-props
+       :results (merge-examples-to-results *results-map *example-id->example)
+       :> *res)
+      (|origin))))
 
 
 ;; direct queries on PStates

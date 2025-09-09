@@ -3,6 +3,8 @@
   (:require
    [com.rpl.agent-o-rama.impl.types])
   (:import
+   [com.rpl.agentorama
+    AgentInvoke]
    [com.rpl.agentorama.impl
     AgentDeclaredObjectsTaskGlobal
     AgentNodeExecutorTaskGlobal
@@ -12,6 +14,7 @@
     AgentResult
     AggInput
     ExceptionSummary
+    ExperimentInputSelector
     ForkContext
     LinkedTrace
     NestedOpInfo
@@ -20,6 +23,7 @@
     Node
     NodeAgg
     NodeAggStart
+    StartExperiment
     StreamingChunk]
    [java.util
     UUID]))
@@ -76,17 +80,13 @@
   []
   "*_agent-datasets-depot")
 
-(defn evaluators-depot-name
+(defn global-actions-depot-name
   []
-  "*_agent-evaluators-depot")
+  "*_agent-global-actions-depot")
 
 (defn agents-clients-name
   []
   "*_agent-clients")
-
-(defn agent-graph-task-global-name
-  [agent-name]
-  (str "*_agent-graph-" agent-name))
 
 (defn agent-id-gen-task-global-name
   [name]
@@ -114,6 +114,15 @@
                           {:parent-agent-id Long
                            :fork-context    ForkContext})
      :forks              (set-schema Long {:subindex? true}) ; agent ids
+     :streaming          (map-schema
+                          String           ; node name
+                          (fixed-keys-schema
+                           {:all     (vector-schema StreamingChunk {:subindex? true})
+                            :invokes (map-schema
+                                      UUID ; invoke-id
+                                      Long ; index
+                                      {:subindex? true})})
+                          {:subindex? true})
     })})
 
 (defn agent-root-count-task-global-name
@@ -141,22 +150,6 @@
 
 (def AGENT-GC-ROOT-INVOKES-PSTATE-SCHEMA
   {UUID Object})
-
-(defn agent-streaming-results-task-global-name
-  [agent-name]
-  (str "$$_agent-streaming-" agent-name))
-
-(def AGENT-STREAMING-PSTATE-SCHEMA
-  {Long ; agent ID
-   (map-schema
-    String           ; node name
-    (fixed-keys-schema
-     {:all     (vector-schema StreamingChunk {:subindex? true})
-      :invokes (map-schema
-                UUID ; invoke-id
-                Long ; index
-                {:subindex? true})})
-    {:subindex? true})})
 
 (defn agent-node-task-global-name
   [agent-name]
@@ -224,13 +217,21 @@
 (def DATASETS-PSTATE-SCHEMA
   {UUID ; dataset-id
    (fixed-keys-schema
-    {:props     (fixed-keys-schema
-                 {:name              String
-                  :description       String
-                  :input-json-schema String
-                  :output-json-schema String
-                  :created-at        Long
-                  :modified-at       Long})
+    {:props       (fixed-keys-schema
+                   {;; only set if local dataset
+                    :name               String
+                    :description        String
+                    :input-json-schema  String
+                    :output-json-schema String
+
+                    ;; only set if remote dataset
+                    :cluster-conductor-host String
+                    :cluster-conductor-port Long
+                    :module-name        String
+
+                    ;; set for both
+                    :created-at         Long
+                    :modified-at        Long})
      :snapshots
      (map-schema
       String ; nil for latest
@@ -246,12 +247,41 @@
          :modified-at      Long
         })
        {:subindex? true})
-      {:subindex? true})}
-   )})
+      {:subindex? true})
+
+     :experiments
+     (map-schema
+      UUID
+      (fixed-keys-schema
+       {:experiment-info       StartExperiment
+        :experiment-invoke     AgentInvoke
+        :start-time-millis     Long
+        :finish-time-millis    Long
+        :results               (map-schema
+                                Long ; result ID
+                                ;; - agent invokes/results are keyed by their index in experiment
+                                ;; targets
+                                ;; - non-comparative experiment will have single one keyed at 0
+                                (fixed-keys-schema
+                                 {:example-id      UUID
+                                  :agent-initiates {Long (fixed-keys-schema
+                                                          {:agent-name   String
+                                                           :agent-invoke AgentInvoke})}
+                                  :agent-results   {Long Object}
+                                  :evals           {String {String Object}} ; eval-name->eval-key->result
+                                  :eval-failures   {String String}
+                                 })
+                                {:subindex? true})
+        :summary-evals         {String {String Object}}
+        :summary-eval-failures {String String}
+       })
+      {:subindex? true})
+    })})
 
 (defn evaluators-task-global-name
   []
   "$$_aor-evaluators")
+
 
 (def EVALUATORS-PSTATE-SCHEMA
   {String (fixed-keys-schema
@@ -299,7 +329,9 @@
 
 (defn agent-graph-task-global
   [name]
-  (declared-object-task-global (agent-graph-task-global-name name)))
+  (-> (agent-declared-objects-task-global)
+      .getAgentGraphs
+      (get name)))
 
 (defn agent-id-gen-task-global
   [name]
@@ -325,11 +357,6 @@
 (defn agent-gc-invokes-task-global
   [name]
   (this-module-pobject-task-global (agent-gc-invokes-task-global-name name)))
-
-(defn agent-streaming-results-task-global
-  [name]
-  (this-module-pobject-task-global (agent-streaming-results-task-global-name
-                                    name)))
 
 (defn agent-node-task-global
   [name]

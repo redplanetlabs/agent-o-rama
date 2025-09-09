@@ -65,7 +65,8 @@
 (defprotocol AgentNodeInternal
   (agent-node-state [this])
   (release-acquired-objects! [this])
-  (get-streaming-recorder [this]))
+  (get-streaming-recorder [this])
+  (get-declared-objects [this]))
 
 (defprotocol StreamingRecorderInternal
   (waitFinish [this]))
@@ -228,7 +229,6 @@
         ^com.rpl.rama.ModuleInstanceInfo module-instance-info
         (ops/module-instance-info)
 
-        this-module-name    (.getModuleName module-instance-info)
         streaming-depot     (.getAgentStreamingDepot rama-clients agent-name)
         human-depot         (.getAgentHumanDepot rama-clients agent-name)
         streaming-recorder  (mk-streaming-recorder agent-task-id
@@ -451,6 +451,8 @@
          ret
        ))
      AgentNodeInternal
+     (get-declared-objects [this]
+       declared-objects-tg)
      (get-streaming-recorder [this] streaming-recorder)
      (release-acquired-objects! [this]
        (release-acquired-objects! fetcher))
