@@ -96,6 +96,33 @@ Include REFINE to refine the spec
 
 	  check the deps.edn files too
 
+- [ ] Create user guide documentation in markdown format in
+      dev/user-guide/.  You can use multiple files.  This guide is
+      intended for human users of agent-o-rama.
+
+      There should be an Introduction, covering what agent-o-rama is.
+
+	  Then a step by step explanation of the concepts in agent-o-rama.
+      The concepts should first be explained independently of the
+      implementation.  language specific explanations may follow.  The
+      explanations should include code snippets if a appropriate.
+
+		- Use the glossary for concepts, and analyse the codebase to find out how the
+          concepts build on each other.
+
+		- see the @examples/clj/src/com/rpl/agent/basic examples to see
+		  how concepts build up.  Also @examples/clj/README.md.
+
+	Use a direct, conversational, and empowering style:
+  - Address the reader directly with "you/your"
+  - Use active verbs and concrete metaphors
+  - Keep sentences short and punchy
+  - Focus on what the reader gains or achieves
+  - Use colons to introduce lists or explanations
+  - Avoid academic jargon or overly formal language
+  - Be confident and declarative rather than tentative
+
+
 - [ ] update the aggregation-agent example to show the return value of
       agg-start node being passed as last arg to agg-node
 
