@@ -675,7 +675,7 @@
                                        "Delete")))))))))))))))
 
 (defn get-dataset-path [module-id dataset-id]
-  (rfe/href :module/dataset-detail.examples
+  (rfe/href :module/dataset-detail
             {:module-id module-id
              :dataset-id dataset-id}))
 
@@ -919,12 +919,10 @@
         decoded-module-id (when module-id (common/url-decode module-id))
         route-name (get-in match [:data :name])
 
-        ;; Determine active tab and content based on route name
-        [active-tab child-view] (case route-name
-                                  :module/dataset-detail.experiments ["experiments" experiments/index]
-                                  :module/dataset-detail.examples ["examples" detail-examples]
-                                  ;; Default to examples for the main dataset route
-                                  ["examples" detail-examples])
+        ;; Determine active tab based on route name
+        active-tab (if (str/includes? (name route-name) "experiments")
+                     "experiments"
+                     "examples")
 
         ;; State for info panel
         [show-info? set-show-info] (uix/use-state false)
@@ -1014,7 +1012,9 @@
                       :href (rfe/href :module/dataset-detail.examples {:module-id module-id :dataset-id dataset-id})}
                      "Examples")))
 
-            ;; Tab Content (rendered based on route)
+            ;; Tab Content (rendered by child routes)
             ($ :div.flex-1.min-h-0
-               ($ child-view {:match match})))
+               (if child-view
+                 ($ child-view {:match match}) ;; Render the child view!
+                 ($ :div.p-4 "Select a tab"))))
          :else ($ :div.p-6 "Dataset not found.")))))
