@@ -25,7 +25,9 @@
    [dev.langchain4j.web.search
     WebSearchRequest]
    [dev.langchain4j.web.search.tavily
-    TavilyWebSearchEngine]))
+    TavilyWebSearchEngine]
+   [java.time
+    Duration]))
 
 (def ANALYST-INSTRUCTIONS
   "You are tasked with creating a set of AI analyst personas. Follow these instructions carefully:
@@ -314,6 +316,7 @@ Here are the sections to reflect on for writing: %s")
   (-> (TavilyWebSearchEngine/builder)
       (.apiKey api-key)
       (.excludeDomains ["en.wikipedia.org"])
+      (.timeout (Duration/ofMinutes 1))
       .build))
 
 (defn tavily-search

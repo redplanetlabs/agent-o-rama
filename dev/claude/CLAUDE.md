@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 agent-o-rama is a framework for building parallel, scalable, and stateful AI agents in Java or Clojure. It's built on top of Red Planet Labs' Rama distributed computing platform and integrates with LangChain4j for AI model interactions.
 
+@dev/glossary.md
+
 ## Architecture
 
 The codebase is structured as a multi-language project:
@@ -153,3 +155,4 @@ To run an example:
 ; In the example namespace
 (run-agent)  ; Most examples provide this function
 ```
+- the project task list is in .claude/TASKS.md
