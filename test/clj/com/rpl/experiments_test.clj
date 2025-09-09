@@ -1578,6 +1578,10 @@
            1))
        ))
 
+     (bind matches-ids?
+       (fn [res ids]
+         (= ids (select [:items ALL :experiment-info :id] res))))
+
      (bind exp-id1 (run-comparative! "hello world"))
      (bind exp-id2 (run-regular! "hello you"))
      (bind exp-id3 (run-comparative! "what is rama"))
@@ -1586,17 +1590,72 @@
      (bind exp-id6 (run-regular! "rama hello"))
      (bind exp-id7 (run-regular! "world hello"))
      (bind exp-id8 (run-regular! "what"))
-     (bind exp-id9 (run-regular! "a b c"))
+     (bind exp-id9 (run-comparative! "a b c"))
      (bind exp-id10 (run-regular! "hello hello"))
 
-     (bind res (foreign-invoke-query search ds-id1 {} 2 nil))
+     (bind res (foreign-invoke-query search ds-id1 {} 3 nil))
+     (is (matches-ids? res [exp-id10 exp-id9 exp-id8]))
+     (bind res (foreign-invoke-query search ds-id1 {} 3 (:pagination-params res)))
+     (is (matches-ids? res [exp-id7 exp-id6 exp-id5]))
+     (bind res (foreign-invoke-query search ds-id1 {} 3 (:pagination-params res)))
+     (is (matches-ids? res [exp-id4 exp-id3 exp-id2]))
+     (bind res (foreign-invoke-query search ds-id1 {} 3 (:pagination-params res)))
+     (is (matches-ids? res [exp-id1]))
+     (is (nil? (:pagination-params res)))
 
-     (clojure.pprint/pprint res)
 
-     ;; TODO: <<<<>>>>
-     ;;  - test search and all filter types
-     ;;     - run experiments without any examples
-     ;;     - search string on id or name
-     ;;     - experiment type
-     ;;     - time filters
+     (bind res (foreign-invoke-query search ds-id1 {:search-string "hello"} 2 nil))
+     (is (matches-ids? res [exp-id10 exp-id7]))
+     (bind res
+       (foreign-invoke-query search ds-id1 {:search-string "hello"} 2 (:pagination-params res)))
+     (is (matches-ids? res [exp-id6 exp-id4]))
+     (bind res
+       (foreign-invoke-query search ds-id1 {:search-string "hello"} 2 (:pagination-params res)))
+     (is (matches-ids? res [exp-id2 exp-id1]))
+     (bind res
+       (foreign-invoke-query search ds-id1 {:search-string "hello"} 2 (:pagination-params res)))
+     (is (matches-ids? res []))
+     (is (nil? (:pagination-params res)))
+
+     (bind res (foreign-invoke-query search ds-id1 {:search-string (str exp-id5)} 2 nil))
+     (is (matches-ids? res [exp-id5]))
+     (is (nil? (:pagination-params res)))
+
+
+     (bind res (foreign-invoke-query search ds-id1 {:type ComparativeExperiment} 2 nil))
+     (is (matches-ids? res [exp-id9 exp-id4 exp-id3]))
+     (bind res
+       (foreign-invoke-query search
+                             ds-id1
+                             {:type ComparativeExperiment}
+                             2
+                             (:pagination-params res)))
+     (is (matches-ids? res [exp-id1]))
+     (is (nil? (:pagination-params res)))
+
+     (bind res
+       (foreign-invoke-query search
+                             ds-id1
+                             {:type ComparativeExperiment :search-string "hello"}
+                             2
+                             nil))
+     (is (matches-ids? res [exp-id4 exp-id1]))
+     (bind res
+       (foreign-invoke-query search
+                             ds-id1
+                             {:type ComparativeExperiment :search-string "hello"}
+                             2
+                             (:pagination-params res)))
+     (is (matches-ids? res []))
+     (is (nil? (:pagination-params res)))
+
+
+     (bind res
+       (foreign-invoke-query search
+                             ds-id1
+                             {:times [{:pred >= :value 1000} {:pred <= :value 4000}]}
+                             10
+                             nil))
+     (is (matches-ids? res [exp-id5 exp-id4 exp-id3 exp-id2]))
+     (is (nil? (:pagination-params res)))
     )))

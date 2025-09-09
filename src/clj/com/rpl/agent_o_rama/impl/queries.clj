@@ -554,6 +554,10 @@
   (vswap! v conj item))
 
 
+(defn next-search-key
+  [m reverse?]
+  (if reverse? (h/first-key m) (h/last-key m)))
+
 (deframaop search-loop
   [$$p *map-path %filter *limit *next-key *reverse?]
   (ramafn> %filter)
@@ -583,13 +587,10 @@
       (:> nil)
 
      (case> (>= (count @*results) *limit))
-      (<<if *reverse?
-        (:> (h/first-key *m))
-       (else>)
-        (:> (h/last-key *m)))
+      (:> (next-search-key *m *reverse?))
 
      (default>)
-      (continue> (h/last-key *m))))
+      (continue> (next-search-key *m *reverse?))))
   (:> @*results *page-key))
 
 ;; accepts filters :source, :tag, and search-string (looks for match within
@@ -724,7 +725,7 @@
         (get *experiment-info :name :> *name)
         (get *experiment-info :spec :> *spec)
         (<<cond
-         (case> (and> (some? *type) (not (instance? *spec *type))))
+         (case> (and> (some? *type) (not (instance? *type *spec))))
           (:> nil nil)
 
          (case> (and> (some? *search-string-lower)
