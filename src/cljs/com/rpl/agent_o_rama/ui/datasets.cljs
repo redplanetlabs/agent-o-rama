@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.datasets-forms :as datasets-forms]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
+   [com.rpl.agent-o-rama.ui.experiments.index :as experiments]
    [reitit.frontend.easy :as rfe]
    [clojure.string :as str]
    [com.rpl.specter :as s]))
@@ -947,9 +948,8 @@
             ($ :div.flex-1.min-h-0
                (case active-tab
                  "experiments"
-                 ($ :div.flex.items-center.justify-center.h-full
-                    ($ :div.text-center.text-gray-500
-                       ($ :p "Experiments functionality coming soon.")))
+                 ($ experiments/index {:module-id decoded-module-id
+                                       :dataset-id dataset-id})
 
                  "examples"
                  ($ :div.h-full.flex.flex-col

@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.impl.ui.handlers.datasets]
    [com.rpl.agent-o-rama.impl.ui.handlers.evaluators]
    [com.rpl.agent-o-rama.impl.ui.handlers.invocations]
+   [com.rpl.agent-o-rama.impl.ui.handlers.experiments]
    [ring.util.response :as resp]
    [ring.middleware.resource :as resource]
    [ring.middleware.file :as ring-file]
