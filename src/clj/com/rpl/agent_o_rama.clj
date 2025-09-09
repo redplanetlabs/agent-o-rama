@@ -637,6 +637,14 @@
                       (i/mk-failure-exception result exceptions))
                      (.complete cf (:val result))))
                ))))
+
+          (isAgentInvokeComplete [this agent-invoke]
+            (let [agent-task-id (.getTaskId agent-invoke)
+                  agent-id      (.getAgentInvokeId agent-invoke)]
+              (foreign-select-one [(keypath agent-id) :result (view some?)]
+                                  root-pstate
+                                  {:pkey agent-task-id})))
+
           (stream [this agent-invoke node]
             (.stream this agent-invoke node nil))
           (stream [this agent-invoke node stream-callback]
@@ -1010,6 +1018,10 @@
 (defn agent-result-async
   ^CompletableFuture [agent-client agent-invoke]
   (c/agent-result-async agent-client agent-invoke))
+
+(defn agent-invoke-complete?
+  [^AgentClient agent-client agent-invoke]
+  (.isAgentInvokeComplete agent-client agent-invoke))
 
 (defn agent-stream
   (^AgentStream [^AgentClient agent-client agent-invoke node]
