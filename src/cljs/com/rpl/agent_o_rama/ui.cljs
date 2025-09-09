@@ -70,7 +70,9 @@
      #(do
         (reset! router-instance router)
         (rfe/start! router
-                    (fn [new-match] (state/dispatch [:route/navigated new-match]))
+                    (fn [new-match]
+                      (println "reitit navigated match:" new-match)
+                      (state/dispatch [:route/navigated new-match]))
                     {:use-fragment false}))
      [router])
     ($ :<> children)))
@@ -294,11 +296,13 @@
 
 (defui RouterComponent []
   (let [match (state/use-sub [:route])
+        _ (println "RouterComponent render match:" match)
         view (get-in match [:data :view])]
     (if view
       ($ view {:match match}) ;; Pass the whole match down to components
       ;; 404 component
       ($ :div.p-8.text-center "Route not found"))))
+
 
 ;; =============================================================================
 ;; MAIN APP COMPONENT
