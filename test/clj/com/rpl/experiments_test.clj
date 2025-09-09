@@ -1487,13 +1487,109 @@
       ))))
 
 (deftest search-experiments-test
-         ;; TODO: <<<<>>>>
-         ;;  - test search and all filter types
-         ;;     - run experiments without any examples
-         ;;     - search string
-         ;;     - experiment type
-         ;;     - time filters
-         ; (bind search
-         ;   (foreign-query ipc module-name (queries/search-experiments-name)))
+  (with-open [ipc (rtest/create-ipc)
+              _ (TopologyUtils/startSimTime)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (aor/declare-comparative-evaluator-builder
+         topology
+         "ccount"
+         ""
+         (fn [params]
+           (fn [fetcher input ref-output outputs]
+             {"res" (count outputs)})))
+        (-> topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node arg]
+               (aor/result! agent-node (str arg "!")))
+            ))))
+     (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+     (bind module-name (get-module-name module))
+     (bind manager (aor/agent-manager ipc module-name))
+     (bind exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME))
+     (bind global-actions-depot
+       (foreign-depot ipc module-name (po/global-actions-depot-name)))
+     (bind search
+       (foreign-query ipc module-name (queries/search-experiments-name)))
 
-)
+     (aor/create-evaluator! manager
+                            "concise2"
+                            "aor/conciseness"
+                            {"threshold" "2"}
+                            "")
+     (aor/create-evaluator! manager "ccount" "ccount" {} "")
+
+     (bind ds-id1 (aor/create-dataset! manager "Dataset 1"))
+     (add-example-and-wait! manager ds-id1 "aa")
+
+     (bind run-experiment!
+       (fn [exp]
+         (let [exp-id (h/random-uuid7)
+
+               {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+               (foreign-append! global-actions-depot exp)]
+           (wait-experiment-finished! exp-client exp-invoke)
+           exp-id
+         )))
+
+     (bind run-regular!
+       (fn [desc]
+         (run-experiment!
+          (aor-types/->valid-StartExperiment
+           exp-id
+           desc
+           ds-id1
+           nil
+           nil
+           [(aor-types/->valid-EvaluatorSelector "concise2" false)]
+           (aor-types/->valid-RegularExperiment
+            (aor-types/->valid-ExperimentTarget
+             (aor-types/->valid-AgentTarget "foo")
+             ["$"]))
+           1
+           1))
+       ))
+
+     (bind run-comparative!
+       (fn [desc]
+         (run-experiment!
+          (aor-types/->valid-StartExperiment
+           exp-id
+           desc
+           ds-id1
+           nil
+           nil
+           [(aor-types/->valid-EvaluatorSelector "ccount" false)]
+           (aor-types/->valid-ComparativeExperiment
+            [(aor-types/->valid-ExperimentTarget
+              (aor-types/->valid-AgentTarget "foo")
+              ["$"])
+             (aor-types/->valid-ExperimentTarget
+              (aor-types/->valid-AgentTarget "foo")
+              ["$"])])
+           1
+           1))
+       ))
+
+     (bind exp-id1 (run-comparative! "hello world"))
+     (TopologyUtils/advanceSimTime 1000)
+     (bind exp-id2 (run-regular! "hello you"))
+     (TopologyUtils/advanceSimTime 1000)
+     (bind exp-id3 (run-comparative! "what is rama"))
+     (TopologyUtils/advanceSimTime 1000)
+     (bind exp-id4 (run-comparative! "hello"))
+     (TopologyUtils/advanceSimTime 1000)
+     (bind exp-id5 (run-regular! "rama"))
+
+     ;; TODO: <<<<>>>>
+     ;;  - test search and all filter types
+     ;;     - run experiments without any examples
+     ;;     - search string on id or name
+     ;;     - experiment type
+     ;;     - time filters
+    )))
