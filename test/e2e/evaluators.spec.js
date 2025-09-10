@@ -6,6 +6,25 @@ import { randomUUID } from 'crypto';
 // =============================================================================
 
 /**
+ * Gets the agent row for the research agent module.
+ * @param {import('@playwright/test').Page} page - The Playwright page object.
+ * @returns {Promise<import('@playwright/test').Locator>} The agent row locator.
+ */
+async function getResearchAgentRow(page) {
+  const moduleNs = 'com.rpl.agent.research-agent';
+  const moduleName = 'ResearchAgentModule';
+  const agentName = 'researcher';
+
+  const agentRow = page.locator('table tbody tr').filter({ hasText: moduleNs }).filter({ hasText: moduleName }).filter({ hasText: agentName });
+  
+  // Wait up to 30 seconds for the agent to appear. The first load can be slow.
+  await expect(agentRow).toBeVisible({ timeout: 30000 });
+  console.log(`Found agent: ${moduleNs}/${moduleName}:${agentName}`);
+  
+  return agentRow;
+}
+
+/**
  * Creates an evaluator via the UI.
  * @param {import('@playwright/test').Page} page - The Playwright page object.
  * @param {string} name - The unique name for the evaluator.
@@ -80,10 +99,7 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
   await page.goto('/');
   await expect(page).toHaveTitle(/Agent-o-rama/);
 
-  const moduleName = 'com.rpl.agent.research-agent';
-  const agentName = 'ResearchAgentModule';
-  const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
-  await expect(agentRow).toBeVisible({ timeout: 30000 });
+  const agentRow = await getResearchAgentRow(page);
   await agentRow.click();
   await expect(page).toHaveURL(new RegExp(`/agents/.*researcher`));
   console.log('--- Test Setup Complete ---');
