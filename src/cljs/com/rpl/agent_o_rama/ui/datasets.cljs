@@ -913,9 +913,8 @@
 ;; DATASET DETAIL LAYOUT COMPONENT
 ;; =============================================================================
 
-(defui detail [{:keys [match]}]
-  (let [child-view (get-in match [:data :view])
-        {:keys [module-id dataset-id]} (get-in match [:path-params])
+(defui detail [{:keys [match child-component]}] ;; Note `child-component`
+  (let [{:keys [module-id dataset-id]} (get-in match [:path-params])
         decoded-module-id (when module-id (common/url-decode module-id))
         route-name (get-in match [:data :name])
 
@@ -942,7 +941,7 @@
          error ($ :div.p-6 "Error: " error)
          dataset
          ($ :div.h-full.flex.flex-col
-            ;; Header Bar
+            ;; Header Bar for the whole dataset page
             ($ :div.bg-white.px-6.py-4
                ($ :div.flex.items-center.justify-between
                   ;; Left side - Title and info
@@ -960,7 +959,7 @@
                   ;; Right side - removed snapshot manager and add example button
                   ($ :div.flex.items-center.space-x-4)))
 
-            ;; Info Panel (collapsible)
+            ;; Collapsible info panel
             (when show-info?
               ($ :div.bg-blue-50.border-b.border-blue-200.px-6.py-4
                  ($ :div.space-y-4
@@ -993,28 +992,23 @@
                                  ($ :div.text-xs.bg-gray-100.p-2.rounded.text-gray-500.italic
                                     "Schema: nil")))))))))
 
-            ;; Tab Navigation (NOW USES href LINKS)
+            ;; Tab navigation bar
             ($ :div.bg-white.border-b.border-gray-200
-               ($ :nav.flex.space-x-8.px-6 {:aria-label "Tabs"}
-                  ;; Experiments Tab
-                  ($ :a
-                     {:className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
-                                            {"border-indigo-500 text-indigo-600" (= active-tab "experiments")
-                                             "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "experiments")})
-                      :href (rfe/href :module/dataset-detail.experiments {:module-id module-id :dataset-id dataset-id})}
+               ($ :nav.flex.space-x-8.px-6
+                  ($ :a {:href (rfe/href :module/dataset-detail.experiments {:module-id module-id, :dataset-id dataset-id}),
+                         :className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
+                                               {"border-indigo-500 text-indigo-600" (= active-tab "experiments")
+                                                "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "experiments")})}
                      "Experiments")
-
-                  ;; Examples Tab
-                  ($ :a
-                     {:className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
-                                            {"border-indigo-500 text-indigo-600" (= active-tab "examples")
-                                             "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "examples")})
-                      :href (rfe/href :module/dataset-detail.examples {:module-id module-id :dataset-id dataset-id})}
+                  ($ :a {:href (rfe/href :module/dataset-detail.examples {:module-id module-id, :dataset-id dataset-id}),
+                         :className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
+                                               {"border-indigo-500 text-indigo-600" (= active-tab "examples")
+                                                "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "examples")})}
                      "Examples")))
 
-            ;; Tab Content (rendered by child routes)
+            ;; Content area where the child component is rendered
             ($ :div.flex-1.min-h-0
-               (if child-view
-                 ($ child-view {:match match}) ;; Render the child view!
-                 ($ :div.p-4 "Select a tab"))))
+               (if child-component
+                 ($ child-component {:match match}) ;; <-- THE MAGIC! Render the child.
+                 ($ :div.p-4 "Select a tab to view content."))))
          :else ($ :div.p-6 "Dataset not found.")))))

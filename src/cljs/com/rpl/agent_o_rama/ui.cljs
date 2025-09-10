@@ -30,32 +30,55 @@
 ;; ROUTE DEFINITIONS
 ;; =============================================================================
 
+;; =============================================================================
+;; MAIN LAYOUT COMPONENT
+;; =============================================================================
+
+(defui main-layout [{:keys [match child-component]}]
+  ($ :div.flex.h-screen.bg-gray-50
+     ($ sidebar-nav)
+     ($ :div.flex-1.flex.flex-col.min-h-0
+        ($ breadcrumb)
+        ($ :div.flex-1.overflow-auto
+           (if child-component
+             ($ child-component {:match match})
+             "Page content missing"))
+        ($ global-modal-component))))
+
+;; =============================================================================
+;; ROUTE DEFINITIONS
+;; ============================================================================= 
+
 (def routes
-  ["/"
-   ["" {:name :home, :view agents/index}]
-   ["agents"
-    ["" {:name :agents/index, :view agents/index}]
+  ["" {:data {:views [main-layout]}}
+   ["/" {:name :home, :data {:views [agents/index]}}]
+   ["/agents"
+    ["" {:name :agents/index, :data {:views [agents/index]}}]
     ["/:module-id"
-     ;; Module-level routes with literal segments FIRST
      ["/datasets"
-      ["" {:name :module/datasets, :view datasets/index}]
+      ["" {:name :module/datasets, :data {:views [datasets/index]}}]
       ["/:dataset-id"
-       ;; Parent route for dataset detail layout
-       {:name :module/dataset-detail}
-       ;; Default child route - redirects to examples
-       ["" {:name :module/dataset-detail.index, :view datasets/detail-examples}]
-       ;; Explicit child routes for tabs
-       ["/examples" {:name :module/dataset-detail.examples, :view datasets/detail-examples}]
-       ["/experiments" {:name :module/dataset-detail.experiments, :view experiments/index}]]]
-     ["/evaluations" {:name :module/evaluations, :view evaluators/index}]
-     ;; Agent routes with prefix to avoid conflicts
+       {:name :module/dataset-detail,
+        :data {:views [datasets/detail]}} ;; The layout/shell component
+
+       ;; Default route: redirect to examples
+       ["" {:handler (fn [match] (rfe/redirect! :module/dataset-detail.examples (:path-params match)))}]
+
+       ["/examples"
+        {:name :module/dataset-detail.examples,
+         :data {:views [datasets/detail-examples]}}]
+
+       ["/experiments"
+        {:name :module/dataset-detail.experiments,
+         :data {:views [experiments/index]}}]]]
+     ["/evaluations" {:name :module/evaluations, :data {:views [evaluators/index]}}]
      ["/agent/:agent-name"
-      ["" {:name :agent/detail, :view agents/agent}]
+      ["" {:name :agent/detail, :data {:views [agents/agent]}}]
       ["/invocations"
-       ["" {:name :agent/invocations, :view agents/invocations}]
-       ["/:invoke-id" {:name :agent/invocation-detail, :view agents/invoke}]]
-      ["/config" {:name :agent/config, :view config-page/config-page}]
-      ["/stats" {:name :agent/stats, :view stats/stats}]]]]])
+       ["" {:name :agent/invocations, :data {:views [agents/invocations]}}]
+       ["/:invoke-id" {:name :agent/invocation-detail, :data {:views [agents/invoke]}}]]
+      ["/config" {:name :agent/config, :data {:views [config-page/config-page]}}]
+      ["/stats" {:name :agent/stats, :data {:views [stats/stats]}}]]]]])
 
 ;; Store router instance globally for navigation
 (defonce router-instance (atom nil))
@@ -296,31 +319,32 @@
 
 (defui RouterComponent []
   (let [match (state/use-sub [:route])
-        _ (println "RouterComponent render match:" match)
-        view (get-in match [:data :view])]
-    (if view
-      ($ view {:match match}) ;; Pass the whole match down to components
-      ;; 404 component
-      ($ :div.p-8.text-center "Route not found"))))
+        view-stack (get-in match [:data :views] [])
 
+        ;; This is our nesting renderer based on the view stack
+        app-component (reduce-right
+                       (fn [child-component parent-component]
+                         (fn [props] ; Return a new function that renders the parent with the child
+                           ($ parent-component (merge props {:child-component child-component}))))
+                       nil ;; Start with no child
+                       view-stack)]
+
+    (if app-component
+      ($ app-component {:match match})
+      ($ :div.p-8.text-center "Route not found"))))
 
 ;; =============================================================================
 ;; MAIN APP COMPONENT
 ;; =============================================================================
 
 (defui app []
-  ($ :div.flex.h-screen.bg-gray-50
-     ($ sidebar-nav)
-     ($ :div.flex-1.flex.flex-col.min-h-0
-        ($ breadcrumb)
-        ($ :div.flex-1.overflow-auto
-           ($ RouterComponent))
-        ($ global-modal-component))))
+  ;; App now becomes a simple wrapper for our router setup
+  ($ with-router {:routes routes}
+     ($ RouterComponent)))
 
 (defn init []
   (sente/init!)
   (uix.dom/render-root
-   ($ with-router {:routes routes}
-      ($ app))
+   ($ app)
    (uix.dom/create-root
     (.getElementById js/document "root"))))
