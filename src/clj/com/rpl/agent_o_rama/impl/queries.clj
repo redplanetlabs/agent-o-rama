@@ -680,7 +680,7 @@
           (:> nil nil)
 
          (default>)
-          (:> (assoc *info {:name *name :type *type}) nil)))
+           (:> (assoc *info :name *name :type *type) nil)))
       (search-loop evals-pstate-sym
                    STAY
                    %filter
