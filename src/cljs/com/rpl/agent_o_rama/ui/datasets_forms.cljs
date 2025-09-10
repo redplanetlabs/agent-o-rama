@@ -56,23 +56,56 @@
                             :error (:error output-schema-field)
                             :placeholder example-schema}))))
 
+;; =============================================================================
+;; NEW: REG-FORM SPECIFICATIONS
+;; =============================================================================
+
+(forms/reg-form
+ :create-dataset
+ {:steps [:main]
+  
+  :main
+  {:initial-fields (fn [props] 
+                      {:name ""
+                       :description ""
+                       :input-schema ""
+                       :output-schema ""})
+   
+   :validators {:name [forms/required]
+                :input-schema [forms/valid-json]
+                :output-schema [forms/valid-json]}
+   
+   :ui (fn [{:keys [form-id]}] 
+         ($ CreateDatasetForm {:form-id form-id}))
+   
+   :modal-props {:title "Create New Dataset"
+                 :submit-text "Create Dataset"}
+
+  :on-submit
+  (fn [db {:keys [form-id form-fields props]}]
+    (let [{:keys [module-id]} props
+          {:keys [name description input-schema output-schema]} form-fields]
+      (sente/request!
+       [:datasets/create {:module-id module-id
+                          :name name
+                          :description description
+                          :input-schema input-schema
+                          :output-schema output-schema}]
+       15000
+       (fn [reply]
+         (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+         (if (:success reply)
+           (do
+             (state/dispatch [:modal/hide])
+             (let [decoded-module-id (when module-id (common/url-decode module-id))]
+               (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}]))
+             (state/dispatch [:form/clear form-id]))
+           (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))}})
+
 (defn show-create-dataset-modal!
   "Shows the create dataset modal."
   [module-id]
-  (state/dispatch [:form/init :create-dataset
-                   {:fields {:name ""
-                             :description ""
-                             :input-schema ""
-                             :output-schema ""}
-                    :validators {:name [forms/required]
-                                 :input-schema [forms/valid-json]
-                                 :output-schema [forms/valid-json]}
-                    :submit-event [:dataset/create {:module-id module-id}]}])
-  (state/dispatch [:modal/show :create-dataset
-                   {:title "Create New Dataset"
-                    :form-id :create-dataset
-                    :submit-text "Create Dataset"
-                    :component ($ CreateDatasetForm {:form-id :create-dataset})}]))
+  (state/dispatch [:modal/show-form :create-dataset {:module-id module-id}]))
 
 (def edit-dataset-form-spec
   {:fields {:name ""

@@ -276,34 +276,6 @@
 ;; DATASET FORM EVENTS
 ;; =============================================================================
 
-(state/reg-event :dataset/create
-                 (fn [db {:keys [module-id form-fields]}]
-                   ;; Extract form data
-                   (let [name (get form-fields :name "")
-                         description (get form-fields :description "")
-                         input-schema (get form-fields :input-schema "")
-                         output-schema (get form-fields :output-schema "")]
-
-                     ;; Use the correct form-id for state updates
-                     (let [form-id :create-dataset]
-                       (sente/request!
-                        [:datasets/create {:module-id module-id
-                                           :name name
-                                           :description description
-                                           :input-schema input-schema
-                                           :output-schema output-schema}]
-                        15000
-                        (fn [reply]
-                          (state/dispatch [:form/set-submitting form-id false])
-                          (if (:success reply)
-                            (do
-                              (state/dispatch [:modal/hide])
-                              ;; Invalidate datasets query to trigger refetch
-                              (let [decoded-module-id (when module-id (common/url-decode module-id))]
-                                (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}]))
-                              (state/dispatch [:form/clear form-id])) ;; Clear form state on success
-                            (state/dispatch [:form/set-error form-id (:error reply)]))))))
-                   nil))
 
 (state/reg-event :dataset/edit
                  (fn [db {:keys [module-id dataset-id initial-name initial-description form-fields]}]
