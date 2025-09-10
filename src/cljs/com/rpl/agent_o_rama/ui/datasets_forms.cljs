@@ -101,11 +101,6 @@
              (state/dispatch [:form/clear form-id]))
            (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
 
-(defn show-create-dataset-modal!
-  "Shows the create dataset modal."
-  [module-id]
-  (state/dispatch [:modal/show-form :create-dataset {:module-id module-id}]))
-
 (def edit-dataset-form-spec
   {:fields {:name ""
             :description ""}
