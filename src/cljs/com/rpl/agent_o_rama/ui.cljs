@@ -50,26 +50,26 @@
 ;; ============================================================================= 
 
 (def routes
-  ["" {:data {:views [main-layout]}}
-   ["/" {:name :home, :data {:views [agents/index]}}]
+  ["" {:views [main-layout]}
+   ["/" {:name :home, :views [agents/index]}]
    ["/agents"
-    ["" {:name :agents/index, :data {:views [agents/index]}}]
+    ["" {:name :agents/index, :views [agents/index]}]
     ["/:module-id"
      ["/datasets"
-      ["" {:name :module/datasets, :data {:views [datasets/index]}}]
+      ["" {:name :module/datasets, :views [datasets/index]}]
       ["/:dataset-id"
-       {:name :module/dataset-detail, :data {:views [datasets/detail]}}
-       ["" {:name :module/dataset-detail.index, :data {:views [datasets/detail-examples]}}]
-       ["/examples" {:name :module/dataset-detail.examples, :data {:views [datasets/detail-examples]}}]
-       ["/experiments" {:name :module/dataset-detail.experiments, :data {:views [experiments/index]}}]]]
-     ["/evaluations" {:name :module/evaluations, :data {:views [evaluators/index]}}]
+       {:name :module/dataset-detail, :views [datasets/detail]}
+       ["" {:name :module/dataset-detail.index, :views [datasets/detail-examples]}]
+       ["/examples" {:name :module/dataset-detail.examples, :views [datasets/detail-examples]}]
+       ["/experiments" {:name :module/dataset-detail.experiments, :views [experiments/index]}]]]
+     ["/evaluations" {:name :module/evaluations, :views [evaluators/index]}]
      ["/agent/:agent-name"
-      ["" {:name :agent/detail, :data {:views [agents/agent]}}]
+      ["" {:name :agent/detail, :views [agents/agent]}]
       ["/invocations"
-       ["" {:name :agent/invocations, :data {:views [agents/invocations]}}]
-       ["/:invoke-id" {:name :agent/invocation-detail, :data {:views [agents/invoke]}}]]
-      ["/config" {:name :agent/config, :data {:views [config-page/config-page]}}]
-      ["/stats" {:name :agent/stats, :data {:views [stats/stats]}}]]]]])
+       ["" {:name :agent/invocations, :views [agents/invocations]}]
+       ["/:invoke-id" {:name :agent/invocation-detail, :views [agents/invoke]}]]
+      ["/config" {:name :agent/config, :views [config-page/config-page]}]
+      ["/stats" {:name :agent/stats, :views [stats/stats]}]]]]])
 
 ;; Store router instance globally for navigation
 (defonce router-instance (atom nil))
