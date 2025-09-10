@@ -224,13 +224,83 @@
 ;; BULK OPERATION MODALS
 ;; =============================================================================
 
-(def add-tag-form-spec
-  {:fields {:tag-name ""}
+(forms/reg-form
+ :add-tag-to-selected
+ {:steps [:main]
+  :main
+  {:initial-fields (fn [_props] {:tag-name ""})
    :validators {:tag-name [forms/required]}
-   :submit-event [:dataset/add-tag-to-selected]})
+   :ui (fn [{:keys [form-id]}]
+         ($ AddTagForm {:form-id form-id}))
+   :modal-props {:title "Add Tag to examples"
+                 :submit-text "Add Tag"}}
+  :on-submit
+  (fn [db {:keys [form-id form-fields props]}]
+    (let [{:keys [module-id dataset-id snapshot-name example-ids]} props
+          {:keys [tag-name]} form-fields]
+      (println "running!")
+      (sente/request!
+       [:datasets/add-tag-to-examples {:module-id module-id
+                                       :dataset-id dataset-id
+                                       :snapshot-name snapshot-name
+                                       :example-ids (vec example-ids)
+                                       :tag tag-name}]
+       15000
+       (fn [reply]
+         (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+         (if (:success reply)
+           (do
+             (state/dispatch [:modal/hide])
+             (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
+             (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+             (state/dispatch [:form/clear form-id]))
+           (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
+
+(defn show-add-tag-modal! [props]
+  (state/dispatch [:modal/show-form :add-tag-to-selected props]))
+
+(forms/reg-form
+ :remove-tag-from-selected
+ {:steps [:main]
+  :main
+  {:initial-fields (fn [_props] {:tag-name ""})
+   :validators {:tag-name [forms/required]}
+   :ui (fn [{:keys [form-id props]}]
+         ;; The UI for this form needs the list of selected examples to populate the dropdown.
+         ($ RemoveTagForm {:form-id form-id
+                           :selected-examples (:selected-examples props)}))
+   :modal-props {:title "Remove Tag from examples"
+                 :submit-text "Remove Tag"}}
+  :on-submit
+  (fn [db {:keys [form-id form-fields props]}]
+    (let [{:keys [module-id dataset-id snapshot-name example-ids]} props
+          {:keys [tag-name]} form-fields]
+      (sente/request!
+       [:datasets/remove-tag-from-examples {:module-id module-id
+                                            :dataset-id dataset-id
+                                            :snapshot-name snapshot-name
+                                            :example-ids (vec example-ids)
+                                            :tag tag-name}]
+       15000
+       (fn [reply]
+         (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+         (if (:success reply)
+           (do
+             (state/dispatch [:modal/hide])
+             (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
+             (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+             (state/dispatch [:form/clear form-id]))
+           (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
+
+(defn show-remove-tag-modal! [props]
+  (state/dispatch [:modal/show-form :remove-tag-from-selected props]))
+
+;; DELETED: The old specs are no longer needed.
+;; (def add-tag-form-spec ...)
+;; (def remove-tag-form-spec ...)
 
 (defui AddTagForm [{:keys [form-id]}]
-  (let [{:keys [error]} (forms/use-centralized-form form-id)
+  (let [{:keys [field-errors]} (forms/use-form form-id)
         tag-name-field (forms/use-form-field form-id :tag-name)]
 
     ($ forms/form
@@ -240,27 +310,8 @@
                             :error (:error tag-name-field)
                             :required? true}))))
 
-(defn show-add-tag-modal! [module-id dataset-id snapshot-name example-ids]
-  (state/dispatch [:form/init :add-tag-to-selected
-                   (-> add-tag-form-spec
-                       (assoc :submit-event [:dataset/add-tag-to-selected
-                                             {:module-id module-id
-                                              :dataset-id dataset-id
-                                              :snapshot-name snapshot-name
-                                              :example-ids example-ids}]))])
-  (state/dispatch [:modal/show :add-tag-to-selected
-                   {:title (str "Add Tag to " (count example-ids) " Examples")
-                    :form-id :add-tag-to-selected
-                    :submit-text "Add Tag"
-                    :component ($ AddTagForm {:form-id :add-tag-to-selected})}]))
-
-(def remove-tag-form-spec
-  {:fields {:tag-name ""}
-   :validators {:tag-name [forms/required]}
-   :submit-event [:dataset/remove-tag-from-selected]})
-
 (defui RemoveTagForm [{:keys [form-id selected-examples]}]
-  (let [{:keys [error]} (forms/use-centralized-form form-id)
+  (let [{:keys [field-errors]} (forms/use-form form-id)
         tag-name-field (forms/use-form-field form-id :tag-name)
 
         ;; Get all unique tags from selected examples
@@ -275,27 +326,12 @@
           ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tag to remove")
           ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.focus:outline-none.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
              {:value (:value tag-name-field)
-              :onChange #((:on-change tag-name-field) (.. % -target -value))}
+              :onChange (:on-change tag-name-field)}
              ($ :option {:value ""} "Select a tag to remove...")
              (for [tag all-tags]
                ($ :option {:key tag :value tag} tag)))
-          (when (:error tag-name-field)
-            ($ :div.text-sm.text-red-600.mt-1 (:error tag-name-field)))))))
-
-(defn show-remove-tag-modal! [module-id dataset-id snapshot-name example-ids selected-examples]
-  (state/dispatch [:form/init :remove-tag-from-selected
-                   (-> remove-tag-form-spec
-                       (assoc :submit-event [:dataset/remove-tag-from-selected
-                                             {:module-id module-id
-                                              :dataset-id dataset-id
-                                              :snapshot-name snapshot-name
-                                              :example-ids example-ids}]))])
-  (state/dispatch [:modal/show :remove-tag-from-selected
-                   {:title (str "Remove Tag from " (count example-ids) " Examples")
-                    :form-id :remove-tag-from-selected
-                    :submit-text "Remove Tag"
-                    :component ($ RemoveTagForm {:form-id :remove-tag-from-selected
-                                                 :selected-examples selected-examples})}]))
+          (when (:error field-errors)
+            ($ :div.text-sm.text-red-600.mt-1 (:error field-errors)))))))
 
 (defn handle-delete-selected! [module-id dataset-id snapshot-name example-ids]
   (when (js/confirm (str "Are you sure you want to delete " (count example-ids) " selected examples? This action cannot be undone."))

@@ -375,50 +375,6 @@
 ;; BULK OPERATION EVENTS
 ;; =============================================================================
 
-(state/reg-event :dataset/add-tag-to-selected
-                 (fn [db {:keys [module-id dataset-id snapshot-name example-ids form-fields]}]
-                   (let [tag-name (get form-fields :tag-name)
-                         form-id :add-tag-to-selected]
-                     (sente/request!
-                      [:datasets/add-tag-to-examples {:module-id module-id
-                                                      :dataset-id dataset-id
-                                                      :snapshot-name snapshot-name
-                                                      :example-ids (vec example-ids)
-                                                      :tag tag-name}]
-                      15000
-                      (fn [reply]
-                        (state/dispatch [:form/set-submitting form-id false])
-                        (if (:success reply)
-                          (do
-                            (state/dispatch [:modal/hide])
-                            (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
-                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                            (state/dispatch [:form/clear form-id]))
-                          (state/dispatch [:form/set-error form-id (:error reply)]))))
-                     nil)))
-
-(state/reg-event :dataset/remove-tag-from-selected
-                 (fn [db {:keys [module-id dataset-id snapshot-name example-ids form-fields]}]
-                   (let [tag-name (get form-fields :tag-name)
-                         form-id :remove-tag-from-selected]
-                     (sente/request!
-                      [:datasets/remove-tag-from-examples {:module-id module-id
-                                                           :dataset-id dataset-id
-                                                           :snapshot-name snapshot-name
-                                                           :example-ids (vec example-ids)
-                                                           :tag tag-name}]
-                      15000
-                      (fn [reply]
-                        (state/dispatch [:form/set-submitting form-id false])
-                        (if (:success reply)
-                          (do
-                            (state/dispatch [:modal/hide])
-                            (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
-                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                            (state/dispatch [:form/clear form-id]))
-                          (state/dispatch [:form/set-error form-id (:error reply)]))))
-                     nil)))
-
 (state/reg-event :dataset/delete-selected
                  (fn [db {:keys [module-id dataset-id snapshot-name example-ids]}]
                    (sente/request!
