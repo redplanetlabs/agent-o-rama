@@ -13,13 +13,15 @@ test.describe('research agent module exists', () => {
     // Step 3: Wait for an agent link to be visible on the page.
     // The UI fetches this data asynchronously, so Playwright's auto-waiting is essential here.
     // We'll look for an agent from your examples - now in table format with separate columns.
-    const moduleName = 'com.rpl.agent.research-agent';
-    const agentName = 'ResearchAgentModule';
-    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
+    const moduleNs = 'com.rpl.agent.research-agent';
+    const moduleName = 'ResearchAgentModule';
+    const agentName = 'researcher';
+
+    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleNs }).filter({ hasText: moduleName }).filter({ hasText: agentName });
 
     // Wait up to 30 seconds for the agent to appear. The first load can be slow.
     await expect(agentRow).toBeVisible({ timeout: 30000 });
-    console.log(`Found agent: ${moduleName}:${agentName}`);
+    console.log(`Found agent: ${moduleNs}/${moduleName}:${agentName}`);
 
     // Step 4: Click the agent row to navigate.
     await agentRow.click();
