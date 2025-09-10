@@ -149,13 +149,11 @@
                 ($ :h3 {:className "text-lg font-medium text-gray-800"} (:title data))
                 ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer", :onClick handle-cancel} "×"))
              ($ :div {:className "flex-1 min-h-0 overflow-y-auto"}
-                (if form
-                  (let [form-spec (get @form-specs form-id)
-                        ui-fn (if (:steps form)
-                                (get-in form-spec [(:current-step form) :ui])
-                                (:ui form-spec))]
-                    (if ui-fn (ui-fn {:form-id form-id}) ($ :div "No UI for this form step.")))
-                  (:component data))) ; Fallback for non-form modals
+                (let [form-spec (get @form-specs form-id)
+                      _ (println "form spec!!!!" form-spec)
+                      _ (println "form state!!" form)
+                      ui-fn (get-in form-spec [(:current-step form) :ui])]
+                  (if ui-fn (ui-fn {:form-id form-id}) ($ :div "No UI for this form step."))))
              (when form
                ($ :div {:className "flex-shrink-0 border-t border-gray-200 bg-white px-6 py-4"}
                   ($ form-error {:error (:error form)})
@@ -281,32 +279,36 @@
                    (let [form-spec (get @form-specs form-id)]
                      (if-not form-spec
                        (do (js/console.error "No form spec registered for" form-id) nil)
-                       (let [is-wizard? (boolean (:steps form-spec))
-                             _ (println "is-wizard?" is-wizard?)
-                             initial-step (when is-wizard? (first (:steps form-spec)))
-                             step-spec (if is-wizard? (get form-spec initial-step) form-spec)
+                       (let [initial-step (first (:steps form-spec))
+                             step-spec (get form-spec initial-step)
                              initial-fields-fn (:initial-fields step-spec)
                              initial-fields (if (fn? initial-fields-fn)
                                               (initial-fields-fn props)
                                               (or initial-fields-fn {}))
                              validators (:validators step-spec)
                              {:keys [valid? errors]} (validate-form-fields initial-fields validators)
-                             modal-data (if is-wizard?
-                                          (get-in form-spec [initial-step :modal-props] {})
-                                          (:modal-props form-spec {}))]
-                         ;; 1. Initialize the form state
-                         (state/dispatch [:db/set-value [:forms form-id] {:fields initial-fields
-                                                                    :validators validators
-                                                                    :field-errors errors
-                                                                    :valid? valid?
-                                                                    :submitting? false
-                                                                    :error nil
-                                                                    :props props
-                                                                    :steps (:steps form-spec)
-                                                                    :current-step initial-step}])
-                         ;; 2. Show the modal
-                         (state/dispatch [:modal/show form-id (assoc modal-data :form-id form-id)]))))
-                   nil))
+                             modal-data (get-in form-spec [initial-step :modal-props] {})
+
+                             ;; 1. Construct the full state for the form
+                             form-state {:fields initial-fields
+                                         :validators validators
+                                         :field-errors errors
+                                         :valid? valid?
+                                         :submitting? false
+                                         :error nil
+                                         :props props
+                                         :steps (:steps form-spec)
+                                         :current-step initial-step}
+                             
+                             ;; 2. Construct the full state for the modal
+                             modal-state {:active form-id
+                                          :data (assoc modal-data :form-id form-id)}]
+                         
+                         ;; 3. Return a single Specter path to update both parts of the DB atomically
+                         (s/multi-path
+                          [:forms form-id (s/terminal-val form-state)]
+                          [:ui :modal (s/terminal-val modal-state)]))))))
+
 
 (state/reg-event :modal/show
                  (fn [db modal-type modal-data]
