@@ -230,11 +230,11 @@
 
   :configure
   {:initial-fields (fn [{:keys [fields]}]
-                     (let [params (get-in fields [:selected-builder :spec :options :params] {})]
-                       (reduce-kv
-                        (fn [acc k v] (assoc-in acc [:params k] (:default v "")))
-                        {:name "", :description "", :input-json-path "", :output-json-path "", :reference-output-json-path ""}
-                        params)))
+                     {:name ""
+                      :description ""
+                      :input-json-path ""
+                      :output-json-path ""
+                      :reference-output-json-path ""})
    :validators {:name [forms/required]}
    :ui (fn [{:keys [form-id]}] ($ CreateEvaluatorForm {:form-id form-id}))
    :modal-props {:title "Create Evaluator"}}
