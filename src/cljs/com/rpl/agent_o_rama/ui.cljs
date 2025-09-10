@@ -50,30 +50,26 @@
 ;; ============================================================================= 
 
 (def routes
-  ["/"
-   ["" {:name :home, :view agents/index}]
-   ["agents"
-    ["" {:name :agents/index, :view agents/index}]
+  ["" {:data {:views [main-layout]}}
+   ["/" {:name :home, :data {:views [agents/index]}}]
+   ["/agents"
+    ["" {:name :agents/index, :data {:views [agents/index]}}]
     ["/:module-id"
      ["/datasets"
-      ["" {:name :module/datasets, :view datasets/index}]
+      ["" {:name :module/datasets, :data {:views [datasets/index]}}]
       ["/:dataset-id"
-       ;; Parent route for dataset detail layout
-       {:name :module/dataset-detail, :view datasets/detail}
-       ;; Default child route - redirects to examples
-       ["" {:name :module/dataset-detail.index, :view datasets/detail-examples}]
-       ;; Explicit child routes for tabs
-       ["/examples" {:name :module/dataset-detail.examples, :view datasets/detail-examples}]
-       ["/experiments" {:name :module/dataset-detail.experiments, :view experiments/index}]]]
-     ["/evaluations" {:name :module/evaluations, :view evaluators/index}]
-     ;; Agent routes with prefix to avoid conflicts
+       {:name :module/dataset-detail, :data {:views [datasets/detail]}}
+       ["" {:name :module/dataset-detail.index, :data {:views [datasets/detail-examples]}}]
+       ["/examples" {:name :module/dataset-detail.examples, :data {:views [datasets/detail-examples]}}]
+       ["/experiments" {:name :module/dataset-detail.experiments, :data {:views [experiments/index]}}]]]
+     ["/evaluations" {:name :module/evaluations, :data {:views [evaluators/index]}}]
      ["/agent/:agent-name"
-      ["" {:name :agent/detail, :view agents/agent}]
+      ["" {:name :agent/detail, :data {:views [agents/agent]}}]
       ["/invocations"
-       ["" {:name :agent/invocations, :view agents/invocations}]
-       ["/:invoke-id" {:name :agent/invocation-detail, :view agents/invoke}]]
-      ["/config" {:name :agent/config, :view config-page/config-page}]
-      ["/stats" {:name :agent/stats, :view stats/stats}]]]]])
+       ["" {:name :agent/invocations, :data {:views [agents/invocations]}}]
+       ["/:invoke-id" {:name :agent/invocation-detail, :data {:views [agents/invoke]}}]]
+      ["/config" {:name :agent/config, :data {:views [config-page/config-page]}}]
+      ["/stats" {:name :agent/stats, :data {:views [stats/stats]}}]]]]])
 
 ;; Store router instance globally for navigation
 (defonce router-instance (atom nil))
@@ -314,10 +310,14 @@
 
 (defui RouterComponent []
   (let [match (state/use-sub [:route])
-        view (get-in match [:data :view])]
-    (if view
-      ($ view {:match match}) ;; Pass the whole match down to components
-      ;; 404 component
+        view-stack (get-in match [:data :views] [])
+        app-component (reduce (fn [child-component parent-component]
+                                (fn [props]
+                                  ($ parent-component (merge props {:child-component child-component}))))
+                              nil
+                              (reverse view-stack))]
+    (if app-component
+      ($ app-component {:match match})
       ($ :div.p-8.text-center "Route not found"))))
 
 ;; =============================================================================
@@ -325,18 +325,11 @@
 ;; =============================================================================
 
 (defui app []
-  ($ :div.flex.h-screen.bg-gray-50
-     ($ sidebar-nav)
-     ($ :div.flex-1.flex.flex-col.min-h-0
-        ($ breadcrumb)
-        ($ :div.flex-1.overflow-auto
-           ($ RouterComponent))
-        ($ global-modal-component))))
+  ($ with-router {:routes routes}
+     ($ RouterComponent)))
 
 (defn init []
   (sente/init!)
   (uix.dom/render-root
-   ($ with-router {:routes routes}
-      ($ app))
-   (uix.dom/create-root
-    (.getElementById js/document "root"))))
+   ($ app)
+   (.getElementById js/document "root")))

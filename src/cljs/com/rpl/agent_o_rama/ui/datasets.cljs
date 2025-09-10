@@ -913,28 +913,18 @@
 ;; DATASET DETAIL LAYOUT COMPONENT
 ;; =============================================================================
 
-(defui detail [{:keys [match]}]
+(defui detail [{:keys [match child-component]}]
   (let [{:keys [module-id dataset-id]} (get-in match [:path-params])
         decoded-module-id (when module-id (common/url-decode module-id))
         route-name (get-in match [:data :name])
-
-        ;; Determine active tab based on route name
-        active-tab (if (str/includes? (name route-name) "experiments")
-                     "experiments"
-                     "examples")
-
-        ;; State for info panel
+        active-tab (if (str/includes? (name route-name) "experiments") "experiments" "examples")
         [show-info? set-show-info] (uix/use-state false)
-
-        ;; Fetch dataset properties for the header
         {:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:dataset-props module-id dataset-id]
           :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
-
         dataset data]
-
     ($ :div.h-full.flex.flex-col
        (cond
          loading? ($ :div.p-6 "Loading dataset details...")
@@ -955,8 +945,7 @@
                         (if show-info?
                           ($ ChevronUpIcon {:className "h-4 w-4"})
                           ($ ChevronDownIcon {:className "h-4 w-4"}))))
-
-                  ;; Right side - removed snapshot manager and add example button
+                  ;; Right side - reserved for actions
                   ($ :div.flex.items-center.space-x-4)))
 
             ;; Collapsible info panel
@@ -1006,10 +995,9 @@
                                                 "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "examples")})}
                      "Examples")))
 
-            ;; Content area - render the appropriate child component based on route
+            ;; Content area where the child component is rendered
             ($ :div.flex-1.min-h-0
-               (case active-tab
-                 "examples" ($ detail-examples {:match match})
-                 "experiments" ($ experiments/index {:match match})
+               (if child-component
+                 ($ child-component {:match match})
                  ($ :div.p-4 "Select a tab to view content."))))
          :else ($ :div.p-6 "Dataset not found.")))))
