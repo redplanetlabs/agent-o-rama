@@ -135,33 +135,35 @@
                         (state/dispatch [:form/clear form-id])
                         (state/dispatch [:modal/hide]))]
 
-    ($ :div {:className "flex-1 min-h-0 overflow-y-auto"}
-       (if ui-fn
-         (ui-fn {:form-id form-id})
-         ($ :div "No UI for this form step.")))
+    ($ :<>
 
-    ;; The footer with form actions
-    (when form
-      ($ :div {:className "flex-shrink-0 border-t border-gray-200 bg-white px-6 py-4"}
-         ($ form-error {:error (:error form)})
-         ($ :div {:className "flex justify-end gap-3"}
-            ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer", :type "button", :onClick handle-cancel} "Cancel")
-            
-            ;; "Back" button
-            (when (and (:steps form) (not= (first (:steps form)) (:current-step form)))
-              ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer", :type "button", :onClick (:prev-step! form)} "Back"))
+       ($ :div {:className "flex-1 min-h-0 overflow-y-auto"}
+          (if ui-fn
+            (ui-fn {:form-id form-id})
+            ($ :div "No UI for this form step.")))
 
-            ;; "Next" or "Submit" button
-            (if (and (:steps form) (not= (last (:steps form)) (:current-step form)))
-              ($ :button {:type "button", :disabled (not (:valid? form)), :onClick (:next-step! form)
-                          :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium "
-                                          (if (not (:valid? form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
-                 "Next")
-              ($ :button {:type "button", :disabled (or (not (:valid? form)) (:submitting? form)), :onClick (:submit! form)
-                          :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
-                                          (if (or (not (:valid? form)) (:submitting? form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
-                 (when (:submitting? form) ($ :div {:className "animate-spin rounded-full h-4 w-4 border-b-2 border-white"}))
-                 (:submit-text modal-data "Submit"))))))))
+       ;; The footer with form actions
+       (when form
+         ($ :div {:className "flex-shrink-0 border-t border-gray-200 bg-white px-6 py-4"}
+            ($ form-error {:error (:error form)})
+            ($ :div {:className "flex justify-end gap-3"}
+               ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer", :type "button", :onClick handle-cancel} "Cancel")
+               
+               ;; "Back" button
+               (when (and (:steps form) (not= (first (:steps form)) (:current-step form)))
+                 ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer", :type "button", :onClick (:prev-step! form)} "Back"))
+
+               ;; "Next" or "Submit" button
+               (if (and (:steps form) (not= (last (:steps form)) (:current-step form)))
+                 ($ :button {:type "button", :disabled (not (:valid? form)), :onClick (:next-step! form)
+                             :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium "
+                                             (if (not (:valid? form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
+                    "Next")
+                 ($ :button {:type "button", :disabled (or (not (:valid? form)) (:submitting? form)), :onClick (:submit! form)
+                             :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
+                                             (if (or (not (:valid? form)) (:submitting? form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
+                    (when (:submitting? form) ($ :div {:className "animate-spin rounded-full h-4 w-4 border-b-2 border-white"}))
+                    (:submit-text modal-data "Submit")))))))))
 
 (defui global-modal-component []
   (let [modal-state (state/use-sub [:ui :modal])
