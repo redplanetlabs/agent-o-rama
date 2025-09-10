@@ -912,19 +912,15 @@
 ;; =============================================================================
 
 (defui detail [{:keys [match module-id dataset-id]}]
-
-  (println "detail match:" module-id dataset-id)
-  (println "detail match:" match)
-  (let [
-        route-name (get-in match [:data :name])
+  (let [route-name (get-in match [:data :name])
         active-tab (if (str/includes? (name route-name) "experiments") "experiments" "examples")
         [show-info? set-show-info] (uix/use-state false)
-        {:keys [data loading? error]}
+        {:keys [loading? error]}
         (queries/use-sente-query
          {:query-key [:dataset-props module-id dataset-id]
           :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
-        dataset data]
+        dataset (state/use-sub [:queries :dataset-props module-id dataset-id])]
     ($ :div.h-full.flex.flex-col
        (cond
          loading? ($ :div.p-6 "Loading dataset details...")
