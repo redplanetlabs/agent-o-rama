@@ -332,4 +332,5 @@
   (sente/init!)
   (uix.dom/render-root
    ($ app)
-   (.getElementById js/document "root")))
+   (uix.dom/create-root
+    (.getElementById js/document "root"))))
