@@ -34,15 +34,12 @@
 ;; MAIN LAYOUT COMPONENT
 ;; =============================================================================
 
-(defui main-layout [{:keys [match child-component]}]
+(defui main-layout [{:keys [children]}]
   ($ :div.flex.h-screen.bg-gray-50
      ($ sidebar-nav)
      ($ :div.flex-1.flex.flex-col.min-h-0
         ($ breadcrumb)
-        ($ :div.flex-1.overflow-auto
-           (if child-component
-             ($ child-component {:match match})
-             "Page content missing"))
+        ($ :div.flex-1.overflow-auto children)
         ($ global-modal-component))))
 
 ;; =============================================================================
@@ -50,7 +47,7 @@
 ;; ============================================================================= 
 
 (def routes
-  ["" {:views [main-layout]}
+  [""
    ["/" {:name :home, :views [agents/index]}]
    ["/agents"
     ["" {:name :agents/index, :views [agents/index]}]
@@ -334,8 +331,9 @@
 ;; =============================================================================
 
 (defui app []
-  ($ with-router {:routes routes}
-     ($ RouterComponent)))
+  ($ main-layout
+     ($ with-router {:routes routes}
+        ($ RouterComponent))))
 
 (defn init []
   (sente/init!)

@@ -439,7 +439,7 @@
 
 (reg-event :route/navigated
            (fn [db new-match]
-             [:route (s/terminal-val new-match)]))
+             [:route (s/terminal-val (s/transform [:path-params s/MAP-VALS] common/url-decode new-match))]))
 
  ;; =============================================================================
 ;; DEBUGGING HELPERS
