@@ -429,19 +429,7 @@
                           (state/dispatch [:form/set-error form-id (:error reply)])))))
                    nil))
 
-(state/reg-event :datasets/add-tag
-                 (fn [db {:keys [module-id dataset-id snapshot-name example-id tag]}]
-                   ;; This event is handled by the TagInput component directly
-                   ;; No state management needed here since we use query invalidation
-                   nil))
-
-(state/reg-event :datasets/remove-tag
-                 (fn [db {:keys [module-id dataset-id snapshot-name example-id tag]}]
-                   ;; This event is handled by the TagInput component directly
-                   ;; No state management needed here since we use query invalidation
-                   nil))
-
- ;; =============================================================================
+;; =============================================================================
 ;; BULK OPERATION EVENTS
 ;; =============================================================================
 
@@ -527,18 +515,6 @@
                                      acc))
                                  {}
                                  form-fields)]
-
-                     ;; DEBUG: Log what we're processing
-                     (println "FRONTEND EVENT - Form fields:" form-fields)
-                     (println "FRONTEND EVENT - Extracted params:" params)
-                     (println "FRONTEND EVENT - Full extracted data:" {:module-id module-id
-                                                                       :builder-name builder-name
-                                                                       :name name
-                                                                       :description description
-                                                                       :params params
-                                                                       :input-json-path input-json-path
-                                                                       :output-json-path output-json-path
-                                                                       :reference-output-json-path reference-output-json-path})
 
                      ;; Set modal form to submitting state
                      (state/dispatch [:form/set-submitting :create-evaluator true])
