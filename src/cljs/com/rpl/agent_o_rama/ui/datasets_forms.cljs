@@ -180,11 +180,12 @@
  :new-snapshot
  {:steps [:main]
   :main
-  {:modal-props {:title "New Snapshot" :submit-text "Add Snapshot"}
+  {:intial-fields (fn [_] {:to-snapshot-name ""})
+   :modal-props {:title "New Snapshot" :submit-text "Add Snapshot"}
    
    :ui
    (fn [{:keys [form-id]}]
-     (let [snapshot-name (forms/use-form-field form-id :name)]
+     (let [snapshot-name (forms/use-form-field form-id :to-snapshot-name)]
        ($ forms/form
           ($ forms/form-field {:label "Snapshot Title"
                                :value (:value snapshot-name)
@@ -194,7 +195,23 @@
   
   :on-submit
   (fn [db {:keys [form-fields props]}]
-    (sente/request! [:datasets/create-snapshot (merge props form-fields)]))})
+    (sente/request! [:datasets/create-snapshot (merge
+                                                form-fields
+                                                props)]
+                    15000
+                    (fn [reply]
+                      (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+                      (if (:success reply)
+                        (do
+                          (state/dispatch [:modal/hide])
+                          ;; On success, call the callback to select the new snapshot in the UI
+                          (when on-success
+                            (on-success (get-in reply [:data :snapshot-name])))
+                          ;; Invalidate the query to refetch the list of snapshots
+                          (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}])
+                          (state/dispatch [:form/clear form-id]))
+                        ;; On failure, display the error in the form
+                        (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)])))))})
 
 (defui CreateSnapshotForm [{:keys [form-id from-snapshot-name]}]
   (let [{:keys [error]} (forms/use-centralized-form form-id)
