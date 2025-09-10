@@ -35,6 +35,25 @@
      :prev-step! #(state/dispatch [:form/prev-step form-id])
      :submit! #(state/dispatch [:form/submit form-id])}))
 
+(defhook use-form-field
+  "Subscribes to a single field's state within a form."
+  [form-id field-key]
+  ;; Ensure field-key is always a vector for consistency with specter paths
+  (let [field-path (if (vector? field-key) field-key [field-key])]
+    (let [value (state/use-sub (into [:forms form-id :fields] field-path))
+          error (state/use-sub (into [:forms form-id :field-errors] field-path))
+
+          ;; Memoize the on-change handler for performance.
+          ;; It will only be recreated if form-id or field-path changes.
+          on-change (uix/use-callback
+                     (fn [new-value]
+                       (state/dispatch [:form/update-field form-id field-path new-value]))
+                     [form-id field-path])]
+
+      ;; Return the convenient props map
+      {:value value
+       :on-change on-change
+       :error error})))
 ;; =============================================================================
 ;; REUSABLE FORM COMPONENTS
 ;; =============================================================================

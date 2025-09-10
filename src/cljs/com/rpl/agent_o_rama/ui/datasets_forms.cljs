@@ -26,7 +26,7 @@
 }")
 
 (defui CreateDatasetForm [{:keys [form-id]}]
-  (let [{:keys [error]} (forms/use-centralized-form form-id)
+  (let [{:keys [fields field-errors]} (forms/use-form form-id)
         name-field (forms/use-form-field form-id :name)
         description-field (forms/use-form-field form-id :description)
         input-schema-field (forms/use-form-field form-id :input-schema)
