@@ -388,10 +388,11 @@
   [eval-maps]
   (let [wrap (fn [m]
                (transform [MAP-VALS MAP-VALS]
-                          #(cond
-                             (number? %) [%]
-                             (boolean %) [(if % 1 0)]
-                             :else NONE)
+                          (fn [v]
+                            (cond
+                              (number? v) [v]
+                              (boolean? v) [(if v 1 0)]
+                              :else NONE))
                           m))]
     (apply merge-with (partial merge-with into) (mapv wrap eval-maps))))
 
@@ -632,10 +633,8 @@
                datasets   (datasets-pstate retriever)
                local-ds   (local-datasets-store retriever)]
            (when (aor-types/RegularExperiment? spec)
-             ;; TODO: <<<<>>>> do this no matter what
-             ;;   - should fetch timing info and eval results as well so can aggregate
+             ;; TODO: <<<<>>>>
              ;;     - need distribution for timings
-             ;;     - do distribution for numeric ones as well?
              (let [example-info
                    (fetch-example-info local-ds datasets id dataset-id snapshot result+example-ids)
 

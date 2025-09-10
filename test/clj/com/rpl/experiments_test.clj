@@ -287,12 +287,49 @@
          (bind [ex-id0 ex-id3]
            (select [:results (multi-path (keypath 0) (keypath 3)) :example-id] res))
 
-
          (is
           (trace-matches?
            res
-           {:summary-evals {"mycount" {"res" 8} "mysum" {"res" 110}}
+           {:summary-evals     {"mycount" {"res" 8} "mysum" {"res" 110}}
             :summary-eval-failures nil
+            :eval-number-stats
+            {"mylen"
+             {"len"
+              {:total       110
+               :count       8
+               :min         6
+               :max         20
+               :percentiles
+               {0.1   6
+                0.2   6
+                0.3   9
+                0.4   9
+                0.5   20
+                0.6   20
+                0.7   20
+                0.8   20
+                0.9   20
+                0.99  20
+                0.999 20
+               }}}
+             "concise2"
+             {"concise?"
+              {:total       6
+               :count       8
+               :min         0
+               :max         1
+               :percentiles
+               {0.1   0
+                0.2   0
+                0.3   1
+                0.4   1
+                0.5   1
+                0.6   1
+                0.7   1
+                0.8   1
+                0.9   1
+                0.99  1
+                0.999 1}}}}
             :results
             {0
              {:example-id       !eid0
@@ -370,6 +407,7 @@
 
          (is (every? aor-types/AgentInvokeImpl?
                      (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
+
 
 
          (doseq [{:keys [start-time-millis finish-time-millis]}
@@ -1723,5 +1761,29 @@
     )))
 
 
-;; TODO: <<<<>>>
-;;   - kind of want boolean evals to aggregate the percentage true, e.g. for "concise?"
+(deftest merge-number-evals-test
+  (is (= {"a" {"b" [1] "c" [2 3]}
+          "d" {"b" [10 11]}
+          "e" {"q" [1 1 0]}}
+         (exp/merge-number-evals [{"a" {"b" 1 "c" 2} "d" {"b" 10}}
+                                  {"a" {"b" "blah" "c" 3}
+                                   "d" {"b" 11}
+                                   "e" {"q" true}}
+                                  {"e" {"q" true}}
+                                  {"e" {"q" false}}
+                                  {"e" {"q" nil}}
+                                 ])))
+)
+
+(deftest compute-eval-number-stats-test
+  (is (= {"e1" {"a" (aor-types/->EvalNumberStats 6 3 1 3 nil)
+                "b" (aor-types/->EvalNumberStats 35.0 4 2 20 nil)}
+          "e2" {"r" (aor-types/->EvalNumberStats 2 3 0 1 nil)}}
+         (setval [MAP-VALS MAP-VALS :percentiles]
+                 nil
+                 (exp/compute-eval-number-stats
+                  [{:evals {"e1" {"a" 1 "b" 2} "e2" {"r" true}}}
+                   {:evals {"e1" {"a" 2 "b" 3} "e2" {"r" false}}}
+                   {:evals {"e1" {"b" 10.0} "e2" {"r" nil}}}
+                   {:evals {"e1" {"a" 3 "b" 20} "e2" {"r" true}}}]))
+      )))

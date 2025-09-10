@@ -816,7 +816,8 @@
                                :start-time-millis
                                :finish-time-millis
                                :summary-evals
-                               :summary-eval-failures])]
+                               :summary-eval-failures
+                               :eval-number-stats])]
                      datasets-pstate-sym
                      :> *experiment-props)
       (local-select> [(keypath *dataset-id :experiments *experiment-id :results)
