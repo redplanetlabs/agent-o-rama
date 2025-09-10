@@ -51,17 +51,17 @@
   (let [match (state/use-sub [:route])
         ;; Get the stack of views to render from the route data.
         ;; Defaults to an empty vector if no views are defined for the route.
-        view-stack (get-in match [:data :views] [])]
-    (println "match" match)
-    
+        view-stack (get-in match [:data :views] [])
+        path-params (:path-params match)]
     ;; Render the views as siblings inside a single div.
     ;; Each view component is responsible for subscribing to the parts
     ;; of the app-db it needs, including the route data itself.
     ($ :div.flex-1.overflow-auto
        (if (seq view-stack)
          (for [view-component view-stack]
-           ($ view-component {:key (str view-component) ;; React needs a key for lists
-                              :match match}))
+           ($ view-component (merge {:key (str view-component) ;; React needs a key for lists
+                                     :match match}
+                                    path-params)))
          ;; Render a fallback if no views are matched
          ($ :div.p-8.text-center "Route not found or has no associated view.")))))
 
@@ -82,9 +82,7 @@
      #(do
         (reset! router-instance router)
         (rfe/start! router
-                    (fn [new-match]
-                      (println "reitit navigated match:" new-match)
-                      (state/dispatch [:route/navigated new-match]))
+                    (fn [new-match] (state/dispatch [:route/navigated new-match]))
                     {:use-fragment false}))
      [router])
     ($ :<> children)))
