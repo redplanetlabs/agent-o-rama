@@ -1,0 +1,3 @@
+i really want to try just stacking vertically the components that are collected in the :views key by reitit. (except for the layout/sidebar/breadcrumbs). have the router control the page structure, coordinate entirely through the app-db, not props.. i feel like that might be cleaner.
+like the views collected in the :views key by reitit, they would be siblings and simultaneously render, rather than being nested matryoshka doll style.
+the state would be split between app-db, and the URL, the views being (more) pure views...
