@@ -807,10 +807,7 @@
 ;; =============================================================================
 
 (defui detail-examples [{:keys [module-id dataset-id]}]
-  (println "detail-examples match:" module-id dataset-id)
-  (let [
-
-        ;; Get selected examples for this dataset
+  (let [;; Get selected examples for this dataset
         selected-example-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
 
         ;; State for selected snapshot and info panel
