@@ -191,7 +191,10 @@
 
              ;; Conditionally render the new content component
              (when form-id
-               ($ ModalFormContent {:form-id form-id :modal-data data}))))
+               ($ ModalFormContent {:form-id form-id :modal-data data}))
+             
+             (when (:component data)
+               (:component data))))
        (.-body js/document)))))
 
 
