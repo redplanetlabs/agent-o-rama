@@ -698,16 +698,14 @@
 ;; MAIN DATASETS INDEX PAGE
 ;; =============================================================================
 
-(defui index []
-  (let [{:keys [module-id]} (state/use-sub [:route :path-params])
-        decoded-module-id (when module-id (common/url-decode module-id))
-
+(defui index [{:keys [module-id]}]
+  (let [
         {:keys [data loading? error]}
         (queries/use-sente-query
-         {:query-key [:datasets decoded-module-id]
-          :sente-event [:datasets/get-all {:module-id decoded-module-id
+         {:query-key [:datasets module-id]
+          :sente-event [:datasets/get-all {:module-id module-id
                                            :pagination nil}]
-          :enabled? (boolean decoded-module-id)})
+          :enabled? (boolean module-id)})
 
         datasets (:datasets data)]
 
@@ -718,7 +716,7 @@
              ($ CircleStackIcon {:className "h-8 w-8 text-indigo-600"}))
 
           ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
-             {:onClick #(datasets-forms/show-create-dataset-modal! decoded-module-id)}
+             {:onClick #(datasets-forms/show-create-dataset-modal! module-id)}
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Create Dataset"))
 
@@ -732,7 +730,7 @@
             ($ :h3.text-lg.font-medium.text-gray-900.mb-2 "No datasets yet")
             ($ :p.text-gray-500.mb-6 "Create your first dataset to get started.")
             ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
-               {:onClick #(datasets-forms/show-create-dataset-modal! decoded-module-id)}
+               {:onClick #(datasets-forms/show-create-dataset-modal! module-id)}
                ($ PlusIcon {:className "h-5 w-5 mr-2"})
                "Create Dataset"))
          :else
@@ -751,12 +749,12 @@
                               :let [name (:name dataset)
                                     desc (:description dataset)
                                     dsid (:dataset-id dataset)
-                                    href (get-dataset-path decoded-module-id dsid)]]
+                                    href (get-dataset-path module-id dsid)]]
                           ($ :tr {:key dsid
                                   :className "hover:bg-gray-50 cursor-pointer"
                                   :onClick (fn [_]
                                              (rfe/push-state :module/dataset-detail
-                                                             {:module-id decoded-module-id
+                                                             {:module-id module-id
                                                               :dataset-id dsid}))}
                              ($ :td {:className (:td common/table-classes)}
                                 ($ :a.text-indigo-600.hover:text-indigo-800 {:href href} name))
@@ -776,7 +774,7 @@
                                       {:onClick (fn [e]
                                                   (.preventDefault e)
                                                   (.stopPropagation e)
-                                                  (show-edit-dataset-modal! decoded-module-id dsid name desc))}
+                                                  (show-edit-dataset-modal! module-id dsid name desc))}
                                       ($ PencilIcon {:className "h-4 w-4 mr-1"})
                                       "Edit")
                                    ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
@@ -785,11 +783,11 @@
                                                   (.stopPropagation e)
                                                   (when (js/confirm (str "Are you sure you want to delete dataset '" name "'? This action cannot be undone."))
                                                     (sente/request!
-                                                     [:datasets/delete {:module-id decoded-module-id :dataset-id dsid}]
+                                                     [:datasets/delete {:module-id module-id :dataset-id dsid}]
                                                      10000
                                                      (fn [reply]
                                                        (if (:success reply)
-                                                         (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}])
+                                                         (state/dispatch [:query/invalidate {:query-key-pattern [:datasets module-id]}])
                                                          (js/alert (str "Error deleting dataset: " (:error reply))))))))}
                                       ($ TrashIcon {:className "h-4 w-4 mr-1"})
                                       "Delete")))))))))))))
@@ -808,9 +806,9 @@
 ;; DATASET DETAIL EXAMPLES TAB COMPONENT
 ;; =============================================================================
 
-(defui detail-examples [{:keys [match]}]
-  (let [{:keys [module-id dataset-id]} (get-in match [:path-params])
-        decoded-module-id (when module-id (common/url-decode module-id))
+(defui detail-examples [{:keys [module-id dataset-id]}]
+  (println "detail-examples match:" module-id dataset-id)
+  (let [
 
         ;; Get selected examples for this dataset
         selected-example-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})

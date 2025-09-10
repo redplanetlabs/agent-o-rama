@@ -309,16 +309,24 @@
 
 (defui RouterComponent []
   (let [match (state/use-sub [:route])
+        ;; Decode and expose path params at top-level props
+        path-params (:path-params match)
+        decoded-params (into {}
+                             (for [[k v] path-params]
+                               [k (when (some? v) (common/url-decode v))]))
+        match* (assoc match :path-params decoded-params)
         view-stack (get-in match [:data :views] [])
-        _ (println "view stack" view-stack)
         app-component (reduce (fn [child-component parent-component]
                                 (fn [props]
-                                  (let [props* (js->clj props :keywordize-keys true)]
+                                  (let [props* (if (map? props)
+                                                 props
+                                                 (js->clj props :keywordize-keys true))]
                                     ($ parent-component (assoc props* :child-component child-component)))))
                               nil
                               (reverse view-stack))]
     (if app-component
-      ($ app-component {:match match})
+      ;; Merge decoded params so leaves can destructure {:module-id ... :dataset-id ...}
+      ($ app-component (merge match* decoded-params {:match match*}))
       ($ :div.p-8.text-center "Route not found"))))
 
 ;; =============================================================================
