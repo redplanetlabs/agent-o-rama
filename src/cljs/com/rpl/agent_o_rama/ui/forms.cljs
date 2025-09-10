@@ -47,7 +47,6 @@
           ;; It will only be recreated if form-id or field-path changes.
           on-change (uix/use-callback
                      (fn [new-value]
-                       (println "new-value" new-value)
                        (state/dispatch [:form/update-field form-id field-path new-value]))
                      [form-id field-path])]
 
