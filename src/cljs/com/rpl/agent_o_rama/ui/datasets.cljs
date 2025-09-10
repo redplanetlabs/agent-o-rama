@@ -699,8 +699,7 @@
 ;; =============================================================================
 
 (defui index [{:keys [module-id]}]
-  (let [
-        {:keys [data loading? error]}
+  (let [{:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:datasets module-id]
           :sente-event [:datasets/get-all {:module-id module-id
@@ -811,7 +810,11 @@
         selected-example-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
 
         ;; State for selected snapshot and info panel
-        [selected-snapshot-name set-selected-snapshot-name] (uix/use-state "")
+        selected-snapshot-name (or (state/use-sub [:ui :datasets :selected-snapshot-per-dataset dataset-id]) "")
+        ;; Create a function that dispatches the event to update the state
+        set-selected-snapshot-name (fn [new-name]
+                                     (state/dispatch [:datasets/set-selected-snapshot
+                                                      {:dataset-id dataset-id :snapshot-name new-name}]))
         is-read-only? (not (str/blank? selected-snapshot-name))
 
         ;; State for search string

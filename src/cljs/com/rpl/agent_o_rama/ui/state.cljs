@@ -53,7 +53,8 @@
                        :error nil}}
         :hitl {:responses {} ;; Keyed by invoke-id -> response text
                :submitting {}}
-        :datasets {:selected-examples {}}} ;; Keyed by dataset-id -> set of example-ids 
+        :datasets {:selected-examples {} ;; Keyed by dataset-id -> set of example-ids
+                   :selected-snapshot-per-dataset {}}} ;; Keyed by dataset-id -> snapshot-name 
    :sente {:connected? false
            :connection-state {}}
    :session {:user-id nil
@@ -65,8 +66,7 @@
 (add-watch app-db :console-logger
            (fn [key atom old-state new-state]
              ;; This runs on EVERY state change
-             (aset js/window "db" (clj->js new-state {:keyword-fn (fn [k] (str/replace (name k) "-" "_"))}
-             ))))
+             (aset js/window "db" (clj->js new-state {:keyword-fn (fn [k] (str/replace (name k) "-" "_"))}))))
 
 ;; =============================================================================
 ;; EVENT SYSTEM
@@ -326,7 +326,6 @@
 ;; FORM STATE MANAGEMENT EVENTS
 ;; =============================================================================
 
-
 ;; =============================================================================
 ;; ROUTING EVENTS
 ;; =============================================================================
@@ -377,3 +376,7 @@
 (reg-event :datasets/clear-selection
            (fn [db {:keys [dataset-id]}]
              [:ui :datasets :selected-examples (s/terminal #(dissoc % dataset-id))]))
+
+(reg-event :datasets/set-selected-snapshot
+           (fn [db {:keys [dataset-id snapshot-name]}]
+             [:ui :datasets :selected-snapshot-per-dataset dataset-id (s/terminal-val snapshot-name)]))

@@ -61,10 +61,10 @@
                                                         (when (and agg-node-invoke-id
                                                                    (not (contains? emitted-ids agg-node-invoke-id))
                                                                    (contains? raw-nodes agg-node-invoke-id))
-                                                          
+
                                                           (when (not (contains? visited agg-node-invoke-id))
-                                                              (vswap! extra-visits-vol conj agg-node-invoke-id))
-                                                          
+                                                            (vswap! extra-visits-vol conj agg-node-invoke-id))
+
                                                           [{:id (str "implicit-" current-id "-" agg-node-invoke-id)
                                                             :source (str current-id)
                                                             :target (str agg-node-invoke-id)
@@ -276,7 +276,6 @@
 ;; DATASET FORM EVENTS
 ;; =============================================================================
 
-
 (state/reg-event :dataset/edit
                  (fn [db {:keys [module-id dataset-id initial-name initial-description form-fields]}]
                    (let [name (get form-fields :name "")
@@ -348,28 +347,11 @@
                          (state/dispatch [:form/set-error form-id (str "Invalid JSON: " (.-message e))]))))
                    nil))
 
-(state/reg-event :dataset/create-snapshot
-                 (fn [db {:keys [module-id dataset-id from-snapshot-name form-fields on-success]}]
-                   (let [snapshot-name (get form-fields :snapshot-name "")
-                         form-id :create-snapshot]
-
-                     (sente/request!
-                      [:datasets/create-snapshot {:module-id module-id
-                                                  :dataset-id dataset-id
-                                                  :from-snapshot-name from-snapshot-name
-                                                  :to-snapshot-name snapshot-name}]
-                      15000
-                      (fn [reply]
-                        (state/dispatch [:form/set-submitting form-id false])
-                        (if (:success reply)
-                          (do
-                            (state/dispatch [:modal/hide])
-                            (when on-success
-                              (on-success (get-in reply [:data :snapshot-name])))
-                            (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}])
-                            (state/dispatch [:form/clear form-id]))
-                          (state/dispatch [:form/set-error form-id (:error reply)])))))
-                   nil))
+;; NOTE: This event handler has been moved to datasets_forms.cljs 
+;; as part of the :new-snapshot form registration. The old callback-based
+;; approach has been replaced with direct state dispatch.
+;; 
+;; (state/reg-event :dataset/create-snapshot ...)
 
 ;; =============================================================================
 ;; BULK OPERATION EVENTS
