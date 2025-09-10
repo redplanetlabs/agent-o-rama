@@ -214,7 +214,6 @@
 (defn valid-json
   "Validator for JSON strings"
   [value]
-  (println "valid-json" value)
   (when-not (str/blank? value)
     (try
       (js/JSON.parse value)
@@ -239,23 +238,25 @@
    validators))
 
 (state/reg-event :form/update-field
-           (fn [db form-id field-path value]
-             (let [form-spec (@form-specs form-id)
-                   current-step-key (get-in db [:forms form-id :current-step])
-                   step-spec (get form-spec current-step-key form-spec)
-                   validators-for-field (get-in step-spec (into [:validators] field-path))]
-               (println "form-id" form-id)
-               (println "field-path" field-path)
-               (println "value" value)
-               (println "validators-for-field" validators-for-field)
-
-               (s/multi-path
-                ;; Path 1: Update the field's value
-                [:forms form-id :fields (s/path field-path) (s/terminal-val value)]
-
-                ;; Path 2: Update only this field's error message
-                [:forms form-id :field-errors (s/path field-path)
-                 (s/terminal-val (some #(% value) validators-for-field))]))))
+                 (fn [db form-id field-path value]
+                   (let [form-state (get-in db [:forms form-id])
+                         form-spec (@form-specs form-id)
+                         current-step-key (:current-step form-state)
+                         step-spec (get form-spec current-step-key form-spec)
+                         all-validators (:validators step-spec)
+                         
+                         ;; Calculate the entire next state before committing it to the atom.
+                         next-fields (s/setval field-path value (:fields form-state))
+                         validation-result (validate-form-fields next-fields all-validators)]
+                     
+                     ;; Atomically update the form state with the new fields, errors, and validity.
+                     [:forms form-id
+                      (s/terminal
+                       (fn [current-form-state]
+                         (assoc current-form-state
+                                :fields next-fields
+                                :field-errors (:errors validation-result)
+                                :valid? (:valid? validation-result))))])))
 
 (state/reg-event :form/validate
            (fn [db form-id]
