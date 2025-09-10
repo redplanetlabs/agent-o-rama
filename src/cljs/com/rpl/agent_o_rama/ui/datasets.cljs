@@ -378,11 +378,11 @@
 
         handle-create (fn []
                         (set-dropdown-open false)
-                        ;; Pass the setter function as a callback
-                        (datasets-forms/show-create-snapshot-modal! module-id
-                                                                    dataset-id
-                                                                    selected-snapshot
-                                                                    set-selected-snapshot))
+                        (state/dispatch
+                         [:modal/show-form :new-snapshot
+                          {:module-id module-id
+                           :dataset-id dataset-id
+                           :selected-snapshot selected-snapshot}]))
 
         handle-delete (fn [snapshot-name]
                         (set-dropdown-open false)

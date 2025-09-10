@@ -176,10 +176,25 @@
 
 
 
-(def create-snapshot-form-spec
-  {:fields {:snapshot-name ""}
-   :validators {:snapshot-name [forms/required]}
-   :submit-event [:dataset/create-snapshot]})
+(forms/reg-form
+ :new-snapshot
+ {:steps [:main]
+  :main
+  {:modal-props {:title "New Snapshot" :submit-text "Add Snapshot"}
+   
+   :ui
+   (fn [{:keys [form-id]}]
+     (let [snapshot-name (forms/use-form-field form-id :name)]
+       ($ forms/form
+          ($ forms/form-field {:label "Snapshot Title"
+                               :value (:value snapshot-name)
+                               :on-change (:on-change snapshot-name)
+                               :error (:error snapshot-name)
+                               :required? true}))))}
+  
+  :on-submit
+  (fn [db {:keys [form-fields props]}]
+    (sente/request! [:datasets/create-snapshot (merge props form-fields)]))})
 
 (defui CreateSnapshotForm [{:keys [form-id from-snapshot-name]}]
   (let [{:keys [error]} (forms/use-centralized-form form-id)
@@ -197,23 +212,7 @@
                             :error (:error snapshot-name-field)
                             :required? true}))))
 
-(defn show-create-snapshot-modal!
-  "Shows the create snapshot modal and accepts an on-success callback."
-  [module-id dataset-id from-snapshot-name on-success] ;; Add on-success parameter
-  (state/dispatch [:form/init :create-snapshot
-                   (-> create-snapshot-form-spec
-                       (assoc :submit-event [:dataset/create-snapshot {:module-id module-id
-                                                                       :dataset-id dataset-id
-                                                                       :from-snapshot-name from-snapshot-name
-                                                                       :on-success on-success}]))]) ;; Pass on-success
-  (state/dispatch [:modal/show :create-snapshot
-                   {:title "Create New Snapshot"
-                    :form-id :create-snapshot
-                    :submit-text "Create Snapshot"
-                    :component ($ CreateSnapshotForm {:form-id :create-snapshot
-                                                      :from-snapshot-name from-snapshot-name})}]))
-
- ;; =============================================================================
+;; =============================================================================
 ;; BULK OPERATION MODALS
 ;; =============================================================================
 
