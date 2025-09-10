@@ -101,7 +101,7 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
 
   const agentRow = await getResearchAgentRow(page);
   await agentRow.click();
-  await expect(page).toHaveURL(new RegExp(`/agents/.*researcher`));
+  await expect(page).toHaveURL(new RegExp(`/agents/.*com\\.rpl\\.agent\\.research-agent.*ResearchAgentModule`));
   console.log('--- Test Setup Complete ---');
 
   // 1. SETUP PHASE: Create evaluators and a dataset with examples

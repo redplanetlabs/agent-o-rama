@@ -43,7 +43,7 @@ test.describe('research agent module exists', () => {
     // Step 4: Click the agent row to navigate.
     await agentRow.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*researcher.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*/i);
     console.log('Successfully verified agent detail page.');
   });
 });
@@ -63,7 +63,7 @@ test.describe('Dataset crud', () => {
     // Step 4: Click the agent row to navigate.
     await agentRow.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*researcher.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*/i);
     console.log('Successfully verified agent detail page.');
 
     const datasetsLink = page.getByText('Datasets & Experiments');
@@ -72,7 +72,7 @@ test.describe('Dataset crud', () => {
 
     await datasetsLink.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*researcher\/datasets.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*\/datasets.*/i);
     console.log('Successfully verified datasets page.');
 
     const newDatasetButton = page.getByRole('button', { name: 'Create Dataset' }).first();
@@ -157,7 +157,7 @@ test.describe('Dataset example crud', () => {
     // Step 4: Click the agent row to navigate.
     await agentRow.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*researcher.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*/i);
     console.log('Successfully verified agent detail page.');
 
     const datasetsLink = page.getByText('Datasets & Experiments');
@@ -166,7 +166,7 @@ test.describe('Dataset example crud', () => {
 
     await datasetsLink.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*researcher\/datasets.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*\/datasets.*/i);
     console.log('Successfully verified datasets page.');
 
     const newDatasetButton = page.getByRole('button', { name: 'Create Dataset' }).first();
@@ -396,13 +396,13 @@ test.describe('Dataset snapshot dropdown', () => {
     await expect(agentRow).toBeVisible({ timeout: 30000 });
     await agentRow.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*researcher.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*/i);
 
     const datasetsLink = page.getByText('Datasets & Experiments');
     await expect(datasetsLink).toBeVisible({ timeout: 30000 });
     await datasetsLink.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*researcher\/datasets.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*\/datasets.*/i);
 
     const newDatasetButton = page.getByRole('button', { name: 'Create Dataset' }).first();
     await expect(newDatasetButton).toBeVisible({ timeout: 30000 });
@@ -515,7 +515,7 @@ test.describe('Form Validation and Error Handling', () => {
     await expect(datasetsLink).toBeVisible({ timeout: 30000 });
     await datasetsLink.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*researcher\/datasets.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*\/datasets.*/i);
     console.log('Successfully navigated to datasets page.');
 
     // 2. ACTION: Open the modal and submit an invalid form

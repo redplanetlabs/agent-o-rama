@@ -71,7 +71,7 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
     await agentRow.click();
 
     await page.getByText('Datasets & Experiments').click();
-    await expect(page).toHaveURL(new RegExp(`/agents/.*researcher/datasets`));
+    await expect(page).toHaveURL(new RegExp(`/agents/.*com\\.rpl\\.agent\\.research-agent.*ResearchAgentModule.*/datasets`));
 
     // Create a new dataset
     await page.getByRole('button', { name: 'Create Dataset' }).first().click();
