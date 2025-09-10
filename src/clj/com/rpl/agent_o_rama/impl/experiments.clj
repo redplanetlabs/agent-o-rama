@@ -386,7 +386,13 @@
 
 (defn merge-number-evals
   [eval-maps]
-  (let [wrap (fn [m] (transform [MAP-VALS MAP-VALS] #(if (number? %) [%] NONE) m))]
+  (let [wrap (fn [m]
+               (transform [MAP-VALS MAP-VALS]
+                          #(cond
+                             (number? %) [%]
+                             (boolean %) [(if % 1 0)]
+                             :else NONE)
+                          m))]
     (apply merge-with (partial merge-with into) (mapv wrap eval-maps))))
 
 (def PERCENTILES [0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 0.99 0.999])
