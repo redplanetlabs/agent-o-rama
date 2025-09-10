@@ -384,17 +384,33 @@
         :evals  (:evals info)})
    )))
 
+(defn merge-number-evals
+  [eval-maps]
+  (let [wrap (fn [m] (transform [MAP-VALS MAP-VALS] #(if (number? %) [%] NONE) m))]
+    (apply merge-with (partial merge-with into) (mapv wrap eval-maps))))
+
+(def PERCENTILES [0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 0.99 0.999])
+
+(defn compute-number-stats
+  [nums]
+  (let [nums (vec (sort nums))
+        c    (count nums)]
+    (aor-types/->valid-EvalNumberStats
+     (reduce + 0 nums)
+     c
+     (nth nums 0)
+     (nth nums (dec c))
+     (reduce
+      (fn [m p]
+        (assoc m p (nth nums (long (* p c)))))
+      {}
+      PERCENTILES))))
+
 (defn compute-eval-number-stats
   [example-info]
-
-  ;; TODO: <<<<>>>>
-  ; (drp/defrecord+ EvalNumberStats
-  ;   [average :- Double
-  ;    min :- Double
-  ;    max :- Double
-  ;    percentiles :- {Double Double}])
-  {}
-)
+  (transform [MAP-VALS MAP-VALS]
+             compute-number-stats
+             (merge-number-evals (mapv :evals example-info))))
 
 (defn maybe-get-json-path
   [jp v]

@@ -427,10 +427,11 @@
 
 ;; used in PState
 (drp/defrecord+ EvalNumberStats
-  [average :- Double
-   min :- Double
-   max :- Double
-   percentiles :- {Double Double}])
+  [total :- Number
+   count :- Long
+   min :- Number
+   max :- Number
+   percentiles :- {Double Number}])
 
 ;; Internal protocols
 
