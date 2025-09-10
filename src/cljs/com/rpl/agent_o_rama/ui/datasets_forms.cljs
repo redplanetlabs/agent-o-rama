@@ -101,14 +101,8 @@
              (state/dispatch [:form/clear form-id]))
            (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
 
-(def edit-dataset-form-spec
-  {:fields {:name ""
-            :description ""}
-   :validators {:name [forms/required]}
-   :submit-event [:dataset/edit]})
-
 (defui EditDatasetForm [{:keys [form-id initial-name initial-description]}]
-  (let [{:keys [error]} (forms/use-centralized-form form-id)
+  (let [{:keys [field-errors]} (forms/use-form form-id)
         name-field (forms/use-form-field form-id :name)
         description-field (forms/use-form-field form-id :description)]
 
@@ -131,15 +125,8 @@
                             :on-change (:on-change description-field)
                             :error (:error description-field)}))))
 
-(defn example-form-spec [config]
-  {:fields {:input ""
-            :output ""}
-   :validators {:input [forms/required forms/valid-json]
-                :output [forms/valid-json]}
-   :submit-event [:dataset/add-example config]})
-
 (defui ExampleForm [{:keys [form-id]}]
-  (let [{:keys [error]} (forms/use-centralized-form form-id)
+  (let [{:keys [field-errors]} (forms/use-form form-id)
         input-field (forms/use-form-field form-id :input)
         output-field (forms/use-form-field form-id :output)]
 
@@ -157,15 +144,44 @@
                             :error (:error output-field)
                             :type :textarea
                             :placeholder "{\"response\": \"Hello there!\"}"}))))
+(forms/reg-form
+ :add-dataset-example
+ {:steps [:main]
+  :main
+  {:initial-fields (fn [_props]
+                     {:input ""
+                      :output ""})
+   :validators {:input [forms/required forms/valid-json]
+                :output [forms/valid-json]}
+   :ui (fn [{:keys [form-id]}]
+         ($ ExampleForm {:form-id form-id}))
+   :modal-props {:title "Add Example"
+                 :submit-text "Add Example"}}
+  :on-submit
+  (fn [db {:keys [form-id form-fields props]}]
+    ;; This logic is moved from events.cljs and adapted
+    (let [{:keys [module-id dataset-id snapshot-name]} props
+          {:keys [input output]} form-fields]
+      (sente/request!
+       [:datasets/add-example {:module-id module-id
+                               :dataset-id dataset-id
+                               :snapshot-name snapshot-name
+                               :input input
+                               :output output}]
+       10000
+       (fn [reply]
+         (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+         (if (:success reply)
+           (do
+             (state/dispatch [:modal/hide])
+             (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+             (state/dispatch [:form/clear form-id]))
+           (state/dispatch [:db/set-value [:forms form-id :error] (or (:error reply) "An unknown server error occurred.")]))))))})
 
-(defn show-add-example-modal! [config]
-  (state/dispatch [:form/init :add-example
-                   (example-form-spec config)])
-  (state/dispatch [:modal/show :add-example
-                   {:title "Add Example"
-                    :form-id :add-example
-                    :submit-text "Add Example"
-                    :component ($ ExampleForm {:form-id :add-example})}]))
+(defn show-add-example-modal! [props]
+  (state/dispatch [:modal/show-form :add-dataset-example props]))
+
+
 
 (def create-snapshot-form-spec
   {:fields {:snapshot-name ""}

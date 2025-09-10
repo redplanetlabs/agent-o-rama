@@ -317,36 +317,6 @@
                                      (state/dispatch [:form/set-error form-id (str "Failed to save: " error)]))))))
                    nil))
 
-(state/reg-event :dataset/add-example
-                 (fn [db {:keys [module-id dataset-id snapshot-name form-fields]}]
-                   (let [input (get form-fields :input "")
-                         output (get form-fields :output "")
-                         form-id :add-example]
-
-                     (try
-                       (when-not (str/blank? input) (js/JSON.parse input))
-                       (when-not (str/blank? output) (js/JSON.parse output))
-
-                       (sente/request!
-                        [:datasets/add-example {:module-id module-id
-                                                :dataset-id dataset-id
-                                                :snapshot-name snapshot-name
-                                                :input input
-                                                :output output}]
-                        10000
-                        (fn [reply]
-                          (state/dispatch [:form/set-submitting form-id false])
-                          (if (:success reply)
-                            (do
-                              (state/dispatch [:modal/hide])
-                              (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                              (state/dispatch [:form/clear form-id]))
-                            (state/dispatch [:form/set-error form-id (or (:error reply) "An unknown server error occurred.")]))))
-                       (catch js/Error e
-                         (state/dispatch [:form/set-submitting form-id false])
-                         (state/dispatch [:form/set-error form-id (str "Invalid JSON: " (.-message e))]))))
-                   nil))
-
 (state/reg-event :dataset/edit-example
                  (fn [db {:keys [module-id dataset-id snapshot-name example-id form-fields]}]
                    (let [input (get form-fields :input "")
