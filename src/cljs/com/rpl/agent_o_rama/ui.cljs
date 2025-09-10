@@ -26,26 +26,6 @@
    [com.rpl.agent-o-rama.ui.invocation-graph-view :refer [global-modal-component]]
    [com.rpl.agent-o-rama.ui.events])) ;; Ensure event handlers are registered at app startup
 
-;; =============================================================================
-;; ROUTE DEFINITIONS
-;; =============================================================================
-
-;; =============================================================================
-;; MAIN LAYOUT COMPONENT
-;; =============================================================================
-
-(defui main-layout [{:keys [children]}]
-  ($ :div.flex.h-screen.bg-gray-50
-     ($ sidebar-nav)
-     ($ :div.flex-1.flex.flex-col.min-h-0
-        ($ breadcrumb)
-        ($ :div.flex-1.overflow-auto children)
-        ($ global-modal-component))))
-
-;; =============================================================================
-;; ROUTE DEFINITIONS
-;; ============================================================================= 
-
 (def routes
   [""
    ["/" {:name :home, :views [agents/index]}]
@@ -67,12 +47,34 @@
       ["/config" {:name :agent/config, :views [config-page/config-page]}]
       ["/stats" {:name :agent/stats, :views [stats/stats]}]]]]])
 
-;; Store router instance globally for navigation
-(defonce router-instance (atom nil))
+(defui ViewStack []
+  (let [match (state/use-sub [:route])
+        ;; Get the stack of views to render from the route data.
+        ;; Defaults to an empty vector if no views are defined for the route.
+        view-stack (get-in match [:data :views] [])]
+    (println "match" match)
+    
+    ;; Render the views as siblings inside a single div.
+    ;; Each view component is responsible for subscribing to the parts
+    ;; of the app-db it needs, including the route data itself.
+    ($ :div.flex-1.overflow-auto
+       (if (seq view-stack)
+         (for [view-component view-stack]
+           ($ view-component {:key (str view-component) ;; React needs a key for lists
+                              :match match}))
+         ;; Render a fallback if no views are matched
+         ($ :div.p-8.text-center "Route not found or has no associated view.")))))
 
-;; =============================================================================
-;; ROUTER WRAPPER COMPONENT
-;; =============================================================================
+(defui main-layout []
+  ($ :div.flex.h-screen.bg-gray-50
+     ($ sidebar-nav)
+     ($ :div.flex-1.flex.flex-col.min-h-0
+        ($ breadcrumb)
+        ($ :div.flex-1.overflow-auto
+           ($ ViewStack))
+        ($ global-modal-component))))
+
+(defonce router-instance (atom nil))
 
 (defui with-router [{:keys [routes children]}]
   (let [router (uix/use-memo #(rf/router routes {:data {:coercion malli/coercion}}) [routes])]
@@ -304,36 +306,11 @@
 ;; ROUTER COMPONENT FOR NESTED ROUTES
 ;; =============================================================================
 
-(defui RouterComponent []
-  (let [match (state/use-sub [:route])
-        ;; Decode and expose path params at top-level props
-        path-params (:path-params match)
-        decoded-params (into {}
-                             (for [[k v] path-params]
-                               [k (when (some? v) (common/url-decode v))]))
-        match* (assoc match :path-params decoded-params)
-        view-stack (get-in match [:data :views] [])
-        app-component (reduce (fn [child-component parent-component]
-                                (fn [props]
-                                  (let [props* (if (map? props)
-                                                 props
-                                                 (js->clj props :keywordize-keys true))]
-                                    ($ parent-component (assoc props* :child-component child-component)))))
-                              nil
-                              (reverse view-stack))]
-    (if app-component
-      ;; Merge decoded params so leaves can destructure {:module-id ... :dataset-id ...}
-      ($ app-component (merge match* decoded-params {:match match*}))
-      ($ :div.p-8.text-center "Route not found"))))
-
 ;; =============================================================================
 ;; MAIN APP COMPONENT
 ;; =============================================================================
 
-(defui app []
-  ($ main-layout
-     ($ with-router {:routes routes}
-        ($ RouterComponent))))
+(defui app [] ($ with-router {:routes routes} ($ main-layout)))
 
 (defn init []
   (sente/init!)
