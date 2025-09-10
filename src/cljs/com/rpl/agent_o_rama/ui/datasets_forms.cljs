@@ -106,13 +106,6 @@
         name-field (forms/use-form-field form-id :name)
         description-field (forms/use-form-field form-id :description)]
 
-    ;; Set initial values when component mounts
-    (uix/use-effect
-     (fn []
-       ((:on-change name-field) initial-name)
-       ((:on-change description-field) initial-description))
-     [initial-name initial-description])
-
     ($ forms/form
        ($ forms/form-field {:label "Name"
                             :value (:value name-field)
@@ -237,8 +230,12 @@
   :on-submit
   (fn [db {:keys [form-id form-fields props]}]
     (let [{:keys [module-id dataset-id snapshot-name example-ids]} props
-          {:keys [tag-name]} form-fields]
+          {:keys [tag-name]} form-fields
+          {:keys [dataset-id module-id]} (s/select-one [:route :path-params] db)
+          ;; TODO need to do snapshot form now
+          {:keys [snapshot-name]} (s/select-one [] db)]
       (println "running!")
+      (println "selected" )
       (sente/request!
        [:datasets/add-tag-to-examples {:module-id module-id
                                        :dataset-id dataset-id
@@ -252,6 +249,11 @@
            (do
              (state/dispatch [:modal/hide])
              (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
+             (println "module-id" module-id)
+             (println "dataset-id" dataset-id)
+             (println "snapshot-name" snapshot-name)
+             (println "example-ids" example-ids)
+             (println "tag-name" tag-name)
              (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
              (state/dispatch [:form/clear form-id]))
            (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
