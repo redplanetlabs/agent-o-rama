@@ -19,11 +19,11 @@ test.describe('research agent module exists', () => {
     const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
 
     // Wait up to 30 seconds for the agent to appear. The first load can be slow.
-    await expect(agentLink).toBeVisible({ timeout: 30000 });
+    await expect(agentRow).toBeVisible({ timeout: 30000 });
     console.log(`Found agent: ${moduleName}:${agentName}`);
 
-    // Step 4: Click the agent link to navigate.
-    await agentLink.click();
+    // Step 4: Click the agent row to navigate.
+    await agentRow.click();
 
     await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule.*/i);
     console.log('Successfully verified agent detail page.');
@@ -48,11 +48,11 @@ test.describe('Dataset crud', () => {
     const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
 
     // Wait up to 30 seconds for the agent to appear. The first load can be slow.
-    await expect(agentLink).toBeVisible({ timeout: 30000 });
+    await expect(agentRow).toBeVisible({ timeout: 30000 });
     console.log(`Found agent: ${moduleName}:${agentName}`);
 
-    // Step 4: Click the agent link to navigate.
-    await agentLink.click();
+    // Step 4: Click the agent row to navigate.
+    await agentRow.click();
 
     await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule.*/i);
     console.log('Successfully verified agent detail page.');
@@ -142,11 +142,11 @@ test.describe('Dataset example crud', () => {
     const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
 
     // Wait up to 30 seconds for the agent to appear. The first load can be slow.
-    await expect(agentLink).toBeVisible({ timeout: 30000 });
+    await expect(agentRow).toBeVisible({ timeout: 30000 });
     console.log(`Found agent: ${moduleName}:${agentName}`);
 
-    // Step 4: Click the agent link to navigate.
-    await agentLink.click();
+    // Step 4: Click the agent row to navigate.
+    await agentRow.click();
 
     await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule.*/i);
     console.log('Successfully verified agent detail page.');
@@ -285,8 +285,8 @@ test.describe('Inline editing validation', () => {
     const agentName = 'ResearchAgentModule';
     const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
     const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
-    await expect(agentLink).toBeVisible({ timeout: 30000 });
-    await agentLink.click();
+    await expect(agentRow).toBeVisible({ timeout: 30000 });
+    await agentRow.click();
 
     const datasetsLink = page.getByText('Datasets & Experiments');
     await expect(datasetsLink).toBeVisible({ timeout: 30000 });
@@ -382,8 +382,8 @@ test.describe('Dataset snapshot dropdown', () => {
     const agentName = 'ResearchAgentModule';
     const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
     const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
-    await expect(agentLink).toBeVisible({ timeout: 30000 });
-    await agentLink.click();
+    await expect(agentRow).toBeVisible({ timeout: 30000 });
+    await agentRow.click();
 
     await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule.*/i);
 
@@ -496,8 +496,8 @@ test.describe('Form Validation and Error Handling', () => {
     const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
     const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
 
-    await expect(agentLink).toBeVisible({ timeout: 30000 });
-    await agentLink.click();
+    await expect(agentRow).toBeVisible({ timeout: 30000 });
+    await agentRow.click();
 
     const datasetsLink = page.getByText('Datasets & Experiments');
     await expect(datasetsLink).toBeVisible({ timeout: 30000 });
