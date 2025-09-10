@@ -477,31 +477,17 @@
 
 (defn all-evaluator-builders-without-builder-fns
   []
-<<<<<<< HEAD
-  (setval
-   [MAP-VALS :builder-fn]
-   NONE
-   (evals/all-evaluator-builders)))
-=======
   (setval [MAP-VALS :builder-fn]
           NONE
           (evals/all-evaluator-builders)))
->>>>>>> master
 
 (defn declare-all-evaluator-builders-query-topology
   [topologies]
   (<<query-topology topologies
-<<<<<<< HEAD
-                    (all-evaluator-builders-name)
-                    [:> *res]
-                    (|origin)
-                    (all-evaluator-builders-without-builder-fns :> *res)))
-=======
     (all-evaluator-builders-name)
     [:> *res]
     (|origin)
     (all-evaluator-builders-without-builder-fns :> *res)))
->>>>>>> master
 
 (defn evaluator-event
   [^CompletableFuture cf name eval-type builder-name builder-params params]
@@ -538,13 +524,13 @@
              :else
              (throw (h/ex-info "Invalid evaluator type"
                                {:type eval-type}))
-             ))
-          )
+           ))
+        )
         (catch Throwable t
           (.completeExceptionally cf t))
         (finally
           (anode/release-acquired-objects! fetcher)))
-      )))
+    )))
 
 (defn declare-try-evaluator-query-topology
   [topologies]
@@ -679,7 +665,7 @@
         :> *search-string-lower)
       (evals/all-evaluator-builders :> *builders)
       (<<ramafn %filter
-        [*name {:keys [*builder-name] :as *info}]
+        [*name {:keys [*builder-name]}]
         (select> [(keypath *builder-name) :type] *builders :> *type)
         (<<cond
          (case> (nil? *type))
@@ -694,7 +680,7 @@
           (:> nil nil)
 
          (default>)
-          (:> (assoc *info :name *name :type *type))))
+          (:> {:name *name :type *type} nil)))
       (search-loop evals-pstate-sym
                    STAY
                    %filter
