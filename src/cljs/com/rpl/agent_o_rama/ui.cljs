@@ -58,8 +58,7 @@
      ["/datasets"
       ["" {:name :module/datasets, :views [datasets/index]}]
       ["/:dataset-id"
-       {:name :module/dataset-detail, :views [datasets/detail]}
-       ["" {:name :module/dataset-detail.index, :views [datasets/detail-examples]}]
+       ["" {:name :module/dataset-detail, :views [datasets/detail-examples]}]
        ["/examples" {:name :module/dataset-detail.examples, :views [datasets/detail-examples]}]
        ["/experiments" {:name :module/dataset-detail.experiments, :views [experiments/index]}]]]
      ["/evaluations" {:name :module/evaluations, :views [evaluators/index]}]
@@ -140,7 +139,7 @@
        (when-not collapsed?
          ($ :div.px-3.text-xs.font-semibold.text-gray-500 "MODULE"))
 
-       ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/datasets")
+       ($ nav-link {:href (rfe/href :module/datasets {:module-id module-id})
                     :location location :collapsed? collapsed? :title "Datasets"}
           ($ CircleStackIcon {:className "h-5 w-5 flex-shrink-0"})
           (when-not collapsed? ($ :span.ml-3 "Datasets & Experiments")))
@@ -311,6 +310,7 @@
 (defui RouterComponent []
   (let [match (state/use-sub [:route])
         view-stack (get-in match [:data :views] [])
+        _ (println "view stack" view-stack)
         app-component (reduce (fn [child-component parent-component]
                                 (fn [props]
                                   (let [props* (js->clj props :keywordize-keys true)]
