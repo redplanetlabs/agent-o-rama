@@ -270,12 +270,12 @@
                          {:keys [valid? errors]} (validate-form-fields (:fields form-state) (:validators step-spec))]
 
                      (if-not valid?
-                       (dispatch [:db/set-value
-                                  [:forms form-id]
-                                  (assoc form-state :valid? false :field-errors errors)])
+                       (state/dispatch [:db/set-value
+                                        [:forms form-id]
+                                        (assoc form-state :valid? false :field-errors errors)])
                        (let [on-submit-handler (:on-submit form-spec)]
                          ;; Set submitting state and let the handler run its side-effect
-                         (dispatch [:db/set-value [:forms form-id] (assoc form-state :submitting? true :error nil)])
+                         (state/dispatch [:db/set-value [:forms form-id] (assoc form-state :submitting? true :error nil)])
                          (when on-submit-handler
                            (on-submit-handler db {:form-id form-id
                                                   :form-fields (:fields form-state)
