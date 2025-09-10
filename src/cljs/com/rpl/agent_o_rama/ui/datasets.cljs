@@ -913,7 +913,7 @@
 ;; DATASET DETAIL LAYOUT COMPONENT
 ;; =============================================================================
 
-(defui detail [{:keys [match child-component]}] ;; Note `child-component`
+(defui detail [{:keys [match]}]
   (let [{:keys [module-id dataset-id]} (get-in match [:path-params])
         decoded-module-id (when module-id (common/url-decode module-id))
         route-name (get-in match [:data :name])
@@ -1006,9 +1006,10 @@
                                                 "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "examples")})}
                      "Examples")))
 
-            ;; Content area where the child component is rendered
+            ;; Content area - render the appropriate child component based on route
             ($ :div.flex-1.min-h-0
-               (if child-component
-                 ($ child-component {:match match}) ;; <-- THE MAGIC! Render the child.
+               (case active-tab
+                 "examples" ($ detail-examples {:match match})
+                 "experiments" ($ experiments/index {:match match})
                  ($ :div.p-4 "Select a tab to view content."))))
          :else ($ :div.p-6 "Dataset not found.")))))
