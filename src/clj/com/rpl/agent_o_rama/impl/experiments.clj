@@ -352,7 +352,7 @@
        dataset-id)
     )))
 
-(defn fetch-example-runs
+(defn fetch-example-info
   [local-ds datasets id dataset-id snapshot result+example-ids]
   (vec
    (for [[result-id example-id] result+example-ids
@@ -362,29 +362,39 @@
            [(keypath dataset-id :snapshots snapshot example-id)]
            datasets)
 
-          results
+          info
           (store/pstate-select-one
            [(keypath dataset-id
                      :experiments
                      id
                      :results
-                     result-id
-                     ;; TODO: <<<<>>> should grab everything, not just this
-                     ;;   - and this method should return map, not ExampleRunImpl
-                     ;;   - can make those later
-                     :agent-results)]
-           local-ds)
-
-          outputs (select [MAP-VALS :result :val] results)]
-         :when (not (selected-any? [MAP-VALS :result :failure? identity] results))]
+                     result-id)
+            (submap [:agent-results :evals])]
+           local-ds)]
+         :when (not (selected-any? [:agent-results MAP-VALS :result :failure? identity] info))]
      (do
-       (when-not (= 1 (count outputs))
+       (when-not (= 1 (count (:agent-results info)))
          (throw
           (h/ex-info
-           "Outputs when fetching example runs unexpectedly does not contain exactly one value"
-           {:outputs outputs})))
-       (aor-types/->ExampleRunImpl input reference-output (nth outputs 0)))
+           "Results when fetching example runs unexpectedly does not contain exactly one value"
+           {:results (:agent-results info)})))
+       {:input  input
+        :reference-output reference-output
+        :output (select-any [:agent-results MAP-VALS :result :val] info)
+        :evals  (:evals info)})
    )))
+
+(defn compute-eval-number-stats
+  [example-info]
+
+  ;; TODO: <<<<>>>>
+  ; (drp/defrecord+ EvalNumberStats
+  ;   [average :- Double
+  ;    min :- Double
+  ;    max :- Double
+  ;    percentiles :- {Double Double}])
+  {}
+)
 
 (defn maybe-get-json-path
   [jp v]
@@ -592,25 +602,35 @@
      h/+concatv
      (fn [agent-node
           result+example-ids
-          [{:keys [id dataset-id snapshot] :as experiment} remote-info]]
+          [{:keys [id dataset-id snapshot spec] :as experiment} remote-info]]
        (with-retriever [agent-node experiment remote-info]
          [retriever]
          (let [eval-info  (all-evaluator-info retriever experiment)
                evaluators (relevant-evaluators agent-node eval-info #{:summary})
                datasets   (datasets-pstate retriever)
                local-ds   (local-datasets-store retriever)]
-           (when-not (empty? evaluators)
+           (when (aor-types/RegularExperiment? spec)
              ;; TODO: <<<<>>>> do this no matter what
              ;;   - should fetch timing info and eval results as well so can aggregate
              ;;     - need distribution for timings
              ;;     - do distribution for numeric ones as well?
-             (let [example-runs
-                   (fetch-example-runs local-ds datasets id dataset-id snapshot result+example-ids)
+             (let [example-info
+                   (fetch-example-info local-ds datasets id dataset-id snapshot result+example-ids)
 
-                   {curr-evals :summary-evals curr-failures :summary-eval-failures}
+                   {curr-evals    :summary-evals
+                    curr-failures :summary-eval-failures
+                    curr-eval-number-stats :eval-number-stats}
                    (store/pstate-select-one [(keypath dataset-id :experiments id)
-                                             (submap [:summary-evals :summary-eval-failures])]
+                                             (submap [:summary-evals :summary-eval-failures
+                                                      :eval-number-stats])]
                                             local-ds)]
+               (when (nil? curr-eval-number-stats)
+                 (let [eval-stats (compute-eval-number-stats example-info)]
+                   (store/pstate-transform!
+                    [(keypath dataset-id :experiments id :eval-number-stats)
+                     (termval eval-stats)]
+                    local-ds
+                    dataset-id)))
                (doseq [[eval-name
                         {:keys [eval-fn input-json-path reference-output-json-path
                                 output-json-path]}]
@@ -619,15 +639,16 @@
                        :when (and (not (contains? curr-evals eval-name))
                                   (not (contains? curr-failures eval-name)))
                        :let [example-runs
-                             ;; TODO: <<<<>>> convert to ExampleRunImpl here
-                             (multi-transform
-                              [ALL
-                               (multi-path
-                                [:input (term #(maybe-get-json-path input-json-path %))]
-                                [:reference-output
-                                 (term #(maybe-get-json-path reference-output-json-path %))]
-                                [:output (term #(maybe-get-json-path output-json-path %))])]
-                              example-runs)]]
+                             (mapv
+                              (fn [{:keys [input reference-output output]}]
+                                (aor-types/->ExampleRunImpl (maybe-get-json-path input-json-path
+                                                                                 input)
+                                                            (maybe-get-json-path
+                                                             reference-output-json-path
+                                                             reference-output)
+                                                            (maybe-get-json-path output-json-path
+                                                                                 output)))
+                              example-info)]]
                  (hook:do-summary-eval eval-name)
                  (evaluate! local-ds
                             dataset-id

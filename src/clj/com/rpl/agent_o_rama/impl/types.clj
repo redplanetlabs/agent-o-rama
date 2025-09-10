@@ -425,6 +425,13 @@
    dataset-id :- UUID]
   ExperimentEvent)
 
+;; used in PState
+(drp/defrecord+ EvalNumberStats
+  [average :- Double
+   min :- Double
+   max :- Double
+   percentiles :- {Double Double}])
+
 ;; Internal protocols
 
 (defprotocol UnderlyingObjects
