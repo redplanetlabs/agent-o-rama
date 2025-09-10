@@ -397,7 +397,7 @@
         c    (count nums)]
     (aor-types/->valid-EvalNumberStats
      (reduce + 0 nums)
-     c
+     (long c)
      (nth nums 0)
      (nth nums (dec c))
      (reduce
@@ -408,9 +408,9 @@
 
 (defn compute-eval-number-stats
   [example-info]
-  (transform [MAP-VALS MAP-VALS]
-             compute-number-stats
-             (merge-number-evals (mapv :evals example-info))))
+  (->> (merge-number-evals (mapv :evals example-info))
+       (setval [MAP-VALS empty?] NONE)
+       (transform [MAP-VALS MAP-VALS] compute-number-stats)))
 
 (defn maybe-get-json-path
   [jp v]
