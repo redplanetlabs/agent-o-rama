@@ -47,6 +47,7 @@
           ;; It will only be recreated if form-id or field-path changes.
           on-change (uix/use-callback
                      (fn [new-value]
+                       (println "new-value" new-value)
                        (state/dispatch [:form/update-field form-id field-path new-value]))
                      [form-id field-path])]
 
@@ -213,6 +214,7 @@
 (defn valid-json
   "Validator for JSON strings"
   [value]
+  (println "valid-json" value)
   (when-not (str/blank? value)
     (try
       (js/JSON.parse value)
@@ -241,7 +243,11 @@
              (let [form-spec (@form-specs form-id)
                    current-step-key (get-in db [:forms form-id :current-step])
                    step-spec (get form-spec current-step-key form-spec)
-                   validators-for-field (get-in step-spec [:validators field-path])]
+                   validators-for-field (get-in step-spec (into [:validators] field-path))]
+               (println "form-id" form-id)
+               (println "field-path" field-path)
+               (println "value" value)
+               (println "validators-for-field" validators-for-field)
 
                (s/multi-path
                 ;; Path 1: Update the field's value
