@@ -9,7 +9,6 @@
    [com.rpl.agent-o-rama.ui.datasets :as datasets]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    [com.rpl.agent-o-rama.ui.experiments.index :as experiments]
-   ;; Replace wouter with reitit
    [reitit.core :as r]
    [reitit.frontend :as rf]
    [reitit.frontend.easy :as rfe]
@@ -22,8 +21,8 @@
    [com.rpl.agent-o-rama.ui.stats :as stats]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.state :as state]
+   [com.rpl.agent-o-rama.ui.forms :refer [global-modal-component]]
    [com.rpl.agent-o-rama.ui.queries :as queries]
-   [com.rpl.agent-o-rama.ui.invocation-graph-view :refer [global-modal-component]]
    [com.rpl.agent-o-rama.ui.events])) ;; Ensure event handlers are registered at app startup
 
 (def routes

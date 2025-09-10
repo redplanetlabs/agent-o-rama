@@ -6,122 +6,49 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [clojure.string :as str]))
 
-;; =============================================================================
-;; REUSABLE FORM HOOKS
-;; =============================================================================
+(defonce forms-specs (atom {}))
 
-;; DELETED: use-form-state hook - vestigial pattern removed in favor of centralized forms
+(defn reg-form
+  "Registers a self-contained form specification."
+  [form-id spec]
+  (swap! form-specs assoc form-id spec))
 
-(defhook use-global-form-submission
-  "Hook that provides access to global form submission state.
-   
-   Returns a map with:
-   - :submitting? - boolean indicating if form is submitting
-   - :error - current error message (or nil)
-   - :clear-error - function to clear error
-   - :submit - function that dispatches the form event"
-  [form-event]
-  (let [submitting? (state/use-sub [:ui :modal :form :submitting?])
-        error (state/use-sub [:ui :modal :form :error])
-
-        clear-error (uix/use-callback
-                     #(state/dispatch [:db/set-value [:ui :modal :form :error] nil])
-                     [])
-
-        submit (uix/use-callback
-                (fn [form-data]
-                  (state/dispatch [form-event form-data]))
-                [form-event])]
-
-    {:submitting? submitting?
-     :error error
-     :clear-error clear-error
-     :submit submit}))
-
-(defhook use-centralized-form
-  "Hook for working with centralized form state management.
-   
-   Usage:
-   (let [{:keys [fields field-errors set-field valid? submitting? error]} (use-centralized-form form-id)]
-     ...)"
+(defhook use-form
+  "The primary hook for components to interact with form state.
+   It provides reactive state and memoized action dispatchers."
   [form-id]
   (let [form-state (state/use-sub [:forms form-id])
-        fields (or (:fields form-state) {})
-        field-errors (or (:field-errors form-state) {})
-        valid? (boolean (:valid? form-state))
-        submitting? (boolean (:submitting? form-state))
-        error (:error form-state)
+        {:keys [fields field-errors valid? submitting? error current-step steps]} form-state
 
-        set-field (uix/use-callback
-                   (fn [field-key value]
-                     (state/dispatch [:form/update-field form-id field-key value]))
-                   [form-id])
+        ;; Memoized action dispatchers
+        set-field! (uix/use-callback
+                    (fn [field-key value]
+                      (state/dispatch [:form/update-field form-id field-key value]))
+                    [form-id])
 
-        get-field (uix/use-callback
-                   (fn [field-key]
-                     (get fields field-key ""))
-                   [fields])]
+        next-step! (uix/use-callback
+                    #(state/dispatch [:form/next-step form-id])
+                    [form-id])
 
-    {:fields fields
-     :field-errors field-errors
-     :get-field get-field
-     :set-field set-field
-     :valid? valid?
-     :submitting? submitting?
-     :error error}))
+        prev-step! (uix/use-callback
+                    #(state/dispatch [:form/prev-step form-id])
+                    [form-id])
 
-(defhook use-form-field
-  "Hook for individual form field that integrates with centralized state.
-   
-   Usage:
-   (let [{:keys [value error on-change]} (use-form-field form-id :name)]
-     ...)"
-  [form-id field-key]
-  (let [{:keys [get-field set-field field-errors]} (use-centralized-form form-id)
-        value (get-field field-key)
-        error (get field-errors field-key)
-        on-change (uix/use-callback
-                   (fn [new-value]
-                     (set-field field-key new-value))
-                   [set-field field-key])]
+        submit! (uix/use-callback
+                 #(state/dispatch [:form/submit form-id])
+                 [form-id])]
 
-    {:value value
+    {:fields (or fields {})
+     :field-errors (or field-errors {})
+     :valid? (boolean valid?)
+     :submitting? (boolean submitting?)
      :error error
-     :on-change on-change}))
-
-;; =============================================================================
-;; COMMON FORM VALIDATORS
-;; =============================================================================
-
-(def required
-  "Validator for required fields"
-  (fn [value]
-    (when (str/blank? value)
-      "This field is required")))
-
-(defn min-length
-  "Validator for minimum string length"
-  [n]
-  (fn [value]
-    (when (and (string? value) (< (count value) n))
-      (str "Must be at least " n " characters long"))))
-
-(defn max-length
-  "Validator for maximum string length"
-  [n]
-  (fn [value]
-    (when (and (string? value) (> (count value) n))
-      (str "Must be no more than " n " characters long"))))
-
-(def valid-json
-  "Validator for JSON strings"
-  (fn [value]
-    (when-not (str/blank? value)
-      (try
-        (js/JSON.parse value)
-        nil ; Valid JSON
-        (catch js/Error e
-          (str "Invalid JSON: " (.-message e)))))))
+     :current-step current-step
+     :steps steps
+     :set-field! set-field!
+     :next-step! next-step!
+     :prev-step! prev-step!
+     :submit! submit!}))
 
 ;; =============================================================================
 ;; REUSABLE FORM COMPONENTS
@@ -178,6 +105,8 @@
          ($ :p.text-sm.text-red-600.mt-1 error)
          ($ :div.mt-1.h-5)))))
 
+;; TODO delete maybe?
+#_
 (defui form-actions
   "Reusable form action buttons (Cancel/Submit).
    
@@ -229,43 +158,53 @@
   ($ :form.p-4
      children))
 
-;; =============================================================================
-;; EXAMPLE USAGE PATTERN
-;; =============================================================================
+(defui global-modal-component []
+  (let [modal-state (state/use-sub [:ui :modal])
+        {:keys [active data]} modal-state
+        form-id (when active (:form-id data))
 
-(comment
-  ;; Example of how to use these utilities in a form component:
+        ;; Use our new form hook. It will return nil if form-id is nil.
+        form (when form-id (forms/use-form form-id))
 
-  (defui my-form-component [{:keys [on-success]}]
-    (let [name-field (use-form-state "" [required (min-length 3)])
-          email-field (use-form-state "" [required])
-          {:keys [submitting? error submit]} (use-global-form-submission :my-form/submit)
+        handle-cancel (fn []
+                        (when form-id (state/dispatch [:form/clear form-id]))
+                        (state/dispatch [:modal/hide]))
 
-          is-valid? (and (nil? (:error name-field))
-                         (nil? (:error email-field))
-                         (not (str/blank? (:value name-field)))
-                         (not (str/blank? (:value email-field))))]
+        handle-keydown (fn [e] (when (= (.-key e) "Escape") (.preventDefault e) (handle-cancel)))]
 
-      ($ :form
-         ($ form-field {:label "Name"
-                        :value (:value name-field)
-                        :on-change (:set-value name-field)
-                        :error (:error name-field)
-                        :required? true})
+    (uix/use-effect (fn [] (when active (.addEventListener js/document "keydown" handle-keydown) #(.removeEventListener js/document "keydown" handle-keydown))) [active])
 
-         ($ form-field {:label "Email"
-                        :type :email
-                        :value (:value email-field)
-                        :on-change (:set-value email-field)
-                        :error (:error email-field)
-                        :required? true})
+    (when active
+      (react-dom/createPortal
+       ($ :div {:className "fixed inset-0 flex items-center justify-center z-50", :style {:backgroundColor "rgba(0, 0, 0, 0.5)"}, :onClick handle-cancel}
+          ($ :div {:className "bg-white rounded-lg shadow-xl w-full max-w-5xl overflow-hidden mx-4 my-8 flex flex-col max-h-screen", :role "dialog", :aria-modal "true", :onClick #(.stopPropagation %)}
+             ($ :div {:className "flex-shrink-0 p-4 border-b border-gray-200 flex justify-between items-center bg-white"}
+                ($ :h3 {:className "text-lg font-medium text-gray-800"} (:title data))
+                ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer", :onClick handle-cancel} "×"))
+             ($ :div {:className "flex-1 min-h-0 overflow-y-auto"}
+                (if form
+                  (let [form-spec (get @forms/form-specs form-id)
+                        ui-fn (if (:steps form)
+                                (get-in form-spec [(:current-step form) :ui])
+                                (:ui form-spec))]
+                    (if ui-fn (ui-fn {:form-id form-id}) ($ :div "No UI for this form step.")))
+                  (:component data))) ; Fallback for non-form modals
+             (when form
+               ($ :div {:className "flex-shrink-0 border-t border-gray-200 bg-white px-6 py-4"}
+                  ($ forms/form-error {:error (:error form)})
+                  ($ :div {:className "flex justify-end gap-3"}
+                     ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer", :type "button", :onClick handle-cancel} "Cancel")
+                     (when (and (:steps form) (not= (first (:steps form)) (:current-step form)))
+                       ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer", :type "button", :onClick (:prev-step! form)} "Back"))
+                     (if (and (:steps form) (not= (last (:steps form)) (:current-step form)))
+                       ($ :button {:type "button", :disabled (not (:valid? form)), :onClick (:next-step! form)
+                                   :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium "
+                                                   (if (not (:valid? form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
+                          "Next")
+                       ($ :button {:type "button", :disabled (or (not (:valid? form)) (:submitting? form)), :onClick (:submit! form)
+                                   :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
+                                                   (if (or (not (:valid? form)) (:submitting? form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
+                          (when (:submitting? form) ($ :div {:className "animate-spin rounded-full h-4 w-4 border-b-2 border-white"}))
+                          "Submit"))))))))
+      (.-body js/document))))
 
-         ($ form-error {:error error})
-
-         ($ form-actions {:on-cancel #(state/dispatch [:modal/hide])
-                          :on-submit #(submit {:name (:value name-field)
-                                               :email (:value email-field)
-                                               :on-success on-success})
-                          :submit-text "Create User"
-                          :submitting? submitting?
-                          :disabled? (or submitting? (not is-valid?))})))))

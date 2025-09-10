@@ -321,28 +321,34 @@
                                      [:should-refetch? (s/terminal-val true)]))
                              matching-keys))))))
 
- ;; =============================================================================
-;; MODAL EVENTS
 ;; =============================================================================
-
-(reg-event :modal/show
-           (fn [db modal-type modal-data]
-             [:ui :modal (s/terminal-val {:active modal-type
-                                          :data modal-data
-                                          :form {:submitting? false
-                                                 :error nil}})]))
-
-(reg-event :modal/hide
-           (fn [db]
-             [:ui :modal (s/terminal-val {:active nil
-                                          :data {}
-                                          :form {:submitting? false
-                                                 :error nil}})]))
-
- ;; =============================================================================
 ;; FORM STATE MANAGEMENT EVENTS
 ;; =============================================================================
+(defn required [value] (when (str/blank? value) "This field is required"))
 
+(defn min-length
+  "Validator for minimum string length"
+  [n]
+  (fn [value]
+    (when (and (string? value) (< (count value) n))
+      (str "Must be at least " n " characters long"))))
+
+(defn max-length
+  "Validator for maximum string length"
+  [n]
+  (fn [value]
+    (when (and (string? value) (> (count value) n))
+      (str "Must be no more than " n " characters long"))))
+
+(defn valid-json
+  "Validator for JSON strings"
+  [value]
+  (when-not (str/blank? value)
+    (try
+      (js/JSON.parse value)
+      nil ; Valid JSON
+      (catch js/Error e
+        (str "Invalid JSON: " (.-message e))))))
 (defn- validate-form-fields
   "Validate fields against validators. Returns a map {:valid? boolean :errors {field-key error-str-or-nil}}"
   [fields validators]
@@ -357,82 +363,109 @@
     {:errors errors
      :valid? (every? nil? (vals errors))}))
 
-(reg-event :form/init
-           (fn [db form-id {:keys [fields validators submit-event]}]
-             (let [{:keys [valid? errors]} (validate-form-fields (or fields {}) (or validators {}))]
-               [:forms form-id (s/terminal-val {:fields (or fields {})
-                                                :validators (or validators {})
-                                                :field-errors errors
-                                                :valid? valid?
-                                                :submitting? false
-                                                :error nil
-                                                :submit-event submit-event})])))
-
 (reg-event :form/update-field
            (fn [db form-id field-key value]
              [:forms form-id
               (s/terminal
                (fn [form-state]
                  (let [updated-fields (assoc (:fields form-state) field-key value)
-                       validators (:validators form-state)
+                       form-spec (@forms/form-specs form-id)
+                       current-step-key (:current-step form-state)
+                       step-spec (get form-spec current-step-key form-spec)
+                       validators (:validators step-spec)
                        {:keys [valid? errors]} (validate-form-fields updated-fields validators)]
                    (assoc form-state
                           :fields updated-fields
                           :field-errors errors
                           :valid? valid?))))]))
 
-(reg-event :form/set-submitting
-           (fn [db form-id submitting?]
-             [:forms form-id :submitting? (s/terminal-val submitting?)]))
+(reg-event :form/next-step
+           (fn [db form-id]
+             (let [form-state (get-in db [:forms form-id])
+                   form-spec (@forms/form-specs form-id)
+                   {:keys [valid? current-step steps]} form-state]
+               (when valid?
+                 (let [current-idx (.indexOf steps current-step)
+                       next-step (get steps (inc current-idx))]
+                   (when next-step
+                     [:forms form-id :current-step (s/terminal-val next-step)]))))))
 
-(reg-event :form/set-error
-           (fn [db form-id error]
-             [:forms form-id :error (s/terminal-val error)]))
+(reg-event :form/prev-step
+           (fn [db form-id]
+             (let [form-state (get-in db [:forms form-id])
+                   {:keys [current-step steps]} form-state
+                   current-idx (.indexOf steps current-step)
+                   prev-step (get steps (dec current-idx))]
+               (when prev-step
+                 [:forms form-id :current-step (s/terminal-val prev-step)]))))
 
 (reg-event :form/submit
            (fn [db form-id]
-             (let [form-state (s/select-one [:forms form-id] db)]
-               (when (:valid? form-state)
-                 ;; Set submitting to true
-                 (dispatch [:form/set-submitting form-id true])
-                 ;; Clear any previous error
-                 (dispatch [:form/set-error form-id nil])
-                 ;; Get the domain event template and merge in field data
-                 (let [submit-event (:submit-event form-state)
-                       event-type (first submit-event)
-                       event-data (second submit-event)
-                       ;; Use deep merge to preserve nested structures like :params
-                       ;; Custom merge that properly handles nested parameter updates
-                       ;; Custom merge that properly handles nested parameter updates
-                       ;; Pass form fields and static event data separately - let the handler sort it out
-                       merged-data (assoc event-data :form-fields (:fields form-state))
-                       full-event [event-type merged-data]]
-                   ;; DEBUG: Log form submission data
-                   (println "FORM SUBMIT - Event type:" event-type)
-                   (println "FORM SUBMIT - Event data:" event-data)
-                   (println "FORM SUBMIT - Form fields:" (:fields form-state))
-                   (println "FORM SUBMIT - Merged data:" merged-data)
-                   ;; Dispatch the actual business logic event
-                   (dispatch full-event)))
-               nil))) ; This handler only dispatches other events
+             (let [form-state (get-in db [:forms form-id])
+                   form-spec (@forms/form-specs form-id)
+                   on-submit-handler (:on-submit form-spec)]
+               (when (and (:valid? form-state) on-submit-handler)
+                 ;; Set submitting state and then dispatch the submission handler as an effect
+                 (dispatch [:db/set-value [:forms form-id] (-> form-state
+                                                               (assoc :submitting? true :error nil))])
+                 ;; The on-submit handler is responsible for the actual side-effect
+                 (on-submit-handler db {:form-id form-id
+                                        :form-fields (:fields form-state)
+                                        :props (:props form-state)})))
+             nil))
 
 (reg-event :form/clear
            (fn [db form-id]
              [:forms (s/terminal #(dissoc % form-id))]))
 
-(reg-event :form/reset
-           (fn [db form-id initial-fields]
-             [:forms form-id
-              (s/terminal
-               (fn [form-state]
-                 (let [validators (:validators form-state)
-                       {:keys [valid? errors]} (validate-form-fields initial-fields validators)]
-                   (assoc form-state
-                          :fields initial-fields
-                          :field-errors errors
-                          :valid? valid?
-                          :error nil
-                          :submitting? false))))]))
+
+;; =============================================================================
+;; NEW MODAL AND FORM INTEGRATION EVENTS
+;; =============================================================================
+
+(reg-event :modal/show-form
+           (fn [db form-id props]
+             (let [form-spec (get @forms/form-specs form-id)]
+               (if-not form-spec
+                 (do (js/console.error "No form spec registered for" form-id) nil)
+                 (let [is-wizard? (boolean (:steps form-spec))
+                       initial-step (when is-wizard? (first (:steps form-spec)))
+                       step-spec (if is-wizard? (get form-spec initial-step) form-spec)
+                       initial-fields-fn (:initial-fields step-spec)
+                       initial-fields (if (fn? initial-fields-fn)
+                                        (initial-fields-fn props)
+                                        (or initial-fields-fn {}))
+                       validators (:validators step-spec)
+                       {:keys [valid? errors]} (validate-form-fields initial-fields validators)
+                       modal-data (if is-wizard?
+                                    (get-in form-spec [initial-step :modal-props] {})
+                                    (:modal-props form-spec {}))]
+                   ;; 1. Initialize the form state
+                   (dispatch [:db/set-value [:forms form-id] {:fields initial-fields
+                                                              :validators validators
+                                                              :field-errors errors
+                                                              :valid? valid?
+                                                              :submitting? false
+                                                              :error nil
+                                                              :props props
+                                                              :steps (:steps form-spec)
+                                                              :current-step initial-step}])
+                   ;; 2. Show the modal
+                   (dispatch [:modal/show form-id (assoc modal-data :form-id form-id)]))))
+             nil))
+
+(reg-event :modal/show
+           (fn [db modal-type modal-data]
+             [:ui :modal (s/terminal-val {:active modal-type
+                                          :data modal-data})]))
+
+(reg-event :modal/hide
+           (fn [db]
+             [:ui :modal (s/terminal-val {:active nil
+                                          :data {}})]))
+
+
+
 
 ;; =============================================================================
 ;; ROUTING EVENTS
@@ -440,7 +473,12 @@
 
 (reg-event :route/navigated
            (fn [db new-match]
-             [:route (s/terminal-val (s/transform [:path-params s/MAP-VALS] common/url-decode new-match))]))
+             [:route
+              (s/terminal-val
+               (s/transform
+                [:path-params s/MAP-VALS]
+                common/url-decode
+                new-match))]))
 
  ;; =============================================================================
 ;; DEBUGGING HELPERS
