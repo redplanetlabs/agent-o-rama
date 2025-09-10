@@ -382,7 +382,7 @@
                          [:modal/show-form :new-snapshot
                           {:module-id module-id
                            :dataset-id dataset-id
-                           :selected-snapshot selected-snapshot}]))
+                           :from-snapshot-name selected-snapshot}]))
 
         handle-delete (fn [snapshot-name]
                         (set-dropdown-open false)
