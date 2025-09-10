@@ -369,6 +369,9 @@
                      id
                      :results
                      result-id
+                     ;; TODO: <<<<>>> should grab everything, not just this
+                     ;;   - and this method should return map, not ExampleRunImpl
+                     ;;   - can make those later
                      :agent-results)]
            local-ds)
 
@@ -597,6 +600,10 @@
                datasets   (datasets-pstate retriever)
                local-ds   (local-datasets-store retriever)]
            (when-not (empty? evaluators)
+             ;; TODO: <<<<>>>> do this no matter what
+             ;;   - should fetch timing info and eval results as well so can aggregate
+             ;;     - need distribution for timings
+             ;;     - do distribution for numeric ones as well?
              (let [example-runs
                    (fetch-example-runs local-ds datasets id dataset-id snapshot result+example-ids)
 
@@ -612,6 +619,7 @@
                        :when (and (not (contains? curr-evals eval-name))
                                   (not (contains? curr-failures eval-name)))
                        :let [example-runs
+                             ;; TODO: <<<<>>> convert to ExampleRunImpl here
                              (multi-transform
                               [ALL
                                (multi-path
