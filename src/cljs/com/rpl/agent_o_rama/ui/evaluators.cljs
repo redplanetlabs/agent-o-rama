@@ -161,6 +161,8 @@
 
 (defui CreateEvaluatorForm [{:keys [form-id]}]
   (let [{:keys [fields set-field! field-errors]} (forms/use-form form-id)
+        name-field (forms/use-form-field form-id :name)
+        description-field (forms/use-form-field form-id :description)
         selected-builder (:selected-builder fields)
         builder-params (get-in selected-builder [:spec :options :params] {})
         builder-options (get-in selected-builder [:spec :options] {})
@@ -171,14 +173,14 @@
     
     ($ forms/form
        ($ forms/form-field {:label "Name"
-                            :value (:name fields)
-                            :on-change #(set-field! [:name] %)
-                            :error (:name field-errors)
+                            :value (:value name-field)
+                            :on-change (:on-change name-field)
+                            :error (:error name-field)
                             :required? true})
        ($ forms/form-field {:label "Description"
                             :type :textarea
-                            :value (:description fields)
-                            :on-change #(set-field! [:description] %)
+                            :value (:value description-field)
+                            :on-change (:on-change description-field)
                             :error (:description field-errors)
                             :rows 2})
        (when (seq builder-params)
