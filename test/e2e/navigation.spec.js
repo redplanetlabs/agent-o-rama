@@ -26,7 +26,7 @@ test.describe('research agent module exists', () => {
     // Step 4: Click the agent row to navigate.
     await agentRow.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*researcher.*/i);
     console.log('Successfully verified agent detail page.');
   });
 });
@@ -43,18 +43,20 @@ test.describe('Dataset crud', () => {
     // Step 3: Wait for an agent link to be visible on the page.
     // The UI fetches this data asynchronously, so Playwright's auto-waiting is essential here.
     // We'll look for an agent from your examples - now in table format with separate columns.
-    const moduleName = 'com.rpl.agent.research-agent';
-    const agentName = 'ResearchAgentModule';
-    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
+    const moduleNs = 'com.rpl.agent.research-agent';
+    const moduleName = 'ResearchAgentModule';
+    const agentName = 'researcher';
+
+    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleNs }).filter({ hasText: moduleName }).filter({ hasText: agentName });
 
     // Wait up to 30 seconds for the agent to appear. The first load can be slow.
     await expect(agentRow).toBeVisible({ timeout: 30000 });
-    console.log(`Found agent: ${moduleName}:${agentName}`);
+    console.log(`Found agent: ${moduleNs}/${moduleName}:${agentName}`);
 
     // Step 4: Click the agent row to navigate.
     await agentRow.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*researcher.*/i);
     console.log('Successfully verified agent detail page.');
 
     const datasetsLink = page.getByText('Datasets & Experiments');
@@ -63,7 +65,7 @@ test.describe('Dataset crud', () => {
 
     await datasetsLink.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule\/datasets.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*researcher\/datasets.*/i);
     console.log('Successfully verified datasets page.');
 
     const newDatasetButton = page.getByRole('button', { name: 'Create Dataset' }).first();
@@ -136,17 +138,19 @@ test.describe('Dataset example crud', () => {
     // Step 3: Wait for an agent link to be visible on the page.
     // The UI fetches this data asynchronously, so Playwright's auto-waiting is essential here.
     // We'll look for an agent from your examples - now in table format with separate columns.
-    const moduleName = 'com.rpl.agent.research-agent';
-    const agentName = 'ResearchAgentModule';
-    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
+    const moduleNs = 'com.rpl.agent.research-agent';
+    const moduleName = 'ResearchAgentModule';
+    const agentName = 'researcher';
+
+    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleNs }).filter({ hasText: moduleName }).filter({ hasText: agentName });
     // Wait up to 30 seconds for the agent to appear. The first load can be slow.
     await expect(agentRow).toBeVisible({ timeout: 30000 });
-    console.log(`Found agent: ${moduleName}:${agentName}`);
+    console.log(`Found agent: ${moduleNs}/${moduleName}:${agentName}`);
 
     // Step 4: Click the agent row to navigate.
     await agentRow.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*researcher.*/i);
     console.log('Successfully verified agent detail page.');
 
     const datasetsLink = page.getByText('Datasets & Experiments');
@@ -155,7 +159,7 @@ test.describe('Dataset example crud', () => {
 
     await datasetsLink.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule\/datasets.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*researcher\/datasets.*/i);
     console.log('Successfully verified datasets page.');
 
     const newDatasetButton = page.getByRole('button', { name: 'Create Dataset' }).first();
@@ -279,9 +283,11 @@ test.describe('Inline editing validation', () => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Agent-o-rama/);
 
-    const moduleName = 'com.rpl.agent.research-agent';
-    const agentName = 'ResearchAgentModule';
-    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
+    const moduleNs = 'com.rpl.agent.research-agent';
+    const moduleName = 'ResearchAgentModule';
+    const agentName = 'researcher';
+
+    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleNs }).filter({ hasText: moduleName }).filter({ hasText: agentName });
     await expect(agentRow).toBeVisible({ timeout: 30000 });
     await agentRow.click();
 
@@ -375,19 +381,21 @@ test.describe('Dataset snapshot dropdown', () => {
 
     await expect(page).toHaveTitle(/Agent-o-rama/);
 
-    const moduleName = 'com.rpl.agent.research-agent';
-    const agentName = 'ResearchAgentModule';
-    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
+    const moduleNs = 'com.rpl.agent.research-agent';
+    const moduleName = 'ResearchAgentModule';
+    const agentName = 'researcher';
+
+    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleNs }).filter({ hasText: moduleName }).filter({ hasText: agentName });
     await expect(agentRow).toBeVisible({ timeout: 30000 });
     await agentRow.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*researcher.*/i);
 
     const datasetsLink = page.getByText('Datasets & Experiments');
     await expect(datasetsLink).toBeVisible({ timeout: 30000 });
     await datasetsLink.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule\/datasets.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*researcher\/datasets.*/i);
 
     const newDatasetButton = page.getByRole('button', { name: 'Create Dataset' }).first();
     await expect(newDatasetButton).toBeVisible({ timeout: 30000 });
@@ -487,9 +495,11 @@ test.describe('Form Validation and Error Handling', () => {
     await expect(page).toHaveTitle(/Agent-o-rama/);
 
     // Find the agent using the same pattern as existing tests
-    const moduleName = 'com.rpl.agent.research-agent';
-    const agentName = 'ResearchAgentModule';
-    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
+    const moduleNs = 'com.rpl.agent.research-agent';
+    const moduleName = 'ResearchAgentModule';
+    const agentName = 'researcher';
+
+    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleNs }).filter({ hasText: moduleName }).filter({ hasText: agentName });
 
     await expect(agentRow).toBeVisible({ timeout: 30000 });
     await agentRow.click();
@@ -498,7 +508,7 @@ test.describe('Form Validation and Error Handling', () => {
     await expect(datasetsLink).toBeVisible({ timeout: 30000 });
     await datasetsLink.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*ResearchAgentModule\/datasets.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*researcher\/datasets.*/i);
     console.log('Successfully navigated to datasets page.');
 
     // 2. ACTION: Open the modal and submit an invalid form

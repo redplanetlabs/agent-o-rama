@@ -48,14 +48,16 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Agent-o-rama/);
 
-    const moduleName = 'com.rpl.agent.research-agent';
+    const moduleNs = 'com.rpl.agent.research-agent';
+    const moduleName = 'ResearchAgentModule';
     const agentName = 'ResearchAgentModule';
-    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
+
+    const agentRow = page.locator('table tbody tr').filter({ hasText: moduleNs }).filter({ hasText: moduleName }).filter({ hasText: agentName });
     await expect(agentRow).toBeVisible({ timeout: 30000 });
     await agentRow.click();
 
     await page.getByText('Datasets & Experiments').click();
-    await expect(page).toHaveURL(new RegExp(`/agents/.*${agentName}/datasets`));
+    await expect(page).toHaveURL(new RegExp(`/agents/.*researcher/datasets`));
 
     // Create a new dataset
     await page.getByRole('button', { name: 'Create Dataset' }).first().click();
