@@ -665,7 +665,7 @@
         :> *search-string-lower)
       (evals/all-evaluator-builders :> *builders)
       (<<ramafn %filter
-        [*name {:keys [*builder-name]}]
+        [*name {:keys [*builder-name] :as *info}]
         (select> [(keypath *builder-name) :type] *builders :> *type)
         (<<cond
          (case> (nil? *type))
@@ -680,7 +680,7 @@
           (:> nil nil)
 
          (default>)
-          (:> {:name *name :type *type} nil)))
+          (:> (assoc *info {:name *name :type *type}) nil)))
       (search-loop evals-pstate-sym
                    STAY
                    %filter
@@ -691,7 +691,6 @@
       (|origin)
       (hash-map :items *items :pagination-params *page-key :> *res)
     )))
-
 ;; - filters can contain:
 ;;    - :search-string, which matches against the experiment name or ID
 ;;    - :type which is either com.rpl.agent_o_rama.impl.types.RegularExperiment or
@@ -710,46 +709,46 @@
   [topologies]
   (let [datasets-pstate-sym (symbol (po/datasets-task-global-name))]
     (<<query-topology topologies
-      (search-experiments-name)
-      [*dataset-id *filters *limit *next-key :> *res]
-      (|hash *dataset-id)
-      (identity *filters :> {:keys [*type *search-string *times]})
-      (ifexpr (some? *search-string)
-        (str/lower-case *search-string)
-        :> *search-string-lower)
-      (<<ramafn %filter
-        [*id {:keys [*start-time-millis *experiment-info] :as *m}]
-        (<<ramafn %matches-time-spec?
-          [{:keys [*pred *value]}]
-          (:> (h/invoke *pred *start-time-millis *value)))
-        (get *experiment-info :name :> *name)
-        (get *experiment-info :spec :> *spec)
-        (<<cond
-         (case> (and> (some? *type) (not (instance? *type *spec))))
-          (:> nil nil)
+                      (search-experiments-name)
+                      [*dataset-id *filters *limit *next-key :> *res]
+                      (|hash *dataset-id)
+                      (identity *filters :> {:keys [*type *search-string *times]})
+                      (ifexpr (some? *search-string)
+                              (str/lower-case *search-string)
+                              :> *search-string-lower)
+                      (<<ramafn %filter
+                                [*id {:keys [*start-time-millis *experiment-info] :as *m}]
+                                (<<ramafn %matches-time-spec?
+                                          [{:keys [*pred *value]}]
+                                          (:> (h/invoke *pred *start-time-millis *value)))
+                                (get *experiment-info :name :> *name)
+                                (get *experiment-info :spec :> *spec)
+                                (<<cond
+                                 (case> (and> (some? *type) (not (instance? *type *spec))))
+                                 (:> nil nil)
 
-         (case> (and> (some? *search-string-lower)
-                      (not (h/contains-string? (str/lower-case (str *id))
-                                                *search-string-lower))
-                      (not (h/contains-string? (str/lower-case *name)
-                                                *search-string-lower))))
-          (:> nil nil)
+                                 (case> (and> (some? *search-string-lower)
+                                              (not (h/contains-string? (str/lower-case (str *id))
+                                                                       *search-string-lower))
+                                              (not (h/contains-string? (str/lower-case *name)
+                                                                       *search-string-lower))))
+                                 (:> nil nil)
 
-         (case> (not (every? %matches-time-spec? *times)))
-          (:> nil nil)
+                                 (case> (not (every? %matches-time-spec? *times)))
+                                 (:> nil nil)
 
-         (default>)
-          (:> {} [:results])))
-      (search-loop datasets-pstate-sym
-                   (keypath *dataset-id :experiments)
-                   %filter
-                   *limit
-                   *next-key
-                   true
-                   :> *items *page-key)
-      (|origin)
-      (hash-map :items *items :pagination-params *page-key :> *res)
-    )))
+                                 (default>)
+                                 (:> {} [:results])))
+                      (search-loop datasets-pstate-sym
+                                   (keypath *dataset-id :experiments)
+                                   %filter
+                                   *limit
+                                   *next-key
+                                   true
+                                   :> *items *page-key)
+                      (|origin)
+                      (hash-map :items *items :pagination-params *page-key :> *res)
+                      )))
 
 (defn is-remote-dataset?
   [{:keys [module-name]}]
