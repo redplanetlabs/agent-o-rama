@@ -279,6 +279,7 @@
         :summary-evals         {String {String Object}}
         :summary-eval-failures {String String}
         :eval-number-stats     {String {String EvalNumberStats}}
+        :latency-number-stats  EvalNumberStats
        })
       {:subindex? true})
     })})

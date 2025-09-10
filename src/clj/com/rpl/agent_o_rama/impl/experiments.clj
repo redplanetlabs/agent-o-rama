@@ -378,10 +378,17 @@
           (h/ex-info
            "Results when fetching example runs unexpectedly does not contain exactly one value"
            {:results (:agent-results info)})))
-       {:input  input
-        :reference-output reference-output
-        :output (select-any [:agent-results MAP-VALS :result :val] info)
-        :evals  (:evals info)})
+       (let [m (select-any [:agent-results MAP-VALS] info)
+             start-time-millis (:start-time-millis m)
+             finish-time-millis (:finish-time-millis m)]
+         {:input          input
+          :reference-output reference-output
+          :output         (-> m
+                              :result
+                              :val)
+          :latency-millis (when (and start-time-millis finish-time-millis)
+                            (- finish-time-millis start-time-millis))
+          :evals          (:evals info)}))
    )))
 
 (defn merge-number-evals
@@ -400,18 +407,20 @@
 
 (defn compute-number-stats
   [nums]
-  (let [nums (vec (sort nums))
-        c    (count nums)]
-    (aor-types/->valid-EvalNumberStats
-     (reduce + 0 nums)
-     (long c)
-     (nth nums 0)
-     (nth nums (dec c))
-     (reduce
-      (fn [m p]
-        (assoc m p (nth nums (long (* p c)))))
-      {}
-      PERCENTILES))))
+  (if (empty? nums)
+    (aor-types/->valid-EvalNumberStats 0 0 0 0 {})
+    (let [nums (vec (sort nums))
+          c    (count nums)]
+      (aor-types/->valid-EvalNumberStats
+       (reduce + 0 nums)
+       (long c)
+       (nth nums 0)
+       (nth nums (dec c))
+       (reduce
+        (fn [m p]
+          (assoc m p (nth nums (long (* p c)))))
+        {}
+        PERCENTILES)))))
 
 (defn compute-eval-number-stats
   [example-info]
@@ -633,14 +642,13 @@
                datasets   (datasets-pstate retriever)
                local-ds   (local-datasets-store retriever)]
            (when (aor-types/RegularExperiment? spec)
-             ;; TODO: <<<<>>>>
-             ;;     - need distribution for timings
              (let [example-info
                    (fetch-example-info local-ds datasets id dataset-id snapshot result+example-ids)
 
-                   {curr-evals    :summary-evals
+                   {curr-evals :summary-evals
                     curr-failures :summary-eval-failures
-                    curr-eval-number-stats :eval-number-stats}
+                    curr-eval-number-stats :eval-number-stats
+                    curr-latency-number-stats :latency-number-stats}
                    (store/pstate-select-one [(keypath dataset-id :experiments id)
                                              (submap [:summary-evals :summary-eval-failures
                                                       :eval-number-stats])]
@@ -650,6 +658,13 @@
                    (store/pstate-transform!
                     [(keypath dataset-id :experiments id :eval-number-stats)
                      (termval eval-stats)]
+                    local-ds
+                    dataset-id)))
+               (when (nil? curr-latency-number-stats)
+                 (let [stats (compute-number-stats (mapv :latency-millis example-info))]
+                   (store/pstate-transform!
+                    [(keypath dataset-id :experiments id :latency-number-stats)
+                     (termval stats)]
                     local-ds
                     dataset-id)))
                (doseq [[eval-name

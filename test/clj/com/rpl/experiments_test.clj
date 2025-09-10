@@ -292,6 +292,8 @@
            res
            {:summary-evals     {"mycount" {"res" 8} "mysum" {"res" 110}}
             :summary-eval-failures nil
+            :latency-number-stats
+            {:count 8}
             :eval-number-stats
             {"mylen"
              {"len"
@@ -404,6 +406,11 @@
               :input            "aa"
               :reference-output "bbbbb"}
             }}))
+
+         (is (> (-> res
+                    :latency-number-stats
+                    :total)
+                0))
 
          (is (every? aor-types/AgentInvokeImpl?
                      (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
@@ -1732,6 +1739,14 @@
                              (:pagination-params res)))
      (is (matches-ids? res [exp-id1]))
      (is (nil? (:pagination-params res)))
+
+     (bind res (foreign-invoke-query search ds-id1 {:type RegularExperiment} 1000 nil))
+     (is (matches-ids? res [exp-id10 exp-id8 exp-id7 exp-id6 exp-id5 exp-id2]))
+     (is (nil? (:pagination-params res)))
+     ;; regular experiments have these additional aggregated stats
+     (is (every? #(contains? % :eval-number-stats) (:items res)))
+     (is (every? #(contains? % :latency-number-stats) (:items res)))
+
 
      (bind res
        (foreign-invoke-query search
