@@ -137,7 +137,7 @@
           :sente-event [:evaluators/get-all-builders {:module-id module-id}]})]
     ;; The on-select logic is now integrated here
     (let [handle-select (fn [builder]
-                          (set-field! :selected-builder builder)
+                          (set-field! [:selected-builder] builder)
                           (next-step!))]
       (cond
         loading? ($ :div.flex.justify-center.items-center.h-64 ($ common/spinner {:size :large}))
@@ -168,16 +168,29 @@
         show-input-path? (get builder-options :input-path? true)
         show-output-path? (get builder-options :output-path? true)
         show-ref-output-path? (get builder-options :reference-output-path? true)]
+    
     ($ forms/form
-       ($ forms/form-field {:label "Name", :value (:name fields), :on-change #(set-field! :name %), :error (:name field-errors), :required? true})
-       ($ forms/form-field {:label "Description", :type :textarea, :value (:description fields), :on-change #(set-field! :description %), :error (:description field-errors), :rows 2})
+       ($ forms/form-field {:label "Name"
+                            :value (:name fields)
+                            :on-change #(set-field! [:name] %)
+                            :error (:name field-errors)
+                            :required? true})
+       ($ forms/form-field {:label "Description"
+                            :type :textarea
+                            :value (:description fields)
+                            :on-change #(set-field! [:description] %)
+                            :error (:description field-errors)
+                            :rows 2})
        (when (seq builder-params)
          ($ :div.mt-6.pt-4.border-t
             ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "Builder Parameters")
             (for [[param-key param-spec] builder-params]
               ($ forms/form-field
-                 {:key (str param-key), :label (str (name param-key)), :value (get-in fields [:params param-key]),
-                  :on-change #(set-field! [:params param-key] %), :error (get-in field-errors [:params param-key]),
+                 {:key (str param-key)
+                  :label (str (name param-key))
+                  :value (get-in fields [:params param-key]),
+                  :on-change #(set-field! [:params param-key] %)
+                  :error (get-in field-errors [:params param-key])
                   :placeholder (:description param-spec)}))))
        (when (or show-input-path? show-output-path? show-ref-output-path?)
          ($ :div.mt-6.pt-4.border-t
@@ -190,11 +203,20 @@
             (when show-advanced?
               ($ :div.mt-4.space-y-4
                  (when show-input-path?
-                   ($ forms/form-field {:label "Input JSON Path", :value (:input-json-path fields), :on-change #(set-field! :input-json-path %), :error (:input-json-path field-errors)}))
+                   ($ forms/form-field {:label "Input JSON Path"
+                                        :value (:input-json-path fields)
+                                        :on-change #(set-field! [:input-json-path] %)
+                                        :error (:input-json-path field-errors)}))
                  (when show-output-path?
-                   ($ forms/form-field {:label "Output JSON Path", :value (:output-json-path fields), :on-change #(set-field! :output-json-path %), :error (:output-json-path field-errors)}))
+                   ($ forms/form-field {:label "Output JSON Path"
+                                        :value (:output-json-path fields)
+                                        :on-change #(set-field! [:output-json-path] %)
+                                        :error (:output-json-path field-errors)}))
                  (when show-ref-output-path?
-                   ($ forms/form-field {:label "Reference Output JSON Path", :value (:reference-output-json-path fields), :on-change #(set-field! :reference-output-json-path %), :error (:reference-output-json-path field-errors)})))))))))
+                   ($ forms/form-field {:label "Reference Output JSON Path"
+                                        :value (:reference-output-json-path fields)
+                                        :on-change #(set-field! [:reference-output-json-path] %)
+                                        :error (:reference-output-json-path field-errors)})))))))))
 
 (forms/reg-form
  :create-evaluator

@@ -17,30 +17,10 @@
   (println "form spects" @form-specs))
 
 (defhook use-form
-  "The primary hook for components to interact with form state.
-   It provides reactive state and memoized action dispatchers."
   [form-id]
   (let [form-state (state/use-sub [:forms form-id])
-        {:keys [fields field-errors valid? submitting? error current-step steps]} form-state
-
-        ;; Memoized action dispatchers
-        set-field! (uix/use-callback
-                    (fn [field-key value]
-                      (state/dispatch [:form/update-field form-id field-key value]))
-                    [form-id])
-
-        next-step! (uix/use-callback
-                    #(state/dispatch [:form/next-step form-id])
-                    [form-id])
-
-        prev-step! (uix/use-callback
-                    #(state/dispatch [:form/prev-step form-id])
-                    [form-id])
-
-        submit! (uix/use-callback
-                 #(state/dispatch [:form/submit form-id])
-                 [form-id])]
-
+        {:keys [fields field-errors valid? submitting? error current-step steps]} form-state]
+    
     {:fields (or fields {})
      :field-errors (or field-errors {})
      :valid? (boolean valid?)
@@ -48,10 +28,12 @@
      :error error
      :current-step current-step
      :steps steps
-     :set-field! set-field!
-     :next-step! next-step!
-     :prev-step! prev-step!
-     :submit! submit!}))
+     ;; The set-field! function is now a direct dispatch.
+     :set-field! (fn [field-path value]
+                   (state/dispatch [:form/update-field form-id field-path value]))
+     :next-step! #(state/dispatch [:form/next-step form-id])
+     :prev-step! #(state/dispatch [:form/prev-step form-id])
+     :submit! #(state/dispatch [:form/submit form-id])}))
 
 ;; =============================================================================
 ;; REUSABLE FORM COMPONENTS
@@ -220,34 +202,44 @@
         (str "Invalid JSON: " (.-message e))))))
 
 (defn- validate-form-fields
-  "Validate fields against validators. Returns a map {:valid? boolean :errors {field-key error-str-or-nil}}"
+  "Validate fields against validators keyed by Specter paths.
+   Returns a map {:valid? boolean :errors {nested-error-map}}"
   [fields validators]
-  (let [field-keys (set (concat (keys fields) (keys validators)))
-        errors (into {}
-                     (for [k field-keys]
-                       (let [value (get fields k "")
-                             field-validators (get validators k)
-                             first-error (when (seq field-validators)
-                                           (some #(% value) field-validators))]
-                         [k first-error])))]
-    {:errors errors
-     :valid? (every? nil? (vals errors))}))
+  (reduce-kv
+   (fn [acc path validator-fns]
+     (let [value (s/select-one path fields)
+           first-error (some #(% value) validator-fns)]
+       (if first-error
+         (-> acc
+             (assoc :valid? false)
+             (update :errors #(s/setval path first-error %)))
+         acc)))
+   {:valid? true, :errors {}}
+   validators))
 
 (state/reg-event :form/update-field
-                 (fn [db form-id field-key value]
-                   [:forms form-id
-                    (s/terminal
-                     (fn [form-state]
-                       (let [updated-fields (assoc (:fields form-state) field-key value)
-                             form-spec (@form-specs form-id)
-                             current-step-key (:current-step form-state)
-                             step-spec (get form-spec current-step-key form-spec)
-                             validators (:validators step-spec)
-                             {:keys [valid? errors]} (validate-form-fields updated-fields validators)]
-                         (assoc form-state
-                                :fields updated-fields
-                                :field-errors errors
-                                :valid? valid?))))]))
+           (fn [db form-id field-path value]
+             (let [form-spec (@form-specs form-id)
+                   current-step-key (get-in db [:forms form-id :current-step])
+                   step-spec (get form-spec current-step-key form-spec)
+                   validators-for-field (get-in step-spec [:validators field-path])]
+
+               (s/multi-path
+                ;; Path 1: Update the field's value
+                [:forms form-id :fields (s/path field-path) (s/terminal-val value)]
+
+                ;; Path 2: Update only this field's error message
+                [:forms form-id :field-errors (s/path field-path)
+                 (s/terminal-val (some #(% value) validators-for-field))]))))
+
+(state/reg-event :form/validate
+           (fn [db form-id]
+             (let [form-state (get-in db [:forms form-id])
+                   form-spec (@form-specs form-id)
+                   current-step-key (:current-step form-state)
+                   step-spec (get form-spec current-step-key form-spec)
+                   {:keys [valid? errors]} (validate-form-fields (:fields form-state) (:validators step-spec))]
+               [:forms form-id (s/terminal #(assoc % :valid? valid? :field-errors errors))])))
 
 (state/reg-event :form/next-step
                  (fn [db form-id]
@@ -273,15 +265,21 @@
                  (fn [db form-id]
                    (let [form-state (get-in db [:forms form-id])
                          form-spec (@form-specs form-id)
-                         on-submit-handler (:on-submit form-spec)]
-                     (when (and (:valid? form-state) on-submit-handler)
-                       ;; Set submitting state and then dispatch the submission handler as an effect
-                       (dispatch [:db/set-value [:forms form-id] (-> form-state
-                                                                     (assoc :submitting? true :error nil))])
-                       ;; The on-submit handler is responsible for the actual side-effect
-                       (on-submit-handler db {:form-id form-id
-                                              :form-fields (:fields form-state)
-                                              :props (:props form-state)})))
+                         current-step-key (:current-step form-state)
+                         step-spec (get form-spec current-step-key form-spec)
+                         {:keys [valid? errors]} (validate-form-fields (:fields form-state) (:validators step-spec))]
+
+                     (if-not valid?
+                       (dispatch [:db/set-value
+                                  [:forms form-id]
+                                  (assoc form-state :valid? false :field-errors errors)])
+                       (let [on-submit-handler (:on-submit form-spec)]
+                         ;; Set submitting state and let the handler run its side-effect
+                         (dispatch [:db/set-value [:forms form-id] (assoc form-state :submitting? true :error nil)])
+                         (when on-submit-handler
+                           (on-submit-handler db {:form-id form-id
+                                                  :form-fields (:fields form-state)
+                                                  :props (:props form-state)})))))
                    nil))
 
 (state/reg-event :form/clear
@@ -294,40 +292,42 @@
 ;; NEW MODAL AND FORM INTEGRATION EVENTS
 ;; =============================================================================
 
-(state/reg-event :modal/show-form
-                 (fn [db form-id props]
-                   (let [form-spec (get @form-specs form-id)]
-                     (if-not form-spec
-                       (do (js/console.error "No form spec registered for" form-id) nil)
-                       (let [initial-step (first (:steps form-spec))
-                             step-spec (get form-spec initial-step)
-                             initial-fields-fn (:initial-fields step-spec)
-                             initial-fields (if (fn? initial-fields-fn)
-                                              (initial-fields-fn props)
-                                              (or initial-fields-fn {}))
-                             validators (:validators step-spec)
-                             {:keys [valid? errors]} (validate-form-fields initial-fields validators)
-                             modal-data (get-in form-spec [initial-step :modal-props] {})
+(state/reg-event
+ :modal/show-form
+ 
+ (fn [db form-id props]
+   (let [form-spec (get @form-specs form-id)]
+     (if-not form-spec
+       (do (js/console.error "No form spec registered for" form-id) nil)
+       (let [initial-step (first (:steps form-spec))
+             step-spec (get form-spec initial-step)
+             initial-fields-fn (:initial-fields step-spec)
+             initial-fields (if (fn? initial-fields-fn)
+                              (initial-fields-fn props)
+                              (or initial-fields-fn {}))
+             validators (:validators step-spec)
+             {:keys [valid? errors]} (validate-form-fields initial-fields validators)
+             modal-data (get-in form-spec [initial-step :modal-props] {})
 
-                             ;; 1. Construct the full state for the form
-                             form-state {:fields initial-fields
-                                         :validators validators
-                                         :field-errors errors
-                                         :valid? valid?
-                                         :submitting? false
-                                         :error nil
-                                         :props props
-                                         :steps (:steps form-spec)
-                                         :current-step initial-step}
-                             
-                             ;; 2. Construct the full state for the modal
-                             modal-state {:active form-id
-                                          :data (assoc modal-data :form-id form-id)}]
-                         
-                         ;; 3. Return a single Specter path to update both parts of the DB atomically
-                         (s/multi-path
-                          [:forms form-id (s/terminal-val form-state)]
-                          [:ui :modal (s/terminal-val modal-state)]))))))
+             ;; 1. Construct the full state for the form
+             form-state {:fields initial-fields
+                         :validators validators
+                         :field-errors errors
+                         :valid? valid?
+                         :submitting? false
+                         :error nil
+                         :props props
+                         :steps (:steps form-spec)
+                         :current-step initial-step}
+             
+             ;; 2. Construct the full state for the modal
+             modal-state {:active form-id
+                          :data (assoc modal-data :form-id form-id)}]
+         
+         ;; 3. Return a single Specter path to update both parts of the DB atomically
+         (s/multi-path
+          [:forms form-id (s/terminal-val form-state)]
+          [:ui :modal (s/terminal-val modal-state)]))))))
 
 
 (state/reg-event :modal/show
