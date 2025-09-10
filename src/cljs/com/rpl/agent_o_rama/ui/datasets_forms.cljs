@@ -79,8 +79,7 @@
          ($ CreateDatasetForm {:form-id form-id}))
    
    :modal-props {:title "Create New Dataset"
-                 :submit-text "Create Dataset"}
-
+                 :submit-text "Create Dataset"}}
   :on-submit
   (fn [db {:keys [form-id form-fields props]}]
     (let [{:keys [module-id]} props
@@ -100,7 +99,7 @@
              (let [decoded-module-id (when module-id (common/url-decode module-id))]
                (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}]))
              (state/dispatch [:form/clear form-id]))
-           (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))}})
+           (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
 
 (defn show-create-dataset-modal!
   "Shows the create dataset modal."
