@@ -313,7 +313,10 @@
         view-stack (get-in match [:data :views] [])
         app-component (reduce (fn [child-component parent-component]
                                 (fn [props]
-                                  ($ parent-component (merge props {:child-component child-component}))))
+                                  (let [props* (if (map? props)
+                                                 props
+                                                 (js->clj props :keywordize-keys true))]
+                                    ($ parent-component (assoc props* :child-component child-component)))))
                               nil
                               (reverse view-stack))]
     (if app-component
