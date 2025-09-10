@@ -84,7 +84,7 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
   const agentName = 'ResearchAgentModule';
   const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
   await expect(agentRow).toBeVisible({ timeout: 30000 });
-  await agentRow.locator('a', { hasText: 'Open' }).click();
+  await agentRow.click();
   await expect(page).toHaveURL(new RegExp(`/agents/.*${agentName}`));
   console.log('--- Test Setup Complete ---');
 

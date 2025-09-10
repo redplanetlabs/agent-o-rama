@@ -16,7 +16,6 @@ test.describe('research agent module exists', () => {
     const moduleName = 'com.rpl.agent.research-agent';
     const agentName = 'ResearchAgentModule';
     const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
-    const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
 
     // Wait up to 30 seconds for the agent to appear. The first load can be slow.
     await expect(agentRow).toBeVisible({ timeout: 30000 });
@@ -45,7 +44,6 @@ test.describe('Dataset crud', () => {
     const moduleName = 'com.rpl.agent.research-agent';
     const agentName = 'ResearchAgentModule';
     const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
-    const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
 
     // Wait up to 30 seconds for the agent to appear. The first load can be slow.
     await expect(agentRow).toBeVisible({ timeout: 30000 });
@@ -139,8 +137,6 @@ test.describe('Dataset example crud', () => {
     const moduleName = 'com.rpl.agent.research-agent';
     const agentName = 'ResearchAgentModule';
     const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
-    const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
-
     // Wait up to 30 seconds for the agent to appear. The first load can be slow.
     await expect(agentRow).toBeVisible({ timeout: 30000 });
     console.log(`Found agent: ${moduleName}:${agentName}`);
@@ -284,7 +280,6 @@ test.describe('Inline editing validation', () => {
     const moduleName = 'com.rpl.agent.research-agent';
     const agentName = 'ResearchAgentModule';
     const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
-    const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
     await expect(agentRow).toBeVisible({ timeout: 30000 });
     await agentRow.click();
 
@@ -381,7 +376,6 @@ test.describe('Dataset snapshot dropdown', () => {
     const moduleName = 'com.rpl.agent.research-agent';
     const agentName = 'ResearchAgentModule';
     const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
-    const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
     await expect(agentRow).toBeVisible({ timeout: 30000 });
     await agentRow.click();
 
@@ -494,7 +488,6 @@ test.describe('Form Validation and Error Handling', () => {
     const moduleName = 'com.rpl.agent.research-agent';
     const agentName = 'ResearchAgentModule';
     const agentRow = page.locator('table tbody tr').filter({ hasText: moduleName }).filter({ hasText: agentName });
-    const agentLink = agentRow.locator('a').filter({ hasText: 'Open' });
 
     await expect(agentRow).toBeVisible({ timeout: 30000 });
     await agentRow.click();
