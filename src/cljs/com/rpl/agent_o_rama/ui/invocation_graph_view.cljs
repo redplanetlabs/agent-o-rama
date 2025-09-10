@@ -12,7 +12,6 @@
    [com.rpl.agent-o-rama.ui.common :as common]
 
    ["react" :refer [useState useCallback useEffect]]
-   ["react-dom" :refer [createPortal]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
    ["@dagrejs/dagre" :as Dagre]
    ["@heroicons/react/24/outline" :refer [ExclamationTriangleIcon ArrowPathIcon ArrowTopRightOnSquareIcon]]))

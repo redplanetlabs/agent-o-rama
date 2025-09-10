@@ -5,7 +5,8 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [clojure.string :as str]
-   [com.rpl.specter :as s]))
+   [com.rpl.specter :as s]
+   ["react-dom" :refer [createPortal]]))
 
 (defonce form-specs (atom {}))
 
@@ -130,8 +131,7 @@
         {:keys [active data]} modal-state
         form-id (when active (:form-id data))
 
-        ;; Use our new form hook. It will return nil if form-id is nil.
-        form (when form-id (use-form form-id))
+        form (use-form form-id)
 
         handle-cancel (fn []
                         (when form-id (state/dispatch [:form/clear form-id]))
@@ -142,7 +142,7 @@
     (uix/use-effect (fn [] (when active (.addEventListener js/document "keydown" handle-keydown) #(.removeEventListener js/document "keydown" handle-keydown))) [active])
 
     (when active
-      (react-dom/createPortal
+      (createPortal
        ($ :div {:className "fixed inset-0 flex items-center justify-center z-50", :style {:backgroundColor "rgba(0, 0, 0, 0.5)"}, :onClick handle-cancel}
           ($ :div {:className "bg-white rounded-lg shadow-xl w-full max-w-5xl overflow-hidden mx-4 my-8 flex flex-col max-h-screen", :role "dialog", :aria-modal "true", :onClick #(.stopPropagation %)}
              ($ :div {:className "flex-shrink-0 p-4 border-b border-gray-200 flex justify-between items-center bg-white"}
@@ -158,7 +158,7 @@
                   (:component data))) ; Fallback for non-form modals
              (when form
                ($ :div {:className "flex-shrink-0 border-t border-gray-200 bg-white px-6 py-4"}
-                  ($ forms/form-error {:error (:error form)})
+                  ($ form-error {:error (:error form)})
                   ($ :div {:className "flex justify-end gap-3"}
                      ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer", :type "button", :onClick handle-cancel} "Cancel")
                      (when (and (:steps form) (not= (first (:steps form)) (:current-step form)))
@@ -172,8 +172,8 @@
                                    :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
                                                    (if (or (not (:valid? form)) (:submitting? form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
                           (when (:submitting? form) ($ :div {:className "animate-spin rounded-full h-4 w-4 border-b-2 border-white"}))
-                          "Submit"))))))))
-      (.-body js/document))))
+                          "Submit")))))))
+       (.-body js/document)))))
 
 
 (defn required [value] (when (str/blank? value) "This field is required"))
