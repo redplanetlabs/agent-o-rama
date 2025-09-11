@@ -20,7 +20,7 @@
   [form-id]
   (let [form-state (state/use-sub [:forms form-id])
         {:keys [fields field-errors valid? submitting? error current-step steps]} form-state]
-    
+
     {:fields (or fields {})
      :field-errors (or field-errors {})
      :valid? (boolean valid?)
@@ -140,7 +140,9 @@
 
        ($ :div {:className "flex-1 min-h-0 overflow-y-auto"}
           (if ui-fn
-            (ui-fn {:form-id form-id})
+            (let [form-state (state/use-sub [:forms form-id])
+                  props (:props form-state)]
+              (ui-fn {:form-id form-id :props props}))
             ($ :div "No UI for this form step.")))
 
        ;; The footer with form actions
@@ -149,7 +151,7 @@
             ($ form-error {:error (:error form)})
             ($ :div {:className "flex justify-end gap-3"}
                ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer", :type "button", :onClick handle-cancel} "Cancel")
-               
+
                ;; "Back" button
                (when (and (:steps form) (not= (first (:steps form)) (:current-step form)))
                  ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer", :type "button", :onClick (:prev-step! form)} "Back"))
@@ -191,11 +193,10 @@
              ;; Conditionally render the new content component
              (when form-id
                ($ ModalFormContent {:form-id form-id :modal-data data}))
-             
+
              (when (:component data)
                (:component data))))
        (.-body js/document)))))
-
 
 (defn required [value] (when (str/blank? value) "This field is required"))
 
@@ -246,11 +247,11 @@
                          current-step-key (:current-step form-state)
                          step-spec (get form-spec current-step-key form-spec)
                          all-validators (:validators step-spec)
-                         
+
                          ;; Calculate the entire next state before committing it to the atom.
                          next-fields (s/setval field-path value (:fields form-state))
                          validation-result (validate-form-fields next-fields all-validators)]
-                     
+
                      ;; Atomically update the form state with the new fields, errors, and validity.
                      [:forms form-id
                       (s/terminal
@@ -261,13 +262,13 @@
                                 :valid? (:valid? validation-result))))])))
 
 (state/reg-event :form/validate
-           (fn [db form-id]
-             (let [form-state (get-in db [:forms form-id])
-                   form-spec (@form-specs form-id)
-                   current-step-key (:current-step form-state)
-                   step-spec (get form-spec current-step-key form-spec)
-                   {:keys [valid? errors]} (validate-form-fields (:fields form-state) (:validators step-spec))]
-               [:forms form-id (s/terminal #(assoc % :valid? valid? :field-errors errors))])))
+                 (fn [db form-id]
+                   (let [form-state (get-in db [:forms form-id])
+                         form-spec (@form-specs form-id)
+                         current-step-key (:current-step form-state)
+                         step-spec (get form-spec current-step-key form-spec)
+                         {:keys [valid? errors]} (validate-form-fields (:fields form-state) (:validators step-spec))]
+                     [:forms form-id (s/terminal #(assoc % :valid? valid? :field-errors errors))])))
 
 (state/reg-event :form/next-step
                  (fn [db form-id]
@@ -315,14 +316,13 @@
                    ;; TODO use s/NONE not dissoc
                    [:forms (s/terminal #(dissoc % form-id))]))
 
-
 ;; =============================================================================
 ;; NEW MODAL AND FORM INTEGRATION EVENTS
 ;; =============================================================================
 
 (state/reg-event
  :modal/show-form
- 
+
  (fn [db form-id props]
    (let [form-spec (get @form-specs form-id)]
      (if-not form-spec
@@ -347,16 +347,15 @@
                          :props props
                          :steps (:steps form-spec)
                          :current-step initial-step}
-             
+
              ;; 2. Construct the full state for the modal
              modal-state {:active form-id
                           :data (assoc modal-data :form-id form-id)}]
-         
+
          ;; 3. Return a single Specter path to update both parts of the DB atomically
          (s/multi-path
           [:forms form-id (s/terminal-val form-state)]
           [:ui :modal (s/terminal-val modal-state)]))))))
-
 
 (state/reg-event :modal/show
                  (fn [db modal-type modal-data]

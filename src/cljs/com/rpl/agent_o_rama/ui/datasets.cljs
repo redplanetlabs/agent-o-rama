@@ -487,7 +487,10 @@
              ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                 {:disabled is-read-only?
                  :onClick #(when-not is-read-only?
-                             (datasets-forms/show-add-tag-modal! module-id dataset-id snapshot-name selected-example-ids))
+                             (datasets-forms/show-add-tag-modal! {:module-id module-id
+                                                                  :dataset-id dataset-id
+                                                                  :snapshot-name snapshot-name
+                                                                  :example-ids selected-example-ids}))
                  :title (when is-read-only? "Cannot add tags to a read-only snapshot.")}
                 "Add Tag...")
 
@@ -495,7 +498,11 @@
              ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                 {:disabled is-read-only?
                  :onClick #(when-not is-read-only?
-                             (datasets-forms/show-remove-tag-modal! module-id dataset-id snapshot-name selected-example-ids selected-examples))
+                             (datasets-forms/show-remove-tag-modal! {:module-id module-id
+                                                                     :dataset-id dataset-id
+                                                                     :snapshot-name snapshot-name
+                                                                     :example-ids selected-example-ids
+                                                                     :selected-examples selected-examples}))
                  :title (when is-read-only? "Cannot remove tags from a read-only snapshot.")}
                 "Remove Tag...")
 

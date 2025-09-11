@@ -349,6 +349,9 @@
   {:initial-fields (fn [_props] {:tag-name ""})
    :validators {:tag-name [forms/required]}
    :ui (fn [{:keys [form-id props]}]
+         ;; Debug logging
+         (println "remove-tag-from-selected :ui props:" props)
+         (println "remove-tag-from-selected :ui selected-examples:" (:selected-examples props))
          ;; The UI for this form needs the list of selected examples to populate the dropdown.
          ($ RemoveTagForm {:form-id form-id
                            :selected-examples (:selected-examples props)}))
@@ -390,6 +393,8 @@
            (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
 
 (defn show-remove-tag-modal! [props]
+  (println "show-remove-tag-modal! props:" props)
+  (println "show-remove-tag-modal! selected-examples:" (:selected-examples props))
   (state/dispatch [:modal/show-form :remove-tag-from-selected props]))
 
 ;; DELETED: The old specs are no longer needed.
@@ -411,12 +416,19 @@
   (let [{:keys [field-errors]} (forms/use-form form-id)
         tag-name-field (forms/use-form-field form-id :tag-name)
 
+        ;; Debug g
+        _ (println "RemoveTagForm selected-examples:" selected-examples)
+        _ (println "RemoveTagForm selected-examples count:" (count selected-examples))
+
         ;; Get all unique tags from selected examples
         all-tags (->> selected-examples
                       (mapcat :tags)
                       (map name) ; Convert keywords to strings
                       (distinct)
-                      (sort))]
+                      (sort))
+
+        ;; Debug logging for tags
+        _ (println "RemoveTagForm all-tags:" all-tags)]
 
     ($ forms/form
        ($ :div
