@@ -9,7 +9,7 @@
    [com.rpl.agent-o-rama.ui.experiments.events]
    [com.rpl.agent-o-rama.ui.datasets.snapshot-selector :as snapshot-selector]
    [clojure.string :as str]
-   ["@heroicons/react/24/outline" :refer [PlusIcon TrashIcon ChevronDownIcon]]))
+   ["@heroicons/react/24/outline" :refer [PlusIcon TrashIcon ChevronDownIcon XMarkIcon]]))
 
 ;; =============================================================================
 ;; SINGLE-STEP EXPERIMENT FORM
@@ -58,6 +58,47 @@
                                           :selected? (= selected-agent decoded-name)
                                           :on-select #(handle-select decoded-name)}))
                  ($ :div.px-4.py-2.text-sm.text-gray-500 "No agents found in this module."))))))))
+
+(defui EvaluatorSelector [{:keys [module-id selected-evaluators on-change]}]
+  (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
+        {:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:evaluator-instances module-id]
+          :sente-event [:evaluators/get-all-instances {:module-id module-id}]
+          :enabled? (boolean module-id)})
+        all-evaluators (or (:items data) [])
+        selected-names (set (map :name selected-evaluators))
+        available-evaluators (remove #(contains? selected-names (:name %)) all-evaluators)]
+    ($ :div
+       ($ :div.flex.flex-wrap.gap-2.mb-2
+          (if (seq selected-evaluators)
+            (for [e selected-evaluators]
+              ($ :span.inline-flex.items-center.px-2.5.py-1.rounded-full.text-xs.font-medium.bg-indigo-100.text-indigo-800
+                 {:key (:name e)}
+                 (:name e)
+                 ($ :button.ml-1.p-0.5.rounded-full.hover:bg-indigo-200
+                    {:onClick #(on-change (vec (remove (fn [sel] (= (:name sel) (:name e))) selected-evaluators)))}
+                    ($ XMarkIcon {:className "h-3 w-3"}))))
+            ($ :div.text-sm.text-gray-500.italic "No evaluators selected.")))
+       ($ :div.relative
+          ($ :button.inline-flex.items-center.gap-2.text-sm.text-blue-600.hover:underline
+             {:type "button" :onClick #(set-dropdown-open (not dropdown-open?))}
+             ($ PlusIcon {:className "h-4 w-4"})
+             "Add Evaluator")
+          (when dropdown-open?
+            ($ :div.origin-top-left.absolute.left-0.mt-2.w-72.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-10
+               ($ :div.py-1.max-h-60.overflow-y-auto
+                  (cond
+                    loading? ($ :div.px-4.py-2.text-sm.text-gray-500 "Loading...")
+                    error ($ :div.px-4.py-2.text-sm.text-red-500 "Error")
+                    (empty? available-evaluators) ($ :div.px-4.py-2.text-sm.text-gray-500 "No more evaluators to add.")
+                    :else (for [e available-evaluators]
+                            ($ common/DropdownRow
+                               {:key (:name e)
+                                :label (:name e)
+                                :on-select #(do
+                                              (on-change (conj selected-evaluators {:name (:name e) :remote? false}))
+                                              (set-dropdown-open false))}))))))))))
 
 ;; =============================================================================
 ;; MAIN EXPERIMENT FORM COMPONENTS
@@ -238,6 +279,15 @@
                ($ PlusIcon {:className "h-4 w-4"})
                "Add Another Target")))
 
+       ;; Evaluation Section
+       ($ :div.mb-8
+          ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "Evaluation")
+          (let [evaluators-field (forms/use-form-field form-id :evaluators)]
+            ($ EvaluatorSelector
+               {:module-id module-id
+                :selected-evaluators (:value evaluators-field)
+                :on-change (:on-change evaluators-field)})))
+
        ;; Execution Settings Section
        ($ :div.mb-8
           ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "Execution Settings")
@@ -263,43 +313,59 @@
  {:steps [:main]
 
   :main
-  {:initial-fields (fn [props]
-                     (merge {:name ""
-                             :description ""
-                             :snapshot ""
-                             :selector {:type :all :tag ""}
-                             :spec {:type :regular
-                                    :targets [{:target-spec {:type :agent}
-                                               :input->args []}]}
-                             :num-repetitions 1
-                             :concurrency 1}
-                            props))
-   :validators {:name [forms/required]}
+  {:initial-fields
+   (fn [props]
+     (merge {:name ""
+             :description ""
+             :snapshot ""
+             :selector {:type :all :tag ""}
+             :spec {:type :regular
+                    :targets [{:target-spec {:type :agent :agent-name nil}
+                               :input->args ["\"$\""]}]}
+             :evaluators []
+             :num-repetitions 1
+             :concurrency 1}
+            props))
+   :validators
+   {:name [forms/required]
+    :evaluators [(fn [v] (when (empty? v) "At least one evaluator is required"))]}
    :ui (fn [{:keys [form-id]}] ($ CreateExperimentForm {:form-id form-id}))
    :modal-props {:title "Create New Experiment"
                  :submit-text "Run Experiment"}}
 
   :on-submit (fn [db form-state]
-               (let [{:keys [form-id module-id dataset-id name description snapshot selector spec num-repetitions concurrency]} form-state
-                   ;; Helper to clean up the spec for the backend
-                     clean-spec (fn [spec]
-                                  (-> spec
-                                    ;; Convert spec type to the expected record name
-                                      (update :type #(case % :regular "RegularExperiment" :comparative "ComparativeExperiment" %))
-                                      (update :targets
-                                              (fn [targets]
-                                                (mapv (fn [target]
-                                                        (-> target
-                                                            (update-in [:target-spec :type] #(case % :agent "AgentTarget" :node "NodeTarget" %))
-                                                          ;; Remove :node key if type is agent
-                                                            (cond-> (= (get-in target [:target-spec :type]) "AgentTarget")
-                                                              (update :target-spec dissoc :node))))
-                                                      targets)))))]
+               (let [{:keys [form-id module-id dataset-id name description snapshot selector spec num-repetitions concurrency evaluators]} form-state]
                  (sente/request!
-                  [:experiments/start {:module-id module-id, :dataset-id dataset-id, :form-data (assoc form-state :spec (clean-spec spec))}]
+                  [:experiments/start
+                   {:module-id module-id
+                    :dataset-id dataset-id
+                    :form-data (-> form-state
+                                   (update :selector (fn [s] (if (= (:type s) :all) nil s)))
+                                   (update :spec
+                                           (fn [s]
+                                             (let [type-keyword (:type s)
+                                                   type-str (case type-keyword
+                                                              :regular "RegularExperiment"
+                                                              :comparative "ComparativeExperiment")]
+                                               (assoc (update s :targets
+                                                              (fn [targets]
+                                                                (mapv (fn [t]
+                                                                        (let [target-type-kw (get-in t [:target-spec :type])
+                                                                              target-type-str (case target-type-kw
+                                                                                                :agent "AgentTarget"
+                                                                                                :node "NodeTarget")]
+                                                                          (-> t
+                                                                              (assoc-in [:target-spec :type] target-type-str)
+                                                                              (cond-> (= target-type-kw :agent)
+                                                                                (update :target-spec dissoc :node)))))
+                                                                      targets)))
+                                                      :type type-str)))))}]
                   15000
                   (fn [reply]
-                  ;; This would be the place to handle success/failure of starting the experiment
-                    (println "Start experiment reply:" reply)
-                    (state/dispatch [:modal/hide])
-                    (state/dispatch [:form/clear form-id])))))})
+                    (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+                    (if (:success reply)
+                      (do
+                        (state/dispatch [:modal/hide])
+                        (state/dispatch [:query/invalidate {:query-key-pattern [:experiments module-id dataset-id]}])
+                        (state/dispatch [:form/clear form-id]))
+                      (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
