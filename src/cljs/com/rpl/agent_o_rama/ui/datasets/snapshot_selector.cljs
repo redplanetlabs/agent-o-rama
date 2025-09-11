@@ -61,8 +61,10 @@
 
     ($ :div.relative.inline-block.text-left
        ;; Main dropdown button
+       ;; Main dropdown button
        ($ :button.inline-flex.items-center.justify-between.w-64.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500.cursor-pointer
-          {:onClick (fn [e]
+          {:type "button"
+           :onClick (fn [e]
                       (.stopPropagation e)
                       (let [is-opening (not dropdown-open?)]
                         (set-dropdown-open is-opening)
@@ -90,7 +92,8 @@
                                         :on-select #(handle-select name)
                                         :delete-button (when-not disabled?
                                                          ($ :button.text-red-600.hover:text-red-800.p-1.rounded.hover:bg-red-100
-                                                            {:onClick (fn [e]
+                                                            {:type "button"
+                                                             :onClick (fn [e]
                                                                         (.stopPropagation e)
                                                                         (handle-delete name))
                                                              :title (str "Delete " name)}
