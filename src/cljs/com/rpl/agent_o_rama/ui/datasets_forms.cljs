@@ -85,8 +85,7 @@
   {:event (fn [db form-state]
             [:datasets/create form-state])
    :on-success-invalidate (fn [db {:keys [module-id]} _reply]
-                            (let [decoded-module-id (when module-id (common/url-decode module-id))]
-                              {:query-key-pattern [:datasets decoded-module-id]}))}})
+                            {:query-key-pattern [:datasets module-id]})}})
 
 (defui EditDatasetForm [{:keys [form-id initial-name initial-description]}]
   (let [{:keys [field-errors]} (forms/use-form form-id)
@@ -328,10 +327,6 @@
 
 (defn show-remove-tag-modal! [props]
   (state/dispatch [:modal/show-form :remove-tag-from-selected props]))
-
-;; DELETED: The old specs are no longer needed.
-;; (def add-tag-form-spec ...)
-;; (def remove-tag-form-spec ...)
 
 (defui AddTagForm [{:keys [form-id]}]
   (let [{:keys [field-errors]} (forms/use-form form-id)
