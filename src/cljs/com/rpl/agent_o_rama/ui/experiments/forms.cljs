@@ -5,21 +5,71 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.state :as state]
+   [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.datasets.snapshot-selector :as snapshot-selector]
    [clojure.string :as str]
-   ["@heroicons/react/24/outline" :refer [PlusIcon TrashIcon]]))
+   ["@heroicons/react/24/outline" :refer [PlusIcon TrashIcon ChevronDownIcon]]))
 
 ;; =============================================================================
 ;; SINGLE-STEP EXPERIMENT FORM
 ;; =============================================================================
 
+;; =============================================================================
+;; REUSABLE SUB-COMPONENTS FOR THE FORM
+;; =============================================================================
+
+(defui AgentSelectorDropdown [{:keys [module-id selected-agent on-select-agent disabled?]}]
+  (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
+        {:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:module-agents module-id]
+          :sente-event [:agents/get-for-module {:module-id module-id}]
+          :enabled? (boolean module-id)})
+        agents (or data [])
+        handle-select (fn [agent-name]
+                        (set-dropdown-open false)
+                        (on-select-agent agent-name))]
+
+    (uix/use-effect
+     (fn []
+       (let [handle-click (fn [e] (when dropdown-open? (set-dropdown-open false)))]
+         (.addEventListener js/document "click" handle-click)
+         #(.removeEventListener js/document "click" handle-click)))
+     [dropdown-open?])
+
+    ($ :div.relative.inline-block.text-left
+       ($ :button.inline-flex.items-center.justify-between.w-full.px-3.py-2.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.disabled:bg-gray-100.cursor-pointer
+          {:type "button"
+           :onClick (fn [e] (.stopPropagation e) (set-dropdown-open (not dropdown-open?)))
+           :disabled (or loading? disabled?)}
+          ($ :span.truncate (if loading? "Loading agents..." (or selected-agent "Select an agent")))
+          ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
+
+       (when dropdown-open?
+         ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
+            {:onClick #(.stopPropagation %)}
+            ($ :div.py-1.max-h-60.overflow-y-auto
+               (if (seq agents)
+                 (for [agent agents
+                       :let [decoded-name (common/url-decode (:agent-name agent))]]
+                   ($ common/DropdownRow {:key decoded-name
+                                          :label decoded-name
+                                          :selected? (= selected-agent decoded-name)
+                                          :on-select #(handle-select decoded-name)}))
+                 ($ :div.px-4.py-2.text-sm.text-gray-500 "No agents found in this module."))))))))
+
+;; =============================================================================
+;; MAIN EXPERIMENT FORM COMPONENTS
+;; ============================================================================= 
+
 (defui TargetEditor [{:keys [form-id index]}]
   (let [path [:spec :targets index]
-        form (forms/use-form form-id)
+        {:keys [module-id] :as form} (forms/use-form form-id)
         target-spec-type-field (forms/use-form-field form-id (conj path :target-spec :type))
         agent-name-field (forms/use-form-field form-id (conj path :target-spec :agent-name))
         node-name-field (forms/use-form-field form-id (conj path :target-spec :node))
-        input-mappings (or (get-in form (conj path :input->args)) [])]
+        input-mappings (or (get-in form (conj path :input->args)) [])
+        is-comparative? (= :comparative (get-in form [:spec :type]))]
 
     ($ :div.p-4.bg-gray-50.border.rounded-lg
        ($ :h4.text-md.font-semibold.mb-3 (str "Target " (inc index)))
@@ -27,17 +77,24 @@
           ($ :label.text-sm.font-medium "Target Type:")
           ($ :select.p-1.border.border-gray-300.rounded-md
              {:value (or (:value target-spec-type-field) :agent)
-              :on-change #((:on-change target-spec-type-field) (keyword (.. % -target -value)))}
+              :on-change #(state/dispatch [:form/set-experiment-target-type form-id index (keyword (.. % -target -value))])}
              ($ :option {:value "agent"} "Agent")
              ($ :option {:value "node"} "Node")))
 
-       ($ forms/form-field
-          {:label "Agent Name" :required? true
-           :value (:value agent-name-field) :on-change (:on-change agent-name-field)})
+       ($ :div.mb-4
+          ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Agent Name")
+          ($ AgentSelectorDropdown
+             {:module-id module-id
+              :selected-agent (:value agent-name-field)
+              :on-select-agent (:on-change agent-name-field)}))
+
        (when (= (:value target-spec-type-field) :node)
-         ($ forms/form-field
-            {:label "Node Name" :required? true
-             :value (:value node-name-field) :on-change (:on-change node-name-field)}))
+         ($ :div.mt-4
+            ($ forms/form-field
+               {:label "Node Name" :required? true
+                :value (:value node-name-field)
+                :on-change (:on-change node-name-field)
+                :error (:error node-name-field)})))
 
        ($ :div.mt-4
           ($ :label.block.text-sm.font-medium.text-gray-700 "Input Mappings")
@@ -145,19 +202,33 @@
              ($ :div.space-y-2
                 ($ :div.flex.items-center
                    ($ :input {:type "radio" :id "regular-exp" :name "exp-type"
-                              :checked (= (:value spec-type-field) :regular)
-                              :on-change #((:on-change spec-type-field) :regular)})
+                              :checked (or (= (:value spec-type-field) :regular) (nil? (:value spec-type-field)))
+                              :on-change #(state/dispatch [:form/set-experiment-target-type form-id 0 :regular])})
                    ($ :label.ml-3 {:htmlFor "regular-exp"} "Regular (Single Target)"))
                 ($ :div.flex.items-center
                    ($ :input {:type "radio" :id "comp-exp" :name "exp-type"
                               :checked (= (:value spec-type-field) :comparative)
-                              :on-change #((:on-change spec-type-field) :comparative)})
+                              :on-change #(state/dispatch [:form/set-experiment-target-type form-id 0 :comparative])})
                    ($ :label.ml-3 {:htmlFor "comp-exp"} "Comparative (A/B Test Multiple Targets)"))))
 
           ($ :div.space-y-4
-             (let [num-targets (if (= (:value spec-type-field) :regular) 1 (count targets))]
-               (for [i (range num-targets)]
-                 ($ TargetEditor {:key i :form-id form-id :index i}))))
+             (let [num-targets (if (or (= (:value spec-type-field) :regular) (nil? (:value spec-type-field)))
+                                 1
+                                 (count targets))]
+               (for [i (range num-targets)
+                     :let [is-comparative? (= (:value spec-type-field) :comparative)]]
+                 ($ :div.relative.pt-6 {:key i}
+                    (when (and is-comparative? (> i 0))
+                      ($ :div.border-t.my-4))
+                    ($ TargetEditor {:form-id form-id :index i})
+                    (when (and is-comparative? (> num-targets 1))
+                      ($ :button.absolute.top-0.right-0.p-1.text-red-500.hover:text-red-700
+                         {:type "button"
+                          :title "Remove Target"
+                          :onClick (fn []
+                                     (let [new-targets (vec (remove #(= % (get targets i)) targets))]
+                                       (state/dispatch [:form/update-field form-id [:spec :targets] new-targets])))}
+                         ($ TrashIcon {:className "h-4 w-4"})))))))
 
           (when (= (:value spec-type-field) :comparative)
             ($ :button.mt-4.flex.items-center.gap-2.text-sm.text-blue-600.hover:underline
@@ -207,8 +278,27 @@
    :modal-props {:title "Create New Experiment"
                  :submit-text "Run Experiment"}}
 
-  :on-submit
-  (fn [_db form-state]
-    (println "Experiment submitted! Final state:" (clj->js form-state))
-    ;; TODO: Construct and send the :experiments/start Sente event here
-    )})
+  :on-submit (fn [db form-state]
+               (let [{:keys [form-id module-id dataset-id name description snapshot selector spec num-repetitions concurrency]} form-state
+                   ;; Helper to clean up the spec for the backend
+                     clean-spec (fn [spec]
+                                  (-> spec
+                                    ;; Convert spec type to the expected record name
+                                      (update :type #(case % :regular "RegularExperiment" :comparative "ComparativeExperiment" %))
+                                      (update :targets
+                                              (fn [targets]
+                                                (mapv (fn [target]
+                                                        (-> target
+                                                            (update-in [:target-spec :type] #(case % :agent "AgentTarget" :node "NodeTarget" %))
+                                                          ;; Remove :node key if type is agent
+                                                            (cond-> (= (get-in target [:target-spec :type]) "AgentTarget")
+                                                              (update :target-spec dissoc :node))))
+                                                      targets)))))]
+                 (sente/request!
+                  [:experiments/start {:module-id module-id, :dataset-id dataset-id, :form-data (assoc form-state :spec (clean-spec spec))}]
+                  15000
+                  (fn [reply]
+                  ;; This would be the place to handle success/failure of starting the experiment
+                    (println "Start experiment reply:" reply)
+                    (state/dispatch [:modal/hide])
+                    (state/dispatch [:form/clear form-id])))))})
