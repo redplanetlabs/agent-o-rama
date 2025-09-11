@@ -5,7 +5,8 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [reitit.frontend.easy :as rfe]))
 
 (defui StatCard [{:keys [label value]}]
   ($ :div.bg-gray-50.p-4.rounded-lg.border
@@ -101,10 +102,10 @@
                       (let [first-invoke (get-in run [:agent-initiates 0 :agent-invoke])]
                         (if first-invoke
                           ($ :a.text-indigo-600.hover:text-indigo-900
-                             {:href (str "/agents/" module-id "/"
-                                         (get-in run [:agent-initiates 0 :agent-name])
-                                         "/invocation/"
-                                         (:task-id first-invoke) "-" (:agent-invoke-id first-invoke))
+                             {:href (rfe/href :agent/invocation-detail
+                                              {:module-id module-id
+                                               :agent-name (get-in run [:agent-initiates 0 :agent-name])
+                                               :invoke-id (str (:task-id first-invoke) "-" (:agent-invoke-id first-invoke))})
                               :target "_blank"}
                              "View Trace")
                           ($ :span.text-gray-400 "No trace")))))))))))

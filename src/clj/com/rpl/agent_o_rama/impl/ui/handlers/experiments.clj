@@ -59,7 +59,7 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/get-results
   [{:keys [manager dataset-id experiment-id]} uid]
-  (let [results-query (:experiment-results-query (aor-types/underlying-objects manager))]
+  (let [results-query (:experiments-results-query (aor-types/underlying-objects manager))]
     (foreign-invoke-query results-query
                           dataset-id
                           experiment-id)))

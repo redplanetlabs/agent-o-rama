@@ -5,7 +5,8 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
-   [clojure.string :as str])) ;; Require events to register handlers
+   [clojure.string :as str]
+   [reitit.frontend.easy :as rfe])) ;; Require events to register handlers
 
 (defui index [{:keys [module-id dataset-id]}]
   (let [{:keys [data loading? error]}
@@ -64,5 +65,8 @@
                           (common/format-relative-time (:start-time-millis exp)))
                        ($ :td {:className (:td common/table-classes)}
                           ($ :a.text-indigo-600.hover:text-indigo-900
-                             {:href (str "/datasets/" dataset-id "/experiments/" (:id info))}
+                             {:href (rfe/href :module/dataset-detail.experiment-detail
+                                              {:module-id module-id
+                                               :dataset-id dataset-id
+                                               :experiment-id (:id info)})}
                              "View Results")))))))))))
