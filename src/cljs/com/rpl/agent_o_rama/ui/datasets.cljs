@@ -743,19 +743,7 @@
                                                    :pagination nil}]
           :enabled? (boolean (and module-id dataset-id))})
 
-        examples (get data :examples)
-
-        ;; --- NEW ---
-        ;; Logic for the "Run New Experiment" button
-        handle-run-experiment (fn []
-                                (let [selector (if (seq selected-example-ids)
-                                                 {:type :example-ids, :ids (vec selected-example-ids)}
-                                                 {:type :all})
-                                      initial-props {:module-id module-id
-                                                     :dataset-id dataset-id
-                                                     :snapshot selected-snapshot-name
-                                                     :selector selector}]
-                                  (state/dispatch [:modal/show-form :create-experiment initial-props])))]
+        examples (get data :examples)]
 
     ;; Clear selections when dataset changes
     (uix/use-effect
@@ -784,11 +772,8 @@
                     :onChange #(set-search-string (.. % -target -value))}))
 
              ;; Right side - Action buttons
+                          ;; Right side - Add Example button
              ($ :div.flex.items-center.space-x-4
-                ;; --- NEW ---
-                ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-green-600.hover:bg-green-700
-                   {:onClick handle-run-experiment}
-                   "Run New Experiment")
                 ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer.disabled:bg-gray-400.disabled:cursor-not-allowed
                    {:onClick #(datasets-forms/show-add-example-modal!
                                {:module-id module-id
