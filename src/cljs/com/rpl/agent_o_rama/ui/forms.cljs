@@ -328,7 +328,8 @@
                          ;; Set submitting state and let the handler run its side-effect
                          (state/dispatch [:db/set-value [:forms form-id] (assoc form-state :submitting? true :error nil)])
                          (when on-submit-handler
-                           (on-submit-handler db form-state)))))
+                           ;; TODO fix, this assoc is ugly
+                           (on-submit-handler db (assoc form-state :form-id form-id))))))
                    nil))
 
 (state/reg-event :form/clear

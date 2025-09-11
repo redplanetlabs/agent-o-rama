@@ -268,7 +268,7 @@
                (state/dispatch [:query/invalidate {:query-key-pattern [:evaluator-instances decoded-module-id]}]))
              (state/dispatch [:form/clear form-id]))
            (do
-             (println "Setting error and stopping spinner in form:" (:error reply))
+             (println "Setting error and stopping spinner in form:" (:error reply) form-id)
              (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
              (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)])))))))})
 
