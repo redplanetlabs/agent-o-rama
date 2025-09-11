@@ -23,7 +23,8 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.forms :refer [global-modal-component]]
    [com.rpl.agent-o-rama.ui.queries :as queries]
-   [com.rpl.agent-o-rama.ui.events])) ;; Ensure event handlers are registered at app startup
+   [com.rpl.agent-o-rama.ui.events]
+   [com.rpl.agent-o-rama.ui.experiments.forms])) ;; Ensure event handlers are registered at app startup
 
 (def routes
   [""
