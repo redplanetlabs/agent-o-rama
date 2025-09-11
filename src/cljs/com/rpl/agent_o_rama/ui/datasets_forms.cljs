@@ -306,19 +306,27 @@
                  :submit-text "Add Tag"}}
   :on-submit
   (fn [db {:keys [form-id form-fields props]}]
-    (let [{:keys [module-id dataset-id snapshot-name example-ids]} props
-          {:keys [tag-name]} form-fields
-          {:keys [dataset-id module-id]} (s/select-one [:route :path-params] db)
-          ;; TODO need to do snapshot form now
-          {:keys [snapshot-name]} (s/select-one [] db)]
-      (println "running!")
-      (println "selected")
+    (let [;; 1. Get stable IDs from the route.
+          {:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
+
+          ;; 2. Get the CURRENTLY selected snapshot name from its state path.
+          snapshot-name (s/select-one [:ui :datasets :selected-snapshot-per-dataset dataset-id] db)
+
+          ;; 3. Get the CURRENTLY selected example IDs from their state path.
+          example-ids (s/select-one [:ui :datasets :selected-examples dataset-id] db)
+
+          ;; 4. Get the tag name from the form's fields.
+          {:keys [tag-name]} form-fields]
+
       (sente/request!
-       [:datasets/add-tag-to-examples {:module-id module-id
-                                       :dataset-id dataset-id
-                                       :snapshot-name snapshot-name
-                                       :example-ids (vec example-ids)
-                                       :tag tag-name}]
+       [:datasets/add-tag-to-examples
+        {:module-id module-id
+         :dataset-id dataset-id
+         ;; Only send snapshot-name if it's not blank.
+         :snapshot-name (when-not (str/blank? snapshot-name) snapshot-name)
+         ;; Ensure example-ids is a vector and not nil.
+         :example-ids (vec (or example-ids #{}))
+         :tag tag-name}]
        15000
        (fn [reply]
          (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
@@ -326,11 +334,7 @@
            (do
              (state/dispatch [:modal/hide])
              (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
-             (println "module-id" module-id)
-             (println "dataset-id" dataset-id)
-             (println "snapshot-name" snapshot-name)
-             (println "example-ids" example-ids)
-             (println "tag-name" tag-name)
+             ;; Invalidate the query to force a refetch of the examples list.
              (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
              (state/dispatch [:form/clear form-id]))
            (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
@@ -352,14 +356,27 @@
                  :submit-text "Remove Tag"}}
   :on-submit
   (fn [db {:keys [form-id form-fields props]}]
-    (let [{:keys [module-id dataset-id snapshot-name example-ids]} props
+    (let [;; 1. Get stable IDs from the route.
+          {:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
+
+          ;; 2. Get the CURRENTLY selected snapshot name from its state path.
+          snapshot-name (s/select-one [:ui :datasets :selected-snapshot-per-dataset dataset-id] db)
+
+          ;; 3. Get the CURRENTLY selected example IDs from their state path.
+          example-ids (s/select-one [:ui :datasets :selected-examples dataset-id] db)
+
+          ;; 4. Get the tag name from the form's fields.
           {:keys [tag-name]} form-fields]
+
       (sente/request!
-       [:datasets/remove-tag-from-examples {:module-id module-id
-                                            :dataset-id dataset-id
-                                            :snapshot-name snapshot-name
-                                            :example-ids (vec example-ids)
-                                            :tag tag-name}]
+       [:datasets/remove-tag-from-examples
+        {:module-id module-id
+         :dataset-id dataset-id
+         ;; Only send snapshot-name if it's not blank.
+         :snapshot-name (when-not (str/blank? snapshot-name) snapshot-name)
+         ;; Ensure example-ids is a vector and not nil.
+         :example-ids (vec (or example-ids #{}))
+         :tag tag-name}]
        15000
        (fn [reply]
          (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
@@ -367,6 +384,7 @@
            (do
              (state/dispatch [:modal/hide])
              (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
+             ;; Invalidate the query to force a refetch of the examples list.
              (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
              (state/dispatch [:form/clear form-id]))
            (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
