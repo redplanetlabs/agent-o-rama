@@ -33,7 +33,7 @@
                          (fn [reply]
                            (if (:success reply)
                              (do
-                               (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                               (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                (when on-delete-success (on-delete-success)))
                              (js/alert (str "Error deleting example: " (:error reply))))))))}
           ($ TrashIcon {:className delete-icon-classes})
@@ -84,7 +84,7 @@
                                        (set-edit-value! "")
                                        ;; Invalidate both the single example query and the main examples list
                                        (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
-                                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                        (when on-save (on-save)))
                                      (set-error! (str "Error saving: " (:error reply)))))))
                               (catch js/Error e
@@ -168,7 +168,7 @@
                                 (fn [reply]
                                   (if (:success reply)
                                     (do
-                                      (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                      (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                       (when on-delete-success (on-delete-success)))
                                     (js/alert (str "Error deleting example: " (:error reply))))))))}
                  ($ TrashIcon {:className "mr-2 h-4 w-4"})
@@ -233,7 +233,7 @@
                                   (set-input-value "")
                                   ;; Invalidate both the single example query and the main examples list
                                   (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
-                                  (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                  (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                   (when on-tags-change (on-tags-change)))
                                 (js/alert (str "Error adding tag: " (:error reply))))))))
 
@@ -250,7 +250,7 @@
                                  (do
                                    ;; Invalidate both the single example query and the main examples list
                                    (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
-                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                    (when on-tags-change (on-tags-change)))
                                  (js/alert (str "Error removing tag: " (:error reply)))))))
 
@@ -668,7 +668,7 @@
                                                       (fn [reply]
                                                         (if (:success reply)
                                                           (do
-                                                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                                             (when on-delete-success (on-delete-success)))
                                                           (js/alert (str "Error deleting example: " (:error reply))))))))}
                                        ($ TrashIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-red-500"})

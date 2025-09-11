@@ -224,7 +224,7 @@
          (if (:success reply)
            (do
              (state/dispatch [:modal/hide])
-             (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+             (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
              (state/dispatch [:form/clear form-id]))
            (state/dispatch [:db/set-value [:forms form-id :error] (or (:error reply) "An unknown server error occurred.")]))))))})
 
@@ -335,7 +335,7 @@
              (state/dispatch [:modal/hide])
              (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
              ;; Invalidate the query to force a refetch of the examples list.
-             (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+             (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
              (state/dispatch [:form/clear form-id]))
            (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
 
@@ -385,7 +385,7 @@
              (state/dispatch [:modal/hide])
              (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
              ;; Invalidate the query to force a refetch of the examples list.
-             (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+             (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
              (state/dispatch [:form/clear form-id]))
            (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
 
