@@ -35,31 +35,32 @@
             ($ :h3.mt-2.text-sm.font-medium.text-gray-900 "No experiments run yet")
             ($ :p.mt-1.text-sm.text-gray-500 "Run your first experiment to evaluate agent performance."))
          :else
-         ($ :div {:className common/table-classes.container}
-            ($ :table {:className common/table-classes.table}
-               ($ :thead {:className common/table-classes.thead}
+         ($ :div {:className (:container common/table-classes)}
+            ($ :table {:className (:table common/table-classes)}
+               ($ :thead {:className (:thead common/table-classes)}
                   ($ :tr
-                     ($ :th {:className common/table-classes.th} "Experiment Name")
-                     ($ :th {:className common/table-classes.th} "Type")
-                     ($ :th {:className common/table-classes.th} "Status")
-                     ($ :th {:className common/table-classes.th} "Started")
-                     ($ :th {:className common/table-classes.th} "Actions")))
+                     ($ :th {:className (:th common/table-classes)} "Experiment Name")
+                     ($ :th {:className (:th common/table-classes)} "Type")
+                     ($ :th {:className (:th common/table-classes)} "Status")
+                     ($ :th {:className (:th common/table-classes)} "Started")
+                     ($ :th {:className (:th common/table-classes)} "Actions")))
                ($ :tbody
                   (for [exp experiments
                         :let [info (get exp :experiment-info)
                               spec (get info :spec)]]
                     ($ :tr {:key (:id info)}
-                       ($ :td {:className common/table-classes.td}
+                       ($ :td {:className (:td common/table-classes)}
                           ($ :div.font-medium.text-gray-900 (:name info)))
-                       ($ :td {:className common/table-classes.td}
-                          (if (str/ends-with? (get spec :type) "RegularExperiment")
-                            "Regular"
-                            "Comparative"))
-                       ($ :td {:className common/table-classes.td}
+                       ($ :td {:className (:td common/table-classes)}
+                          (let [spec-type (get spec :type)]
+                            (if (and spec-type (str/ends-with? spec-type "RegularExperiment"))
+                              "Regular"
+                              "Comparative")))
+                       ($ :td {:className (:td common/table-classes)}
                           (if (:finish-time-millis exp)
                             ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs "Completed")
                             ($ :span.px-2.py-1.bg-blue-100.text-blue-800.rounded-full.text-xs "Running")))
-                       ($ :td {:className common/table-classes.td}
+                       ($ :td {:className (:td common/table-classes)}
                           (common/format-relative-time (:start-time-millis exp)))
-                       ($ :td {:className common/table-classes.td}
+                       ($ :td {:className (:td common/table-classes)}
                           ($ :button.text-indigo-600.hover:text-indigo-900 "View Results")))))))))))
