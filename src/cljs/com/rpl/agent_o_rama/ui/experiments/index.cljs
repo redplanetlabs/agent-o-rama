@@ -4,7 +4,8 @@
    ["@heroicons/react/24/outline" :refer [BeakerIcon PlusIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.queries :as queries])) ;; Require events to register handlers
+   [com.rpl.agent-o-rama.ui.queries :as queries]
+   [clojure.string :as str])) ;; Require events to register handlers
 
 (defui index [{:keys [module-id dataset-id]}]
   (let [{:keys [data loading? error]}
@@ -26,8 +27,8 @@
 
        ;; Content
        (cond
-         loading? ($ :div "Loading experiments...")
-         error ($ :div.text-red-500 "Error: " error)
+         loading? ($ :div.text-center.py-12 ($ common/spinner {:size :large}))
+         error ($ :div.text-red-500.text-center.py-8 "Error loading experiments: " error)
          (empty? experiments)
          ($ :div.text-center.py-12
             ($ BeakerIcon {:className "mx-auto h-12 w-12 text-gray-400"})
@@ -51,7 +52,7 @@
                        ($ :td {:className common/table-classes.td}
                           ($ :div.font-medium.text-gray-900 (:name info)))
                        ($ :td {:className common/table-classes.td}
-                          (if (goog.string/endsWith (get spec :type) "RegularExperiment")
+                          (if (str/ends-with? (get spec :type) "RegularExperiment")
                             "Regular"
                             "Comparative"))
                        ($ :td {:className common/table-classes.td}

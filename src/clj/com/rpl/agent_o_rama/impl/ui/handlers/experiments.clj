@@ -34,19 +34,25 @@
                             (aor-types/->AgentTarget (:agent-name target-spec))
                             (aor-types/->NodeTarget (:agent-name target-spec) (:node target-spec)))
                           (:input->args t))))]
-    (if (= (:type spec) "RegularExperiment")
-      (aor-types/->RegularExperiment (parse-target (first (:targets spec))))
-      (aor-types/->ComparativeExperiment (mapv parse-target (:targets spec))))))
+    ;; The :type value will be a keyword on the backend, but a string from the UI
+    (if (= (get spec "type") "RegularExperiment")
+      (aor-types/->RegularExperiment (parse-target (first (get spec "targets"))))
+      (aor-types/->ComparativeExperiment (mapv parse-target (get spec "targets"))))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/start
   [{:keys [manager dataset-id form-data]} uid]
   (let [global-actions-depot (:global-actions-depot (aor-types/underlying-objects manager))
-        {:keys [name spec selector evaluators num-repetitions concurrency]} form-data]
-    (let [{:keys [agent-invoke]} (foreign-append! global-actions-depot
-                                                  (aor-types/->StartExperiment
-                                                   (h/random-uuid7) name (UUID/fromString dataset-id) (:snapshot form-data)
-                                                   (parse-selector selector)
-                                                   (mapv #(aor-types/->EvaluatorSelector (:name %) (:remote? %)) evaluators)
-                                                   (parse-spec spec)
-                                                   num-repetitions concurrency))]
+        {:keys [name snapshot selector evaluators spec num-repetitions concurrency]} form-data]
+    (let [{:keys [agent-invoke]}
+          (foreign-append! global-actions-depot
+                           (aor-types/->StartExperiment
+                            (h/random-uuid7)
+                            name
+                            dataset-id
+                            snapshot
+                            (parse-selector selector)
+                            (mapv #(aor-types/->EvaluatorSelector (:name %) (:remote? %)) evaluators)
+                            (parse-spec spec)
+                            (long num-repetitions)
+                            (long concurrency)))]
       {:status :ok :invoke-id (:agent-invoke-id agent-invoke)})))
