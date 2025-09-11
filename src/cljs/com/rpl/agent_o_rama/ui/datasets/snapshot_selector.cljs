@@ -8,7 +8,7 @@
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [clojure.string :as str]))
 
-(defui SnapshotManager [{:keys [module-id dataset-id selected-snapshot on-select-snapshot disabled?]}]
+(defui SnapshotManager [{:keys [module-id dataset-id selected-snapshot on-select-snapshot disabled? read-only?]}]
   (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
 
         {:keys [data loading? error refetch]}
@@ -61,7 +61,6 @@
 
     ($ :div.relative.inline-block.text-left
        ;; Main dropdown button
-       ;; Main dropdown button
        ($ :button.inline-flex.items-center.justify-between.w-64.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500.cursor-pointer
           {:type "button"
            :onClick (fn [e]
@@ -90,7 +89,7 @@
                                         :label name
                                         :selected? (= selected-snapshot name)
                                         :on-select #(handle-select name)
-                                        :delete-button (when-not disabled?
+                                        :delete-button (when-not (or disabled? read-only?)
                                                          ($ :button.text-red-600.hover:text-red-800.p-1.rounded.hover:bg-red-100
                                                             {:type "button"
                                                              :onClick (fn [e]
@@ -103,8 +102,7 @@
                ($ :div.border-t.border-gray-100.my-1)
 
                ;; New snapshot action
-               ;; New snapshot action
-               (when-not disabled?
+               (when-not (or disabled? read-only?)
                  ($ common/DropdownRow {:label "New snapshot"
                                         :action? true
                                         :on-select handle-create

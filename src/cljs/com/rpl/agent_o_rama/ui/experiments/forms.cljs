@@ -110,7 +110,7 @@
                  :dataset-id dataset-id
                  :selected-snapshot (:value snapshot-field)
                  :on-select-snapshot (:on-change snapshot-field)
-                 :disabled? false})) ;; Snapshots are always editable for experiments
+                 :read-only? true})) ;; Snapshots are always editable for experiments
 
           ($ :div
              ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Examples to run on")
