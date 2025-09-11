@@ -276,45 +276,7 @@
 ;; DATASET FORM EVENTS
 ;; =============================================================================
 
-(state/reg-event :dataset/edit
-                 (fn [db {:keys [module-id dataset-id initial-name initial-description form-fields]}]
-                   (let [name (get form-fields :name "")
-                         description (get form-fields :description "")
-                         form-id :edit-dataset] ;; The form-id for editing
-
-                     (let [name-promise (js/Promise.
-                                         (fn [resolve reject]
-                                           (if (= name initial-name)
-                                             (resolve {:success true})
-                                             (sente/request!
-                                              [:datasets/set-name {:module-id module-id
-                                                                   :dataset-id dataset-id
-                                                                   :name name}]
-                                              5000
-                                              #(if (:success %) (resolve %) (reject (:error %)))))))
-                           desc-promise (js/Promise.
-                                         (fn [resolve reject]
-                                           (if (= description initial-description)
-                                             (resolve {:success true})
-                                             (sente/request!
-                                              [:datasets/set-description {:module-id module-id
-                                                                          :dataset-id dataset-id
-                                                                          :description description}]
-                                              5000
-                                              #(if (:success %) (resolve %) (reject (:error %)))))))]
-
-                       (-> (.all js/Promise [name-promise desc-promise])
-                           (.then (fn [_]
-                                    (state/dispatch [:form/set-submitting form-id false])
-                                    (state/dispatch [:modal/hide])
-                                    (let [decoded-module-id (when module-id (common/url-decode module-id))]
-                                      (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}])
-                                      (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-props decoded-module-id dataset-id]}]))
-                                    (state/dispatch [:form/clear form-id])))
-                           (.catch (fn [error]
-                                     (state/dispatch [:form/set-submitting form-id false])
-                                     (state/dispatch [:form/set-error form-id (str "Failed to save: " error)]))))))
-                   nil))
+;; DELETED: :dataset/edit event handler has been moved to the :on-submit function in the :edit-dataset form spec
 
 (state/reg-event :dataset/edit-example
                  (fn [db {:keys [module-id dataset-id snapshot-name example-id form-fields]}]

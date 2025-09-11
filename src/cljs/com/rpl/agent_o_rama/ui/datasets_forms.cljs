@@ -118,6 +118,63 @@
                             :on-change (:on-change description-field)
                             :error (:error description-field)}))))
 
+ ;; =============================================================================
+;; EDIT DATASET FORM SPECIFICATION
+;; =============================================================================
+
+(forms/reg-form
+ :edit-dataset
+ {:steps [:main]
+  :main
+  {:initial-fields (fn [props]
+                     {:name (:initial-name props)
+                      :description (:initial-description props)})
+   :validators {:name [forms/required]}
+   :ui (fn [{:keys [form-id props]}]
+         ($ EditDatasetForm {:form-id form-id
+                             :initial-name (:initial-name props)
+                             :initial-description (:initial-description props)}))
+   :modal-props {:title "Edit Dataset"
+                 :submit-text "Save Changes"}}
+  :on-submit
+  (fn [db {:keys [form-id form-fields props]}]
+    ;; This logic is moved from the old :dataset/edit event handler
+    (let [{:keys [module-id dataset-id initial-name initial-description]} props
+          {:keys [name description]} form-fields]
+
+      (let [name-promise (js/Promise.
+                          (fn [resolve reject]
+                            (if (= name initial-name)
+                              (resolve {:success true})
+                              (sente/request!
+                               [:datasets/set-name {:module-id module-id
+                                                    :dataset-id dataset-id
+                                                    :name name}]
+                               5000
+                               #(if (:success %) (resolve %) (reject (:error %)))))))
+            desc-promise (js/Promise.
+                          (fn [resolve reject]
+                            (if (= description initial-description)
+                              (resolve {:success true})
+                              (sente/request!
+                               [:datasets/set-description {:module-id module-id
+                                                           :dataset-id dataset-id
+                                                           :description description}]
+                               5000
+                               #(if (:success %) (resolve %) (reject (:error %)))))))]
+
+        (-> (.all js/Promise [name-promise desc-promise])
+            (.then (fn [_]
+                     (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+                     (state/dispatch [:modal/hide])
+                     (let [decoded-module-id (when module-id (common/url-decode module-id))]
+                       (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}])
+                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-props decoded-module-id dataset-id]}]))
+                     (state/dispatch [:form/clear form-id])))
+            (.catch (fn [error]
+                      (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+                      (state/dispatch [:db/set-value [:forms form-id :error] (str "Failed to save: " error)])))))))})
+
 (defui ExampleForm [{:keys [form-id]}]
   (let [{:keys [field-errors]} (forms/use-form form-id)
         input-field (forms/use-form-field form-id :input)

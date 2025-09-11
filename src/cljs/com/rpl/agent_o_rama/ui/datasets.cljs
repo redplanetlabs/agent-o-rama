@@ -679,20 +679,7 @@
             {:module-id module-id
              :dataset-id dataset-id}))
 
-(defn show-edit-dataset-modal! [module-id dataset-id initial-name initial-description]
-  (state/dispatch [:form/init :edit-dataset
-                   (-> datasets-forms/edit-dataset-form-spec
-                       (assoc :submit-event [:dataset/edit {:module-id module-id
-                                                            :dataset-id dataset-id
-                                                            :initial-name initial-name
-                                                            :initial-description initial-description}]))])
-  (state/dispatch [:modal/show :edit-dataset
-                   {:title "Edit Dataset"
-                    :form-id :edit-dataset
-                    :submit-text "Save Changes"
-                    :component ($ datasets-forms/EditDatasetForm {:form-id :edit-dataset
-                                                                  :initial-name initial-name
-                                                                  :initial-description initial-description})}]))
+;; DELETED: show-edit-dataset-modal! function has been replaced by the declarative :edit-dataset form spec
 
 ;; =============================================================================
 ;; MAIN DATASETS INDEX PAGE
@@ -773,7 +760,11 @@
                                       {:onClick (fn [e]
                                                   (.preventDefault e)
                                                   (.stopPropagation e)
-                                                  (show-edit-dataset-modal! module-id dsid name desc))}
+                                                  (state/dispatch [:modal/show-form :edit-dataset
+                                                                   {:module-id module-id
+                                                                    :dataset-id dsid
+                                                                    :initial-name name
+                                                                    :initial-description desc}]))}
                                       ($ PencilIcon {:className "h-4 w-4 mr-1"})
                                       "Edit")
                                    ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
