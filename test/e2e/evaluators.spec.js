@@ -111,6 +111,33 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
   await page.getByText('Evaluators').click();
   await expect(page).toHaveURL(/evaluations/);
 
+  // First, test error handling by trying to create evaluator without required parameter
+  console.log('Testing error handling for missing threshold parameter...');
+  await page.getByRole('button', { name: 'Create Evaluator' }).first().click();
+
+  // Step 1: Select the builder
+  let modal = page.locator('[role="dialog"]');
+  await expect(modal).toBeVisible();
+  await modal.getByText('aor/conciseness').click();
+  await expect(modal.getByLabel('Name')).toBeVisible(); // Wait for form to load
+
+  // Step 2: Fill out the form but deliberately omit the threshold parameter
+  await modal.getByLabel('Name').fill('test-error-handling');
+  await modal.getByLabel('Description').fill('Testing error handling');
+  // Deliberately NOT filling the threshold parameter
+
+  await modal.getByRole('button', { name: 'Submit' }).click();
+
+  // Step 3: Verify error message appears and spinner stops
+  await expect(modal.getByText(/Mismatched params.*threshold/)).toBeVisible({ timeout: 10000 });
+  // Verify the submit button is not in loading state (spinner stopped)
+  await expect(modal.getByRole('button', { name: 'Submit' })).not.toHaveAttribute('disabled');
+  console.log('Error handling test passed - error message displayed correctly');
+
+  // Close the modal to continue with successful creation
+  await modal.getByRole('button', { name: '×' }).click();
+  await expect(modal).not.toBeVisible();
+
   // Create evaluators (comment out jcompare1 as it's not loaded yet)
   await createEvaluator(page, { name: regularEvalName, builderName: 'aor/conciseness', description: 'Regular evaluator for testing.', params: { threshold: '10' } });
   // await createEvaluator(page, { name: comparativeEvalName, builderName: 'jcompare1', description: 'Comparative evaluator for testing.' });
@@ -147,33 +174,33 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
   await shortExampleRow.locator('button').click(); // Click ellipsis
   await page.getByText('Try with evaluator').click();
 
-  const modal = page.locator('[role="dialog"]');
-  await expect(modal).toBeVisible();
-  await modal.getByRole('button', { name: /Choose an evaluator/ }).click();
+  const evaluatorModal = page.locator('[role="dialog"]');
+  await expect(evaluatorModal).toBeVisible();
+  await evaluatorModal.getByRole('button', { name: /Choose an evaluator/ }).click();
 
     // Assert dropdown is filtered correctly (summary should be absent)
-    await expect(modal.getByText(regularEvalName)).toBeVisible();
-    // await expect(modal.getByText(comparativeEvalName)).toBeVisible(); // commented out - jcompare1 not loaded
-    await expect(modal.getByText(summaryEvalName)).not.toBeVisible();
+    await expect(evaluatorModal.getByText(regularEvalName)).toBeVisible();
+    // await expect(evaluatorModal.getByText(comparativeEvalName)).toBeVisible(); // commented out - jcompare1 not loaded
+    await expect(evaluatorModal.getByText(summaryEvalName)).not.toBeVisible();
 
   // Select the regular evaluator
-  await modal.getByText(regularEvalName).click();
+  await evaluatorModal.getByText(regularEvalName).click();
 
   // Wait for the modal to update with the evaluator-specific fields
-  await expect(modal.getByText('Model Output (JSON)')).toBeVisible({ timeout: 5000 });
-  const outputField = modal.getByPlaceholder('{"result": "..."}');
+  await expect(evaluatorModal.getByText('Model Output (JSON)')).toBeVisible({ timeout: 5000 });
+  const outputField = evaluatorModal.getByPlaceholder('{"result": "..."}');
 
   // Test with a passing value
   await outputField.fill('"pass"');
-  await modal.getByRole('button', { name: 'Run Evaluator' }).click();
-  await expect(modal.getByText(/"concise\?":\s*true/)).toBeVisible();
+  await evaluatorModal.getByRole('button', { name: 'Run Evaluator' }).click();
+  await expect(evaluatorModal.getByText(/"concise\?":\s*true/)).toBeVisible();
 
   // Test with a failing value
   await outputField.fill('"this string is definitely too long"');
-  await modal.getByRole('button', { name: 'Run Evaluator' }).click();
-  await expect(modal.getByText(/"concise\?":\s*false/)).toBeVisible();
+  await evaluatorModal.getByRole('button', { name: 'Run Evaluator' }).click();
+  await expect(evaluatorModal.getByText(/"concise\?":\s*false/)).toBeVisible();
 
-  await modal.getByRole('button', { name: '×' }).click(); // Close modal
+  await evaluatorModal.getByRole('button', { name: '×' }).click(); // Close modal
 
     // --- Test :comparative evaluator ---
     // console.log('Testing :comparative evaluator...');
@@ -217,25 +244,26 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
 
   await page.getByRole('button', { name: 'Try summary evaluator' }).click();
 
-  await expect(modal).toBeVisible();
-  await modal.getByRole('button', { name: /Choose an evaluator/ }).click();
+  const summaryModal = page.locator('[role="dialog"]');
+  await expect(summaryModal).toBeVisible();
+  await summaryModal.getByRole('button', { name: /Choose an evaluator/ }).click();
 
     // Assert dropdown is filtered correctly (only summary should be visible)
-    await expect(modal.getByText(summaryEvalName)).toBeVisible();
-    await expect(modal.getByText(regularEvalName)).not.toBeVisible();
-    // await expect(modal.getByText(comparativeEvalName)).not.toBeVisible(); // commented out - jcompare1 not loaded
+    await expect(summaryModal.getByText(summaryEvalName)).toBeVisible();
+    await expect(summaryModal.getByText(regularEvalName)).not.toBeVisible();
+    // await expect(summaryModal.getByText(comparativeEvalName)).not.toBeVisible(); // commented out - jcompare1 not loaded
 
-  await modal.getByText(summaryEvalName).click();
+  await summaryModal.getByText(summaryEvalName).click();
 
   // Assert confirmation text is shown
-  await expect(modal.getByText(`This will run the summary evaluator '${summaryEvalName}' on 2 selected examples.`)).toBeVisible();
+  await expect(summaryModal.getByText(`This will run the summary evaluator '${summaryEvalName}' on 2 selected examples.`)).toBeVisible();
 
-  await modal.getByRole('button', { name: 'Run Evaluator' }).click();
+  await summaryModal.getByRole('button', { name: 'Run Evaluator' }).click();
 
   // Assert response includes a score key
-  await expect(modal.getByText(/"score"\s*:/)).toBeVisible();
+  await expect(summaryModal.getByText(/"score"\s*:/)).toBeVisible();
 
-  await modal.getByRole('button', { name: '×' }).click(); // Close modal
+  await summaryModal.getByRole('button', { name: '×' }).click(); // Close modal
 
   console.log('--- Modal Tests Complete ---');
 
