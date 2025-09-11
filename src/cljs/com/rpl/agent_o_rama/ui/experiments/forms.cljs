@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.ui.experiments.events]
    [com.rpl.agent-o-rama.ui.datasets.snapshot-selector :as snapshot-selector]
    [clojure.string :as str]
+   [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    ["@heroicons/react/24/outline" :refer [PlusIcon TrashIcon ChevronDownIcon XMarkIcon]]))
 
 ;; =============================================================================
@@ -70,35 +71,54 @@
         selected-names (set (map :name selected-evaluators))
         available-evaluators (remove #(contains? selected-names (:name %)) all-evaluators)]
     ($ :div
+
        ($ :div.flex.flex-wrap.gap-2.mb-2
           (if (seq selected-evaluators)
-            (for [e selected-evaluators]
-              ($ :span.inline-flex.items-center.px-2.5.py-1.rounded-full.text-xs.font-medium.bg-indigo-100.text-indigo-800
-                 {:key (:name e)}
-                 (:name e)
-                 ($ :button.ml-1.p-0.5.rounded-full.hover:bg-indigo-200
+            (for [e selected-evaluators
+                  :let [evaluator-info (first (filter #(= (:name %) (:name e)) all-evaluators))]]
+              ($ :<>
+                 ($ :div.inline-flex.items-center.gap-2.px-3.py-2.rounded-lg.text-xs.font-medium.bg-indigo-100.text-indigo-800.border.border-indigo-200
+                    {:key (:name e)}
+                    ($ :div.flex.flex-col.gap-1
+                       ($ :div.flex.items-center.gap-2
+                          ($ :span.font-semibold (:name e))
+                          (when evaluator-info
+                            ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
+                               {:className (evaluators/get-evaluator-type-badge-style (:type evaluator-info))}
+                               (evaluators/get-evaluator-type-display (:type evaluator-info)))))
+                       (when (and evaluator-info (not (str/blank? (:description evaluator-info))))
+                         ($ :span.text-indigo-600.max-w-xs.truncate (:description evaluator-info)))))
+                 ($ :button.p-1.rounded-full.hover:bg-indigo-200.transition-colors
                     {:onClick #(on-change (vec (remove (fn [sel] (= (:name sel) (:name e))) selected-evaluators)))}
-                    ($ XMarkIcon {:className "h-3 w-3"}))))
-            ($ :div.text-sm.text-gray-500.italic "No evaluators selected.")))
-       ($ :div.relative
-          ($ :button.inline-flex.items-center.gap-2.text-sm.text-blue-600.hover:underline
-             {:type "button" :onClick #(set-dropdown-open (not dropdown-open?))}
-             ($ PlusIcon {:className "h-4 w-4"})
-             "Add Evaluator")
-          (when dropdown-open?
-            ($ :div.origin-top-left.absolute.left-0.mt-2.w-72.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-10
-               ($ :div.py-1.max-h-60.overflow-y-auto
-                  (cond
-                    loading? ($ :div.px-4.py-2.text-sm.text-gray-500 "Loading...")
-                    error ($ :div.px-4.py-2.text-sm.text-red-500 "Error")
-                    (empty? available-evaluators) ($ :div.px-4.py-2.text-sm.text-gray-500 "No more evaluators to add.")
-                    :else (for [e available-evaluators]
-                            ($ common/DropdownRow
-                               {:key (:name e)
-                                :label (:name e)
-                                :on-select #(do
-                                              (on-change (conj selected-evaluators {:name (:name e) :remote? false}))
-                                              (set-dropdown-open false))}))))))))))
+                    ($ XMarkIcon {:className "h-3 w-3"})))))
+          ($ :div.text-sm.text-gray-500.italic "No evaluators selected.")))
+    ($ :div.relative
+       ($ :button.inline-flex.items-center.gap-2.text-sm.text-blue-600.hover:underline
+          {:type "button" :onClick #(set-dropdown-open (not dropdown-open?))}
+          ($ PlusIcon {:className "h-4 w-4"})
+          "Add Evaluator")
+       (when dropdown-open?
+         ($ :div.origin-top-left.absolute.left-0.mt-2.w-80.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-10
+            ($ :div.py-1.max-h-60.overflow-y-auto
+               (cond
+                 loading? ($ :div.px-4.py-2.text-sm.text-gray-500 "Loading...")
+                 error ($ :div.px-4.py-2.text-sm.text-red-500 "Error")
+                 (empty? available-evaluators) ($ :div.px-4.py-2.text-sm.text-gray-500 "No more evaluators to add.")
+                 :else (for [e available-evaluators]
+                         ($ :div.px-3.py-2.hover:bg-gray-50.cursor-pointer.border-b.border-gray-100.last:border-b-0
+                            {:key (:name e)
+                             :onClick #(do
+                                         (on-change (conj selected-evaluators {:name (:name e) :remote? false}))
+                                         (set-dropdown-open false))}
+                            ($ :div.flex.flex-col.gap-1
+                               ($ :div.flex.items-center.justify-between
+                                  ($ :span.font-medium.text-gray-900 (:name e))
+                                  ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
+                                     {:className (evaluators/get-evaluator-type-badge-style (:type e))}
+                                     (evaluators/get-evaluator-type-display (:type e))))
+                               (when-not (str/blank? (:description e))
+                                 ($ :span.text-sm.text-gray-600.max-w-xs.truncate (:description e)))
+                               ($ :span.text-xs.text-gray-500.font-mono (:builder-name e))))))))))))
 
 ;; =============================================================================
 ;; MAIN EXPERIMENT FORM COMPONENTS
