@@ -19,28 +19,28 @@
 (defhook use-form
   [form-id]
   (let [form-state (state/use-sub [:forms form-id])
-        {:keys [fields field-errors valid? submitting? error current-step steps]} form-state]
+        {:keys [field-errors valid? submitting? error current-step steps]} form-state]
 
-    {:fields (or fields {})
-     :field-errors (or field-errors {})
-     :valid? (boolean valid?)
-     :submitting? (boolean submitting?)
-     :error error
-     :current-step current-step
-     :steps steps
-     ;; The set-field! function is now a direct dispatch.
-     :set-field! (fn [field-path value]
-                   (state/dispatch [:form/update-field form-id field-path value]))
-     :next-step! #(state/dispatch [:form/next-step form-id])
-     :prev-step! #(state/dispatch [:form/prev-step form-id])
-     :submit! #(state/dispatch [:form/submit form-id])}))
+    (merge form-state
+           {:field-errors (or field-errors {})
+            :valid? (boolean valid?)
+            :submitting? (boolean submitting?)
+            :error error
+            :current-step current-step
+            :steps steps
+            ;; The set-field! function is now a direct dispatch.
+            :set-field! (fn [field-path value]
+                          (state/dispatch [:form/update-field form-id field-path value]))
+            :next-step! #(state/dispatch [:form/next-step form-id])
+            :prev-step! #(state/dispatch [:form/prev-step form-id])
+            :submit! #(state/dispatch [:form/submit form-id])})))
 
 (defhook use-form-field
   "Subscribes to a single field's state within a form."
   [form-id field-key]
   ;; Ensure field-key is always a vector for consistency with specter paths
   (let [field-path (if (vector? field-key) field-key [field-key])]
-    (let [value (state/use-sub (into [:forms form-id :fields] field-path))
+    (let [value (state/use-sub (into [:forms form-id] field-path))
           error (state/use-sub (into [:forms form-id :field-errors] field-path))
 
           ;; Memoize the on-change handler for performance.
@@ -140,9 +140,8 @@
 
        ($ :div {:className "flex-1 min-h-0 overflow-y-auto"}
           (if ui-fn
-            (let [form-state (state/use-sub [:forms form-id])
-                  props (:props form-state)]
-              (ui-fn {:form-id form-id :props props}))
+            ;; Pass the entire form state as props - it now contains everything
+            (ui-fn {:form-id form-id :props form})
             ($ :div "No UI for this form step.")))
 
        ;; The footer with form actions
@@ -249,17 +248,17 @@
                          all-validators (:validators step-spec)
 
                          ;; Calculate the entire next state before committing it to the atom.
-                         next-fields (s/setval field-path value (:fields form-state))
-                         validation-result (validate-form-fields next-fields all-validators)]
+                         next-form-state (s/setval field-path value form-state)
+                         validation-result (validate-form-fields next-form-state all-validators)]
 
-                     ;; Atomically update the form state with the new fields, errors, and validity.
+                     ;; Atomically update the form state with the new value, errors, and validity.
                      [:forms form-id
                       (s/terminal
                        (fn [current-form-state]
-                         (assoc current-form-state
-                                :fields next-fields
-                                :field-errors (:errors validation-result)
-                                :valid? (:valid? validation-result))))])))
+                         (-> current-form-state
+                             (s/setval field-path value)
+                             (assoc :field-errors (:errors validation-result)
+                                    :valid? (:valid? validation-result)))))])))
 
 (state/reg-event :form/validate
                  (fn [db form-id]
@@ -267,7 +266,7 @@
                          form-spec (@form-specs form-id)
                          current-step-key (:current-step form-state)
                          step-spec (get form-spec current-step-key form-spec)
-                         {:keys [valid? errors]} (validate-form-fields (:fields form-state) (:validators step-spec))]
+                         {:keys [valid? errors]} (validate-form-fields form-state (:validators step-spec))]
                      [:forms form-id (s/terminal #(assoc % :valid? valid? :field-errors errors))])))
 
 (state/reg-event :form/next-step
@@ -296,7 +295,7 @@
                          form-spec (@form-specs form-id)
                          current-step-key (:current-step form-state)
                          step-spec (get form-spec current-step-key form-spec)
-                         {:keys [valid? errors]} (validate-form-fields (:fields form-state) (:validators step-spec))]
+                         {:keys [valid? errors]} (validate-form-fields form-state (:validators step-spec))]
 
                      (if-not valid?
                        (state/dispatch [:db/set-value
@@ -306,9 +305,7 @@
                          ;; Set submitting state and let the handler run its side-effect
                          (state/dispatch [:db/set-value [:forms form-id] (assoc form-state :submitting? true :error nil)])
                          (when on-submit-handler
-                           (on-submit-handler db {:form-id form-id
-                                                  :form-fields (:fields form-state)
-                                                  :props (:props form-state)})))))
+                           (on-submit-handler db form-state)))))
                    nil))
 
 (state/reg-event :form/clear
@@ -337,16 +334,14 @@
              {:keys [valid? errors]} (validate-form-fields initial-fields validators)
              modal-data (get-in form-spec [initial-step :modal-props] {})
 
-             ;; 1. Construct the full state for the form
-             form-state {:fields initial-fields
-                         :validators validators
-                         :field-errors errors
-                         :valid? valid?
-                         :submitting? false
-                         :error nil
-                         :props props
-                         :steps (:steps form-spec)
-                         :current-step initial-step}
+             ;; 1. Construct the full state for the form - now it's just a single flat map
+             form-state (merge initial-fields
+                               {:field-errors errors
+                                :valid? valid?
+                                :submitting? false
+                                :error nil
+                                :steps (:steps form-spec)
+                                :current-step initial-step})
 
              ;; 2. Construct the full state for the modal
              modal-state {:active form-id

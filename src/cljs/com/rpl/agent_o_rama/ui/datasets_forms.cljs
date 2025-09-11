@@ -66,10 +66,11 @@
 
   :main
   {:initial-fields (fn [props]
-                     {:name ""
-                      :description ""
-                      :input-schema ""
-                      :output-schema ""})
+                     (merge {:name ""
+                             :description ""
+                             :input-schema ""
+                             :output-schema ""}
+                            props))
 
    :validators {:name [forms/required]
                 :input-schema [forms/valid-json]
@@ -81,9 +82,8 @@
    :modal-props {:title "Create New Dataset"
                  :submit-text "Create Dataset"}}
   :on-submit
-  (fn [db {:keys [form-id form-fields props]}]
-    (let [{:keys [module-id]} props
-          {:keys [name description input-schema output-schema]} form-fields]
+  (fn [db form-state]
+    (let [{:keys [form-id module-id name description input-schema output-schema]} form-state]
       (sente/request!
        [:datasets/create {:module-id module-id
                           :name name
@@ -126,21 +126,19 @@
  :edit-dataset
  {:steps [:main]
   :main
-  {:initial-fields (fn [props]
-                     {:name (:initial-name props)
-                      :description (:initial-description props)})
+  {:initial-fields (fn [props] props) ; The beautiful simplification - props are the initial fields!
    :validators {:name [forms/required]}
    :ui (fn [{:keys [form-id props]}]
+         ;; Props now contains the actual field values directly
          ($ EditDatasetForm {:form-id form-id
-                             :initial-name (:initial-name props)
-                             :initial-description (:initial-description props)}))
+                             :initial-name (:name props)
+                             :initial-description (:description props)}))
    :modal-props {:title "Edit Dataset"
                  :submit-text "Save Changes"}}
   :on-submit
-  (fn [db {:keys [form-id form-fields props]}]
-    ;; This logic is moved from the old :dataset/edit event handler
-    (let [{:keys [module-id dataset-id initial-name initial-description]} props
-          {:keys [name description]} form-fields]
+  (fn [db form-state] ; The elegant single-map signature!
+    ;; All data is now in one place - much cleaner!
+    (let [{:keys [form-id module-id dataset-id name description initial-name initial-description]} form-state]
 
       (let [name-promise (js/Promise.
                           (fn [resolve reject]
@@ -198,9 +196,10 @@
  :add-dataset-example
  {:steps [:main]
   :main
-  {:initial-fields (fn [_props]
-                     {:input ""
-                      :output ""})
+  {:initial-fields (fn [props]
+                     (merge {:input ""
+                             :output ""}
+                            props))
    :validators {:input [forms/required forms/valid-json]
                 :output [forms/valid-json]}
    :ui (fn [{:keys [form-id]}]
@@ -208,10 +207,9 @@
    :modal-props {:title "Add Example"
                  :submit-text "Add Example"}}
   :on-submit
-  (fn [db {:keys [form-id form-fields props]}]
+  (fn [db form-state]
     ;; This logic is moved from events.cljs and adapted
-    (let [{:keys [module-id dataset-id snapshot-name]} props
-          {:keys [input output]} form-fields]
+    (let [{:keys [form-id module-id dataset-id snapshot-name input output]} form-state]
       (sente/request!
        [:datasets/add-example {:module-id module-id
                                :dataset-id dataset-id
@@ -235,7 +233,7 @@
  :new-snapshot
  {:steps [:main]
   :main
-  {:initial-fields (fn [_] {:to-snapshot-name ""})
+  {:initial-fields (fn [props] (merge {:to-snapshot-name ""} props))
    :validators {:to-snapshot-name [forms/required]}
    :modal-props {:title "New Snapshot" :submit-text "Create Snapshot"}
 
@@ -250,9 +248,8 @@
                                :required? true}))))}
 
   :on-submit
-  (fn [db {:keys [form-id form-fields props]}]
-    (let [{:keys [module-id dataset-id from-snapshot-name]} props
-          {:keys [to-snapshot-name]} form-fields]
+  (fn [db form-state]
+    (let [{:keys [form-id module-id dataset-id from-snapshot-name to-snapshot-name]} form-state]
       (sente/request!
        [:datasets/create-snapshot {:module-id module-id
                                    :dataset-id dataset-id
@@ -271,8 +268,7 @@
              ;; Invalidate the query to refetch the list of snapshots
              (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}])
              (state/dispatch [:form/clear form-id]))
-           ;; On failure, display the error in the form
-           (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
+           (state/dispatch [:db/set-value [:forms form-id :error] (or (:error reply) "An unknown server error occurred.")]))))))})
 
 (defui CreateSnapshotForm [{:keys [form-id from-snapshot-name]}]
   (let [{:keys [error]} (forms/use-centralized-form form-id)
@@ -298,14 +294,14 @@
  :add-tag-to-selected
  {:steps [:main]
   :main
-  {:initial-fields (fn [_props] {:tag-name ""})
+  {:initial-fields (fn [props] (merge {:tag-name ""} props))
    :validators {:tag-name [forms/required]}
    :ui (fn [{:keys [form-id]}]
          ($ AddTagForm {:form-id form-id}))
    :modal-props {:title "Add Tag to examples"
                  :submit-text "Add Tag"}}
   :on-submit
-  (fn [db {:keys [form-id form-fields props]}]
+  (fn [db form-state]
     (let [;; 1. Get stable IDs from the route.
           {:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
 
@@ -315,8 +311,8 @@
           ;; 3. Get the CURRENTLY selected example IDs from their state path.
           example-ids (s/select-one [:ui :datasets :selected-examples dataset-id] db)
 
-          ;; 4. Get the tag name from the form's fields.
-          {:keys [tag-name]} form-fields]
+          ;; 4. Get the tag name from the form state.
+          {:keys [form-id tag-name]} form-state]
 
       (sente/request!
        [:datasets/add-tag-to-examples
@@ -346,7 +342,7 @@
  :remove-tag-from-selected
  {:steps [:main]
   :main
-  {:initial-fields (fn [_props] {:tag-name ""})
+  {:initial-fields (fn [props] (merge {:tag-name ""} props))
    :validators {:tag-name [forms/required]}
    :ui (fn [{:keys [form-id props]}]
          ;; The UI for this form needs the list of selected examples to populate the dropdown.
@@ -355,7 +351,7 @@
    :modal-props {:title "Remove Tag from examples"
                  :submit-text "Remove Tag"}}
   :on-submit
-  (fn [db {:keys [form-id form-fields props]}]
+  (fn [db form-state]
     (let [;; 1. Get stable IDs from the route.
           {:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
 
@@ -365,8 +361,8 @@
           ;; 3. Get the CURRENTLY selected example IDs from their state path.
           example-ids (s/select-one [:ui :datasets :selected-examples dataset-id] db)
 
-          ;; 4. Get the tag name from the form's fields.
-          {:keys [tag-name]} form-fields]
+          ;; 4. Get the tag name from the form state.
+          {:keys [form-id tag-name]} form-state]
 
       (sente/request!
        [:datasets/remove-tag-from-examples

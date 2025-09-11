@@ -770,6 +770,8 @@
                                                   (state/dispatch [:modal/show-form :edit-dataset
                                                                    {:module-id module-id
                                                                     :dataset-id dsid
+                                                                    :name name
+                                                                    :description desc
                                                                     :initial-name name
                                                                     :initial-description desc}]))}
                                       ($ PencilIcon {:className "h-4 w-4 mr-1"})
