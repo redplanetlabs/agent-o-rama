@@ -9,73 +9,8 @@
    ["@heroicons/react/24/outline" :refer [PlusIcon TrashIcon]]))
 
 ;; =============================================================================
-;; WIZARD STEP COMPONENTS (Each is now a simple, self-contained form)
+;; SINGLE-STEP EXPERIMENT FORM
 ;; =============================================================================
-
-(defui BasicInfoStep [{:keys [form-id]}]
-  (let [name-field (forms/use-form-field form-id :name)
-        description-field (forms/use-form-field form-id :description)]
-    ($ forms/form
-       ($ forms/form-field
-          {:label "Experiment Name"
-           :value (:value name-field)
-           :on-change (:on-change name-field)
-           :error (:error name-field)
-           :required? true
-           :placeholder "e.g., Test new prompt for summary agent"})
-       ($ forms/form-field
-          {:label "Description (Optional)"
-           :type :textarea
-           :value (:value description-field)
-           :on-change (:on-change description-field)
-           :error (:error description-field)
-           :rows 3}))))
-
-(defui DataSelectionStep [{:keys [form-id]}]
-  (let [{:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
-        {:keys [data]} (queries/use-sente-query
-                        {:query-key [:snapshot-names module-id dataset-id]
-                         :sente-event [:datasets/get-snapshot-names {:module-id module-id :dataset-id dataset-id}]})
-        snapshot-names (or (sort data) [])
-
-        snapshot-field (forms/use-form-field form-id :snapshot)
-        selector-type-field (forms/use-form-field form-id [:selector :type])
-        selector-tag-field (forms/use-form-field form-id [:selector :tag])]
-
-    ($ forms/form
-       ($ :div
-          ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Snapshot")
-          ($ :select.w-full.p-2.border.border-gray-300.rounded-md
-             {:value (or (:value snapshot-field) "")
-              :on-change #((:on-change snapshot-field) (.. % -target -value))}
-             ($ :option {:value ""} "Latest (Working Copy)")
-             (for [name snapshot-names]
-               ($ :option {:key name :value name} name))))
-
-       ($ :div.mt-4
-          ($ :label.block.text-sm.font-medium.text-gray-700 "Examples to run on")
-          ($ :div.mt-2.space-y-2
-             ($ :div.flex.items-center
-                ($ :input.h-4.w-4.border-gray-300.text-indigo-600.focus:ring-indigo-500
-                   {:type "radio" :id "all-examples" :name "selector-type"
-                    :checked (= (:value selector-type-field) :all)
-                    :on-change #((:on-change selector-type-field) :all)})
-                ($ :label.ml-3.block.text-sm.text-gray-700 {:htmlFor "all-examples"}
-                   "All examples in snapshot"))
-             ($ :div.flex.items-center
-                ($ :input.h-4.w-4.border-gray-300.text-indigo-600.focus:ring-indigo-500
-                   {:type "radio" :id "tag-examples" :name "selector-type"
-                    :checked (= (:value selector-type-field) :tag)
-                    :on-change #((:on-change selector-type-field) :tag)})
-                ($ :label.ml-3.block.text-sm.text-gray-700 {:htmlFor "tag-examples"}
-                   "Only examples with tag:"))
-             (when (= (:value selector-type-field) :tag)
-               ($ :div.pl-8
-                  ($ forms/form-field
-                     {:value (:value selector-tag-field)
-                      :on-change (:on-change selector-tag-field)
-                      :error (:error selector-tag-field)
-                      :placeholder "e.g., hard-case"}))))))))
 
 (defui TargetEditor [{:keys [form-id index]}]
   (let [path [:spec :targets index]
@@ -123,90 +58,155 @@
               :onClick (fn [] (state/dispatch [:form/update-field form-id (conj path :input->args) (conj input-mappings "\"$\"")]))}
              "Add Mapping")))))
 
-(defui TargetConfigStep [{:keys [form-id]}]
-  (let [form (forms/use-form form-id)
+(defui CreateExperimentForm [{:keys [form-id]}]
+  (let [{:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
+        {:keys [data]} (queries/use-sente-query
+                        {:query-key [:snapshot-names module-id dataset-id]
+                         :sente-event [:datasets/get-snapshot-names {:module-id module-id :dataset-id dataset-id}]})
+        snapshot-names (or (sort data) [])
+
+        ;; Basic info fields
+        name-field (forms/use-form-field form-id :name)
+        description-field (forms/use-form-field form-id :description)
+
+        ;; Data selection fields
+        snapshot-field (forms/use-form-field form-id :snapshot)
+        selector-type-field (forms/use-form-field form-id [:selector :type])
+        selector-tag-field (forms/use-form-field form-id [:selector :tag])
+
+        ;; Target config fields
+        form (forms/use-form form-id)
         spec-type-field (forms/use-form-field form-id [:spec :type])
         targets (or (get-in form [:spec :targets]) [])]
+
     ($ forms/form
-       ($ :div.mb-4
-          ($ :label.block.text-sm.font-medium.text-gray-700 "Experiment Type")
-          ($ :div.mt-2.space-y-2
-             ($ :div.flex.items-center
-                ($ :input {:type "radio" :id "regular-exp" :name "exp-type"
-                           :checked (= (:value spec-type-field) :regular)
-                           :on-change #((:on-change spec-type-field) :regular)})
-                ($ :label.ml-3 {:htmlFor "regular-exp"} "Regular (Single Target)"))
-             ($ :div.flex.items-center
-                ($ :input {:type "radio" :id "comp-exp" :name "exp-type"
-                           :checked (= (:value spec-type-field) :comparative)
-                           :on-change #((:on-change spec-type-field) :comparative)})
-                ($ :label.ml-3 {:htmlFor "comp-exp"} "Comparative (A/B Test Multiple Targets)"))))
-       ($ :div.space-y-4
-          (let [num-targets (if (= (:value spec-type-field) :regular) 1 (count targets))]
-            (for [i (range num-targets)]
-              ($ TargetEditor {:key i :form-id form-id :index i}))))
+       ;; Basic Information Section
+       ($ :div.mb
+          ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "Basic Information")
+          ($ forms/form-field
+             {:label "Experiment Name"
+              :value (:value name-field)
+              :on-change (:on-change name-field)
+              :error (:error name-field)
+              :required? true
+              :placeholder "e.g., Test new prompt for summary agent"})
+          ($ forms/form-field
+             {:label "Description (Optional)"
+              :type :textarea
+              :value (:value description-field)
+              :on-change (:on-change description-field)
+              :error (:error description-field)
+              :rows 3}))
 
-       (when (= (:value spec-type-field) :comparative)
-         ($ :button.mt-4.flex.items-center.gap-2.text-sm.text-blue-600.hover:underline
-            {:type "button"
-             :onClick (fn [] (state/dispatch [:form/update-field form-id [:spec :targets] (conj targets {})]))}
-            ($ PlusIcon {:className "h-4 w-4"})
-            "Add Another Target")))))
+       ;; Data Selection Section
+       ($ :div.mb-8
+          ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "Data Selection")
+          ($ :div.mb-4
+             ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Snapshot")
+             ($ :select.w-full.p-2.border.border-gray-300.rounded-md
+                {:value (or (:value snapshot-field) "")
+                 :on-change #((:on-change snapshot-field) (.. % -target -value))}
+                ($ :option {:value ""} "Latest (Working Copy)")
+                (for [name snapshot-names]
+                  ($ :option {:key name :value name} name))))
 
-(defui EvaluatorSelectionStep [{:keys [form-id]}]
-  ($ forms/form
-     ($ :div.p-4.text-center.text-gray-500 "UI for selecting evaluators coming soon...")))
+          ($ :div
+             ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Examples to run on")
+             ($ :div.space-y-2
+                ($ :div.flex.items-center
+                   ($ :input.h-4.w-4.border-gray-300.text-indigo-600.focus:ring-indigo-500
+                      {:type "radio" :id "all-examples" :name "selector-type"
+                       :checked (= (:value selector-type-field) :all)
+                       :on-change #((:on-change selector-type-field) :all)})
+                   ($ :label.ml-3.block.text-sm.text-gray-700 {:htmlFor "all-examples"}
+                      "All examples in snapshot"))
+                ($ :div.flex.items-center
+                   ($ :input.h-4.w-4.border-gray-300.text-indigo-600.focus:ring-indigo-500
+                      {:type "radio" :id "tag-examples" :name "selector-type"
+                       :checked (= (:value selector-type-field) :tag)
+                       :on-change #((:on-change selector-type-field) :tag)})
+                   ($ :label.ml-3.block.text-sm.text-gray-700 {:htmlFor "tag-examples"}
+                      "Only examples with tag:"))
+                (when (= (:value selector-type-field) :tag)
+                  ($ :div.pl-8
+                     ($ forms/form-field
+                        {:value (:value selector-tag-field)
+                         :on-change (:on-change selector-tag-field)
+                         :error (:error selector-tag-field)
+                         :placeholder "e.g., hard-case"}))))))
 
-(defui SettingsAndReviewStep [{:keys [form-id]}]
-  ($ forms/form
-     ($ :div.p-4.text-center.text-gray-500 "UI for final settings and review coming soon...")))
+       ;; Target Configuration Section
+       ($ :div.mb-8
+          ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "Target Configuration")
+          ($ :div.mb-4
+             ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Experiment Type")
+             ($ :div.space-y-2
+                ($ :div.flex.items-center
+                   ($ :input {:type "radio" :id "regular-exp" :name "exp-type"
+                              :checked (= (:value spec-type-field) :regular)
+                              :on-change #((:on-change spec-type-field) :regular)})
+                   ($ :label.ml-3 {:htmlFor "regular-exp"} "Regular (Single Target)"))
+                ($ :div.flex.items-center
+                   ($ :input {:type "radio" :id "comp-exp" :name "exp-type"
+                              :checked (= (:value spec-type-field) :comparative)
+                              :on-change #((:on-change spec-type-field) :comparative)})
+                   ($ :label.ml-3 {:htmlFor "comp-exp"} "Comparative (A/B Test Multiple Targets)"))))
+
+          ($ :div.space-y-4
+             (let [num-targets (if (= (:value spec-type-field) :regular) 1 (count targets))]
+               (for [i (range num-targets)]
+                 ($ TargetEditor {:key i :form-id form-id :index i}))))
+
+          (when (= (:value spec-type-field) :comparative)
+            ($ :button.mt-4.flex.items-center.gap-2.text-sm.text-blue-600.hover:underline
+               {:type "button"
+                :onClick (fn [] (state/dispatch [:form/update-field form-id [:spec :targets] (conj targets {})]))}
+               ($ PlusIcon {:className "h-4 w-4"})
+               "Add Another Target")))
+
+       ;; Execution Settings Section
+       ($ :div.mb-8
+          ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "Execution Settings")
+          ($ :div.grid.grid-cols-2.gap-4
+             ($ forms/form-field
+                {:label "Number of Repetitions"
+                 :type :number
+                 :value (or (get form :num-repetitions) 1)
+                 :on-change #(state/dispatch [:form/update-field form-id :num-repetitions (js/parseInt (.. % -target -value))])
+                 :placeholder "1"})
+             ($ forms/form-field
+                {:label "Concurrency Level"
+                 :type :number
+                 :value (or (get form :concurrency) 1)
+                 :on-change #(state/dispatch [:form/update-field form-id :concurrency (js/parseInt (.. % -target -value))])
+                 :placeholder "1"}))))))
 
 ;; =============================================================================
 ;; FORM REGISTRATION
 ;; =============================================================================
 (forms/reg-form
  :create-experiment
- {:steps [:basic-info :data-selection :target-config :evaluator-selection :settings-review]
+ {:steps [:main]
 
-  :basic-info
-  {:initial-fields (fn [props] (merge {:name "", :description ""} props))
-   :validators {:name [forms/required]}
-   :ui (fn [{:keys [form-id]}] ($ BasicInfoStep {:form-id form-id}))
-   :modal-props {:title "New Experiment (1/5): Basic Information"}}
-
-  :data-selection
-  {:initial-fields (fn [current-state]
-                     (merge {:snapshot "" :selector {:type :all :tag ""}}
-                            current-state))
-   :validators {}
-   :ui (fn [{:keys [form-id]}] ($ DataSelectionStep {:form-id form-id}))
-   :modal-props {:title "New Experiment (2/5): Data Selection"}}
-
-  :target-config
-  {:initial-fields (fn [current-state]
-                     (merge {:spec {:type :regular
+  :main
+  {:initial-fields (fn [props]
+                     (merge {:name ""
+                             :description ""
+                             :snapshot ""
+                             :selector {:type :all :tag ""}
+                             :spec {:type :regular
                                     :targets [{:target-spec {:type :agent}
-                                               :input->args []}]}}
-                            current-state))
-   :validators {}
-   :ui (fn [{:keys [form-id]}] ($ TargetConfigStep {:form-id form-id}))
-   :modal-props {:title "New Experiment (3/5): Target Configuration"}}
-
-  :evaluator-selection
-  {:initial-fields (fn [current-state] (merge {:evaluators []} current-state))
-   :validators {}
-   :ui (fn [{:keys [form-id]}] ($ EvaluatorSelectionStep {:form-id form-id}))
-   :modal-props {:title "New Experiment (4/5): Select Evaluators"}}
-
-  :settings-review
-  {:initial-fields (fn [current-state] (merge {:num-repetitions 1 :concurrency 1} current-state))
-   :validators {}
-   :ui (fn [{:keys [form-id]}] ($ SettingsAndReviewStep {:form-id form-id}))
-   :modal-props {:title "New Experiment (5/5): Settings & Review"
+                                               :input->args []}]}
+                             :num-repetitions 1
+                             :concurrency 1}
+                            props))
+   :validators {:name [forms/required]}
+   :ui (fn [{:keys [form-id]}] ($ CreateExperimentForm {:form-id form-id}))
+   :modal-props {:title "Create New Experiment"
                  :submit-text "Run Experiment"}}
 
   :on-submit
   (fn [_db form-state]
-    (println "Wizard submitted! Final state:" (clj->js form-state))
+    (println "Experiment submitted! Final state:" (clj->js form-state))
     ;; TODO: Construct and send the :experiments/start Sente event here
     )})
