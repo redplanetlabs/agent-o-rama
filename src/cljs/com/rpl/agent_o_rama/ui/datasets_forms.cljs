@@ -237,13 +237,13 @@
   :main
   {:initial-fields (fn [_] {:to-snapshot-name ""})
    :validators {:to-snapshot-name [forms/required]}
-   :modal-props {:title "New Snapshot" :submit-text "Add Snapshot"}
+   :modal-props {:title "New Snapshot" :submit-text "Create Snapshot"}
 
    :ui
    (fn [{:keys [form-id]}]
      (let [snapshot-name (forms/use-form-field form-id :to-snapshot-name)]
        ($ forms/form
-          ($ forms/form-field {:label "Snapshot Title"
+          ($ forms/form-field {:label "New Snapshot Name"
                                :value (:value snapshot-name)
                                :on-change (:on-change snapshot-name)
                                :error (:error snapshot-name)
