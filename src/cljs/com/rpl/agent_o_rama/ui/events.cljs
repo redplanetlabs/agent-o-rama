@@ -339,48 +339,7 @@
 ;; EVALUATOR FORM EVENTS
 ;; =============================================================================
 
-(state/reg-event :evaluators/create
-                 (fn [db {:keys [module-id builder-name form-fields]}]
-                   ;; Extract form data
-                   (let [;; Extract basic fields
-                         name (get form-fields :name "")
-                         description (get form-fields :description "")
-                         input-json-path (get form-fields :input-json-path "")
-                         output-json-path (get form-fields :output-json-path "")
-                         reference-output-json-path (get form-fields :reference-output-json-path "")
-
-                         ;; Build params map from individual param fields
-                         params (reduce-kv
-                                 (fn [acc k v]
-                                   (if (and (vector? k) (= (first k) :params))
-                                     (assoc acc (second k) v)
-                                     acc))
-                                 {}
-                                 form-fields)]
-
-                     ;; Set modal form to submitting state
-                     (state/dispatch [:form/set-submitting :create-evaluator true])
-                     (state/dispatch [:form/set-error :create-evaluator nil])
-
-                     (sente/request!
-                      [:evaluators/create {:module-id module-id
-                                           :builder-name builder-name
-                                           :name name
-                                           :description description
-                                           :params params
-                                           :input-json-path input-json-path
-                                           :output-json-path output-json-path
-                                           :reference-output-json-path reference-output-json-path}]
-                      15000
-                      (fn [reply]
-                        (state/dispatch [:form/set-submitting :create-evaluator false])
-                        (if (:success reply)
-                          (do
-                            (state/dispatch [:modal/hide])
-                            ;; Invalidate evaluators query to trigger refetch
-                            (let [decoded-module-id (when module-id (common/url-decode module-id))]
-                              (state/dispatch [:query/invalidate {:query-key-pattern [:evaluator-instances decoded-module-id]}]))
-                            (state/dispatch [:form/clear :create-evaluator]))
-                          (state/dispatch [:form/set-error :create-evaluator (:error reply)])))))
-                   nil))
+;; NOTE: This old event handler has been replaced by the new form system
+;; in evaluators.cljs. The form now handles its own submission via :on-submit.
+;; Keeping this comment as a reminder of the migration.
 

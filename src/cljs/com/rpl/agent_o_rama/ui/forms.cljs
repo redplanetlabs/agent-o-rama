@@ -285,7 +285,23 @@
                        (let [current-idx (.indexOf steps current-step)
                              next-step (get steps (inc current-idx))]
                          (when next-step
-                           [:forms form-id :current-step (s/terminal-val next-step)]))))))
+                           (let [next-step-spec (get form-spec next-step)
+                                 initial-fields-fn (:initial-fields next-step-spec)
+                                 ;; Call the initial-fields function with current form state
+                                 ;; This allows each step to add new fields while preserving existing ones
+                                 updated-form-state (if (fn? initial-fields-fn)
+                                                      (initial-fields-fn form-state)
+                                                      form-state)
+                                 ;; Validate the updated form state for the new step
+                                 validators (:validators next-step-spec)
+                                 {:keys [valid? errors]} (validate-form-fields updated-form-state validators)]
+
+                             ;; Update the entire form state with the new step data
+                             [:forms form-id (s/terminal-val
+                                              (assoc updated-form-state
+                                                     :current-step next-step
+                                                     :field-errors errors
+                                                     :valid? valid?))])))))))
 
 (state/reg-event :form/prev-step
                  (fn [db form-id]
