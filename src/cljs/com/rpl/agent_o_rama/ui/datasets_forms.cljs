@@ -82,9 +82,9 @@
    :modal-props {:title "Create New Dataset"
                  :submit-text "Create Dataset"}}
   :on-submit
-  {:event (fn [form-state]
+  {:event (fn [db form-state]
             [:datasets/create form-state])
-   :on-success-invalidate (fn [{:keys [module-id]} _reply]
+   :on-success-invalidate (fn [db {:keys [module-id]} _reply]
                             (let [decoded-module-id (when module-id (common/url-decode module-id))]
                               {:query-key-pattern [:datasets decoded-module-id]}))}})
 
@@ -194,9 +194,9 @@
    :modal-props {:title "Add Example"
                  :submit-text "Add Example"}}
   :on-submit
-  {:event (fn [form-state]
+  {:event (fn [db form-state]
             [:datasets/add-example form-state])
-   :on-success-invalidate (fn [{:keys [module-id dataset-id]} _reply]
+   :on-success-invalidate (fn [db {:keys [module-id dataset-id]} _reply]
                             {:query-key-pattern [:dataset-examples module-id dataset-id]})}})
 
 (defn show-add-example-modal! [props]
@@ -221,9 +221,9 @@
                                :required? true}))))}
 
   :on-submit
-  {:event (fn [form-state]
+  {:event (fn [db form-state]
             [:datasets/create-snapshot form-state])
-   :on-success-invalidate (fn [{:keys [module-id dataset-id]} _reply]
+   :on-success-invalidate (fn [db {:keys [module-id dataset-id]} _reply]
                             {:query-key-pattern [:snapshot-names module-id dataset-id]})
    :on-success (fn [db {:keys [dataset-id]} reply]
                  ;; On success, directly dispatch an event to select the new snapshot
@@ -262,10 +262,9 @@
    :modal-props {:title "Add Tag to examples"
                  :submit-text "Add Tag"}}
   :on-submit
-  {:event (fn [form-state]
-            (let [db @state/app-db
-                  ;; 1. Get stable IDs from the route.
-                  {:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
+  {:event (fn [db form-state]
+            ;; 1. Get stable IDs from the route.
+            (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
                   ;; 2. Get the CURRENTLY selected snapshot name from its state path.
                   snapshot-name (s/select-one [:ui :datasets :selected-snapshot-per-dataset dataset-id] db)
                   ;; 3. Get the CURRENTLY selected example IDs from their state path.
@@ -280,9 +279,8 @@
                 ;; Ensure example-ids is a vector and not nil.
                 :example-ids (vec (or example-ids #{}))
                 :tag tag-name}]))
-   :on-success-invalidate (fn [_form-state _reply]
-                            (let [db @state/app-db
-                                  {:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
+   :on-success-invalidate (fn [db _form-state _reply]
+                            (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
                               {:query-key-pattern [:dataset-examples module-id dataset-id]}))
    :on-success (fn [db _form-state _reply]
                  (let [{:keys [dataset-id]} (s/select-one [:route :path-params] db)]
@@ -304,10 +302,9 @@
    :modal-props {:title "Remove Tag from examples"
                  :submit-text "Remove Tag"}}
   :on-submit
-  {:event (fn [form-state]
-            (let [db @state/app-db
-                  ;; 1. Get stable IDs from the route.
-                  {:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
+  {:event (fn [db form-state]
+            ;; 1. Get stable IDs from the route.
+            (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
                   ;; 2. Get the CURRENTLY selected snapshot name from its state path.
                   snapshot-name (s/select-one [:ui :datasets :selected-snapshot-per-dataset dataset-id] db)
                   ;; 3. Get the CURRENTLY selected example IDs from their state path.
@@ -322,9 +319,8 @@
                 ;; Ensure example-ids is a vector and not nil.
                 :example-ids (vec (or example-ids #{}))
                 :tag tag-name}]))
-   :on-success-invalidate (fn [_form-state _reply]
-                            (let [db @state/app-db
-                                  {:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
+   :on-success-invalidate (fn [db _form-state _reply]
+                            (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
                               {:query-key-pattern [:dataset-examples module-id dataset-id]}))
    :on-success (fn [db _form-state _reply]
                  (let [{:keys [dataset-id]} (s/select-one [:route :path-params] db)]

@@ -331,7 +331,7 @@
                            ;; New declarative path
                            (map? on-submit-handler)
                            (let [{:keys [event on-success-invalidate on-success on-error]} on-submit-handler
-                                 sente-event (event form-state-with-id)]
+                                 sente-event (event db form-state-with-id)]
                              (state/dispatch [:db/set-value [:forms form-id] (assoc form-state :submitting? true :error nil)])
                              (sente/request!
                               sente-event
@@ -342,7 +342,7 @@
                                   (do
                                     (state/dispatch [:modal/hide])
                                     (when on-success-invalidate
-                                      (state/dispatch [:query/invalidate (on-success-invalidate form-state-with-id reply)]))
+                                      (state/dispatch [:query/invalidate (on-success-invalidate db form-state-with-id reply)]))
                                     (when on-success (on-success db form-state-with-id reply))
                                     (state/dispatch [:form/clear form-id]))
                                   (do
