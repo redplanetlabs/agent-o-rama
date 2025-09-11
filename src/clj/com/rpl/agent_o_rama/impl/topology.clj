@@ -107,6 +107,7 @@
        :last-progress-time-millis
        (termval (h/current-time-millis))]
       $$root))
+   ;; TODO: <<<<>>> update stats here on root whether in agg or not
    (<<if (some? *agg-invoke-id)
      (aor-types/->valid-AggAckOp *agg-invoke-id *ack-val :> *op)
      (anchor> <agg-ack-emit>)

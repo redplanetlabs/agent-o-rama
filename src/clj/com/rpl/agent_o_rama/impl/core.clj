@@ -332,50 +332,54 @@
 (defn hook:agent-result-proxy [proxy])
 
 (defn client-wait-for-result
-  [root-pstate ^AgentInvoke agent-invoke handle-fn]
-  (let [agent-task-id (.getTaskId agent-invoke)
-        agent-id      (.getAgentInvokeId agent-invoke)
-        ret           (CompletableFuture.)
-        proxy-atom    (atom nil)]
-    (.thenApply
-     (foreign-proxy-async
-      [(keypath agent-id)
-       (submap [:result :exception-summaries :human-requests])
-       (transformed :human-requests first)
-       (transformed [:exception-summaries ALL] :throwable-str)
-       (multi-transformed [(map-key :exception-summaries)
-                           (termval :exceptions)])
-       (multi-transformed [(map-key :human-requests) (termval :human-request)])]
-      root-pstate
-      {:pkey        agent-task-id
-       :callback-fn
-       (fn [m _ _]
-         (let [done-fn (handle-fn m)]
-           (when (some? done-fn)
-             (when-not (.isDone ret)
-               (done-fn ret))
-             (locking proxy-atom
-               (cond
-                 (nil? @proxy-atom)
-                 (reset! proxy-atom ::close)
+  ([root-pstate agent-invoke handle-fn]
+   (client-wait-for-result root-pstate agent-invoke handle-fn false))
+  ([root-pstate ^AgentInvoke agent-invoke handle-fn stats?]
+   (let [agent-task-id (.getTaskId agent-invoke)
+         agent-id      (.getAgentInvokeId agent-invoke)
+         ret           (CompletableFuture.)
+         proxy-atom    (atom nil)
+         ks            [:result :exception-summaries :human-requests]
+         ks            (if stats? (conj ks :stats) ks)]
+     (.thenApply
+      (foreign-proxy-async
+       [(keypath agent-id)
+        (submap ks)
+        (transformed :human-requests first)
+        (transformed [:exception-summaries ALL] :throwable-str)
+        (multi-transformed [(map-key :exception-summaries)
+                            (termval :exceptions)])
+        (multi-transformed [(map-key :human-requests) (termval :human-request)])]
+       root-pstate
+       {:pkey        agent-task-id
+        :callback-fn
+        (fn [m _ _]
+          (let [done-fn (handle-fn m)]
+            (when (some? done-fn)
+              (when-not (.isDone ret)
+                (done-fn ret))
+              (locking proxy-atom
+                (cond
+                  (nil? @proxy-atom)
+                  (reset! proxy-atom ::close)
 
-                 (keyword? @proxy-atom) nil
+                  (keyword? @proxy-atom) nil
 
-                 :else
-                 (do
-                   (close! @proxy-atom)
-                   (reset! proxy-atom ::done)
-                 )))
-           )))
-      })
-     (h/cf-function [proxy-state]
-       (hook:agent-result-proxy proxy-state)
-       (locking proxy-atom
-         (if (= ::close @proxy-atom)
-           (do
-             (close! proxy-state)
-             (reset! proxy-atom ::done))
-           (reset! proxy-atom proxy-state))
-       )))
-    ret
-  ))
+                  :else
+                  (do
+                    (close! @proxy-atom)
+                    (reset! proxy-atom ::done)
+                  )))
+            )))
+       })
+      (h/cf-function [proxy-state]
+        (hook:agent-result-proxy proxy-state)
+        (locking proxy-atom
+          (if (= ::close @proxy-atom)
+            (do
+              (close! proxy-state)
+              (reset! proxy-atom ::done))
+            (reset! proxy-atom proxy-state))
+        )))
+     ret
+   )))

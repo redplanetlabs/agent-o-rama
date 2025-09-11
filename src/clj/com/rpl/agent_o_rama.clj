@@ -736,6 +736,24 @@
              agent-invoke
              node
              callback-fn))
+          (subagentNextStepAsync [this agent-invoke]
+            (i/client-wait-for-result
+             root-pstate
+             agent-invoke
+             (fn [{:keys [result human-request exceptions stats]}]
+               (cond
+                 result
+                 (fn [^CompletableFuture cf]
+                   (.complete cf
+                              {:stats  stats
+                               :result (if (:failure? result)
+                                         (i/mk-failure-exception result exceptions)
+                                         (aor-types/->AgentCompleteImpl (:val result)))}))
+                 human-request
+                 (fn [^CompletableFuture cf]
+                   (.complete cf human-request))
+               ))
+             true))
           aor-types/UnderlyingObjects
           (underlying-objects [this]
             {:agent-depot          agent-depot

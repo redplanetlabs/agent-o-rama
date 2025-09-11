@@ -10,6 +10,7 @@
     AgentNodeExecutorTaskGlobal
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
+    AgentInvokeStats
     AgentNodeEmit
     AgentResult
     AggInput
@@ -110,6 +111,7 @@
      :finish-time-millis Long
      :last-progress-time-millis Long
      :retry-num          Long
+     :stats              AgentInvokeStats
      :human-requests     (set-schema NodeHumanInputRequest {:subindex? true})
      :fork-of            (fixed-keys-schema
                           {:parent-agent-id Long

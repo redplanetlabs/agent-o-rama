@@ -14,6 +14,7 @@
   (:import
    [com.rpl.agentorama
     AgentClient
+    AgentFailedException
     AgentNode
     AgentObjectFetcher
     HumanInputRequest
@@ -349,14 +350,38 @@
           (initiateForkAsync [this invoke invokeIdToNewArgs]
             (no-async!))
           (nextStep [this agent-invoke]
-            (timed-agent-call
-             (.nextStep client agent-invoke)
-             agent-node
-             agent-info-tuple
-             [res]
-             {"op"           "nextStep"
-              "agent-invoke" agent-invoke
-              "result"       res}))
+            (let [start-time-millis (h/current-time-millis)
+                  ret               (.get ^CompletableFuture
+                                          (aor-types/subagentNextStepAsync client agent-invoke))
+                  [stats res]       (if (instance? HumanInputRequest ret)
+                                      [nil ret]
+                                      [(:stats ret) (:result ret)])
+
+                  finish-time-millis
+                  (h/current-time-millis)
+                  [agent-module-name agent-name]
+                  agent-info-tuple
+                  data-map
+                  {"op"           "nextStep"
+                   "agent-invoke" agent-invoke
+                   "agent-module-name" agent-module-name
+                   "agent-name"   agent-name}
+
+                  data-map
+                  (if stats (assoc data-map "stats" stats) data-map)
+                  data-map
+                  (if (instance? AgentFailedException res) data-map (assoc data-map "result" res))
+                 ]
+              (record-nested-op!-impl
+               agent-node
+               :agent-call
+               start-time-millis
+               finish-time-millis
+               data-map)
+              (if (instance? AgentFailedException res)
+                (throw res))
+              res
+            ))
           (nextStepAsync [this agent-invoke]
             (no-async!))
           (result [this agent-invoke]
