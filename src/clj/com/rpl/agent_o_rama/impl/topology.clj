@@ -103,12 +103,14 @@
    (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
                |direct
                *agent-task-id)
-   (hook:update-last-progress>)
-   (local-transform>
-    [(keypath *agent-id)
-     :last-progress-time-millis
-     (termval (h/current-time-millis))]
-    $$root)
+   ;; <<atomic here only because tests override the hook to elide this
+   (<<atomic
+     (hook:update-last-progress>)
+     (local-transform>
+      [(keypath *agent-id)
+       :last-progress-time-millis
+       (termval (h/current-time-millis))]
+      $$root))
 
    (<<if (some? *result)
      (hook:writing-result *agent-task-id *agent-id *result)
