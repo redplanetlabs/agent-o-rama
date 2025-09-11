@@ -130,7 +130,7 @@
 
 (defui SelectBuilderStep [{:keys [form-id]}]
   (let [{:keys [set-field! next-step!]} (forms/use-form form-id)
-        {:keys [module-id]} (state/use-sub [:forms form-id :props])
+        {:keys [module-id]} (state/use-sub [:forms form-id])
         {:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:evaluator-builders module-id]
@@ -170,7 +170,7 @@
         show-input-path? (get builder-options :input-path? true)
         show-output-path? (get builder-options :output-path? true)
         show-ref-output-path? (get builder-options :reference-output-path? true)]
-    
+
     ($ forms/form
        ($ forms/form-field {:label "Name"
                             :value (:value name-field)
@@ -225,26 +225,26 @@
  {:steps [:select-builder :configure]
 
   :select-builder
-  {:initial-fields (fn [_] {:selected-builder nil})
+  {:initial-fields (fn [props] (merge {:selected-builder nil} props))
    :validators {}
    :ui (fn [{:keys [form-id]}] ($ SelectBuilderStep {:form-id form-id}))
    :modal-props {:title "Select Evaluator Builder"}}
 
   :configure
-  {:initial-fields (fn [{:keys [fields]}]
-                     {:name ""
-                      :description ""
-                      :input-json-path ""
-                      :output-json-path ""
-                      :reference-output-json-path ""})
+  {:initial-fields (fn [props]
+                     (merge {:name ""
+                             :description ""
+                             :input-json-path ""
+                             :output-json-path ""
+                             :reference-output-json-path ""}
+                            props))
    :validators {:name [forms/required]}
    :ui (fn [{:keys [form-id]}] ($ CreateEvaluatorForm {:form-id form-id}))
    :modal-props {:title "Create Evaluator"}}
 
   :on-submit
-  (fn [db {:keys [form-id form-fields props]}]
-    (let [{:keys [module-id]} props
-          {:keys [name description input-json-path output-json-path reference-output-json-path params selected-builder]} form-fields]
+  (fn [db form-state] ; Updated to use the new flattened signature!
+    (let [{:keys [form-id module-id name description input-json-path output-json-path reference-output-json-path params selected-builder]} form-state]
       (sente/request!
        [:evaluators/create {:module-id module-id
                             :builder-name (:name selected-builder)
@@ -264,7 +264,6 @@
                (state/dispatch [:query/invalidate {:query-key-pattern [:evaluator-instances decoded-module-id]}]))
              (state/dispatch [:form/clear form-id]))
            (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
-
 
 ;; =============================================================================
 ;; MAIN PAGE COMPONENT
