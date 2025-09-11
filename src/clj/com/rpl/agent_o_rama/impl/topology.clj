@@ -66,15 +66,18 @@
   []
   (:>))
 
+(defn hook:writing-result [agent-task-id agent-id result])
+
 (defn finished-streaming-chunk
   []
   (aor-types/->StreamingChunk -1 -1 iclient/FINISHED))
 
 (deframaop send-emits>
   [*agent-name *agent-task-id *agent-id *retry-num *invoke-id *agg-invoke-id
-   *emits *fork-context]
+   *emits *result *fork-context]
   (<<with-substitutions
-   [$$root (po/agent-root-task-global *agent-name)]
+   [$$root (po/agent-root-task-global *agent-name)
+    $$active (po/agent-active-invokes-task-global *agent-name)]
    (anchor> <root>)
    (ops/explode *emits
                 :> {:keys [*invoke-id *fork-invoke-id *target-task-id
@@ -100,13 +103,26 @@
    (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
                |direct
                *agent-task-id)
-   (<<atomic
-     (hook:update-last-progress>)
+   (hook:update-last-progress>)
+   (local-transform>
+    [(keypath *agent-id)
+     :last-progress-time-millis
+     (termval (h/current-time-millis))]
+    $$root)
+
+   (<<if (some? *result)
+     (hook:writing-result *agent-task-id *agent-id *result)
+     ;; if race with retry and it happened to have finished, don't change the
+     ;; result here – this can happen if the agent has other branches that fail
+     ;; besides the one that created the result
+     (h/current-time-millis :> *finish-time-millis)
      (local-transform>
       [(keypath *agent-id)
-       :last-progress-time-millis
-       (termval (h/current-time-millis))]
-      $$root))
+       (selected? :result nil?)
+       (multi-path [:result (termval *result)]
+                   [:finish-time-millis (termval *finish-time-millis)])]
+      $$root)
+     (local-transform> [(keypath *agent-id) NONE>] $$active))
    ;; TODO: <<<<>>> update stats here on root whether in agg or not
    (<<if (some? *agg-invoke-id)
      (aor-types/->valid-AggAckOp *agg-invoke-id *ack-val :> *op)
@@ -148,29 +164,6 @@
    (unify> <regular-emit> <agg-ack-emit>)
    (:> *op)))
 
-(defn hook:writing-result [agent-task-id agent-id result])
-
-(deframaop handle-result!
-  [*agent-name *agent-task-id *agent-id *retry-num *result]
-  (<<with-substitutions
-   [$$root (po/agent-root-task-global *agent-name)
-    $$active (po/agent-active-invokes-task-global *agent-name)]
-   (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
-               |direct
-               *agent-task-id)
-   (hook:writing-result *agent-task-id *agent-id *result)
-   ;; if race with retry and it happened to have finished, don't change the
-   ;; result here – this can happen if the agent has other branches that fail
-   ;; besides the one that created the result
-   (h/current-time-millis :> *finish-time-millis)
-   (local-transform>
-    [(keypath *agent-id)
-     (selected? :result nil?)
-     (multi-path [:result (termval *result)]
-                 [:finish-time-millis (termval *finish-time-millis)])]
-    $$root)
-   (local-transform> [(keypath *agent-id) NONE>] $$active)
-   (:>)))
 
 (deframaop init-root
   [*agent-name *agent-id *retry-num *args]
@@ -464,10 +457,6 @@
                     :> {*invoke-id :agg-start-invoke-id})
    )
 
-   ;; AgentNode implementation makes it impossible for there to be both
-   ;; emits and result
-   (<<if (some? *result)
-     (handle-result! *agent-name *agent-task-id *agent-id *retry-num *result))
    (send-emits> *agent-name
                 *agent-task-id
                 *agent-id
@@ -475,6 +464,7 @@
                 *invoke-id
                 *agg-invoke-id
                 *emits
+                *result
                 *fork-context
                 :> *op)
    (:> *op)))
@@ -512,6 +502,9 @@
                         :agg-start-res
                         (termval *node-fn-res)]
                        $$nodes))
+   ;; TODO: <<<<>>> send forward nested op info, token stats, and node stat
+   ;; - probably an instance of AgentInvokeStats, and then merge at root
+   ;; - need to look at finish-time - start-time and nested ops
    (handle-node-complete-emits
     *agent-name
     *agent-task-id
@@ -690,6 +683,11 @@
         *parent-agg-invoke-id)
      ))
 
+   ;; TODO: <<<<>>> send forward nested op info, token stats, and node stat
+   ;; - probably an instance of AgentInvokeStats, and then merge at root
+   ;; - need to look at finish-time - start-time and nested ops
+   ;; - query $$nodes to get start time
+   ;;     - don't have start/finish for individual aggs into NodeAgg – only have total time for it
    (handle-node-complete-emits
     *agent-name
     *agent-task-id
