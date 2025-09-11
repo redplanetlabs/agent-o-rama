@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.datasets-forms :as datasets-forms]
+   [com.rpl.agent-o-rama.ui.datasets.snapshot-selector :as snapshot-selector]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    [com.rpl.agent-o-rama.ui.experiments.index :as experiments]
    [reitit.frontend.easy :as rfe]
@@ -365,104 +366,13 @@
 ;; SNAPSHOT MANAGER
 ;; =============================================================================
 
-(defui SnapshotManager [{:keys [module-id dataset-id selected-snapshot set-selected-snapshot]}]
-  (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
+;; =============================================================================
+;; SNAPSHOT MANAGER - MOVED TO DEDICATED FILE
+;; =============================================================================
 
-        {:keys [data loading? error refetch]}
-        (queries/use-sente-query
-         {:query-key [:snapshot-names module-id dataset-id]
-          :sente-event [:datasets/get-snapshot-names {:module-id module-id :dataset-id dataset-id}]
-          :enabled? (boolean (and module-id dataset-id))})
-
-        snapshot-names (or (sort data) [])
-
-        handle-create (fn []
-                        (set-dropdown-open false)
-                        (state/dispatch
-                         [:modal/show-form :new-snapshot
-                          {:module-id module-id
-                           :dataset-id dataset-id
-                           :from-snapshot-name selected-snapshot}]))
-
-        handle-delete (fn [snapshot-name]
-                        (set-dropdown-open false)
-                        (when (js/confirm (str "Are you sure you want to delete snapshot '" snapshot-name "'?"))
-                          (sente/request!
-                           [:datasets/delete-snapshot {:module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name}]
-                           10000
-                           (fn [reply]
-                             (if (:success reply)
-                               (do
-                                 (when (= selected-snapshot snapshot-name)
-                                   (set-selected-snapshot "")) ;; Reset view to latest if deleting current
-                                 ;; Invalidate snapshot names query to trigger refetch
-                                 (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}]))
-                               (js/alert (str "Error deleting snapshot: " (:error reply))))))))
-
-        handle-select (fn [snapshot-name]
-                        (set-dropdown-open false)
-                        (set-selected-snapshot snapshot-name))
-
-        current-display-name (if (str/blank? selected-snapshot)
-                               "Latest (Working Copy)"
-                               selected-snapshot)]
-
-    ;; Close dropdown when clicking outside
-    (uix/use-effect
-     (fn []
-       (let [handle-click (fn [e]
-                            (when dropdown-open?
-                              (set-dropdown-open false)))]
-         (.addEventListener js/document "click" handle-click)
-         #(.removeEventListener js/document "click" handle-click)))
-     [dropdown-open?])
-
-    ($ :div.flex.items-center.space-x-2
-       ($ :div.relative.inline-block.text-left
-          ;; Main dropdown button
-          ($ :button.inline-flex.items-center.justify-between.w-64.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500.cursor-pointer
-             {:onClick (fn [e]
-                         (.stopPropagation e)
-                         (let [is-opening (not dropdown-open?)]
-                           (set-dropdown-open is-opening)
-                           (when is-opening (refetch))))
-              :disabled loading?}
-             ($ :span.truncate current-display-name)
-             ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
-
-          ;; Dropdown menu
-          (when dropdown-open?
-            ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
-               {:onClick #(.stopPropagation %)}
-               ($ :div.py-1
-                  ;; Latest option
-                  ($ common/DropdownRow {:label "Latest (Working Copy)"
-                                         :selected? (str/blank? selected-snapshot)
-                                         :on-select #(handle-select "")
-                                         :delete-button nil})
-
-                  ;; Named snapshots
-                  (for [name snapshot-names]
-                    ($ common/DropdownRow {:key name
-                                           :label name
-                                           :selected? (= selected-snapshot name)
-                                           :on-select #(handle-select name)
-                                           :delete-button ($ :button.text-red-600.hover:text-red-800.p-1.rounded.hover:bg-red-100
-                                                             {:onClick (fn [e]
-                                                                         (.stopPropagation e)
-                                                                         (handle-delete name))
-                                                              :title (str "Delete " name)}
-                                                             ($ TrashIcon {:className "h-3 w-3"}))}))
-
-                  ;; Divider
-                  ($ :div.border-t.border-gray-100.my-1)
-
-                  ;; New snapshot action
-                  ($ common/DropdownRow {:label "New snapshot"
-                                         :action? true
-                                         :on-select handle-create
-                                         :icon ($ PlusIcon {:className "h-4 w-4"})
-                                         :delete-button nil}))))))))
+;; The SnapshotManager component has been moved to:
+;; com.rpl.agent-o-rama.ui.datasets.snapshot-selector
+;; This provides better code organization and reusability.
 
 ;; =============================================================================
 ;; CONTEXTUAL ACTION BAR
@@ -809,9 +719,9 @@
   (let [;; Get selected examples for this dataset
         selected-example-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
 
-        ;; State for selected snapshot and info panel
+        ;; --- REFACTORED ---
+        ;; State for selected snapshot now comes from app-db and is updated via dispatch
         selected-snapshot-name (or (state/use-sub [:ui :datasets :selected-snapshot-per-dataset dataset-id]) "")
-        ;; Create a function that dispatches the event to update the state
         set-selected-snapshot-name (fn [new-name]
                                      (state/dispatch [:datasets/set-selected-snapshot
                                                       {:dataset-id dataset-id :snapshot-name new-name}]))
@@ -833,7 +743,19 @@
                                                    :pagination nil}]
           :enabled? (boolean (and module-id dataset-id))})
 
-        examples (get data :examples)]
+        examples (get data :examples)
+
+        ;; --- NEW ---
+        ;; Logic for the "Run New Experiment" button
+        handle-run-experiment (fn []
+                                (let [selector (if (seq selected-example-ids)
+                                                 {:type :example-ids, :ids (vec selected-example-ids)}
+                                                 {:type :all})
+                                      initial-props {:module-id module-id
+                                                     :dataset-id dataset-id
+                                                     :snapshot selected-snapshot-name
+                                                     :selector selector}]
+                                  (state/dispatch [:modal/show-form :create-experiment initial-props])))]
 
     ;; Clear selections when dataset changes
     (uix/use-effect
@@ -848,10 +770,11 @@
              ;; Left side - Snapshot Manager and Search
              ($ :div.flex.items-center.space-x-4
                 ($ :span.text-sm.font-medium.text-gray-700 "Snapshot:")
-                ($ SnapshotManager {:module-id module-id
-                                    :dataset-id dataset-id
-                                    :selected-snapshot selected-snapshot-name
-                                    :set-selected-snapshot set-selected-snapshot-name})
+                ;; --- REPLACED ---
+                ($ snapshot-selector/SnapshotManager {:module-id module-id
+                                                      :dataset-id dataset-id
+                                                      :selected-snapshot selected-snapshot-name
+                                                      :on-select-snapshot set-selected-snapshot-name})
 
                 ;; Search input field
                 ($ :input.ml-4.px-3.py-1.border.border-gray-300.rounded-md.text-sm
@@ -860,8 +783,12 @@
                     :value search-string
                     :onChange #(set-search-string (.. % -target -value))}))
 
-             ;; Right side - Add Example button
+             ;; Right side - Action buttons
              ($ :div.flex.items-center.space-x-4
+                ;; --- NEW ---
+                ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-green-600.hover:bg-green-700
+                   {:onClick handle-run-experiment}
+                   "Run New Experiment")
                 ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer.disabled:bg-gray-400.disabled:cursor-not-allowed
                    {:onClick #(datasets-forms/show-add-example-modal!
                                {:module-id module-id

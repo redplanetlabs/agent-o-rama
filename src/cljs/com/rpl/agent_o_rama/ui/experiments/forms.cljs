@@ -5,6 +5,7 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.state :as state]
+   [com.rpl.agent-o-rama.ui.datasets.snapshot-selector :as snapshot-selector]
    [clojure.string :as str]
    ["@heroicons/react/24/outline" :refer [PlusIcon TrashIcon]]))
 
@@ -60,10 +61,9 @@
 
 (defui CreateExperimentForm [{:keys [form-id]}]
   (let [{:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
-        {:keys [data]} (queries/use-sente-query
-                        {:query-key [:snapshot-names module-id dataset-id]
-                         :sente-event [:datasets/get-snapshot-names {:module-id module-id :dataset-id dataset-id}]})
-        snapshot-names (or (sort data) [])
+        ;; --- DELETED ---
+        ;; The query for snapshot names is no longer needed here.
+        ;; The SnapshotManager component will handle it.
 
         ;; Basic info fields
         name-field (forms/use-form-field form-id :name)
@@ -103,12 +103,14 @@
           ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "Data Selection")
           ($ :div.mb-4
              ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Snapshot")
-             ($ :select.w-full.p-2.border.border-gray-300.rounded-md
-                {:value (or (:value snapshot-field) "")
-                 :on-change #((:on-change snapshot-field) (.. % -target -value))}
-                ($ :option {:value ""} "Latest (Working Copy)")
-                (for [name snapshot-names]
-                  ($ :option {:key name :value name} name))))
+             ;; --- REPLACED ---
+             ;; Replace the old <select> with the new component
+             ($ snapshot-selector/SnapshotManager
+                {:module-id module-id
+                 :dataset-id dataset-id
+                 :selected-snapshot (:value snapshot-field)
+                 :on-select-snapshot (:on-change snapshot-field)
+                 :disabled? false})) ;; Snapshots are always editable for experiments
 
           ($ :div
              ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Examples to run on")
