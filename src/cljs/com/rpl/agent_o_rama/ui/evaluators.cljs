@@ -269,110 +269,8 @@
              (state/dispatch [:form/clear form-id]))
            (do
              (println "Setting error and stopping spinner in form:" (:error reply))
-             (println "Form state BEFORE error update:" (get-in @state/app-db [:forms form-id]))
-
-             ;; Try individual updates instead of batch update to debug
              (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-             (js/setTimeout (fn []
-                              (println "Form state after submitting? update:" (get-in @state/app-db [:forms form-id]))
-                              (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)])
-                              (js/setTimeout (fn [] (println "Form state after error update:" (get-in @state/app-db [:forms form-id]))) 50)) 50)))))))}
-
-;; =============================================================================
- ;; MAIN PAGE COMPONENT
- ;; =============================================================================
-
- (defui index []
-   (let [{:keys [module-id]} (state/use-sub [:route :path-params])
-         {:keys [data loading? error refetch]}
-         (queries/use-sente-query
-          {:query-key [:evaluator-instances module-id]
-           :sente-event [:evaluators/get-all-instances {:module-id module-id}]
-           :enabled? (boolean module-id)
-           :refetch-interval-ms 5000})
-
-        ;; Destructure the response from the query
-         evaluators (get data :items [])
-
-         handle-delete (uix/use-callback
-                        (fn [evaluator-name]
-                          (when (js/confirm (str "Are you sure you want to delete evaluator '" evaluator-name "'?"))
-                            (sente/request! [:evaluators/delete {:name evaluator-name
-                                                                 :module-id module-id}] 15000
-                                            (fn [reply]
-                                              (if (:success reply)
-                                                (refetch)
-                                                (js/alert (str "Failed to delete evaluator: " (:error reply))))))))
-                        [module-id refetch])]
-
-     ($ :div.p-6
-       ;; Header
-        ($ :div.flex.justify-between.items-center.mb-6
-           ($ :div.flex.items-center.gap-3
-              ($ BeakerIcon {:className "h-8 w-8 text-indigo-600"}))
-
-           ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
-              {:onClick #(state/dispatch [:modal/show-form :create-evaluator {:module-id module-id}])}
-              ($ PlusIcon {:className "h-5 w-5 mr-2"})
-              "Create Evaluator"))
-
-       ;; Content
-        (cond
-          loading?
-          ($ :div.flex.justify-center.items-center.h-64
-             ($ common/spinner {:size :large}))
-
-          error
-          ($ :div.text-red-500.text-center.py-8
-             "Error loading evaluators: " error)
-
-          (empty? evaluators)
-          ($ :div.text-center.py-12
-             ($ BeakerIcon {:className "mx-auto h-12 w-12 text-gray-400 mb-4"})
-             ($ :h3.text-lg.font-medium.text-gray-900.mb-2 "No evaluators yet")
-             ($ :p.text-gray-500.mb-6 "Create your first evaluator to get started.")
-             ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
-                {:onClick #(show-create-evaluator-modal! module-id)}
-                ($ PlusIcon {:className "h-5 w-5 mr-2"})
-                "Create Evaluator"))
-
-          :else
-          ($ :div {:className (:container common/table-classes)}
-             ($ :table {:className (:table common/table-classes)}
-                ($ :thead {:className (:thead common/table-classes)}
-                   ($ :tr
-                      ($ :th {:className (:th common/table-classes)} "Name")
-                      ($ :th {:className (:th common/table-classes)} "Description")
-                      ($ :th {:className (:th common/table-classes)} "Builder")
-                      ($ :th {:className (:th common/table-classes)} "Type")
-                      ($ :th {:className (:th common/table-classes)} "Actions")))
-                ($ :tbody
-                   (into []
-                         (for [spec evaluators]
-                           (let [evaluator-name (:name spec)
-                                 type (:type spec)
-                                 description (:description spec)
-                                 builder-name (:builder-name spec)]
-                             ($ :tr {:key evaluator-name
-                                     :className "hover:bg-gray-50 cursor-pointer"
-                                     :onClick #(show-evaluator-details-modal! spec)}
-                                ($ :td {:className (:td common/table-classes)} evaluator-name)
-                                ($ :td {:className (common/cn (:td common/table-classes) "max-w-sm truncate")}
-                                   (if (str/blank? description)
-                                     ($ :span.italic.text-gray-400 "—")
-                                     description))
-                                ($ :td {:className (:td common/table-classes)}
-                                   ($ :code.font-mono.text-xs.text-gray-600 builder-name))
-                                ($ :td {:className (:td common/table-classes)}
-                                   ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
-                                      {:className (get-evaluator-type-badge-style type)}
-                                      (get-evaluator-type-display type)))
-                                ($ :td {:className (:td-right common/table-classes)}
-                                   ($ :button.text-sm.text-red-600.hover:text-red-800.cursor-pointer
-                                      {:onClick (fn [e]
-                                                  (.stopPropagation e) ; Prevent row click
-                                                  (handle-delete evaluator-name))}
-                                      "Delete"))))))))))))))
+             (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)])))))))})
 
 (defui RunEvaluatorModal [{:keys [module-id dataset-id mode example selected-example-ids]}]
   (let [[selected-evaluator set-selected-evaluator] (uix/use-state nil)
@@ -534,3 +432,99 @@
             ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Evaluator Result")
             ($ :div.bg-green-50.rounded-md.p-4.border.border-green-200
                ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono (js/JSON.stringify (clj->js evaluation-result) nil 2))))))))
+
+ ;; =============================================================================
+;; MAIN PAGE COMPONENT
+;; =============================================================================
+
+(defui index []
+  (let [{:keys [module-id]} (state/use-sub [:route :path-params])
+        {:keys [data loading? error refetch]}
+        (queries/use-sente-query
+         {:query-key [:evaluator-instances module-id]
+          :sente-event [:evaluators/get-all-instances {:module-id module-id}]
+          :enabled? (boolean module-id)
+          :refetch-interval-ms 5000})
+
+       ;; Destructure the response from the query
+        evaluators (get data :items [])
+
+        handle-delete (uix/use-callback
+                       (fn [evaluator-name]
+                         (when (js/confirm (str "Are you sure you want to delete evaluator '" evaluator-name "'?"))
+                           (sente/request! [:evaluators/delete {:name evaluator-name
+                                                                :module-id module-id}] 15000
+                                           (fn [reply]
+                                             (if (:success reply)
+                                               (refetch)
+                                               (js/alert (str "Failed to delete evaluator: " (:error reply))))))))
+                       [module-id refetch])]
+
+    ($ :div.p-6
+      ;; Header
+       ($ :div.flex.justify-between.items-center.mb-6
+          ($ :div.flex.items-center.gap-3
+             ($ BeakerIcon {:className "h-8 w-8 text-indigo-600"}))
+
+          ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
+             {:onClick #(state/dispatch [:modal/show-form :create-evaluator {:module-id module-id}])}
+             ($ PlusIcon {:className "h-5 w-5 mr-2"})
+             "Create Evaluator"))
+
+      ;; Content
+       (cond
+         loading?
+         ($ :div.flex.justify-center.items-center.h-64
+            ($ common/spinner {:size :large}))
+
+         error
+         ($ :div.text-red-500.text-center.py-8
+            "Error loading evaluators: " error)
+
+         (empty? evaluators)
+         ($ :div.text-center.py-12
+            ($ BeakerIcon {:className "mx-auto h-12 w-12 text-gray-400 mb-4"})
+            ($ :h3.text-lg.font-medium.text-gray-900.mb-2 "No evaluators yet")
+            ($ :p.text-gray-500.mb-6 "Create your first evaluator to get started.")
+            ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
+               {:onClick #(state/dispatch [:modal/show-form :create-evaluator {:module-id module-id}])}
+               ($ PlusIcon {:className "h-5 w-5 mr-2"})
+               "Create Evaluator"))
+
+         :else
+         ($ :div {:className (:container common/table-classes)}
+            ($ :table {:className (:table common/table-classes)}
+               ($ :thead {:className (:thead common/table-classes)}
+                  ($ :tr
+                     ($ :th {:className (:th common/table-classes)} "Name")
+                     ($ :th {:className (:th common/table-classes)} "Description")
+                     ($ :th {:className (:th common/table-classes)} "Builder")
+                     ($ :th {:className (:th common/table-classes)} "Type")
+                     ($ :th {:className (:th common/table-classes)} "Actions")))
+               ($ :tbody
+                  (into []
+                        (for [spec evaluators]
+                          (let [evaluator-name (:name spec)
+                                type (:type spec)
+                                description (:description spec)
+                                builder-name (:builder-name spec)]
+                            ($ :tr {:key evaluator-name
+                                    :className "hover:bg-gray-50 cursor-pointer"
+                                    :onClick #(show-evaluator-details-modal! spec)}
+                               ($ :td {:className (:td common/table-classes)} evaluator-name)
+                               ($ :td {:className (common/cn (:td common/table-classes) "max-w-sm truncate")}
+                                  (if (str/blank? description)
+                                    ($ :span.italic.text-gray-400 "—")
+                                    description))
+                               ($ :td {:className (:td common/table-classes)}
+                                  ($ :code.font-mono.text-xs.text-gray-600 builder-name))
+                               ($ :td {:className (:td common/table-classes)}
+                                  ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
+                                     {:className (get-evaluator-type-badge-style type)}
+                                     (get-evaluator-type-display type)))
+                               ($ :td {:className (:td-right common/table-classes)}
+                                  ($ :button.text-sm.text-red-600.hover:text-red-800.cursor-pointer
+                                     {:onClick (fn [e]
+                                                 (.stopPropagation e) ; Prevent row click
+                                                 (handle-delete evaluator-name))}
+                                     "Delete")))))))))))))
