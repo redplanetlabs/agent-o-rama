@@ -50,7 +50,7 @@ async function createEvaluator(page, { name, builderName, description, params = 
     await modal.getByLabel(paramKey, { exact: true }).fill(paramValue);
   }
 
-  await modal.getByRole('button', { name: 'Create Evaluator' }).click();
+  await modal.getByRole('button', { name: 'Submit' }).click();
 
   // Wait for the modal to close and the new evaluator to appear in the list
   await expect(modal).not.toBeVisible({ timeout: 15000 });
