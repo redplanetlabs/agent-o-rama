@@ -225,19 +225,24 @@
 
 (defn- validate-form-fields
   "Validate fields against validators keyed by Specter paths.
-   Returns a map {:valid? boolean :errors {nested-error-map}}"
-  [fields validators]
-  (reduce-kv
-   (fn [acc path validator-fns]
-     (let [value (s/select-one path fields)
-           first-error (some #(% value) validator-fns)]
-       (if first-error
-         (-> acc
-             (assoc :valid? false)
-             (update :errors #(s/setval path first-error %)))
-         acc)))
-   {:valid? true, :errors {}}
-   validators))
+   Returns a map {:valid? boolean :errors {nested-error-map}}
+   
+   The form-state contains both field data and metadata. We need to extract
+   only the field data for validation by excluding known metadata keys."
+  [form-state validators]
+  (let [metadata-keys #{:field-errors :valid? :submitting? :error :current-step :steps :set-field! :next-step! :prev-step! :submit!}
+        field-data (apply dissoc form-state metadata-keys)]
+    (reduce-kv
+     (fn [acc path validator-fns]
+       (let [value (s/select-one path field-data)
+             first-error (some #(% value) validator-fns)]
+         (if first-error
+           (-> acc
+               (assoc :valid? false)
+               (update :errors #(s/setval path first-error %)))
+           acc)))
+     {:valid? true, :errors {}}
+     validators)))
 
 (state/reg-event :form/update-field
                  (fn [db form-id field-path value]
@@ -247,18 +252,20 @@
                          step-spec (get form-spec current-step-key form-spec)
                          all-validators (:validators step-spec)
 
-                         ;; Calculate the entire next state before committing it to the atom.
-                         next-form-state (s/setval field-path value form-state)
-                         validation-result (validate-form-fields next-form-state all-validators)]
+                         ;; Update the field value in the form state
+                         updated-form-state (if (vector? field-path)
+                                              (assoc-in form-state field-path value)
+                                              (assoc form-state field-path value))
 
-                     ;; Atomically update the form state with the new value, errors, and validity.
+                         ;; Validate the updated form state
+                         validation-result (validate-form-fields updated-form-state all-validators)]
+
+                     ;; Return the updated form state with new validation results
                      [:forms form-id
-                      (s/terminal
-                       (fn [current-form-state]
-                         (-> current-form-state
-                             (s/setval field-path value)
-                             (assoc :field-errors (:errors validation-result)
-                                    :valid? (:valid? validation-result)))))])))
+                      (s/terminal-val
+                       (assoc updated-form-state
+                              :field-errors (:errors validation-result)
+                              :valid? (:valid? validation-result)))])))
 
 (state/reg-event :form/validate
                  (fn [db form-id]
@@ -331,17 +338,22 @@
                               (initial-fields-fn props)
                               (or initial-fields-fn {}))
              validators (:validators step-spec)
-             {:keys [valid? errors]} (validate-form-fields initial-fields validators)
+
+             ;; Create initial form state with metadata
+             initial-form-state (merge initial-fields
+                                       {:steps (:steps form-spec)
+                                        :current-step initial-step})
+
+             ;; Validate the initial form state
+             {:keys [valid? errors]} (validate-form-fields initial-form-state validators)
              modal-data (get-in form-spec [initial-step :modal-props] {})
 
              ;; 1. Construct the full state for the form - now it's just a single flat map
-             form-state (merge initial-fields
-                               {:field-errors errors
-                                :valid? valid?
-                                :submitting? false
-                                :error nil
-                                :steps (:steps form-spec)
-                                :current-step initial-step})
+             form-state (assoc initial-form-state
+                               :field-errors errors
+                               :valid? valid?
+                               :submitting? false
+                               :error nil)
 
              ;; 2. Construct the full state for the modal
              modal-state {:active form-id
