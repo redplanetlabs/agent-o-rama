@@ -82,24 +82,11 @@
    :modal-props {:title "Create New Dataset"
                  :submit-text "Create Dataset"}}
   :on-submit
-  (fn [db form-state]
-    (let [{:keys [form-id module-id name description input-schema output-schema]} form-state]
-      (sente/request!
-       [:datasets/create {:module-id module-id
-                          :name name
-                          :description description
-                          :input-schema input-schema
-                          :output-schema output-schema}]
-       15000
-       (fn [reply]
-         (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-         (if (:success reply)
-           (do
-             (state/dispatch [:modal/hide])
-             (let [decoded-module-id (when module-id (common/url-decode module-id))]
-               (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}]))
-             (state/dispatch [:form/clear form-id]))
-           (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
+  {:event (fn [form-state]
+            [:datasets/create form-state])
+   :on-success-invalidate (fn [{:keys [module-id]} _reply]
+                            (let [decoded-module-id (when module-id (common/url-decode module-id))]
+                              {:query-key-pattern [:datasets decoded-module-id]}))}})
 
 (defui EditDatasetForm [{:keys [form-id initial-name initial-description]}]
   (let [{:keys [field-errors]} (forms/use-form form-id)
@@ -207,24 +194,10 @@
    :modal-props {:title "Add Example"
                  :submit-text "Add Example"}}
   :on-submit
-  (fn [db form-state]
-    ;; This logic is moved from events.cljs and adapted
-    (let [{:keys [form-id module-id dataset-id snapshot-name input output]} form-state]
-      (sente/request!
-       [:datasets/add-example {:module-id module-id
-                               :dataset-id dataset-id
-                               :snapshot-name snapshot-name
-                               :input input
-                               :output output}]
-       10000
-       (fn [reply]
-         (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-         (if (:success reply)
-           (do
-             (state/dispatch [:modal/hide])
-             (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
-             (state/dispatch [:form/clear form-id]))
-           (state/dispatch [:db/set-value [:forms form-id :error] (or (:error reply) "An unknown server error occurred.")]))))))})
+  {:event (fn [form-state]
+            [:datasets/add-example form-state])
+   :on-success-invalidate (fn [{:keys [module-id dataset-id]} _reply]
+                            {:query-key-pattern [:dataset-examples module-id dataset-id]})}})
 
 (defn show-add-example-modal! [props]
   (state/dispatch [:modal/show-form :add-dataset-example props]))
@@ -248,27 +221,15 @@
                                :required? true}))))}
 
   :on-submit
-  (fn [db form-state]
-    (let [{:keys [form-id module-id dataset-id from-snapshot-name to-snapshot-name]} form-state]
-      (sente/request!
-       [:datasets/create-snapshot {:module-id module-id
-                                   :dataset-id dataset-id
-                                   :from-snapshot-name from-snapshot-name
-                                   :to-snapshot-name to-snapshot-name}]
-       15000
-       (fn [reply]
-         (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-         (if (:success reply)
-           (do
-             (state/dispatch [:modal/hide])
-             ;; On success, directly dispatch an event to select the new snapshot
-             (state/dispatch [:datasets/set-selected-snapshot
-                              {:dataset-id dataset-id
-                               :snapshot-name (get-in reply [:data :snapshot-name])}])
-             ;; Invalidate the query to refetch the list of snapshots
-             (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}])
-             (state/dispatch [:form/clear form-id]))
-           (state/dispatch [:db/set-value [:forms form-id :error] (or (:error reply) "An unknown server error occurred.")]))))))})
+  {:event (fn [form-state]
+            [:datasets/create-snapshot form-state])
+   :on-success-invalidate (fn [{:keys [module-id dataset-id]} _reply]
+                            {:query-key-pattern [:snapshot-names module-id dataset-id]})
+   :on-success (fn [db {:keys [dataset-id]} reply]
+                 ;; On success, directly dispatch an event to select the new snapshot
+                 (state/dispatch [:datasets/set-selected-snapshot
+                                  {:dataset-id dataset-id
+                                   :snapshot-name (get-in reply [:data :snapshot-name])}]))}})
 
 (defui CreateSnapshotForm [{:keys [form-id from-snapshot-name]}]
   (let [{:keys [error]} (forms/use-centralized-form form-id)
@@ -301,39 +262,31 @@
    :modal-props {:title "Add Tag to examples"
                  :submit-text "Add Tag"}}
   :on-submit
-  (fn [db form-state]
-    (let [;; 1. Get stable IDs from the route.
-          {:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
-
-          ;; 2. Get the CURRENTLY selected snapshot name from its state path.
-          snapshot-name (s/select-one [:ui :datasets :selected-snapshot-per-dataset dataset-id] db)
-
-          ;; 3. Get the CURRENTLY selected example IDs from their state path.
-          example-ids (s/select-one [:ui :datasets :selected-examples dataset-id] db)
-
-          ;; 4. Get the tag name from the form state.
-          {:keys [form-id tag-name]} form-state]
-
-      (sente/request!
-       [:datasets/add-tag-to-examples
-        {:module-id module-id
-         :dataset-id dataset-id
-         ;; Only send snapshot-name if it's not blank.
-         :snapshot-name (when-not (str/blank? snapshot-name) snapshot-name)
-         ;; Ensure example-ids is a vector and not nil.
-         :example-ids (vec (or example-ids #{}))
-         :tag tag-name}]
-       15000
-       (fn [reply]
-         (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-         (if (:success reply)
-           (do
-             (state/dispatch [:modal/hide])
-             (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
-             ;; Invalidate the query to force a refetch of the examples list.
-             (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
-             (state/dispatch [:form/clear form-id]))
-           (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
+  {:event (fn [form-state]
+            (let [db @state/app-db
+                  ;; 1. Get stable IDs from the route.
+                  {:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
+                  ;; 2. Get the CURRENTLY selected snapshot name from its state path.
+                  snapshot-name (s/select-one [:ui :datasets :selected-snapshot-per-dataset dataset-id] db)
+                  ;; 3. Get the CURRENTLY selected example IDs from their state path.
+                  example-ids (s/select-one [:ui :datasets :selected-examples dataset-id] db)
+                  ;; 4. Get the tag name from the form state.
+                  {:keys [tag-name]} form-state]
+              [:datasets/add-tag-to-examples
+               {:module-id module-id
+                :dataset-id dataset-id
+                ;; Only send snapshot-name if it's not blank.
+                :snapshot-name (when-not (str/blank? snapshot-name) snapshot-name)
+                ;; Ensure example-ids is a vector and not nil.
+                :example-ids (vec (or example-ids #{}))
+                :tag tag-name}]))
+   :on-success-invalidate (fn [_form-state _reply]
+                            (let [db @state/app-db
+                                  {:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
+                              {:query-key-pattern [:dataset-examples module-id dataset-id]}))
+   :on-success (fn [db _form-state _reply]
+                 (let [{:keys [dataset-id]} (s/select-one [:route :path-params] db)]
+                   (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])))}})
 
 (defn show-add-tag-modal! [props]
   (state/dispatch [:modal/show-form :add-tag-to-selected props]))
@@ -351,39 +304,31 @@
    :modal-props {:title "Remove Tag from examples"
                  :submit-text "Remove Tag"}}
   :on-submit
-  (fn [db form-state]
-    (let [;; 1. Get stable IDs from the route.
-          {:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
-
-          ;; 2. Get the CURRENTLY selected snapshot name from its state path.
-          snapshot-name (s/select-one [:ui :datasets :selected-snapshot-per-dataset dataset-id] db)
-
-          ;; 3. Get the CURRENTLY selected example IDs from their state path.
-          example-ids (s/select-one [:ui :datasets :selected-examples dataset-id] db)
-
-          ;; 4. Get the tag name from the form state.
-          {:keys [form-id tag-name]} form-state]
-
-      (sente/request!
-       [:datasets/remove-tag-from-examples
-        {:module-id module-id
-         :dataset-id dataset-id
-         ;; Only send snapshot-name if it's not blank.
-         :snapshot-name (when-not (str/blank? snapshot-name) snapshot-name)
-         ;; Ensure example-ids is a vector and not nil.
-         :example-ids (vec (or example-ids #{}))
-         :tag tag-name}]
-       15000
-       (fn [reply]
-         (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-         (if (:success reply)
-           (do
-             (state/dispatch [:modal/hide])
-             (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
-             ;; Invalidate the query to force a refetch of the examples list.
-             (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
-             (state/dispatch [:form/clear form-id]))
-           (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
+  {:event (fn [form-state]
+            (let [db @state/app-db
+                  ;; 1. Get stable IDs from the route.
+                  {:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
+                  ;; 2. Get the CURRENTLY selected snapshot name from its state path.
+                  snapshot-name (s/select-one [:ui :datasets :selected-snapshot-per-dataset dataset-id] db)
+                  ;; 3. Get the CURRENTLY selected example IDs from their state path.
+                  example-ids (s/select-one [:ui :datasets :selected-examples dataset-id] db)
+                  ;; 4. Get the tag name from the form state.
+                  {:keys [tag-name]} form-state]
+              [:datasets/remove-tag-from-examples
+               {:module-id module-id
+                :dataset-id dataset-id
+                ;; Only send snapshot-name if it's not blank.
+                :snapshot-name (when-not (str/blank? snapshot-name) snapshot-name)
+                ;; Ensure example-ids is a vector and not nil.
+                :example-ids (vec (or example-ids #{}))
+                :tag tag-name}]))
+   :on-success-invalidate (fn [_form-state _reply]
+                            (let [db @state/app-db
+                                  {:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
+                              {:query-key-pattern [:dataset-examples module-id dataset-id]}))
+   :on-success (fn [db _form-state _reply]
+                 (let [{:keys [dataset-id]} (s/select-one [:route :path-params] db)]
+                   (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])))}})
 
 (defn show-remove-tag-modal! [props]
   (state/dispatch [:modal/show-form :remove-tag-from-selected props]))

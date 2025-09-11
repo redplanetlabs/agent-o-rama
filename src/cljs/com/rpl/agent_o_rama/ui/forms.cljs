@@ -4,6 +4,7 @@
    [uix.core :as uix :refer [defui defhook $]]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
+   [com.rpl.agent-o-rama.ui.sente :as sente]
    [clojure.string :as str]
    [com.rpl.specter :as s]
    ["react-dom" :refer [createPortal]]))
@@ -324,12 +325,35 @@
                        (state/dispatch [:db/set-value
                                         [:forms form-id]
                                         (assoc form-state :valid? false :field-errors errors)])
-                       (let [on-submit-handler (:on-submit form-spec)]
-                         ;; Set submitting state and let the handler run its side-effect
-                         (state/dispatch [:db/set-value [:forms form-id] (assoc form-state :submitting? true :error nil)])
-                         (when on-submit-handler
-                           ;; TODO fix, this assoc is ugly
-                           (on-submit-handler db (assoc form-state :form-id form-id))))))
+                       (let [on-submit-handler (:on-submit form-spec)
+                             form-state-with-id (assoc form-state :form-id form-id)]
+                         (cond
+                           ;; New declarative path
+                           (map? on-submit-handler)
+                           (let [{:keys [event on-success-invalidate on-success on-error]} on-submit-handler
+                                 sente-event (event form-state-with-id)]
+                             (state/dispatch [:db/set-value [:forms form-id] (assoc form-state :submitting? true :error nil)])
+                             (sente/request!
+                              sente-event
+                              15000
+                              (fn [reply]
+                                (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+                                (if (:success reply)
+                                  (do
+                                    (state/dispatch [:modal/hide])
+                                    (when on-success-invalidate
+                                      (state/dispatch [:query/invalidate (on-success-invalidate form-state-with-id reply)]))
+                                    (when on-success (on-success db form-state-with-id reply))
+                                    (state/dispatch [:form/clear form-id]))
+                                  (do
+                                    (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)])
+                                    (when on-error (on-error db form-state-with-id (:error reply))))))))
+
+                           ;; Fallback to original function-based handler for complex cases
+                           (fn? on-submit-handler)
+                           (do
+                             (state/dispatch [:db/set-value [:forms form-id] (assoc form-state :submitting? true :error nil)])
+                             (on-submit-handler db form-state-with-id))))))
                    nil))
 
 (state/reg-event :form/clear
