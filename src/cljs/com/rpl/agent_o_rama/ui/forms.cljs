@@ -128,22 +128,61 @@
   ($ :form.p-4
      children))
 
+ ;; =============================================================================
+;; WIZARD FORM COMPONENTS
+;; =============================================================================
+
+(defui WizardProgressBar [{:keys [steps current-step]}]
+  ($ :div.mb-8.px-4.pt-4
+     ($ :ol.flex.items-center.w-full
+        (for [[idx step-key] (map-indexed vector steps)
+              :let [step-title (-> (name step-key) (str/replace "-" " ") str/capitalize)
+                    current-step-idx (.indexOf steps current-step)
+                    is-done (< idx current-step-idx)
+                    is-current (= idx current-step-idx)
+                    is-last? (= idx (dec (count steps)))]]
+          ($ :li {:key (str step-key)
+                  :className (common/cn "flex w-full items-center"
+                                        {"after:content-[''] after:w-full after:h-1 after:border-b after:border-4 after:inline-block" (not is-last?)}
+                                        (if is-done "after:border-blue-600" "after:border-gray-200"))}
+             ($ :span {:className (common/cn "flex items-center justify-center w-10 h-10 rounded-full shrink-0"
+                                             (if (or is-done is-current) "bg-blue-100 text-blue-600" "bg-gray-100 text-gray-500"))}
+                ($ :span.text-xs.font-bold step-title)))))))
+
+(defui WizardForm [{:keys [form-id]}]
+  (let [form (use-form form-id)
+        form-spec (get @form-specs form-id)
+        {:keys [steps current-step]} form
+        current-step-spec (get form-spec current-step)
+        ui-fn (:ui current-step-spec)]
+
+    ($ :div.flex.flex-col.h-full
+       (when (seq steps)
+         ($ WizardProgressBar {:steps steps :current-step current-step}))
+
+       ($ :div.flex-1.min-h-0.overflow-y-auto
+          (if ui-fn
+            (ui-fn {:form-id form-id :props form})
+            ($ :div.p-8.text-center.text-gray-500
+               (str "No UI defined for step: " current-step)))))))
+
 (defui ModalFormContent [{:keys [form-id modal-data]}]
   (let [form (use-form form-id)
         form-spec (get @form-specs form-id)
-        current-step-spec (get form-spec (:current-step form))
-        ui-fn (:ui current-step-spec)
+        is-wizard? (seq (:steps form-spec)) ;; Check if it's a wizard
         handle-cancel (fn []
                         (state/dispatch [:form/clear form-id])
                         (state/dispatch [:modal/hide]))]
 
     ($ :<>
-
+       ;; Main content area
        ($ :div {:className "flex-1 min-h-0 overflow-y-auto"}
-          (if ui-fn
-            ;; Pass the entire form state as props - it now contains everything
-            (ui-fn {:form-id form-id :props form})
-            ($ :div "No UI for this form step.")))
+          (if is-wizard?
+            ($ WizardForm {:form-id form-id}) ;; Render the generic wizard
+            (let [ui-fn (or (:ui form-spec) (get-in form-spec [:main :ui]))]
+              (if ui-fn
+                (ui-fn {:form-id form-id :props form})
+                ($ :div "No UI defined for this form.")))))
 
        ;; The footer with form actions
        (when form
@@ -152,12 +191,12 @@
             ($ :div {:className "flex justify-end gap-3"}
                ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer", :type "button", :onClick handle-cancel} "Cancel")
 
-               ;; "Back" button
-               (when (and (:steps form) (not= (first (:steps form)) (:current-step form)))
+               ;; "Back" button for wizards
+               (when (and is-wizard? (not= (first (:steps form)) (:current-step form)))
                  ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer", :type "button", :onClick (:prev-step! form)} "Back"))
 
                ;; "Next" or "Submit" button
-               (if (and (:steps form) (not= (last (:steps form)) (:current-step form)))
+               (if (and is-wizard? (not= (last (:steps form)) (:current-step form)))
                  ($ :button {:type "button", :disabled (not (:valid? form)), :onClick (:next-step! form)
                              :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium "
                                              (if (not (:valid? form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
@@ -165,7 +204,7 @@
                  ($ :button {:type "button", :disabled (or (not (:valid? form)) (:submitting? form)), :onClick (:submit! form)
                              :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
                                              (if (or (not (:valid? form)) (:submitting? form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
-                    (when (:submitting? form) ($ :div {:className "animate-spin rounded-full h-4 w-4 border-b-2 border-white"}))
+                    (when (:submitting? form) ($ common/spinner {:size :medium}))
                     (:submit-text modal-data "Submit")))))))))
 
 (defui global-modal-component []
