@@ -160,10 +160,10 @@
                      ($ :p.text-sm.text-gray-600 description))))))))))
 
 (defui CreateEvaluatorForm [{:keys [form-id]}]
-  (let [{:keys [fields set-field! field-errors]} (forms/use-form form-id)
+  (let [form-state (forms/use-form form-id)
+        {:keys [set-field! field-errors selected-builder params input-json-path output-json-path reference-output-json-path]} form-state
         name-field (forms/use-form-field form-id :name)
         description-field (forms/use-form-field form-id :description)
-        selected-builder (:selected-builder fields)
         builder-params (get-in selected-builder [:spec :options :params] {})
         builder-options (get-in selected-builder [:spec :options] {})
         [show-advanced? set-show-advanced!] (uix/use-state false)
@@ -181,7 +181,7 @@
                             :type :textarea
                             :value (:value description-field)
                             :on-change (:on-change description-field)
-                            :error (:description field-errors)
+                            :error (:error description-field)
                             :rows 2})
        (when (seq builder-params)
          ($ :div.mt-6.pt-4.border-t
@@ -190,7 +190,7 @@
               ($ forms/form-field
                  {:key (str param-key)
                   :label (str (name param-key))
-                  :value (get-in fields [:params param-key]),
+                  :value (get-in params [param-key]),
                   :on-change #(set-field! [:params param-key] %)
                   :error (get-in field-errors [:params param-key])
                   :placeholder (:description param-spec)}))))
@@ -206,17 +206,17 @@
               ($ :div.mt-4.space-y-4
                  (when show-input-path?
                    ($ forms/form-field {:label "Input JSON Path"
-                                        :value (:input-json-path fields)
+                                        :value input-json-path
                                         :on-change #(set-field! [:input-json-path] %)
                                         :error (:input-json-path field-errors)}))
                  (when show-output-path?
                    ($ forms/form-field {:label "Output JSON Path"
-                                        :value (:output-json-path fields)
+                                        :value output-json-path
                                         :on-change #(set-field! [:output-json-path] %)
                                         :error (:output-json-path field-errors)}))
                  (when show-ref-output-path?
                    ($ forms/form-field {:label "Reference Output JSON Path"
-                                        :value (:reference-output-json-path fields)
+                                        :value reference-output-json-path
                                         :on-change #(set-field! [:reference-output-json-path] %)
                                         :error (:reference-output-json-path field-errors)})))))))))
 
