@@ -56,3 +56,10 @@
                             (long num-repetitions)
                             (long concurrency)))]
       {:status :ok :invoke-id (:agent-invoke-id agent-invoke)})))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/get-results
+  [{:keys [manager dataset-id experiment-id]} uid]
+  (let [results-query (:experiment-results-query (aor-types/underlying-objects manager))]
+    (foreign-invoke-query results-query
+                          dataset-id
+                          experiment-id)))

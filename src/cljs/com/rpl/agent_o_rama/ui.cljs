@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.ui.datasets :as datasets]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    [com.rpl.agent-o-rama.ui.experiments.index :as experiments]
+   [com.rpl.agent-o-rama.ui.experiments.detail :as experiments-detail]
    [reitit.core :as r]
    [reitit.frontend :as rf]
    [reitit.frontend.easy :as rfe]
@@ -38,7 +39,8 @@
        {:name :module/dataset, :views [datasets/detail]}
        ["" {:name :module/dataset-detail, :views [datasets/detail-examples]}]
        ["/examples" {:name :module/dataset-detail.examples, :views [datasets/detail-examples]}]
-       ["/experiments" {:name :module/dataset-detail.experiments, :views [experiments/index]}]]]
+       ["/experiments" {:name :module/dataset-detail.experiments, :views [experiments/index]}]
+       ["/experiments/:experiment-id" {:name :module/dataset-detail.experiment-detail, :views [experiments-detail/experiment-detail-page]}]]]
      ["/evaluations" {:name :module/evaluations, :views [evaluators/index]}]
      ["/agent/:agent-name"
       ["" {:name :agent/detail, :views [agents/agent]}]

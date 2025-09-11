@@ -63,4 +63,6 @@
                        ($ :td {:className (:td common/table-classes)}
                           (common/format-relative-time (:start-time-millis exp)))
                        ($ :td {:className (:td common/table-classes)}
-                          ($ :button.text-indigo-600.hover:text-indigo-900 "View Results")))))))))))
+                          ($ :a.text-indigo-600.hover:text-indigo-900
+                             {:href (str "/datasets/" dataset-id "/experiments/" (:id info))}
+                             "View Results")))))))))))
