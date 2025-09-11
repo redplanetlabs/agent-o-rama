@@ -354,39 +354,41 @@
    :modal-props {:title "Create New Experiment"
                  :submit-text "Run Experiment"}}
 
-  :on-submit (fn [db form-state]
-               (let [{:keys [form-id module-id dataset-id name description snapshot selector spec num-repetitions concurrency evaluators]} form-state]
-                 (sente/request!
-                  [:experiments/start
-                   {:module-id module-id
-                    :dataset-id dataset-id
-                    :form-data (-> form-state
-                                   (update :selector (fn [s] (if (= (:type s) :all) nil s)))
-                                   (update :spec
-                                           (fn [s]
-                                             (let [type-keyword (:type s)
-                                                   type-str (case type-keyword
-                                                              :regular "RegularExperiment"
-                                                              :comparative "ComparativeExperiment")]
-                                               (assoc (update s :targets
-                                                              (fn [targets]
-                                                                (mapv (fn [t]
-                                                                        (let [target-type-kw (get-in t [:target-spec :type])
-                                                                              target-type-str (case target-type-kw
-                                                                                                :agent "AgentTarget"
-                                                                                                :node "NodeTarget")]
-                                                                          (-> t
-                                                                              (assoc-in [:target-spec :type] target-type-str)
-                                                                              (cond-> (= target-type-kw :agent)
-                                                                                (update :target-spec dissoc :node)))))
-                                                                      targets)))
-                                                      :type type-str)))))}]
-                  15000
-                  (fn [reply]
-                    (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-                    (if (:success reply)
-                      (do
-                        (state/dispatch [:modal/hide])
-                        (state/dispatch [:query/invalidate {:query-key-pattern [:experiments module-id dataset-id]}])
-                        (state/dispatch [:form/clear form-id]))
-                      (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
+  :on-submit
+  (fn [db form-state]
+    (println "form-state" form-state )
+    (let [{:keys [form-id module-id dataset-id name description snapshot selector spec num-repetitions concurrency evaluators]} form-state]
+      (sente/request!
+       [:experiments/start
+        {:module-id module-id
+         :dataset-id dataset-id
+         :form-data (-> form-state
+                        (update :selector (fn [s] (if (= (:type s) :all) nil s)))
+                        (update :spec
+                                (fn [s]
+                                  (let [type-keyword (:type s)
+                                        type-str (case type-keyword
+                                                   :regular "RegularExperiment"
+                                                   :comparative "ComparativeExperiment")]
+                                    (assoc (update s :targets
+                                                   (fn [targets]
+                                                     (mapv (fn [t]
+                                                             (let [target-type-kw (get-in t [:target-spec :type])
+                                                                   target-type-str (case target-type-kw
+                                                                                     :agent "AgentTarget"
+                                                                                     :node "NodeTarget")]
+                                                               (-> t
+                                                                   (assoc-in [:target-spec :type] target-type-str)
+                                                                   (cond-> (= target-type-kw :agent)
+                                                                     (update :target-spec dissoc :node)))))
+                                                           targets)))
+                                           :type type-str)))))}]
+       15000
+       (fn [reply]
+         (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+         (if (:success reply)
+           (do
+             (state/dispatch [:modal/hide])
+             (state/dispatch [:query/invalidate {:query-key-pattern [:experiments module-id dataset-id]}])
+             (state/dispatch [:form/clear form-id]))
+           (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
