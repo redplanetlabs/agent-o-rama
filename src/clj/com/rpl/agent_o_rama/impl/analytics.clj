@@ -71,7 +71,7 @@
                           (nil->val EMPTY-OP-STATS)
                           (multi-path [:count (term inc)]
                                       [:total-time-millis (term (adder delta-millis))])]
-                         tc-vol)
+                         nops-vol)
         (when (= :model-call type)
           (multi-transform [h/VOLATILE
                             (multi-path [:input (term (adder (get info "inputTokenCount" 0)))]
