@@ -14,8 +14,7 @@
 (defn reg-form
   "Registers a self-contained form specification."
   [form-id spec]
-  (swap! form-specs assoc form-id spec)
-  (println "form spects" @form-specs))
+  (swap! form-specs assoc form-id spec))
 
 (defhook use-form
   [form-id]
