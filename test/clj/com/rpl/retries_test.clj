@@ -809,6 +809,7 @@
      (with-redefs [CF-ATOM (atom nil)
                    anode/log-node-error (fn [& args])
                    at/hook:running-retry> cf-running-retry>
+                   aor-types/get-config (max-retries-override 3)
 
                    anode/hook:appended-agent-failure
                    (fn [& args] (swap! failures-atom inc))]
@@ -1175,7 +1176,8 @@
 (deftest exceptions-test
   (with-redefs [SEM      (h/mk-semaphore 0)
                 VAL-ATOM (atom 0)
-                anode/log-node-error (fn [& args])]
+                anode/log-node-error (fn [& args])
+                aor-types/get-config (max-retries-override 3)]
     (with-open [ipc (rtest/create-ipc)]
       (letlocals
        (bind module
