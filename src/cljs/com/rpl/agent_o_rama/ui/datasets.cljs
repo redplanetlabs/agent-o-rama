@@ -825,7 +825,8 @@
 
 (defui detail [{:keys [match module-id dataset-id]}]
   (let [route-name (get-in match [:data :name])
-        active-tab (if (str/includes? (name route-name) "experiments") "experiments" "examples")
+        experiments-routes #{:module/dataset-detail.experiments :module/dataset-detail.experiment-detail}
+        active-tab (if (contains? experiments-routes route-name) "experiments" "examples")
         [show-info? set-show-info] (uix/use-state false)
         {:keys [loading? error]}
         (queries/use-sente-query
