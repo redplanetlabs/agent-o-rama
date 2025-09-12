@@ -14,7 +14,8 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.test-common :as tc])
+   [com.rpl.test-common :as tc]
+   [meander.epsilon :as m])
   (:import
    [dev.langchain4j.data.message
     AiMessage
@@ -216,10 +217,10 @@
             (aor/node
              "node1"
              nil
-             (fn [agent-node s s2]
+             (fn [agent-node v]
                (let [model (aor/get-agent-object agent-node "my-model")]
                  (lc4j/basic-chat model "..........")
-                 (aor/result! agent-node (str s "-" s2))))
+                 (aor/result! agent-node v)))
             ))
         (-> topology
             (aor/new-agent "bar")
@@ -277,7 +278,32 @@
 
      (bind inv (aor/agent-initiate fib 4))
      (is (= 5 (aor/agent-result fib inv)))
-     (clojure.pprint/pprint (fetch-stats fib-root inv))
+     (is
+      (trace-matches?
+       (fetch-stats fib-root inv)
+       {:subagent-stats
+        {{:module-name !m1
+          :agent-name  "fib"}
+         {:count       8
+          :basic-stats
+          {:nested-op-stats    {:agent-call {:count 12 :total-time-millis !t1}}
+           :input-token-count  0
+           :output-token-count 0
+           :total-token-count  0
+           :node-stats         {"start" {:count 8 :total-time-millis !t2}}}}}
+        :basic-stats
+        {:nested-op-stats    {:agent-call {:count 4 :total-time-millis !t3}}
+         :input-token-count  0
+         :output-token-count 0
+         :total-token-count  0
+         :node-stats         {"start" {:count 1 :total-time-millis !t4}}}}
+       (m/guard
+        (= !m1 module-name))
+      ))
+
+     (bind inv (aor/agent-initiate foo))
+     (is (= :done (aor/agent-result foo inv)))
+     (clojure.pprint/pprint (fetch-stats foo-root inv))
 
 
 
