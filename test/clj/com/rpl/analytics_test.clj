@@ -5,6 +5,7 @@
         [com.rpl.rama.path])
   (:require
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
@@ -13,7 +14,18 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.test-common :as tc]))
+   [com.rpl.test-common :as tc])
+  (:import
+   [dev.langchain4j.data.message
+    AiMessage
+    UserMessage]
+   [dev.langchain4j.model.chat
+    ChatModel]
+   [dev.langchain4j.model.chat.response
+    ChatResponse$Builder]
+   [dev.langchain4j.model.output
+    FinishReason
+    TokenUsage]))
 
 (defn ai-stats [& args] (apply aor-types/->AgentInvokeStats args))
 (defn bai-stats [& args] (apply aor-types/->BasicAgentInvokeStats args))
@@ -164,6 +176,110 @@
      ])))
 )
 
-(deftest agent-trace-analytics-test
+(defrecord MockChatModel []
+  ChatModel
+  (doChat [this request]
+    (let [^UserMessage m (-> request
+                             .messages
+                             last)
+          c (count (.singleText m))]
+      (-> (ChatResponse$Builder.)
+          (.aiMessage (AiMessage. "!!!"))
+          (.finishReason FinishReason/STOP)
+          (.modelName "aor-model")
+          (.tokenUsage (TokenUsage. (int c) (int (+ c 10)) (int (+ c 15))))
+          .build))))
 
-)
+(deftest agent-trace-analytics-test
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (aor/declare-agent-object-builder
+         topology
+         "my-model"
+         (fn [setup] (->MockChatModel)))
+        (-> topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             "node1"
+             (fn [agent-node]
+               (let [bar   (aor/agent-client agent-node "bar")
+                     model (aor/get-agent-object agent-node "my-model")]
+                 (lc4j/basic-chat model "..")
+                 (lc4j/basic-chat model "...")
+                 (aor/emit! agent-node
+                            "node1"
+                            (aor/agent-invoke bar)))))
+            (aor/node
+             "node1"
+             nil
+             (fn [agent-node s s2]
+               (let [model (aor/get-agent-object agent-node "my-model")]
+                 (lc4j/basic-chat model "..........")
+                 (aor/result! agent-node (str s "-" s2))))
+            ))
+        (-> topology
+            (aor/new-agent "bar")
+            (aor/node
+             "start"
+             "q"
+             (fn [agent-node]
+               (aor/emit! agent-node "q")))
+            (aor/node
+             "q"
+             nil
+             (fn [agent-node]
+               (let [model (aor/get-agent-object agent-node "my-model")]
+                 (lc4j/basic-chat model ".")
+                 (aor/result! agent-node :done)
+               ))))
+        (-> topology
+            (aor/new-agent "fib")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node v]
+               (let [fib (aor/agent-client agent-node "fib")]
+                 (if (#{0 1} v)
+                   (aor/result! agent-node 1)
+                   (aor/result!
+                    agent-node
+                    (+ (aor/agent-invoke fib (- v 1))
+                       (aor/agent-invoke fib (- v 2)))
+                   ))
+               ))))
+       ))
+     (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+     (bind module-name (get-module-name module))
+     (bind agent-manager (aor/agent-manager ipc module-name))
+     (bind foo (aor/agent-client agent-manager "foo"))
+     (bind fib (aor/agent-client agent-manager "fib"))
+
+     (bind foo-root
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-root-task-global-name "foo")))
+     (bind fib-root
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-root-task-global-name "fib")))
+
+     (bind fetch-stats
+       (fn [root inv]
+         (foreign-select-one
+          [(keypath (:agent-invoke-id inv)) :stats]
+          root
+          {:pkey (:task-id inv)})))
+
+
+     (bind inv (aor/agent-initiate fib 4))
+     (is (= 5 (aor/agent-result fib inv)))
+     (clojure.pprint/pprint (fetch-stats fib-root inv))
+
+
+
+     ;; TODO: <<<<>>>>
+    )))
