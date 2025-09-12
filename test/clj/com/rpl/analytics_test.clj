@@ -286,26 +286,49 @@
           :agent-name  "fib"}
          {:count       8
           :basic-stats
-          {:nested-op-stats    {:agent-call {:count 12 :total-time-millis !t1}}
+          {:nested-op-stats    {:agent-call {:count 12 :total-time-millis ?t1}}
            :input-token-count  0
            :output-token-count 0
            :total-token-count  0
-           :node-stats         {"start" {:count 8 :total-time-millis !t2}}}}}
+           :node-stats         {"start" {:count 8 :total-time-millis ?t2}}}}}
         :basic-stats
-        {:nested-op-stats    {:agent-call {:count 4 :total-time-millis !t3}}
+        {:nested-op-stats    {:agent-call {:count 4 :total-time-millis ?t3}}
          :input-token-count  0
          :output-token-count 0
          :total-token-count  0
-         :node-stats         {"start" {:count 1 :total-time-millis !t4}}}}
+         :node-stats         {"start" {:count 1 :total-time-millis ?t4}}}}
        (m/guard
         (= !m1 module-name))
       ))
 
      (bind inv (aor/agent-initiate foo))
      (is (= :done (aor/agent-result foo inv)))
-     (clojure.pprint/pprint (fetch-stats foo-root inv))
-
-
-
-     ;; TODO: <<<<>>>>
+     (is
+      (trace-matches?
+       (fetch-stats foo-root inv)
+       {:subagent-stats
+        {{:module-name !module-name
+          :agent-name  "bar"}
+         {:count       1
+          :basic-stats
+          {:nested-op-stats    {:model-call {:count 1 :total-time-millis ?t1}}
+           :input-token-count  1
+           :output-token-count 11
+           :total-token-count  16
+           :node-stats
+           {"start" {:count 1 :total-time-millis ?t2}
+            "q"     {:count 1 :total-time-millis ?t3}}}}}
+        :basic-stats
+        {:nested-op-stats
+         {:model-call {:count 3 :total-time-millis ?t4}
+          :agent-call {:count 2 :total-time-millis ?t5}}
+         :input-token-count  15
+         :output-token-count 45
+         :total-token-count  60
+         :node-stats
+         {"start" {:count 1 :total-time-millis ?t6}
+          "node1" {:count 1 :total-time-millis ?t7}}}}
+       (m/guard
+        (= !module-name module-name))
+      ))
     )))
