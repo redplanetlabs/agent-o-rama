@@ -19,6 +19,8 @@
 (defn bai-stats [& args] (apply aor-types/->BasicAgentInvokeStats args))
 (defn op-stats [& args] (apply aor-types/->OpStats args))
 (defn nop-info [& args] (apply aor-types/->NestedOpInfo args))
+(defn sa-ref [& args] (apply aor-types/->AgentRef args))
+(defn sa-stats [& args] (apply aor-types/->SubagentInvokeStats args))
 
 (deftest mk-node-stats-test
   (is (= (ana/mk-node-stats "a" 3 5 [])
@@ -49,5 +51,119 @@
       20
       120
       {"bb" (op-stats 1 3)}))))
-  ;; TODO: <<<<>>>> unit test with subagent calls
+
+  (is
+   (=
+    (ai-stats
+     {(sa-ref "M1" "A1")
+      (sa-stats 4
+                (bai-stats {:other    (op-stats 5 10)
+                            :db-write (op-stats 3 7)}
+                           12
+                           15
+                           18
+                           {"abc" (op-stats 1020 1040)
+                            "q"   (op-stats 1 2)}))
+
+      (sa-ref "M1" "A2")
+      (sa-stats 5
+                (bai-stats {:other (op-stats 20 31)}
+                           11
+                           14
+                           17
+                           {"q"   (op-stats 2 4)
+                            "abc" (op-stats 10 20)}))
+     }
+     (bai-stats
+      {:agent-call (op-stats 6 25)}
+      0
+      0
+      0
+      {"abc" (op-stats 1 3)}))
+    (ana/mk-node-stats
+     "abc"
+     3
+     6
+     [(nop-info 1
+                5
+                :agent-call
+                {"agent-module-name" "M1"
+                 "agent-name"        "A3"})
+      (nop-info 1
+                5
+                :agent-call
+                {"agent-module-name" "M1"
+                 "agent-name" "A1"
+                 "stats"      3})
+      (nop-info 1
+                6
+                :agent-call
+                {"agent-module-name" 1
+                 "agent-name" 2
+                 "stats"      3})
+      (nop-info 1
+                5
+                :agent-call
+                {"agent-module-name" "M1"
+                 "agent-name" "A1"
+                 "stats"
+                 (ai-stats
+                  {(sa-ref "M1" "A1")
+                   (sa-stats 2
+                             (bai-stats {:other (op-stats 3 4)}
+                                        10
+                                        11
+                                        12
+                                        {"abc" (op-stats 1000 1000)}))
+                   (sa-ref "M1" "A2")
+                   (sa-stats 3
+                             (bai-stats {:other (op-stats 18 19)}
+                                        5
+                                        6
+                                        7
+                                        {"q" (op-stats 1 2)}))}
+                  (bai-stats {:other    (op-stats 1 3)
+                              :db-write (op-stats 3 7)}
+                             1
+                             2
+                             3
+                             {"abc" (op-stats 10 20)
+                              "q"   (op-stats 1 2)}))})
+      (nop-info 1
+                5
+                :agent-call
+                {"agent-module-name" "M1"
+                 "agent-name" "A1"
+                 "stats"
+                 (ai-stats
+                  {(sa-ref "M1" "A2")
+                   (sa-stats 1
+                             (bai-stats {:other (op-stats 1 9)}
+                                        5
+                                        6
+                                        7
+                                        {"q" (op-stats 1 2)}))}
+                  (bai-stats {:other (op-stats 1 3)}
+                             1
+                             2
+                             3
+                             {"abc" (op-stats 10 20)}))})
+      (nop-info 1
+                5
+                :agent-call
+                {"agent-module-name" "M1"
+                 "agent-name" "A2"
+                 "stats"
+                 (ai-stats
+                  {}
+                  (bai-stats {:other (op-stats 1 3)}
+                             1
+                             2
+                             3
+                             {"abc" (op-stats 10 20)}))})
+     ])))
+)
+
+(deftest agent-trace-analytics-test
+
 )
