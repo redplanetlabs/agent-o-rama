@@ -12,6 +12,9 @@
   [{:keys [manager dataset-id pagination]} uid]
   (let [search-query (:search-experiments-query (aor-types/underlying-objects manager))]
     ;; For the index table, we get the first page with a reasonable limit
+    (def search-query search-query)
+    (def dataset-id dataset-id)
+    (def pagination pagination)
     (foreign-invoke-query search-query
                           dataset-id
                           {} ; no filters

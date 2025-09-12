@@ -42,8 +42,8 @@
                   ($ :tr
                      ($ :th {:className (:th common/table-classes)} "Experiment Name")
                      ($ :th {:className (:th common/table-classes)} "Type")
-                     ($ :th {:className (:th common/table-classes)} "Status")
                      ($ :th {:className (:th common/table-classes)} "Started")
+                     ($ :th {:className (:th common/table-classes)} "Finished")
                      ($ :th {:className (:th common/table-classes)} "Actions")))
                ($ :tbody
                   (for [exp experiments
@@ -58,11 +58,11 @@
                               "Regular"
                               "Comparative")))
                        ($ :td {:className (:td common/table-classes)}
-                          (if (:finish-time-millis exp)
-                            ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs "Completed")
-                            ($ :span.px-2.py-1.bg-blue-100.text-blue-800.rounded-full.text-xs "Running")))
-                       ($ :td {:className (:td common/table-classes)}
                           (common/format-relative-time (:start-time-millis exp)))
+                       ($ :td {:className (:td common/table-classes)}
+                          (if (:finish-time-millis exp)
+                            (common/format-relative-time (:finish-time-millis exp))
+                            "--"))
                        ($ :td {:className (:td common/table-classes)}
                           ($ :a.text-indigo-600.hover:text-indigo-900
                              {:href (rfe/href :module/dataset-detail.experiment-detail
