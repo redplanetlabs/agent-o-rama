@@ -62,4 +62,5 @@
   (let [results-query (:experiments-results-query (aor-types/underlying-objects manager))]
     (foreign-invoke-query results-query
                           dataset-id
-                          experiment-id)))
+                          ;; TODO move this uuid parse onto client
+                          (java.util.UUID/fromString experiment-id))))
