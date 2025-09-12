@@ -549,7 +549,7 @@
   MAX-RETRIES
   natural-long?
   "Maximum number of times an agent should retry after failing"
-  3)
+  2)
 
 (defconfig
   STALL-CHECKER-THRESHOLD-MILLIS
