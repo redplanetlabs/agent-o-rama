@@ -3,6 +3,7 @@
         [com.rpl.rama path])
   (:require
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
+   [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
@@ -74,7 +75,7 @@
 
 (deframaop send-emits>
   [*agent-name *agent-task-id *agent-id *retry-num *invoke-id *agg-invoke-id
-   *emits *result *fork-context]
+   *emits *result *stats *fork-context]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
     $$active (po/agent-active-invokes-task-global *agent-name)]
@@ -108,8 +109,8 @@
      (hook:update-last-progress>)
      (local-transform>
       [(keypath *agent-id)
-       :last-progress-time-millis
-       (termval (h/current-time-millis))]
+       (multi-path [:last-progress-time-millis (termval (h/current-time-millis))]
+                   [:stats (term (ana/agent-stats-merger *stats))])]
       $$root))
 
    (<<if (some? *result)
@@ -125,7 +126,6 @@
                    [:finish-time-millis (termval *finish-time-millis)])]
       $$root)
      (local-transform> [(keypath *agent-id) NONE>] $$active))
-   ;; TODO: <<<<>>> update stats here on root whether in agg or not
    (<<if (some? *agg-invoke-id)
      (aor-types/->valid-AggAckOp *agg-invoke-id *ack-val :> *op)
      (anchor> <agg-ack-emit>)
@@ -186,6 +186,7 @@
                :ack-val           (h/half-uuid *invoke-id)
                :last-progress-time-millis *current-time-millis
                :retry-num         *retry-num
+               :stats             ana/EMPTY-AGENT-STATS
                :start-time-millis *current-time-millis})]
     $$root)
    (:> *invoke-id)))
@@ -432,18 +433,17 @@
    (local-select> (keypath *invoke-id)
                   $$nodes
                   :> {:keys [*agent-task-id *agent-id *node
-                             *agg-invoke-id]
-                      :as   *all-data})
+                             *agg-invoke-id *start-time-millis]})
    (filter> (some? *agent-id))
    (apart/filter-valid-retry-num> *agent-name
                                   *agent-task-id
                                   *agent-id
                                   *retry-num)
-   (:> *agent-task-id *agent-id *node *agg-invoke-id)))
+   (:> *agent-task-id *agent-id *node *agg-invoke-id *start-time-millis)))
 
 (deframaop handle-node-complete-emits
   [*agent-name *agent-task-id *agent-id *retry-num *node *invoke-id
-   *agg-invoke-id *result *emits *fork-context]
+   *agg-invoke-id *result *emits *stats *fork-context]
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)]
    (<<subsource (get-node-obj (po/agent-graph-task-global *agent-name) *node)
@@ -467,6 +467,7 @@
                 *agg-invoke-id
                 *emits
                 *result
+                *stats
                 *fork-context
                 :> *op)
    (:> *op)))
@@ -485,7 +486,7 @@
    (begin-node-complete *agent-name
                         *invoke-id
                         *retry-num
-                        :> *agent-task-id *agent-id *node *agg-invoke-id)
+                        :> *agent-task-id *agent-id *node *agg-invoke-id *start-time-millis)
    (<<ramafn %merger
      [*m]
      (:> (reduce-kv assoc
@@ -504,9 +505,9 @@
                         :agg-start-res
                         (termval *node-fn-res)]
                        $$nodes))
-   ;; TODO: <<<<>>> send forward nested op info, token stats, and node stat
-   ;; - probably an instance of AgentInvokeStats, and then merge at root
-   ;; - need to look at finish-time - start-time and nested ops
+
+
+   (ana/mk-node-stats *node *start-time-millis *finish-time-millis *nested-ops :> *stats)
    (handle-node-complete-emits
     *agent-name
     *agent-task-id
@@ -517,6 +518,7 @@
     *agg-invoke-id
     *result
     *emits
+    *stats
     nil
     :> *op)
    (:> *agent-task-id *agent-id *retry-num *op)
@@ -648,7 +650,7 @@
    (begin-node-complete *agent-name
                         *invoke-id
                         *retry-num
-                        :> *agent-task-id *agent-id *node *agg-invoke-id)
+                        :> *agent-task-id *agent-id *node *agg-invoke-id _)
    (hook:handling-retry-node-complete> *agent-name *node *invoke-id *retry-num)
    (get-node-obj *agent-graph *node :> *node-obj)
    (local-select> (keypath *invoke-id)
@@ -658,12 +660,12 @@
    (<<if (aor-types/NodeAggStart? *node-obj)
      (local-select> (keypath *agg-invoke-id)
                     $$nodes
-                    :> {*agg-finished?        :agg-finished?
-                        *agg-node-name        :node
-                        *parent-agg-invoke-id :agg-invoke-id
-                        *finish-time-millis   :finish-time-millis})
+                    :> {*agg-finished?          :agg-finished?
+                        *agg-node-name          :node
+                        *parent-agg-invoke-id   :agg-invoke-id
+                        *agg-finish-time-millis :finish-time-millis})
      (<<if *agg-finished?
-       (<<if (some? *finish-time-millis)
+       (<<if (some? *agg-finish-time-millis)
          (depot-partition-append!
           *agent-depot
           (aor-types/->valid-RetryNodeComplete *agg-invoke-id
@@ -685,11 +687,6 @@
         *parent-agg-invoke-id)
      ))
 
-   ;; TODO: <<<<>>> send forward nested op info, token stats, and node stat
-   ;; - probably an instance of AgentInvokeStats, and then merge at root
-   ;; - need to look at finish-time - start-time and nested ops
-   ;; - query $$nodes to get start time
-   ;;     - don't have start/finish for individual aggs into NodeAgg – only have total time for it
    (handle-node-complete-emits
     *agent-name
     *agent-task-id
@@ -700,6 +697,7 @@
     *agg-invoke-id
     *result
     *emits
+    nil
     *fork-context
     :> *op)
    (:> *agent-task-id *agent-id *retry-num *op)))

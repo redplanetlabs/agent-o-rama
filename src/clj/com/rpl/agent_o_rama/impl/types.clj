@@ -441,16 +441,23 @@
   ])
 
 (drp/defrecord+ BasicAgentInvokeStats
-  [nested-ops :- {clojure.lang.Keyword OpStats}
+  [nested-op-stats :- {clojure.lang.Keyword OpStats}
    input-token-count :- Long
    output-token-count :- Long
    total-token-count :- Long
    node-stats :- {String OpStats}
   ])
 
+(drp/defrecord+ AgentRef
+  [module-name :- String
+   agent-name :- String])
+
+(drp/defrecord+ SubagentInvokeStats
+  [count :- Long
+   basic-stats :- BasicAgentInvokeStats])
 
 (drp/defrecord+ AgentInvokeStats
-  [subagent-stats :- {String BasicAgentInvokeStats}
+  [subagent-stats :- {AgentRef SubagentInvokeStats}
    basic-stats :- BasicAgentInvokeStats])
 
 ;; Internal protocols
