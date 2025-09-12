@@ -408,6 +408,9 @@
             (no-async!))
           (close [this]
             (close! client))
+          aor-types/UnderlyingObjects
+          (underlying-objects [this]
+            (aor-types/underlying-objects client))
          )))
      (streamChunk [this chunk]
        (.streamChunk streaming-recorder chunk))

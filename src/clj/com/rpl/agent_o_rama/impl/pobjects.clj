@@ -13,6 +13,7 @@
     AgentNodeEmit
     AgentResult
     AggInput
+    EvalNumberStats
     ExceptionSummary
     ExperimentInputSelector
     ForkContext
@@ -267,13 +268,18 @@
                                   :agent-initiates {Long (fixed-keys-schema
                                                           {:agent-name   String
                                                            :agent-invoke AgentInvoke})}
-                                  :agent-results   {Long Object}
+                                  :agent-results   {Long (fixed-keys-schema
+                                                          {:result AgentResult
+                                                           :start-time-millis Long
+                                                           :finish-time-millis Long})}
                                   :evals           {String {String Object}} ; eval-name->eval-key->result
                                   :eval-failures   {String String}
                                  })
                                 {:subindex? true})
         :summary-evals         {String {String Object}}
         :summary-eval-failures {String String}
+        :eval-number-stats     {String {String EvalNumberStats}}
+        :latency-number-stats  EvalNumberStats
        })
       {:subindex? true})
     })})
