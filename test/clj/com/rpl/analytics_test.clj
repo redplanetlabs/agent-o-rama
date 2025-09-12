@@ -219,6 +219,7 @@
              nil
              (fn [agent-node v]
                (let [model (aor/get-agent-object agent-node "my-model")]
+                 (aor/record-nested-op! agent-node :other 1 3 {})
                  (lc4j/basic-chat model "..........")
                  (aor/result! agent-node v)))
             ))
@@ -321,7 +322,8 @@
         :basic-stats
         {:nested-op-stats
          {:model-call {:count 3 :total-time-millis ?t4}
-          :agent-call {:count 2 :total-time-millis ?t5}}
+          :agent-call {:count 2 :total-time-millis ?t5}
+          :other      {:count 1 :total-time-millis 2}}
          :input-token-count  15
          :output-token-count 45
          :total-token-count  60
