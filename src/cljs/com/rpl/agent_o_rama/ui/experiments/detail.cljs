@@ -13,11 +13,11 @@
      ($ :div.text-sm.text-gray-600 label)
      ($ :div.text-2xl.font-bold.text-gray-900 value)))
 
-(defui ExperimentHeader [{:keys [info status on-rerun]}]
+(defui ExperimentHeader [{:keys [info status on-rerun module-id dataset-id]}]
   ($ :div.flex.justify-between.items-center
      ($ :div.flex.items-center.gap-4
-        ($ :button.inline-flex.items-center.text-gray-600.hover:text-gray-900
-           {:onClick #(state/dispatch [:navigate/back])}
+        ($ :a.inline-flex.items-center.text-gray-600.hover:text-gray-900
+           {:href (rfe/href :module/dataset-detail.experiments {:module-id module-id :dataset-id dataset-id})}
            ($ ArrowLeftIcon {:className "h-5 w-5 mr-2"})
            "Back")
         ($ :h2.text-2xl.font-bold (:name info)))
@@ -125,7 +125,9 @@
                                    :status (if (:finish-time-millis data) :completed :running)
                                    :on-rerun #(state/dispatch [:modal/show-form :create-experiment
                                                                {:module-id module-id
-                                                                :dataset-id dataset-id}])})
+                                                                :dataset-id dataset-id}])
+                                   :module-id module-id
+                                   :dataset-id dataset-id})
               ($ SummaryPanel {:summary-evals (:summary-evals data)
                                :results (vals (:results data))})
               ($ ResultsTable {:results (vals (:results data))
