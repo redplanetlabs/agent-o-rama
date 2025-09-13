@@ -177,9 +177,45 @@
      ])))
 )
 
-(defn aggregated-basic-stats-test
-      ;(aggregated-basic-stats stats)
-)
+(deftest aggregated-basic-stats-test
+  (is (=
+       (bai-stats
+        {:agent-call (op-stats 6 25)
+         :other      (op-stats 25 41)
+         :db-write   (op-stats 3 7)}
+        111
+        163
+        215
+        {"abc" (op-stats 1031 1063)
+         "q"   (op-stats 3 6)})
+       (ana/aggregated-basic-stats
+        (ai-stats
+         {(sa-ref "M1" "A1")
+          (sa-stats 4
+                    (bai-stats {:other    (op-stats 5 10)
+                                :db-write (op-stats 3 7)}
+                               1
+                               2
+                               3
+                               {"abc" (op-stats 1020 1040)
+                                "q"   (op-stats 1 2)}))
+
+          (sa-ref "M1" "A2")
+          (sa-stats 5
+                    (bai-stats {:other (op-stats 20 31)}
+                               10
+                               11
+                               12
+                               {"q"   (op-stats 2 4)
+                                "abc" (op-stats 10 20)}))
+         }
+         (bai-stats
+          {:agent-call (op-stats 6 25)}
+          100
+          150
+          200
+          {"abc" (op-stats 1 3)})))
+      )))
 
 (defrecord MockChatModel []
   ChatModel
