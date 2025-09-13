@@ -818,7 +818,11 @@
                                :summary-evals
                                :summary-eval-failures
                                :eval-number-stats
-                               :latency-number-stats])]
+                               :latency-number-stats
+                               :input-token-number-stats
+                               :output-token-number-stats
+                               :total-token-number-stats
+                              ])]
                      datasets-pstate-sym
                      :> *experiment-props)
       (local-select> [(keypath *dataset-id :experiments *experiment-id :results)

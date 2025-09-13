@@ -4,6 +4,7 @@
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
+   [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -394,14 +395,17 @@
        (let [m (select-any [:agent-results MAP-VALS] info)
              start-time-millis (:start-time-millis m)
              finish-time-millis (:finish-time-millis m)]
-         {:input          input
+         {:input input
           :reference-output reference-output
-          :output         (-> m
-                              :result
-                              :val)
+          :output (-> m
+                      :result
+                      :val)
           :latency-millis (when (and start-time-millis finish-time-millis)
                             (- finish-time-millis start-time-millis))
-          :evals          (:evals info)}))
+          :input-token-count (:input-token-count m)
+          :output-token-count (:output-token-count m)
+          :total-token-count (:total-token-count m)
+          :evals (:evals info)}))
    )))
 
 (defn merge-number-evals
@@ -558,28 +562,33 @@
                (dotimes [i num-targets]
                  (hook:result-target i)
                  (if (nil? (get agent-results i))
-                   (let [client (nth clients i)
+                   (let [client      (nth clients i)
 
                          {:keys [task-id agent-invoke-id] :as agent-invoke}
                          (:agent-invoke (nth @initiates-vol i))
 
-                         result (agent-result-obj client agent-invoke)
-                         root   (:root-pstate (aor-types/underlying-objects client))
+                         result      (agent-result-obj client agent-invoke)
+                         root        (:root-pstate (aor-types/underlying-objects client))
                          ;; transferring timings allows it to persist even if underlying trace gets
                          ;; GC'd
-                         {:keys [start-time-millis finish-time-millis]}
+                         {:keys [start-time-millis finish-time-millis stats]}
                          (foreign-select-one
                           [(keypath agent-invoke-id)
-                           (submap [:start-time-millis :finish-time-millis])]
+                           (submap [:start-time-millis :finish-time-millis :stats])]
                           root
-                          {:pkey task-id})]
+                          {:pkey task-id})
+                         basic-stats (ana/aggregated-basic-stats stats)]
                      (store/pstate-transform!
                       [(keypath dataset-id :experiments id :results result-id :agent-results)
                        (nil->val (sorted-map))
                        (keypath i)
-                       (termval {:result result
-                                 :start-time-millis start-time-millis
-                                 :finish-time-millis finish-time-millis})]
+                       (termval {:result             result
+                                 :start-time-millis  start-time-millis
+                                 :finish-time-millis finish-time-millis
+                                 :input-token-count  (:input-token-count basic-stats)
+                                 :output-token-count (:output-token-count basic-stats)
+                                 :total-token-count  (:total-token-count basic-stats)
+                                })]
                       local-ds
                       dataset-id)
                    )))
@@ -661,11 +670,18 @@
                    {curr-evals :summary-evals
                     curr-failures :summary-eval-failures
                     curr-eval-number-stats :eval-number-stats
-                    curr-latency-number-stats :latency-number-stats}
-                   (store/pstate-select-one [(keypath dataset-id :experiments id)
-                                             (submap [:summary-evals :summary-eval-failures
-                                                      :eval-number-stats])]
-                                            local-ds)]
+                    curr-latency-number-stats :latency-number-stats
+                    curr-input-token-number-stats :input-token-number-stats
+                    curr-output-token-number-stats :output-token-number-stats
+                    curr-total-token-number-stats :total-token-number-stats}
+                   (store/pstate-select-one
+                    [(keypath dataset-id :experiments id)
+                     (submap [:summary-evals :summary-eval-failures
+                              :eval-number-stats :latency-number-stats
+                              :input-token-number-stats :output-token-number-stats
+                              :total-token-number-stats
+                             ])]
+                    local-ds)]
                (when (nil? curr-eval-number-stats)
                  (let [eval-stats (compute-eval-number-stats example-info)]
                    (store/pstate-transform!
@@ -677,6 +693,27 @@
                  (let [stats (compute-number-stats (mapv :latency-millis example-info))]
                    (store/pstate-transform!
                     [(keypath dataset-id :experiments id :latency-number-stats)
+                     (termval stats)]
+                    local-ds
+                    dataset-id)))
+               (when (nil? curr-input-token-number-stats)
+                 (let [stats (compute-number-stats (mapv :input-token-count example-info))]
+                   (store/pstate-transform!
+                    [(keypath dataset-id :experiments id :input-token-number-stats)
+                     (termval stats)]
+                    local-ds
+                    dataset-id)))
+               (when (nil? curr-output-token-number-stats)
+                 (let [stats (compute-number-stats (mapv :output-token-count example-info))]
+                   (store/pstate-transform!
+                    [(keypath dataset-id :experiments id :output-token-number-stats)
+                     (termval stats)]
+                    local-ds
+                    dataset-id)))
+               (when (nil? curr-input-token-number-stats)
+                 (let [stats (compute-number-stats (mapv :total-token-count example-info))]
+                   (store/pstate-transform!
+                    [(keypath dataset-id :experiments id :total-token-number-stats)
                      (termval stats)]
                     local-ds
                     dataset-id)))

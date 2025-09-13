@@ -38,6 +38,13 @@
    (+ (:total-token-count b1) (:total-token-count b2))
    (merge-op-stats (:node-stats b1) (:node-stats b2))))
 
+(defn aggregated-basic-stats
+  [stats]
+  (reduce
+   combine-basic-stats
+   (:basic-stats stats)
+   (traverse [:subagent-stats MAP-VALS :basic-stats] stats)))
+
 (defn merge-subagent-stats
   [m1 m2]
   (merge-with
