@@ -710,7 +710,7 @@
                      (termval stats)]
                     local-ds
                     dataset-id)))
-               (when (nil? curr-input-token-number-stats)
+               (when (nil? curr-total-token-number-stats)
                  (let [stats (compute-number-stats (mapv :total-token-count example-info))]
                    (store/pstate-transform!
                     [(keypath dataset-id :experiments id :total-token-number-stats)

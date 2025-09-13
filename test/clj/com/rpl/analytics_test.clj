@@ -177,6 +177,10 @@
      ])))
 )
 
+(defn aggregated-basic-stats-test
+      ;(aggregated-basic-stats stats)
+)
+
 (defrecord MockChatModel []
   ChatModel
   (doChat [this request]

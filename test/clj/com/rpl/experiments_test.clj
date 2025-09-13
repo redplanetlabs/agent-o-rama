@@ -107,6 +107,14 @@
                  "start"
                  ["end" "end2" "a" "b"]
                  (fn [agent-node action & inputs]
+                   (aor/record-nested-op!
+                    agent-node
+                    :model-call
+                    10
+                    11
+                    {"inputTokenCount"  1
+                     "outputTokenCount" 100
+                     "totalTokenCount"  1000})
                    (if (= action "counts")
                      (let [v (reduce + 0 (mapv count-or-num inputs))]
                        (aor/emit! agent-node "end" :ignore v)
@@ -290,8 +298,59 @@
          (is
           (trace-matches?
            res
-           {:summary-evals     {"mycount" {"res" 8} "mysum" {"res" 110}}
+           {:summary-evals {"mycount" {"res" 8} "mysum" {"res" 110}}
             :summary-eval-failures nil
+            :input-token-number-stats
+            {:total       8
+             :count       8
+             :min         1
+             :max         1
+             :percentiles
+             {0.6   1
+              0.3   1
+              0.7   1
+              0.5   1
+              0.9   1
+              0.1   1
+              0.4   1
+              0.2   1
+              0.8   1
+              0.999 1
+              0.99  1}}
+            :output-token-number-stats
+            {:total       800
+             :count       8
+             :min         100
+             :max         100
+             :percentiles
+             {0.6   100
+              0.3   100
+              0.7   100
+              0.5   100
+              0.9   100
+              0.1   100
+              0.4   100
+              0.2   100
+              0.8   100
+              0.999 100
+              0.99  100}}
+            :total-token-number-stats
+            {:total       8000
+             :count       8
+             :min         1000
+             :max         1000
+             :percentiles
+             {0.6   1000
+              0.3   1000
+              0.7   1000
+              0.5   1000
+              0.9   1000
+              0.1   1000
+              0.4   1000
+              0.2   1000
+              0.8   1000
+              0.999 1000
+              0.99  1000}}
             :latency-number-stats
             {:count 8}
             :eval-number-stats
@@ -1746,6 +1805,9 @@
      ;; regular experiments have these additional aggregated stats
      (is (every? #(contains? % :eval-number-stats) (:items res)))
      (is (every? #(contains? % :latency-number-stats) (:items res)))
+     (is (every? #(contains? % :input-token-number-stats) (:items res)))
+     (is (every? #(contains? % :output-token-number-stats) (:items res)))
+     (is (every? #(contains? % :total-token-number-stats) (:items res)))
 
 
      (bind res
