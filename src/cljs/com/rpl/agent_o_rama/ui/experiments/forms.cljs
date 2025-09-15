@@ -21,6 +21,7 @@
 ;; =============================================================================
 
 (defui AgentSelectorDropdown [{:keys [module-id selected-agent on-select-agent disabled?]}]
+  (println "AgentSelectorDropdown - selected-agent:" selected-agent "type:" (type selected-agent) "nil?:" (nil? selected-agent))
   (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
         {:keys [data loading? error]}
         (queries/use-sente-query
@@ -296,7 +297,7 @@
           (when (= (:value spec-type-field) :comparative)
             ($ :button.mt-4.flex.items-center.gap-2.text-sm.text-blue-600.hover:underline
                {:type "button"
-                :onClick (fn [] (state/dispatch [:form/update-field form-id [:spec :targets] (conj targets {})]))}
+                :onClick (fn [] (state/dispatch [:form/update-field form-id [:spec :targets] (conj targets {:target-spec {:type :agent :agent-name nil} :input->args ["\"$\""]})]))}
                ($ PlusIcon {:className "h-4 w-4"})
                "Add Another Target")))
 
@@ -356,7 +357,7 @@
 
   :on-submit
   (fn [db form-state]
-    (println "form-state" form-state )
+    (println "form-state" form-state)
     (let [{:keys [form-id module-id dataset-id name description snapshot selector spec num-repetitions concurrency evaluators]} form-state]
       (sente/request!
        [:experiments/start
