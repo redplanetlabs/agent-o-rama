@@ -16,7 +16,8 @@
                         {:module-id module-id
                          :dataset-id dataset-id
                          :filters {:type :regular}}]
-          :enabled? (boolean (and module-id dataset-id))})
+          :enabled? (boolean (and module-id dataset-id))
+          :refresh-interval-ms 1000})
 
         experiments (get data :items)]
 

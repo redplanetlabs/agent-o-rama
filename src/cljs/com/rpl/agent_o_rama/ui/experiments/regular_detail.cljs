@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.experiments.regular-detail
   (:require
    [uix.core :as uix :refer [defui $]]
-   ["@heroicons/react/24/outline" :refer [ArrowLeftIcon PlayIcon]]
+   ["@heroicons/react/24/outline" :refer [ArrowLeftIcon PlayIcon ChevronDownIcon ChevronUpIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
@@ -21,20 +21,42 @@
                   ($ :span.font-mono.text-xs.bg-red-100.p-1.rounded.mt-1
                      (pr-str problem)))))))))
 
-
 (defui StatCard [{:keys [label value]}]
   ($ :div.bg-gray-50.p-4.rounded-lg.border
      ($ :div.text-sm.text-gray-600 label)
      ($ :div.text-2xl.font-bold.text-gray-900 value)))
 
-(defui ExperimentHeader [{:keys [info status on-rerun module-id dataset-id]}]
+ ;; NEW: Added DetailItem component for rendering key-value pairs in the info panel.
+(defui DetailItem [{:keys [label children]}]
+  ($ :div.py-2.sm:grid.sm:grid-cols-3.sm:gap-4.sm:px-0
+     ($ :dt.text-sm.font-medium.leading-6.text-gray-900 label)
+     ($ :dd.mt-1.text-sm.leading-6.text-gray-700.sm:col-span-2.sm:mt-0
+        children)))
+
+ ;; NEW: Created the ExperimentInfoPanel to display the experiment-info data.
+(defui ExperimentInfoPanel [{:keys [info]}]
+  ($ :div.bg-blue-50.border-y.border-blue-200.px-6.py-4
+     ($ :dl.divide-y.divide-gray-200
+        (for [[k v] (sort-by key info)]
+          ($ DetailItem {:key (name k) :label (name k)}
+             ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-48.font-mono
+                (common/pp v)))))))
+
+(defui ExperimentHeader [{:keys [info status on-rerun module-id dataset-id show-info? on-toggle-info]}]
   ($ :div.flex.justify-between.items-center
      ($ :div.flex.items-center.gap-4
         ($ :a.inline-flex.items-center.text-gray-600.hover:text-gray-900
            {:href (rfe/href :module/dataset-detail.experiments {:module-id module-id :dataset-id dataset-id})}
            ($ ArrowLeftIcon {:className "h-5 w-5 mr-2"})
            "Back")
-        ($ :h2.text-2xl.font-bold (:name info)))
+        ($ :h2.text-2xl.font-bold (:name info))
+        ;; NEW: Added "Details" button that toggles the info panel
+        ($ :button.inline-flex.items-center.px-3.py-1.text-sm.text-gray-600.hover:text-gray-800.rounded-md.hover:bg-gray-100.cursor-pointer
+           {:onClick on-toggle-info}
+           ($ :span.mr-1 "Details")
+           (if show-info?
+             ($ ChevronUpIcon {:className "h-4 w-4"})
+             ($ ChevronDownIcon {:className "h-4 w-4"}))))
      ($ :div.flex.items-center.gap-4
         ($ :span.px-3.py-1.rounded-full.text-sm.font-medium
            {:className (case status
@@ -136,13 +158,14 @@
          {:query-key [:experiment-results module-id dataset-id experiment-id]
           :sente-event [:experiments/get-results {:module-id module-id
                                                   :dataset-id dataset-id
-                                                  :experiment-id experiment-id}]})]
+                                                  :experiment-id experiment-id}]})
+        ;; NEW: State for the details panel visibility
+        [show-info? set-show-info] (uix/use-state false)]
 
     (cond
       loading? ($ :div.p-6.text-center.py-12 ($ common/spinner {:size :large}))
       error ($ :div.p-6.text-red-500.text-center.py-8 "Error loading experiment results: " error)
 
-      ;; NEW CLAUSE: Check for invocation error
       (and data (:invocation-error data))
       ($ :div.p-6.space-y-6
          ($ ExperimentHeader {:info (:experiment-info data)
@@ -151,7 +174,13 @@
                                                           {:module-id module-id
                                                            :dataset-id dataset-id}])
                               :module-id module-id
-                              :dataset-id dataset-id})
+                              :dataset-id dataset-id
+                              ;; NEW: Pass state and handler to header
+                              :show-info? show-info?
+                              :on-toggle-info #(set-show-info (not show-info?))})
+         ;; NEW: Conditionally render the info panel
+         (when show-info?
+           ($ ExperimentInfoPanel {:info (:experiment-info data)}))
          ($ ExperimentErrorPanel {:error-info (:invocation-error data)}))
 
       data ($ :div.p-6.space-y-6
@@ -161,7 +190,14 @@
                                                                {:module-id module-id
                                                                 :dataset-id dataset-id}])
                                    :module-id module-id
-                                   :dataset-id dataset-id})
+                                   :dataset-id dataset-id
+                                   ;; NEW: Pass state and handler to header
+                                   :show-info? show-info?
+                                   :on-toggle-info #(set-show-info (not show-info?))})
+              ;; NEW: Conditionally render the info panel
+              (when show-info?
+                ($ ExperimentInfoPanel {:info (:experiment-info data)}))
+
               ($ SummaryPanel {:summary-evals (:summary-evals data)
                                :results (vals (:results data))})
               ($ ResultsTable {:results (vals (:results data))

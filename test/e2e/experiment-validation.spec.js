@@ -94,6 +94,7 @@ test.describe('Experiment Validation Error Handling', () => {
     // 3. VERIFICATION: Check for the error message in the UI
     // -------------------------------------------------------------------------
     console.log('--- Verifying Error Display ---');
+    await page.getByRole('link', { name: 'Comparative Experiments', exact: true }).click();
     // Wait for navigation to the experiment results page.
     await expect(page.getByText(experimentName, { exact: true })).toBeVisible({ timeout: 15000 });
     const experimentRow = page.locator('table tbody tr').filter({ hasText: experimentName });
