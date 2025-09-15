@@ -12,9 +12,6 @@
   [{:keys [manager dataset-id pagination]} uid]
   (let [search-query (:search-experiments-query (aor-types/underlying-objects manager))]
     ;; For the index table, we get the first page with a reasonable limit
-    (def search-query search-query)
-    (def dataset-id dataset-id)
-    (def pagination pagination)
     (foreign-invoke-query search-query
                           dataset-id
                           {} ; no filters
@@ -63,7 +60,12 @@
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/get-results
   [{:keys [manager dataset-id experiment-id]} uid]
   (let [results-query (:experiments-results-query (aor-types/underlying-objects manager))]
+    (def results-query results-query)
+    (def dataset-id dataset-id)
+    (def experiment-id experiment-id)
     (foreign-invoke-query results-query
                           dataset-id
                           ;; TODO move this uuid parse onto client
                           (java.util.UUID/fromString experiment-id))))
+
+;; todo use invoke coords to get result

@@ -826,7 +826,12 @@
 (defui detail [{:keys [match module-id dataset-id]}]
   (let [route-name (get-in match [:data :name])
         experiments-routes #{:module/dataset-detail.experiments :module/dataset-detail.experiment-detail}
-        active-tab (if (contains? experiments-routes route-name) "experiments" "examples")
+        active-tab (cond
+                     (contains? #{:module/dataset-detail.comparative-experiments} route-name)
+                     "comparative"
+                     (contains? experiments-routes route-name)
+                     "experiments"
+                     :else "examples")
         [show-info? set-show-info] (uix/use-state false)
         {:keys [loading? error]}
         (queries/use-sente-query
@@ -899,6 +904,11 @@
                                                {"border-indigo-500 text-indigo-600" (= active-tab "experiments")
                                                 "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "experiments")})}
                      "Experiments")
+                  ($ :a {:href (rfe/href :module/dataset-detail.comparative-experiments {:module-id module-id, :dataset-id dataset-id}),
+                         :className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
+                                               {"border-indigo-500 text-indigo-600" (= active-tab "comparative")
+                                                "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "comparative")})}
+                     "Comparative Experiments")
                   ($ :a {:href (rfe/href :module/dataset-detail.examples {:module-id module-id, :dataset-id dataset-id}),
                          :className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
                                                {"border-indigo-500 text-indigo-600" (= active-tab "examples")
