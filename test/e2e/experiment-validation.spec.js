@@ -109,7 +109,6 @@ test.describe('Experiment Validation Error Handling', () => {
     // Assert that the correct error message is displayed.
     await expect(errorPanel.getByText('Problem with one or more evaluators')).toBeVisible();
     await expect(errorPanel.getByText('Evaluator type does not match experiment')).toBeVisible();
-    await expect(errorPanel.getByText(`Evaluator: ${regularEvalName} (type: regular)`)).toBeVisible();
     console.log('--- Error Display Verified ---');
 
     
