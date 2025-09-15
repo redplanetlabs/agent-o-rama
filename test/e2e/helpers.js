@@ -18,3 +18,109 @@ export async function getResearchAgentRow(page) {
   
   return agentRow;
 }
+
+/**
+ * Creates an evaluator via the UI.
+ * @param {import('@playwright/test').Page} page - The Playwright page object.
+ * @param {Object} options - The evaluator creation options.
+ * @param {string} options.name - The unique name for the evaluator.
+ * @param {string} options.builderName - The name of the builder to select.
+ * @param {string} [options.description] - The description for the evaluator.
+ * @param {Object} [options.params] - Additional parameters for the evaluator.
+ */
+export async function createEvaluator(page, { name, builderName, description, params = {} }) {
+  console.log(`Creating evaluator: ${name}`);
+  await page.getByRole('button', { name: 'Create Evaluator' }).first().click();
+
+  const modal = page.locator('[role="dialog"]');
+  await expect(modal).toBeVisible();
+  await modal.getByText(builderName).click();
+  await expect(modal.getByLabel('Name')).toBeVisible();
+
+  await modal.getByLabel('Name').fill(name);
+  const descText = description || `E2E test evaluator for ${name}`;
+  await modal.getByLabel('Description').fill(descText);
+
+  for (const [paramKey, paramValue] of Object.entries(params)) {
+    await modal.getByLabel(paramKey, { exact: true }).fill(paramValue);
+  }
+
+  await modal.getByRole('button', { name: 'Submit' }).click();
+
+  await expect(modal).not.toBeVisible({ timeout: 15000 });
+  await expect(page.locator('table tbody tr').filter({ hasText: name })).toBeVisible();
+  console.log(`Successfully created evaluator: ${name}`);
+}
+
+/**
+ * Adds an example to the currently viewed dataset.
+ * @param {import('@playwright/test').Page} page - The Playwright page object.
+ * @param {Object} example - An object with `input` and optional `output`.
+ */
+export async function addExample(page, { input, output }) {
+  console.log('Adding example with input:', JSON.stringify(input));
+  // Click the first enabled Add Example button
+  await page.locator('button').filter({ hasText: 'Add Example' }).filter({ hasNot: page.locator('[disabled]') }).first().click();
+
+  const modal = page.locator('[role="dialog"]');
+  await expect(modal).toBeVisible();
+  await modal.getByLabel('Input (JSON)').fill(JSON.stringify(input, null, 2));
+  
+  if (output !== undefined) {
+    await modal.getByLabel('Output (JSON)').fill(JSON.stringify(output, null, 2));
+  }
+  
+  await modal.getByRole('button', { name: 'Add Example' }).click();
+
+  await expect(modal).not.toBeVisible({ timeout: 15000 });
+  await expect(page.locator('table tbody tr').filter({ hasText: input.id })).toBeVisible();
+  console.log('Successfully added example.');
+}
+
+/**
+ * Creates a dataset via the UI.
+ * @param {import('@playwright/test').Page} page - The Playwright page object.
+ * @param {string} name - The name of the dataset to create.
+ * @returns {Promise<void>}
+ */
+export async function createDataset(page, name) {
+  console.log(`Creating dataset: ${name}`);
+  await page.getByRole('button', { name: 'Create Dataset' }).first().click();
+  
+  const modal = page.locator('[role="dialog"]');
+  await expect(modal).toBeVisible();
+  await modal.getByLabel('Name').fill(name);
+  await modal.getByRole('button', { name: 'Create Dataset' }).click();
+  
+  await expect(modal).not.toBeVisible();
+  await expect(page.getByText(name)).toBeVisible();
+  console.log(`Successfully created dataset: ${name}`);
+}
+
+/**
+ * Deletes a dataset via the UI.
+ * @param {import('@playwright/test').Page} page - The Playwright page object.
+ * @param {string} name - The name of the dataset to delete.
+ * @returns {Promise<void>}
+ */
+export async function deleteDataset(page, name) {
+  console.log(`Deleting dataset: ${name}`);
+  const datasetRow = page.locator('table tbody tr').filter({ hasText: name });
+  await datasetRow.getByRole('button', { name: 'Delete' }).click();
+  await expect(datasetRow).not.toBeVisible();
+  console.log(`Successfully deleted dataset: ${name}`);
+}
+
+/**
+ * Deletes an evaluator via the UI.
+ * @param {import('@playwright/test').Page} page - The Playwright page object.
+ * @param {string} name - The name of the evaluator to delete.
+ * @returns {Promise<void>}
+ */
+export async function deleteEvaluator(page, name) {
+  console.log(`Deleting evaluator: ${name}`);
+  const evalRow = page.locator('table tbody tr').filter({ hasText: name });
+  await evalRow.getByRole('button', { name: 'Delete' }).click();
+  await expect(evalRow).not.toBeVisible();
+  console.log(`Successfully deleted evaluator: ${name}`);
+}
