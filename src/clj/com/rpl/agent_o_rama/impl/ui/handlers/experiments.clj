@@ -1,5 +1,6 @@
 (ns com.rpl.agent-o-rama.impl.ui.handlers.experiments
   (:require
+   [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
@@ -25,21 +26,21 @@
     (case (:type selector)
       "tag" (aor-types/->TagSelector (:tag selector))
       "example-ids" (aor-types/->ExampleIdsSelector (mapv #(UUID/fromString %) (:example-ids selector)))
-      nil))) ; :all case
+      nil)))
+
+(defn- parse-target [t]
+  (let [target-spec (:target-spec t)
+        type (:type target-spec)]
+    (aor-types/->ExperimentTarget
+     (if (= type :agent)
+       (aor-types/->AgentTarget (:agent-name target-spec))
+       (aor-types/->NodeTarget (:agent-name target-spec) (:node target-spec)))
+     (:input->args t))))
 
 (defn- parse-spec [spec]
-  (let [parse-target (fn [t]
-                       (let [target-spec (:target-spec t)
-                             type (:type target-spec)]
-                         (aor-types/->ExperimentTarget
-                          (if (= type "AgentTarget")
-                            (aor-types/->AgentTarget (:agent-name target-spec))
-                            (aor-types/->NodeTarget (:agent-name target-spec) (:node target-spec)))
-                          (:input->args t))))]
-    ;; The :type value will be a keyword on the backend, but a string from the UI
-    (if (= (get spec "type") "RegularExperiment")
-      (aor-types/->RegularExperiment (parse-target (first (get spec "targets"))))
-      (aor-types/->ComparativeExperiment (mapv parse-target (get spec "targets"))))))
+  (if (= (get spec :type) :regular)
+    (aor-types/->RegularExperiment (parse-target (first (get spec :targets))))
+    (aor-types/->ComparativeExperiment (mapv parse-target (get spec :targets)))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/start
   [{:keys [manager dataset-id form-data]} uid]
@@ -51,7 +52,7 @@
                             (h/random-uuid7)
                             name
                             dataset-id
-                            snapshot
+                            (if (str/blank? snapshot) nil snapshot)
                             (parse-selector selector)
                             (mapv #(aor-types/->EvaluatorSelector (:name %) (:remote? %)) evaluators)
                             (parse-spec spec)
