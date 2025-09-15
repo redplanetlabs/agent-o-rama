@@ -18,6 +18,7 @@
     ExceptionSummary
     ExperimentInputSelector
     ForkContext
+    InfoSource
     LinkedTrace
     NestedOpInfo
     NodeHumanInputRequest
@@ -98,6 +99,13 @@
   [agent-name]
   (str "$$_agent-root-" agent-name))
 
+(def FEEDBACK-SCHEMA
+  [(fixed-keys-schema
+    {:scores      {String Object}
+     :source      InfoSource
+     :created-at  Long
+     :modified-at Long})])
+
 (def AGENT-ROOT-PSTATE-SCHEMA
   {Long
    (fixed-keys-schema
@@ -112,6 +120,7 @@
      :last-progress-time-millis Long
      :retry-num          Long
      :stats              AgentInvokeStats
+     :feedback           FEEDBACK-SCHEMA
      :human-requests     (set-schema NodeHumanInputRequest {:subindex? true})
      :fork-of            (fixed-keys-schema
                           {:parent-agent-id Long
@@ -170,6 +179,7 @@
      :start-time-millis   Long
      :finish-time-millis  Long
      :exceptions          [String] ; throwable strs
+     :feedback            FEEDBACK-SCHEMA
 
      :agg-invoke-id       UUID
 
@@ -244,7 +254,7 @@
         {:input            Object
          :reference-output Object
          :tags             #{String}
-         :source           String
+         :source           InfoSource
          :linked-trace     LinkedTrace
          :created-at       Long
          :modified-at      Long
@@ -278,6 +288,7 @@
                                                            :output-token-count Long
                                                            :total-token-count  Long
                                                           })}
+                                  :eval-initiates  {String AgentInvoke}
                                   :evals           {String {String Object}} ; eval-name->eval-key->result
                                   :eval-failures   {String String}
                                  })

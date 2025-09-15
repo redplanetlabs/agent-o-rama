@@ -352,7 +352,7 @@
           (nextStep [this agent-invoke]
             (let [start-time-millis (h/current-time-millis)
                   ret               (.get ^CompletableFuture
-                                          (aor-types/subagentNextStepAsync client agent-invoke))
+                                          (aor-types/subagent-next-step-async client agent-invoke))
                   [stats res]       (if (instance? HumanInputRequest ret)
                                       [nil ret]
                                       [(:stats ret) (:result ret)])
@@ -433,6 +433,9 @@
             (no-async!))
           (close [this]
             (close! client))
+          aor-types/AgentClientInternal
+          (subagent-next-step-async [this agent-invoke]
+            (aor-types/subagent-next-step-async client agent-invoke))
           aor-types/UnderlyingObjects
           (underlying-objects [this]
             (aor-types/underlying-objects client))

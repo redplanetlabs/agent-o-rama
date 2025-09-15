@@ -165,7 +165,7 @@
          (bind ds-module-name (get-module-name ds-module))
          (bind manager (aor/agent-manager ipc module-name))
          (bind ds-manager (aor/agent-manager ipc ds-module-name))
-         (bind exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME))
+         (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
          (bind global-actions-depot
            (foreign-depot ipc module-name (po/global-actions-depot-name)))
 
@@ -526,7 +526,7 @@
              {:example-id       !eid1
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}
+               {:agent-name "_aor-evaluator"}
                1
                {:agent-name "foo"}}
               :agent-results
@@ -546,7 +546,7 @@
              {:example-id       !eid2
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}
+               {:agent-name "_aor-evaluator"}
                1
                {:agent-name "foo"}}
               :agent-results
@@ -566,7 +566,7 @@
              {:example-id       !eid3
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}
+               {:agent-name "_aor-evaluator"}
                1
                {:agent-name "foo"}}
               :agent-results
@@ -623,7 +623,7 @@
              {:example-id       !eid1
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}}
+               {:agent-name "_aor-evaluator"}}
               :agent-results    {0 {:result {:val {"a" "110"} :failure? false}}}
               :evals            {"rc3" {"concise?" true}}
               :input            {"a" 1 "b" 10}
@@ -632,7 +632,7 @@
              {:example-id       !eid2
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}}
+               {:agent-name "_aor-evaluator"}}
               :agent-results    {0 {:result {:val {"a" "2100"} :failure? false}}}
               :evals            {"rc3" {"concise?" false}}
               :input            {"a" 2 "b" 100}
@@ -641,7 +641,7 @@
              {:example-id       !eid3
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}}
+               {:agent-name "_aor-evaluator"}}
               :agent-results    {0 {:result {:val {"a" "31000"} :failure? false}}}
               :evals            {"rc3" {"concise?" false}}
               :input            {"a" 3 "b" 1000}
@@ -679,7 +679,7 @@
                             {:example-id       !eid1
                              :agent-initiates
                              {0
-                              {:agent-name "_aor-experimenter"}}
+                              {:agent-name "_aor-evaluator"}}
                              :agent-results    {0 {:result {:val {"a" "abcdefg!"} :failure? false}}}
                              :input            "abcdefg"
                              :reference-output "aaaaaaaaaaa"}
@@ -687,7 +687,7 @@
                             {:example-id       !eid2
                              :agent-initiates
                              {0
-                              {:agent-name "_aor-experimenter"}}
+                              {:agent-name "_aor-evaluator"}}
                              :agent-results    {0 {:result {:val {"a" "ab!"} :failure? false}}}
                              :input            "ab"
                              :reference-output ".."}
@@ -695,7 +695,7 @@
                             {:example-id       !eid3
                              :agent-initiates
                              {0
-                              {:agent-name "_aor-experimenter"}}
+                              {:agent-name "_aor-evaluator"}}
                              :agent-results
                              {0 {:result {:val {"a" "123456789abcdefg!"} :failure? false}}}
                              :input            "123456789abcdefg"
@@ -733,7 +733,7 @@
              {:example-id       !eid0
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}}
+               {:agent-name "_aor-evaluator"}}
               :agent-results    {0 {:result {:val {"a" "abcdefg!!!"} :failure? false}}}
               :input            "abcdefg"
               :reference-output "aaaaaaaaaaa"}
@@ -741,7 +741,7 @@
              {:example-id       !eid1
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}}
+               {:agent-name "_aor-evaluator"}}
               :agent-results    {0 {:result {:val {"a" "aa!!!"} :failure? false}}}
               :input            "aa"
               :reference-output "bbbbb"}}}
@@ -778,7 +778,7 @@
              {:example-id       !eid0
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}}
+               {:agent-name "_aor-evaluator"}}
               :agent-results    {0 {:result {:val {"a" "abcdefg!!!"} :failure? false}}}
               :input            "abcdefg"
               :reference-output "aaaaaaaaaaa"}}}
@@ -817,7 +817,7 @@
              {:example-id       !eid0
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}}
+               {:agent-name "_aor-evaluator"}}
               :agent-results
               {0
                {:result {:val      {:message "Node does not exist" :node "notanode"}
@@ -1030,7 +1030,7 @@
        (rtest/launch-module! ipc module {:tasks 2 :threads 2})
        (bind module-name (get-module-name module))
        (bind manager (aor/agent-manager ipc module-name))
-       (bind exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME))
+       (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
        (bind global-actions-depot
          (foreign-depot ipc module-name (po/global-actions-depot-name)))
        (bind results
@@ -1145,7 +1145,7 @@
            {:example-id       !eid0
             :agent-initiates
             {0
-             {:agent-name "_aor-experimenter"}}
+             {:agent-name "_aor-evaluator"}}
             :agent-results    {0 {:result {:val "a?" :failure? false}}}
             :evals            {"concise2" {"concise?" true}}
             :input            "a"
@@ -1154,7 +1154,7 @@
            {:example-id       !eid1
             :agent-initiates
             {0
-             {:agent-name "_aor-experimenter"}}
+             {:agent-name "_aor-evaluator"}}
             :agent-results    {0 {:result {:val "fail-agent?" :failure? false}}}
             :evals            {"concise2" {"concise?" false}}
             :input            "fail-agent"
@@ -1163,7 +1163,7 @@
            {:example-id       !eid2
             :agent-initiates
             {0
-             {:agent-name "_aor-experimenter"}}
+             {:agent-name "_aor-evaluator"}}
             :agent-results
             {0
              {:result {:val
@@ -1265,7 +1265,7 @@
             {0
              {:agent-name "foo"}
              1
-             {:agent-name "_aor-experimenter"}}
+             {:agent-name "_aor-evaluator"}}
             :agent-results
             {0 {:result {:val "a!" :failure? false}}
              1 {:result {:val "a?" :failure? false}}}
@@ -1280,7 +1280,7 @@
             {0
              {:agent-name "foo"}
              1
-             {:agent-name "_aor-experimenter"}}
+             {:agent-name "_aor-evaluator"}}
             :agent-results
             {0 {:result {:val "b!" :failure? false}}
              1 {:result {:val "b?" :failure? false}}}
@@ -1305,7 +1305,7 @@
             {0
              {:agent-name "foo"}
              1
-             {:agent-name "_aor-experimenter"}}
+             {:agent-name "_aor-evaluator"}}
             :agent-results
             {0 {:result {:val "a!" :failure? false}}
              1 {:result {:val "a?" :failure? false}}}
@@ -1319,7 +1319,7 @@
             {0
              {:agent-name "foo"}
              1
-             {:agent-name "_aor-experimenter"}}
+             {:agent-name "_aor-evaluator"}}
             :agent-results
             {0 {:result {:val "b!" :failure? false}}
              1 {:result {:val "b?" :failure? false}}}
@@ -1332,6 +1332,8 @@
 (def RUNS)
 (def HANDLER-FNS)
 
+;; TODO: <<<<>>>> see if need anything else for evals not initiating multiple times
+;;   - should force failure after initiate and before result
 (deftest experimenter-agent-failures-test
   (with-redefs [RUNS (atom [])
                 HANDLER-FNS (atom {})
@@ -1395,7 +1397,7 @@
        (rtest/launch-module! ipc module {:tasks 2 :threads 2})
        (bind module-name (get-module-name module))
        (bind manager (aor/agent-manager ipc module-name))
-       (bind exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME))
+       (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
        (bind global-actions-depot
          (foreign-depot ipc module-name (po/global-actions-depot-name)))
        (bind results
@@ -1679,7 +1681,7 @@
      (rtest/launch-module! ipc module {:tasks 2 :threads 2})
      (bind module-name (get-module-name module))
      (bind manager (aor/agent-manager ipc module-name))
-     (bind exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME))
+     (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
      (bind global-actions-depot
        (foreign-depot ipc module-name (po/global-actions-depot-name)))
      (bind search

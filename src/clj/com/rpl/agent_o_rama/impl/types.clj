@@ -63,13 +63,20 @@
   AgentComplete
   (getResult [this] val))
 
+(defprotocol EvalTarget)
+
 (drp/defrecord+ AgentInvokeImpl
   [task-id :- Long
    agent-invoke-id :- Long]
   AgentInvoke
   (getTaskId [this] task-id)
-  (getAgentInvokeId [this] agent-invoke-id))
+  (getAgentInvokeId [this] agent-invoke-id)
+  EvalTarget)
 
+(drp/defrecord+ EvalNodeTarget
+  [task-id :- Long
+   invoke-id :- UUID]
+  EvalTarget)
 
 (drp/defrecord+ AgentNode
   [node :- (s/cond-pre Node NodeAggStart NodeAgg)
@@ -244,6 +251,32 @@
   (getToolSpecification [this] tool-specification))
 
 
+;; Sources
+
+(definterface InfoSource
+  (source_string []))
+
+(drp/defrecord+ HumanSource
+  [name :- String]
+  InfoSource
+  (source_string [this] "human"))
+
+(drp/defrecord+ ApiSource
+  []
+  InfoSource
+  (source_string [this] "api"))
+
+(drp/defrecord+ BulkUploadSource
+  []
+  InfoSource
+  (source_string [this] "bulkUpload"))
+
+(drp/defrecord+ ExperimentSource
+  [dataset-id :- UUID
+   experiment-id :- UUID]
+  InfoSource
+  (source_string [this] "experiment"))
+
 ;; Datasets
 
 (drp/defrecord+ CreateDataset
@@ -281,7 +314,7 @@
    input :- Object
    reference-output :- (s/maybe Object)
    tags :- (s/maybe #{String})
-   source :- (s/maybe String)
+   source :- (s/maybe InfoSource)
    linked-trace :- (s/maybe LinkedTrace)
   ])
 
@@ -425,6 +458,27 @@
    dataset-id :- UUID]
   ExperimentEvent)
 
+(drp/defrecord+ ExperimentNodeInvoke
+  [agent-name :- String
+   node :- String
+   args :- [Object]])
+
+(drp/defrecord+ EvalInfo
+  [agent-name :- String
+   target :- (s/protocol EvalTarget)])
+
+(drp/defrecord+ EvalInvoke
+  [input :- (s/maybe Object)
+   reference-output :- (s/maybe Object)
+   outputs :- [Object]
+   eval-name :- String
+   builder-name :- String
+   builder-params :- {String Object}
+   eval-type :- (s/enum :regular :comparative)
+   eval-infos :- [EvalInfo]
+   source :- InfoSource
+  ])
+
 ;; used in PState
 (drp/defrecord+ EvalNumberStats
   [total :- Number
@@ -487,7 +541,7 @@
   (stream-internal [this agent-invoke node callback-fn])
   (stream-specific-internal [this agent-invoke node node-invoke-id callback-fn])
   (stream-all-internal [this agent-invoke node callback-fn])
-  (subagentNextStepAsync [this agent-invoke]))
+  (subagent-next-step-async [this agent-invoke]))
 
 (defprotocol AgentManagerInternal
   (add-remote-dataset-internal [this dataset-id cluster-conductor-host cluster-conductor-port

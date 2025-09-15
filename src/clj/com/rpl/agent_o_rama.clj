@@ -6,6 +6,7 @@
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.core :as i]
+   [com.rpl.agent-o-rama.impl.datasets :as datasets]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -183,7 +184,7 @@
        (when @defined?-vol
          (throw (h/ex-info "Agents topology already defined" {})))
        (vreset! defined?-vol true)
-       (exp/define-experiments-agent! this)
+       (exp/define-evaluator-agent! this)
        (i/define-agents!
         setup
         topologies
@@ -736,7 +737,7 @@
              agent-invoke
              node
              callback-fn))
-          (subagentNextStepAsync [this agent-invoke]
+          (subagent-next-step-async [this agent-invoke]
             (i/client-wait-for-result
              root-pstate
              agent-invoke
@@ -807,7 +808,7 @@
                input
                (.referenceOutput options)
                (into #{} (.tags options))
-               (.source options)
+               (or datasets/EXAMPLE-SOURCE (aor-types/->ApiSource))
                (.linkedTrace options)
               ))
              (.thenApply
@@ -846,14 +847,6 @@
          (when error
            (throw (h/ex-info "Error updating example" {:info error})))
        ))
-     (setDatasetExampleSource [this datasetId snapshotName exampleId source]
-       (foreign-append!
-        datasets-depot
-        (aor-types/->valid-UpdateDatasetExample datasetId
-                                                snapshotName
-                                                exampleId
-                                                :source
-                                                source)))
      (removeDatasetExample [this datasetId snapshotName exampleId]
        (foreign-append!
         datasets-depot
@@ -1129,16 +1122,14 @@
    ;; types are validated by Java API
    (h/validate-options! name
                         options
-                        {:snapshot         h/any-spec
+                        {:snapshot     h/any-spec
                          :reference-output h/any-spec
-                         :tags             h/any-spec
-                         :source           h/any-spec
-                         :linked-trace     h/any-spec})
+                         :tags         h/any-spec
+                         :linked-trace h/any-spec})
    (let [joptions (AddDatasetExampleOptions.)]
      (set! (.snapshotName joptions) (:snapshot options))
      (set! (.referenceOutput joptions) (:reference-output options))
      (set! (.tags joptions) (:tags options))
-     (set! (.source joptions) (:source options))
      (set! (.linkedTrace joptions) (:linked-trace options))
      (.addDatasetExampleAsync manager
                               dataset-id
@@ -1182,24 +1173,6 @@
                                       (:snapshot options)
                                       example-id
                                       reference-output)))
-
-(defn set-dataset-example-source!
-  ([manager dataset-id example-id source]
-   (set-dataset-example-source! manager
-                                dataset-id
-                                example-id
-                                source
-                                nil))
-  ([^AgentManager manager dataset-id example-id source options]
-   ;; types are validated by Java API
-   (h/validate-options! name
-                        options
-                        {:snapshot h/any-spec})
-   (.setDatasetExampleSource manager
-                             dataset-id
-                             (:snapshot options)
-                             example-id
-                             source)))
 
 (defn remove-dataset-example!
   ([manager dataset-id example-id]

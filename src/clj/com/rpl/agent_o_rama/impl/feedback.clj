@@ -1,0 +1,17 @@
+(ns com.rpl.agent-o-rama.impl.feedback
+  (:use [com.rpl.rama]
+        [com.rpl.rama path])
+  (:require
+   [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.rama.ops :as ops]))
+
+
+(defn add-feedback-path
+  ^:direct-nav [scores source]
+  (let [t (h/current-time-millis)
+        v {:scores      scores
+           :source      source
+           :created-at  t
+           :modified-at t}]
+    (path :feedback NIL->VECTOR AFTER-ELEM (termval v))))
