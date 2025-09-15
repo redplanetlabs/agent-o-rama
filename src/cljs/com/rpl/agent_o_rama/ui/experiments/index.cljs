@@ -52,10 +52,15 @@
                     ($ :tr {:key (:id info)
                             :className "hover:bg-gray-50 cursor-pointer"
                             :onClick (fn [_]
-                                       (rfe/push-state :module/dataset-detail.experiment-detail
-                                                       {:module-id module-id
-                                                        :dataset-id dataset-id
-                                                        :experiment-id (:id info)}))}
+                                       (let [spec-type (get spec :type)
+                                             is-regular? (and spec-type (str/ends-with? spec-type "RegularExperiment"))
+                                             route-name (if is-regular?
+                                                          :module/dataset-detail.experiment-detail
+                                                          :module/dataset-detail.comparative-experiment-detail)]
+                                         (rfe/push-state route-name
+                                                         {:module-id module-id
+                                                          :dataset-id dataset-id
+                                                          :experiment-id (:id info)})))}
                        ($ :td {:className (:td common/table-classes)}
                           ($ :div.font-medium.text-gray-900 (:name info)))
                        ($ :td {:className (:td common/table-classes)}

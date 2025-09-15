@@ -1,4 +1,4 @@
-(ns com.rpl.agent-o-rama.ui.experiments.detail
+(ns com.rpl.agent-o-rama.ui.experiments.regular-detail
   (:require
    [uix.core :as uix :refer [defui $]]
    ["@heroicons/react/24/outline" :refer [ArrowLeftIcon PlayIcon]]
@@ -20,6 +20,7 @@
                ($ :li.text-sm.text-red-700 {:key idx}
                   ($ :span.font-mono.text-xs.bg-red-100.p-1.rounded.mt-1
                      (pr-str problem)))))))))
+
 
 (defui StatCard [{:keys [label value]}]
   ($ :div.bg-gray-50.p-4.rounded-lg.border
@@ -129,7 +130,7 @@
                              "View Trace")
                           ($ :span.text-gray-400 "No trace")))))))))))
 
-(defui experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
+(defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
   (let [{:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:experiment-results module-id dataset-id experiment-id]
