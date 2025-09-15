@@ -75,13 +75,14 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
 
   // Navigate into the new dataset
   await page.getByRole('link', { name: datasetName }).click();
+  await page.getByRole('link', { name: 'Examples' }).click();
   await expect(page.getByRole('heading', { name: datasetName })).toBeVisible();
 
-  // Create examples
-  await addExample(page, { input: "short", output: "out" }); // For conciseness test
-  await addExample(page, { input: 5, output: 10 });         // For comparative test (input < output)
-  await addExample(page, { input: "+", output: "+" });      // For summary F1 test
-  await addExample(page, { input: "-", output: "-" });      // For summary F1 test
+  // Create examples with unique identifiers
+  await addExample(page, { input: { text: "short", id: `ex1-${uniqueId}` }, output: "out" }); // For conciseness test
+  await addExample(page, { input: { value: 5, id: `ex2-${uniqueId}` }, output: 10 });         // For comparative test (input < output)
+  await addExample(page, { input: { symbol: "+", id: `ex3-${uniqueId}` }, output: "+" });      // For summary F1 test
+  await addExample(page, { input: { symbol: "-", id: `ex4-${uniqueId}` }, output: "-" });      // For summary F1 test
 
   console.log('--- Evaluator and Dataset Creation Complete ---');
 

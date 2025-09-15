@@ -36,6 +36,7 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
 
     // Navigate into the new dataset
     await page.getByRole('link', { name: datasetName }).click();
+    await page.getByRole('link', { name: 'Examples' }).click();
     await expect(page.getByRole('heading', { name: datasetName })).toBeVisible();
     console.log('--- Test Setup Complete ---');
 

@@ -67,13 +67,15 @@ export async function addExample(page, { input, output }) {
   await modal.getByLabel('Input (JSON)').fill(JSON.stringify(input, null, 2));
   
   if (output !== undefined) {
-    await modal.getByLabel('Output (JSON)').fill(JSON.stringify(output, null, 2));
+    await modal.getByLabel('Output (JSON, Optional)').fill(JSON.stringify(output, null, 2));
   }
   
   await modal.getByRole('button', { name: 'Add Example' }).click();
 
   await expect(modal).not.toBeVisible({ timeout: 15000 });
-  await expect(page.locator('table tbody tr').filter({ hasText: input.id })).toBeVisible();
+  // Find the row that contains our input ID (JSON gets truncated in the table)
+  const rowWithId = page.locator('table tbody tr').filter({ hasText: input.id });
+  await expect(rowWithId).toBeVisible({ timeout: 10000 });
   console.log('Successfully added example.');
 }
 

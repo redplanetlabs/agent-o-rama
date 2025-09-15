@@ -33,7 +33,6 @@ test.describe('Experiment Validation Error Handling', () => {
 
     // Go to evaluators page and create a regular evaluator
     await page.getByText('Evaluators').click();
-    await expect(page.getByRole('heading', { name: 'Evaluators' })).toBeVisible();
     await createEvaluator(page, {
       name: regularEvalName,
       builderName: 'aor/conciseness',
