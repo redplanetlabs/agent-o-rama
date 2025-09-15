@@ -23,6 +23,14 @@
                   ($ :span.font-mono.text-xs.bg-red-100.p-1.rounded.mt-1
                      (pr-str problem)))))))))
 
+ ;; NEW: Simple modal content to display exception details
+(defui ExceptionModal [{:keys [throwable]}]
+  ($ :div.p-6.space-y-4
+     ($ :div
+        ($ :h4.text-sm.font-medium.text-gray-900.mb-2 "Exception Details")
+        ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-auto.max-h-80.font-mono
+           (common/pp throwable)))))
+
 (defui StatCard [{:keys [label value]}]
   ($ :div.bg-gray-50.p-4.rounded-lg.border
      ($ :div.text-sm.text-gray-600 label)
@@ -135,10 +143,11 @@
                              ($ :div.space-y-2
                                 ($ :span.text-red-500.font-semibold "FAIL")
                                 (when-let [throwable (get-in agent-result [:result :val :throwable])]
-                                  ($ :div.text-xs.text-red-600.bg-red-50.p-2.rounded.border
-                                     ($ :div.font-semibold.mb-1 "Exception:")
-                                     ($ :div.font-mono.text-xs
-                                        (str (:type (first (:via throwable))) ": " (:message (first (:via throwable))))))))
+                                  ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
+                                     {:onClick #(state/dispatch [:modal/show :exception-detail
+                                                                 {:title "Error Details"
+                                                                  :component ($ ExceptionModal {:throwable throwable})}])}
+                                     "View Error")))
                              (common/pp (:val (:result agent-result)))))))
                    ($ :td {:className (:td common/table-classes)}
                       ($ ScoreBadge {:evals (:evals run) :failures (:eval-failures run)}))
