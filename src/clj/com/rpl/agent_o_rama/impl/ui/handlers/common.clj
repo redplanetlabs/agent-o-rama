@@ -59,9 +59,14 @@
   [data]
   (walk/postwalk
    (fn [item]
-     (if (satisfies? jser/JSONFreeze item)
-       (jser/json-freeze*-with-type item)
-       item))
+     (cond (satisfies? jser/JSONFreeze item)
+           (jser/json-freeze*-with-type item)
+
+           (instance? Throwable item)
+           (Throwable->map item)
+
+           :else
+           item))
    data))
 
 (defn from-ui-serializable

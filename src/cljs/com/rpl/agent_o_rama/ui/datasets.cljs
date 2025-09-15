@@ -841,8 +841,7 @@
         (queries/use-sente-query
          {:query-key [:dataset-props module-id dataset-id]
           :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
-          :enabled? (boolean (and module-id dataset-id))
-          :refetch-interval-ms 1000})
+          :enabled? (boolean (and module-id dataset-id)) })
         ;; not sure about doing it this way, why not. maybe we can eventually decouple fetching from views?
         dataset (state/use-sub [:queries :dataset-props module-id dataset-id :data])]
     ($ :div.h-full.flex.flex-col

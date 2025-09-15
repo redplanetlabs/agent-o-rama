@@ -106,11 +106,20 @@
                    ;; Render each agent's output
                    (for [i (range (count targets))]
                      (let [agent-result (get-in run [:agent-results i])]
+                       (println "agent-result" (keys agent-result))
                        ($ :td {:key i :className (:td common/table-classes)}
                           ($ :div.max-w-xs.truncate
-                             (if (:failure? agent-result)
-                               ($ :span.text-red-500 "FAIL")
-                               (common/pp (:val agent-result)))))))
+                             (if (:failure? (:result agent-result))
+                               ($ :div.space-y-2
+                                  ($ :span.text-red-500.font-semibold "FAIL")
+                                  (when-let [throwable (get-in agent-result [:result :val :throwable])]
+                                    (println "throwable" throwable)
+
+                                    ($ :div.text-xs.text-red-600.bg-red-50.p-2.rounded.border
+                                       ($ :div.font-semibold.mb-1 "Exception:")
+                                       ($ :div.font-mono.text-xs
+                                          (str (:type (first (:via throwable))) ": " (:message (first (:via throwable))))))))
+                               (common/pp (:val (:result agent-result))))))))
                    ($ :td {:className (:td common/table-classes)}
                       ($ ScoreBadge {:evals (:evals run) :failures (:eval-failures run)}))
                    ($ :td {:className (:td common/table-classes)}
@@ -132,6 +141,7 @@
           :sente-event [:experiments/get-results {:module-id module-id
                                                   :dataset-id dataset-id
                                                   :experiment-id experiment-id}]})]
+
     (cond
       loading? ($ :div.p-6.text-center.py-12 ($ common/spinner {:size :large}))
       error ($ :div.p-6.text-red-500.text-center.py-8 "Error loading experiment results: " error)
@@ -159,6 +169,6 @@
               ($ SummaryPanel {:summary-evals (:summary-evals data)
                                :results (vals (:results data))})
               ($ ResultsTable {:results (vals (:results data))
-                               :targets (get-in data [:experiment-info :spec :targets])
+                               :targets (get-in data [:experiment-info :spec :target])
                                :module-id module-id}))
       :else ($ :div.p-6.text-center.py-12 "No experiment data found"))))
