@@ -53,11 +53,12 @@
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/start
   [{:keys [manager dataset-id form-data]} uid]
   (let [global-actions-depot (:global-actions-depot (aor-types/underlying-objects manager))
-        {:keys [name snapshot selector evaluators spec num-repetitions concurrency]} form-data]
-    (let [{:keys [agent-invoke]}
+        {:keys [name snapshot selector evaluators spec num-repetitions concurrency]} form-data
+        experiment-id (h/random-uuid7)]
+    (let [{:keys [agent-invoke]} 
           (foreign-append! global-actions-depot
                            (aor-types/->StartExperiment
-                            (h/random-uuid7)
+                            experiment-id
                             name
                             dataset-id
                             (if (str/blank? snapshot) nil snapshot)
@@ -66,7 +67,7 @@
                             (parse-spec spec)
                             (long num-repetitions)
                             (long concurrency)))]
-      {:status :ok :invoke-id (:agent-invoke-id agent-invoke)})))
+      {:status :ok :experiment-id (str experiment-id)})))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/get-results
   [{:keys [manager dataset-id experiment-id]} uid]

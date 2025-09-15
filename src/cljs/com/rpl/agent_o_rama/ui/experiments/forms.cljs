@@ -10,6 +10,7 @@
    [com.rpl.agent-o-rama.ui.datasets.snapshot-selector :as snapshot-selector]
    [clojure.string :as str]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
+   [reitit.frontend.easy :as rfe]
    ["@heroicons/react/24/outline" :refer [PlusIcon TrashIcon ChevronDownIcon XMarkIcon]]))
 
  ;; =============================================================================
@@ -397,7 +398,8 @@
   :on-submit
   (fn [db form-state]
     (println "form-state" form-state)
-    (let [{:keys [form-id module-id dataset-id name description snapshot selector spec num-repetitions concurrency evaluators]} form-state]
+    (let [{:keys [form-id module-id dataset-id spec]} form-state
+          spec-type (get spec :type)]
       (sente/request!
        [:experiments/start
         {:module-id module-id
@@ -410,5 +412,14 @@
            (do
              (state/dispatch [:modal/hide])
              (state/dispatch [:query/invalidate {:query-key-pattern [:experiments module-id dataset-id]}])
+             (let [eid (get-in reply [:data :experiment-id])]
+               (if (and eid (not= spec-type :comparative))
+                 (rfe/push-state :module/dataset-detail.experiment-detail
+                                 {:module-id module-id :dataset-id dataset-id :experiment-id eid})
+                 (if (= spec-type :comparative)
+                   (rfe/push-state :module/dataset-detail.comparative-experiments
+                                   {:module-id module-id :dataset-id dataset-id})
+                   (rfe/push-state :module/dataset-detail.experiments
+                                   {:module-id module-id :dataset-id dataset-id}))))
              (state/dispatch [:form/clear form-id]))
            (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
