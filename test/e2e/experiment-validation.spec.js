@@ -77,11 +77,12 @@ test.describe('Experiment Validation Error Handling', () => {
     // scroll to the second agent selector
     await agentSelectors.nth(1).scrollIntoViewIfNeeded();
     await agentSelectors.nth(1).click();
-    await expModal.getByText('researcher').click();
+    // nth(1) because nth(0) is the first agent selector, being selected above
+    await expModal.getByText('researcher').nth(1).click();
     
     // Select the REGULAR evaluator for this COMPARATIVE experiment
     await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
-    await expModal.getByText(regularEvalName).click();
+    await expModal.getByText(regularEvalName, { exact: true }).click();
 
     // Run the experiment, which should fail validation
     await expModal.getByRole('button', { name: 'Run Experiment' }).click();
@@ -94,13 +95,15 @@ test.describe('Experiment Validation Error Handling', () => {
     // -------------------------------------------------------------------------
     console.log('--- Verifying Error Display ---');
     // Wait for navigation to the experiment results page.
-    await expect(page.getByRole('heading', { name: experimentName })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(experimentName, { exact: true })).toBeVisible({ timeout: 15000 });
+    const experimentRow = page.locator('table tbody tr').filter({ hasText: experimentName });
+    await expect(experimentRow).toBeVisible();
+    await experimentRow.click();
 
-    // Assert that the header shows the "Failed" status.
     await expect(page.getByText('❌ Failed')).toBeVisible();
 
     // Assert that the specific error panel is visible.
-    const errorPanel = page.locator('div').filter({ hasText: 'Experiment Failed to Start' });
+    const errorPanel = page.locator('.bg-red-50.p-6.rounded-lg.border.border-red-200');
     await expect(errorPanel).toBeVisible();
 
     // Assert that the correct error message is displayed.

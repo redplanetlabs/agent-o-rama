@@ -49,7 +49,13 @@
                   (for [exp experiments
                         :let [info (get exp :experiment-info)
                               spec (get info :spec)]]
-                    ($ :tr {:key (:id info)}
+                    ($ :tr {:key (:id info)
+                            :className "hover:bg-gray-50 cursor-pointer"
+                            :onClick (fn [_]
+                                       (rfe/push-state :module/dataset-detail.experiment-detail
+                                                       {:module-id module-id
+                                                        :dataset-id dataset-id
+                                                        :experiment-id (:id info)}))}
                        ($ :td {:className (:td common/table-classes)}
                           ($ :div.font-medium.text-gray-900 (:name info)))
                        ($ :td {:className (:td common/table-classes)}
@@ -62,11 +68,4 @@
                        ($ :td {:className (:td common/table-classes)}
                           (if (:finish-time-millis exp)
                             (common/format-relative-time (:finish-time-millis exp))
-                            "--"))
-                       ($ :td {:className (:td common/table-classes)}
-                          ($ :a.text-indigo-600.hover:text-indigo-900
-                             {:href (rfe/href :module/dataset-detail.experiment-detail
-                                              {:module-id module-id
-                                               :dataset-id dataset-id
-                                               :experiment-id (:id info)})}
-                             "View Results")))))))))))
+                            "--")))))))))))
