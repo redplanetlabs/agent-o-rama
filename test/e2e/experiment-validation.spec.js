@@ -45,6 +45,7 @@ test.describe('Experiment Validation Error Handling', () => {
     
     await createDataset(page, datasetName);
     await page.getByRole('link', { name: datasetName }).click();
+    await page.getByRole('link', { name: 'Examples' }).click();
     await addExample(page, { input: { id: `ex1-${uniqueId}` } });
     console.log('--- Test Setup Complete ---');
 
@@ -53,7 +54,8 @@ test.describe('Experiment Validation Error Handling', () => {
     // 2. TRIGGER FAILURE: Configure and run an invalid experiment
     // -------------------------------------------------------------------------
     console.log('--- Triggering Experiment Failure ---');
-    await page.getByText('Experiments').click();
+
+    await page.getByRole('link', { name: 'Experiments', exact: true }).click();
     await page.getByRole('button', { name: 'Run New Experiment' }).click();
 
     const expModal = page.locator('[role="dialog"]');
@@ -71,9 +73,12 @@ test.describe('Experiment Validation Error Handling', () => {
     // Configure both targets to use the same agent (common for prompt testing)
     const agentSelectors = expModal.locator('button').filter({ hasText: 'Select an agent' });
     await agentSelectors.nth(0).click();
-    await page.getByText('researcher', { exact: true }).click();
+    await expModal.getByText('researcher').click();
+    // scroll to the second agent selector
+    expModal.scrollIntoViewIfNeeded();
+    await agentSelectors.nth(1).scrollIntoViewIfNeeded();
     await agentSelectors.nth(1).click();
-    await page.getByText('researcher', { exact: true }).click();
+    await expModal.getByText('researcher').click();
     
     // Select the REGULAR evaluator for this COMPARATIVE experiment
     await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
