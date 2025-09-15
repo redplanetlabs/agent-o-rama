@@ -9,15 +9,23 @@
    [com.rpl.agent-o-rama.impl.experiments :as exp])
   (:use [com.rpl.rama])
   (:import [java.util UUID]
-           [com.rpl.agentorama AgentFailedException]))
+           [com.rpl.agentorama AgentFailedException]
+           [com.rpl.agent_o_rama.impl.types RegularExperiment ComparativeExperiment]))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/get-all-for-dataset
-  [{:keys [manager dataset-id pagination]} uid]
-  (let [search-query (:search-experiments-query (aor-types/underlying-objects manager))]
+  [{:keys [manager dataset-id pagination filters]} uid]
+  (let [search-query (:search-experiments-query (aor-types/underlying-objects manager))
+        ;; Process filters to translate type keywords to classes
+        processed-filters (if-let [type (:type filters)]
+                            (assoc filters :type (case type
+                                                   :regular RegularExperiment
+                                                   :comparative ComparativeExperiment
+                                                   nil)) ; Default to nil if unknown
+                            filters)]
     ;; For the index table, we get the first page with a reasonable limit
     (foreign-invoke-query search-query
                           dataset-id
-                          {} ; no filters
+                          (or processed-filters {}) ; Use processed filters
                           20 ; limit
                           pagination)))
 
@@ -83,5 +91,4 @@
           ;; If the agent is not yet complete, just return the base results.
           base-results))
       ;; If there are no invoke coordinates, it's too early, return base results.
-      base-results))
-  )
+      base-results)))

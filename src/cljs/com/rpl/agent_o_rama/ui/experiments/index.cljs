@@ -11,8 +11,11 @@
 (defui index [{:keys [module-id dataset-id]}]
   (let [{:keys [data loading? error]}
         (queries/use-sente-query
-         {:query-key [:experiments module-id dataset-id]
-          :sente-event [:experiments/get-all-for-dataset {:module-id module-id :dataset-id dataset-id}]
+         {:query-key [:experiments module-id dataset-id :regular]
+          :sente-event [:experiments/get-all-for-dataset
+                        {:module-id module-id
+                         :dataset-id dataset-id
+                         :filters {:type :regular}}]
           :enabled? (boolean (and module-id dataset-id))})
 
         experiments (get data :items)]
@@ -41,33 +44,20 @@
                ($ :thead {:className (:thead common/table-classes)}
                   ($ :tr
                      ($ :th {:className (:th common/table-classes)} "Experiment Name")
-                     ($ :th {:className (:th common/table-classes)} "Type")
                      ($ :th {:className (:th common/table-classes)} "Started")
-                     ($ :th {:className (:th common/table-classes)} "Finished")
-                     ($ :th {:className (:th common/table-classes)} "Actions")))
+                     ($ :th {:className (:th common/table-classes)} "Finished")))
                ($ :tbody
                   (for [exp experiments
-                        :let [info (get exp :experiment-info)
-                              spec (get info :spec)]]
+                        :let [info (get exp :experiment-info)]]
                     ($ :tr {:key (:id info)
                             :className "hover:bg-gray-50 cursor-pointer"
                             :onClick (fn [_]
-                                       (let [spec-type (get spec :type)
-                                             is-regular? (and spec-type (str/ends-with? spec-type "RegularExperiment"))
-                                             route-name (if is-regular?
-                                                          :module/dataset-detail.experiment-detail
-                                                          :module/dataset-detail.comparative-experiment-detail)]
-                                         (rfe/push-state route-name
-                                                         {:module-id module-id
-                                                          :dataset-id dataset-id
-                                                          :experiment-id (:id info)})))}
+                                       (rfe/push-state :module/dataset-detail.experiment-detail
+                                                       {:module-id module-id
+                                                        :dataset-id dataset-id
+                                                        :experiment-id (:id info)}))}
                        ($ :td {:className (:td common/table-classes)}
                           ($ :div.font-medium.text-gray-900 (:name info)))
-                       ($ :td {:className (:td common/table-classes)}
-                          (let [spec-type (get spec :type)]
-                            (if (and spec-type (str/ends-with? spec-type "RegularExperiment"))
-                              "Regular"
-                              "Comparative")))
                        ($ :td {:className (:td common/table-classes)}
                           (common/format-relative-time (:start-time-millis exp)))
                        ($ :td {:className (:td common/table-classes)}
