@@ -428,7 +428,10 @@
 
              ;; Validate the initial form state
              {:keys [valid? errors]} (validate-form-fields initial-form-state validators)
-             modal-data (get-in form-spec [initial-step :modal-props] {})
+             modal-data (let [mp (get-in form-spec [initial-step :modal-props] {})]
+                          (if (fn? mp)
+                            (mp props)
+                            mp))
 
              ;; 1. Construct the full state for the form - now it's just a single flat map
              form-state (assoc initial-form-state
