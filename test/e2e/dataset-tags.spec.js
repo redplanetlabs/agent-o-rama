@@ -1,36 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getResearchAgentRow } from './helpers.js';
-
-// =============================================================================
-// HELPER FUNCTIONS (similar to other tests for consistency)
-// =============================================================================
-
-/**
- * Adds an example to the currently viewed dataset.
- * @param {import('@playwright/test').Page} page - The Playwright page object.
- * @param {Object} example - An object with `input` and `output` keys.
- */
-async function addExample(page, { input, output }) {
-  console.log('Adding example with input:', JSON.stringify(input));
-  // Click the first enabled Add Example button
-  await page.locator('button').filter({ hasText: 'Add Example' }).filter({ hasNot: page.locator('[disabled]') }).first().click();
-
-  const modal = page.locator('[role="dialog"]');
-  await expect(modal).toBeVisible();
-  await modal.getByLabel('Input (JSON)').fill(JSON.stringify(input, null, 2));
-  if (output) {
-    await modal.getByLabel('Reference Output (JSON, Optional)').fill(JSON.stringify(output, null, 2));
-  }
-  await modal.getByRole('button', { name: 'Add Example' }).click();
-
-  // Wait for the modal to disappear
-  await expect(modal).not.toBeVisible({ timeout: 15000 });
-  // Verify the new example is in the table by looking for its unique ID in the input
-  await expect(page.locator('table tbody tr').filter({ hasText: input.id })).toBeVisible();
-  console.log('Successfully added example.');
-}
-
+import { getResearchAgentRow, addExample } from './helpers.js';
 
 // =============================================================================
 // TEST SUITE
