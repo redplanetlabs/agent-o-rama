@@ -81,7 +81,7 @@
          "N/A"
          (str passed-count "/" total " OK")))))
 
-(defui ResultsTable [{:keys [results targets module-id]}]
+(defui ResultsTable [{:keys [results target module-id]}]
   ($ :div
      ($ :h3.text-xl.font-bold.mb-4 "Detailed Results")
      ($ :div {:className (:container common/table-classes)}
@@ -91,9 +91,8 @@
                  ($ :th {:className (:th common/table-classes)} "Input")
                  ($ :th {:className (:th common/table-classes)} "Reference Output")
                  ;; Dynamically create a column for each agent target
-                 (for [[i target] (map-indexed vector targets)]
-                   ($ :th {:key i :className (:th common/table-classes)}
-                      (str "Output " (or (get-in target [:target-spec :agent-name]) (str "Target " (inc i))))))
+                 ($ :th {:key i :className (:th common/table-classes)}
+                    (str "Output " (or (get-in target [:target-spec :agent-name]) (str "Target " (inc i)))))
                  ($ :th {:className (:th common/table-classes)} "Scores")
                  ($ :th {:className (:th common/table-classes)} "Actions")))
            ($ :tbody
@@ -103,23 +102,19 @@
                       ($ :div.max-w-xs.truncate (common/pp (:input run))))
                    ($ :td {:className (:td common/table-classes)}
                       ($ :div.max-w-xs.truncate (common/pp (:reference-output run))))
-                   ;; Render each agent's output
-                   (for [i (range (count targets))]
-                     (let [agent-result (get-in run [:agent-results i])]
-                       (println "agent-result" (keys agent-result))
-                       ($ :td {:key i :className (:td common/table-classes)}
-                          ($ :div.max-w-xs.truncate
-                             (if (:failure? (:result agent-result))
-                               ($ :div.space-y-2
-                                  ($ :span.text-red-500.font-semibold "FAIL")
-                                  (when-let [throwable (get-in agent-result [:result :val :throwable])]
-                                    (println "throwable" throwable)
-
-                                    ($ :div.text-xs.text-red-600.bg-red-50.p-2.rounded.border
-                                       ($ :div.font-semibold.mb-1 "Exception:")
-                                       ($ :div.font-mono.text-xs
-                                          (str (:type (first (:via throwable))) ": " (:message (first (:via throwable))))))))
-                               (common/pp (:val (:result agent-result))))))))
+                   ;; 0 is hardcoded, because this component only works for REGULAR experiments, not comparative ones
+                   (let [agent-result (get-in run [:agent-results 0])]
+                     ($ :td {:key i :className (:td common/table-classes)}
+                        ($ :div.max-w-xs.truncate
+                           (if (:failure? (:result agent-result))
+                             ($ :div.space-y-2
+                                ($ :span.text-red-500.font-semibold "FAIL")
+                                (when-let [throwable (get-in agent-result [:result :val :throwable])]
+                                  ($ :div.text-xs.text-red-600.bg-red-50.p-2.rounded.border
+                                     ($ :div.font-semibold.mb-1 "Exception:")
+                                     ($ :div.font-mono.text-xs
+                                        (str (:type (first (:via throwable))) ": " (:message (first (:via throwable))))))))
+                             (common/pp (:val (:result agent-result)))))))
                    ($ :td {:className (:td common/table-classes)}
                       ($ ScoreBadge {:evals (:evals run) :failures (:eval-failures run)}))
                    ($ :td {:className (:td common/table-classes)}
@@ -169,6 +164,6 @@
               ($ SummaryPanel {:summary-evals (:summary-evals data)
                                :results (vals (:results data))})
               ($ ResultsTable {:results (vals (:results data))
-                               :targets (get-in data [:experiment-info :spec :target])
+                               :target (get-in data [:experiment-info :spec :target])
                                :module-id module-id}))
       :else ($ :div.p-6.text-center.py-12 "No experiment data found"))))
