@@ -828,8 +828,10 @@
         experiments-routes #{:module/dataset-detail
                              :module/dataset-detail.experiments
                              :module/dataset-detail.experiment-detail}
+        comparative-routes #{:module/dataset-detail.comparative-experiments
+                             :module/dataset-detail.comparative-experiment-detail}
         active-tab (cond
-                     (contains? #{:module/dataset-detail.comparative-experiments} route-name)
+                     (contains? comparative-routes route-name)
                      "comparative"
                      
                      (contains? experiments-routes route-name)
