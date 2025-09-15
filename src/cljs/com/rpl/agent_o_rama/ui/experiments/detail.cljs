@@ -18,10 +18,8 @@
           ($ :ul.list-disc.list-inside.space-y-2.pl-2
              (for [[idx problem] (map-indexed vector problems)]
                ($ :li.text-sm.text-red-700 {:key idx}
-                  ($ :div.flex.flex-col
-                     ($ :span ($ :strong "Problem: ") (:problem problem))
-                     ($ :span.font-mono.text-xs.bg-red-100.p-1.rounded.mt-1
-                        (str "Evaluator: " (:name problem) " (type: " (name (:evaluator-type problem)) ")"))))))))))
+                  ($ :span.font-mono.text-xs.bg-red-100.p-1.rounded.mt-1
+                     (pr-str problem)))))))))
 
 (defui StatCard [{:keys [label value]}]
   ($ :div.bg-gray-50.p-4.rounded-lg.border
