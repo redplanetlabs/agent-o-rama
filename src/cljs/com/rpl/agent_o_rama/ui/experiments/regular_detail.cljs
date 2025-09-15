@@ -173,10 +173,10 @@
          ($ ExperimentHeader {:info (:experiment-info data)
                               :status :failed
                                                             ;; NEW: Implement the on-rerun handler
-                              :on-rerun #(let [form-props (forms/experiment-info->form-state
-                                                           (assoc (:experiment-info data)
-                                                                  :module-id module-id
-                                                                  :dataset-id dataset-id))]
+                              :on-rerun #(let [form-props (-> (:experiment-info data)
+                                                              forms/experiment-info->form-state
+                                                              (assoc :module-id module-id
+                                                                     :dataset-id dataset-id))]
                                            (state/dispatch [:modal/show-form :create-experiment form-props]))
                               :module-id module-id
                               :dataset-id dataset-id
@@ -192,10 +192,10 @@
               ($ ExperimentHeader {:info (:experiment-info data)
                                    :status (if (:finish-time-millis data) :completed :running)
                                                                       ;; NEW: Implement the on-rerun handler
-                                   :on-rerun #(let [form-props (forms/experiment-info->form-state
-                                                                (assoc (:experiment-info data)
-                                                                       :module-id module-id
-                                                                       :dataset-id dataset-id))]
+                                   :on-rerun #(let [form-props (-> (:experiment-info data)
+                                                                   forms/experiment-info->form-state
+                                                                   (assoc :module-id module-id
+                                                                          :dataset-id dataset-id))]
                                                 (state/dispatch [:modal/show-form :create-experiment form-props]))
                                    :module-id module-id
                                    :dataset-id dataset-id
