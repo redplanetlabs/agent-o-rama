@@ -75,7 +75,6 @@ test.describe('Experiment Validation Error Handling', () => {
     await agentSelectors.nth(0).click();
     await expModal.getByText('researcher').click();
     // scroll to the second agent selector
-    expModal.scrollIntoViewIfNeeded();
     await agentSelectors.nth(1).scrollIntoViewIfNeeded();
     await agentSelectors.nth(1).click();
     await expModal.getByText('researcher').click();
