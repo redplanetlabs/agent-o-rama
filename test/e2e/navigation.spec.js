@@ -163,6 +163,7 @@ test.describe('Dataset example crud', () => {
 
     // Navigate to dataset detail page by clicking the dataset link
     await page.getByRole('link', { name: datasetName }).first().click();
+    await page.getByRole('link', { name: 'Examples' }).click();
 
     // Wait for the dataset detail page controls to appear
     const addExampleHeaderButton = page.getByRole('button', { name: 'Add Example' });
@@ -283,6 +284,7 @@ test.describe('Inline editing validation', () => {
 
     await expect(page.getByText(datasetName)).toBeVisible({ timeout: 30000 });
     await page.getByRole('link', { name: datasetName }).first().click();
+    await page.getByRole('link', { name: 'Examples' }).click();
 
     // Add an example with a string value to test JSON formatting
     const addExampleButton = page.getByRole('button', { name: 'Add Example' });
@@ -384,6 +386,7 @@ test.describe('Dataset snapshot dropdown', () => {
     await expect(page.getByText(datasetName)).toBeVisible({ timeout: 30000 });
 
     await page.getByRole('link', { name: datasetName }).first().click();
+    await page.getByRole('link', { name: 'Examples' }).click();
 
     // Ensure Examples tab controls are visible and snapshot dropdown shows Latest
     await expect(page.getByText('Snapshot:')).toBeVisible({ timeout: 30000 });
