@@ -4,9 +4,11 @@
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
-   [com.rpl.agent-o-rama.impl.helpers :as h])
+   [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.experiments :as exp])
   (:use [com.rpl.rama])
-  (:import [java.util UUID]))
+  (:import [java.util UUID]
+           [com.rpl.agentorama AgentFailedException]))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/get-all-for-dataset
   [{:keys [manager dataset-id pagination]} uid]
@@ -59,13 +61,25 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/get-results
   [{:keys [manager dataset-id experiment-id]} uid]
-  (let [results-query (:experiments-results-query (aor-types/underlying-objects manager))]
-    (def results-query results-query)
-    (def dataset-id dataset-id)
-    (def experiment-id experiment-id)
-    (foreign-invoke-query results-query
-                          dataset-id
-                          ;; TODO move this uuid parse onto client
-                          (java.util.UUID/fromString experiment-id))))
+  (let [results-query (:experiments-results-query (aor-types/underlying-objects manager))
+        ;; 1. Fetch the base experiment data as before.
+        base-results (foreign-invoke-query results-query
+                                           dataset-id
+                                           ;; TODO move this uuid parse to client
+                                           (java.util.UUID/fromString experiment-id))]
 
-;; todo use invoke coords to get result
+    ;; 2. NEW LOGIC STARTS HERE: Check for early failure.
+    (if-let [invoke (:experiment-invoke base-results)]
+      ;; If we have the invoke coordinates for the experimenter agent...
+      (with-open [exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME)]
+        (if (aor/agent-invoke-complete? exp-client invoke)
+          ;; If the agent is complete, fetch its result.
+          (let [result (aor/agent-result exp-client invoke)]
+            ;; A successful run returns :done. Anything else is an error.
+            (if (not= :done result)
+              (assoc base-results :invocation-error result)
+              base-results))
+          ;; If the agent is not yet complete, just return the base results.
+          base-results))
+      ;; If there are no invoke coordinates, it's too early, return base results.
+      base-results)))

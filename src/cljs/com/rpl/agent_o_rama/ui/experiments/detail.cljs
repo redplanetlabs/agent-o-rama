@@ -8,6 +8,21 @@
    [clojure.string :as str]
    [reitit.frontend.easy :as rfe]))
 
+(defui ExperimentErrorPanel [{:keys [error-info]}]
+  ($ :div.bg-red-50.p-6.rounded-lg.border.border-red-200
+     ($ :h3.text-lg.font-semibold.text-red-800.mb-2 "Experiment Failed to Start")
+     ($ :p.text-sm.text-red-700.mb-4 (:error error-info))
+     (when-let [problems (:problems error-info)]
+       ($ :div
+          ($ :h4.text-sm.font-medium.text-red-800.mb-2 "Details:")
+          ($ :ul.list-disc.list-inside.space-y-2.pl-2
+             (for [[idx problem] (map-indexed vector problems)]
+               ($ :li.text-sm.text-red-700 {:key idx}
+                  ($ :div.flex.flex-col
+                     ($ :span ($ :strong "Problem: ") (:problem problem))
+                     ($ :span.font-mono.text-xs.bg-red-100.p-1.rounded.mt-1
+                        (str "Evaluator: " (:name problem) " (type: " (name (:evaluator-type problem)) ")"))))))))))
+
 (defui StatCard [{:keys [label value]}]
   ($ :div.bg-gray-50.p-4.rounded-lg.border
      ($ :div.text-sm.text-gray-600 label)
@@ -23,11 +38,13 @@
         ($ :h2.text-2xl.font-bold (:name info)))
      ($ :div.flex.items-center.gap-4
         ($ :span.px-3.py-1.rounded-full.text-sm.font-medium
-           {:className (if (= status :completed)
-                         "bg-green-100 text-green-800"
+           {:className (case status
+                         :completed "bg-green-100 text-green-800"
+                         :failed "bg-red-100 text-red-800"
                          "bg-blue-100 text-blue-800")}
-           (if (= status :completed)
-             "✅ Completed"
+           (case status
+             :completed "✅ Completed"
+             :failed "❌ Failed"
              "🔄 Running"))
         ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
            {:onClick on-rerun}
@@ -120,6 +137,19 @@
     (cond
       loading? ($ :div.p-6.text-center.py-12 ($ common/spinner {:size :large}))
       error ($ :div.p-6.text-red-500.text-center.py-8 "Error loading experiment results: " error)
+
+      ;; NEW CLAUSE: Check for invocation error
+      (and data (:invocation-error data))
+      ($ :div.p-6.space-y-6
+         ($ ExperimentHeader {:info (:experiment-info data)
+                              :status :failed
+                              :on-rerun #(state/dispatch [:modal/show-form :create-experiment
+                                                          {:module-id module-id
+                                                           :dataset-id dataset-id}])
+                              :module-id module-id
+                              :dataset-id dataset-id})
+         ($ ExperimentErrorPanel {:error-info (:invocation-error data)}))
+
       data ($ :div.p-6.space-y-6
               ($ ExperimentHeader {:info (:experiment-info data)
                                    :status (if (:finish-time-millis data) :completed :running)
