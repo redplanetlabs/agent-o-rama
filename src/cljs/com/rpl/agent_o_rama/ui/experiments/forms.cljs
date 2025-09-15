@@ -12,6 +12,43 @@
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    ["@heroicons/react/24/outline" :refer [PlusIcon TrashIcon ChevronDownIcon XMarkIcon]]))
 
+ ;; =============================================================================
+;; NEW: TRANSFORMATION FUNCTION
+;; =============================================================================
+(defn experiment-info->form-state
+  "Transforms a backend :experiment-info map into the initial state
+   for the :create-experiment form."
+  [info]
+  (let [spec (:spec info)
+        is-regular? (contains? spec :target)
+        targets (if is-regular? [(:target spec)] (:targets spec))]
+    {;; Add a custom title for the modal when re-running
+     :title (str "Re-run Experiment: " (:name info))
+     ;; Prepend name to indicate it's a copy
+     :name (str "Copy of " (:name info))
+     :description (get info :description "")
+     :snapshot (get info :snapshot "")
+     :selector (if-let [selector (:selector info)]
+                 ;; Handle tag selector
+                 (if (:tag selector)
+                   {:type :tag, :tag (:tag selector)}
+                   ;; Handle other selectors by defaulting to 'all'
+                   {:type :all, :tag ""})
+                 ;; Default to 'all' if selector is nil
+                 {:type :all, :tag ""})
+     :spec {:type (if is-regular? :regular :comparative)
+            :targets (mapv
+                      (fn [t]
+                        (let [ts (:target-spec t)]
+                          {:target-spec (if (:node ts)
+                                          (assoc ts :type :node)
+                                          (assoc ts :type :agent))
+                           :input->args (:input->args t)}))
+                      targets)}
+     :evaluators (:evaluators info)
+     :num-repetitions (:num-repetitions info)
+     :concurrency (:concurrency info)}))
+
 ;; =============================================================================
 ;; SINGLE-STEP EXPERIMENT FORM
 ;; =============================================================================
@@ -352,8 +389,10 @@
    {:name [forms/required]
     :evaluators [(fn [v] (when (empty? v) "At least one evaluator is required"))]}
    :ui (fn [{:keys [form-id]}] ($ CreateExperimentForm {:form-id form-id}))
-   :modal-props {:title "Create New Experiment"
-                 :submit-text "Run Experiment"}}
+      ;; NEW: Modal props is now a function to allow dynamic titles
+   :modal-props (fn [props]
+                  {:title (get props :title "Create New Experiment")
+                   :submit-text "Run Experiment"})}
 
   :on-submit
   (fn [db form-state]

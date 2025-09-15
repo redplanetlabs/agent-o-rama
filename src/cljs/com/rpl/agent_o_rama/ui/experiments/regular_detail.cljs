@@ -6,7 +6,9 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [clojure.string :as str]
-   [reitit.frontend.easy :as rfe]))
+   [reitit.frontend.easy :as rfe]
+   ;; NEW: Require the forms namespace to access the transformation function
+   [com.rpl.agent-o-rama.ui.experiments.forms :as forms]))
 
 (defui ExperimentErrorPanel [{:keys [error-info]}]
   ($ :div.bg-red-50.p-6.rounded-lg.border.border-red-200
@@ -170,9 +172,12 @@
       ($ :div.p-6.space-y-6
          ($ ExperimentHeader {:info (:experiment-info data)
                               :status :failed
-                              :on-rerun #(state/dispatch [:modal/show-form :create-experiment
-                                                          {:module-id module-id
-                                                           :dataset-id dataset-id}])
+                                                            ;; NEW: Implement the on-rerun handler
+                              :on-rerun #(let [form-props (forms/experiment-info->form-state
+                                                           (assoc (:experiment-info data)
+                                                                  :module-id module-id
+                                                                  :dataset-id dataset-id))]
+                                           (state/dispatch [:modal/show-form :create-experiment form-props]))
                               :module-id module-id
                               :dataset-id dataset-id
                               ;; NEW: Pass state and handler to header
@@ -186,9 +191,12 @@
       data ($ :div.p-6.space-y-6
               ($ ExperimentHeader {:info (:experiment-info data)
                                    :status (if (:finish-time-millis data) :completed :running)
-                                   :on-rerun #(state/dispatch [:modal/show-form :create-experiment
-                                                               {:module-id module-id
-                                                                :dataset-id dataset-id}])
+                                                                      ;; NEW: Implement the on-rerun handler
+                                   :on-rerun #(let [form-props (forms/experiment-info->form-state
+                                                                (assoc (:experiment-info data)
+                                                                       :module-id module-id
+                                                                       :dataset-id dataset-id))]
+                                                (state/dispatch [:modal/show-form :create-experiment form-props]))
                                    :module-id module-id
                                    :dataset-id dataset-id
                                    ;; NEW: Pass state and handler to header
