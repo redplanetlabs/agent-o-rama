@@ -825,12 +825,16 @@
 
 (defui detail [{:keys [match module-id dataset-id]}]
   (let [route-name (get-in match [:data :name])
-        experiments-routes #{:module/dataset-detail.experiments :module/dataset-detail.experiment-detail}
+        experiments-routes #{:module/dataset-detail
+                             :module/dataset-detail.experiments
+                             :module/dataset-detail.experiment-detail}
         active-tab (cond
                      (contains? #{:module/dataset-detail.comparative-experiments} route-name)
                      "comparative"
+                     
                      (contains? experiments-routes route-name)
                      "experiments"
+                     
                      :else "examples")
         [show-info? set-show-info] (uix/use-state false)
         {:keys [loading? error]}
