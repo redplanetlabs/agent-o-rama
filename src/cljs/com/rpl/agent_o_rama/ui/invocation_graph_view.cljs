@@ -16,6 +16,16 @@
    ["@dagrejs/dagre" :as Dagre]
    ["@heroicons/react/24/outline" :refer [ExclamationTriangleIcon ArrowPathIcon ArrowTopRightOnSquareIcon]]))
 
+(defui ExpandableContentModal [{:keys [title content]}]
+  ($ :div.p-6.space-y-4
+     ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-auto.max-h-80.font-mono
+        content)))
+
+(defui ExceptionDetailModal [{:keys [title content]}]
+  ($ :div.p-6.space-y-4
+     ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-auto.max-h-80.font-mono
+        content)))
+
 (defn format-ms [ms]
   (let [date (js/Date. ms)
         formatter (js/Intl.DateTimeFormat.
@@ -117,7 +127,7 @@
                             (.stopPropagation e)
                             (state/dispatch [:modal/show :expandable-content
                                              {:title title
-                                              :content pretty-str}]))
+                                              :component ($ ExpandableContentModal {:title title :content pretty-str})}]))
                  :title "Click to expand"}
           truncated-str))))
 
@@ -306,7 +316,7 @@
                                             (.stopPropagation e)
                                             (state/dispatch [:modal/show :exception-detail
                                                              {:title (str "Exception " (inc idx))
-                                                              :content exc-str}]))
+                                                              :component ($ ExceptionDetailModal {:title (str "Exception " (inc idx)) :content exc-str})}]))
                                  :title "Click to view full exception"}
                            ($ :div {:className "text-xs font-mono text-red-800"}
                               first-line)))))))
@@ -579,7 +589,7 @@
                                              (.stopPropagation e)
                                              (state/dispatch [:modal/show :exception-detail
                                                               {:title (str "Exception in " node-name)
-                                                               :content throwable-str}]))
+                                                               :component ($ ExceptionDetailModal {:title (str "Exception in " node-name) :content throwable-str})}]))
                                   :title "Click to view full exception"}
                             first-line))
                       ($ :div {:className "flex items-center gap-2 justify-end"}
