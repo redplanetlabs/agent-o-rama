@@ -89,45 +89,30 @@
         ;; Fetch available datasets
         {:keys [data loading?]} (queries/use-sente-query
                                  {:query-key [:datasets module-id]
-                                  :sente-event [:datasets/get-all {:module-id module-id}]})
-
-        ;; Debounced effect for live preview using useRef for timeout
-        timeout-ref (useRef nil)]
+                                  :sente-event [:datasets/get-all {:module-id module-id}]})]
 
     ;; Debounced effect for live preview
-    (useEffect
+    (use-debounced-effect
      (fn []
-       ;; Clear existing timeout
-       (when @timeout-ref
-         (js/clearTimeout @timeout-ref))
-
-       ;; Set new timeout if we have required data
+       ;; Only run if we have required data
        (when (and (:value dataset-id-field) (not (str/blank? (:value input-template-field))))
-         (reset! timeout-ref
-                 (js/setTimeout
-                  (fn []
-                    (sente/request! [:datasets/preview-from-trace
-                                     {:module-id module-id
-                                      :dataset-id (:value dataset-id-field)
-                                      :input-template (:value input-template-field)
-                                      :output-template (:value output-template-field)
-                                      :source-args source-args
-                                      :source-result source-result}]
-                                    5000
-                                    (fn [reply]
-                                      (if (:success reply)
-                                        (do
-                                          (set-preview-data (:data reply))
-                                          (set-preview-error nil))
-                                        (do
-                                          (set-preview-data nil)
-                                          (set-preview-error (:error reply)))))))
-                  300))) ; debounce delay in ms
-
-       ;; Cleanup function
-       (fn []
-         (when @timeout-ref
-           (js/clearTimeout @timeout-ref))))
+         (sente/request! [:datasets/preview-from-trace
+                          {:module-id module-id
+                           :dataset-id (:value dataset-id-field)
+                           :input-template (:value input-template-field)
+                           :output-template (:value output-template-field)
+                           :source-args source-args
+                           :source-result source-result}]
+                         5000
+                         (fn [reply]
+                           (if (:success reply)
+                             (do
+                               (set-preview-data (:data reply))
+                               (set-preview-error nil))
+                             (do
+                               (set-preview-data nil)
+                               (set-preview-error (:error reply))))))))
+     300 ; debounce delay in ms
      [(:value dataset-id-field) (:value input-template-field) (:value output-template-field)])
 
     ($ :div {:className "flex h-full"}
@@ -145,7 +130,7 @@
                                             (if (:error dataset-id-field)
                                               "border-red-300 focus:ring-red-500 focus:border-red-500"
                                               "border-gray-300 focus:ring-blue-500 focus:border-blue-500"))
-                            :value (:value dataset-id-field)
+                            :value (or (:value dataset-id-field) "")
                             :onChange #((:on-change dataset-id-field) (.. % -target -value))}
                    (if loading?
                      ($ :option {:value ""} "Loading datasets...")
@@ -168,7 +153,7 @@
  :add-from-trace
  {:steps [:main]
   :main
-  {:initial-fields (fn [props] (merge {:dataset-id nil :input-template "$[0]" :output-template "$"} props))
+  {:initial-fields (fn [props] (merge {:dataset-id "" :input-template "$[0]" :output-template "$"} props))
    :validators {:dataset-id [forms/required]}
    :ui (fn [{:keys [form-id]}] ($ AddFromTraceForm {:form-id form-id}))
    :modal-props (fn [props] {:title (or (:title props) "Add to Dataset") :submit-text "Add Example"})}
