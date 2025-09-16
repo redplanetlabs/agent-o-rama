@@ -293,6 +293,7 @@
                   ($ :span {:className "text-sm font-medium text-indigo-700"} "ID")
                   ($ :span {:className "text-xs text-indigo-500 font-mono"} (str node-id)))
                ;; Add to Dataset button for individual node
+                              ;; Add to Dataset button for individual node
                ($ :div {:className "mt-3"}
                   ($ :button
                      {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
@@ -301,8 +302,9 @@
                                  (state/dispatch [:modal/show-form :add-from-trace
                                                   {:module-id module-id
                                                    :title (str "Add Node '" node-name "' to Dataset")
+                                                   :source-type :node
                                                    :source-args input
-                                                   :source-result (:val result)}]))}
+                                                   :source-emits emits}]))}
                      "Add to Dataset")))
 
             (when result
@@ -642,6 +644,7 @@
                                     :truncate-length 100
                                     :depth 0})
             ;; Add to Dataset button for overall trace
+                        ;; Add to Dataset button for overall trace
             ($ :div {:className "mt-4"}
                ($ :button
                   {:className "w-full text-sm font-medium py-2 px-4 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
@@ -649,6 +652,7 @@
                               (state/dispatch [:modal/show-form :add-from-trace
                                                {:module-id module-id
                                                 :title "Add Agent Invocation to Dataset"
+                                                :source-type :agent
                                                 :source-args (:invoke-args summary-data)
                                                 :source-result result-val}]))}
                   "Add to Dataset"))))

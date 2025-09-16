@@ -24,16 +24,20 @@
     ;; The effect re-runs whenever the dependencies change.
    (clj->js deps)))
 
-(defui SourceDataPanel [{:keys [source-args source-result]}]
+(defui SourceDataPanel [{:keys [source-type source-args source-result source-emits]}]
   ($ :div {:className "w-1/3 p-4 bg-gray-50 border-r overflow-auto"}
      ($ :h4 {:className "font-semibold mb-2"} "Source Data (from Trace)")
      ($ :div {:className "space-y-4"}
         ($ :div
-           ($ :label {:className "text-xs font-medium text-gray-500"} "Input Arguments")
+           ($ :label {:className "text-xs font-medium text-gray-500"}
+              (if (= source-type :agent) "Agent Initial Arguments" "Node Input Arguments"))
            ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"} (common/pp source-args)))
         ($ :div
-           ($ :label {:className "text-xs font-medium text-gray-500"} "Result")
-           ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"} (common/pp source-result))))))
+           ($ :label {:className "text-xs font-medium text-gray-500"}
+              (if (= source-type :agent) "Agent Final Result" "Node Emitted Data"))
+           ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"}
+              ;; Display the correct source for the output template
+              (common/pp (if (= source-type :agent) source-result source-emits)))))))
 
 (defui PreviewPanel [{:keys [preview-data error is-previewing]}]
   ($ :div {:className "w-1/3 p-4 overflow-auto"}
@@ -80,8 +84,12 @@
         output-template-field (forms/use-form-field form-id :output-template)
 
         ;; Props passed when the form was shown
+                ;; Props passed when the form was shown
         props (state/use-sub [:forms form-id])
-        {:keys [module-id source-args source-result]} props
+        {:keys [module-id source-type source-args source-result source-emits]} props
+
+        ;; Determine the correct source for the output template
+        output-template-source (if (= source-type :agent) source-result source-emits)
 
         ;; Local state for preview
         [preview-data set-preview-data] (uix/use-state nil)
@@ -104,7 +112,7 @@
                            :input-template (:value input-template-field)
                            :output-template (:value output-template-field)
                            :source-args source-args
-                           :source-result source-result}]
+                           :source-output output-template-source}]
                          5000
                          (fn [reply]
                            (if (:success reply)
@@ -118,7 +126,10 @@
      [(:value dataset-id-field) (:value input-template-field) (:value output-template-field)])
 
     ($ :div {:className "flex h-full"}
-       ($ SourceDataPanel {:source-args source-args :source-result source-result})
+       ($ SourceDataPanel {:source-type source-type
+                           :source-args source-args
+                           :source-result source-result
+                           :source-emits source-emits})
        ;; Center Panel: Controls
        ($ :div {:className "w-1/3 p-4 border-r overflow-auto"}
           ($ forms/form
@@ -176,7 +187,14 @@
  :add-from-trace
  {:steps [:main]
   :main
-  {:initial-fields (fn [props] (merge {:dataset-id "" :input-template "$[0]" :output-template "$"} props))
+  {:initial-fields
+   (fn [props]
+     (merge
+      {:dataset-id ""
+       ;; Simple defaults - just use $ for everything
+       :input-template "$"
+       :output-template "$"}
+      props))
    :validators {:dataset-id [forms/required]}
    :ui (fn [{:keys [form-id]}] ($ AddFromTraceForm {:form-id form-id}))
    :modal-props (fn [props] {:title (or (:title props) "Add to Dataset") :submit-text "Add Example"})}
@@ -184,18 +202,20 @@
   {:event
    (fn [_db form-state]
      ;; On submit, we call the add-from-trace endpoint that does both preview and add
-     (let [{:keys [module-id]} form-state
+     (let [{:keys [module-id source-type]} form-state
            dataset-id (:dataset-id form-state)
            input-template (:input-template form-state)
            output-template (:output-template form-state)
            source-args (:source-args form-state)
-           source-result (:source-result form-state)]
+           source-result (:source-result form-state)
+           source-emits (:source-emits form-state)
+           output-template-source (if (= source-type :agent) source-result source-emits)]
        [:datasets/add-from-trace
         {:module-id module-id
          :dataset-id dataset-id
          :input-template input-template
          :output-template output-template
          :source-args source-args
-         :source-result source-result}]))
+         :source-output output-template-source}]))
    :on-success-invalidate (fn [_db {:keys [module-id dataset-id]} _reply]
                             {:query-key-pattern [:dataset-examples module-id dataset-id]})}})

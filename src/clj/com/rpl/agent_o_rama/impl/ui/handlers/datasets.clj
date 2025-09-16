@@ -210,22 +210,22 @@
        :validation-error (str "Invalid JSONPath template: " (.getMessage e))})))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/preview-from-trace
-  [{:keys [manager dataset-id input-template output-template source-args source-result]} uid]
+  [{:keys [manager dataset-id input-template output-template source-args source-output]} uid]
   (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
         schemas (queries/get-dataset-properties datasets-pstate dataset-id)]
     (if-not schemas
       (throw (ex-info "Dataset not found" {:dataset-id dataset-id}))
       {:input (transform-and-validate input-template source-args (:input-json-schema schemas))
-       :output (transform-and-validate output-template source-result (:output-json-schema schemas))})))
+       :output (transform-and-validate output-template source-output (:output-json-schema schemas))})))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-from-trace
-  [{:keys [manager dataset-id input-template output-template source-args source-result]} uid]
+  [{:keys [manager dataset-id input-template output-template source-args source-output]} uid]
   (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
         schemas (queries/get-dataset-properties datasets-pstate dataset-id)]
     (if-not schemas
       (throw (ex-info "Dataset not found" {:dataset-id dataset-id}))
       (let [input-result (transform-and-validate input-template source-args (:input-json-schema schemas))
-            output-result (transform-and-validate output-template source-result (:output-json-schema schemas))]
+            output-result (transform-and-validate output-template source-output (:output-json-schema schemas))]
         (if (and (:is-valid? input-result) (:is-valid? output-result))
           ;; Both are valid, add the example
           (do
