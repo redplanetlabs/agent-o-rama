@@ -21,6 +21,7 @@
 (defn with-customer-support-ipc
   "Test helper that sets up IPC environment for customer support tests."
   [test-fn]
+  (System/gc)
   (with-open [ipc (rtest/create-ipc)]
     (rtest/launch-module!
      ipc
@@ -35,8 +36,7 @@
       ;; Initialize reference data stores before running tests
       (aor/agent-invoke initializer)
 
-      (test-fn agent)
-      (rtest/destroy-module! ipc module-name))))
+      (test-fn agent))))
 
 (deftest customer-support-tools-test
   (testing "customer support tools are properly defined"
@@ -231,6 +231,7 @@
 (deftest customer-support-module-integration-test
   (testing "full agent module execution"
     (when (some? (System/getenv "OPENAI_API_KEY"))
+      (System/gc)
       (with-open [ipc (rtest/create-ipc)]
         (rtest/launch-module! ipc
                               cs/CustomerSupportModule
