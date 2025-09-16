@@ -1,13 +1,27 @@
 (ns com.rpl.agent-o-rama.ui.datasets.add-from-trace
   (:require
-   [uix.core :as uix :refer [defui $]]
+   [uix.core :as uix :refer [defui defhook $]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [clojure.string :as str]
-   ["react" :refer [useEffect useRef]]))
+   ["react" :refer [useEffect]]))
+
+(defhook use-debounced-effect
+  "Runs an effect after a specified delay when dependencies change.
+  Cancels the previous effect if dependencies change before the delay has passed."
+  [effect-fn delay-ms deps]
+  (useEffect
+   (fn []
+      ;; Set up the timeout
+     (let [handler (js/setTimeout effect-fn delay-ms)]
+        ;; Return a cleanup function that clears the timeout.
+        ;; This is the core of the debounce logic.
+       #(js/clearTimeout handler)))
+    ;; The effect re-runs whenever the dependencies change.
+   (clj->js deps)))
 
 (defui SourceDataPanel [{:keys [source-args source-result]}]
   ($ :div {:className "w-1/3 p-4 bg-gray-50 border-r overflow-auto"}
@@ -20,37 +34,43 @@
            ($ :label {:className "text-xs font-medium text-gray-500"} "Result")
            ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"} (common/pp source-result))))))
 
-(defui PreviewPanel [{:keys [preview-data error]}]
+(defui PreviewPanel [{:keys [preview-data error is-previewing]}]
   ($ :div {:className "w-1/3 p-4 overflow-auto"}
-     ($ :h4 {:className "font-semibold mb-2"} "Live Preview")
-     (if error
-       ($ :div {:className "bg-red-50 p-2 rounded border border-red-200 text-red-700 text-xs whitespace-pre-wrap"} error)
-       (when preview-data
-         ($ :div {:className "space-y-4"}
-            ;; Preview for Input
-            ($ :div
-               ($ :div {:className "flex justify-between items-center"}
-                  ($ :label {:className "text-xs font-medium text-gray-500"} "Dataset Input")
-                  (when-let [input-preview (:input preview-data)]
-                    ($ :span {:className (if (:is-valid? input-preview)
-                                           "text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full"
-                                           "text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded-full")}
-                       (if (:is-valid? input-preview) "Valid" "Invalid"))))
-               ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"} (common/pp (:transformed-data (:input preview-data))))
-               (when-let [err (:validation-error (:input preview-data))]
-                 ($ :p {:className "text-xs text-red-600 mt-1"} err)))
-            ;; Preview for Reference Output
-            ($ :div
-               ($ :div {:className "flex justify-between items-center"}
-                  ($ :label {:className "text-xs font-medium text-gray-500"} "Dataset Reference Output")
-                  (when-let [output-preview (:output preview-data)]
-                    ($ :span {:className (if (:is-valid? output-preview)
-                                           "text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full"
-                                           "text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded-full")}
-                       (if (:is-valid? output-preview) "Valid" "Invalid"))))
-               ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"} (common/pp (:transformed-data (:output preview-data))))
-               (when-let [err (:validation-error (:output preview-data))]
-                 ($ :p {:className "text-xs text-red-600 mt-1"} err))))))))
+     ($ :div {:className "flex justify-between items-center mb-2"}
+        ($ :h4 {:className "font-semibold"} "Live Preview")
+        (when is-previewing
+          ($ :div {:className "flex items-center gap-1 text-xs text-gray-500"}
+             ($ common/spinner {:size :small})
+             "Updating...")))
+     (cond
+       error ($ :div {:className "bg-red-50 p-2 rounded border border-red-200 text-red-700 text-xs whitespace-pre-wrap"} error)
+       preview-data
+       ($ :div {:className "space-y-4"}
+          ;; Preview for Input
+          ($ :div
+             ($ :div {:className "flex justify-between items-center"}
+                ($ :label {:className "text-xs font-medium text-gray-500"} "Dataset Input")
+                (when-let [input-preview (:input preview-data)]
+                  ($ :span {:className (if (:is-valid? input-preview)
+                                         "text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full"
+                                         "text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded-full")}
+                     (if (:is-valid? input-preview) "Valid" "Invalid"))))
+             ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"} (common/pp (:transformed-data (:input preview-data))))
+             (when-let [err (:validation-error (:input preview-data))]
+               ($ :p {:className "text-xs text-red-600 mt-1"} err)))
+          ;; Preview for Reference Output
+          ($ :div
+             ($ :div {:className "flex justify-between items-center"}
+                ($ :label {:className "text-xs font-medium text-gray-500"} "Dataset Reference Output")
+                (when-let [output-preview (:output preview-data)]
+                  ($ :span {:className (if (:is-valid? output-preview)
+                                         "text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full"
+                                         "text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded-full")}
+                     (if (:is-valid? output-preview) "Valid" "Invalid"))))
+             ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"} (common/pp (:transformed-data (:output preview-data))))
+             (when-let [err (:validation-error (:output preview-data))]
+               ($ :p {:className "text-xs text-red-600 mt-1"} err))))
+       :else ($ :div {:className "text-sm text-gray-400 italic"} "Select a dataset to see a preview."))))
 
 (defui AddFromTraceForm [{:keys [form-id]}]
   (let [;; Form fields
