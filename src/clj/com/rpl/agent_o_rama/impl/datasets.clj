@@ -403,7 +403,7 @@
 
     (case> AddDatasetExample
            :> {:keys [*snapshot-name *example-id *input *reference-output
-                       *tags *source *linked-trace]})
+                       *tags *source]})
      (get *props :input-json-schema :> *input-json-schema)
      (get *props :output-json-schema :> *output-json-schema)
      (validate-with-schema> *input-json-schema *input)
@@ -418,7 +418,6 @@
                          :reference-output *reference-output
                          :tags             *tags
                          :source           *source
-                         :linked-trace     *linked-trace
                          :created-at       *current-time-millis
                          :modified-at      *current-time-millis})])
 

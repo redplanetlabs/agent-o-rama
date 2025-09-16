@@ -256,10 +256,19 @@
 (definterface InfoSource
   (source_string []))
 
+(defn source-string
+  [^InfoSource i]
+  (.source_string i))
+
 (drp/defrecord+ HumanSource
   [name :- String]
   InfoSource
-  (source_string [this] "human"))
+  (source_string [this] (str "human[" name "]")))
+
+(drp/defrecord+ AiSource
+  []
+  InfoSource
+  (source_string [this] "ai"))
 
 (drp/defrecord+ ApiSource
   []
@@ -276,6 +285,13 @@
    experiment-id :- UUID]
   InfoSource
   (source_string [this] "experiment"))
+
+(drp/defrecord+ AgentRunSource
+  [module-name :- String
+   agent-name :- String
+   agent-invoke :- AgentInvokeImpl]
+  InfoSource
+  (source_string [this] (str "agent[" module-name "/" agent-name "]")))
 
 ;; Datasets
 
@@ -302,11 +318,6 @@
 (drp/defrecord+ DestroyDataset
   [dataset-id :- UUID])
 
-(drp/defrecord+ LinkedTrace
-  [module-name :- String
-   agent-name :- String
-   agent-invoke :- AgentInvokeImpl])
-
 (drp/defrecord+ AddDatasetExample
   [dataset-id :- UUID
    snapshot-name :- (s/maybe String)
@@ -315,7 +326,6 @@
    reference-output :- (s/maybe Object)
    tags :- (s/maybe #{String})
    source :- (s/maybe InfoSource)
-   linked-trace :- (s/maybe LinkedTrace)
   ])
 
 (drp/defrecord+ UpdateDatasetExample

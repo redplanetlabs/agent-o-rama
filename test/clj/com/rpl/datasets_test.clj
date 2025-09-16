@@ -723,8 +723,7 @@
              (multi-path :created-at
                          :modified-at
                          :id
-                         [:source nil?]
-                         [:linked-trace nil?])]
+                         [:source nil?])]
             NONE
             examples)))
 
@@ -788,17 +787,15 @@
           pstate))
        (is (some? created-at))
        (is (= created-at modified-at))
-       (bind li
-         (aor-types/->LinkedTrace "foo.Module"
-                                  "agent1"
-                                  (aor-types/->AgentInvokeImpl 1 2)))
-       (add-example-and-wait!
-        manager
-        ds-id1
-        "example1-2"
-        {:reference-output "output1-2"
-         :tags         #{"tag1" "tag2"}
-         :linked-trace li})
+       (bind ar-source
+         (aor-types/->AgentRunSource "foo.Module" "agent1" (aor-types/->AgentInvokeImpl 1 2)))
+       (binding [datasets/EXAMPLE-SOURCE ar-source]
+         (add-example-and-wait!
+          manager
+          ds-id1
+          "example1-2"
+          {:reference-output "output1-2"
+           :tags #{"tag1" "tag2"}}))
 
        (bind get-examples-page
          (fn [ds-id snapshot limit page-key]
@@ -817,11 +814,10 @@
                 :reference-output nil
                 :tags   #{}
                 :source (aor-types/->ApiSource)}
-               {:input        "example1-2"
+               {:input  "example1-2"
                 :reference-output "output1-2"
-                :tags         #{"tag1" "tag2"}
-                :source       (aor-types/->ApiSource)
-                :linked-trace li}]))
+                :tags   #{"tag1" "tag2"}
+                :source ar-source}]))
        (verified-dataset-times
         ds-id1
         #(aor/snapshot-dataset! manager ds-id1 nil "snapshot1"))
@@ -830,11 +826,10 @@
        (is (nil? pagination-params))
        (is (= (examples-cleaned examples)
               [{:input "example1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSource)}
-               {:input        "example1-2"
+               {:input  "example1-2"
                 :reference-output "output1-2"
-                :tags         #{"tag1" "tag2"}
-                :source       (aor-types/->ApiSource)
-                :linked-trace li}]))
+                :tags   #{"tag1" "tag2"}
+                :source ar-source}]))
        (add-example-and-wait-java! manager
                                    ds-id1
                                    "snapshot1"
@@ -848,11 +843,10 @@
         (=
          (examples-cleaned examples)
          [{:input "example1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSource)}
-          {:input        "example1-2"
+          {:input  "example1-2"
            :reference-output "output1-2"
-           :tags         #{"tag1" "tag2"}
-           :source       (aor-types/->ApiSource)
-           :linked-trace li}
+           :tags   #{"tag1" "tag2"}
+           :source ar-source}
           {:input "examples1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSource)}]))
 
 
@@ -862,11 +856,10 @@
        (is (nil? pagination-params))
        (is (= (examples-cleaned examples)
               [{:input "example1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSource)}
-               {:input        "example1-2"
+               {:input  "example1-2"
                 :reference-output "output1-2"
-                :tags         #{"tag1" "tag2"}
-                :source       (aor-types/->ApiSource)
-                :linked-trace li}]))
+                :tags   #{"tag1" "tag2"}
+                :source ar-source}]))
 
        (aor/snapshot-dataset! manager ds-id1 "snapshot1" "snapshot2")
        (bind {:keys [examples pagination-params]}
@@ -876,11 +869,10 @@
         (=
          (examples-cleaned examples)
          [{:input "example1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSource)}
-          {:input        "example1-2"
+          {:input  "example1-2"
            :reference-output "output1-2"
-           :tags         #{"tag1" "tag2"}
-           :source       (aor-types/->ApiSource)
-           :linked-trace li}
+           :tags   #{"tag1" "tag2"}
+           :source ar-source}
           {:input "examples1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSource)}]))
 
 
@@ -965,11 +957,10 @@
                 :reference-output "snap-out-1"
                 :tags   #{"a" "c"}
                 :source (aor-types/->ApiSource)}
-               {:input        "example1-2"
+               {:input  "example1-2"
                 :reference-output "output1-2"
-                :tags         #{"tag1" "tag2"}
-                :source       (aor-types/->ApiSource)
-                :linked-trace li}]))
+                :tags   #{"tag1" "tag2"}
+                :source ar-source}]))
 
        (is (= #{"snapshot1" "snapshot2"}
               (queries/get-dataset-snapshot-names pstate ds-id1)))
@@ -1219,40 +1210,38 @@
 
 
 
-       ;; TODO: <<<<>>>> use binding to override sources
-       ;;   - manual -> Human
-       ;;   - ai -> ai
-       ;;   - shoudl search string search usernames as well?
-
        ;; test search with filters
-       (add-example-and-wait! manager
-                              ds-id5
-                              "hello how are you"
-                              {:reference-output "abc"
-                               :tags   #{"a" "b"}
-                               :source "manual"})
-       (add-example-and-wait! manager
-                              ds-id5
-                              "how are you"
-                              {:tags   #{"a"}
-                               :source "ai"})
+       (bind human-source (aor-types/->HumanSource "user"))
+       (bind ai-source (aor-types/->AiSource))
+
+       (binding [datasets/EXAMPLE-SOURCE human-source]
+         (add-example-and-wait! manager
+                                ds-id5
+                                "hello how are you"
+                                {:reference-output "abc"
+                                 :tags #{"a" "b"}}))
+       (binding [datasets/EXAMPLE-SOURCE ai-source]
+         (add-example-and-wait! manager
+                                ds-id5
+                                "how are you"
+                                {:tags #{"a"}}))
        (add-example-and-wait! manager
                               ds-id5
                               "apple banana")
        (add-example-and-wait! manager
                               ds-id5
                               "hello banana")
-       (add-example-and-wait! manager
-                              ds-id5
-                              "the man said apple"
-                              {:reference-output "children"
-                               :tags   #{"a"}
-                               :source "manual"})
-       (add-example-and-wait! manager
-                              ds-id5
-                              (UserMessage. "apple")
-                              {:reference-output (UserMessage. "grOUcho")
-                               :source "ai"})
+       (binding [datasets/EXAMPLE-SOURCE human-source]
+         (add-example-and-wait! manager
+                                ds-id5
+                                "the man said apple"
+                                {:reference-output "children"
+                                 :tags #{"a"}}))
+       (binding [datasets/EXAMPLE-SOURCE ai-source]
+         (add-example-and-wait! manager
+                                ds-id5
+                                (UserMessage. "apple")
+                                {:reference-output (UserMessage. "grOUcho")}))
 
 
        (bind {:keys [examples pagination-params]}
@@ -1268,11 +1257,11 @@
               [{:input  "hello how are you"
                 :reference-output "abc"
                 :tags   #{"a" "b"}
-                :source "manual"}
+                :source human-source}
                {:input  "how are you"
                 :reference-output nil
                 :tags   #{"a"}
-                :source "ai"}
+                :source ai-source}
               ]))
        (bind {:keys [examples pagination-params]}
          (foreign-invoke-query
@@ -1287,17 +1276,16 @@
               [{:input  "the man said apple"
                 :reference-output "children"
                 :tags   #{"a"}
-                :source "manual"}
+                :source human-source}
               ]))
        (is (nil? pagination-params))
-
 
        (bind {:keys [examples pagination-params]}
          (foreign-invoke-query
           search-examples-query
           ds-id5
           nil
-          {:tag "a" :source "manual"}
+          {:tag "a" :source "human"}
           3
           nil
          ))
@@ -1305,11 +1293,11 @@
               [{:input  "hello how are you"
                 :reference-output "abc"
                 :tags   #{"a" "b"}
-                :source "manual"}
+                :source human-source}
                {:input  "the man said apple"
                 :reference-output "children"
                 :tags   #{"a"}
-                :source "manual"}
+                :source human-source}
               ]))
        (is (nil? pagination-params))
 
@@ -1327,7 +1315,7 @@
               [{:input  (UserMessage. "apple")
                 :reference-output (UserMessage. "grOUcho")
                 :tags   #{}
-                :source "ai"}
+                :source ai-source}
               ]))
        (is (nil? pagination-params))
       ))))

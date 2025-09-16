@@ -19,7 +19,6 @@
     ExperimentInputSelector
     ForkContext
     InfoSource
-    LinkedTrace
     NestedOpInfo
     NodeHumanInputRequest
     HistoricalAgentGraphInfo
@@ -255,7 +254,6 @@
          :reference-output Object
          :tags             #{String}
          :source           InfoSource
-         :linked-trace     LinkedTrace
          :created-at       Long
          :modified-at      Long
         })

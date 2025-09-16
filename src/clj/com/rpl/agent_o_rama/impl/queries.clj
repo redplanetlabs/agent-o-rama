@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops])
   (:import
@@ -616,7 +617,8 @@
          (case> (and> (some? *search-tag) (not (contains? *tags *search-tag))))
           (:> nil nil)
 
-         (case> (and> (some? *search-source) (not= *source *search-source)))
+         (case> (and> (some? *search-source)
+                      (not (h/contains-string? (aor-types/source-string *source) *search-source))))
           (:> nil nil)
 
          (case>

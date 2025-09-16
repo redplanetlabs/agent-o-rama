@@ -653,9 +653,8 @@
           name
           :db-write
           [res]
-          {"op"        "add"
-           "embedding" (.vector embedding)
-           "id"        res
+          {"op" "add"
+           "id" res
           }))
        (^String add [this ^Embedding embedding ^Object embedded]
          (with-traced
@@ -663,10 +662,8 @@
           name
           :db-write
           [res]
-          {"op"        "add"
-           "embedding" (.vector embedding)
-           "embedded"  (str embedded)
-           "id"        res
+          {"op" "add"
+           "id" res
           }))
        (^void add [this ^String id ^Embedding embedding]
          (with-traced
@@ -674,9 +671,8 @@
           name
           :db-write
           [res]
-          {"op"        "add"
-           "embedding" (.vector embedding)
-           "id"        id
+          {"op" "add"
+           "id" id
           }))
        (addAll [this embeddings]
          (with-traced
@@ -684,9 +680,8 @@
           name
           :db-write
           [res]
-          {"op"         "addAll"
-           "embeddings" (mapv #(.vector ^Embedding %) embeddings)
-           "ids"        res
+          {"op"  "addAll"
+           "ids" res
           }))
        (addAll [this embeddings embeddeds]
          (with-traced
@@ -694,10 +689,8 @@
           name
           :db-write
           [res]
-          {"op"         "addAll"
-           "embeddings" (mapv #(.vector ^Embedding %) embeddings)
-           "embeddeds"  (mapv str embeddeds)
-           "ids"        res
+          {"op"  "addAll"
+           "ids" res
           }))
        (addAll [this ids embeddings embeddeds]
          (with-traced
@@ -705,10 +698,8 @@
           name
           :db-write
           [res]
-          {"op"         "addAll"
-           "embeddings" (mapv #(.vector ^Embedding %) embeddings)
-           "embeddeds"  (mapv str embeddeds)
-           "ids"        ids
+          {"op"  "addAll"
+           "ids" ids
           }))
        (generateIds [this n]
          (.generateIds obj n))
@@ -754,16 +745,13 @@
           :db-read
           [res]
           {"op"      "search"
-           "request" {"filter"         (str (.filter request))
-                      "maxResults"     (.maxResults request)
-                      "minScore"       (.minScore request)
-                      "queryEmbedding" (.vector (.queryEmbedding request))}
+           "request" {"filter"     (str (.filter request))
+                      "maxResults" (.maxResults request)
+                      "minScore"   (.minScore request)}
            "matches" (mapv
                       (fn [^EmbeddingMatch match]
-                        {"embedded"  (str (.embedded match))
-                         "embedding" (.vector (.embedding match))
-                         "id"        (.embeddingId match)
-                         "score"     (.score match)})
+                        {"id"    (.embeddingId match)
+                         "score" (.score match)})
                       (.matches res))
           }))
 
