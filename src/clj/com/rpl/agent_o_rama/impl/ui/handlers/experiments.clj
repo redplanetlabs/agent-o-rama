@@ -81,7 +81,7 @@
     ;; 2. NEW LOGIC STARTS HERE: Check for early failure.
     (if-let [invoke (:experiment-invoke base-results)]
       ;; If we have the invoke coordinates for the experimenter agent...
-      (with-open [exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME)]
+      (with-open [exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME)]
         (if (aor/agent-invoke-complete? exp-client invoke)
           ;; If the agent is complete, fetch its result.
           (let [result (aor/agent-result exp-client invoke)]
