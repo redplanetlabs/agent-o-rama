@@ -4,7 +4,7 @@ This glossary defines terms that have project-specific meanings in the
 agent-o-rama framework, either different from or more constrained than
 their general computing definitions.
 
-## Agent
+## [Agent](terms/agent.md)
 
 A distributed, stateful computational unit that executes a directed,
 possibly cyclic, graph of nodes. Agents are the primary execution
@@ -50,7 +50,7 @@ objects into a deployable Rama module. Defined using `defagentmodule`
 macro, contains agent definitions, store declarations, and agent object
 builders.
 
-## Agent Node
+## [Agent Node](terms/agent-node.md)
 
 An individual execution unit within an agent graph that performs
 specific computation and can emit to other nodes or return
@@ -58,7 +58,7 @@ results. Defined with `aor/node` function, receives an `agent-node`
 parameter that provides access to stores, agent objects, and control
 functions like `emit!` and `result!`.
 
-## Agent Objects
+## [Agent Objects](terms/agent-objects.md)
 
 Shared resources (like AI models, databases, APIs) that agents can
 access during execution. Declared via `declare-agent-object` or
@@ -71,7 +71,7 @@ The final output value returned by an agent execution, signaling
 completion of the agent graph traversal. Set via `result!` function
 within agent nodes, retrieved via `agent-result` on client side.
 
-## Agent Step
+## [Agent Step](terms/agent-step.md)
 
 An individual execution unit returned by agent processing, can be result, human input request, or continuation.
 
@@ -89,14 +89,14 @@ The top-level container for defining agents, stores, and objects within
 a module. Created via `agents-topology` function, provides methods for
 declaring agents and resources.
 
-## Aggregation
+## [Aggregation](terms/aggregation.md)
 
 A distributed computation pattern for collecting and combining results
 from multiple node executions, using `agg-start-node`, `agg-node`, and
 `multi-agg` constructs. Enables scatter-gather patterns, parallel
 processing, and result combination across agent graph executions.
 
-## Dataset
+## [Dataset](terms/dataset.md)
 
 A managed collection of input/output examples for agent testing and
 evaluation. Created and managed via agent manager dataset functions for
@@ -114,7 +114,7 @@ Functions for measuring agent performance against datasets.
 
 A single execution instance within an experiment for tracking input/output pairs.
 
-## Experiment
+## [Experiment](terms/experiment.md)
 
 A structured test run comparing agent performance across datasets with specific evaluators.
 
@@ -130,7 +130,7 @@ A mechanism for agents to request input from human users during
 execution. Created via `get-human-input` within agent nodes, handled via
 client API to enable human-in-the-loop workflows.
 
-## Key-Value Store
+## [Key-Value Store](terms/key-value-store.md)
 
 A typed store for simple key-value pairs with specified key/value classes.
 
