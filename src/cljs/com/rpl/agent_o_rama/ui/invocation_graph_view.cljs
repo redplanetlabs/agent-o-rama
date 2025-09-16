@@ -90,21 +90,21 @@
 
     ;; Render the status bar if there are any indicators
     (when (seq indicators)
-      ($ :div {:className "absolute -top-1 -right-1 flex items-center gap-0.5 rounded-full px-0.5 py-0.5 bg-white border border-gray-200"}
+      ($ :div {:className (common/cn "absolute -top-1 -right-1 flex items-center gap-0.5 rounded-full px-0.5 py-0.5 bg-white border border-gray-200")}
          (for [{:keys [type title]} indicators]
            ($ :div {:key type
-                    :className "w-3 h-3 flex items-center justify-center"
+                    :className (common/cn "w-3 h-3 flex items-center justify-center")
                     :title title}
               (case type
                 :spinner ($ common/spinner {:size :small})
-                :stuck ($ :div {:className "w-3 h-3 bg-red-500 rounded-full flex items-center justify-center"}
-                          ($ :svg {:className "w-2 h-2 text-white" :fill "none" :viewBox "0 0 24 24" :stroke "currentColor"}
+                :stuck ($ :div {:className (common/cn "w-3 h-3 bg-red-500 rounded-full flex items-center justify-center")}
+                          ($ :svg {:className (common/cn "w-2 h-2 text-white") :fill "none" :viewBox "0 0 24 24" :stroke "currentColor"}
                              ($ :path {:strokeLinecap "round" :strokeLinejoin "round" :strokeWidth 3 :d "M6 18L18 6M6 6l12 12"})))
-                :changed ($ :div {:className "w-3 h-3 bg-orange-400 rounded-full"})
-                :human ($ :div {:className "w-3 h-3 flex items-center justify-center text-xs"} "🙋")
-                :exception ($ :div {:className "w-3 h-3 bg-yellow-500 rounded-full flex items-center justify-center"}
+                :changed ($ :div {:className (common/cn "w-3 h-3 bg-orange-400 rounded-full")})
+                :human ($ :div {:className (common/cn "w-3 h-3 flex items-center justify-center text-xs")} "🙋")
+                :exception ($ :div {:className (common/cn "w-3 h-3 bg-yellow-500 rounded-full flex items-center justify-center")}
                               ($ ExclamationTriangleIcon {:className "w-2 h-2 text-white"}))
-                :success ($ :div {:className "w-3 h-3 bg-green-500 rounded-full"})
+                :success ($ :div {:className (common/cn "w-3 h-3 bg-green-500 rounded-full")})
                 nil)))))))
 
 (defn pretty-format [item]
@@ -145,19 +145,19 @@
              :style {:background-color "rgba(0, 0, 0, 0.02)"}}
        (for [[idx item] (map-indexed vector displayed-items)]
          ($ :div {:key idx
-                  :className "flex items-start gap-2"}
+                  :className (common/cn "flex items-start gap-2")}
             ($ :span {:className (str "text-" color "-400 text-xs flex-shrink-0")}
                (str (inc idx) "."))
             ;; Recursively render each item using the generic viewer
-            ($ :div {:className "flex-1"}
+            ($ :div {:className (common/cn "flex-1")}
                ($ generic-data-viewer {:data item
                                        :color color
                                        :truncate-length truncate-length
                                        :depth depth}))))
        ;; Show all/less button at the bottom
        (when has-many-items?
-         ($ :div {:className "mt-2 pl-2"}
-            ($ :button {:className "text-xs text-blue-600 hover:underline cursor-pointer"
+         ($ :div {:className (common/cn "mt-2 pl-2")}
+            ($ :button {:className (common/cn "text-xs text-blue-600 hover:underline cursor-pointer")
                         :onClick #(set-show-all-items (not show-all-items))}
                (if show-all-items
                  "Show less"
@@ -253,7 +253,7 @@
                                      [:ui :hitl :submitting :placeholder]))]
 
     (when selected-node
-      ($ :div {:className "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl"}
+      ($ :div {:className (common/cn "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl")}
          ($ :div {:className "p-6"}
             ;; Human input section
             (when hr
@@ -269,10 +269,9 @@
                                   :onChange #(state/dispatch [:db/set-value
                                                               [:ui :hitl :responses (s/keypath hr-invoke-id)]
                                                               (.. % -target -value)])})
-                    ($ :button {:className (str "mt-2 px-3 py-2 rounded text-sm font-medium transition-colors "
-                                                (if submitting?
-                                                  "bg-gray-400 text-gray-600 cursor-not-allowed"
-                                                  "bg-blue-600 hover:bg-blue-700 text-white"))
+                    ($ :button {:className (common/cn "mt-2 px-3 py-2 rounded text-sm font-medium transition-colors"
+                                                      {"bg-gray-400 text-gray-600 cursor-not-allowed" submitting?
+                                                       "bg-blue-600 hover:bg-blue-700 text-white" (not submitting?)})
                                 :disabled (or submitting? (empty? (str/trim (or hitl-response ""))))
                                 :onClick #(when (and (not submitting?)
                                                      (not (empty? (str/trim (or hitl-response "")))))
@@ -304,8 +303,8 @@
 
             (when (seq exceptions)
               ($ :div {:className "bg-red-50 p-3 rounded-md mt-4 border border-red-200"}
-                 ($ :div {:className "text-sm font-medium text-red-700 mb-2 flex items-center gap-2"}
-                    ($ ExclamationTriangleIcon {:className "w-5 h-5"})
+                 ($ :div {:className (common/cn "text-sm font-medium text-red-700 mb-2 flex items-center gap-2")}
+                    ($ ExclamationTriangleIcon {:className (common/cn "w-5 h-5")})
                     (str "Exceptions (" (count exceptions) ")"))
                  ($ :div {:className "space-y-2"}
                     (for [[idx exc-str] (map-indexed vector exceptions)]
@@ -362,7 +361,7 @@
                                  :className "bg-white p-3 rounded border border-sky-200"}
 
                            ;; 1. The Header: Keep this part to display consistent op-level info
-                           ($ :div {:className "flex justify-between items-start mb-2"}
+                           ($ :div {:className (common/cn "flex justify-between items-start mb-2")}
                               ($ :div {:className "flex-1"}
                                  ($ :div {:className "flex items-center gap-2"}
                                     ($ :span {:className "text-sm font-medium text-sky-800 bg-sky-100 px-2 py-1 rounded"}
@@ -470,7 +469,7 @@
      [selected-node changed-nodes])
 
     (when selected-node
-      ($ :div {:className "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl"}
+      ($ :div {:className (common/cn "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl")}
          ($ :div {:className "p-6"}
             ($ :div {:className "mb-4"}
                ($ :h3 {:className "text-lg font-medium text-gray-800 mb-2"}
@@ -503,10 +502,9 @@
                        ($ :span {:className "text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full"} "Valid JSON")
                        ($ :span {:className "text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded-full"} "Invalid JSON")))
 
-                  ($ :textarea {:className (str "w-full h-32 p-3 border rounded-md font-mono text-sm resize-y transition-colors "
-                                                (if is-valid-json?
-                                                  "border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                                                  "border-red-500 ring-2 ring-red-300 focus:ring-red-500 focus:border-red-500"))
+                  ($ :textarea {:className (common/cn "w-full h-32 p-3 border rounded-md font-mono text-sm resize-y transition-colors"
+                                                      {"border-gray-300 focus:ring-blue-500 focus:border-blue-500" is-valid-json?
+                                                       "border-red-500 ring-2 ring-red-300 focus:ring-red-500 focus:border-red-500" (not is-valid-json?)})
                                 :value input-text
                                 :onChange (fn [e]
                                             (let [new-value (.-value (.-target e))]
@@ -566,7 +564,7 @@
 (defui exceptions-panel [{:keys [summary-data graph-data on-select-node]}]
   (let [exceptions (get-in summary-data [:exception-summaries])]
     (when (seq exceptions)
-      ($ :div {:className "bg-red-50 p-3 rounded-lg border border-red-200"}
+      ($ :div {:className (common/cn "bg-red-50 p-3 rounded-lg border border-red-200")}
          ($ :div {:className "text-sm font-medium text-red-700 mb-2 flex items-center gap-2"}
             ($ ExclamationTriangleIcon {:className "w-5 h-5"})
             (str "Exceptions (" (count exceptions) ")"))
@@ -715,22 +713,20 @@
          (state/dispatch [:db/set-value [:ui :active-tab] :info])))
      [is-live changed-nodes])
 
-    ($ :div {:className "fixed right-0 top-32 h-[calc(100vh-8rem)] w-80 bg-white shadow-lg border-l border-gray-200 overflow-hidden z-40"}
+    ($ :div {:className (common/cn "fixed right-0 top-32 h-[calc(100vh-8rem)] w-80 bg-white shadow-lg border-l border-gray-200 overflow-hidden z-40")}
        ;; Tab header
-       ($ :div {:className "border-b border-gray-200 p-4"}
-          ($ :div {:className "flex space-x-1 bg-gray-100 rounded-lg p-1"}
-             ($ :button {:className (str "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors "
-                                         (if (= active-tab :info)
-                                           "bg-white text-gray-900 shadow-sm"
-                                           "text-gray-600 hover:text-gray-900"))
+       ($ :div {:className (common/cn "border-b border-gray-200 p-4")}
+          ($ :div {:className (common/cn "flex space-x-1 bg-gray-100 rounded-lg p-1")}
+             ($ :button {:className (common/cn "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors"
+                                               {"bg-white text-gray-900 shadow-sm" (= active-tab :info)
+                                                "text-gray-600 hover:text-gray-900" (not= active-tab :info)})
                          :onClick #(state/dispatch [:db/set-value [:ui :active-tab] :info])}
                 "Info")
              ;; Only show Fork tab when not in live mode
              (when-not is-live
-               ($ :button {:className (str "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors "
-                                           (if (= active-tab :fork)
-                                             "bg-white text-gray-900 shadow-sm"
-                                             "text-gray-600 hover:text-gray-900"))
+               ($ :button {:className (common/cn "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors"
+                                                 {"bg-white text-gray-900 shadow-sm" (= active-tab :fork)
+                                                  "text-gray-600 hover:text-gray-900" (not= active-tab :fork)})
                            :onClick #(state/dispatch [:db/set-value [:ui :active-tab] :fork])}
                   (str "Fork" (when (> (count changed-nodes) 0) (str " (" (count changed-nodes) ")")))))))
 
@@ -767,10 +763,9 @@
                                                         (on-select-node node-id))))]
 
                            ($ :div {:key node-id
-                                    :className (str "border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow "
-                                                    (if is-overridden
-                                                      "bg-yellow-50 border-yellow-300 hover:bg-yellow-100"
-                                                      "bg-gray-50 border-gray-200 hover:bg-gray-100"))
+                                    :className (common/cn "border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow"
+                                                          {"bg-yellow-50 border-yellow-300 hover:bg-yellow-100" is-overridden
+                                                           "bg-gray-50 border-gray-200 hover:bg-gray-100" (not is-overridden)})
                                     :onClick handle-select-node}
                               ($ :div {:className "flex justify-between items-start mb-2"}
                                  ($ :div
