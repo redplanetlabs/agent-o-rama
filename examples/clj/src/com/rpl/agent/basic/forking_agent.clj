@@ -91,46 +91,32 @@
         (println "  Squared:" (:squared base-result))
         (println "  Valid:" (:valid? base-result))
 
-        ;; Fork from the calculate node with different input
-        (println "\n--- Fork 1: Different processed value ---")
+        ;; Fork without modification - re-runs with same data
+        (println "\n--- Fork 1: Re-run with same data ---")
         (let [fork1 (aor/agent-fork agent
                                     base-invoke
-                                    {"calculate" [{:original-input  {:base-value
-                                                                     10
-                                                                     :multiplier
-                                                                     2}
-                                                   :processed-value 20}]})]
+                                    {})]
           (println "Fork 1 result:")
           (println "  Processed value:" (:processed-value fork1))
           (println "  Squared:" (:squared fork1))
           (println "  Valid:" (:valid? fork1)))
 
         ;; Fork with async initiation
-        (println "\n--- Fork 2: Async fork with larger value ---")
+        (println "\n--- Fork 2: Async fork re-run ---")
         (let [fork2-invoke (aor/agent-initiate-fork agent
                                                     base-invoke
-                                                    {"calculate"
-                                                     [{:original-input
-                                                       {:base-value 7
-                                                        :multiplier 4}
-                                                       :processed-value 28}]})
+                                                    {})
               fork2-result (aor/agent-result agent fork2-invoke)]
           (println "Fork 2 result:")
           (println "  Processed value:" (:processed-value fork2-result))
           (println "  Squared:" (:squared fork2-result))
           (println "  Valid:" (:valid? fork2-result)))
 
-        ;; Fork from validation node with custom data
-        (println "\n--- Fork 3: Fork from validation node ---")
+        ;; Another fork example
+        (println "\n--- Fork 3: Another fork re-run ---")
         (let [fork3 (aor/agent-fork agent
                                     base-invoke
-                                    {"validate" [{:original-input  {:base-value
-                                                                    1
-                                                                    :multiplier
-                                                                    1}
-                                                  :processed-value 1
-                                                  :squared         1
-                                                  :halved          0.5}]})]
+                                    {})]
           (println "Fork 3 result:")
           (println "  Processed value:" (:processed-value fork3))
           (println "  Squared:" (:squared fork3))
@@ -139,6 +125,5 @@
 
       (println "\nNotice how:")
       (println "- Forks create independent execution branches")
-      (println "- Different nodes can be used as fork points")
-      (println "- Fork inputs override original node inputs")
+      (println "- Forks re-run the agent execution independently")
       (println "- Both sync and async forking are supported"))))
