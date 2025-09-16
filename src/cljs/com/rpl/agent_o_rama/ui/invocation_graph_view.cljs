@@ -299,12 +299,16 @@
                      {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
                       :onClick (fn [e]
                                  (.stopPropagation e)
-                                 (state/dispatch [:modal/show-form :add-from-trace
-                                                  {:module-id module-id
-                                                   :title (str "Add Node '" node-name "' to Dataset")
-                                                   :source-type :node
-                                                   :source-args input
-                                                   :source-emits emits}]))}
+                                 ;; Get data from app-db (graph-data) instead of converted component data
+                                 (let [raw-node-data (get graph-data node-id)
+                                       raw-input (:input raw-node-data)
+                                       raw-emits (:emits raw-node-data)]
+                                   (state/dispatch [:modal/show-form :add-from-trace
+                                                    {:module-id module-id
+                                                     :title (str "Add Node '" node-name "' to Dataset")
+                                                     :source-type :node
+                                                     :source-args raw-input
+                                                     :source-emits raw-emits}])))}
                      "Add to Dataset")))
 
             (when result
@@ -505,13 +509,13 @@
                                             :truncate-length 80
                                             :depth 0}))))
 
-              ;; Normal editing interface for unaffected nodes  
+            ;; Normal editing interface for unaffected nodes  
             ($ :div {:className "space-y-4"}
                ($ :div
                   ($ :div {:className "flex justify-between items-center mb-2"}
                      ($ :label {:className "block text-sm font-medium text-gray-700"}
                         "New Input (JSON format):")
-                       ;; Show validation status
+                     ;; Show validation status
                      (if is-valid-json?
                        ($ :span {:className "text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full"} "Valid JSON")
                        ($ :span {:className "text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded-full"} "Invalid JSON")))
@@ -649,12 +653,15 @@
                ($ :button
                   {:className "w-full text-sm font-medium py-2 px-4 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
                    :onClick (fn []
-                              (state/dispatch [:modal/show-form :add-from-trace
-                                               {:module-id module-id
-                                                :title "Add Agent Invocation to Dataset"
-                                                :source-type :agent
-                                                :source-args (:invoke-args summary-data)
-                                                :source-result result-val}]))}
+                              ;; Get data directly from app-db (summary-data) instead of converted component data
+                              (let [raw-result (:result summary-data)
+                                    raw-result-val (:val raw-result)]
+                                (state/dispatch [:modal/show-form :add-from-trace
+                                                 {:module-id module-id
+                                                  :title "Add Agent Invocation to Dataset"
+                                                  :source-type :agent
+                                                  :source-args (:invoke-args summary-data)
+                                                  :source-result raw-result-val}])))}
                   "Add to Dataset"))))
 
        ($ exceptions-panel {:summary-data summary-data
@@ -935,6 +942,8 @@
         handle-select-node-click (fn [node]
                                    (when on-select-node
                                      (let [node-data (js->clj (.-data node) :keywordize-keys true)]
+                                       (prn "DATA" (.-data node))
+                                       (prn "CONV" node-data)
                                        (on-select-node (:node-id node-data)))))]
 
     (if (empty? graph-data)

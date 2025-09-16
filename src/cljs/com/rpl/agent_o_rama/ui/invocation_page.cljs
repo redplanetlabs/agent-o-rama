@@ -12,11 +12,8 @@
 (defui invocation-page []
   (let [{:keys [module-id agent-name invoke-id]} (state/use-sub [:route :path-params])
 
-;; 1. Subscribe to all necessary state from app-db
-                ;; 1. Subscribe to the entire invocation state object
         invocation-state (state/use-sub [:invocations-data invoke-id])
 
-        ;; 2. Destructure the state with defaults
         {:keys [status graph summary next-leaves is-complete implicit-edges
                 root-invoke-id task-id forks fork-of error]}
         (or invocation-state {:status :loading})
