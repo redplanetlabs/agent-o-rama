@@ -6,6 +6,7 @@
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.core :as i]
+   [com.rpl.agent-o-rama.impl.datasets :as datasets]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -183,7 +184,7 @@
        (when @defined?-vol
          (throw (h/ex-info "Agents topology already defined" {})))
        (vreset! defined?-vol true)
-       (exp/define-experiments-agent! this)
+       (exp/define-evaluator-agent! this)
        (i/define-agents!
         setup
         topologies
@@ -736,6 +737,24 @@
              agent-invoke
              node
              callback-fn))
+          (subagent-next-step-async [this agent-invoke]
+            (i/client-wait-for-result
+             root-pstate
+             agent-invoke
+             (fn [{:keys [result human-request exceptions stats]}]
+               (cond
+                 result
+                 (fn [^CompletableFuture cf]
+                   (.complete cf
+                              {:stats  stats
+                               :result (if (:failure? result)
+                                         (i/mk-failure-exception result exceptions)
+                                         (aor-types/->AgentCompleteImpl (:val result)))}))
+                 human-request
+                 (fn [^CompletableFuture cf]
+                   (.complete cf human-request))
+               ))
+             true))
           aor-types/UnderlyingObjects
           (underlying-objects [this]
             {:agent-depot          agent-depot
@@ -789,8 +808,7 @@
                input
                (.referenceOutput options)
                (into #{} (.tags options))
-               (.source options)
-               (.linkedTrace options)
+               (or datasets/EXAMPLE-SOURCE (aor-types/->ApiSource))
               ))
              (.thenApply
               (h/cf-function [{error aor-types/AGENTS-TOPOLOGY-NAME}]
@@ -828,14 +846,6 @@
          (when error
            (throw (h/ex-info "Error updating example" {:info error})))
        ))
-     (setDatasetExampleSource [this datasetId snapshotName exampleId source]
-       (foreign-append!
-        datasets-depot
-        (aor-types/->valid-UpdateDatasetExample datasetId
-                                                snapshotName
-                                                exampleId
-                                                :source
-                                                source)))
      (removeDatasetExample [this datasetId snapshotName exampleId]
        (foreign-append!
         datasets-depot
@@ -1111,17 +1121,13 @@
    ;; types are validated by Java API
    (h/validate-options! name
                         options
-                        {:snapshot         h/any-spec
+                        {:snapshot h/any-spec
                          :reference-output h/any-spec
-                         :tags             h/any-spec
-                         :source           h/any-spec
-                         :linked-trace     h/any-spec})
+                         :tags     h/any-spec})
    (let [joptions (AddDatasetExampleOptions.)]
      (set! (.snapshotName joptions) (:snapshot options))
      (set! (.referenceOutput joptions) (:reference-output options))
      (set! (.tags joptions) (:tags options))
-     (set! (.source joptions) (:source options))
-     (set! (.linkedTrace joptions) (:linked-trace options))
      (.addDatasetExampleAsync manager
                               dataset-id
                               input
@@ -1164,24 +1170,6 @@
                                       (:snapshot options)
                                       example-id
                                       reference-output)))
-
-(defn set-dataset-example-source!
-  ([manager dataset-id example-id source]
-   (set-dataset-example-source! manager
-                                dataset-id
-                                example-id
-                                source
-                                nil))
-  ([^AgentManager manager dataset-id example-id source options]
-   ;; types are validated by Java API
-   (h/validate-options! name
-                        options
-                        {:snapshot h/any-spec})
-   (.setDatasetExampleSource manager
-                             dataset-id
-                             (:snapshot options)
-                             example-id
-                             source)))
 
 (defn remove-dataset-example!
   ([manager dataset-id example-id]

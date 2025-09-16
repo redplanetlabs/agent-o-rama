@@ -10,6 +10,7 @@
     AgentNodeExecutorTaskGlobal
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
+    AgentInvokeStats
     AgentNodeEmit
     AgentResult
     AggInput
@@ -17,7 +18,7 @@
     ExceptionSummary
     ExperimentInputSelector
     ForkContext
-    LinkedTrace
+    InfoSource
     NestedOpInfo
     NodeHumanInputRequest
     HistoricalAgentGraphInfo
@@ -97,6 +98,13 @@
   [agent-name]
   (str "$$_agent-root-" agent-name))
 
+(def FEEDBACK-SCHEMA
+  [(fixed-keys-schema
+    {:scores      {String Object}
+     :source      InfoSource
+     :created-at  Long
+     :modified-at Long})])
+
 (def AGENT-ROOT-PSTATE-SCHEMA
   {Long
    (fixed-keys-schema
@@ -110,6 +118,8 @@
      :finish-time-millis Long
      :last-progress-time-millis Long
      :retry-num          Long
+     :stats              AgentInvokeStats
+     :feedback           FEEDBACK-SCHEMA
      :human-requests     (set-schema NodeHumanInputRequest {:subindex? true})
      :fork-of            (fixed-keys-schema
                           {:parent-agent-id Long
@@ -168,6 +178,7 @@
      :start-time-millis   Long
      :finish-time-millis  Long
      :exceptions          [String] ; throwable strs
+     :feedback            FEEDBACK-SCHEMA
 
      :agg-invoke-id       UUID
 
@@ -242,8 +253,7 @@
         {:input            Object
          :reference-output Object
          :tags             #{String}
-         :source           String
-         :linked-trace     LinkedTrace
+         :source           InfoSource
          :created-at       Long
          :modified-at      Long
         })
@@ -269,9 +279,14 @@
                                                           {:agent-name   String
                                                            :agent-invoke AgentInvoke})}
                                   :agent-results   {Long (fixed-keys-schema
-                                                          {:result AgentResult
-                                                           :start-time-millis Long
-                                                           :finish-time-millis Long})}
+                                                          {:result             AgentResult
+                                                           :start-time-millis  Long
+                                                           :finish-time-millis Long
+                                                           :input-token-count  Long
+                                                           :output-token-count Long
+                                                           :total-token-count  Long
+                                                          })}
+                                  :eval-initiates  {String AgentInvoke}
                                   :evals           {String {String Object}} ; eval-name->eval-key->result
                                   :eval-failures   {String String}
                                  })
@@ -280,6 +295,9 @@
         :summary-eval-failures {String String}
         :eval-number-stats     {String {String EvalNumberStats}}
         :latency-number-stats  EvalNumberStats
+        :input-token-number-stats EvalNumberStats
+        :output-token-number-stats EvalNumberStats
+        :total-token-number-stats EvalNumberStats
        })
       {:subindex? true})
     })})

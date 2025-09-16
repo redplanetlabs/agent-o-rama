@@ -163,18 +163,16 @@
      (is (= ["ABC 1" "ABC 2" "DEF 3"] (mapv :prompt items)))
      (aor/provide-human-input foo r0 "hello there")
 
-     (bind trace
-       (foreign-invoke-query traces-query
-                             agent-task-id1
-                             [[agent-task-id1 root1]]
-                             10000))
-
      (is
-      ;; provide-human-input only blocks until it's delviered, not until node is
+      ;; provide-human-input only blocks until it's delivered, not until node is
       ;; complete
       (condition-attained?
        (trace-matches?
-        (:invokes-map trace)
+        (:invokes-map
+         (foreign-invoke-query traces-query
+                               agent-task-id1
+                               [[agent-task-id1 root1]]
+                               10000))
         {!id1
          {:agent-id      ?agent-id
           :agent-task-id ?agent-task-id

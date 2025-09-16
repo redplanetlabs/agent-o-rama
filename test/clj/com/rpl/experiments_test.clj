@@ -48,6 +48,22 @@
     (when-not (= res :done)
       (throw (h/ex-info "Experiment failed" {:res res})))))
 
+(defn check-experiment-feedback!
+  [all-feedback all-score-sets]
+  (doseq [[fb score-sets] (mapv vector all-feedback all-score-sets)]
+    (doseq [{:keys [source created-at modified-at]} fb]
+      (when-not (aor-types/ExperimentSource? source)
+        (throw (ex-info "Expected ExperimentSource"
+                        {:feedback fb})))
+      (when-not (and created-at modified-at (= created-at modified-at))
+        (throw (ex-info "Mismatched feedback times" {:feedback fb}))))
+    (let [scores (mapv :scores fb)]
+      (when-not (= (count scores) (count score-sets))
+        (throw (ex-info "Scores count mismatch" {:scores scores :score-sets score-sets})))
+      (when-not (= (set scores) score-sets)
+        (throw (ex-info "Scores mismatch" {:scores scores :score-sets score-sets})))
+    )))
+
 (deftest basic-experiments-test
   (let [example-id-chunks-atom (atom [])]
     (with-redefs [exp/hook:running-invoke-node
@@ -107,6 +123,14 @@
                  "start"
                  ["end" "end2" "a" "b"]
                  (fn [agent-node action & inputs]
+                   (aor/record-nested-op!
+                    agent-node
+                    :model-call
+                    10
+                    11
+                    {"inputTokenCount"  1
+                     "outputTokenCount" 100
+                     "totalTokenCount"  1000})
                    (if (= action "counts")
                      (let [v (reduce + 0 (mapv count-or-num inputs))]
                        (aor/emit! agent-node "end" :ignore v)
@@ -157,12 +181,28 @@
          (bind ds-module-name (get-module-name ds-module))
          (bind manager (aor/agent-manager ipc module-name))
          (bind ds-manager (aor/agent-manager ipc ds-module-name))
-         (bind exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME))
+         (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
+         (bind foo-root
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name "foo")))
+         (bind exp-root
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name exp/EVALUATOR-AGENT-NAME)))
+
          (bind global-actions-depot
            (foreign-depot ipc module-name (po/global-actions-depot-name)))
 
          (bind results
            (foreign-query ipc module-name (queries/experiment-results-name)))
+
+         (bind root-feedback
+           (fn [{:keys [task-id agent-invoke-id]}]
+             (foreign-select-one [(keypath agent-invoke-id) :feedback] foo-root {:pkey task-id})))
+         (bind exp-root-feedback
+           (fn [{:keys [task-id agent-invoke-id]}]
+             (foreign-select-one [(keypath agent-invoke-id) :feedback] exp-root {:pkey task-id})))
 
          (aor/create-evaluator! manager
                                 "concise2"
@@ -290,8 +330,59 @@
          (is
           (trace-matches?
            res
-           {:summary-evals     {"mycount" {"res" 8} "mysum" {"res" 110}}
+           {:summary-evals {"mycount" {"res" 8} "mysum" {"res" 110}}
             :summary-eval-failures nil
+            :input-token-number-stats
+            {:total       8
+             :count       8
+             :min         1
+             :max         1
+             :percentiles
+             {0.6   1
+              0.3   1
+              0.7   1
+              0.5   1
+              0.9   1
+              0.1   1
+              0.4   1
+              0.2   1
+              0.8   1
+              0.999 1
+              0.99  1}}
+            :output-token-number-stats
+            {:total       800
+             :count       8
+             :min         100
+             :max         100
+             :percentiles
+             {0.6   100
+              0.3   100
+              0.7   100
+              0.5   100
+              0.9   100
+              0.1   100
+              0.4   100
+              0.2   100
+              0.8   100
+              0.999 100
+              0.99  100}}
+            :total-token-number-stats
+            {:total       8000
+             :count       8
+             :min         1000
+             :max         1000
+             :percentiles
+             {0.6   1000
+              0.3   1000
+              0.7   1000
+              0.5   1000
+              0.9   1000
+              0.1   1000
+              0.4   1000
+              0.2   1000
+              0.8   1000
+              0.999 1000
+              0.99  1000}}
             :latency-number-stats
             {:count 8}
             :eval-number-stats
@@ -412,9 +503,19 @@
                     :total)
                 0))
 
-         (is (every? aor-types/AgentInvokeImpl?
-                     (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
 
+         (bind ais (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res))
+         (is (every? aor-types/AgentInvokeImpl? ais))
+         (bind all-feedback (mapv root-feedback ais))
+         (check-experiment-feedback! all-feedback
+                                     [#{{"len" 20} {"concise?" true}}
+                                      #{{"len" 6} {"concise?" true}}
+                                      #{{"len" 20} {"concise?" false}}
+                                      #{{"len" 9} {"concise?" true}}
+                                      #{{"len" 20} {"concise?" true}}
+                                      #{{"len" 6} {"concise?" true}}
+                                      #{{"len" 20} {"concise?" false}}
+                                      #{{"len" 9} {"concise?" true}}])
 
 
          (doseq [{:keys [start-time-millis finish-time-millis]}
@@ -457,6 +558,7 @@
          (is (= 2 (count @example-id-chunks-atom)))
          (is (= #{2 1} (set @example-id-chunks-atom)))
 
+
          (is
           (trace-matches?
            res
@@ -467,7 +569,7 @@
              {:example-id       !eid1
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}
+               {:agent-name "_aor-evaluator"}
                1
                {:agent-name "foo"}}
               :agent-results
@@ -487,7 +589,7 @@
              {:example-id       !eid2
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}
+               {:agent-name "_aor-evaluator"}
                1
                {:agent-name "foo"}}
               :agent-results
@@ -507,7 +609,7 @@
              {:example-id       !eid3
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}
+               {:agent-name "_aor-evaluator"}
                1
                {:agent-name "foo"}}
               :agent-results
@@ -524,8 +626,16 @@
               :input            {"a" 3 "b" 1000}
               :reference-output ["abcdefg" "hijklmnop"]}}}
           ))
-         (is (every? aor-types/AgentInvokeImpl?
-                     (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
+         (bind ais (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res))
+
+         (is (every? aor-types/AgentInvokeImpl? ais))
+         (bind all-feedback (mapv root-feedback ais))
+         ;; no feedback for comparative experiments
+         (is (every? empty? all-feedback))
+
+         (bind ei (select [:results MAP-VALS :eval-initiates MAP-VALS] res))
+         (is (every? aor-types/AgentInvokeImpl? ei))
+         (is (= 3 (count ei)))
 
 
          ;; test:
@@ -553,6 +663,7 @@
              2)))
 
          (wait-experiment-finished! exp-client exp-invoke)
+
          (bind res (foreign-invoke-query results remote-ds exp-id))
          (is
           (trace-matches?
@@ -564,7 +675,7 @@
              {:example-id       !eid1
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}}
+               {:agent-name "_aor-evaluator"}}
               :agent-results    {0 {:result {:val {"a" "110"} :failure? false}}}
               :evals            {"rc3" {"concise?" true}}
               :input            {"a" 1 "b" 10}
@@ -573,7 +684,7 @@
              {:example-id       !eid2
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}}
+               {:agent-name "_aor-evaluator"}}
               :agent-results    {0 {:result {:val {"a" "2100"} :failure? false}}}
               :evals            {"rc3" {"concise?" false}}
               :input            {"a" 2 "b" 100}
@@ -582,12 +693,20 @@
              {:example-id       !eid3
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}}
+               {:agent-name "_aor-evaluator"}}
               :agent-results    {0 {:result {:val {"a" "31000"} :failure? false}}}
               :evals            {"rc3" {"concise?" false}}
               :input            {"a" 3 "b" 1000}
               :reference-output ["abcdefg" "hijklmnop"]}}}
           ))
+
+         (bind ais (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res))
+         (is (every? aor-types/AgentInvokeImpl? ais))
+         (bind all-feedback (mapv exp-root-feedback ais))
+         (check-experiment-feedback! all-feedback
+                                     [#{{"concise?" true}}
+                                      #{{"concise?" false}}
+                                      #{{"concise?" false}}])
 
 
          ;; test selecting specific tag
@@ -620,7 +739,7 @@
                             {:example-id       !eid1
                              :agent-initiates
                              {0
-                              {:agent-name "_aor-experimenter"}}
+                              {:agent-name "_aor-evaluator"}}
                              :agent-results    {0 {:result {:val {"a" "abcdefg!"} :failure? false}}}
                              :input            "abcdefg"
                              :reference-output "aaaaaaaaaaa"}
@@ -628,7 +747,7 @@
                             {:example-id       !eid2
                              :agent-initiates
                              {0
-                              {:agent-name "_aor-experimenter"}}
+                              {:agent-name "_aor-evaluator"}}
                              :agent-results    {0 {:result {:val {"a" "ab!"} :failure? false}}}
                              :input            "ab"
                              :reference-output ".."}
@@ -636,7 +755,7 @@
                             {:example-id       !eid3
                              :agent-initiates
                              {0
-                              {:agent-name "_aor-experimenter"}}
+                              {:agent-name "_aor-evaluator"}}
                              :agent-results
                              {0 {:result {:val {"a" "123456789abcdefg!"} :failure? false}}}
                              :input            "123456789abcdefg"
@@ -674,7 +793,7 @@
              {:example-id       !eid0
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}}
+               {:agent-name "_aor-evaluator"}}
               :agent-results    {0 {:result {:val {"a" "abcdefg!!!"} :failure? false}}}
               :input            "abcdefg"
               :reference-output "aaaaaaaaaaa"}
@@ -682,7 +801,7 @@
              {:example-id       !eid1
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}}
+               {:agent-name "_aor-evaluator"}}
               :agent-results    {0 {:result {:val {"a" "aa!!!"} :failure? false}}}
               :input            "aa"
               :reference-output "bbbbb"}}}
@@ -719,7 +838,7 @@
              {:example-id       !eid0
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}}
+               {:agent-name "_aor-evaluator"}}
               :agent-results    {0 {:result {:val {"a" "abcdefg!!!"} :failure? false}}}
               :input            "abcdefg"
               :reference-output "aaaaaaaaaaa"}}}
@@ -758,7 +877,7 @@
              {:example-id       !eid0
               :agent-initiates
               {0
-               {:agent-name "_aor-experimenter"}}
+               {:agent-name "_aor-evaluator"}}
               :agent-results
               {0
                {:result {:val      {:message "Node does not exist" :node "notanode"}
@@ -971,7 +1090,7 @@
        (rtest/launch-module! ipc module {:tasks 2 :threads 2})
        (bind module-name (get-module-name module))
        (bind manager (aor/agent-manager ipc module-name))
-       (bind exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME))
+       (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
        (bind global-actions-depot
          (foreign-depot ipc module-name (po/global-actions-depot-name)))
        (bind results
@@ -1086,7 +1205,7 @@
            {:example-id       !eid0
             :agent-initiates
             {0
-             {:agent-name "_aor-experimenter"}}
+             {:agent-name "_aor-evaluator"}}
             :agent-results    {0 {:result {:val "a?" :failure? false}}}
             :evals            {"concise2" {"concise?" true}}
             :input            "a"
@@ -1095,7 +1214,7 @@
            {:example-id       !eid1
             :agent-initiates
             {0
-             {:agent-name "_aor-experimenter"}}
+             {:agent-name "_aor-evaluator"}}
             :agent-results    {0 {:result {:val "fail-agent?" :failure? false}}}
             :evals            {"concise2" {"concise?" false}}
             :input            "fail-agent"
@@ -1104,7 +1223,7 @@
            {:example-id       !eid2
             :agent-initiates
             {0
-             {:agent-name "_aor-experimenter"}}
+             {:agent-name "_aor-evaluator"}}
             :agent-results
             {0
              {:result {:val
@@ -1206,7 +1325,7 @@
             {0
              {:agent-name "foo"}
              1
-             {:agent-name "_aor-experimenter"}}
+             {:agent-name "_aor-evaluator"}}
             :agent-results
             {0 {:result {:val "a!" :failure? false}}
              1 {:result {:val "a?" :failure? false}}}
@@ -1221,7 +1340,7 @@
             {0
              {:agent-name "foo"}
              1
-             {:agent-name "_aor-experimenter"}}
+             {:agent-name "_aor-evaluator"}}
             :agent-results
             {0 {:result {:val "b!" :failure? false}}
              1 {:result {:val "b?" :failure? false}}}
@@ -1246,7 +1365,7 @@
             {0
              {:agent-name "foo"}
              1
-             {:agent-name "_aor-experimenter"}}
+             {:agent-name "_aor-evaluator"}}
             :agent-results
             {0 {:result {:val "a!" :failure? false}}
              1 {:result {:val "a?" :failure? false}}}
@@ -1260,7 +1379,7 @@
             {0
              {:agent-name "foo"}
              1
-             {:agent-name "_aor-experimenter"}}
+             {:agent-name "_aor-evaluator"}}
             :agent-results
             {0 {:result {:val "b!" :failure? false}}
              1 {:result {:val "b?" :failure? false}}}
@@ -1284,6 +1403,10 @@
                 exp/hook:result-target
                 (fn [i]
                   ((get @HANDLER-FNS :result) i))
+
+                exp/hook:initiate-eval
+                (fn [i]
+                  ((get @HANDLER-FNS :initiate-eval) i))
 
                 exp/hook:do-eval
                 (fn [eval-name]
@@ -1336,7 +1459,7 @@
        (rtest/launch-module! ipc module {:tasks 2 :threads 2})
        (bind module-name (get-module-name module))
        (bind manager (aor/agent-manager ipc module-name))
-       (bind exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME))
+       (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
        (bind global-actions-depot
          (foreign-depot ipc module-name (po/global-actions-depot-name)))
        (bind results
@@ -1356,10 +1479,11 @@
 
        (bind reset-handlers!
          (fn []
-           (reset! HANDLER-FNS {:initiate (constantly nil)
-                                :result   (constantly nil)
-                                :eval     (constantly nil)
-                                :summary  (constantly nil)})))
+           (reset! HANDLER-FNS {:initiate      (constantly nil)
+                                :initiate-eval (constantly nil)
+                                :result        (constantly nil)
+                                :eval          (constantly nil)
+                                :summary       (constantly nil)})))
        (bind handler!
          (fn [k afn]
            (swap! HANDLER-FNS assoc k afn)))
@@ -1593,6 +1717,90 @@
             :input            "cc"
             :reference-output nil}}}
         ))
+
+
+       (reset-handlers!)
+       (reset! RUNS [])
+       (fail-on-n! :initiate-eval 2)
+       (bind exp-id (h/random-uuid7))
+       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (foreign-append!
+          global-actions-depot
+          (aor-types/->valid-StartExperiment
+           exp-id
+           "My experiment"
+           ds-id1
+           nil
+           nil
+           [(aor-types/->valid-EvaluatorSelector "reg" false)
+            (aor-types/->valid-EvaluatorSelector "reg2" false)]
+           (aor-types/->valid-RegularExperiment
+            (aor-types/->valid-ExperimentTarget
+             (aor-types/->valid-AgentTarget "foo")
+             ["$"]))
+           1
+           1)))
+       (wait-experiment-finished! exp-client exp-invoke)
+       (bind res (foreign-invoke-query results ds-id1 exp-id))
+       (is (= {:agent 3 :eval-r 6}
+              (->> @RUNS
+                   (group-by identity)
+                   (transform MAP-VALS count))))
+       (is
+        (trace-matches?
+         res
+         {:latency-number-stats {:count 3}
+          :summary-eval-failures nil
+          :total-token-number-stats {:total 0
+                                     :count 3}
+          :input-token-number-stats {:total 0
+                                     :count 3}
+          :output-token-number-stats {:total 0
+                                      :count 3}
+          :summary-evals nil
+          :eval-number-stats {}
+
+          :results
+          {0
+           {:example-id       !eid0
+            :agent-initiates
+            {0
+             {:agent-name "foo"}}
+            :agent-results
+            {0
+             {:result {:val "aa!" :failure? false}}}
+            :eval-initiates   {"reg"  !init0
+                               "reg2" !init1}
+            :evals            {"reg" {"res" "aa!"} "reg2" {"res" "aa!"}}
+            :input            "aa"
+            :reference-output nil}
+           1
+           {:example-id       !eid1
+            :agent-initiates  {0
+                               {:agent-name "foo"}}
+            :agent-results
+            {0
+             {:result {:val "bb!" :failure? false}}}
+            :eval-initiates   {"reg"  !init2
+                               "reg2" !init3}
+            :evals            {"reg" {"res" "bb!"} "reg2" {"res" "bb!"}}
+            :input            "bb"
+            :reference-output nil}
+           2
+           {:example-id       !eid3
+            :agent-initiates  {0
+                               {:agent-name "foo"}}
+            :agent-results
+            {0
+             {:result {:val "cc!" :failure? false}}}
+            :eval-initiates   {"reg"  !init4
+                               "reg2" !init5}
+            :evals            {"reg" {"res" "cc!"} "reg2" {"res" "cc!"}}
+            :input            "cc"
+            :reference-output nil}}}
+        ))
+       (is (every? aor-types/AgentInvokeImpl?
+                   (select [:results MAP-VALS :eval-initiates MAP-VALS] res)))
       ))))
 
 (deftest search-experiments-test
@@ -1620,7 +1828,7 @@
      (rtest/launch-module! ipc module {:tasks 2 :threads 2})
      (bind module-name (get-module-name module))
      (bind manager (aor/agent-manager ipc module-name))
-     (bind exp-client (aor/agent-client manager exp/EXPERIMENTER-NAME))
+     (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
      (bind global-actions-depot
        (foreign-depot ipc module-name (po/global-actions-depot-name)))
      (bind search
@@ -1746,6 +1954,9 @@
      ;; regular experiments have these additional aggregated stats
      (is (every? #(contains? % :eval-number-stats) (:items res)))
      (is (every? #(contains? % :latency-number-stats) (:items res)))
+     (is (every? #(contains? % :input-token-number-stats) (:items res)))
+     (is (every? #(contains? % :output-token-number-stats) (:items res)))
+     (is (every? #(contains? % :total-token-number-stats) (:items res)))
 
 
      (bind res

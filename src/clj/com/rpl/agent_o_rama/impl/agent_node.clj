@@ -14,6 +14,7 @@
   (:import
    [com.rpl.agentorama
     AgentClient
+    AgentFailedException
     AgentNode
     AgentObjectFetcher
     HumanInputRequest
@@ -349,14 +350,38 @@
           (initiateForkAsync [this invoke invokeIdToNewArgs]
             (no-async!))
           (nextStep [this agent-invoke]
-            (timed-agent-call
-             (.nextStep client agent-invoke)
-             agent-node
-             agent-info-tuple
-             [res]
-             {"op"           "nextStep"
-              "agent-invoke" agent-invoke
-              "result"       res}))
+            (let [start-time-millis (h/current-time-millis)
+                  ret               (.get ^CompletableFuture
+                                          (aor-types/subagent-next-step-async client agent-invoke))
+                  [stats res]       (if (instance? HumanInputRequest ret)
+                                      [nil ret]
+                                      [(:stats ret) (:result ret)])
+
+                  finish-time-millis
+                  (h/current-time-millis)
+                  [agent-module-name agent-name]
+                  agent-info-tuple
+                  data-map
+                  {"op"           "nextStep"
+                   "agent-invoke" agent-invoke
+                   "agent-module-name" agent-module-name
+                   "agent-name"   agent-name}
+
+                  data-map
+                  (if stats (assoc data-map "stats" stats) data-map)
+                  data-map
+                  (if (instance? AgentFailedException res) data-map (assoc data-map "result" res))
+                 ]
+              (record-nested-op!-impl
+               agent-node
+               :agent-call
+               start-time-millis
+               finish-time-millis
+               data-map)
+              (if (instance? AgentFailedException res)
+                (throw res))
+              res
+            ))
           (nextStepAsync [this agent-invoke]
             (no-async!))
           (result [this agent-invoke]
@@ -408,6 +433,9 @@
             (no-async!))
           (close [this]
             (close! client))
+          aor-types/AgentClientInternal
+          (subagent-next-step-async [this agent-invoke]
+            (aor-types/subagent-next-step-async client agent-invoke))
           aor-types/UnderlyingObjects
           (underlying-objects [this]
             (aor-types/underlying-objects client))
@@ -625,9 +653,8 @@
           name
           :db-write
           [res]
-          {"op"        "add"
-           "embedding" (.vector embedding)
-           "id"        res
+          {"op" "add"
+           "id" res
           }))
        (^String add [this ^Embedding embedding ^Object embedded]
          (with-traced
@@ -635,10 +662,8 @@
           name
           :db-write
           [res]
-          {"op"        "add"
-           "embedding" (.vector embedding)
-           "embedded"  (str embedded)
-           "id"        res
+          {"op" "add"
+           "id" res
           }))
        (^void add [this ^String id ^Embedding embedding]
          (with-traced
@@ -646,9 +671,8 @@
           name
           :db-write
           [res]
-          {"op"        "add"
-           "embedding" (.vector embedding)
-           "id"        id
+          {"op" "add"
+           "id" id
           }))
        (addAll [this embeddings]
          (with-traced
@@ -656,9 +680,8 @@
           name
           :db-write
           [res]
-          {"op"         "addAll"
-           "embeddings" (mapv #(.vector ^Embedding %) embeddings)
-           "ids"        res
+          {"op"  "addAll"
+           "ids" res
           }))
        (addAll [this embeddings embeddeds]
          (with-traced
@@ -666,10 +689,8 @@
           name
           :db-write
           [res]
-          {"op"         "addAll"
-           "embeddings" (mapv #(.vector ^Embedding %) embeddings)
-           "embeddeds"  (mapv str embeddeds)
-           "ids"        res
+          {"op"  "addAll"
+           "ids" res
           }))
        (addAll [this ids embeddings embeddeds]
          (with-traced
@@ -677,10 +698,8 @@
           name
           :db-write
           [res]
-          {"op"         "addAll"
-           "embeddings" (mapv #(.vector ^Embedding %) embeddings)
-           "embeddeds"  (mapv str embeddeds)
-           "ids"        ids
+          {"op"  "addAll"
+           "ids" ids
           }))
        (generateIds [this n]
          (.generateIds obj n))
@@ -726,16 +745,13 @@
           :db-read
           [res]
           {"op"      "search"
-           "request" {"filter"         (str (.filter request))
-                      "maxResults"     (.maxResults request)
-                      "minScore"       (.minScore request)
-                      "queryEmbedding" (.vector (.queryEmbedding request))}
+           "request" {"filter"     (str (.filter request))
+                      "maxResults" (.maxResults request)
+                      "minScore"   (.minScore request)}
            "matches" (mapv
                       (fn [^EmbeddingMatch match]
-                        {"embedded"  (str (.embedded match))
-                         "embedding" (.vector (.embedding match))
-                         "id"        (.embeddingId match)
-                         "score"     (.score match)})
+                        {"id"    (.embeddingId match)
+                         "score" (.score match)})
                       (.matches res))
           }))
 

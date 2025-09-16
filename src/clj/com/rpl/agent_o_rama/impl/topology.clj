@@ -3,6 +3,7 @@
         [com.rpl.rama path])
   (:require
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
+   [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
@@ -66,15 +67,18 @@
   []
   (:>))
 
+(defn hook:writing-result [agent-task-id agent-id result])
+
 (defn finished-streaming-chunk
   []
   (aor-types/->StreamingChunk -1 -1 iclient/FINISHED))
 
 (deframaop send-emits>
   [*agent-name *agent-task-id *agent-id *retry-num *invoke-id *agg-invoke-id
-   *emits *fork-context]
+   *emits *result *stats *fork-context]
   (<<with-substitutions
-   [$$root (po/agent-root-task-global *agent-name)]
+   [$$root (po/agent-root-task-global *agent-name)
+    $$active (po/agent-active-invokes-task-global *agent-name)]
    (anchor> <root>)
    (ops/explode *emits
                 :> {:keys [*invoke-id *fork-invoke-id *target-task-id
@@ -100,13 +104,28 @@
    (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
                |direct
                *agent-task-id)
+   ;; <<atomic here only because tests override the hook to elide this
    (<<atomic
      (hook:update-last-progress>)
      (local-transform>
       [(keypath *agent-id)
-       :last-progress-time-millis
-       (termval (h/current-time-millis))]
+       (multi-path [:last-progress-time-millis (termval (h/current-time-millis))]
+                   [:stats (term (ana/agent-stats-merger *stats))])]
       $$root))
+
+   (<<if (some? *result)
+     (hook:writing-result *agent-task-id *agent-id *result)
+     ;; if race with retry and it happened to have finished, don't change the
+     ;; result here – this can happen if the agent has other branches that fail
+     ;; besides the one that created the result
+     (h/current-time-millis :> *finish-time-millis)
+     (local-transform>
+      [(keypath *agent-id)
+       (selected? :result nil?)
+       (multi-path [:result (termval *result)]
+                   [:finish-time-millis (termval *finish-time-millis)])]
+      $$root)
+     (local-transform> [(keypath *agent-id) NONE>] $$active))
    (<<if (some? *agg-invoke-id)
      (aor-types/->valid-AggAckOp *agg-invoke-id *ack-val :> *op)
      (anchor> <agg-ack-emit>)
@@ -147,29 +166,6 @@
    (unify> <regular-emit> <agg-ack-emit>)
    (:> *op)))
 
-(defn hook:writing-result [agent-task-id agent-id result])
-
-(deframaop handle-result!
-  [*agent-name *agent-task-id *agent-id *retry-num *result]
-  (<<with-substitutions
-   [$$root (po/agent-root-task-global *agent-name)
-    $$active (po/agent-active-invokes-task-global *agent-name)]
-   (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
-               |direct
-               *agent-task-id)
-   (hook:writing-result *agent-task-id *agent-id *result)
-   ;; if race with retry and it happened to have finished, don't change the
-   ;; result here – this can happen if the agent has other branches that fail
-   ;; besides the one that created the result
-   (h/current-time-millis :> *finish-time-millis)
-   (local-transform>
-    [(keypath *agent-id)
-     (selected? :result nil?)
-     (multi-path [:result (termval *result)]
-                 [:finish-time-millis (termval *finish-time-millis)])]
-    $$root)
-   (local-transform> [(keypath *agent-id) NONE>] $$active)
-   (:>)))
 
 (deframaop init-root
   [*agent-name *agent-id *retry-num *args]
@@ -190,6 +186,7 @@
                :ack-val           (h/half-uuid *invoke-id)
                :last-progress-time-millis *current-time-millis
                :retry-num         *retry-num
+               :stats             ana/EMPTY-AGENT-STATS
                :start-time-millis *current-time-millis})]
     $$root)
    (:> *invoke-id)))
@@ -436,18 +433,17 @@
    (local-select> (keypath *invoke-id)
                   $$nodes
                   :> {:keys [*agent-task-id *agent-id *node
-                             *agg-invoke-id]
-                      :as   *all-data})
+                             *agg-invoke-id *start-time-millis]})
    (filter> (some? *agent-id))
    (apart/filter-valid-retry-num> *agent-name
                                   *agent-task-id
                                   *agent-id
                                   *retry-num)
-   (:> *agent-task-id *agent-id *node *agg-invoke-id)))
+   (:> *agent-task-id *agent-id *node *agg-invoke-id *start-time-millis)))
 
 (deframaop handle-node-complete-emits
   [*agent-name *agent-task-id *agent-id *retry-num *node *invoke-id
-   *agg-invoke-id *result *emits *fork-context]
+   *agg-invoke-id *result *emits *stats *fork-context]
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)]
    (<<subsource (get-node-obj (po/agent-graph-task-global *agent-name) *node)
@@ -463,10 +459,6 @@
                     :> {*invoke-id :agg-start-invoke-id})
    )
 
-   ;; AgentNode implementation makes it impossible for there to be both
-   ;; emits and result
-   (<<if (some? *result)
-     (handle-result! *agent-name *agent-task-id *agent-id *retry-num *result))
    (send-emits> *agent-name
                 *agent-task-id
                 *agent-id
@@ -474,6 +466,8 @@
                 *invoke-id
                 *agg-invoke-id
                 *emits
+                *result
+                *stats
                 *fork-context
                 :> *op)
    (:> *op)))
@@ -492,7 +486,7 @@
    (begin-node-complete *agent-name
                         *invoke-id
                         *retry-num
-                        :> *agent-task-id *agent-id *node *agg-invoke-id)
+                        :> *agent-task-id *agent-id *node *agg-invoke-id *start-time-millis)
    (<<ramafn %merger
      [*m]
      (:> (reduce-kv assoc
@@ -511,6 +505,9 @@
                         :agg-start-res
                         (termval *node-fn-res)]
                        $$nodes))
+
+
+   (ana/mk-node-stats *node *start-time-millis *finish-time-millis *nested-ops :> *stats)
    (handle-node-complete-emits
     *agent-name
     *agent-task-id
@@ -521,6 +518,7 @@
     *agg-invoke-id
     *result
     *emits
+    *stats
     nil
     :> *op)
    (:> *agent-task-id *agent-id *retry-num *op)
@@ -652,7 +650,7 @@
    (begin-node-complete *agent-name
                         *invoke-id
                         *retry-num
-                        :> *agent-task-id *agent-id *node *agg-invoke-id)
+                        :> *agent-task-id *agent-id *node *agg-invoke-id _)
    (hook:handling-retry-node-complete> *agent-name *node *invoke-id *retry-num)
    (get-node-obj *agent-graph *node :> *node-obj)
    (local-select> (keypath *invoke-id)
@@ -662,12 +660,12 @@
    (<<if (aor-types/NodeAggStart? *node-obj)
      (local-select> (keypath *agg-invoke-id)
                     $$nodes
-                    :> {*agg-finished?        :agg-finished?
-                        *agg-node-name        :node
-                        *parent-agg-invoke-id :agg-invoke-id
-                        *finish-time-millis   :finish-time-millis})
+                    :> {*agg-finished?          :agg-finished?
+                        *agg-node-name          :node
+                        *parent-agg-invoke-id   :agg-invoke-id
+                        *agg-finish-time-millis :finish-time-millis})
      (<<if *agg-finished?
-       (<<if (some? *finish-time-millis)
+       (<<if (some? *agg-finish-time-millis)
          (depot-partition-append!
           *agent-depot
           (aor-types/->valid-RetryNodeComplete *agg-invoke-id
@@ -699,6 +697,7 @@
     *agg-invoke-id
     *result
     *emits
+    nil
     *fork-context
     :> *op)
    (:> *agent-task-id *agent-id *retry-num *op)))

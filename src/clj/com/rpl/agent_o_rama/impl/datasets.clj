@@ -56,6 +56,8 @@
     BiConsumer
     Consumer]))
 
+(def ^:dynamic EXAMPLE-SOURCE nil)
+
 (def ^ObjectMapper MAPPER (ObjectMapper.))
 (def META "urn:agent-o-rama:meta:java-types-2020-12")
 
@@ -401,7 +403,7 @@
 
     (case> AddDatasetExample
            :> {:keys [*snapshot-name *example-id *input *reference-output
-                       *tags *source *linked-trace]})
+                       *tags *source]})
      (get *props :input-json-schema :> *input-json-schema)
      (get *props :output-json-schema :> *output-json-schema)
      (validate-with-schema> *input-json-schema *input)
@@ -416,7 +418,6 @@
                          :reference-output *reference-output
                          :tags             *tags
                          :source           *source
-                         :linked-trace     *linked-trace
                          :created-at       *current-time-millis
                          :modified-at      *current-time-millis})])
 
@@ -496,50 +497,50 @@
   (let [sem    (Semaphore. 100)
         mapper (j/object-mapper)]
     (with-open [r (io/reader path)]
-      (doseq [line (line-seq r)]
-        (when-not (str/blank? line)
-          (let [m (try
-                    (j/read-value line mapper)
-                    (catch Exception ex
-                      (failure-callback line ex)
-                      ::parse-failed))]
-            (when-not (identical? ::parse-failed m)
-              (let [input  (get m "input")
-                    output (get m "output")
-                    tags-v (get m "tags")]
-                (if-not (or (nil? tags-v)
-                            (and (sequential? tags-v) (every? string? tags-v)))
-                  (failure-callback
-                   line
-                   (ex-info
-                    "Tags must be an array of strings or omitted"
-                    {:tags tags-v}))
-                  (let [tags    (if (nil? tags-v) #{} (set tags-v))
-                        options (AddDatasetExampleOptions.)]
-                    (set! (.snapshotName options) snapshot-name)
-                    (set! (.tags options) tags)
-                    (set! (.referenceOutput options) output)
-                    (set! (.source options) "bulkUpload")
-                    (.acquire sem)
-                    (try
-                      (let [cf
-                            (.addDatasetExampleAsync manager
-                                                     dataset-id
-                                                     input
-                                                     options)]
-                        (.whenComplete cf
-                                       (reify
-                                        BiConsumer
-                                        (accept [_ _ ex]
-                                          (.release sem)
-                                          (when ex
-                                            (failure-callback line ex))))))
-                      (catch Throwable t
-                        (.release sem)
-                        (failure-callback line t))))
-                ))))))
-      (.acquire sem 100)
-      nil)))
+      (binding [EXAMPLE-SOURCE (aor-types/->BulkUploadSource)]
+        (doseq [line (line-seq r)]
+          (when-not (str/blank? line)
+            (let [m (try
+                      (j/read-value line mapper)
+                      (catch Exception ex
+                        (failure-callback line ex)
+                        ::parse-failed))]
+              (when-not (identical? ::parse-failed m)
+                (let [input  (get m "input")
+                      output (get m "output")
+                      tags-v (get m "tags")]
+                  (if-not (or (nil? tags-v)
+                              (and (sequential? tags-v) (every? string? tags-v)))
+                    (failure-callback
+                     line
+                     (ex-info
+                      "Tags must be an array of strings or omitted"
+                      {:tags tags-v}))
+                    (let [tags    (if (nil? tags-v) #{} (set tags-v))
+                          options (AddDatasetExampleOptions.)]
+                      (set! (.snapshotName options) snapshot-name)
+                      (set! (.tags options) tags)
+                      (set! (.referenceOutput options) output)
+                      (.acquire sem)
+                      (try
+                        (let [cf
+                              (.addDatasetExampleAsync manager
+                                                       dataset-id
+                                                       input
+                                                       options)]
+                          (.whenComplete cf
+                                         (reify
+                                          BiConsumer
+                                          (accept [_ _ ex]
+                                            (.release sem)
+                                            (when ex
+                                              (failure-callback line ex))))))
+                        (catch Throwable t
+                          (.release sem)
+                          (failure-callback line t))))
+                  ))))))
+        (.acquire sem 100)
+        nil))))
 
 (defn create-remote-dataset!
   [datasets-depot dataset-id cluster-conductor-host cluster-conductor-port module-name]
