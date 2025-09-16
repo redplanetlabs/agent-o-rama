@@ -485,13 +485,13 @@
           (store/pstate-transform!
            [(keypath (:agent-invoke-id target)) (fb/add-feedback-path res source)]
            (.getStore agent-node (po/agent-root-task-global-name agent-name))
-           (:task-id target))
+           (aor-types/->DirectTaskId (:task-id target)))
 
           (aor-types/EvalNodeTarget? target)
           (store/pstate-transform!
-           [(keypath (:invoke-id target)) (fb/add-feedback-path res source)]
+           [(keypath (:agent-invoke-id target)) (fb/add-feedback-path res source)]
            (.getStore agent-node (po/agent-node-task-global-name agent-name))
-           (:task-id target))
+           (aor-types/->DirectTaskId (:task-id target)))
 
           :else
           (throw (h/ex-info "Unexpected eval target" {:type (class target)}))

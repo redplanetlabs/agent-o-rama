@@ -257,11 +257,13 @@
      (source> pstate-write-depot-sym
                {:retry-mode :none}
               :> {:keys [*pstate-name *path *agent-name *agent-task-id
-                          *agent-id *retry-num]})
+                          *agent-id *retry-num *key]})
       (<<if (apart/valid-retry-num? *agent-name
                                     *agent-task-id
                                     *agent-id
                                     *retry-num)
+        (<<if (aor-types/DirectTaskId? *key)
+          (|direct (get *key :task-id)))
         (this-module-pobject-task-global *pstate-name :> $$p)
         (do-transform! *path $$p :> *ret)
         (ack-return> *ret)

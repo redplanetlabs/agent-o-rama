@@ -48,6 +48,22 @@
     (when-not (= res :done)
       (throw (h/ex-info "Experiment failed" {:res res})))))
 
+(defn check-experiment-feedback!
+  [all-feedback all-score-sets]
+  (doseq [[fb score-sets] (mapv vector all-feedback all-score-sets)]
+    (doseq [{:keys [source created-at modified-at]} fb]
+      (when-not (aor-types/ExperimentSource? source)
+        (throw (ex-info "Expected ExperimentSource"
+                        {:feedback fb})))
+      (when-not (and created-at modified-at (= created-at modified-at))
+        (throw (ex-info "Mismatched feedback times" {:feedback fb}))))
+    (let [scores (mapv :scores fb)]
+      (when-not (= (count scores) (count score-sets))
+        (throw (ex-info "Scores count mismatch" {:scores scores :score-sets score-sets})))
+      (when-not (= (set scores) score-sets)
+        (throw (ex-info "Scores mismatch" {:scores scores :score-sets score-sets})))
+    )))
+
 (deftest basic-experiments-test
   (let [example-id-chunks-atom (atom [])]
     (with-redefs [exp/hook:running-invoke-node
@@ -166,11 +182,20 @@
          (bind manager (aor/agent-manager ipc module-name))
          (bind ds-manager (aor/agent-manager ipc ds-module-name))
          (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
+         (bind foo-root
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name "foo")))
+
          (bind global-actions-depot
            (foreign-depot ipc module-name (po/global-actions-depot-name)))
 
          (bind results
            (foreign-query ipc module-name (queries/experiment-results-name)))
+
+         (bind root-feedback
+           (fn [{:keys [task-id agent-invoke-id]}]
+             (foreign-select-one [(keypath agent-invoke-id) :feedback] foo-root {:pkey task-id})))
 
          (aor/create-evaluator! manager
                                 "concise2"
@@ -471,9 +496,19 @@
                     :total)
                 0))
 
-         (is (every? aor-types/AgentInvokeImpl?
-                     (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
 
+         (bind ais (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res))
+         (is (every? aor-types/AgentInvokeImpl? ais))
+         (bind all-feedback (mapv root-feedback ais))
+         (check-experiment-feedback! all-feedback
+                                     [#{{"len" 20} {"concise?" true}}
+                                      #{{"len" 6} {"concise?" true}}
+                                      #{{"len" 20} {"concise?" false}}
+                                      #{{"len" 9} {"concise?" true}}
+                                      #{{"len" 20} {"concise?" true}}
+                                      #{{"len" 6} {"concise?" true}}
+                                      #{{"len" 20} {"concise?" false}}
+                                      #{{"len" 9} {"concise?" true}}])
 
 
          (doseq [{:keys [start-time-millis finish-time-millis]}
@@ -515,6 +550,7 @@
          (is (aor-types/AgentInvokeImpl? (:experiment-invoke res)))
          (is (= 2 (count @example-id-chunks-atom)))
          (is (= #{2 1} (set @example-id-chunks-atom)))
+
 
          (is
           (trace-matches?
@@ -583,8 +619,13 @@
               :input            {"a" 3 "b" 1000}
               :reference-output ["abcdefg" "hijklmnop"]}}}
           ))
-         (is (every? aor-types/AgentInvokeImpl?
-                     (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
+         (bind ais (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res))
+
+         (is (every? aor-types/AgentInvokeImpl? ais))
+         (bind all-feedback (mapv root-feedback ais))
+         ;; no feedback for comparative experiments
+         (is (every? empty? all-feedback))
+
          (bind ei (select [:results MAP-VALS :eval-initiates MAP-VALS] res))
          (is (every? aor-types/AgentInvokeImpl? ei))
          (is (= 3 (count ei)))
@@ -615,6 +656,10 @@
              2)))
 
          (wait-experiment-finished! exp-client exp-invoke)
+
+
+         ;; TODO: <<<<>>>> check feedback added to the agent run for the node
+
          (bind res (foreign-invoke-query results remote-ds exp-id))
          (is
           (trace-matches?

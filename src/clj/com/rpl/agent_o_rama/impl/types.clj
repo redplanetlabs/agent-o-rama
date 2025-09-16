@@ -524,6 +524,12 @@
   [subagent-stats :- {AgentRef SubagentInvokeStats}
    basic-stats :- BasicAgentInvokeStats])
 
+;; Misc
+
+;; used for PState writes
+(drp/defrecord+ DirectTaskId
+  [task-id :- Long])
+
 ;; Internal protocols
 
 (defprotocol UnderlyingObjects
