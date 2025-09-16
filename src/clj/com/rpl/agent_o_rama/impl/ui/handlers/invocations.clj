@@ -38,7 +38,7 @@
                       {:forks (foreign-select-one [(keypath agent-id) :forks (sorted-set-range-to-end 100)]
                                                   root-pstate
                                                   {:pkey agent-task-id})}
-                      (foreign-select-one [(keypath agent-id) (submap [:result :start-time-millis :finish-time-millis :graph-version :retry-num :fork-of :exception-summaries])]
+                      (foreign-select-one [(keypath agent-id) (submap [:result :start-time-millis :finish-time-millis :graph-version :retry-num :fork-of :exception-summaries :invoke-args])]
                                           root-pstate
                                           {:pkey agent-task-id}))
 

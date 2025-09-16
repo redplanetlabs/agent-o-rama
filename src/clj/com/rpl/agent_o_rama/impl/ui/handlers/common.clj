@@ -84,16 +84,19 @@
   [{:keys [?data] :as ev-msg}]
   (if-not (map? ?data)
     ev-msg ; Return original message if there's no data map to process
-    (let [;; --- Decode URL components ---
-          decoded-module-id (when-let [mid (:module-id ?data)]
+    (let [;; --- NEW STEP: Deserialize from UI format first ---
+          thawed-data (from-ui-serializable ?data)
+
+          ;; --- The rest of the function operates on thawed-data ---
+          decoded-module-id (when-let [mid (:module-id thawed-data)]
                               (url-decode mid))
-          decoded-agent-name (when-let [aname (:agent-name ?data)]
+          decoded-agent-name (when-let [aname (:agent-name thawed-data)]
                                (url-decode aname))
 
           ;; --- Parse String Identifiers into Rich Types ---
-          parsed-dataset-id (when-let [did (:dataset-id ?data)]
+          parsed-dataset-id (when-let [did (:dataset-id thawed-data)]
                               (if (string? did) (UUID/fromString did) did))
-          parsed-invoke-pair (when-let [iid (:invoke-id ?data)]
+          parsed-invoke-pair (when-let [iid (:invoke-id thawed-data)]
                                (if (string? iid) (parse-url-pair iid) iid))
 
           ;; --- Fetch Common Contextual Objects ---
@@ -102,7 +105,7 @@
                    (get-client decoded-module-id decoded-agent-name))
 
           ;; --- Build the new, enriched data map ---
-          enriched-data (cond-> ?data
+          enriched-data (cond-> thawed-data
                           decoded-module-id (assoc :decoded-module-id decoded-module-id)
                           decoded-agent-name (assoc :decoded-agent-name decoded-agent-name)
                           parsed-dataset-id (assoc :dataset-id parsed-dataset-id)
