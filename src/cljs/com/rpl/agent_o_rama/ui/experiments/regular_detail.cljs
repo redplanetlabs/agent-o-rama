@@ -101,18 +101,32 @@
                                (str (Math/round (* 100 value)) "/100")
                                (str value))})))))
 
-(defui ScoreBadge [{:keys [evals failures]}]
-  (let [total (count evals)
-        failed-count (count failures)
-        passed-count (- total failed-count)
-        color-class (cond
-                      (pos? failed-count) "bg-red-100 text-red-800"
-                      (pos? passed-count) "bg-green-100 text-green-800"
-                      :else "bg-gray-100 text-gray-800")]
-    ($ :span.px-2.py-1.rounded-full.text-xs.font-medium {:className color-class}
-       (if (and (zero? total) (zero? failed-count))
-         "N/A"
-         (str passed-count "/" total " OK")))))
+(defn format-metric-value [value]
+  (cond
+    (true? value) ($ :span.text-green-700 "✓")
+    (false? value) ($ :span.text-red-700 "✗")
+    (and (number? value) (<= 0 value) (<= value 1)) (str (int (* 100 value)) "/100")
+    (number? value) (str value)
+    (string? value) (if (> (count value) 20) (str (subs value 0 17) "…") value)
+    (nil? value) ($ :span.italic.text-gray-400 "nil")
+    :else ($ :span.italic.text-gray-400 "…")))
+
+(defui EvaluatorScores [{:keys [evals failures duplicate-metric-keys]}]
+  ($ :div.flex.flex-wrap.gap-1.items-center
+     (for [[eval-name error-str] (sort-by key failures)]
+       ($ :div.px-2.py-1.rounded-md.text-xs.font-medium.bg-red-100.text-red-800
+          {:key (str "fail-" (name eval-name)) :title error-str}
+          (str (name eval-name) ": Failed")))
+     (for [[eval-name eval-result] (sort-by key evals)
+           [metric-key metric-value] (sort-by key eval-result)
+           :let [label (if (contains? duplicate-metric-keys metric-key)
+                         (str (name eval-name) "/" (name metric-key))
+                         (name metric-key))]]
+       ($ :div.flex.items-center.gap-1.5.px-2.py-1.rounded-md.text-xs.bg-gray-100.text-gray-800.border.border-gray-200
+          {:key (str (name eval-name) "-" (name metric-key))
+           :title (str "Evaluator: " (name eval-name))}
+          ($ :span.font-medium.text-gray-600 label)
+          ($ :span.font-semibold (format-metric-value metric-value))))))
 
 (defui ResultsTable [{:keys [results target module-id]}]
   ($ :div
@@ -123,45 +137,48 @@
               ($ :tr
                  ($ :th {:className (:th common/table-classes)} "Input")
                  ($ :th {:className (:th common/table-classes)} "Reference Output")
-                 ;; Dynamically create a column for each agent target
-                 ($ :th {:key i :className (:th common/table-classes)}
-                    (str "Output " (or (get-in target [:target-spec :agent-name]) (str "Target " (inc i)))))
-                 ($ :th {:className (:th common/table-classes)} "Scores")
-                 ($ :th {:className (:th common/table-classes)} "Actions")))
+                 ($ :th {:className (:th common/table-classes)} "Output")))
            ($ :tbody
-              (for [run results]
+              (for [run results
+                    :let [evals (:evals run)
+                          all-metric-keys (mapcat keys (vals evals))
+                          metric-frequencies (frequencies all-metric-keys)
+                          duplicate-keys (->> metric-frequencies (filter (fn [[_ v]] (> v 1))) (map first) set)]]
                 ($ :tr.border-b {:key (:example-id run)}
                    ($ :td {:className (:td common/table-classes)}
-                      ($ :div.max-w-xs.truncate (common/pp (:input run))))
+                      ($ :div.max-w-xs.truncate (common/pp (:input run)))
+                      (let [first-invoke (get-in run [:agent-initiates 0 :agent-invoke])]
+                        (if first-invoke
+                          ($ :div.mt-2
+                             ($ :a.text-indigo-600.hover:text-indigo-900
+                                {:href (rfe/href :agent/invocation-detail
+                                                 {:module-id module-id
+                                                  :agent-name (get-in run [:agent-initiates 0 :agent-name])
+                                                  :invoke-id (str (:task-id first-invoke) "-" (:agent-invoke-id first-invoke))})
+                                 :target "_blank"}
+                                "View Trace"))
+                          ($ :div.mt-2 ($ :span.text-gray-400 "No trace")))))
                    ($ :td {:className (:td common/table-classes)}
                       ($ :div.max-w-xs.truncate (common/pp (:reference-output run))))
                    ;; 0 is hardcoded, because this component only works for REGULAR experiments, not comparative ones
                    (let [agent-result (get-in run [:agent-results 0])]
                      ($ :td {:key i :className (:td common/table-classes)}
-                        ($ :div.max-w-xs.truncate
-                           (if (:failure? (:result agent-result))
-                             ($ :div.space-y-2
-                                ($ :span.text-red-500.font-semibold "FAIL")
-                                (when-let [throwable (get-in agent-result [:result :val :throwable])]
-                                  ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
-                                     {:onClick #(state/dispatch [:modal/show :exception-detail
-                                                                 {:title "Error Details"
-                                                                  :component ($ ExceptionModal {:throwable throwable})}])}
-                                     "View Error")))
-                             (common/pp (:val (:result agent-result)))))))
-                   ($ :td {:className (:td common/table-classes)}
-                      ($ ScoreBadge {:evals (:evals run) :failures (:eval-failures run)}))
-                   ($ :td {:className (:td common/table-classes)}
-                      (let [first-invoke (get-in run [:agent-initiates 0 :agent-invoke])]
-                        (if first-invoke
-                          ($ :a.text-indigo-600.hover:text-indigo-900
-                             {:href (rfe/href :agent/invocation-detail
-                                              {:module-id module-id
-                                               :agent-name (get-in run [:agent-initiates 0 :agent-name])
-                                               :invoke-id (str (:task-id first-invoke) "-" (:agent-invoke-id first-invoke))})
-                              :target "_blank"}
-                             "View Trace")
-                          ($ :span.text-gray-400 "No trace")))))))))))
+                        ($ :div.max-w-xs
+                           ($ :div.truncate
+                              (if (:failure? (:result agent-result))
+                                ($ :div.space-y-2
+                                   (if-let [throwable (get-in agent-result [:result :val :throwable])]
+                                     ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
+                                        {:onClick #(state/dispatch [:modal/show :exception-detail
+                                                                    {:title "Error Details"
+                                                                     :component ($ ExceptionModal {:throwable throwable})}])}
+                                        "View Error")
+                                     ($ :span.text-red-500.font-semibold "FAIL")))
+                                (common/pp (:val (:result agent-result)))))
+                           ($ :div.mt-2
+                              ($ EvaluatorScores {:evals evals
+                                                  :failures (:eval-failures run)
+                                                  :duplicate-metric-keys duplicate-keys}))))))))))))
 
 (defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
   (let [{:keys [data loading? error]}
