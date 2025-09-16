@@ -15,7 +15,7 @@
         (let [manager (aor/agent-manager ipc
                                          (rama/get-module-name
                                           StructuredLangChain4jModule))
-              agent (aor/agent-client manager "StructuredLangChain4jAgent")]
+              agent   (aor/agent-client manager "StructuredLangChain4jAgent")]
 
           (testing "returns structured response with all expected fields"
             (let [result (aor/agent-invoke agent "What is agent-o-rama?")]

@@ -27,16 +27,16 @@
    {"question_type" (lj/enum
                      "Type of question being asked"
                      ["factual" "analytical" "creative" "technical" "personal"])
-    "complexity" (lj/enum
-                  "Complexity level of the question"
-                  ["simple" "moderate" "complex"])
-    "main_topics" (lj/array
-                   "Key topics covered in the question"
-                   (lj/string "A main topic or concept"))
-    "answer" (lj/string "Direct answer to the user's question")
-    "confidence" (lj/enum
-                  "Confidence level in the response"
-                  ["high" "medium" "low"])}))
+    "complexity"    (lj/enum
+                     "Complexity level of the question"
+                     ["simple" "moderate" "complex"])
+    "main_topics"   (lj/array
+                     "Key topics covered in the question"
+                     (lj/string "A main topic or concept"))
+    "answer"        (lj/string "Direct answer to the user's question")
+    "confidence"    (lj/enum
+                     "Confidence level in the response"
+                     ["high" "medium" "low"])}))
 
 ;;; Agent module demonstrating structured LangChain4j output
 (aor/defagentmodule StructuredLangChain4jModule
@@ -57,33 +57,36 @@
          (.apiKey (aor/get-agent-object setup "openai-api-key"))
          (.modelName "gpt-4o-mini")
          (.temperature 0.3)
-         (.maxTokens 300)
+         (.maxTokens (int 300))
          .build)))
 
-  (-> (aor/new-agent topology "StructuredLangChain4jAgent")
+  (->
+    (aor/new-agent topology "StructuredLangChain4jAgent")
 
-      ;; Single node that analyzes user question and returns structured response
-      (aor/node
-       "analyze-question"
-       nil
-       (fn [agent-node user-question]
-         (let [model (aor/get-agent-object agent-node "openai-model")
-               system-msg (SystemMessage.
-                           "You are an intelligent question analyzer. Analyze the user's question and provide a structured response that categorizes the question type, assesses its complexity, identifies main topics, provides a direct answer, and indicates your confidence level.")
-               user-msg (UserMessage. user-question)
-               ;; Configure structured JSON response
-               response (lc4j/chat
-                         model
-                         (lc4j/chat-request
-                          [system-msg user-msg]
-                          {:response-format
-                           (lc4j/json-response-format
-                            "QuestionAnalysis"
-                            QuestionAnalysis)}))]
+    ;; Single node that analyzes user question and returns structured response
+    (aor/node
+     "analyze-question"
+     nil
+     (fn [agent-node user-question]
+       (let
+         [model (aor/get-agent-object agent-node "openai-model")
+          system-msg
+          (SystemMessage.
+           "You are an intelligent question analyzer. Analyze the user's question and provide a structured response that categorizes the question type, assesses its complexity, identifies main topics, provides a direct answer, and indicates your confidence level.")
+          user-msg (UserMessage. user-question)
+          ;; Configure structured JSON response
+          response (lc4j/chat
+                    model
+                    (lc4j/chat-request
+                     [system-msg user-msg]
+                     {:response-format
+                      (lc4j/json-response-format
+                       "QuestionAnalysis"
+                       QuestionAnalysis)}))]
 
-           ;; Parse and return structured response
-           (aor/result! agent-node
-                        (j/read-value (.text (.aiMessage response)))))))))
+         ;; Parse and return structured response
+         (aor/result! agent-node
+                      (j/read-value (.text (.aiMessage response)))))))))
 
 (defn -main
   "Run the structured LangChain4j agent example"
@@ -93,8 +96,8 @@
       (rtest/launch-module! ipc StructuredLangChain4jModule {:tasks 1 :threads 1})
 
       (let [module-name (rama/get-module-name StructuredLangChain4jModule)
-            manager (aor/agent-manager ipc module-name)
-            agent (aor/agent-client manager "StructuredLangChain4jAgent")]
+            manager     (aor/agent-manager ipc module-name)
+            agent       (aor/agent-client manager "StructuredLangChain4jAgent")]
 
         (println "Structured LangChain4j Agent Example:")
         (println "Analyzing questions with structured output...\n")
