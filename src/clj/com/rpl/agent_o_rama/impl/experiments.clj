@@ -501,6 +501,7 @@
 
 (defn hook:running-invoke-node [result+example-ids])
 (defn hook:initiate-target [i])
+(defn hook:initiate-eval [i])
 (defn hook:result-target [i])
 (defn hook:do-summary-eval [eval-name])
 
@@ -681,7 +682,8 @@
                     [(keypath dataset-id :experiments id :results result-id)]
                     local-ds)
 
-                   eval-initiates (volatile! curr-eval-initiates)]
+                   eval-initiates (volatile! curr-eval-initiates)
+                   eval-counter (volatile! -1)]
                (when-not (selected-any? [MAP-VALS :result :failure? identity] agent-results)
                  (doseq [[eval-name
                           {:keys [input-json-path reference-output-json-path output-json-path
@@ -691,6 +693,7 @@
                          :when (and (not (contains? curr-evals eval-name))
                                     (not (contains? eval-failures eval-name)))]
 
+                   (hook:initiate-eval (vswap! eval-counter inc))
                    (when-not (contains? @eval-initiates eval-name)
                      (let [inv
                            (c/agent-initiate

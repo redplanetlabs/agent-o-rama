@@ -1332,8 +1332,6 @@
 (def RUNS)
 (def HANDLER-FNS)
 
-;; TODO: <<<<>>>> see if need anything else for evals not initiating multiple times
-;;   - should force failure after initiate and before result
 (deftest experimenter-agent-failures-test
   (with-redefs [RUNS (atom [])
                 HANDLER-FNS (atom {})
@@ -1345,6 +1343,10 @@
                 exp/hook:result-target
                 (fn [i]
                   ((get @HANDLER-FNS :result) i))
+
+                exp/hook:initiate-eval
+                (fn [i]
+                  ((get @HANDLER-FNS :initiate-eval) i))
 
                 exp/hook:do-eval
                 (fn [eval-name]
@@ -1654,6 +1656,90 @@
             :input            "cc"
             :reference-output nil}}}
         ))
+
+
+       (reset-handlers!)
+       (reset! RUNS [])
+       (fail-on-n! :initiate-eval 2)
+       (bind exp-id (h/random-uuid7))
+       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (foreign-append!
+          global-actions-depot
+          (aor-types/->valid-StartExperiment
+           exp-id
+           "My experiment"
+           ds-id1
+           nil
+           nil
+           [(aor-types/->valid-EvaluatorSelector "reg" false)
+            (aor-types/->valid-EvaluatorSelector "reg2" false)]
+           (aor-types/->valid-RegularExperiment
+            (aor-types/->valid-ExperimentTarget
+             (aor-types/->valid-AgentTarget "foo")
+             ["$"]))
+           1
+           1)))
+       (wait-experiment-finished! exp-client exp-invoke)
+       (bind res (foreign-invoke-query results ds-id1 exp-id))
+       (is (= {:agent 3 :eval-r 6}
+              (->> @RUNS
+                   (group-by identity)
+                   (transform MAP-VALS count))))
+       (is
+        (trace-matches?
+         res
+         {:latency-number-stats {:count 3}
+          :summary-eval-failures nil
+          :total-token-number-stats {:total 0
+                                     :count 3}
+          :input-token-number-stats {:total 0
+                                     :count 3}
+          :output-token-number-stats {:total 0
+                                      :count 3}
+          :summary-evals nil
+          :eval-number-stats {}
+
+          :results
+          {0
+           {:example-id       !eid0
+            :agent-initiates
+            {0
+             {:agent-name "foo"}}
+            :agent-results
+            {0
+             {:result {:val "aa!" :failure? false}}}
+            :eval-initiates   {"reg"  !init0
+                               "reg2" !init1}
+            :evals            {"reg" {"res" "aa!"} "reg2" {"res" "aa!"}}
+            :input            "aa"
+            :reference-output nil}
+           1
+           {:example-id       !eid1
+            :agent-initiates  {0
+                               {:agent-name "foo"}}
+            :agent-results
+            {0
+             {:result {:val "bb!" :failure? false}}}
+            :eval-initiates   {"reg"  !init2
+                               "reg2" !init3}
+            :evals            {"reg" {"res" "bb!"} "reg2" {"res" "bb!"}}
+            :input            "bb"
+            :reference-output nil}
+           2
+           {:example-id       !eid3
+            :agent-initiates  {0
+                               {:agent-name "foo"}}
+            :agent-results
+            {0
+             {:result {:val "cc!" :failure? false}}}
+            :eval-initiates   {"reg"  !init4
+                               "reg2" !init5}
+            :evals            {"reg" {"res" "cc!"} "reg2" {"res" "cc!"}}
+            :input            "cc"
+            :reference-output nil}}}
+        ))
+       (is (every? aor-types/AgentInvokeImpl?
+                   (select [:results MAP-VALS :eval-initiates MAP-VALS] res)))
       ))))
 
 (deftest search-experiments-test
