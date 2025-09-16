@@ -152,26 +152,26 @@
 
 (defn extract-graph-elements [{:keys [graph]}]
   "Extract nodes, edges, and start node from graph data without layout"
-  (let [start-id (get graph "start-node")
+  (let [start-id (:start-node graph)
         ;; Build nodes with extra metadata for coloring (node-type and start?)
-        nodes (->> (get graph "node-map")
+        nodes (->> (get graph :node-map)
                    (map (fn [[k v]]
                           {:id k
                            :type "custom"
                            :draggable false
-                           :data {"label" k
-                                  "node-id" k
-                                  "node-type" (get v "node-type")
-                                  "is-start?" (= k start-id)}
+                           :data {:label k
+                                  :node-id k
+                                  :node-type (:node-type v)
+                                  :is-start? (= k start-id)}
                            :width 170
                            :height 40})))
 
         edges (s/select
-               ["node-map"
+               [:node-map
                 s/ALL
                 (s/collect-one s/FIRST)
                 s/LAST
-                "output-nodes"
+                :output-nodes
                 s/ALL]
                graph)]
     {:nodes nodes
@@ -182,14 +182,14 @@
 
 (defn process-elk-edge [edge]
   "Process an ELK edge to extract routing points for React Flow"
-  (let [sections (or (get edge "sections") [])
+  (let [sections (or (:sections edge) [])
         ;; ELK provides edge routing as sections with start, end, and bend points
         raw-points (when (seq sections)
                      (mapcat (fn [section]
                                (concat
-                                [(get section "startPoint")]
-                                (get section "bendPoints" [])
-                                [(get section "endPoint")]))
+                                [(:startPoint section)]
+                                (:bendPoints section [])
+                                [(:endPoint section)]))
                              sections))
         ;; Remove consecutive duplicate points
         edge-points (when raw-points
@@ -204,21 +204,21 @@
                               raw-points))]
     (-> edge
         ;; Add the routing points to the edge data
-        (assoc "data" {"elkPoints" edge-points})
+        (assoc :data {:elkPoints edge-points})
         ;; Set edge type to use our custom rendering
-        (assoc "type" "elk-edge"))))
+        (assoc :type "elk-edge"))))
 
 (defn get-layouted-elements [nodes edges options start-id]
   "Layout nodes and edges using ELK.js"
   (let [is-horizontal false
         ;; Create a map of original edges by ID for merging later
-        edge-map (into {} (map (fn [e] [(get e "id") e]) edges))
+        edge-map (into {} (map (fn [e] [(:id e) e]) edges))
         graph #js {:id "root"
                    :layoutOptions options
                    :children (clj->js
                               (map (fn [node]
                                      (-> node
-                                         (cond-> (= start-id (get node "id"))
+                                         (cond-> (= start-id (:id node))
                                            (assoc :layoutOptions {"elk.layered.layering.layerConstraint" "FIRST"}))
                                          (assoc :targetPosition (if is-horizontal "left" "top"))
                                          (assoc :sourcePosition (if is-horizontal "right" "bottom"))
@@ -238,7 +238,7 @@
                                           (js->clj)
                                           (->> (map (fn [elk-edge]
                                                      ;; Merge original edge properties with ELK results
-                                                      (let [original-edge (get edge-map (get elk-edge "id"))
+                                                      (let [original-edge (get edge-map (:id elk-edge))
                                                             processed-edge (process-elk-edge elk-edge)]
                                                         (merge original-edge processed-edge))))))]
                    #js {:nodes layouted-nodes
