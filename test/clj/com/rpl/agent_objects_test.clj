@@ -617,48 +617,36 @@
          :nested-ops    [{:type :db-write
                           :info
                           {"op"         "add"
-                           "embedding"  ["*" ["1.0" "2.0"]]
                            "id"         "999"
                            "objectName" "emb"
                           }}
                          {:type :db-write
                           :info
                           {"op"         "add"
-                           "embedding"  ["*" ["1.1" "2.1"]]
-                           "embedded"   "a1"
                            "id"         "1001"
                            "objectName" "emb"
                           }}
                          {:type :db-write
                           :info
                           {"op"         "add"
-                           "embedding"  ["*" ["1.2" "2.2"]]
                            "id"         "abcd"
                            "objectName" "emb"
                           }}
                          {:type :db-write
                           :info
                           {"op"         "addAll"
-                           "embeddings" [["*" ["1.3" "2.3"]]
-                                         ["*" ["1.4" "2.4"]]]
                            "ids"        ["0" "1"]
                            "objectName" "emb"
                           }}
                          {:type :db-write
                           :info
                           {"op"         "addAll"
-                           "embeddings" [["*" ["1.5" "2.5"]]
-                                         ["*" ["1.6" "2.6"]]]
-                           "embeddeds"  ["x" "y"]
                            "ids"        ["0" "1"]
                            "objectName" "emb"
                           }}
                          {:type :db-write
                           :info
                           {"op"         "addAll"
-                           "embeddings" [["*" ["1.7" "2.7"]]
-                                         ["*" ["1.8" "2.8"]]]
-                           "embeddeds"  ["x1" "y1"]
                            "ids"        ["7" "8"]
                            "objectName" "emb"
                           }}
@@ -690,19 +678,14 @@
                           {"op"         "search"
                            "objectName" "emb"
                            "request"
-                           {"filter" "IsEqualTo(key=b, comparisonValue=2)"
+                           {"filter"     "IsEqualTo(key=b, comparisonValue=2)"
                             "maxResults" ["i" "5"]
-                            "minScore" ["d" "0.75"]
-                            "queryEmbedding" ["*" ["0.1" "0.3"]]}
+                            "minScore"   ["d" "0.75"]}
                            "matches"
-                           [{"embedded"  "foo"
-                             "embedding" ["*" ["0.1" "0.2"]]
-                             "id"        "11"
-                             "score"     ["d" "0.5"]}
-                            {"embedded"  "bar"
-                             "embedding" ["*" ["1.5" "0.3"]]
-                             "id"        "12"
-                             "score"     ["d" "0.75"]}
+                           [{"id"    "11"
+                             "score" ["d" "0.5"]}
+                            {"id"    "12"
+                             "score" ["d" "0.75"]}
                            ]
                           }}]
          :input         ["emb" ""]}}

@@ -170,7 +170,7 @@
                              10000))
 
      (is
-      ;; provide-human-input only blocks until it's delviered, not until node is
+      ;; provide-human-input only blocks until it's delivered, not until node is
       ;; complete
       (condition-attained?
        (trace-matches?
