@@ -67,7 +67,7 @@
                                                    nil
                                                    (js/JSON.parse edit-value))
                                     ;; Create updated example with the new field value
-                                    updated-example (assoc current-example field-key (js->clj parsed-value))]
+                                    updated-example (assoc current-example field-key (js->clj parsed-value :keywordize-keys true))]
                                 (sente/request!
                                  [:datasets/edit-example
                                   {:module-id module-id
@@ -833,17 +833,17 @@
         active-tab (cond
                      (contains? comparative-routes route-name)
                      "comparative"
-
+                     
                      (contains? experiments-routes route-name)
                      "experiments"
-
+                     
                      :else "examples")
         [show-info? set-show-info] (uix/use-state false)
         {:keys [loading? error]}
         (queries/use-sente-query
          {:query-key [:dataset-props module-id dataset-id]
           :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
-          :enabled? (boolean (and module-id dataset-id))})
+          :enabled? (boolean (and module-id dataset-id)) })
         ;; not sure about doing it this way, why not. maybe we can eventually decouple fetching from views?
         dataset (state/use-sub [:queries :dataset-props module-id dataset-id :data])]
     ($ :div.h-full.flex.flex-col

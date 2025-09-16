@@ -229,7 +229,7 @@
 
 (defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes module-id agent-name invoke-id]}]
   (let [data (when selected-node
-               (js->clj (.-data selected-node)))
+               (js->clj (.-data selected-node) :keywordize-keys true))
         node-id (:node-id data)
         node-name (:node data)
         input (:input data)
@@ -420,7 +420,7 @@
                  ($ :div {:className "text-sm font-medium text-purple-700 mb-2"}
                     (str "Emits (" (count emits) ")"))
                  ($ :div {:className "space-y-2"}
-                    (for [[idx emit] (map-indexed vector (js->clj emits))]
+                    (for [[idx emit] (map-indexed vector (js->clj emits :keywordize-keys true))]
                       (let [emit-id (str (:invoke-id emit))
                             is-loaded (contains? graph-data (:invoke-id emit))
                             ;; We no longer track loading state locally
@@ -433,7 +433,7 @@
                                             (.stopPropagation e)
                                             (if is-loaded
                                               ;; Find and select the loaded node
-                                              (let [nodes (js->clj flow-nodes)
+                                              (let [nodes (js->clj flow-nodes :keywordize-keys true)
                                                     target-node (->> nodes
                                                                      (filter #(= (-> % :data :node-id) (:invoke-id emit)))
                                                                      first)]
@@ -454,7 +454,7 @@
 
 (defui forking-input-component [{:keys [selected-node changed-nodes on-change-node-input affected-nodes]}]
   (let [data (when selected-node
-               (js->clj (.-data selected-node)))
+               (js->clj (.-data selected-node) :keywordize-keys true))
         node-id (:node-id data)
         node-name (:node data)
         original-input (:input data)
@@ -475,7 +475,7 @@
     (uix/use-effect
      (fn []
        (when selected-node
-         (let [data (js->clj (.-data selected-node))
+         (let [data (js->clj (.-data selected-node) :keywordize-keys true)
                node-id (:node-id data)
                original-input (:input data)
                current-input (get changed-nodes node-id (to-pretty-json original-input))]
@@ -782,7 +782,7 @@
                                handle-select-node (fn [e]
                                                     (.stopPropagation e)
                                                     ;; Find the corresponding flow node and select it
-                                                    (let [nodes (js->clj flow-nodes)
+                                                    (let [nodes (js->clj flow-nodes :keywordize-keys true)
                                                           target-node (->> nodes
                                                                            (filter #(= (-> % :data :node-id) node-id))
                                                                            first)]
@@ -923,7 +923,7 @@
         _ (uix/use-effect
            (fn []
              (when selected-node-id
-               (let [nodes (js->clj flow-nodes)
+               (let [nodes (js->clj flow-nodes :keywordize-keys true)
                      target-node (->> nodes
                                       (filter #(= (-> % :data :node-id) selected-node-id))
                                       first)]
@@ -934,7 +934,7 @@
         ;; Use callbacks passed as props
         handle-select-node-click (fn [node]
                                    (when on-select-node
-                                     (let [node-data (js->clj (.-data node))]
+                                     (let [node-data (js->clj (.-data node) :keywordize-keys true)]
                                        (on-select-node (:node-id node-data)))))]
 
     (if (empty? graph-data)
@@ -952,7 +952,7 @@
                              :nodeTypes (clj->js {"custom"
                                                   (uix.core/as-react
                                                    (fn [{:keys [data id]}]
-                                                     (let [data (js->clj data)
+                                                     (let [data (js->clj data :keywordize-keys true)
                                                            label (:label data)
                                                            node-id (:node-id data)
                                                            selected (= (when selected-node (.-id selected-node)) id)
@@ -1002,7 +1002,7 @@
                                                   "phantom"
                                                   (uix.core/as-react
                                                    (fn [{:keys [data]}]
-                                                     (let [data (js->clj data)
+                                                     (let [data (js->clj data :keywordize-keys true)
                                                            missing-node-id (:missing-node-id data)]
                                                        ($ :div {:className "relative cursor-pointer"
                                                                 :onClick (fn [e]
