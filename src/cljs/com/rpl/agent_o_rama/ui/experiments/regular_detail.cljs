@@ -45,12 +45,39 @@
 
  ;; NEW: Created the ExperimentInfoPanel to display the experiment-info data.
 (defui ExperimentInfoPanel [{:keys [info]}]
-  ($ :div.bg-blue-50.border-y.border-blue-200.px-6.py-4
-     ($ :dl.divide-y.divide-gray-200
-        (for [[k v] (sort-by key info)]
-          ($ DetailItem {:key (name k) :label (name k)}
-             ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-48.font-mono
-                (common/pp v)))))))
+  (let [spec (:spec info)
+        exp-type (name (or (:type spec) (if (:target spec) :regular :comparative)))
+        targets (if (:target spec)
+                  [(:target spec)]
+                  (:targets spec))]
+    ($ :div.bg-blue-50.border-y.border-blue-200.px-6.py-4
+       ($ :dl.divide-y.divide-gray-200
+          (when-let [id (:id info)]
+            ($ DetailItem {:label "ID"}
+               ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-48.font-mono (str id))))
+          ($ DetailItem {:label "experiment-type"}
+             ($ :span.text-sm.text-gray-800 exp-type))
+          (for [[idx t] (map-indexed vector (or targets []))]
+            (let [label (if (= 1 (count targets))
+                          "target"
+                          (str "target" (inc idx)))]
+              ($ DetailItem {:key (str "target-" idx) :label label}
+                 ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-48.font-mono
+                    (common/pp t)))))
+          ;; Always show snapshot and selector, even when nil
+          ($ DetailItem {:label "snapshot"}
+             ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-48.font-mono (common/pp (:snapshot info))))
+          ($ DetailItem {:label "selector"}
+             ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-48.font-mono (common/pp (:selector info))))
+          (when-let [evaluators (:evaluators info)]
+            ($ DetailItem {:label "evaluators"}
+               ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-48.font-mono (common/pp evaluators))))
+          (when-let [nr (:num-repetitions info)]
+            ($ DetailItem {:label "num-repetitions"}
+               ($ :span.text-sm.text-gray-800 (str nr))))
+          (when-let [conc (:concurrency info)]
+            ($ DetailItem {:label "concurrency"}
+               ($ :span.text-sm.text-gray-800 (str conc))))))))
 
 (defui ExperimentHeader [{:keys [info status on-rerun module-id dataset-id show-info? on-toggle-info]}]
   ($ :div.flex.justify-between.items-center
