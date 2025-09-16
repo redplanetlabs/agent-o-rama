@@ -37,7 +37,7 @@
          (.apiKey (aor/get-agent-object setup "openai-api-key"))
          (.modelName "gpt-4o-mini")
          (.temperature 0.7)
-         (.maxTokens 500)
+         (.maxTokens (int 500))
          .build)))
 
   (-> (aor/new-agent topology "LangChain4jAgent")
