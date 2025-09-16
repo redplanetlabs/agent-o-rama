@@ -585,6 +585,9 @@
           ))
          (is (every? aor-types/AgentInvokeImpl?
                      (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res)))
+         (bind ei (select [:results MAP-VALS :eval-initiates MAP-VALS] res))
+         (is (every? aor-types/AgentInvokeImpl? ei))
+         (is (= 3 (count ei)))
 
 
          ;; test:
@@ -1419,10 +1422,11 @@
 
        (bind reset-handlers!
          (fn []
-           (reset! HANDLER-FNS {:initiate (constantly nil)
-                                :result   (constantly nil)
-                                :eval     (constantly nil)
-                                :summary  (constantly nil)})))
+           (reset! HANDLER-FNS {:initiate      (constantly nil)
+                                :initiate-eval (constantly nil)
+                                :result        (constantly nil)
+                                :eval          (constantly nil)
+                                :summary       (constantly nil)})))
        (bind handler!
          (fn [k afn]
            (swap! HANDLER-FNS assoc k afn)))
