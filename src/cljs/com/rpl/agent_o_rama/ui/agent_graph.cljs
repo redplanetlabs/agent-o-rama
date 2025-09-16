@@ -130,7 +130,7 @@
        ($ :path {:d edge-path
                  :fill "none"
                  :stroke edge-color
-                 :strokeWidth (or (get style "strokeWidth") 2)})
+                 :strokeWidth (or (:strokeWidth style) 2)})
        ;; Draw arrow at the end
        (when markerEnd
          ($ :g {:transform (str "translate(" arrow-x "," arrow-y ") "
@@ -288,9 +288,9 @@
                                (uix.core/as-react
                                 (fn [{:keys [data id]}]
                                   (let [data (js->clj data)
-                                        label (get data "label")
-                                        node-id (get data "node-id")
-                                        node-type (get data "node-type")
+                                        label (:label data)
+                                        node-id (:node-id data)
+                                        node-type (:node-type data)
                                         selected (= (when selected-node (.-id selected-node)) id)
                                         base-classes (cond
                                                        (= "agg-start-node" node-type)
