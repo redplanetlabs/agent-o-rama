@@ -186,6 +186,10 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-root-task-global-name "foo")))
+         (bind exp-root
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name exp/EVALUATOR-AGENT-NAME)))
 
          (bind global-actions-depot
            (foreign-depot ipc module-name (po/global-actions-depot-name)))
@@ -196,6 +200,9 @@
          (bind root-feedback
            (fn [{:keys [task-id agent-invoke-id]}]
              (foreign-select-one [(keypath agent-invoke-id) :feedback] foo-root {:pkey task-id})))
+         (bind exp-root-feedback
+           (fn [{:keys [task-id agent-invoke-id]}]
+             (foreign-select-one [(keypath agent-invoke-id) :feedback] exp-root {:pkey task-id})))
 
          (aor/create-evaluator! manager
                                 "concise2"
@@ -657,9 +664,6 @@
 
          (wait-experiment-finished! exp-client exp-invoke)
 
-
-         ;; TODO: <<<<>>>> check feedback added to the agent run for the node
-
          (bind res (foreign-invoke-query results remote-ds exp-id))
          (is
           (trace-matches?
@@ -695,6 +699,14 @@
               :input            {"a" 3 "b" 1000}
               :reference-output ["abcdefg" "hijklmnop"]}}}
           ))
+
+         (bind ais (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res))
+         (is (every? aor-types/AgentInvokeImpl? ais))
+         (bind all-feedback (mapv exp-root-feedback ais))
+         (check-experiment-feedback! all-feedback
+                                     [#{{"concise?" true}}
+                                      #{{"concise?" false}}
+                                      #{{"concise?" false}}])
 
 
          ;; test selecting specific tag
