@@ -19,6 +19,10 @@ Client-side interface for invoking and interacting with specific
 agents. Obtained from an agent manager, it provides invoke, streaming,
 and human input capabilities for a particular agent type.
 
+## Agent Complete
+
+Final state of an agent execution indicating successful termination with result.
+
 ## Agent Graph
 
 A directed graph structure that defines the execution flow of an agent,
@@ -67,6 +71,18 @@ The final output value returned by an agent execution, signaling
 completion of the agent graph traversal. Set via `result!` function
 within agent nodes, retrieved via `agent-result` on client side.
 
+## Agent Step
+
+An individual execution unit returned by agent processing, can be result, human input request, or continuation.
+
+## Agent Throttling
+
+Rate-limiting mechanism for log messages to prevent overwhelming output in distributed execution.
+
+## Agent Trace
+
+Execution monitoring system that captures agent node transitions and data flow for debugging.
+
 ## Agents Topology
 
 The top-level container for defining agents, stores, and objects within
@@ -86,9 +102,21 @@ A managed collection of input/output examples for agent testing and
 evaluation. Created and managed via agent manager dataset functions for
 tracking agent performance and behavior.
 
+## Document Store
+
+A schema-flexible store for complex nested data structures in agents.
+
 ## Evaluators
 
 Functions for measuring agent performance against datasets.
+
+## Example Run
+
+A single execution instance within an experiment for tracking input/output pairs.
+
+## Experiment
+
+A structured test run comparing agent performance across datasets with specific evaluators.
 
 ## Fork
 
@@ -102,11 +130,19 @@ A mechanism for agents to request input from human users during
 execution. Created via `get-human-input` within agent nodes, handled via
 client API to enable human-in-the-loop workflows.
 
+## Key-Value Store
+
+A typed store for simple key-value pairs with specified key/value classes.
+
 ## Multi-Agg
 
 A flexible aggregation mechanism that allows custom combination logic
 for distributed computations. Defined via `multi-agg` macro with `init`
 and `on` clauses for sophisticated result aggregation patterns.
+
+## PState Store
+
+A persistent state store backed by Rama's PState for durable agent data.
 
 ## Node Emit
 
