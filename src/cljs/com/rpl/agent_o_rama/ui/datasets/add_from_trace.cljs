@@ -7,7 +7,8 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [clojure.string :as str]
-   ["react" :refer [useEffect]]))
+   ["react" :refer [useEffect]]
+   ["@heroicons/react/24/outline" :refer [ChevronDownIcon]]))
 
 (defhook use-debounced-effect
   "Runs an effect after a specified delay when dependencies change.
@@ -85,6 +86,7 @@
         ;; Local state for preview
         [preview-data set-preview-data] (uix/use-state nil)
         [preview-error set-preview-error] (uix/use-state nil)
+        [dropdown-open? set-dropdown-open] (uix/use-state false)
 
         ;; Fetch available datasets
         {:keys [data loading?]} (queries/use-sente-query
@@ -121,21 +123,42 @@
        ($ :div {:className "w-1/3 p-4 border-r overflow-auto"}
           ($ forms/form
              ($ :h4 {:className "font-semibold mb-4"} "Configuration")
-                          ;; Custom select field for datasets
+                          ;; Custom dropdown field for datasets
              ($ :div {:className "space-y-1"}
                 ($ :label {:className "block text-sm font-medium text-gray-700"}
                    "Target Dataset"
                    ($ :span {:className "text-red-500 ml-1"} "*"))
-                ($ :select {:className (str "w-full p-3 border rounded-md text-sm transition-colors "
-                                            (if (:error dataset-id-field)
-                                              "border-red-300 focus:ring-red-500 focus:border-red-500"
-                                              "border-gray-300 focus:ring-blue-500 focus:border-blue-500"))
-                            :value (or (:value dataset-id-field) "")
-                            :onChange #((:on-change dataset-id-field) (.. % -target -value))}
-                   (if loading?
-                     ($ :option {:value ""} "Loading datasets...")
-                     (for [ds (:datasets data)]
-                       ($ :option {:key (:dataset-id ds) :value (:dataset-id ds)} (:name ds)))))
+                ($ :div {:className "relative"}
+                   ($ :button {:type "button"
+                               :className (str "inline-flex items-center justify-between w-full px-3 py-2 text-sm bg-white border rounded-md shadow-sm hover:bg-gray-50 "
+                                               (if (:error dataset-id-field)
+                                                 "border-red-300 focus:ring-red-500 focus:border-red-500"
+                                                 "border-gray-300 focus:ring-blue-500 focus:border-blue-500"))
+                               :onClick #(set-dropdown-open (not dropdown-open?))
+                               :disabled loading?}
+                      ($ :span {:className "truncate"}
+                         (cond
+                           loading? "Loading datasets..."
+                           (str/blank? (:value dataset-id-field)) "Select a dataset..."
+                           :else (some-> (:datasets data)
+                                         (->> (filter #(= (:dataset-id %) (:value dataset-id-field)))
+                                              (first)
+                                              (:name)))))
+                      ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
+                   (when dropdown-open?
+                     ($ :div {:className "origin-top-right absolute right-0 mt-1 w-full rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
+                              :onClick #(.stopPropagation %)}
+                        ($ :div {:className "py-1"}
+                           (if (seq (:datasets data))
+                             (for [ds (:datasets data)]
+                               ($ common/DropdownRow {:key (:dataset-id ds)
+                                                      :label (:name ds)
+                                                      :selected? (= (:dataset-id ds) (:value dataset-id-field))
+                                                      :on-select #(do
+                                                                    ((:on-change dataset-id-field) (:dataset-id ds))
+                                                                    (set-dropdown-open false))
+                                                      :delete-button nil}))
+                             ($ :div {:className "px-4 py-2 text-sm text-gray-500"} "No datasets available"))))))
                 (if (:error dataset-id-field)
                   ($ :p {:className "text-sm text-red-600 mt-1"} (:error dataset-id-field))
                   ($ :div {:className "mt-1 h-5"})))
