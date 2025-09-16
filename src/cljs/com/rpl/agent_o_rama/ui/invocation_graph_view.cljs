@@ -230,19 +230,19 @@
 (defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes module-id agent-name invoke-id]}]
   (let [data (when selected-node
                (js->clj (.-data selected-node)))
-        node-id (:node-id data)
-        node-name (:node data)
-        input (:input data)
-        exceptions (:exceptions data)
-        result (:result data)
-        start-time (:start-time-millis data)
-        finish-time (:finish-time-millis data)
+        node-id (get data "node-id")
+        node-name (get data "node")
+        input (get data "input")
+        exceptions (get data "exceptions")
+        result (get data "result")
+        start-time (get data "start-time-millis")
+        finish-time (get data "finish-time-millis")
         duration (when (and start-time finish-time)
                    (str (- finish-time start-time)))
-        emits (:emits data)
-        has-paginated (:has-paginated-children data)
+        emits (get data "emits")
+        has-paginated (get data "has-paginated-children")
 
-        hr (:human-request data)
+        hr (get data "human-request")
 
         hr-invoke-id (when hr (:invoke-id hr))
         hitl-response (state/use-sub (if hr-invoke-id
@@ -421,8 +421,8 @@
                     (str "Emits (" (count emits) ")"))
                  ($ :div {:className "space-y-2"}
                     (for [[idx emit] (map-indexed vector (js->clj emits))]
-                      (let [emit-id (str (:invoke-id emit))
-                            is-loaded (contains? graph-data (:invoke-id emit))
+                      (let [emit-id (str (get emit "invoke-id"))
+                            is-loaded (contains? graph-data (get emit "invoke-id"))
                             ;; We no longer track loading state locally
                             border-class (if is-loaded "border-purple-200" "border-dashed border-purple-300")
                             cursor-class "cursor-pointer"
@@ -435,17 +435,17 @@
                                               ;; Find and select the loaded node
                                               (let [nodes (js->clj flow-nodes)
                                                     target-node (->> nodes
-                                                                     (filter #(= (-> % :data :node-id) (:invoke-id emit)))
+                                                                     (filter #(= (get (:data %) "node-id") (get emit "invoke-id")))
                                                                      first)]
                                                 (when (and target-node on-select-node)
-                                                  (on-select-node (:invoke-id emit))))
+                                                  (on-select-node (get emit "invoke-id"))))
                                               ;; Load the unloaded node
                                               (when on-paginate-node
                                                 (on-paginate-node emit-id))))}
                            ($ :div {:className "text-xs text-purple-600"}
-                              ($ :div (str "→ " (:node-name emit)))
-                              (when (:args emit)
-                                ($ generic-data-viewer {:data (:args emit)
+                              ($ :div (str "→ " (get emit "node-name")))
+                              (when (get emit "args")
+                                ($ generic-data-viewer {:data (get emit "args")
                                                         :color "purple"
                                                         :truncate-length 60
                                                         :depth 0}))
@@ -455,9 +455,9 @@
 (defui forking-input-component [{:keys [selected-node changed-nodes on-change-node-input affected-nodes]}]
   (let [data (when selected-node
                (js->clj (.-data selected-node)))
-        node-id (:node-id data)
-        node-name (:node data)
-        original-input (:input data)
+        node-id (get data "node-id")
+        node-name (get data "node")
+        original-input (get data "input")
 
         ;; Function to pretty-print ClojureScript data to a JSON string
         to-pretty-json (fn [val] (js/JSON.stringify (clj->js val) nil 2))
@@ -476,8 +476,8 @@
      (fn []
        (when selected-node
          (let [data (js->clj (.-data selected-node))
-               node-id (:node-id data)
-               original-input (:input data)
+               node-id (get data "node-id")
+               original-input (get data "input")
                current-input (get changed-nodes node-id (to-pretty-json original-input))]
            (set-input-text current-input))))
      [selected-node changed-nodes])
@@ -584,9 +584,9 @@
             (str "Exceptions (" (count exceptions) ")"))
          ($ :div {:className "space-y-2"}
             (for [[idx exc] (map-indexed vector exceptions)]
-              (let [invoke-id (:invoke-id exc)
-                    node-name (:node exc)
-                    throwable-str (:throwable-str exc)
+              (let [invoke-id (get exc "invoke-id")
+                    node-name (get exc "node")
+                    throwable-str (get exc "throwable-str")
                     first-line (first (str/split-lines throwable-str))
                     is-loaded? (contains? graph-data invoke-id)]
                 ($ :div {:key idx
@@ -784,7 +784,7 @@
                                                     ;; Find the corresponding flow node and select it
                                                     (let [nodes (js->clj flow-nodes)
                                                           target-node (->> nodes
-                                                                           (filter #(= (-> % :data :node-id) node-id))
+                                                                           (filter #(= (get (:data %) "node-id") node-id))
                                                                            first)]
                                                       (when (and target-node on-select-node)
                                                         (on-select-node node-id))))]
@@ -836,7 +836,7 @@
                            :type "custom"
                            :draggable false
                            :data (assoc data
-                                        :label (str (:node data))
+                                        :label (str (get data "node"))
                                         :node-id id)})))
 
         all-edges (concat real-edges implicit-edges)]
@@ -872,7 +872,7 @@
                                          (if (visited current)
                                            (recur remaining visited downstream)
                                            (let [node-data (get graph-data current)
-                                                 emitted-ids (set (map :invoke-id (:emits node-data)))
+                                                 emitted-ids (set (map #(get % "invoke-id") (get node-data "emits")))
                                                  ;; Add emitted nodes to downstream (but not the starting node)
                                                  new-downstream (if (= current start-node-id)
                                                                   downstream
@@ -925,7 +925,7 @@
              (when selected-node-id
                (let [nodes (js->clj flow-nodes)
                      target-node (->> nodes
-                                      (filter #(= (-> % :data :node-id) selected-node-id))
+                                      (filter #(= (get (:data %) "node-id") selected-node-id))
                                       first)]
                  (when target-node
                    (set-selected-node-internal (clj->js target-node))))))
@@ -953,14 +953,14 @@
                                                   (uix.core/as-react
                                                    (fn [{:keys [data id]}]
                                                      (let [data (js->clj data)
-                                                           label (:label data)
-                                                           node-id (:node-id data)
+                                                           label (get data "label")
+                                                           node-id (get data "node-id")
                                                            selected (= (when selected-node (.-id selected-node)) id)
                                                            has-changes (contains? changed-nodes node-id)
                                                            is-affected (and forking-mode? (contains? affected-nodes node-id))
                                                            ;; Check if node is in progress
-                                                           in-progress? (and (:start-time-millis data)
-                                                                             (not (:finish-time-millis data)))
+                                                           in-progress? (and (get data "start-time-millis")
+                                                                             (not (get data "finish-time-millis")))
                                                            ;; NEW: Check if the node is stuck (in-progress but the whole agent has finished)
                                                            is-stuck? (and in-progress? is-complete)
                                                            base-classes (cond
@@ -983,8 +983,8 @@
                                                                                ["shadow-lg"])
                                                            common-classes ["p-3" "rounded-md" "transition-all" "duration-200"]
                                                            node-className (common/cn base-classes selection-classes common-classes)
-                                                           has-human-request (:human-request data)
-                                                           has-exceptions (seq (:exceptions data))]
+                                                           has-human-request (get data "human-request")
+                                                           has-exceptions (seq (get data "exceptions"))]
                                                        ($ :div {:className "relative"}
                                                           ($ :div {:className node-className
                                                                    :style {:width "170px" :height "40px" :opacity (if is-affected "0.6" "1.0")}}
@@ -995,7 +995,7 @@
                                                                               :has-changes has-changes
                                                                               :has-human-request has-human-request
                                                                               :has-exceptions has-exceptions
-                                                                              :has-result (:result data)})
+                                                                              :has-result (get data "result")})
                                                           ($ Handle {:type "target" :position "top"})
                                                           ($ Handle {:type "source" :position "bottom"})))))
 
@@ -1003,7 +1003,7 @@
                                                   (uix.core/as-react
                                                    (fn [{:keys [data]}]
                                                      (let [data (js->clj data)
-                                                           missing-node-id (:missing-node-id data)]
+                                                           missing-node-id (get data "missing-node-id")]
                                                        ($ :div {:className "relative cursor-pointer"
                                                                 :onClick (fn [e]
                                                                            (.stopPropagation e)
@@ -1011,7 +1011,7 @@
                                                                            (on-paginate-node missing-node-id))}
                                                           ($ :div {:className "bg-gray-100 text-gray-600 p-3 rounded-md shadow-lg border-2 border-dashed border-gray-400 hover:bg-gray-200 transition-colors"
                                                                    :style {:width "170px" :height "40px"}}
-                                                             (:label data))
+                                                             (get data "label"))
                                                           ($ Handle {:type "target" :position "top"})))))})
                              :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
                              :onNodeClick (fn [_ node] (handle-select-node-click node))}
