@@ -4,7 +4,8 @@
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.rama :as rama]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.agent.basic.dataset-agent :refer [DatasetExampleModule math-input-schema math-output-schema]]))
+   [com.rpl.agent.basic.dataset-agent :refer [DatasetExampleModule math-input-schema math-output-schema]]
+   [clojure.string :as str]))
 
 (deftest dataset-example-test
   (testing "Dataset management at client level with calculator agent"
@@ -79,7 +80,9 @@
             ;; Verify datasets are searchable
             (let [math-results (aor/search-datasets manager "Math" 10)]
               (is (>= (count math-results) 1))
-              (is (some #(.contains % "Math Operations") (vals math-results))))
+              (is (some
+                   #(str/includes? % "Math Operations")
+                   (vals math-results))))
 
             ;; Create a snapshot
             (aor/snapshot-dataset! manager math-dataset-id nil "v1.0")

@@ -10,7 +10,8 @@
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.rama :as rama]
-   [com.rpl.rama.test :as rtest]))
+   [com.rpl.rama.test :as rtest]
+   [clojure.string :as str]))
 
 ;;; Agent module with evaluator builders
 (aor/defagentmodule EvaluatorAgentModule
@@ -42,10 +43,10 @@
                                {:index  idx
                                 :output output
                                 :score  (+ (count (str output))
-                                           (if (.contains (str output) "good")
+                                           (if (str/includes? (str output) "good")
                                              10
                                              0)
-                                           (if (.contains (str output) "bad")
+                                           (if (str/includes? (str output) "bad")
                                              -10
                                              0))})
                              outputs)

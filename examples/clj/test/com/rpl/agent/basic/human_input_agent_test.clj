@@ -5,7 +5,8 @@
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.rama :as rama]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.agent.basic.human-input-agent :refer [HumanInputAgentModule human-helpful?]])
+   [com.rpl.agent.basic.human-input-agent :refer [HumanInputAgentModule human-helpful?]]
+   [clojure.string :as str])
   (:import
    [com.rpl.agentorama
     HumanInputRequest]
@@ -29,20 +30,20 @@
          (.modelName "gpt-4o-mini")
          .build)))
   (->
-   topology
-   (aor/new-agent "HumanInputAgent")
-   (aor/node
-    "chat"
-    nil
-    (fn [agent-node user-message]
-      (let [openai (aor/get-agent-object agent-node "openai")
-            response (-> (lc4j/chat openai [(UserMessage. user-message)])
-                         .aiMessage
-                         .text)
-            helpful? (human-helpful? agent-node response)]
-        (aor/result! agent-node
-                     {:response response
-                      :helpful helpful?}))))))
+    topology
+    (aor/new-agent "HumanInputAgent")
+    (aor/node
+     "chat"
+     nil
+     (fn [agent-node ^String user-message]
+       (let [openai   (aor/get-agent-object agent-node "openai")
+             response (-> (lc4j/chat openai [(UserMessage. user-message)])
+                          .aiMessage
+                          .text)
+             helpful? (human-helpful? agent-node response)]
+         (aor/result! agent-node
+                      {:response response
+                       :helpful  helpful?}))))))
 
 (deftest human-input-agent-test
   (testing "HumanInputAgent handles human input correctly"
@@ -53,7 +54,7 @@
         (let [manager (aor/agent-manager ipc
                                          (rama/get-module-name
                                           TestHumanInputAgentModule))
-              agent (aor/agent-client manager "HumanInputAgent")]
+              agent   (aor/agent-client manager "HumanInputAgent")]
 
           (testing "processes user message and collects helpfulness feedback"
             (let [invoke (aor/agent-initiate agent "What is AI?")]
@@ -61,8 +62,10 @@
               ;; Handle helpfulness input request
               (let [step1 (aor/agent-next-step agent invoke)]
                 (is (instance? HumanInputRequest step1))
-                (is (.contains (:prompt step1) "AI Response"))
-                (is (.contains (:prompt step1) "Was this response helpful?"))
+                (is (str/includes? (:prompt step1) "AI Response"))
+                (is (str/includes?
+                     (:prompt step1)
+                     "Was this response helpful?"))
                 (aor/provide-human-input agent step1 "y"))
 
               ;; Get final result
@@ -80,7 +83,7 @@
               ;; Should get validation prompt
               (let [step2 (aor/agent-next-step agent invoke)]
                 (is (instance? HumanInputRequest step2))
-                (is (.contains (:prompt step2) "Please answer 'y' or 'n'"))
+                (is (str/includes? (:prompt step2) "Please answer 'y' or 'n'"))
                 (aor/provide-human-input agent step2 "n"))
 
               ;; Get final result

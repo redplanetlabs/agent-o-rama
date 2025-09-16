@@ -47,35 +47,35 @@
          (.modelName "gpt-4o-mini")
          .build)))
   (->
-   topology
-   (aor/new-agent "HumanInputAgent")
-   (aor/node
-    "chat"
-    nil
-    (fn [agent-node user-message]
-      (let [openai (aor/get-agent-object agent-node "openai")
-            response (-> (lc4j/chat openai [(UserMessage. user-message)])
-                         .aiMessage
-                         .text)
-            helpful? (human-helpful? agent-node response)]
-        (aor/result! agent-node
-                     {:response response
-                      :helpful helpful?}))))))
+    topology
+    (aor/new-agent "HumanInputAgent")
+    (aor/node
+     "chat"
+     nil
+     (fn [agent-node ^String user-message]
+       (let [openai   (aor/get-agent-object agent-node "openai")
+             response (-> (lc4j/chat openai [(UserMessage. user-message)])
+                          .aiMessage
+                          .text)
+             helpful? (human-helpful? agent-node response)]
+         (aor/result! agent-node
+                      {:response response
+                       :helpful  helpful?}))))))
 
 (defn -main
   "Run the human input agent example"
   [& _args]
   (if (System/getenv "OPENAI_API_KEY")
     (with-open [ipc (rtest/create-ipc)
-                ui (aor/start-ui ipc)]
+                ui  (aor/start-ui ipc)]
       (rtest/launch-module! ipc HumanInputAgentModule {:tasks 4 :threads 2})
-      (let [module-name (rama/get-module-name HumanInputAgentModule)
+      (let [module-name   (rama/get-module-name HumanInputAgentModule)
             agent-manager (aor/agent-manager ipc module-name)
-            chat-agent (aor/agent-client agent-manager "HumanInputAgent")
+            chat-agent    (aor/agent-client agent-manager "HumanInputAgent")
             _ (print "Enter your message: ")
             _ (flush)
-            user-message (read-line)
-            inv (aor/agent-initiate chat-agent user-message)]
+            user-message  (read-line)
+            inv           (aor/agent-initiate chat-agent user-message)]
         (println)
         (println user-message)
         (loop [step (aor/agent-next-step chat-agent inv)]

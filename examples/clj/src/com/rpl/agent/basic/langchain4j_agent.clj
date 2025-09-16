@@ -46,7 +46,7 @@
       (aor/node
        "chat"
        nil
-       (fn [agent-node user-message]
+       (fn [agent-node ^String user-message]
          (let [model         (aor/get-agent-object agent-node "openai-model")
                messages      [(SystemMessage. "You are a helpful assistant.")
                               (UserMessage. user-message)]

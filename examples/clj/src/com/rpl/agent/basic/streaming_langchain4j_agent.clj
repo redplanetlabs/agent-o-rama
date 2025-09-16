@@ -45,18 +45,18 @@
       (aor/node
        "streaming-chat"
        nil
-       (fn [agent-node user-message]
-         (let [model (aor/get-agent-object agent-node "openai-streaming-model")
-               messages [(SystemMessage. "You are a helpful assistant.")
-                         (UserMessage. user-message)]
+       (fn [agent-node ^String user-message]
+         (let [model         (aor/get-agent-object agent-node "openai-streaming-model")
+               messages      [(SystemMessage. "You are a helpful assistant.")
+                              (UserMessage. user-message)]
 
                ;; Send chat request to streaming OpenAI model
                ;; Streaming chunks are automatically emitted by agent-o-rama
-               response (lc4j/chat
-                         model
-                         (lc4j/chat-request
-                          messages
-                          {:temperature 0.7 :max-output-tokens 200}))
+               response      (lc4j/chat
+                              model
+                              (lc4j/chat-request
+                               messages
+                               {:temperature 0.7 :max-output-tokens 200}))
                response-text (.text (.aiMessage response))]
 
            (aor/result! agent-node response-text))))))
@@ -69,8 +69,8 @@
       (rtest/launch-module! ipc StreamingLangChain4jAgentModule {:tasks 1 :threads 1})
 
       (let [module-name (rama/get-module-name StreamingLangChain4jAgentModule)
-            manager (aor/agent-manager ipc module-name)
-            agent (aor/agent-client manager "StreamingLangChain4jAgent")]
+            manager     (aor/agent-manager ipc module-name)
+            agent       (aor/agent-client manager "StreamingLangChain4jAgent")]
 
         (println "Streaming LangChain4j Agent Example:")
         (println "Asking OpenAI a question with real-time streaming...\n")

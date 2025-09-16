@@ -15,9 +15,8 @@
    [com.rpl.rama :as rama]
    [com.rpl.rama.test :as rtest])
   (:import
-   [dev.langchain4j.agent.tool
-    ToolExecutionRequest]
    [dev.langchain4j.data.message
+    ToolExecutionResultMessage
     UserMessage]
    [dev.langchain4j.model.openai
     OpenAiChatModel]))
@@ -25,27 +24,25 @@
 ;;; Tool function definitions
 (defn calculate-tool
   "Simple calculator tool that performs basic arithmetic"
-  [request]
-  (let [args (.arguments request)
-        operation (.get args "operation")
-        a (Double/parseDouble (.get args "a"))
-        b (Double/parseDouble (.get args "b"))
-        result (case operation
-                 "add" (+ a b)
-                 "subtract" (- a b)
-                 "multiply" (* a b)
-                 "divide" (if (zero? b)
-                            "Error: Division by zero"
-                            (/ a b))
-                 "Error: Unknown operation")]
+  [args]
+  (let [operation (args "operation")
+        a         (args "a")
+        b         (args "b")
+        result    (case operation
+                    "add" (+ a b)
+                    "subtract" (- a b)
+                    "multiply" (* a b)
+                    "divide" (if (zero? b)
+                               "Error: Division by zero"
+                               (/ a b))
+                    "Error: Unknown operation")]
     (str result)))
 
 (defn string-tool
   "String manipulation tool for text processing"
-  [request]
-  (let [args (.arguments request)
-        text (.get args "text")
-        operation (.get args "operation")]
+  [args]
+  (let [text      (args "text")
+        operation (args "operation")]
     (case operation
       "uppercase" (str/upper-case text)
       "lowercase" (str/lower-case text)
@@ -60,10 +57,11 @@
     "calculator"
     (lj/object
      {:description "Parameters for calculator operations"
-      :required ["operation" "a" "b"]}
-     {"operation" (lj/enum "The arithmetic operation to perform" ["add" "subtract" "multiply" "divide"])
-      "a" (lj/number "The first number")
-      "b" (lj/number "The second number")})
+      :required    ["operation" "a" "b"]}
+     {"operation" (lj/enum "The arithmetic operation to perform"
+                           ["add" "subtract" "multiply" "divide"])
+      "a"         (lj/number "The first number")
+      "b"         (lj/number "The second number")})
     "Performs basic arithmetic operations on two numbers")
    calculate-tool))
 
@@ -73,9 +71,10 @@
     "string-processor"
     (lj/object
      {:description "Parameters for string manipulation operations"
-      :required ["text" "operation"]}
-     {"text" (lj/string "The text to process")
-      "operation" (lj/enum "The string operation to perform" ["uppercase" "lowercase" "reverse" "length"])})
+      :required    ["text" "operation"]}
+     {"text"      (lj/string "The text to process")
+      "operation" (lj/enum "The string operation to perform"
+                           ["uppercase" "lowercase" "reverse" "length"])})
     "Performs string manipulation operations")
    string-tool))
 
@@ -101,83 +100,74 @@
 
   ;; Create a coordinator agent that uses OpenAI with tools
   (->
-   topology
-   (aor/new-agent "ToolsCoordinator")
+    topology
+    (aor/new-agent "ToolsCoordinator")
 
-   ;; Node that sends natural language prompts to OpenAI and processes tool calls
-   (aor/node
-    "chat-with-tools"
-    nil
-    (fn [agent-node prompts]
-      (let [model (aor/get-agent-object agent-node "openai-model")
-            tools-agent (aor/agent-client agent-node "ToolsAgent")
-            results (atom [])]
+    ;; Node that sends natural language prompts to OpenAI and processes tool calls
+    (aor/node
+     "chat-with-tools"
+     nil
+     (fn [agent-node prompts]
+       (let [model       (aor/get-agent-object agent-node "openai-model")
+             tools-agent (aor/agent-client agent-node "ToolsAgent")
+             results     (atom [])]
 
-        (doseq [prompt prompts]
-          (println (format "\nProcessing prompt: \"%s\"" prompt))
+         (doseq [^String prompt prompts]
+           ;; Send prompt to OpenAI model with tools
+           (let [response   (lc4j/chat model
+                                       (lc4j/chat-request
+                                        [(UserMessage. prompt)]
+                                        {:tools [CALCULATOR-TOOL STRING-TOOL]}))
+                 ai-message (.aiMessage response)
+                 tool-calls (.toolExecutionRequests ai-message)]
 
-          ;; Send prompt to OpenAI model with tools
-          (let [response (lc4j/chat model (lc4j/chat-request
-                                           [(UserMessage. prompt)]
-                                           {:tools [CALCULATOR-TOOL STRING-TOOL]}))
-                ai-message (.aiMessage response)
-                tool-calls (.toolExecutionRequests ai-message)]
+             (if (seq tool-calls)
+               ;; Execute tools and get results
+               (let [tool-results (aor/agent-invoke tools-agent tool-calls)]
+                 (swap! results conj
+                   {:prompt       prompt
+                    :tool-calls   (count tool-calls)
+                    :tool-results tool-results}))
+               (swap! results conj
+                 {:prompt     prompt
+                  :response   (.text ai-message)
+                  :tool-calls 0}))))
 
-            (if (seq tool-calls)
-              (do
-                (println (format "Model generated %d tool calls" (count tool-calls)))
-                ;; Execute tools and get results
-                (let [tool-results (aor/agent-invoke tools-agent tool-calls)]
-                  (swap! results conj {:prompt prompt
-                                       :tool-calls (count tool-calls)
-                                       :tool-results tool-results})))
-              (do
-                (println "Model responded without tool calls")
-                (swap! results conj {:prompt prompt
-                                     :response (.text ai-message)
-                                     :tool-calls 0})))))
-
-        (aor/result! agent-node
-                     {:prompts-count (count prompts)
-                      :results @results}))))))
+         (aor/result! agent-node
+                      {:prompts-count (count prompts)
+                       :results       @results}))))))
 
 (defn -main
   "Run the tools agent example"
   [& _args]
   (with-open [ipc (rtest/create-ipc)]
-    (rtest/launch-module! ipc ToolsAgentModule {:tasks 2 :threads 2})
-
-    (let [manager (aor/agent-manager
-                   ipc
-                   (rama/get-module-name ToolsAgentModule))
-          coordinator (aor/agent-client manager "ToolsCoordinator")]
-
-      (println "OpenAI Tools Agent Example:")
-      (println "Using natural language prompts that trigger tool execution")
+    (rtest/launch-module! ipc ToolsAgentModule {:tasks 1 :threads 1})
+    (let [manager     (aor/agent-manager
+                       ipc
+                       (rama/get-module-name ToolsAgentModule))
+          coordinator (aor/agent-client manager "ToolsCoordinator")
+          prompts     ["What is 15 plus 25?"
+                       "Calculate 7 times 8"
+                       "Divide 100 by 4"
+                       "Convert 'Hello World' to uppercase"
+                       "Reverse the text 'ReverseMe'"
+                       "How many characters are in 'Count Characters'?"]
+          result      (aor/agent-invoke coordinator prompts)]
 
       ;; Create natural language prompts that will trigger tool usage
-      (let [prompts ["What is 15 plus 25?"
-                     "Calculate 7 times 8"
-                     "Divide 100 by 4"
-                     "Convert 'Hello World' to uppercase"
-                     "Reverse the text 'ReverseMe'"
-                     "How many characters are in 'Count Characters'?"]]
+      (println "Prompts processed:" (:prompts-count result))
 
-        (let [result (aor/agent-invoke coordinator prompts)]
-          (println "\nResults:")
-          (println "  Prompts processed:" (:prompts-count result))
+      (println "\nDetailed results:")
+      (doseq [[idx prompt-result] (map-indexed vector (:results result))]
+        (println (format "\n[%d] Prompt: \"%s\"" (inc idx) (:prompt prompt-result)))
+        (if (> (:tool-calls prompt-result 0) 0)
+          (do
+            (println (format "    Tool calls: %d" (:tool-calls prompt-result)))
+            (println "    Tool results:"
+                     (mapv
+                      #(.text ^ToolExecutionResultMessage %)
+                      (:tool-results prompt-result))))
+          (println "    Direct response:" (:response prompt-result)))))))
 
-          (println "\nDetailed results:")
-          (doseq [[idx prompt-result] (map-indexed vector (:results result))]
-            (println (format "\n[%d] Prompt: \"%s\"" (inc idx) (:prompt prompt-result)))
-            (if (> (:tool-calls prompt-result 0) 0)
-              (do
-                (println (format "    Tool calls: %d" (:tool-calls prompt-result)))
-                (println "    Tool results:" (:tool-results prompt-result)))
-              (println "    Direct response:" (:response prompt-result))))))
-
-      (println "\nNotice how:")
-      (println "- Natural language prompts automatically trigger appropriate tools")
-      (println "- OpenAI model decides which tools to call based on the request")
-      (println "- Tools execute seamlessly and results are returned")
-      (println "- Complex reasoning is handled by the language model"))))
+(comment
+  (-main))

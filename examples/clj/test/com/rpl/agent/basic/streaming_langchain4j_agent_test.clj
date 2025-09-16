@@ -40,18 +40,18 @@
       (aor/node
        "streaming-chat"
        nil
-       (fn [agent-node user-message]
-         (let [model (aor/get-agent-object agent-node "openai-streaming-model")
-               messages [(SystemMessage. "You are a helpful assistant.")
-                         (UserMessage. user-message)]
+       (fn [agent-node ^String user-message]
+         (let [model         (aor/get-agent-object agent-node "openai-streaming-model")
+               messages      [(SystemMessage. "You are a helpful assistant.")
+                              (UserMessage. user-message)]
 
                ;; Send chat request to streaming OpenAI model
                ;; Streaming chunks are automatically emitted by agent-o-rama
-               response (lc4j/chat
-                         model
-                         (lc4j/chat-request
-                          messages
-                          {:temperature 0.7 :max-output-tokens 200}))
+               response      (lc4j/chat
+                              model
+                              (lc4j/chat-request
+                               messages
+                               {:temperature 0.7 :max-output-tokens 200}))
                response-text (.text (.aiMessage response))]
 
            (aor/result! agent-node response-text))))))
@@ -65,7 +65,7 @@
         (let [manager (aor/agent-manager ipc
                                          (rama/get-module-name
                                           TestStreamingLangChain4jModule))
-              agent (aor/agent-client manager "StreamingLangChain4jAgent")]
+              agent   (aor/agent-client manager "StreamingLangChain4jAgent")]
 
           (testing "receives streaming chunks and final result"
             (let [invoke (aor/agent-initiate agent "What is AI?")
@@ -91,7 +91,8 @@
 
                 ;; Verify streaming chunks combine to final result
                 (let [combined-chunks (apply str @streaming-chunks)]
-                  (is (= combined-chunks final-result) "Streaming chunks should combine to final result")))))
+                  (is (= combined-chunks final-result)
+                      "Streaming chunks should combine to final result")))))
 
           (testing "handles different questions"
             (let [invoke (aor/agent-initiate agent "Explain machine learning briefly")

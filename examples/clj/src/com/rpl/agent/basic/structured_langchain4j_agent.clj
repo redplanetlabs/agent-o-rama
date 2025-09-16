@@ -67,22 +67,22 @@
     (aor/node
      "analyze-question"
      nil
-     (fn [agent-node user-question]
+     (fn [agent-node ^String user-question]
        (let
-         [model (aor/get-agent-object agent-node "openai-model")
+         [model      (aor/get-agent-object agent-node "openai-model")
           system-msg
           (SystemMessage.
            "You are an intelligent question analyzer. Analyze the user's question and provide a structured response that categorizes the question type, assesses its complexity, identifies main topics, provides a direct answer, and indicates your confidence level.")
-          user-msg (UserMessage. user-question)
+          user-msg   (UserMessage. user-question)
           ;; Configure structured JSON response
-          response (lc4j/chat
-                    model
-                    (lc4j/chat-request
-                     [system-msg user-msg]
-                     {:response-format
-                      (lc4j/json-response-format
-                       "QuestionAnalysis"
-                       QuestionAnalysis)}))]
+          response   (lc4j/chat
+                      model
+                      (lc4j/chat-request
+                       [system-msg user-msg]
+                       {:response-format
+                        (lc4j/json-response-format
+                         "QuestionAnalysis"
+                         QuestionAnalysis)}))]
 
          ;; Parse and return structured response
          (aor/result! agent-node

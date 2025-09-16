@@ -5,7 +5,8 @@
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.rama :as rama]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.agent.basic.langchain4j-agent :refer [LangChain4jAgentModule]])
+   [com.rpl.agent.basic.langchain4j-agent
+    :refer [LangChain4jAgentModule]])
   (:import
    [dev.langchain4j.data.message
     SystemMessage
@@ -41,16 +42,16 @@
       (aor/node
        "chat"
        nil
-       (fn [agent-node user-message]
-         (let [model (aor/get-agent-object agent-node "openai-model")
-               messages [(SystemMessage. "You are a helpful assistant.")
-                         (UserMessage. user-message)]
+       (fn [agent-node ^String user-message]
+         (let [model         (aor/get-agent-object agent-node "openai-model")
+               messages      [(SystemMessage. "You are a helpful assistant.")
+                              (UserMessage. user-message)]
 
                ;; Send chat request to OpenAI
-               response (lc4j/chat model
-                                   (lc4j/chat-request messages
-                                                      {:temperature 0.7
-                                                       :max-output-tokens 200}))
+               response      (lc4j/chat model
+                                        (lc4j/chat-request messages
+                                                           {:temperature       0.7
+                                                            :max-output-tokens 200}))
                response-text (.text (.aiMessage response))]
 
            (aor/result! agent-node response-text))))))
@@ -64,7 +65,7 @@
         (let [manager (aor/agent-manager ipc
                                          (rama/get-module-name
                                           TestLangChain4jModule))
-              agent (aor/agent-client manager "LangChain4jAgent")]
+              agent   (aor/agent-client manager "LangChain4jAgent")]
 
           (testing "returns response from OpenAI chat model"
             (let [result (aor/agent-invoke agent "What is artificial intelligence?")]
