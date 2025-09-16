@@ -1,24 +1,26 @@
 # State Management
 
-Agents need memory. They track conversations, store results, and share data. Agent-O-Rama provides three powerful stores, each optimized for different patterns.
+Agents need memory. They track conversations, store results, and share data across distributed executions. Agent-O-Rama provides three powerful distributed stores, each optimized for different patterns.
+
+> **Reference**: See [Key-Value Store](../terms/key-value-store.md) documentation for comprehensive storage details.
 
 ## The Three Stores
 
-Each store serves a specific purpose:
+Each store serves a specific purpose in distributed agent state management:
 
-- **Key-Value Store**: Simple key-to-value mapping. Perfect for caching, flags, and lookups.
-- **Document Store**: Field-based storage for structured data. Ideal for entities with multiple attributes.
-- **PState Store**: Path-based hierarchical storage. Built for complex, nested data structures.
+- **[Key-Value Store](../terms/key-value-store.md)**: Typed persistent storage for simple key-value pairs with automatic partitioning
+- **Document Store**: Field-based storage for structured data with individual field updates
+- **PState Store**: Path-based hierarchical storage for complex, nested data structures with atomic navigation
 
-All stores are:
-- **Distributed**: Automatically partitioned across your cluster
-- **Persistent**: Data survives restarts and failures
-- **Transactional**: Updates are atomic and consistent
-- **Fast**: Optimized for both reads and writes
+All stores provide:
+- **Distributed Access**: Automatically partitioned across cluster [task globals](../glossary.md#task-global)
+- **Persistent State**: Data survives restarts and failures with automatic backup
+- **Strong Consistency**: All reads return most recent writes with atomic operations
+- **High Performance**: Task-local caching with sub-millisecond access for cached entries
 
 ## Key-Value Store: Simple and Direct
 
-The key-value store maps keys to values. Think Redis, but distributed and integrated.
+The [key-value store](../terms/key-value-store.md) provides typed persistent storage for simple key-value relationships with specified key and value classes. Think Redis, but distributed and integrated with compile-time type safety.
 
 **Clojure:**
 ```clojure
@@ -75,7 +77,7 @@ public class CacheModule extends AgentModule {
 
 ## Document Store: Structured Records
 
-Document stores handle entities with multiple fields. Update individual fields without rewriting the entire record.
+Document stores handle entities with multiple fields using field-based storage. Update individual fields atomically without rewriting the entire record, perfect for entities with multiple attributes that change independently.
 
 **Clojure:**
 ```clojure
@@ -171,7 +173,7 @@ public class UserModule extends AgentModule {
 
 ## PState Store: Hierarchical Data
 
-PState stores manage complex, nested data structures using paths. Navigate and update deep structures efficiently.
+PState stores manage complex, nested data structures using path-based navigation. Navigate and update deep structures efficiently with atomic operations on nested values, ideal for tree-like or graph data.
 
 **Clojure:**
 ```clojure
@@ -307,7 +309,7 @@ Pick your store based on your data pattern:
 
 ## Cross-Agent State Sharing
 
-Stores are shared across all agents in a module. Use this for coordination:
+Stores are shared across all [agents](../terms/agent.md) in an [agent module](../glossary.md#agent-module), enabling distributed coordination and state synchronization between different agent types:
 
 **Clojure:**
 ```clojure
@@ -399,4 +401,4 @@ public class SharedStateModule extends AgentModule {
 
 ## What's Next?
 
-You've mastered state management. Now learn how agents communicate in real-time with [Communication Patterns](03-communication-patterns.md).
+You've mastered distributed state management with [key-value stores](../terms/key-value-store.md), document stores, and PState stores. Now learn how agents communicate in real-time with [Communication Patterns](03-communication-patterns.md).

@@ -1,14 +1,16 @@
 # Communication Patterns
 
-Agents don't just compute: they communicate. Stream real-time updates. Request human input. Build interactive systems that respond as things happen.
+Agents don't just compute: they communicate. Stream real-time updates through [streaming chunks](../glossary.md#streaming-chunk). Request [human input](../glossary.md#human-input-request). Build interactive systems that respond as things happen.
+
+> **Reference**: See comprehensive communication pattern documentation in the [Glossary](../glossary.md) for streaming and human input concepts.
 
 ## Streaming: Real-Time Data Flow
 
-Streaming lets your agents send data as it's generated. Perfect for progress updates, live monitoring, or AI responses.
+[Streaming chunks](../glossary.md#streaming-chunk) let your [agents](../terms/agent.md) send data as it's generated from any [agent node](../glossary.md#agent-node). Perfect for progress updates, live monitoring, or AI responses with real-time feedback.
 
 ### Emitting Stream Chunks
 
-Any node can stream data using `stream-chunk!`:
+Any [agent node](../glossary.md#agent-node) can emit [streaming chunks](../glossary.md#streaming-chunk) using `stream-chunk!` to send real-time data to active [streaming subscriptions](../glossary.md#streaming-subscription):
 
 **Clojure:**
 ```clojure
@@ -68,7 +70,7 @@ public class StreamingModule extends AgentModule {
 
 ### Subscribing to Streams
 
-Clients subscribe to receive stream chunks in real-time:
+[Agent clients](../glossary.md#agent-client) create [streaming subscriptions](../glossary.md#streaming-subscription) to receive [streaming chunks](../glossary.md#streaming-chunk) in real-time from specific nodes or all nodes:
 
 **Clojure:**
 ```clojure
@@ -114,11 +116,11 @@ StreamSubscription targetedSub = client.streamSpecific(
 
 ## Human Input: Interactive Agents
 
-Sometimes agents need human decisions. The human input pattern pauses execution and waits for user response.
+Sometimes [agents](../terms/agent.md) need human decisions. The [human input request](../glossary.md#human-input-request) pattern pauses [agent node](../glossary.md#agent-node) execution and waits for user response, enabling human-in-the-loop workflows.
 
 ### Requesting Input
 
-Use `get-human-input` to pause and wait:
+Use `get-human-input` within [agent nodes](../glossary.md#agent-node) to create [human input requests](../glossary.md#human-input-request) that pause execution and wait for user response:
 
 **Clojure:**
 ```clojure
@@ -204,7 +206,7 @@ public class ApprovalModule extends AgentModule {
 
 ### Handling Human Input Requests
 
-The client must handle input requests when they occur:
+The [agent client](../glossary.md#agent-client) must handle [human input requests](../glossary.md#human-input-request) when they occur during [agent invoke](../glossary.md#agent-invoke) execution:
 
 **Clojure:**
 ```clojure
@@ -248,7 +250,7 @@ Map<String, Object> result = invokeHandle.result();
 
 ## Combining Patterns: Interactive Streaming
 
-Stream progress while accepting human input for truly interactive experiences:
+Combine [streaming chunks](../glossary.md#streaming-chunk) with [human input requests](../glossary.md#human-input-request) for truly interactive experiences that provide real-time progress while accepting user decisions:
 
 **Clojure:**
 ```clojure
@@ -369,7 +371,7 @@ Map<String, Object> finalResult = invokeHandle.result();
 
 ## Pattern Selection Guide
 
-Choose your communication pattern based on needs:
+Choose your communication pattern based on your [agent](../terms/agent.md) interaction needs:
 
 **Use Streaming when you:**
 - Generate data incrementally
@@ -391,4 +393,4 @@ Choose your communication pattern based on needs:
 
 ## What's Next?
 
-You've learned how agents communicate. Now discover advanced patterns for parallel processing and AI integration in [Advanced Patterns](04-advanced-patterns.md).
+You've learned how [agents](../terms/agent.md) communicate through [streaming chunks](../glossary.md#streaming-chunk) and [human input requests](../glossary.md#human-input-request). Now discover advanced patterns for parallel processing and AI integration in [Advanced Patterns](04-advanced-patterns.md).

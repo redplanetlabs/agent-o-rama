@@ -1,14 +1,16 @@
 # System Features
 
-Take control of your agent systems. Fork executions for exploration. Build datasets for testing. Evaluate performance systematically.
+Take control of your [agent](../terms/agent.md) systems. [Fork](../glossary.md#fork) executions for exploration. Build [datasets](../terms/dataset.md) for testing. [Evaluate](../glossary.md#evaluators) performance systematically.
+
+> **Reference**: See [Dataset](../terms/dataset.md) and [Experiment](../terms/experiment.md) documentation for comprehensive evaluation details.
 
 ## Forking: Branching Execution Paths
 
-Forking creates new execution branches from existing ones. Explore alternatives, test variations, or implement speculative execution.
+[Forking](../glossary.md#fork) creates new execution branches from existing [agent invocations](../glossary.md#agent-invoke) with modified parameters. Explore alternatives, test variations, or implement speculative execution from any point in [agent graph](../glossary.md#agent-graph) execution.
 
 ### Basic Forking
 
-Create alternate execution paths:
+Create alternate execution paths by [forking](../glossary.md#fork) from existing [agent invokes](../glossary.md#agent-invoke) to explore different parameter sets or strategies:
 
 **Clojure:**
 ```clojure
@@ -112,7 +114,7 @@ Map<String, Object> results = Map.of(
 
 ### Advanced Forking Patterns
 
-Fork recursively for tree exploration:
+[Fork](../glossary.md#fork) recursively from [agent invocations](../glossary.md#agent-invoke) for tree exploration and decision analysis with nested execution branches:
 
 **Clojure:**
 ```clojure
@@ -220,11 +222,11 @@ public List<Map<String, Object>> exploreTree(AgentInvoke invoke, int depth) {
 
 ## Datasets: Testing and Validation
 
-Datasets let you systematically test agent behavior. Create test cases, validate outputs, measure performance.
+[Datasets](../terms/dataset.md) are managed collections of input/output examples used for [agent](../terms/agent.md) testing, evaluation, and performance tracking. Create test cases, validate outputs, measure performance systematically.
 
 ### Creating Datasets
 
-Build test suites for your agents:
+Build test suites for your [agents](../terms/agent.md) using [datasets](../terms/dataset.md) with structured examples for systematic evaluation:
 
 **Clojure:**
 ```clojure
@@ -320,7 +322,7 @@ for (Map<String, Object> entry : manager.getDatasetEntries(datasetId)) {
 
 ### Complex Dataset Scenarios
 
-Test conversational agents with multi-turn datasets:
+Test conversational [agents](../terms/agent.md) with multi-turn [datasets](../terms/dataset.md) for complex interaction scenarios and stateful conversations:
 
 **Clojure:**
 ```clojure
@@ -378,11 +380,11 @@ Test conversational agents with multi-turn datasets:
 
 ## Evaluators: Systematic Performance Measurement
 
-Evaluators automate testing across datasets. Define metrics, run evaluations, track performance.
+[Evaluators](../glossary.md#evaluators) are functions for measuring [agent](../terms/agent.md) performance against [datasets](../terms/dataset.md). Define metrics, run [experiments](../terms/experiment.md), track performance systematically across test scenarios.
 
 ### Basic Evaluator
 
-Create evaluators for automatic testing:
+Create [evaluators](../glossary.md#evaluators) for automatic testing against [datasets](../terms/dataset.md) with custom scoring functions:
 
 **Clojure:**
 ```clojure
@@ -498,7 +500,7 @@ Map<String, Object> metrics = Map.of(
 
 ### Advanced Evaluation Patterns
 
-Multi-metric evaluations for comprehensive testing:
+Multi-metric [evaluations](../glossary.md#evaluators) for comprehensive testing with complex scoring algorithms and statistical analysis:
 
 **Clojure:**
 ```clojure
@@ -534,7 +536,7 @@ Multi-metric evaluations for comprehensive testing:
 
 ## Putting It All Together
 
-Here's a complete example using all system features:
+Here's a complete example using all system features: [forking](../glossary.md#fork), [datasets](../terms/dataset.md), [evaluators](../glossary.md#evaluators), and distributed state management:
 
 **Clojure:**
 ```clojure
@@ -613,10 +615,10 @@ Here's a complete example using all system features:
 
 You now command the full power of Agent-O-Rama:
 
-- **Core Concepts**: Building blocks of agents, nodes, and graphs
-- **State Management**: Persistent, distributed storage patterns
-- **Communication**: Real-time streaming and human interaction
-- **Advanced Patterns**: Parallel processing and AI integration
-- **System Features**: Forking, datasets, and evaluation
+- **Core Concepts**: Building blocks of [agents](../terms/agent.md), [nodes](../glossary.md#agent-node), and [graphs](../glossary.md#agent-graph)
+- **State Management**: [Key-value stores](../terms/key-value-store.md) and distributed storage patterns
+- **Communication**: [Streaming chunks](../glossary.md#streaming-chunk) and [human input](../glossary.md#human-input-request)
+- **Advanced Patterns**: [Aggregation](../terms/aggregation.md) and [agent object](../terms/agent-objects.md) integration
+- **System Features**: [Forking](../glossary.md#fork), [datasets](../terms/dataset.md), and [evaluators](../glossary.md#evaluators)
 
-You're ready to build production agent systems that scale, adapt, and deliver.
+You're ready to build production [agent](../terms/agent.md) systems that scale, adapt, and deliver distributed AI solutions.

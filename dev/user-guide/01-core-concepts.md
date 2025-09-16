@@ -1,16 +1,19 @@
 # Core Concepts
 
-You build Agent-O-Rama systems from three fundamental pieces: agents, nodes, and graphs. Master these, and everything else follows naturally.
+You build Agent-O-Rama systems from three fundamental pieces: [agents](../terms/agent.md), [nodes](../glossary.md#agent-node), and [graphs](../glossary.md#agent-graph). Master these, and everything else follows naturally.
+
+> **Reference**: See the [Agent](../terms/agent.md) and [Agent Node](../terms/agent-node.md) documentation for comprehensive details.
 
 ## Agents: Your Distributed Workers
 
-An agent is a computational unit that executes tasks. Think of it as a smart worker that:
-- Follows a defined workflow (its graph)
-- Maintains its own state
-- Runs distributed across your cluster
-- Handles failures automatically
+An [agent](../terms/agent.md) is a distributed, stateful computational unit that executes a directed graph of [nodes](../glossary.md#agent-node). Think of it as a smart worker that:
+- Follows a defined workflow (its [agent graph](../glossary.md#agent-graph))
+- Maintains its own state through [stores](../glossary.md#key-value-store)
+- Runs distributed across your cluster with automatic partitioning
+- Handles failures automatically with [retry mechanisms](../glossary.md#retry-mechanism)
+- Communicates via [node emissions](../glossary.md#node-emit) and [agent results](../glossary.md#agent-result)
 
-Every agent starts with a module definition:
+Every agent starts with an [agent module](../glossary.md#agent-module) definition that packages agents, stores, and [agent objects](../terms/agent-objects.md) into a deployable unit:
 
 **Clojure:**
 ```clojure
@@ -32,10 +35,11 @@ public class MyModule extends AgentModule {
 
 ## Nodes: The Building Blocks
 
-Nodes are the individual steps in your agent's workflow. Each node:
-- Performs a specific computation
-- Receives input from previous nodes or the initial invocation
-- Can emit data to other nodes or return a final result
+An [agent node](../glossary.md#agent-node) is an individual execution unit within an [agent graph](../glossary.md#agent-graph) that performs specific computation. Each node:
+- Performs a specific computation with access to [stores](../glossary.md#key-value-store) and [agent objects](../terms/agent-objects.md)
+- Receives input from previous nodes or the initial [agent invoke](../glossary.md#agent-invoke)
+- Can [emit](../glossary.md#node-emit) data to other nodes or return a final [agent result](../glossary.md#agent-result)
+- Executes within distributed [task globals](../glossary.md#task-global) for state management
 
 A node is just a function that receives an `agent-node` context and your data:
 
@@ -60,13 +64,13 @@ A node is just a function that receives an `agent-node` context and your data:
 ```
 
 Nodes have three key operations:
-- **`emit!`**: Send data to another node
-- **`result!`**: Return the final result and end execution
-- **`stream-chunk!`**: Send streaming data to subscribers
+- **`emit!`**: Send data via [node emit](../glossary.md#node-emit) to trigger execution of downstream nodes
+- **`result!`**: Return the final [agent result](../glossary.md#agent-result) and complete the agent execution
+- **`stream-chunk!`**: Send [streaming chunks](../glossary.md#streaming-chunk) to active [streaming subscriptions](../glossary.md#streaming-subscription)
 
 ## Graphs: Connecting the Dots
 
-An agent graph defines how nodes connect and data flows. You build graphs by chaining nodes together:
+An [agent graph](../glossary.md#agent-graph) is a directed graph structure that defines the execution flow of an agent, consisting of interconnected [nodes](../glossary.md#agent-node) with specified output relationships. You build graphs by chaining nodes together:
 
 **Clojure:**
 ```clojure
@@ -109,7 +113,7 @@ topology.newAgent("DataProcessor")
 
 ## Routing: Dynamic Flow Control
 
-Sometimes you need dynamic control flow. Router nodes let you choose the next node at runtime:
+Sometimes you need dynamic control flow based on runtime conditions. Router nodes provide conditional [node emissions](../glossary.md#node-emit) to choose the next node at runtime:
 
 **Clojure:**
 ```clojure
@@ -136,7 +140,7 @@ Sometimes you need dynamic control flow. Router nodes let you choose the next no
 
 ## Invoking Agents
 
-Once deployed, you interact with agents through clients:
+Once deployed, you interact with agents through [agent clients](../glossary.md#agent-client). An [agent invoke](../glossary.md#agent-invoke) represents a specific execution instance:
 
 **Clojure:**
 ```clojure
@@ -166,7 +170,7 @@ Map<String, Object> result = invokeHandle.result();
 
 ## Shared Resources: Agent Objects
 
-Agents often need shared resources like database connections or AI models. Agent objects provide these:
+[Agent objects](../terms/agent-objects.md) are shared resources (like AI models, databases, APIs) that agents can access during execution. They provide distributed access to expensive or stateful resources:
 
 **Clojure:**
 ```clojure
@@ -220,7 +224,7 @@ public class ModuleWithResources extends AgentModule {
 
 ## Putting It Together
 
-Here's a complete example that shows all the concepts working together:
+Here's a complete example that shows all the concepts working together - an [agent module](../glossary.md#agent-module) with [agent objects](../terms/agent-objects.md), [stores](../glossary.md#key-value-store), and a multi-node [agent graph](../glossary.md#agent-graph):
 
 **Clojure:**
 ```clojure
@@ -328,4 +332,4 @@ public class OrderProcessingModule extends AgentModule {
 
 ## What's Next?
 
-You now understand the core building blocks. Next, learn how agents maintain and share state in [State Management](02-state-management.md).
+You now understand the core building blocks: [agents](../terms/agent.md), [agent nodes](../glossary.md#agent-node), [agent graphs](../glossary.md#agent-graph), and [agent objects](../terms/agent-objects.md). Next, learn how agents maintain and share distributed state in [State Management](02-state-management.md).

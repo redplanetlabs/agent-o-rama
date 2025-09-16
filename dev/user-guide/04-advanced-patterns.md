@@ -1,14 +1,16 @@
 # Advanced Patterns
 
-Scale your agents with parallel processing. Integrate AI models seamlessly. These patterns transform simple agents into powerful, intelligent systems.
+Scale your [agents](../terms/agent.md) with parallel processing using [aggregation](../terms/aggregation.md). Integrate AI models seamlessly through [agent objects](../terms/agent-objects.md). These patterns transform simple agents into powerful, intelligent distributed systems.
+
+> **Reference**: See [Aggregation](../terms/aggregation.md) and [Agent Objects](../terms/agent-objects.md) documentation for comprehensive details.
 
 ## Aggregation: Parallel Processing at Scale
 
-Aggregation patterns let you split work across multiple executions, then combine results. Think MapReduce, but simpler and more flexible.
+[Aggregation](../terms/aggregation.md) is a distributed computation pattern for collecting and combining results from multiple [node executions](../glossary.md#agent-node), enabling scatter-gather operations and parallel processing within [agent graphs](../glossary.md#agent-graph). Think MapReduce, but simpler and more flexible.
 
 ### Basic Aggregation
 
-The foundation: fan out work, then collect results.
+The foundation: use aggregation start nodes to fan out work, then aggregation nodes to collect and combine results with automatic correlation:
 
 **Clojure:**
 ```clojure
@@ -82,7 +84,7 @@ public class ParallelSearchModule extends AgentModule {
 
 ### Custom Aggregation with Multi-Agg
 
-For complex aggregation logic, use `multi-agg` for full control:
+For complex [aggregation](../terms/aggregation.md) logic, [multi-agg](../glossary.md#multi-agg) provides flexible aggregation with custom combination logic for sophisticated result aggregation patterns:
 
 **Clojure:**
 ```clojure
@@ -193,11 +195,11 @@ public class StatisticsModule extends AgentModule {
 
 ## LangChain4j Integration: AI-Powered Agents
 
-Integrate large language models seamlessly. Agent-O-Rama provides first-class support for LangChain4j.
+Integrate large language models seamlessly through [agent objects](../terms/agent-objects.md). Agent-O-Rama provides first-class support for LangChain4j with distributed AI model access across [agent nodes](../glossary.md#agent-node).
 
 ### Basic Chat Integration
 
-Connect to any LangChain4j-supported model:
+Connect to any LangChain4j-supported model using [agent objects](../terms/agent-objects.md) for shared AI model access across distributed [agent executions](../glossary.md#agent-invoke):
 
 **Clojure:**
 ```clojure
@@ -275,7 +277,7 @@ public class ChatModule extends AgentModule {
 
 ### Structured Output with JSON
 
-Get structured data from LLMs:
+Get structured data from LLMs using specialized [agent objects](../terms/agent-objects.md) configured for JSON output:
 
 **Clojure:**
 ```clojure
@@ -355,7 +357,7 @@ public class StructuredExtractionModule extends AgentModule {
 
 ### Streaming AI Responses
 
-Stream tokens as they're generated:
+Stream tokens as they're generated using [streaming chunks](../glossary.md#streaming-chunk) combined with LangChain4j streaming models:
 
 **Clojure:**
 ```clojure
@@ -456,7 +458,7 @@ public class StreamingAIModule extends AgentModule {
 
 ### Tool Calling
 
-Let AI agents use tools to interact with the world:
+Let AI [agents](../terms/agent.md) use [tools sub agents](../glossary.md#tools-sub-agent) to interact with the world through structured tool execution:
 
 **Clojure:**
 ```clojure
@@ -582,7 +584,7 @@ public class ToolCallingModule extends AgentModule {
 
 ## Combining Patterns: Parallel AI Processing
 
-Combine aggregation with AI for powerful patterns:
+Combine [aggregation](../terms/aggregation.md) with [agent objects](../terms/agent-objects.md) for powerful parallel AI processing patterns:
 
 **Clojure:**
 ```clojure
@@ -635,4 +637,4 @@ Combine aggregation with AI for powerful patterns:
 
 ## What's Next?
 
-You've mastered advanced patterns. Finally, explore system-level features in [System Features](05-system-features.md).
+You've mastered advanced patterns: [aggregation](../terms/aggregation.md) for parallel processing and [agent objects](../terms/agent-objects.md) for AI integration. Finally, explore system-level features in [System Features](05-system-features.md).
