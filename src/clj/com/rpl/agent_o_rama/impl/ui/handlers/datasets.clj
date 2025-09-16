@@ -4,6 +4,7 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
    [com.rpl.agent-o-rama.impl.queries :as queries]
+   [com.rpl.agent-o-rama.impl.datasets :as datasets]
    [clojure.string :as str]
    [jsonista.core :as j])
   (:import [java.util UUID])
@@ -190,3 +191,53 @@
                                  example-id
                                  {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}))
   {:status :ok})
+
+;; =============================================================================
+;; PREVIEW FROM TRACE HANDLER
+;; =============================================================================
+
+(defn- transform-and-validate [template source-data schema-str]
+  (try
+    (let [transformed (com.rpl.agent-o-rama.impl.helpers/read-json-path source-data template)
+          validation-error (when schema-str
+                             (datasets/validate-with-schema* schema-str transformed))]
+      {:transformed-data transformed
+       :is-valid? (nil? validation-error)
+       :validation-error validation-error})
+    (catch Exception e
+      {:transformed-data nil
+       :is-valid? false
+       :validation-error (str "Invalid JSONPath template: " (.getMessage e))})))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/preview-from-trace
+  [{:keys [manager dataset-id input-template output-template source-args source-result]} uid]
+  (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
+        schemas (queries/get-dataset-properties datasets-pstate dataset-id)]
+    (if-not schemas
+      (throw (ex-info "Dataset not found" {:dataset-id dataset-id}))
+      {:input (transform-and-validate input-template source-args (:input-json-schema schemas))
+       :output (transform-and-validate output-template source-result (:output-json-schema schemas))})))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-from-trace
+  [{:keys [manager dataset-id input-template output-template source-args source-result]} uid]
+  (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
+        schemas (queries/get-dataset-properties datasets-pstate dataset-id)]
+    (if-not schemas
+      (throw (ex-info "Dataset not found" {:dataset-id dataset-id}))
+      (let [input-result (transform-and-validate input-template source-args (:input-json-schema schemas))
+            output-result (transform-and-validate output-template source-result (:output-json-schema schemas))]
+        (if (and (:is-valid? input-result) (:is-valid? output-result))
+          ;; Both are valid, add the example
+          (do
+            (aor/add-dataset-example! manager
+                                      dataset-id
+                                      (:transformed-data input-result)
+                                      {:reference-output (:transformed-data output-result)})
+            {:status :ok})
+          ;; Invalid data, return error
+          {:status :error
+           :error (str "Invalid data: "
+                       (when-not (:is-valid? input-result)
+                         (str "Input: " (:validation-error input-result)))
+                       (when-not (:is-valid? output-result)
+                         (str "Output: " (:validation-error output-result))))})))))

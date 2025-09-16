@@ -291,7 +291,19 @@
                   ($ :span {:className "text-sm text-indigo-600 font-mono"} node-name))
                ($ :div {:className "flex justify-between items-center mt-1"}
                   ($ :span {:className "text-sm font-medium text-indigo-700"} "ID")
-                  ($ :span {:className "text-xs text-indigo-500 font-mono"} (str node-id))))
+                  ($ :span {:className "text-xs text-indigo-500 font-mono"} (str node-id)))
+               ;; Add to Dataset button for individual node
+               ($ :div {:className "mt-3"}
+                  ($ :button
+                     {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
+                      :onClick (fn [e]
+                                 (.stopPropagation e)
+                                 (state/dispatch [:modal/show-form :add-from-trace
+                                                  {:module-id module-id
+                                                   :title (str "Add Node '" node-name "' to Dataset")
+                                                   :source-args input
+                                                   :source-result (:val result)}]))}
+                     "Add to Dataset")))
 
             (when result
               ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4"}
@@ -628,7 +640,18 @@
             ($ generic-data-viewer {:data result-val
                                     :color (if failure? "red" "green")
                                     :truncate-length 100
-                                    :depth 0})))
+                                    :depth 0})
+            ;; Add to Dataset button for overall trace
+            ($ :div {:className "mt-4"}
+               ($ :button
+                  {:className "w-full text-sm font-medium py-2 px-4 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
+                   :onClick (fn []
+                              (state/dispatch [:modal/show-form :add-from-trace
+                                               {:module-id module-id
+                                                :title "Add Agent Invocation to Dataset"
+                                                :source-args (:invoke-args summary-data)
+                                                :source-result result-val}]))}
+                  "Add to Dataset"))))
 
        ($ exceptions-panel {:summary-data summary-data
                             :graph-data graph-data
