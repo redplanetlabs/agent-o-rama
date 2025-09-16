@@ -7,6 +7,7 @@
    [com.rpl.agent.basic.structured-langchain4j-agent :refer [StructuredLangChain4jModule]]))
 
 (deftest structured-langchain4j-agent-test
+  (System/gc)
   (testing "StructuredLangChain4jAgent with real OpenAI model"
     (if (System/getenv "OPENAI_API_KEY")
       (with-open [ipc (rtest/create-ipc)]

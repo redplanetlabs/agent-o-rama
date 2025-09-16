@@ -7,6 +7,7 @@
    [com.rpl.agent.basic.aggregation-agent :refer [AggregationAgentModule]]))
 
 (deftest aggregation-agent-test
+  (System/gc)
   (testing "AggregationAgent example produces expected fan-out/fan-in behavior"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc AggregationAgentModule {:tasks 2 :threads 2})
@@ -14,12 +15,12 @@
       (let [manager (aor/agent-manager ipc
                                        (rama/get-module-name
                                         AggregationAgentModule))
-            agent (aor/agent-client manager "AggregationAgent")]
+            agent   (aor/agent-client manager "AggregationAgent")]
 
         (testing "processes data in chunks and aggregates results"
           (let [result (aor/agent-invoke agent
-                                         {:data (range 1 13) ; [1 2 3 ...
-                                                                   ; 12]
+                                         {:data       (range 1 13) ; [1 2 3 ...
+                                          ; 12]
                                           :chunk-size 4})]
             ;; Verify final result structure
             (is (= 12 (:total-items result)))
@@ -47,8 +48,8 @@
 
         (testing "handles different chunk sizes correctly"
           (let [result (aor/agent-invoke agent
-                                         {:data (range 1 8) ; [1 2 3 4 5 6
-                                                                  ; 7]
+                                         {:data       (range 1 8) ; [1 2 3 4 5 6
+                                          ; 7]
                                           :chunk-size 3})]
             (is (= 7 (:total-items result)))
             (is (= 3 (:chunks-processed result))) ; [1,2,3], [4,5,6], [7]

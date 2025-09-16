@@ -7,6 +7,7 @@
    [com.rpl.agent.basic.router-agent :refer [RouterAgentModule]]))
 
 (deftest router-agent-test
+  (System/gc)
   (testing "RouterAgent routes messages to appropriate handlers"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc RouterAgentModule {:tasks 1 :threads 1})

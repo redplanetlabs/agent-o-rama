@@ -7,6 +7,7 @@
    [com.rpl.agent.basic.evaluator-agent :refer [EvaluatorAgentModule]]))
 
 (deftest evaluator-agent-test
+  (System/gc)
   (testing "Evaluator example creates evaluators and tests agent outputs"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc EvaluatorAgentModule {:tasks 1 :threads 1})

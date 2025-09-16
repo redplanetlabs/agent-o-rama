@@ -7,6 +7,7 @@
    [com.rpl.agent.basic.basic-agent :refer [BasicAgentModule]]))
 
 (deftest basic-agent-test
+  (System/gc)
   (testing "BasicAgent example"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc BasicAgentModule {:tasks 1 :threads 1})

@@ -8,6 +8,7 @@
    [clojure.string :as str]))
 
 (deftest dataset-example-test
+  (System/gc)
   (testing "Dataset management at client level with calculator agent"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc DatasetExampleModule {:tasks 1 :threads 1})

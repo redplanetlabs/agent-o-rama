@@ -7,6 +7,7 @@
    [com.rpl.agent.basic.multi-node-agent :refer [MultiNodeAgentModule]]))
 
 (deftest multi-node-agent-test
+  (System/gc)
   (testing "MultiNodeAgent greeting workflow"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc MultiNodeAgentModule {:tasks 1 :threads 1})

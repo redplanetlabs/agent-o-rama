@@ -10,6 +10,7 @@
 (deftest langchain4j-agent-test
   ;; Tests the LangChain4jAgent's integration with OpenAI models
   ;; and its ability to process chat requests with configured parameters
+  (System/gc)
   (testing "LangChain4jAgent with real OpenAI model"
     (if (System/getenv "OPENAI_API_KEY")
       (with-open [ipc (rtest/create-ipc)]

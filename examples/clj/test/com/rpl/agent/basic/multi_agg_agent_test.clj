@@ -7,6 +7,7 @@
    [com.rpl.agent.basic.multi-agg-agent :refer [MultiAggAgentModule]]))
 
 (deftest multi-agg-agent-test
+  (System/gc)
   (testing "MultiAggAgent example produces expected tagged aggregation behavior"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc MultiAggAgentModule {:tasks 2 :threads 2})
@@ -14,12 +15,12 @@
       (let [manager (aor/agent-manager ipc
                                        (rama/get-module-name
                                         MultiAggAgentModule))
-            agent (aor/agent-client manager "MultiAggAgent")]
+            agent   (aor/agent-client manager "MultiAggAgent")]
 
         (testing "processes mixed data types with custom aggregation"
           (let [result (aor/agent-invoke agent
                                          {:numbers [5 10 15]
-                                          :text ["test" "hello world" "foo"]})]
+                                          :text    ["test" "hello world" "foo"]})]
             ;; Verify summary calculations
             (let [summary (:summary result)]
               (is (= 3 (:numbers-processed summary)))
@@ -41,8 +42,8 @@
               (is (= 18 (:total-characters summary))))
 
             ;; Verify detailed results structure (order not guaranteed)
-            (let [details (:details result)
-                  numbers (:numbers details)
+            (let [details       (:details result)
+                  numbers       (:numbers details)
                   number-values (set (map :value numbers))]
               ;; Numbers analysis
               (is (= 3 (count numbers)))
@@ -55,7 +56,7 @@
                   (is (= (even? v) (:even? num-analysis)))))
 
               ;; Text analysis
-              (let [texts (:text details)
+              (let [texts       (:text details)
                     text-values (set (map :value texts))]
                 (is (= 3 (count texts)))
                 (is (= #{"test" "hello world" "foo"} text-values))
@@ -71,7 +72,7 @@
         (testing "handles empty collections correctly"
           (let [result (aor/agent-invoke agent
                                          {:numbers []
-                                          :text []})]
+                                          :text    []})]
             (let [summary (:summary result)]
               (is (= 0 (:numbers-processed summary)))
               (is (= 0 (:text-processed summary)))
@@ -84,9 +85,9 @@
         (testing "processes larger datasets correctly"
           (let [result (aor/agent-invoke agent
                                          {:numbers [1 2 3 4 5 6 7 8 9 10]
-                                          :text ["Multi-agg is powerful"
-                                                 "Parallel processing"
-                                                 "State management"]})]
+                                          :text    ["Multi-agg is powerful"
+                                                    "Parallel processing"
+                                                    "State management"]})]
             (let [summary (:summary result)]
               (is (= 10 (:numbers-processed summary)))
               (is (= 3 (:text-processed summary)))
@@ -103,5 +104,5 @@
               ;; Words: 3 + 2 + 2 = 7
               (is (= 7 (:total-words summary)))
 
-              ;; Characters: 21 + 19 + 16 = 56  
+              ;; Characters: 21 + 19 + 16 = 56
               (is (= 56 (:total-characters summary))))))))))

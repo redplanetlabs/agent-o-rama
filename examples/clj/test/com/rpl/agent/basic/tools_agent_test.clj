@@ -10,6 +10,7 @@
     ToolExecutionResultMessage]))
 
 (deftest tools-agent-test
+  (System/gc)
   (testing "ToolsAgent example with OpenAI model and natural language prompts"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc ToolsAgentModule {:tasks 1 :threads 1})

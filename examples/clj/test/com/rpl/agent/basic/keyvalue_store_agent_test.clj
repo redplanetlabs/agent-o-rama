@@ -7,6 +7,7 @@
    [com.rpl.agent.basic.keyvalue-store-agent :refer [KeyValueStoreModule]]))
 
 (deftest keyvalue-store-agent-test
+  (System/gc)
   (testing "KeyValueStoreAgent example produces expected results"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc KeyValueStoreModule {:tasks 1 :threads 1})

@@ -7,6 +7,7 @@
    [com.rpl.agent.basic.forking-agent :refer [ForkingAgentModule]]))
 
 (deftest forking-agent-test
+  (System/gc)
   (testing "ForkingAgent example produces expected forking behavior"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc ForkingAgentModule {:tasks 2 :threads 2})

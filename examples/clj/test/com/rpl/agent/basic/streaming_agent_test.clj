@@ -7,6 +7,7 @@
    [com.rpl.agent.basic.streaming-agent :refer [StreamingAgentModule]]))
 
 (deftest streaming-agent-test
+  (System/gc)
   (testing "StreamingAgent example produces expected streaming behavior"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc StreamingAgentModule {:tasks 1 :threads 1})

@@ -7,6 +7,7 @@
    [com.rpl.agent.basic.pstate-store-agent :refer [PStateStoreModule]]))
 
 (deftest pstate-store-agent-test
+  (System/gc)
   (testing "PStateStoreAgent example produces expected results"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc PStateStoreModule {:tasks 1 :threads 1})

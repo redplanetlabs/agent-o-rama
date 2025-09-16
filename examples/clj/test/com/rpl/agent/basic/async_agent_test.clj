@@ -8,6 +8,7 @@
 
 (deftest async-agent-test
   (testing "AsyncAgent example produces expected results"
+    (System/gc)
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc AsyncAgentModule {:tasks 1 :threads 1})
       (let [manager (aor/agent-manager

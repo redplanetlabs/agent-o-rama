@@ -8,13 +8,14 @@
 
 (deftest agent-objects-agent-test
   (testing "AgentObjectsAgent example produces expected results"
+    (System/gc)
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module! ipc AgentObjectsModule {:tasks 1 :threads 1})
 
       (let [manager (aor/agent-manager
                      ipc
                      (rama/get-module-name AgentObjectsModule))
-            agent (aor/agent-client manager "AgentObjectsAgent")]
+            agent   (aor/agent-client manager "AgentObjectsAgent")]
 
         (testing "returns formatted messages with version and counter"
           (let [result1 (aor/agent-invoke agent "Hello")
