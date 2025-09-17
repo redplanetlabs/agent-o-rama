@@ -786,7 +786,7 @@
          (dotimes [_ 10]
            (let [{[agent-task-id agent-id] "_agents-topology"}
                  (foreign-append! depot
-                                  (aor-types/->AgentInitiate ["hello"] nil))]
+                                  (aor-types/->AgentInitiate ["hello"] nil nil))]
              (is (= 0
                     (foreign-select-one [(keypath agent-id) :graph-version]
                                         root-pstate
@@ -839,7 +839,7 @@
          (reset! task-counts-atom {})
          (dotimes [_ 10]
            (let [{[agent-task-id agent-id] "_agents-topology"}
-                 (foreign-append! depot (aor-types/->AgentInitiate [] nil))]
+                 (foreign-append! depot (aor-types/->AgentInitiate [] nil nil))]
              (is (= 1
                     (foreign-select-one [(keypath agent-id) :graph-version]
                                         root-pstate
