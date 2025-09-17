@@ -90,11 +90,11 @@ test.describe('Full Experiment Flow E2E Test', () => {
     await feedbackNode.click({ timeout: 60000 }); // wait for first node.
     const hitlPrompt = page.locator('.bg-amber-50');
     await expect(hitlPrompt).toBeVisible({ timeout: 60000 }); // Wait up to a minute for the first prompt
-    await hitlPrompt.getByPlaceholder('Type your response...').fill('yes');
+    await hitlPrompt.getByPlaceholder('Type your response...').fill('no');
     await hitlPrompt.getByRole('button', { name: 'Submit Response' }).click();
 
-    // 2c. Wait for the agent to finish
-    await expect(page.getByText('Completed', { exact: true })).toBeVisible({ timeout: 120000 }); // Wait up to 2 minutes
+    // 2c. Wait for the agent to finish - look for the "Success" badge in the Final Result section
+    await expect(page.locator('.bg-green-100.text-green-800').filter({ hasText: 'Success' })).toBeVisible({ timeout: 120000 }); // Wait up to 2 minutes
     console.log('Agent run completed.');
 
 
@@ -103,11 +103,15 @@ test.describe('Full Experiment Flow E2E Test', () => {
     // ---
     console.log('--- PHASE 3: ADD TO DATASET ---');
 
-    // 3a. Select the 'write-section' node and open the "Add to Dataset" modal
-    const writeSectionNode = page.locator('.react-flow__node').filter({ hasText: 'write-section' });
+    // 3a. Select the first 'write-section' node and open the "Add to Dataset" modal
+    const writeSectionNode = page.locator('.react-flow__node').filter({ hasText: 'write-section' }).first();
     await writeSectionNode.click();
+    
+    // Wait for the node details panel to appear and the Add to Dataset button to be available
+    await expect(page.locator('.bg-indigo-50').getByRole('button', { name: 'Add to Dataset' })).toBeVisible({ timeout: 10000 });
     await page.locator('.bg-indigo-50').getByRole('button', { name: 'Add to Dataset' }).click();
 
+    // Now the modal should appear
     const addToDatasetModal = page.locator('[role="dialog"]');
     await expect(addToDatasetModal.getByText('Add to Dataset')).toBeVisible();
     console.log('Opened "Add to Dataset" modal.');
