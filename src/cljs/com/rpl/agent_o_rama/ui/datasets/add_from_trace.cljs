@@ -8,21 +8,14 @@
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [clojure.string :as str]
    ["react" :refer [useEffect]]
+   ["use-debounce" :refer [useDebounce]]
    ["@heroicons/react/24/outline" :refer [ChevronDownIcon]]))
 
-(defhook use-debounced-effect
-  "Runs an effect after a specified delay when dependencies change.
-  Cancels the previous effect if dependencies change before the delay has passed."
-  [effect-fn delay-ms deps]
-  (useEffect
-   (fn []
-      ;; Set up the timeout
-     (let [handler (js/setTimeout effect-fn delay-ms)]
-        ;; Return a cleanup function that clears the timeout.
-        ;; This is the core of the debounce logic.
-       #(js/clearTimeout handler)))
-    ;; The effect re-runs whenever the dependencies change.
-   (clj->js deps)))
+(defhook use-debounced-value
+  "Returns a debounced value that only updates after the specified delay."
+  [value delay-ms]
+  (let [[debounced-value] (useDebounce value delay-ms)]
+    debounced-value))
 
 (defui SourceDataPanel [{:keys [source-type source-args source-result source-emits]}]
   ($ :div {:className "w-1/3 p-4 bg-gray-50 border-r overflow-auto"}
@@ -99,18 +92,23 @@
         ;; Fetch available datasets
         {:keys [data loading?]} (queries/use-sente-query
                                  {:query-key [:datasets module-id]
-                                  :sente-event [:datasets/get-all {:module-id module-id}]})]
+                                  :sente-event [:datasets/get-all {:module-id module-id}]})
 
-    ;; Debounced effect for live preview
-    (use-debounced-effect
+        ;; Debounced values for form fields
+        debounced-dataset-id (use-debounced-value (:value dataset-id-field) 300)
+        debounced-input-template (use-debounced-value (:value input-template-field) 300)
+        debounced-output-template (use-debounced-value (:value output-template-field) 300)]
+
+    ;; Effect for live preview that runs when debounced values change
+    (useEffect
      (fn []
        ;; Only run if we have required data
-       (when (and (:value dataset-id-field) (not (str/blank? (:value input-template-field))))
+       (when (and debounced-dataset-id (not (str/blank? debounced-input-template)))
          (sente/request! [:datasets/preview-from-trace
                           {:module-id module-id
-                           :dataset-id (:value dataset-id-field)
-                           :input-template (:value input-template-field)
-                           :output-template (:value output-template-field)
+                           :dataset-id debounced-dataset-id
+                           :input-template debounced-input-template
+                           :output-template debounced-output-template
                            :source-args source-args
                            :source-output output-template-source}]
                          5000
@@ -121,9 +119,11 @@
                                (set-preview-error nil))
                              (do
                                (set-preview-data nil)
-                               (set-preview-error (:error reply))))))))
-     300 ; debounce delay in ms
-     [(:value dataset-id-field) (:value input-template-field) (:value output-template-field)])
+                               (set-preview-error (:error reply)))))))
+       ;; No cleanup needed
+       js/undefined)
+     ;; Dependencies - effect runs when debounced values change
+     (clj->js [debounced-dataset-id debounced-input-template debounced-output-template]))
 
     ($ :div {:className "flex h-full"}
        ($ SourceDataPanel {:source-type source-type
