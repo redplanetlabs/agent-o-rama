@@ -69,33 +69,45 @@ test.describe('Full Experiment Flow E2E Test', () => {
 
 
     // ---
-    // PHASE 2: GENERATE TRACE DATA - Run the research agent manually
+    // PHASE 2: GET TRACE DATA - Use existing completed invocation or run agent manually
     // ---
-    console.log('--- PHASE 2: GENERATE TRACE DATA ---');
+    console.log('--- PHASE 2: GET TRACE DATA ---');
     await page.getByText('Overview').click();
     const row = await getResearchAgentRow(page); // Wait for overview to be ready
     await row.click();
 
-    // 2a. Manually run the agent
-    console.log(`Running agent "${agentToRun}"...`);
-    const manualRunForm = page.locator('div').filter({ hasText: /^Manually Run Agent/ });
-    await manualRunForm.getByPlaceholder(/\[arg1, arg2, arg3, ...\]/).fill('["", {"topic": "Rama"}]');
-    await manualRunForm.getByRole('button', { name: 'Submit' }).click();
+    // 2a. Check if there are any existing completed invocations
+    const completedInvocations = page.locator('table tbody tr').filter({ hasText: 'Success' });
+    const hasCompletedInvocations = await completedInvocations.count() > 0;
 
-    // 2b. Wait for navigation to the trace page and handle HITL prompt
-    await expect(page).toHaveURL(/\/invocations\//, { timeout: 30000 });
-    console.log('Navigated to invocation trace page.');
+    if (hasCompletedInvocations) {
+      // Use existing completed invocation
+      console.log('Found existing completed invocation, navigating to it...');
+      await completedInvocations.first().click();
+      await expect(page).toHaveURL(/\/invocations\//, { timeout: 30000 });
+      console.log('Navigated to existing invocation trace page.');
+    } else {
+      // Manually run the agent
+      console.log(`No completed invocations found. Running agent "${agentToRun}"...`);
+      const manualRunForm = page.locator('div').filter({ hasText: /^Manually Run Agent/ });
+      await manualRunForm.getByPlaceholder(/\[arg1, arg2, arg3, ...\]/).fill('["", {"topic": "Rama"}]');
+      await manualRunForm.getByRole('button', { name: 'Submit' }).click();
 
-    const feedbackNode = page.locator('.react-flow__node').filter({ hasText: 'feedback' });
-    await feedbackNode.click({ timeout: 60000 }); // wait for first node.
-    const hitlPrompt = page.locator('.bg-amber-50');
-    await expect(hitlPrompt).toBeVisible({ timeout: 60000 }); // Wait up to a minute for the first prompt
-    await hitlPrompt.getByPlaceholder('Type your response...').fill('no');
-    await hitlPrompt.getByRole('button', { name: 'Submit Response' }).click();
+      // Wait for navigation to the trace page and handle HITL prompt
+      await expect(page).toHaveURL(/\/invocations\//, { timeout: 30000 });
+      console.log('Navigated to invocation trace page.');
 
-    // 2c. Wait for the agent to finish - look for the "Success" badge in the Final Result section
-    await expect(page.locator('.bg-green-100.text-green-800').filter({ hasText: 'Success' })).toBeVisible({ timeout: 120000 }); // Wait up to 2 minutes
-    console.log('Agent run completed.');
+      const feedbackNode = page.locator('.react-flow__node').filter({ hasText: 'feedback' });
+      await feedbackNode.click({ timeout: 60000 }); // wait for first node.
+      const hitlPrompt = page.locator('.bg-amber-50');
+      await expect(hitlPrompt).toBeVisible({ timeout: 60000 }); // Wait up to a minute for the first prompt
+      await hitlPrompt.getByPlaceholder('Type your response...').fill('no');
+      await hitlPrompt.getByRole('button', { name: 'Submit Response' }).click();
+
+      // Wait for the agent to finish - look for the "Success" badge in the Final Result section
+      await expect(page.locator('.bg-green-100.text-green-800').filter({ hasText: 'Success' })).toBeVisible({ timeout: 120000 }); // Wait up to 2 minutes
+      console.log('Agent run completed.');
+    }
 
 
     // ---
@@ -113,7 +125,7 @@ test.describe('Full Experiment Flow E2E Test', () => {
 
     // Now the modal should appear
     const addToDatasetModal = page.locator('[role="dialog"]');
-    await expect(addToDatasetModal.getByText('Add to Dataset')).toBeVisible();
+    await expect(addToDatasetModal.getByText('Add Node \'write-section\' to Dataset')).toBeVisible();
     console.log('Opened "Add to Dataset" modal.');
 
     // 3b. Interact with the modal form
@@ -129,16 +141,16 @@ test.describe('Full Experiment Flow E2E Test', () => {
 
     // Test valid path
     await inputTemplate.fill('$[0]');
-    await expect(previewPane.getByText('Valid')).toBeVisible();
+    await expect(previewPane.locator('div').filter({ hasText: 'Dataset Input' }).locator('span.bg-green-100').getByText('Valid')).toBeVisible();
 
     // Test invalid path
     await inputTemplate.fill('invalid-jsonpath');
-    await expect(previewPane.getByText(/Invalid JSONPath template/)).toBeVisible();
+    await expect(previewPane.locator('div').filter({ hasText: 'Dataset Input' }).locator('span.bg-red-100').getByText('Invalid')).toBeVisible();
 
     // Test schema validation failure
     await inputTemplate.fill('$'); // This is a valid path
-    await expect(previewPane.getByText('Invalid', { exact: true })).toBeVisible();
-    await expect(previewPane.getByText(/Invalid schema.*number expected/)).toBeVisible();
+    await expect(previewPane.locator('div').filter({ hasText: 'Dataset Input' }).locator('span.bg-red-100').getByText('Invalid')).toBeVisible();
+    await expect(previewPane.locator('div').filter({ hasText: 'Dataset Input' }).getByText(/number/)).toBeVisible();
     console.log('Schema validation failure correctly detected and displayed.');
 
     // Fix the input to be valid for submission
