@@ -942,8 +942,6 @@
         handle-select-node-click (fn [node]
                                    (when on-select-node
                                      (let [node-data (js->clj (.-data node) :keywordize-keys true)]
-                                       (prn "DATA" (.-data node))
-                                       (prn "CONV" node-data)
                                        (on-select-node (:node-id node-data)))))]
 
     (if (empty? graph-data)

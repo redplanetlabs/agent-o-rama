@@ -93,11 +93,13 @@
             ($ :div.py-1.max-h-60.overflow-y-auto
                (if (seq agents)
                  (for [agent agents
-                       :let [decoded-name (common/url-decode (:agent-name agent))]]
-                   ($ common/DropdownRow {:key decoded-name
-                                          :label decoded-name
-                                          :selected? (= selected-agent decoded-name)
-                                          :on-select #(handle-select decoded-name)}))
+                       :let [decoded-name (common/url-decode (:agent-name agent))]
+                       :when (not= decoded-name "_aor-evaluator")]
+                   (do (println "decoded-name" decoded-name)
+                       ($ common/DropdownRow {:key decoded-name
+                                              :label decoded-name
+                                              :selected? (= selected-agent decoded-name)
+                                              :on-select #(handle-select decoded-name)})))
                  ($ :div.px-4.py-2.text-sm.text-gray-500 "No agents found in this module."))))))))
 
 (defui EvaluatorSelector [{:keys [module-id selected-evaluators on-change]}]
