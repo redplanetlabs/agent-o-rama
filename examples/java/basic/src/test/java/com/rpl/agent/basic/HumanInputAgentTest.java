@@ -1,6 +1,5 @@
 package com.rpl.agent.basic;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -20,16 +19,15 @@ import org.junit.Test;
  *   <li>getHumanInput: Requesting input from human users
  *   <li>agent.nextStep: Handling human input requests in execution flow
  *   <li>provideHumanInput: Supplying responses to human input requests
- *   <li>Human-in-the-loop agent execution patterns
  * </ul>
  *
- * <p>Note: These tests use a test API key and mock the OpenAI responses to avoid requiring a real
- * API key during testing.
+ * <p>Note: This test uses a test API key and expects the agent to fail gracefully without a real
+ * API key.
  */
 public class HumanInputAgentTest {
 
   @Test
-  public void testHumanInputAgentWithMockApiKey() throws Exception {
+  public void testHumanInputAgent() throws Exception {
     // Tests human input agent with mock API key (will fail gracefully)
     try (InProcessCluster ipc = InProcessCluster.create()) {
       // Set a test API key to avoid null pointer
@@ -65,93 +63,5 @@ public class HumanInputAgentTest {
         System.clearProperty("OPENAI_API_KEY");
       }
     }
-  }
-
-  @Test
-  public void testHumanInputAgentWithoutApiKey() throws Exception {
-    // Tests that agent handles missing API key gracefully
-    try (InProcessCluster ipc = InProcessCluster.create()) {
-      // Ensure no API key is set
-      System.clearProperty("OPENAI_API_KEY");
-
-      // Deploy the agent module (should handle null API key)
-      HumanInputAgent.HumanInputModule module = new HumanInputAgent.HumanInputModule();
-      ipc.launchModule(module, new LaunchConfig(1, 1));
-
-      // Get agent manager and client
-      String moduleName = module.getModuleName();
-      AgentManager manager = AgentManager.create(ipc, moduleName);
-      AgentClient agent = manager.getAgentClient("HumanInputAgent");
-
-      // This should either work with null handling or fail gracefully
-      try {
-        AgentInvoke invoke = agent.initiate("Test message");
-        // If it gets here, the agent handled null API key
-        assertNotNull("Agent invoke should not be null", invoke);
-      } catch (Exception e) {
-        // Expected to fail with null API key
-        assertTrue("Should fail due to null API key", e.getMessage() != null);
-      }
-    }
-  }
-
-  // Note: In a real testing environment, you would create tests like this:
-  //
-  // @Test
-  // public void testHumanInputWorkflow() throws Exception {
-  //   // This test would require a valid OPENAI_API_KEY environment variable
-  //   String apiKey = System.getenv("OPENAI_API_KEY");
-  //   org.junit.Assume.assumeNotNull("OPENAI_API_KEY required for this test", apiKey);
-  //
-  //   try (InProcessCluster ipc = InProcessCluster.create()) {
-  //     HumanInputAgent.HumanInputModule module = new HumanInputAgent.HumanInputModule();
-  //     ipc.launchModule(module, new LaunchConfig(1, 1));
-  //
-  //     String moduleName = module.getModuleName();
-  //     AgentManager manager = AgentManager.create(ipc, moduleName);
-  //     AgentClient agent = manager.getAgentClient("HumanInputAgent");
-  //
-  //     AgentInvoke invoke = agent.initiate("What is 2+2?");
-  //
-  //     // Handle human input requests
-  //     AgentStep step = agent.nextStep(invoke);
-  //     while (step instanceof HumanInputRequest) {
-  //       HumanInputRequest humanInput = (HumanInputRequest) step;
-  //       assertNotNull("Human input prompt should not be null", humanInput.getPrompt());
-  //       assertTrue("Prompt should ask about helpfulness",
-  //           humanInput.getPrompt().contains("helpful"));
-  //
-  //       // Simulate human response
-  //       agent.provideHumanInput(humanInput, "y");
-  //       step = agent.nextStep(invoke);
-  //     }
-  //
-  //     // Get final result
-  //     HumanInputAgent.ChatResponse result =
-  //         (HumanInputAgent.ChatResponse) agent.result(invoke);
-  //     assertNotNull("Result should not be null", result);
-  //     assertNotNull("Response should not be null", result.getResponse());
-  //     assertTrue("Should be marked as helpful", result.isHelpful());
-  //   }
-  // }
-
-  @Test
-  public void testChatResponseClass() {
-    // Tests the ChatResponse data class
-    HumanInputAgent.ChatResponse response = new HumanInputAgent.ChatResponse("Test response", true);
-
-    assertEquals("Response should match", "Test response", response.getResponse());
-    assertTrue("Should be helpful", response.isHelpful());
-
-    String toString = response.toString();
-    assertNotNull("toString should not be null", toString);
-    assertTrue("toString should contain response", toString.contains("Test response"));
-    assertTrue("toString should contain helpful=true", toString.contains("helpful=true"));
-
-    // Test unhelpful response
-    HumanInputAgent.ChatResponse unhelpfulResponse =
-        new HumanInputAgent.ChatResponse("Another response", false);
-    assertEquals("Response should match", "Another response", unhelpfulResponse.getResponse());
-    assertTrue("Should not be helpful", !unhelpfulResponse.isHelpful());
   }
 }

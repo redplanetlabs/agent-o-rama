@@ -132,10 +132,29 @@ Include REFINE to refine the spec
 - [x] Fix the compile errors in the basic java examples in @examples/java/basic
        - `mvn package` can be used to compile them
 
-- [ ] Add missing tests for the basic java examples in @examples/java/basic
+- [x] Add missing tests for the basic java examples in @examples/java/basic
+
+- [x] for the basic java examples in @examples/java/basic:
+       - the types used for node arguments, and results should be pojo
+         records, rather than full classes.
+	   - the types need to implement RamaSerializable (no methods required)
+
+- [x] for the basic java examples in @examples/java/basic:
+        - the test should only test that the examples run properly
+		- no need to test edge conditions
+		- one test per agent
+
+- [ ] for the basic java examples in @examples/java/basic:
+       - the types used for node arguments, and results should be replaced
+         with HashMap instances.
 
 - [ ] update the aggregation-agent example to show the return value of
       agg-start node being passed as last arg to agg-node
 
+- [ ]  AOR uses com.rpl.agent-o-rama.impl.json-serialize to display them
+       which also allows user to edit things that implement that
+       protocol, like lc4j messages but someone could make any type
+       editable by implementing json-freeze* and json-thaw* ok, I'll
+       create an example with that
 
 # Large
