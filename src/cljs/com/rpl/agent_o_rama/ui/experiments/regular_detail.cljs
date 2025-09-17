@@ -138,30 +138,33 @@
     (nil? value) ($ :span.italic.text-gray-400 "nil")
     :else ($ :span.italic.text-gray-400 "…")))
 
-(defui EvaluatorErrorModal [{:keys [eval-name error-str]}]
-  ($ :div.p-6.space-y-4
-     ($ :h4.text-lg.font-medium.text-gray-900.mb-4
-        (str "Evaluator Error: " (name eval-name)))
-     ($ :div.bg-red-50.p-4.rounded.border.border-red-200.max-h-96.overflow-auto
-        ($ :pre.text-sm.font-mono.whitespace-pre-wrap.text-red-800 error-str))))
-
-(defui EvaluatorScores [{:keys [evals failures duplicate-metric-keys]}]
+(defui EvaluatorScores [{:keys [evals failures duplicate-metric-keys eval-initiates module-id]}]
   ($ :div.flex.flex-wrap.gap-1.items-center
      (for [[eval-name error-str] (sort-by key failures)]
-       ($ :button.px-2.py-1.rounded-md.text-xs.font-medium.bg-red-100.text-red-800.hover:bg-red-200.cursor-pointer.transition-colors
-          {:key (str "fail-" (name eval-name))
-           :onClick #(state/dispatch [:modal/show :evaluator-error
-                                      {:title "Evaluator Error"
-                                       :component ($ EvaluatorErrorModal {:eval-name eval-name :error-str error-str})}])}
-          (str (name eval-name) ": Failed")))
+       (let [eval-invoke (get eval-initiates eval-name)]
+         ($ :a.px-2.py-1.rounded-md.text-xs.font-medium.bg-red-100.text-red-800.hover:bg-red-200.cursor-pointer.transition-colors.no-underline
+            {:key (str "fail-" (name eval-name))
+             :href (when eval-invoke
+                     (rfe/href :agent/invocation-detail
+                               {:module-id module-id
+                                :agent-name "_aor-evaluator"
+                                :invoke-id (str (:task-id eval-invoke) "-" (:agent-invoke-id eval-invoke))}))
+             :target "_blank"}
+            (str (name eval-name) ": Failed"))))
      (for [[eval-name eval-result] (sort-by key evals)
            [metric-key metric-value] (sort-by key eval-result)
            :let [label (if (contains? duplicate-metric-keys metric-key)
                          (str (name eval-name) "/" (name metric-key))
-                         (name metric-key))]]
-       ($ :div.flex.items-center.gap-1.5.px-2.py-1.rounded-md.text-xs.bg-gray-100.text-gray-800.border.border-gray-200
+                         (name metric-key))
+                 eval-invoke (get eval-initiates eval-name)]]
+       ($ :a.flex.items-center.gap-1.5.px-2.py-1.rounded-md.text-xs.bg-gray-100.text-gray-800.border.border-gray-200.hover:bg-gray-200.cursor-pointer.transition-colors.no-underline
           {:key (str (name eval-name) "-" (name metric-key))
-           :title (str "Evaluator: " (name eval-name))}
+           :href (when eval-invoke
+                   (rfe/href :agent/invocation-detail
+                             {:module-id module-id
+                              :agent-name "_aor-evaluator"
+                              :invoke-id (str (:task-id eval-invoke) "-" (:agent-invoke-id eval-invoke))}))
+           :target "_blank"}
           ($ :span.font-medium.text-gray-600 label)
           ($ :span.font-semibold (format-metric-value metric-value))))))
 
@@ -257,7 +260,9 @@
                              ($ :div.mt-2
                                 ($ EvaluatorScores {:evals evals
                                                     :failures (:eval-failures run)
-                                                    :duplicate-metric-keys duplicate-keys})))))))))))))
+                                                    :duplicate-metric-keys duplicate-keys
+                                                    :eval-initiates (:eval-initiates run)
+                                                    :module-id module-id})))))))))))))
 
 (defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
   (let [{:keys [data loading? error]}
