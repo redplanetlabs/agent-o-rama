@@ -124,8 +124,13 @@ Include REFINE to refine the spec
   - Avoid academic jargon or overly formal language
   - Be confident and declarative rather than tentative
 
+- [x] the basic java examples are trying to use  com.rpl.agentorama.langchain4j.
+       - there is a langchain4j wrapper in clojure to ease use
+	   - java code should use langchain4j directly
+	  Please update the basic agent examples that use langchain4j
 
 - [ ] update the aggregation-agent example to show the return value of
       agg-start node being passed as last arg to agg-node
+
 
 # Large

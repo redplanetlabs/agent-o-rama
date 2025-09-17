@@ -8,12 +8,9 @@ import com.rpl.agentorama.AgentStep;
 import com.rpl.agentorama.AgentsModule;
 import com.rpl.agentorama.AgentsTopology;
 import com.rpl.agentorama.HumanInputRequest;
-import com.rpl.agentorama.langchain4j.LangChain4j;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.util.Scanner;
 
@@ -83,10 +80,10 @@ public class HumanInputAgent {
 
     @Override
     public void invoke(AgentNode agentNode, String userMessage) {
-      ChatLanguageModel openai = (ChatLanguageModel) agentNode.getAgentObject("openai");
+      OpenAiChatModel openai = (OpenAiChatModel) agentNode.getAgentObject("openai");
 
       // Get AI response
-      String response = LangChain4j.chat(openai, new UserMessage(userMessage)).aiMessage().text();
+      String response = openai.chat(userMessage);
 
       // Ask human if response was helpful
       boolean helpful = isHumanHelpful(agentNode, response);
@@ -160,7 +157,7 @@ public class HumanInputAgent {
       }
 
       // Get final result
-      ChatResponse result = (ChatResponse) step.getResult();
+      ChatResponse result = (ChatResponse) agent.result(invoke);
       System.out.println("Final result:");
       System.out.println(result);
 

@@ -5,16 +5,10 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentsModule;
 import com.rpl.agentorama.AgentsTopology;
-import com.rpl.agentorama.langchain4j.LangChain4j;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.openai.OpenAiChatModel;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Java example demonstrating LangChain4j chat model integration with agent-o-rama.
@@ -65,20 +59,8 @@ public class LangChain4jAgent {
     public void invoke(AgentNode agentNode, String userMessage) {
       OpenAiChatModel model = (OpenAiChatModel) agentNode.getAgentObject("openai-model");
 
-      // Prepare messages
-      SystemMessage systemMessage = new SystemMessage("You are a helpful assistant.");
-      UserMessage userMsg = new UserMessage(userMessage);
-
-      // Create chat request options
-      Map<String, Object> options = new HashMap<>();
-      options.put("temperature", 0.7);
-      options.put("max-output-tokens", 200);
-
-      // Send chat request to OpenAI
-      var response =
-          LangChain4j.chat(
-              model, LangChain4j.chatRequest(Arrays.asList(systemMessage, userMsg), options));
-      String responseText = response.aiMessage().text();
+      // Send chat request to OpenAI using simple API
+      String responseText = model.chat(userMessage);
 
       agentNode.result(responseText);
     }
