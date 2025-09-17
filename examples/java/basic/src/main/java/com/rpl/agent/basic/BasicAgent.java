@@ -36,7 +36,6 @@ public class BasicAgent {
 
     @Override
     protected void defineAgents(AgentsTopology topology) {
-      // Create agent with single node that processes input and returns result
       topology.newAgent("BasicAgent").node("process", null, new ProcessFunction());
     }
   }

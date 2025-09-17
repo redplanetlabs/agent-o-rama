@@ -1,13 +1,22 @@
-# Basic Agent Example
+# Basic Agent Examples
 
-This example demonstrates the fundamental concepts of the agent-o-rama framework with a simple Java agent implementation.
+This directory demonstrates the fundamental concepts of the agent-o-rama framework with Java agent implementations.
+
+## Examples
+
+### BasicAgent
+A simple single-node agent that processes user names and returns welcome messages.
+
+### MultiNodeAgent
+An agent with multiple connected nodes demonstrating inter-node emissions and data flow through a greeting workflow.
 
 ## Overview
 
-The BasicAgent example shows how to:
-- Define an agent module extending `AgentsModule`
-- Create a single-node agent topology
-- Implement node functions using `RamaVoidFunction2`
+These examples show how to:
+- Define agent modules extending `AgentsModule`
+- Create single and multi-node agent topologies
+- Implement node functions using `RamaVoidFunction2` and `RamaVoidFunction3`
+- Use `emit()` to pass data between nodes
 - Deploy and invoke agents using `InProcessCluster`
 - Test agent functionality
 
@@ -19,7 +28,8 @@ basic/
 │   ├── main/
 │   │   └── java/
 │   │       └── com/rpl/agent/basic/
-│   │           └── BasicAgent.java    # Main example implementation
+│   │           ├── BasicAgent.java     # Single-node example
+│   │           └── MultiNodeAgent.java # Multi-node example
 │   └── test/
 │       └── java/
 │           └── com/rpl/agent/basic/
@@ -27,7 +37,7 @@ basic/
 └── pom.xml                             # Maven build configuration
 ```
 
-## Running the Example
+## Running the Examples
 
 ### Prerequisites
 
@@ -37,11 +47,14 @@ basic/
 ### Build and Run
 
 ```bash
-# Compile the example
+# Compile the examples
 mvn clean compile
 
-# Run the main example
-mvn exec:java
+# Run the basic agent example
+mvn exec:java -Dexec.mainClass="com.rpl.agent.basic.BasicAgent"
+
+# Run the multi-node agent example
+mvn exec:java -Dexec.mainClass="com.rpl.agent.basic.MultiNodeAgent"
 
 # Run tests
 mvn test
@@ -49,9 +62,9 @@ mvn test
 
 ## Key Concepts
 
-### Agent Module
+### Single-Node Agent (BasicAgent)
 
-The `BasicModule` class extends `AgentsModule` and defines the agent topology:
+The `BasicModule` class extends `AgentsModule` and defines a simple topology:
 
 ```java
 public static class BasicModule extends AgentsModule {
@@ -62,41 +75,72 @@ public static class BasicModule extends AgentsModule {
 }
 ```
 
-### Node Function
+### Multi-Node Agent (MultiNodeAgent)
 
-The `ProcessFunction` implements `RamaVoidFunction2<AgentNode, String>` to process input:
+The `MultiNodeModule` demonstrates connected nodes with data flow:
 
 ```java
-public static class ProcessFunction implements RamaVoidFunction2<AgentNode, String> {
-  @Override
-  public void invoke(AgentNode agentNode, String userName) {
-    String result = "Welcome to agent-o-rama, " + userName + "!";
-    agentNode.result(result);
-  }
+topology
+  .newAgent("MultiNodeAgent")
+  .node("receive", "personalize", new ReceiveFunction())
+  .node("personalize", "finalize", new PersonalizeFunction())
+  .node("finalize", null, new FinalizeFunction());
+```
+
+### Node Functions
+
+Single parameter functions use `RamaVoidFunction2<AgentNode, String>`:
+
+```java
+public void invoke(AgentNode agentNode, String userName) {
+  agentNode.result("Welcome to agent-o-rama, " + userName + "!");
 }
 ```
 
-### Agent Invocation
+Multiple parameter functions use `RamaVoidFunction3<AgentNode, String, String>`:
 
 ```java
-// Create and launch the module
-InProcessCluster ipc = InProcessCluster.create();
-BasicModule module = new BasicModule();
-ipc.launchModule(module, new LaunchConfig(1, 1));
+public void invoke(AgentNode agentNode, String userName, String greeting) {
+  String result = greeting + " Welcome to agent-o-rama! Thanks for joining us, " + userName + ".";
+  agentNode.result(result);
+}
+```
 
-// Get agent client and invoke
-AgentManager manager = AgentManager.create(ipc, module.getModuleName());
-AgentClient agent = manager.getAgentClient("BasicAgent");
-String result = (String) agent.invoke("Alice");
+### Inter-Node Communication
+
+Use `emit()` to pass data between nodes:
+
+```java
+// Emit single value
+agentNode.emit("nextNode", userName);
+
+// Emit multiple values
+agentNode.emit("nextNode", userName, greeting);
 ```
 
 ## Example Output
 
+### BasicAgent
 ```
 Starting Basic Agent Example...
 Basic Agent Results:
 User: "Alice" -> Result: Welcome to agent-o-rama, Alice!
 User: "Bob" -> Result: Welcome to agent-o-rama, Bob!
+```
+
+### MultiNodeAgent
+```
+Starting Multi-Node Agent Example...
+Multi-Node Agent Results:
+
+--- Greeting Alice ---
+Result: Hello, Alice! Welcome to agent-o-rama! Thanks for joining us, Alice.
+
+--- Greeting Bob ---
+Result: Hello, Bob! Welcome to agent-o-rama! Thanks for joining us, Bob.
+
+--- Greeting Charlie ---
+Result: Hello, Charlie! Welcome to agent-o-rama! Thanks for joining us, Charlie.
 ```
 
 ## Testing
@@ -110,8 +154,8 @@ Note: Tests may take a minute to run due to InProcessCluster initialization.
 
 ## Next Steps
 
-This example serves as the foundation for more complex agent implementations. Consider exploring:
-- Multi-node agent topologies
+These examples serve as the foundation for more complex agent implementations. Consider exploring:
 - Agent state management with stores
 - Integration with AI models (see the React example)
 - Streaming and asynchronous operations
+- Human input workflows

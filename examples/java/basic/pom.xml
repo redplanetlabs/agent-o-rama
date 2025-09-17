@@ -10,8 +10,8 @@
   <version>1.0.0</version>
   <packaging>jar</packaging>
 
-  <name>Basic Agent Example</name>
-  <description>Java implementation of basic agent using agent-o-rama framework</description>
+  <name>Basic Agent Examples</name>
+  <description>Java implementations of basic and multi-node agents using agent-o-rama framework</description>
 
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
