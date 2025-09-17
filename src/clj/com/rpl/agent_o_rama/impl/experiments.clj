@@ -864,7 +864,7 @@
      ;; have to do it this way since cannot do :ack on the depot append since it's running as part
      ;; of the same stream topology
      (h/random-uuid7 :> *agent-invoke-id)
-     (aor-types/->valid-AgentInitiate [*data] *start-time-millis *agent-invoke-id :> *initiate)
+     (aor-types/->valid-AgentInitiate [*data] *agent-invoke-id :> *initiate)
      (depot-partition-append!
       *agent-depot
       *initiate

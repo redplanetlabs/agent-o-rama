@@ -50,7 +50,6 @@
 
 (drp/defrecord+ AgentInitiate
   [args :- [s/Any]
-   time-millis :- Long
    forced-agent-invoke-id :- (s/maybe UUID)
   ])
 

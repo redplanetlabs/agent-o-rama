@@ -572,7 +572,6 @@
               agent-depot
               (aor-types/->AgentInitiate
                (vec args)
-               (h/current-time-millis)
                nil))
              (h/cf-function [{[agent-task-id agent-id]
                               aor-types/AGENTS-TOPOLOGY-NAME}]
