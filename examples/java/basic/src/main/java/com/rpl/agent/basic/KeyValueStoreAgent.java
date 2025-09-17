@@ -5,8 +5,8 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentsModule;
 import com.rpl.agentorama.AgentsTopology;
-import com.rpl.agentorama.Store;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
+import com.rpl.agentorama.store.KeyValueStore;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.time.Instant;
@@ -175,7 +175,7 @@ public class KeyValueStoreAgent {
 
     @Override
     public void invoke(AgentNode agentNode, CounterRequest request) {
-      Store<String, Long> countersStore = agentNode.getStore("$$counters");
+      KeyValueStore<String, Long> countersStore = agentNode.getStore("$$counters");
       String counterName = request.getCounterName();
 
       CounterResponse result;

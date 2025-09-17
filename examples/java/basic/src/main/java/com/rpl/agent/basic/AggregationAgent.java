@@ -5,8 +5,10 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentsModule;
 import com.rpl.agentorama.AgentsTopology;
+import com.rpl.agentorama.BuiltIn;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
-import com.rpl.rama.Aggregators;
+import com.rpl.agentorama.ops.RamaVoidFunction3;
+import com.rpl.rama.ops.RamaFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.util.ArrayList;
@@ -118,16 +120,16 @@ public class AggregationAgent {
           // Process individual chunks in parallel
           .node("process-chunk", "collect-results", new ProcessChunkFunction())
           // Aggregate all results using built-in vector aggregator
-          .aggNode("collect-results", null, Aggregators.vectorAgg(), new CollectResultsFunction());
+          .aggNode("collect-results", null, BuiltIn.LIST_AGG, new CollectResultsFunction());
     }
   }
 
   /** Aggregation start function that distributes work to parallel processors. */
   public static class DistributeWorkFunction
-      implements RamaVoidFunction2<AgentNode, AggregationRequest> {
+      implements RamaFunction2<AgentNode, AggregationRequest, Object> {
 
     @Override
-    public void invoke(AgentNode agentNode, AggregationRequest request) {
+    public Object invoke(AgentNode agentNode, AggregationRequest request) {
       List<Integer> data = request.getData();
       int chunkSize = request.getChunkSize();
 
@@ -142,6 +144,8 @@ public class AggregationAgent {
       for (List<Integer> chunk : chunks) {
         agentNode.emit("process-chunk", chunk);
       }
+
+      return null; // aggStartNode doesn't need to return meaningful data
     }
   }
 
@@ -166,10 +170,11 @@ public class AggregationAgent {
 
   /** Function that aggregates all results using built-in vector aggregator. */
   public static class CollectResultsFunction
-      implements RamaVoidFunction2<AgentNode, List<ChunkResult>> {
+      implements RamaVoidFunction3<AgentNode, List<ChunkResult>, Object> {
 
     @Override
-    public void invoke(AgentNode agentNode, List<ChunkResult> aggregatedResults) {
+    public void invoke(
+        AgentNode agentNode, List<ChunkResult> aggregatedResults, Object startNodeResult) {
       // Sort chunks by their first element to ensure consistent order
       List<ChunkResult> sortedResults = new ArrayList<>(aggregatedResults);
       sortedResults.sort(Comparator.comparing(result -> result.getOriginalChunk().get(0)));

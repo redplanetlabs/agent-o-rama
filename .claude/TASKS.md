@@ -129,6 +129,9 @@ Include REFINE to refine the spec
 	   - java code should use langchain4j directly
 	  Please update the basic agent examples that use langchain4j
 
+- [x] Fix the compile errors in the basic java examples in @examples/java/basic
+       - `mvn package` can be used to compile them
+
 - [ ] update the aggregation-agent example to show the return value of
       agg-start node being passed as last arg to agg-node
 
