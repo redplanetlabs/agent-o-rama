@@ -505,6 +505,8 @@
 
 
          (bind ais (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res))
+         ;; TODO: <<<<>>>> verify ExperimentSource set for them
+         ;;   - and verify in another test that they're nil for regular initiate
          (is (every? aor-types/AgentInvokeImpl? ais))
          (bind all-feedback (mapv root-feedback ais))
          (check-experiment-feedback! all-feedback

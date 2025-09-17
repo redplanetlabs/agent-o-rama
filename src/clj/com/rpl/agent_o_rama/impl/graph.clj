@@ -122,7 +122,7 @@
                next-traversed)))
 
           :else
-          (throw (h/ex-info "Undefined node" {:node node :path path :graph graph})))
+          (throw (h/ex-info "Undefined node" {:node node :path path})))
       ))))
 
 (defprotocol AgentGraphInternal

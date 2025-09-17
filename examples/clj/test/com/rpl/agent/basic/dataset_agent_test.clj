@@ -60,8 +60,7 @@
              math-dataset-id
              {:operation "add" :a 5 :b 3}
              {:reference-output {:result 8}
-              :tags   #{"basic" "addition"}
-              :source "test"})
+              :tags #{"basic" "addition"}})
 
             (aor/add-dataset-example!
              manager
