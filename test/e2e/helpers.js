@@ -28,7 +28,7 @@ export async function getResearchAgentRow(page) {
  * @param {string} [options.description] - The description for the evaluator.
  * @param {Object} [options.params] - Additional parameters for the evaluator.
  */
-export async function createEvaluator(page, { name, builderName, description, params = {} }) {
+export async function createEvaluator(page, { name, builderName, description, params = {}, inputJsonPath, outputJsonPath, referenceOutputJsonPath }) {
   console.log(`Creating evaluator: ${name}`);
   await page.getByRole('button', { name: 'Create Evaluator' }).first().click();
 
@@ -43,6 +43,20 @@ export async function createEvaluator(page, { name, builderName, description, pa
 
   for (const [paramKey, paramValue] of Object.entries(params)) {
     await modal.getByLabel(paramKey, { exact: true }).fill(paramValue);
+  }
+
+  // Optionally set JSONPath fields by expanding Advanced Options
+  if (inputJsonPath || outputJsonPath || referenceOutputJsonPath) {
+    await modal.getByRole('button', { name: 'Advanced Options' }).click();
+    if (inputJsonPath) {
+      await modal.getByLabel('Input JSON Path').fill(inputJsonPath);
+    }
+    if (outputJsonPath) {
+      await modal.getByLabel('Output JSON Path').fill(outputJsonPath);
+    }
+    if (referenceOutputJsonPath) {
+      await modal.getByLabel('Reference Output JSON Path').fill(referenceOutputJsonPath);
+    }
   }
 
   await modal.getByRole('button', { name: 'Submit' }).click();

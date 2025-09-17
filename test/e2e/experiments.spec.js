@@ -13,7 +13,8 @@ import {
 // =============================================================================
 const uniqueId = randomUUID().substring(0, 8);
 const datasetName = `e2e-exp-dataset-${uniqueId}`;
-const evaluatorName = `e2e-exp-evaluator-${uniqueId}`;
+const evaluatorNamePass = `e2e-exp-evaluator-pass-${uniqueId}`;
+const evaluatorNameFail = `e2e-exp-evaluator-fail-${uniqueId}`;
 const experimentName = `e2e-full-flow-experiment-${uniqueId}`;
 const agentToRun = 'researcher'; // As defined in the research_agent.clj example
 
@@ -60,15 +61,25 @@ test.describe('Full Experiment Flow E2E Test', () => {
     await expect(page.getByText(datasetName)).toBeVisible();
     console.log('Dataset created successfully.');
 
-    // 1b. Create Evaluator
-    console.log(`Creating evaluator "${evaluatorName}"...`);
+    // 1b. Create Evaluators
+    console.log(`Creating evaluators "${evaluatorNamePass}" and "${evaluatorNameFail}"...`);
     await page.getByText('Evaluators').click();
+    // Passing conciseness (very high threshold)
     await createEvaluator(page, {
-      name: evaluatorName,
+      name: evaluatorNamePass,
       builderName: 'aor/conciseness',
       params: { threshold: '5000' }, // High threshold to ensure it passes
+      // Evaluate the first arg string from the first output item
+      outputJsonPath: '$[0].args[0]'
     });
-    console.log('Evaluator created successfully.');
+    // Failing conciseness (very low threshold)
+    await createEvaluator(page, {
+      name: evaluatorNameFail,
+      builderName: 'aor/conciseness',
+      params: { threshold: '10' },
+      outputJsonPath: '$[0].args[0]'
+    });
+    console.log('Evaluators created successfully.');
 
 
     // ---
@@ -209,10 +220,13 @@ test.describe('Full Experiment Flow E2E Test', () => {
     await mappingsSection.locator('input').nth(1).fill('$[1]'); // messages
     await mappingsSection.locator('input').nth(2).fill('$[2]'); // context
 
-    // Select the evaluator
+    // Select both evaluators (via portal)
     await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
-    await expect(page.getByText(evaluatorName, { exact: true })).toBeVisible();
-    await page.getByText(evaluatorName, { exact: true }).click();
+    await expect(page.getByText(evaluatorNamePass, { exact: true })).toBeVisible();
+    await page.getByText(evaluatorNamePass, { exact: true }).click();
+    await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
+    await expect(page.getByText(evaluatorNameFail, { exact: true })).toBeVisible();
+    await page.getByText(evaluatorNameFail, { exact: true }).click();
 
     // 5b. Start the experiment
     await expModal.getByRole('button', { name: 'Run Experiment' }).click();
@@ -236,12 +250,15 @@ test.describe('Full Experiment Flow E2E Test', () => {
     const resultsTable = page.locator('table').filter({ hasText: 'Input' });
     const resultRow = resultsTable.locator('tbody tr').first();
 
-    // Verify the evaluator score is present
-    const evaluatorScore = resultRow.locator('div').filter({ hasText: new RegExp(evaluatorName) });
-    await expect(evaluatorScore).toBeVisible();
-    await expect(evaluatorScore).toContainText('concise?');
-    await expect(evaluatorScore).toContainText('✓'); // The checkmark for a passing boolean score
-    console.log('Evaluator scores correctly displayed.');
+    // Verify both evaluator chips (duplicate metric key forces label to include name)
+    const outputCell = resultRow.locator('td').nth(2);
+    const passChip = outputCell.locator('a').filter({ hasText: new RegExp(`${evaluatorNamePass}/concise\\?`) }).first();
+    const failChip = outputCell.locator('a').filter({ hasText: new RegExp(`${evaluatorNameFail}/concise\\?`) }).first();
+    await expect(passChip).toBeVisible();
+    await expect(passChip).toContainText('✓');
+    await expect(failChip).toBeVisible();
+    await expect(failChip).toContainText('✗');
+    console.log('Evaluator scores for both pass and fail correctly displayed.');
 
     
     // ---
@@ -255,9 +272,10 @@ test.describe('Full Experiment Flow E2E Test', () => {
     await page.getByText('Datasets & Experiments').click();
     await deleteDataset(page, datasetName);
     
-    // Delete the evaluator
+    // Delete the evaluators
     await page.getByText('Evaluators').click();
-    await deleteEvaluator(page, evaluatorName);
+    await deleteEvaluator(page, evaluatorNamePass);
+    await deleteEvaluator(page, evaluatorNameFail);
     
     console.log('--- Test successfully completed and cleaned up. ---');
   });
