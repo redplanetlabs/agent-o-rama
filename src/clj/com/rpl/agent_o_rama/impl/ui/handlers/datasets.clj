@@ -235,9 +235,12 @@
                                       {:reference-output (:transformed-data output-result)})
             {:status :ok})
           ;; Invalid data, return error
-          {:status :error
-           :error (str "Invalid data: "
-                       (when-not (:is-valid? input-result)
-                         (str "Input: " (:validation-error input-result)))
-                       (when-not (:is-valid? output-result)
-                         (str "Output: " (:validation-error output-result))))})))))
+          (throw
+           (ex-info (str "Invalid "
+                         (when-not (:is-valid? input-result)
+                                     (str "Input: " (:validation-error input-result)
+                                          "Schema: " (:input-json-schema schemas)))
+                         (when-not (:is-valid? output-result)
+                           (str "Output: " (:validation-error output-result)
+                                "Schema: " (:output-json-schema schemas))))
+                    {})))))))

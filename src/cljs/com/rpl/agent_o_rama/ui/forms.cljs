@@ -203,9 +203,9 @@
                              :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium "
                                              (if (not (:valid? form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
                     "Next")
-                 ($ :button {:type "button", :disabled (or (not (:valid? form)) (:submitting? form)), :onClick (:submit! form)
+                 ($ :button {:type "button", :disabled (or (not (:valid? form)) (:submitting? form) (:error form)), :onClick (:submit! form)
                              :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
-                                             (if (or (not (:valid? form)) (:submitting? form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
+                                             (if (or (not (:valid? form)) (:submitting? form) (:error form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
                     (when (:submitting? form) ($ common/spinner {:size :medium}))
                     (:submit-text modal-data "Submit")))))))))
 
@@ -309,7 +309,8 @@
                       (s/terminal-val
                        (assoc updated-form-state
                               :field-errors (:errors validation-result)
-                              :valid? (:valid? validation-result)))])))
+                              :valid? (:valid? validation-result)
+                              :error nil))])))
 
 (state/reg-event :form/validate
                  (fn [db form-id]
@@ -381,16 +382,24 @@
                               15000
                               (fn [reply]
                                 (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-                                (if (:success reply)
-                                  (do
-                                    (state/dispatch [:modal/hide])
-                                    (when on-success-invalidate
-                                      (state/dispatch [:query/invalidate (on-success-invalidate db form-state-with-id reply)]))
-                                    (when on-success (on-success db form-state-with-id reply))
-                                    (state/dispatch [:form/clear form-id]))
-                                  (do
-                                    (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)])
-                                    (when on-error (on-error db form-state-with-id (:error reply))))))))
+                                ;; Check for nested error structure: {:success true, :data {:status :error, :error "..."}}
+                                (let [has-nested-error? (and (:success reply)
+                                                             (= :error (get-in reply [:data :status]))
+                                                             (get-in reply [:data :error]))
+                                      actual-error (if has-nested-error?
+                                                     (get-in reply [:data :error])
+                                                     (:error reply))
+                                      is-success? (and (:success reply) (not has-nested-error?))]
+                                  (if is-success?
+                                    (do
+                                      (state/dispatch [:modal/hide])
+                                      (when on-success-invalidate
+                                        (state/dispatch [:query/invalidate (on-success-invalidate db form-state-with-id reply)]))
+                                      (when on-success (on-success db form-state-with-id reply))
+                                      (state/dispatch [:form/clear form-id]))
+                                    (do
+                                      (state/dispatch [:db/set-value [:forms form-id :error] actual-error])
+                                      (when on-error (on-error db form-state-with-id actual-error))))))))
 
                            ;; Fallback to original function-based handler for complex cases
                            (fn? on-submit-handler)
