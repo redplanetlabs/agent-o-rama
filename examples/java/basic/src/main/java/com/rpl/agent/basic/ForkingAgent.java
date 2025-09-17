@@ -137,7 +137,7 @@ public class ForkingAgent {
     try (InProcessCluster ipc = InProcessCluster.create()) {
       // Launch the agent module
       ForkingModule module = new ForkingModule();
-      ipc.launchModule(module, new LaunchConfig(2, 2));
+      ipc.launchModule(module, new LaunchConfig(1, 1));
 
       // Get agent manager and client
       String moduleName = module.getModuleName();

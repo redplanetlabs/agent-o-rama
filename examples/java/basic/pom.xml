@@ -16,6 +16,7 @@
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+     <maven.model.builder.ignoreInvalidModel>true</maven.model.builder.ignoreInvalidModel>
   </properties>
 
   <repositories>
@@ -38,6 +39,16 @@
       <groupId>com.rpl</groupId>
       <artifactId>rama</artifactId>
       <version>0.0.6-SNAPSHOT</version>
+      <exclusions>
+	<exclusion>
+	  <groupId>org.javassist</groupId>
+	  <artifactId>javassist</artifactId>
+	</exclusion>
+	<exclusion>
+	  <groupId>org.apache.yetus</groupId>
+	  <artifactId>audience-annotations</artifactId>
+	</exclusion>
+      </exclusions>
     </dependency>
 
     <!-- LangChain4j -->
@@ -74,6 +85,9 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.11.0</version>
+	<configuration>
+	  <proc>none</proc>
+	</configuration>
       </plugin>
 
       <plugin>

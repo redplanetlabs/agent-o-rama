@@ -33,7 +33,7 @@ public class AggregationAgentTest {
     try (InProcessCluster ipc = InProcessCluster.create()) {
       // Deploy the agent module
       AggregationAgent.AggregationModule module = new AggregationAgent.AggregationModule();
-      ipc.launchModule(module, new LaunchConfig(2, 2));
+      ipc.launchModule(module, new LaunchConfig(1, 1));
 
       // Get agent manager and client
       String moduleName = module.getModuleName();
