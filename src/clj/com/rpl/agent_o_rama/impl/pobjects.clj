@@ -90,10 +90,6 @@
   []
   "*_agent-clients")
 
-(defn agent-id-gen-task-global-name
-  [name]
-  (str "$$_agent-id-gen-" name))
-
 (defn agent-root-task-global-name
   [agent-name]
   (str "$$_agent-root-" agent-name))
@@ -106,7 +102,7 @@
      :modified-at Long})])
 
 (def AGENT-ROOT-PSTATE-SCHEMA
-  {Long
+  {UUID
    (fixed-keys-schema
     {:root-invoke-id     UUID
      :invoke-args        [Object]
@@ -122,9 +118,9 @@
      :feedback           FEEDBACK-SCHEMA
      :human-requests     (set-schema NodeHumanInputRequest {:subindex? true})
      :fork-of            (fixed-keys-schema
-                          {:parent-agent-id Long
+                          {:parent-agent-id UUID
                            :fork-context    ForkContext})
-     :forks              (set-schema Long {:subindex? true}) ; agent ids
+     :forks              (set-schema UUID {:subindex? true}) ; agent ids
      :streaming          (map-schema
                           String           ; node name
                           (fixed-keys-schema
@@ -145,7 +141,7 @@
   (str "$$_agent-active-invokes-" agent-name))
 
 (def AGENT-ACTIVE-INVOKES-PSTATE-SCHEMA
-  {Long Boolean})
+  {UUID Boolean})
 
 (defn agent-valid-invokes-task-global-name
   [agent-name]
@@ -169,7 +165,7 @@
 (def AGENT-NODE-PSTATE-SCHEMA
   {UUID ; invoke-id
    (fixed-keys-schema
-    {:agent-id            Long
+    {:agent-id            UUID
      :agent-task-id       Long
      :node                String
      :nested-ops          [NestedOpInfo]
@@ -356,10 +352,6 @@
   (-> (agent-declared-objects-task-global)
       .getAgentGraphs
       (get name)))
-
-(defn agent-id-gen-task-global
-  [name]
-  (this-module-pobject-task-global (agent-id-gen-task-global-name name)))
 
 (defn agent-root-task-global
   [name]

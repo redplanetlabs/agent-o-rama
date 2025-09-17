@@ -193,17 +193,10 @@
 
 (defn init-retry-num [] 0)
 
-(deframaop gen-id
-  [$$id]
-  (local-select> STAY $$id :> *ret)
-  (local-transform> (term inc) $$id)
-  (:> *ret))
-
 (deframaop intake-agent-initiate
   [*agent-name *data]
   (<<with-substitutions
-   [$$id-gen (po/agent-id-gen-task-global *agent-name)
-    $$active (po/agent-active-invokes-task-global *agent-name)
+   [$$active (po/agent-active-invokes-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
    (get *data :args :> *args)
    (ops/current-task-id :> *agent-task-id)
@@ -211,7 +204,7 @@
    (<<if (some? *forced-agent-id)
      (identity *forced-agent-id :> *agent-id)
     (else>)
-     (gen-id $$id-gen :> *agent-id))
+     (h/random-uuid7 :> *agent-id))
    (init-retry-num :> *retry-num)
    (init-root *agent-name *agent-id *retry-num *args :> *invoke-id)
    (local-transform> [(keypath *agent-id) (termval true)]
@@ -328,7 +321,6 @@
   [*agent-name {:keys [*agent-task-id *agent-id *invoke-id->new-args]}]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
-    $$id-gen (po/agent-id-gen-task-global *agent-name)
     $$active (po/agent-active-invokes-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)
     %affected-aggs (queries/fork-affected-aggs-query-task-global *agent-name)]
@@ -347,7 +339,7 @@
    (aor-types/->ForkContext *invoke-id->new-args
                             *affected-aggs
                             :> *fork-context)
-   (gen-id $$id-gen :> *fork-agent-id)
+   (h/random-uuid7 :> *fork-agent-id)
    (init-retry-num :> *retry-num)
    (init-root *agent-name
               *fork-agent-id

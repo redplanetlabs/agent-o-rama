@@ -849,8 +849,7 @@
   [*data]
   (<<with-substitutions
    [$$datasets (po/datasets-task-global)
-    *agent-depot (po/agent-depot-task-global EVALUATOR-AGENT-NAME)
-    $$id-gen (po/agent-id-gen-task-global EVALUATOR-AGENT-NAME)]
+    *agent-depot (po/agent-depot-task-global EVALUATOR-AGENT-NAME)]
    (<<subsource *data
     (case> StartExperiment :> {:keys [*id *dataset-id]})
      (|hash *dataset-id)
@@ -864,7 +863,7 @@
      (|direct *task-id)
      ;; have to do it this way since cannot do :ack on the depot append since it's running as part
      ;; of the same stream topology
-     (at/gen-id $$id-gen :> *agent-invoke-id)
+     (h/random-uuid7 :> *agent-invoke-id)
      (aor-types/->valid-AgentInitiate [*data] *start-time-millis *agent-invoke-id :> *initiate)
      (depot-partition-append!
       *agent-depot

@@ -51,7 +51,7 @@
 (drp/defrecord+ AgentInitiate
   [args :- [s/Any]
    time-millis :- Long
-   forced-agent-invoke-id :- (s/maybe Long)
+   forced-agent-invoke-id :- (s/maybe UUID)
   ])
 
 (drp/defrecord+ AgentResult
@@ -67,7 +67,7 @@
 
 (drp/defrecord+ AgentInvokeImpl
   [task-id :- Long
-   agent-invoke-id :- Long]
+   agent-invoke-id :- UUID]
   AgentInvoke
   (getTaskId [this] task-id)
   (getAgentInvokeId [this] agent-invoke-id)
@@ -166,17 +166,17 @@
 
 (drp/defrecord+ AgentFailure
   [agent-task-id :- Long
-   agent-id :- Long
+   agent-id :- UUID
    retry-num :- Long])
 
 (drp/defrecord+ RetryAgentInvoke
   [agent-task-id :- Long
-   agent-id :- Long
+   agent-id :- UUID
    expected-retry-num :- Long])
 
 (drp/defrecord+ ForkAgentInvoke
   [agent-task-id :- Long
-   agent-id :- Long
+   agent-id :- UUID
    invoke-id->new-args :- {UUID [s/Any]}])
 
 (drp/defrecord+ HistoricalAgentNodeInfo
@@ -193,7 +193,7 @@
 
 (drp/defrecord+ NodeStreamingResult
   [agent-task-id :- Long
-   agent-id :- Long
+   agent-id :- UUID
    node :- String
    invoke-id :- UUID
    retry-num :- Long
@@ -207,7 +207,7 @@
 
 (drp/defrecord+ NodeHumanInputRequest
   [agent-task-id :- Long
-   agent-id :- Long
+   agent-id :- UUID
    node :- String
    node-task-id :- Long
    invoke-id :- UUID
@@ -237,7 +237,7 @@
 (drp/defrecord+ PStateWrite
   [agent-name :- String
    agent-task-id :- Long
-   agent-id :- Long
+   agent-id :- UUID
    retry-num :- Long
    pstate-name :- String
    path :- s/Any
