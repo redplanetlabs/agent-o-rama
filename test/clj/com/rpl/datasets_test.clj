@@ -789,7 +789,7 @@
        (is (= created-at modified-at))
        (bind ar-source
          (aor-types/->AgentRunSource "foo.Module" "agent1" (aor-types/->AgentInvokeImpl 1 2)))
-       (binding [datasets/EXAMPLE-SOURCE ar-source]
+       (binding [aor-types/OPERATION-SOURCE ar-source]
          (add-example-and-wait!
           manager
           ds-id1
@@ -1214,13 +1214,13 @@
        (bind human-source (aor-types/->HumanSource "user"))
        (bind ai-source (aor-types/->AiSource))
 
-       (binding [datasets/EXAMPLE-SOURCE human-source]
+       (binding [aor-types/OPERATION-SOURCE human-source]
          (add-example-and-wait! manager
                                 ds-id5
                                 "hello how are you"
                                 {:reference-output "abc"
                                  :tags #{"a" "b"}}))
-       (binding [datasets/EXAMPLE-SOURCE ai-source]
+       (binding [aor-types/OPERATION-SOURCE ai-source]
          (add-example-and-wait! manager
                                 ds-id5
                                 "how are you"
@@ -1231,13 +1231,13 @@
        (add-example-and-wait! manager
                               ds-id5
                               "hello banana")
-       (binding [datasets/EXAMPLE-SOURCE human-source]
+       (binding [aor-types/OPERATION-SOURCE human-source]
          (add-example-and-wait! manager
                                 ds-id5
                                 "the man said apple"
                                 {:reference-output "children"
                                  :tags #{"a"}}))
-       (binding [datasets/EXAMPLE-SOURCE ai-source]
+       (binding [aor-types/OPERATION-SOURCE ai-source]
          (add-example-and-wait! manager
                                 ds-id5
                                 (UserMessage. "apple")

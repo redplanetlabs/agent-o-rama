@@ -24,6 +24,9 @@
    [java.util.concurrent
     CompletableFuture]))
 
+
+(def ^:dynamic OPERATION-SOURCE nil)
+
 (def AGENTS-TOPOLOGY-NAME "_agents-topology")
 (def AGENTS-MB-TOPOLOGY-NAME "_agents-mb-topology")
 
@@ -48,9 +51,54 @@
 ;; TODO: use flexible serialization for these to ease updating the
 ;; library? or just some of them?
 
+;; Sources
+
+(definterface InfoSource
+  (source_string []))
+
+(defn source-string
+  [^InfoSource i]
+  (.source_string i))
+
+(drp/defrecord+ HumanSource
+  [name :- String]
+  InfoSource
+  (source_string [this] (str "human[" name "]")))
+
+(drp/defrecord+ AiSource
+  []
+  InfoSource
+  (source_string [this] "ai"))
+
+(drp/defrecord+ ApiSource
+  []
+  InfoSource
+  (source_string [this] "api"))
+
+(drp/defrecord+ BulkUploadSource
+  []
+  InfoSource
+  (source_string [this] "bulkUpload"))
+
+(drp/defrecord+ ExperimentSource
+  [dataset-id :- UUID
+   experiment-id :- UUID]
+  InfoSource
+  (source_string [this] "experiment"))
+
+(drp/defrecord+ AgentRunSource
+  [module-name :- String
+   agent-name :- String
+   agent-invoke :- AgentInvokeImpl]
+  InfoSource
+  (source_string [this] (str "agent[" module-name "/" agent-name "]")))
+
+;; Core types
+
 (drp/defrecord+ AgentInitiate
   [args :- [s/Any]
    forced-agent-invoke-id :- (s/maybe UUID)
+   source :- (s/maybe InfoSource)
   ])
 
 (drp/defrecord+ AgentResult
@@ -249,48 +297,6 @@
   ToolInfo
   (getToolSpecification [this] tool-specification))
 
-
-;; Sources
-
-(definterface InfoSource
-  (source_string []))
-
-(defn source-string
-  [^InfoSource i]
-  (.source_string i))
-
-(drp/defrecord+ HumanSource
-  [name :- String]
-  InfoSource
-  (source_string [this] (str "human[" name "]")))
-
-(drp/defrecord+ AiSource
-  []
-  InfoSource
-  (source_string [this] "ai"))
-
-(drp/defrecord+ ApiSource
-  []
-  InfoSource
-  (source_string [this] "api"))
-
-(drp/defrecord+ BulkUploadSource
-  []
-  InfoSource
-  (source_string [this] "bulkUpload"))
-
-(drp/defrecord+ ExperimentSource
-  [dataset-id :- UUID
-   experiment-id :- UUID]
-  InfoSource
-  (source_string [this] "experiment"))
-
-(drp/defrecord+ AgentRunSource
-  [module-name :- String
-   agent-name :- String
-   agent-invoke :- AgentInvokeImpl]
-  InfoSource
-  (source_string [this] (str "agent[" module-name "/" agent-name "]")))
 
 ;; Datasets
 

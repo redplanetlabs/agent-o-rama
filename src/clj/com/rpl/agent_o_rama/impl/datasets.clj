@@ -56,8 +56,6 @@
     BiConsumer
     Consumer]))
 
-(def ^:dynamic EXAMPLE-SOURCE nil)
-
 (def ^ObjectMapper MAPPER (ObjectMapper.))
 (def META "urn:agent-o-rama:meta:java-types-2020-12")
 
@@ -497,7 +495,7 @@
   (let [sem    (Semaphore. 100)
         mapper (j/object-mapper)]
     (with-open [r (io/reader path)]
-      (binding [EXAMPLE-SOURCE (aor-types/->BulkUploadSource)]
+      (binding [aor-types/OPERATION-SOURCE (aor-types/->BulkUploadSource)]
         (doseq [line (line-seq r)]
           (when-not (str/blank? line)
             (let [m (try

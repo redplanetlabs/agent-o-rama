@@ -572,7 +572,8 @@
               agent-depot
               (aor-types/->AgentInitiate
                (vec args)
-               nil))
+               nil
+               aor-types/OPERATION-SOURCE))
              (h/cf-function [{[agent-task-id agent-id]
                               aor-types/AGENTS-TOPOLOGY-NAME}]
                (aor-types/->AgentInvokeImpl agent-task-id agent-id)
@@ -807,7 +808,7 @@
                input
                (.referenceOutput options)
                (into #{} (.tags options))
-               (or datasets/EXAMPLE-SOURCE (aor-types/->ApiSource))
+               (or aor-types/OPERATION-SOURCE (aor-types/->ApiSource))
               ))
              (.thenApply
               (h/cf-function [{error aor-types/AGENTS-TOPOLOGY-NAME}]

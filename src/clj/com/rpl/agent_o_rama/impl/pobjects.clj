@@ -114,6 +114,7 @@
      :finish-time-millis Long
      :last-progress-time-millis Long
      :retry-num          Long
+     :source             InfoSource
      :stats              AgentInvokeStats
      :feedback           FEEDBACK-SCHEMA
      :human-requests     (set-schema NodeHumanInputRequest {:subindex? true})

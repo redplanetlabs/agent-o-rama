@@ -567,23 +567,25 @@
                                  (.getAgentClient agent-node (:agent-name target-spec))
                                  (.getAgentClient agent-node EVALUATOR-AGENT-NAME)))
                              targets)
+               source       (aor-types/->valid-ExperimentSource dataset-id id)
                initiate-fns
                (mapv
                 (fn [{:keys [target-spec input->args]} client]
                   (let [agent-name         (:agent-name target-spec)
                         parsed-input->args (mapv parse-input-spec input->args)]
                     (fn [input]
-                      (let [args (convert-input->args input parsed-input->args)]
-                        (if (aor-types/AgentTarget? target-spec)
-                          {:agent-name   agent-name
-                           :agent-invoke (apply c/agent-initiate client args)}
-                          {:agent-name   EVALUATOR-AGENT-NAME
-                           :agent-invoke (c/agent-initiate client
-                                                           (aor-types/->valid-ExperimentNodeInvoke
-                                                            agent-name
-                                                            (:node target-spec)
-                                                            args))})
-                      ))))
+                      (binding [aor-types/OPERATION-SOURCE source]
+                        (let [args (convert-input->args input parsed-input->args)]
+                          (if (aor-types/AgentTarget? target-spec)
+                            {:agent-name   agent-name
+                             :agent-invoke (apply c/agent-initiate client args)}
+                            {:agent-name   EVALUATOR-AGENT-NAME
+                             :agent-invoke (c/agent-initiate client
+                                                             (aor-types/->valid-ExperimentNodeInvoke
+                                                              agent-name
+                                                              (:node target-spec)
+                                                              args))})
+                        )))))
                 targets
                 clients)]
            (doseq [[result-id example-id] result+example-ids]
