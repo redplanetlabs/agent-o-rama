@@ -8,6 +8,7 @@ import com.rpl.agentorama.AgentsTopology;
 import com.rpl.agentorama.BuiltIn;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.agentorama.ops.RamaVoidFunction3;
+import com.rpl.rama.RamaSerializable;
 import com.rpl.rama.ops.RamaFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -33,80 +34,18 @@ import java.util.List;
 public class AggregationAgent {
 
   /** Input request for aggregation processing. */
-  public static class AggregationRequest {
-    private final List<Integer> data;
-    private final int chunkSize;
-
-    public AggregationRequest(List<Integer> data, int chunkSize) {
-      this.data = data;
-      this.chunkSize = chunkSize;
-    }
-
-    public List<Integer> getData() {
-      return data;
-    }
-
-    public int getChunkSize() {
-      return chunkSize;
-    }
-  }
+  public static record AggregationRequest(List<Integer> data, int chunkSize)
+      implements RamaSerializable {}
 
   /** Result of processing a single chunk. */
-  public static class ChunkResult {
-    private final List<Integer> originalChunk;
-    private final List<Integer> processedChunk;
-    private final int chunkSum;
-
-    public ChunkResult(List<Integer> originalChunk, List<Integer> processedChunk, int chunkSum) {
-      this.originalChunk = originalChunk;
-      this.processedChunk = processedChunk;
-      this.chunkSum = chunkSum;
-    }
-
-    public List<Integer> getOriginalChunk() {
-      return originalChunk;
-    }
-
-    public List<Integer> getProcessedChunk() {
-      return processedChunk;
-    }
-
-    public int getChunkSum() {
-      return chunkSum;
-    }
-  }
+  public static record ChunkResult(
+      List<Integer> originalChunk, List<Integer> processedChunk, int chunkSum)
+      implements RamaSerializable {}
 
   /** Final aggregated result. */
-  public static class AggregationResult {
-    private final int totalItems;
-    private final int totalSum;
-    private final int chunksProcessed;
-    private final List<ChunkResult> chunkResults;
-
-    public AggregationResult(
-        int totalItems, int totalSum, int chunksProcessed, List<ChunkResult> chunkResults) {
-      this.totalItems = totalItems;
-      this.totalSum = totalSum;
-      this.chunksProcessed = chunksProcessed;
-      this.chunkResults = chunkResults;
-    }
-
-    public int getTotalItems() {
-      return totalItems;
-    }
-
-    public int getTotalSum() {
-      return totalSum;
-    }
-
-    public int getChunksProcessed() {
-      return chunksProcessed;
-    }
-
-    public List<ChunkResult> getChunkResults() {
-      return chunkResults;
-    }
-  }
+  public static record AggregationResult(
+      int totalItems, int totalSum, int chunksProcessed, List<ChunkResult> chunkResults)
+      implements RamaSerializable {}
 
   /** Agent Module demonstrating aggregation functionality. */
   public static class AggregationModule extends AgentsModule {
@@ -130,8 +69,8 @@ public class AggregationAgent {
 
     @Override
     public Object invoke(AgentNode agentNode, AggregationRequest request) {
-      List<Integer> data = request.getData();
-      int chunkSize = request.getChunkSize();
+      List<Integer> data = request.data();
+      int chunkSize = request.chunkSize();
 
       // Create chunks from the data
       List<List<Integer>> chunks = new ArrayList<>();
@@ -177,13 +116,13 @@ public class AggregationAgent {
         AgentNode agentNode, List<ChunkResult> aggregatedResults, Object startNodeResult) {
       // Sort chunks by their first element to ensure consistent order
       List<ChunkResult> sortedResults = new ArrayList<>(aggregatedResults);
-      sortedResults.sort(Comparator.comparing(result -> result.getOriginalChunk().get(0)));
+      sortedResults.sort(Comparator.comparing(result -> result.originalChunk().get(0)));
 
       int totalSum = 0;
       int totalItems = 0;
       for (ChunkResult result : sortedResults) {
-        totalSum += result.getChunkSum();
-        totalItems += result.getOriginalChunk().size();
+        totalSum += result.chunkSum();
+        totalItems += result.originalChunk().size();
       }
 
       AggregationResult finalResult =
@@ -219,17 +158,17 @@ public class AggregationAgent {
       AggregationResult result1 =
           (AggregationResult) agent.invoke(new AggregationRequest(testData, 5));
       System.out.println("Result 1:");
-      System.out.println("  Total items: " + result1.getTotalItems());
-      System.out.println("  Total sum: " + result1.getTotalSum());
-      System.out.println("  Chunks processed: " + result1.getChunksProcessed());
+      System.out.println("  Total items: " + result1.totalItems());
+      System.out.println("  Total sum: " + result1.totalSum());
+      System.out.println("  Chunks processed: " + result1.chunksProcessed());
 
       System.out.println("\n--- Processing with chunk size 3 ---");
       AggregationResult result2 =
           (AggregationResult) agent.invoke(new AggregationRequest(testData, 3));
       System.out.println("Result 2:");
-      System.out.println("  Total items: " + result2.getTotalItems());
-      System.out.println("  Total sum: " + result2.getTotalSum());
-      System.out.println("  Chunks processed: " + result2.getChunksProcessed());
+      System.out.println("  Total items: " + result2.totalItems());
+      System.out.println("  Total sum: " + result2.totalSum());
+      System.out.println("  Chunks processed: " + result2.chunksProcessed());
 
       System.out.println("\nNotice how:");
       System.out.println("- Work is distributed in parallel to multiple nodes");

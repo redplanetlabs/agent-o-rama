@@ -7,6 +7,7 @@ import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentsModule;
 import com.rpl.agentorama.AgentsTopology;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
+import com.rpl.rama.RamaSerializable;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.util.ArrayList;
@@ -31,92 +32,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class StreamingAgent {
 
   /** Request object for data processing parameters. */
-  public static class ProcessingRequest {
-    private final int dataSize;
-    private final int chunkSize;
-
-    public ProcessingRequest(int dataSize, int chunkSize) {
-      this.dataSize = dataSize;
-      this.chunkSize = chunkSize;
-    }
-
-    public int getDataSize() {
-      return dataSize;
-    }
-
-    public int getChunkSize() {
-      return chunkSize;
-    }
-  }
+  public static record ProcessingRequest(int dataSize, int chunkSize) implements RamaSerializable {}
 
   /** Streaming chunk data emitted during processing. */
-  public static class ChunkData {
-    private final int chunkNumber;
-    private final int itemsProcessed;
-    private final double progress;
-    private final List<Integer> items;
-
-    public ChunkData(int chunkNumber, int itemsProcessed, double progress, List<Integer> items) {
-      this.chunkNumber = chunkNumber;
-      this.itemsProcessed = itemsProcessed;
-      this.progress = progress;
-      this.items = new ArrayList<>(items);
-    }
-
-    public int getChunkNumber() {
-      return chunkNumber;
-    }
-
-    public int getItemsProcessed() {
-      return itemsProcessed;
-    }
-
-    public double getProgress() {
-      return progress;
-    }
-
-    public List<Integer> getItems() {
-      return items;
-    }
-  }
+  public static record ChunkData(
+      int chunkNumber, int itemsProcessed, double progress, List<Integer> items)
+      implements RamaSerializable {}
 
   /** Final result object returned after processing completion. */
-  public static class ProcessingResult {
-    private final String action;
-    private final int totalItems;
-    private final int totalChunks;
-    private final int chunkSize;
-    private final long completedAt;
-
-    public ProcessingResult(
-        String action, int totalItems, int totalChunks, int chunkSize, long completedAt) {
-      this.action = action;
-      this.totalItems = totalItems;
-      this.totalChunks = totalChunks;
-      this.chunkSize = chunkSize;
-      this.completedAt = completedAt;
-    }
-
-    public String getAction() {
-      return action;
-    }
-
-    public int getTotalItems() {
-      return totalItems;
-    }
-
-    public int getTotalChunks() {
-      return totalChunks;
-    }
-
-    public int getChunkSize() {
-      return chunkSize;
-    }
-
-    public long getCompletedAt() {
-      return completedAt;
-    }
-  }
+  public static record ProcessingResult(
+      String action, int totalItems, int totalChunks, int chunkSize, long completedAt)
+      implements RamaSerializable {}
 
   /** Agent Module demonstrating streaming functionality. */
   public static class StreamingAgentModule extends AgentsModule {
@@ -133,8 +59,8 @@ public class StreamingAgent {
 
     @Override
     public void invoke(AgentNode agentNode, ProcessingRequest request) {
-      int dataSize = request.getDataSize();
-      int chunkSize = request.getChunkSize();
+      int dataSize = request.dataSize();
+      int chunkSize = request.chunkSize();
       int totalChunks = (int) Math.ceil((double) dataSize / chunkSize);
 
       System.out.printf("Processing %d items in chunks of %d%n", dataSize, chunkSize);
@@ -203,7 +129,7 @@ public class StreamingAgent {
               chunksReceived.incrementAndGet();
               System.out.printf(
                   "Received chunk %d: %d items (%.1f%% complete)%n",
-                  chunk.getChunkNumber(), chunk.getItemsProcessed(), chunk.getProgress() * 100.0);
+                  chunk.chunkNumber(), chunk.itemsProcessed(), chunk.progress() * 100.0);
             }
           });
 
@@ -211,9 +137,9 @@ public class StreamingAgent {
       ProcessingResult result = (ProcessingResult) agent.result(invoke);
 
       System.out.println("\nFinal result:");
-      System.out.println("  Total items processed: " + result.getTotalItems());
-      System.out.println("  Total chunks: " + result.getTotalChunks());
-      System.out.println("  Chunk size: " + result.getChunkSize());
+      System.out.println("  Total items processed: " + result.totalItems());
+      System.out.println("  Total chunks: " + result.totalChunks());
+      System.out.println("  Chunk size: " + result.chunkSize());
       System.out.println("  Chunks received via streaming: " + chunksReceived.get());
 
       System.out.println("\nNotice how:");
