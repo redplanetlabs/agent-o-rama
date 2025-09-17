@@ -51,6 +51,22 @@
 ;; TODO: use flexible serialization for these to ease updating the
 ;; library? or just some of them?
 
+
+(defprotocol EvalTarget)
+
+(drp/defrecord+ AgentInvokeImpl
+  [task-id :- Long
+   agent-invoke-id :- UUID]
+  AgentInvoke
+  (getTaskId [this] task-id)
+  (getAgentInvokeId [this] agent-invoke-id)
+  EvalTarget)
+
+(drp/defrecord+ EvalNodeTarget
+  [task-id :- Long
+   invoke-id :- UUID]
+  EvalTarget)
+
 ;; Sources
 
 (definterface InfoSource
@@ -110,20 +126,6 @@
   AgentComplete
   (getResult [this] val))
 
-(defprotocol EvalTarget)
-
-(drp/defrecord+ AgentInvokeImpl
-  [task-id :- Long
-   agent-invoke-id :- UUID]
-  AgentInvoke
-  (getTaskId [this] task-id)
-  (getAgentInvokeId [this] agent-invoke-id)
-  EvalTarget)
-
-(drp/defrecord+ EvalNodeTarget
-  [task-id :- Long
-   invoke-id :- UUID]
-  EvalTarget)
 
 (drp/defrecord+ AgentNode
   [node :- (s/cond-pre Node NodeAggStart NodeAgg)
