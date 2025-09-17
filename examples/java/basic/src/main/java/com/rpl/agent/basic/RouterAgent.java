@@ -8,6 +8,8 @@ import com.rpl.agentorama.AgentsTopology;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Java example demonstrating conditional routing between different nodes in an agent graph.
@@ -25,30 +27,6 @@ import com.rpl.rama.test.LaunchConfig;
  * self-containment.
  */
 public class RouterAgent {
-
-  /** Message processing result with priority and content. */
-  public static class ProcessedMessage {
-    private final String priority;
-    private final String message;
-
-    public ProcessedMessage(String priority, String message) {
-      this.priority = priority;
-      this.message = message;
-    }
-
-    public String getPriority() {
-      return priority;
-    }
-
-    public String getMessage() {
-      return message;
-    }
-
-    @Override
-    public String toString() {
-      return String.format("[%s] %s", priority, message);
-    }
-  }
 
   /** Agent Module that routes messages to different processing nodes based on content. */
   public static class RouterAgentModule extends AgentsModule {
@@ -88,7 +66,9 @@ public class RouterAgent {
     @Override
     public void invoke(AgentNode agentNode, String message) {
       String content = message.substring(7); // remove "urgent:" prefix
-      ProcessedMessage processed = new ProcessedMessage("HIGH", content);
+      Map<String, Object> processed = new HashMap<>();
+      processed.put("priority", "HIGH");
+      processed.put("message", content);
       agentNode.emit("finalize", processed);
     }
   }
@@ -98,17 +78,22 @@ public class RouterAgent {
 
     @Override
     public void invoke(AgentNode agentNode, String message) {
-      ProcessedMessage processed = new ProcessedMessage("NORMAL", message);
+      Map<String, Object> processed = new HashMap<>();
+      processed.put("priority", "NORMAL");
+      processed.put("message", message);
       agentNode.emit("finalize", processed);
     }
   }
 
   /** Final node that creates the result from processed message. */
-  public static class FinalizeFunction implements RamaVoidFunction2<AgentNode, ProcessedMessage> {
+  public static class FinalizeFunction
+      implements RamaVoidFunction2<AgentNode, Map<String, Object>> {
 
     @Override
-    public void invoke(AgentNode agentNode, ProcessedMessage processed) {
-      String result = String.format("[%s] %s", processed.getPriority(), processed.getMessage());
+    public void invoke(AgentNode agentNode, Map<String, Object> processed) {
+      String priority = (String) processed.get("priority");
+      String message = (String) processed.get("message");
+      String result = String.format("[%s] %s", priority, message);
       agentNode.result(result);
     }
   }

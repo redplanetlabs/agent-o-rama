@@ -12,6 +12,8 @@ import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import dev.langchain4j.model.openai.OpenAiChatModel;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Scanner;
 
 /**
@@ -30,30 +32,6 @@ import java.util.Scanner;
  * self-containment.
  */
 public class HumanInputAgent {
-
-  /** Response object containing both AI response and user feedback. */
-  public static class ChatResponse {
-    private final String response;
-    private final boolean helpful;
-
-    public ChatResponse(String response, boolean helpful) {
-      this.response = response;
-      this.helpful = helpful;
-    }
-
-    public String getResponse() {
-      return response;
-    }
-
-    public boolean isHelpful() {
-      return helpful;
-    }
-
-    @Override
-    public String toString() {
-      return String.format("ChatResponse{response='%s', helpful=%s}", response, helpful);
-    }
-  }
 
   /** Agent Module demonstrating human input integration with AI models. */
   public static class HumanInputModule extends AgentsModule {
@@ -88,7 +66,12 @@ public class HumanInputAgent {
       // Ask human if response was helpful
       boolean helpful = isHumanHelpful(agentNode, response);
 
-      agentNode.result(new ChatResponse(response, helpful));
+      // Return result as HashMap
+      // Expected structure: {"response": String, "helpful": boolean}
+      Map<String, Object> result = new HashMap<>();
+      result.put("response", response);
+      result.put("helpful", helpful);
+      agentNode.result(result);
     }
 
     /** Ask user if the response was helpful and loop until valid y/n answer. */
@@ -156,10 +139,12 @@ public class HumanInputAgent {
         step = agent.nextStep(invoke);
       }
 
-      // Get final result
-      ChatResponse result = (ChatResponse) agent.result(invoke);
+      // Get final result as HashMap
+      @SuppressWarnings("unchecked")
+      Map<String, Object> result = (Map<String, Object>) agent.result(invoke);
       System.out.println("Final result:");
-      System.out.println(result);
+      System.out.println("Response: " + result.get("response"));
+      System.out.println("Helpful: " + result.get("helpful"));
 
       System.out.println("\nNotice how:");
       System.out.println("- Agents can request human input during execution");

@@ -7,6 +7,7 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
+import java.util.Map;
 import org.junit.Test;
 
 /**
@@ -18,13 +19,14 @@ import org.junit.Test;
  *   <li>declareKeyValueStore: Creating persistent key-value storage
  *   <li>getStore: Accessing stores from agent nodes
  *   <li>Store operations: get, put, update for persistent state
+ *   <li>HashMap usage for request and response data structures
  * </ul>
  */
 public class KeyValueStoreAgentTest {
 
   @Test
   public void testKeyValueStoreAgent() throws Exception {
-    // Tests basic key-value store operations
+    // Tests basic key-value store operations using HashMap
     try (InProcessCluster ipc = InProcessCluster.create()) {
       // Deploy the agent module
       KeyValueStoreAgent.KeyValueStoreModule module = new KeyValueStoreAgent.KeyValueStoreModule();
@@ -36,28 +38,28 @@ public class KeyValueStoreAgentTest {
       AgentClient agent = manager.getAgentClient("KeyValueStoreAgent");
 
       // Test SET operation
-      KeyValueStoreAgent.CounterRequest setRequest =
-          new KeyValueStoreAgent.CounterRequest(
-              "test-counter", KeyValueStoreAgent.CounterRequest.Operation.SET, 42L);
-      KeyValueStoreAgent.CounterResponse setResult =
-          (KeyValueStoreAgent.CounterResponse) agent.invoke(setRequest);
+      Map<String, Object> setRequest =
+          KeyValueStoreAgent.createCounterRequest(
+              "test-counter", KeyValueStoreAgent.Operation.SET, 42L);
+      @SuppressWarnings("unchecked")
+      Map<String, Object> setResult = (Map<String, Object>) agent.invoke(setRequest);
 
       assertNotNull("Set result should not be null", setResult);
-      assertEquals("Action should be set", "set", setResult.getAction());
-      assertEquals("Counter name should match", "test-counter", setResult.getCounter());
-      assertEquals("Value should be 42", (Long) 42L, setResult.getValue());
+      assertEquals("Action should be set", "set", setResult.get("action"));
+      assertEquals("Counter name should match", "test-counter", setResult.get("counter"));
+      assertEquals("Value should be 42", 42L, setResult.get("value"));
 
       // Test GET operation
-      KeyValueStoreAgent.CounterRequest getRequest =
-          new KeyValueStoreAgent.CounterRequest(
-              "test-counter", KeyValueStoreAgent.CounterRequest.Operation.GET, null);
-      KeyValueStoreAgent.CounterResponse getResult =
-          (KeyValueStoreAgent.CounterResponse) agent.invoke(getRequest);
+      Map<String, Object> getRequest =
+          KeyValueStoreAgent.createCounterRequest(
+              "test-counter", KeyValueStoreAgent.Operation.GET, null);
+      @SuppressWarnings("unchecked")
+      Map<String, Object> getResult = (Map<String, Object>) agent.invoke(getRequest);
 
       assertNotNull("Get result should not be null", getResult);
-      assertEquals("Action should be get", "get", getResult.getAction());
-      assertEquals("Counter name should match", "test-counter", getResult.getCounter());
-      assertEquals("Value should be 42", (Long) 42L, getResult.getValue());
+      assertEquals("Action should be get", "get", getResult.get("action"));
+      assertEquals("Counter name should match", "test-counter", getResult.get("counter"));
+      assertEquals("Value should be 42", 42L, getResult.get("value"));
     }
   }
 }

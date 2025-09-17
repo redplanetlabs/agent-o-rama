@@ -36,11 +36,11 @@ public class RouterAgentTest {
       AgentClient agent = manager.getAgentClient("RouterAgent");
 
       // Test with high priority message
-      String result = (String) agent.invoke("URGENT: System alert");
+      String result = (String) agent.invoke("urgent:System alert");
 
       assertNotNull("Result should not be null", result);
       assertTrue("Should contain HIGH priority", result.contains("[HIGH]"));
-      assertTrue("Should contain the message", result.contains("URGENT: System alert"));
+      assertTrue("Should contain the message", result.contains("System alert"));
     }
   }
 }

@@ -2,14 +2,15 @@ package com.rpl.agent.basic;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.Test;
 
 /**
@@ -45,19 +46,21 @@ public class AggregationAgentTest {
         testData.add(i); // [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
       }
 
-      AggregationAgent.AggregationRequest request =
-          new AggregationAgent.AggregationRequest(testData, 3);
-      AggregationAgent.AggregationResult result =
-          (AggregationAgent.AggregationResult) agent.invoke(request);
+      Map<String, Object> request = new HashMap<>();
+      request.put("data", testData);
+      request.put("chunkSize", 3);
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> result = (Map<String, Object>) agent.invoke(request);
 
       assertNotNull("Result should not be null", result);
-      assertEquals("Should process all 10 items", 10, result.totalItems());
-      assertEquals("Should create 4 chunks", 4, result.chunksProcessed());
+      assertEquals("Should process all 10 items", 10, result.get("totalItems"));
+      assertEquals("Should create 4 chunks", 4, result.get("chunksProcessed"));
 
       // Expected: chunks [1,2,3], [4,5,6], [7,8,9], [10]
       // Squared: [1,4,9], [16,25,36], [49,64,81], [100]
       // Sums: 14 + 77 + 194 + 100 = 385
-      assertEquals("Total sum should be correct", 385, result.totalSum());
+      assertEquals("Total sum should be correct", 385, result.get("totalSum"));
     }
   }
 }

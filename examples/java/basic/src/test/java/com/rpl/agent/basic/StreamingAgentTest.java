@@ -10,7 +10,9 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 
@@ -42,13 +44,14 @@ public class StreamingAgentTest {
       AgentClient agent = manager.getAgentClient("StreamingAgent");
 
       // Start agent execution with small numbers for testing
-      StreamingAgent.ProcessingRequest request =
-          new StreamingAgent.ProcessingRequest(10, 5); // 10 total items, chunk size 5
+      Map<String, Object> request = new HashMap<>();
+      request.put("dataSize", 10); // 10 total items
+      request.put("chunkSize", 5); // chunk size 5
       AgentInvoke invoke = agent.initiate(request);
 
       // Track chunks received via streaming
       AtomicInteger chunksReceived = new AtomicInteger(0);
-      List<StreamingAgent.ChunkData> receivedChunks = new ArrayList<>();
+      List<Map<String, Object>> receivedChunks = new ArrayList<>();
 
       // Subscribe to streaming chunks
       agent.stream(
@@ -56,15 +59,16 @@ public class StreamingAgentTest {
           "process-data",
           (allChunks, newChunks, reset, complete) -> {
             for (Object chunkObj : newChunks) {
-              StreamingAgent.ChunkData chunk = (StreamingAgent.ChunkData) chunkObj;
+              @SuppressWarnings("unchecked")
+              Map<String, Object> chunk = (Map<String, Object>) chunkObj;
               receivedChunks.add(chunk);
               chunksReceived.incrementAndGet();
             }
           });
 
       // Get final result
-      StreamingAgent.ProcessingResult result =
-          (StreamingAgent.ProcessingResult) agent.result(invoke);
+      @SuppressWarnings("unchecked")
+      Map<String, Object> result = (Map<String, Object>) agent.result(invoke);
 
       // Verify streaming chunks were emitted
       assertTrue("Should have received streaming chunks", chunksReceived.get() > 0);
@@ -72,9 +76,9 @@ public class StreamingAgentTest {
 
       // Verify final result
       assertNotNull("Final result should not be null", result);
-      assertEquals("Should process 10 items", 10, result.totalItems());
-      assertEquals("Should have chunk size 5", 5, result.chunkSize());
-      assertTrue("Should have total chunks", result.totalChunks() > 0);
+      assertEquals("Should process 10 items", 10, (int) result.get("totalItems"));
+      assertEquals("Should have chunk size 5", 5, (int) result.get("chunkSize"));
+      assertTrue("Should have total chunks", (Integer) result.get("totalChunks") > 0);
     }
   }
 }

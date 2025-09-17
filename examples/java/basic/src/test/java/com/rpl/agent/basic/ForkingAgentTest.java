@@ -2,12 +2,15 @@ package com.rpl.agent.basic;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.junit.Test;
 
 /**
@@ -37,16 +40,21 @@ public class ForkingAgentTest {
       AgentClient agent = manager.getAgentClient("ForkingAgent");
 
       // Test basic execution
-      ForkingAgent.ForkingInput input = new ForkingAgent.ForkingInput(4, 3);
-      ForkingAgent.ForkingResult result = (ForkingAgent.ForkingResult) agent.invoke(input);
+      Map<String, Object> input = new HashMap<>();
+      input.put("numbers", Arrays.asList(4, 3, 2));
+      input.put("operation", "sum");
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> result = (Map<String, Object>) agent.invoke(input);
 
       assertNotNull("Result should not be null", result);
-      assertEquals(
-          "Action should be calculation-complete", "calculation-complete", result.getAction());
-      assertEquals("Processed value should be 12", 12, result.getProcessedValue());
-      assertEquals("Squared should be 144", 144, result.getSquared());
-      assertEquals("Halved should be 6.0", 6.0, result.getHalved(), 0.01);
-      assertTrue("Result should be valid", result.isValid());
+
+      @SuppressWarnings("unchecked")
+      List<Integer> resultNumbers = (List<Integer>) result.get("numbers");
+      assertEquals("Numbers should match input", Arrays.asList(4, 3, 2), resultNumbers);
+      assertEquals("Operation should be sum", "sum", result.get("operation"));
+      assertEquals("Result should be 9", Integer.valueOf(9), result.get("result"));
+      assertNotNull("Processing time should be set", result.get("processingTime"));
     }
   }
 }

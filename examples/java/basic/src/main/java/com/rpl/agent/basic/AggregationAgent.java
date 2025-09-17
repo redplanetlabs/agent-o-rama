@@ -8,13 +8,14 @@ import com.rpl.agentorama.AgentsTopology;
 import com.rpl.agentorama.BuiltIn;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.agentorama.ops.RamaVoidFunction3;
-import com.rpl.rama.RamaSerializable;
 import com.rpl.rama.ops.RamaFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Java example demonstrating fan-out/fan-in aggregation patterns with aggStartNode and aggNode.
@@ -32,20 +33,6 @@ import java.util.List;
  * self-containment.
  */
 public class AggregationAgent {
-
-  /** Input request for aggregation processing. */
-  public static record AggregationRequest(List<Integer> data, int chunkSize)
-      implements RamaSerializable {}
-
-  /** Result of processing a single chunk. */
-  public static record ChunkResult(
-      List<Integer> originalChunk, List<Integer> processedChunk, int chunkSum)
-      implements RamaSerializable {}
-
-  /** Final aggregated result. */
-  public static record AggregationResult(
-      int totalItems, int totalSum, int chunksProcessed, List<ChunkResult> chunkResults)
-      implements RamaSerializable {}
 
   /** Agent Module demonstrating aggregation functionality. */
   public static class AggregationModule extends AgentsModule {
@@ -65,12 +52,13 @@ public class AggregationAgent {
 
   /** Aggregation start function that distributes work to parallel processors. */
   public static class DistributeWorkFunction
-      implements RamaFunction2<AgentNode, AggregationRequest, Object> {
+      implements RamaFunction2<AgentNode, Map<String, Object>, Object> {
 
     @Override
-    public Object invoke(AgentNode agentNode, AggregationRequest request) {
-      List<Integer> data = request.data();
-      int chunkSize = request.chunkSize();
+    @SuppressWarnings("unchecked")
+    public Object invoke(AgentNode agentNode, Map<String, Object> request) {
+      List<Integer> data = (List<Integer>) request.get("data");
+      int chunkSize = (Integer) request.get("chunkSize");
 
       // Create chunks from the data
       List<List<Integer>> chunks = new ArrayList<>();
@@ -102,31 +90,40 @@ public class AggregationAgent {
         chunkSum += squared;
       }
 
-      ChunkResult result = new ChunkResult(chunk, processedChunk, chunkSum);
+      Map<String, Object> result = new HashMap<>();
+      result.put("originalChunk", chunk);
+      result.put("processedChunk", processedChunk);
+      result.put("chunkSum", chunkSum);
+
       agentNode.emit("collect-results", result);
     }
   }
 
   /** Function that aggregates all results using built-in vector aggregator. */
   public static class CollectResultsFunction
-      implements RamaVoidFunction3<AgentNode, List<ChunkResult>, Object> {
+      implements RamaVoidFunction3<AgentNode, List<Map<String, Object>>, Object> {
 
     @Override
+    @SuppressWarnings("unchecked")
     public void invoke(
-        AgentNode agentNode, List<ChunkResult> aggregatedResults, Object startNodeResult) {
+        AgentNode agentNode, List<Map<String, Object>> aggregatedResults, Object startNodeResult) {
       // Sort chunks by their first element to ensure consistent order
-      List<ChunkResult> sortedResults = new ArrayList<>(aggregatedResults);
-      sortedResults.sort(Comparator.comparing(result -> result.originalChunk().get(0)));
+      List<Map<String, Object>> sortedResults = new ArrayList<>(aggregatedResults);
+      sortedResults.sort(
+          Comparator.comparing(result -> ((List<Integer>) result.get("originalChunk")).get(0)));
 
       int totalSum = 0;
       int totalItems = 0;
-      for (ChunkResult result : sortedResults) {
-        totalSum += result.chunkSum();
-        totalItems += result.originalChunk().size();
+      for (Map<String, Object> result : sortedResults) {
+        totalSum += (Integer) result.get("chunkSum");
+        totalItems += ((List<Integer>) result.get("originalChunk")).size();
       }
 
-      AggregationResult finalResult =
-          new AggregationResult(totalItems, totalSum, sortedResults.size(), sortedResults);
+      Map<String, Object> finalResult = new HashMap<>();
+      finalResult.put("totalItems", totalItems);
+      finalResult.put("totalSum", totalSum);
+      finalResult.put("chunksProcessed", sortedResults.size());
+      finalResult.put("chunkResults", sortedResults);
 
       agentNode.result(finalResult);
     }
@@ -155,20 +152,28 @@ public class AggregationAgent {
       }
 
       System.out.println("\n--- Processing with chunk size 5 ---");
-      AggregationResult result1 =
-          (AggregationResult) agent.invoke(new AggregationRequest(testData, 5));
+      Map<String, Object> request1 = new HashMap<>();
+      request1.put("data", testData);
+      request1.put("chunkSize", 5);
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> result1 = (Map<String, Object>) agent.invoke(request1);
       System.out.println("Result 1:");
-      System.out.println("  Total items: " + result1.totalItems());
-      System.out.println("  Total sum: " + result1.totalSum());
-      System.out.println("  Chunks processed: " + result1.chunksProcessed());
+      System.out.println("  Total items: " + result1.get("totalItems"));
+      System.out.println("  Total sum: " + result1.get("totalSum"));
+      System.out.println("  Chunks processed: " + result1.get("chunksProcessed"));
 
       System.out.println("\n--- Processing with chunk size 3 ---");
-      AggregationResult result2 =
-          (AggregationResult) agent.invoke(new AggregationRequest(testData, 3));
+      Map<String, Object> request2 = new HashMap<>();
+      request2.put("data", testData);
+      request2.put("chunkSize", 3);
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> result2 = (Map<String, Object>) agent.invoke(request2);
       System.out.println("Result 2:");
-      System.out.println("  Total items: " + result2.totalItems());
-      System.out.println("  Total sum: " + result2.totalSum());
-      System.out.println("  Chunks processed: " + result2.chunksProcessed());
+      System.out.println("  Total items: " + result2.get("totalItems"));
+      System.out.println("  Total sum: " + result2.get("totalSum"));
+      System.out.println("  Chunks processed: " + result2.get("chunksProcessed"));
 
       System.out.println("\nNotice how:");
       System.out.println("- Work is distributed in parallel to multiple nodes");

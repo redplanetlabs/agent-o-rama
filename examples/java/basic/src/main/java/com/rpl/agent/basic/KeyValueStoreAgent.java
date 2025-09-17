@@ -10,6 +10,8 @@ import com.rpl.agentorama.store.KeyValueStore;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Java example demonstrating key-value store operations for persistent agent state.
@@ -25,134 +27,43 @@ import java.time.Instant;
  *   <li>Persistent state across agent invocations
  * </ul>
  *
- * <p>All required classes are defined as nested classes within this single file for simplicity and
- * self-containment.
+ * <p>Uses HashMap for request and response data structures with keys:
+ *
+ * <ul>
+ *   <li>Request: "operation" (String), "counterName" (String), "value" (Long)
+ *   <li>Response: "action" (String), "counter" (String), "value" (Long), "previousValue" (Long),
+ *       "newValue" (Long), "addedValue" (Long), "timestamp" (Long)
+ * </ul>
  */
 public class KeyValueStoreAgent {
 
-  /** Request object for counter operations. */
-  public static class CounterRequest {
-    private final String counterName;
-    private final Operation operation;
-    private final Long value;
-
-    public CounterRequest(String counterName, Operation operation, Long value) {
-      this.counterName = counterName;
-      this.operation = operation;
-      this.value = value;
-    }
-
-    public String getCounterName() {
-      return counterName;
-    }
-
-    public Operation getOperation() {
-      return operation;
-    }
-
-    public Long getValue() {
-      return value;
-    }
-
-    public enum Operation {
-      GET,
-      INCREMENT,
-      SET,
-      UPDATE
-    }
+  /** Available counter operations. */
+  public enum Operation {
+    GET,
+    INCREMENT,
+    SET,
+    UPDATE
   }
 
-  /** Response object for counter operations. */
-  public static class CounterResponse {
-    private final String action;
-    private final String counter;
-    private final Long value;
-    private final Long previousValue;
-    private final Long newValue;
-    private final Long addedValue;
-    private final long processedAt;
-
-    private CounterResponse(Builder builder) {
-      this.action = builder.action;
-      this.counter = builder.counter;
-      this.value = builder.value;
-      this.previousValue = builder.previousValue;
-      this.newValue = builder.newValue;
-      this.addedValue = builder.addedValue;
-      this.processedAt = builder.processedAt;
+  /** Helper method to create a counter request HashMap. */
+  public static Map<String, Object> createCounterRequest(
+      String counterName, Operation operation, Long value) {
+    Map<String, Object> request = new HashMap<>();
+    request.put("counterName", counterName);
+    request.put("operation", operation.toString());
+    if (value != null) {
+      request.put("value", value);
     }
+    return request;
+  }
 
-    public static class Builder {
-      private String action;
-      private String counter;
-      private Long value;
-      private Long previousValue;
-      private Long newValue;
-      private Long addedValue;
-      private long processedAt = Instant.now().toEpochMilli();
-
-      public Builder action(String action) {
-        this.action = action;
-        return this;
-      }
-
-      public Builder counter(String counter) {
-        this.counter = counter;
-        return this;
-      }
-
-      public Builder value(Long value) {
-        this.value = value;
-        return this;
-      }
-
-      public Builder previousValue(Long previousValue) {
-        this.previousValue = previousValue;
-        return this;
-      }
-
-      public Builder newValue(Long newValue) {
-        this.newValue = newValue;
-        return this;
-      }
-
-      public Builder addedValue(Long addedValue) {
-        this.addedValue = addedValue;
-        return this;
-      }
-
-      public CounterResponse build() {
-        return new CounterResponse(this);
-      }
-    }
-
-    public String getAction() {
-      return action;
-    }
-
-    public String getCounter() {
-      return counter;
-    }
-
-    public Long getValue() {
-      return value;
-    }
-
-    public Long getPreviousValue() {
-      return previousValue;
-    }
-
-    public Long getNewValue() {
-      return newValue;
-    }
-
-    public Long getAddedValue() {
-      return addedValue;
-    }
-
-    public long getProcessedAt() {
-      return processedAt;
-    }
+  /** Helper method to create a counter response HashMap with common fields. */
+  public static Map<String, Object> createCounterResponse(String action, String counterName) {
+    Map<String, Object> response = new HashMap<>();
+    response.put("action", action);
+    response.put("counter", counterName);
+    response.put("timestamp", Instant.now().toEpochMilli());
+    return response;
   }
 
   /** Agent Module demonstrating key-value store usage. */
@@ -171,24 +82,23 @@ public class KeyValueStoreAgent {
 
   /** Node function that manages counter operations using the key-value store. */
   public static class ManageCounterFunction
-      implements RamaVoidFunction2<AgentNode, CounterRequest> {
+      implements RamaVoidFunction2<AgentNode, Map<String, Object>> {
 
     @Override
-    public void invoke(AgentNode agentNode, CounterRequest request) {
+    public void invoke(AgentNode agentNode, Map<String, Object> request) {
       KeyValueStore<String, Long> countersStore = agentNode.getStore("$$counters");
-      String counterName = request.getCounterName();
+      String counterName = (String) request.get("counterName");
+      String operationStr = (String) request.get("operation");
+      Operation operation = Operation.valueOf(operationStr);
+      Long value = (Long) request.get("value");
 
-      CounterResponse result;
+      Map<String, Object> result;
 
-      switch (request.getOperation()) {
+      switch (operation) {
         case GET:
           Long currentValue = countersStore.get(counterName);
-          result =
-              new CounterResponse.Builder()
-                  .action("get")
-                  .counter(counterName)
-                  .value(currentValue)
-                  .build();
+          result = createCounterResponse("get", counterName);
+          result.put("value", currentValue);
           break;
 
         case INCREMENT:
@@ -196,51 +106,39 @@ public class KeyValueStoreAgent {
           if (current == null) current = 0L;
           Long newValue = current + 1;
           countersStore.put(counterName, newValue);
-          result =
-              new CounterResponse.Builder()
-                  .action("increment")
-                  .counter(counterName)
-                  .previousValue(current)
-                  .newValue(newValue)
-                  .build();
+          result = createCounterResponse("increment", counterName);
+          result.put("previousValue", current);
+          result.put("newValue", newValue);
           break;
 
         case SET:
-          countersStore.put(counterName, request.getValue());
-          result =
-              new CounterResponse.Builder()
-                  .action("set")
-                  .counter(counterName)
-                  .value(request.getValue())
-                  .build();
+          countersStore.put(counterName, value);
+          result = createCounterResponse("set", counterName);
+          result.put("value", value);
           break;
 
         case UPDATE:
           Long currentVal = countersStore.get(counterName);
           if (currentVal == null) currentVal = 0L;
-          Long updatedValue = currentVal + request.getValue();
-          countersStore.update(counterName, v -> (v == null ? 0L : v) + request.getValue());
-          result =
-              new CounterResponse.Builder()
-                  .action("update")
-                  .counter(counterName)
-                  .previousValue(currentVal)
-                  .addedValue(request.getValue())
-                  .newValue(updatedValue)
-                  .build();
+          Long updatedValue = currentVal + value;
+          countersStore.update(counterName, v -> (v == null ? 0L : v) + value);
+          result = createCounterResponse("update", counterName);
+          result.put("previousValue", currentVal);
+          result.put("addedValue", value);
+          result.put("newValue", updatedValue);
           break;
 
         default:
-          throw new IllegalArgumentException("Unknown operation: " + request.getOperation());
+          throw new IllegalArgumentException("Unknown operation: " + operation);
       }
 
       System.out.printf(
           "Counter '%s' %s: %s%n",
           counterName,
-          request.getOperation().toString().toLowerCase(),
-          result.getValue() != null
-              ? result.getValue()
-              : result.getNewValue() != null ? result.getNewValue() : "completed");
+          operation.toString().toLowerCase(),
+          result.get("value") != null
+              ? result.get("value")
+              : result.get("newValue") != null ? result.get("newValue") : "completed");
 
       agentNode.result(result);
     }
@@ -263,71 +161,77 @@ public class KeyValueStoreAgent {
 
       // Demonstrate different counter operations
       System.out.println("\n--- Setting initial counter value ---");
-      CounterResponse result1 =
-          (CounterResponse)
-              agent.invoke(new CounterRequest("page-views", CounterRequest.Operation.SET, 10L));
+      @SuppressWarnings("unchecked")
+      Map<String, Object> result1 =
+          (Map<String, Object>)
+              agent.invoke(createCounterRequest("page-views", Operation.SET, 10L));
       System.out.printf(
           "Result: action=%s, counter=%s, value=%d%n",
-          result1.getAction(), result1.getCounter(), result1.getValue());
+          result1.get("action"), result1.get("counter"), result1.get("value"));
 
       System.out.println("\n--- Getting current counter value ---");
-      CounterResponse result2 =
-          (CounterResponse)
-              agent.invoke(new CounterRequest("page-views", CounterRequest.Operation.GET, null));
+      @SuppressWarnings("unchecked")
+      Map<String, Object> result2 =
+          (Map<String, Object>)
+              agent.invoke(createCounterRequest("page-views", Operation.GET, null));
       System.out.printf(
           "Result: action=%s, counter=%s, value=%d%n",
-          result2.getAction(), result2.getCounter(), result2.getValue());
+          result2.get("action"), result2.get("counter"), result2.get("value"));
 
       System.out.println("\n--- Incrementing counter ---");
-      CounterResponse result3 =
-          (CounterResponse)
-              agent.invoke(
-                  new CounterRequest("page-views", CounterRequest.Operation.INCREMENT, null));
+      @SuppressWarnings("unchecked")
+      Map<String, Object> result3 =
+          (Map<String, Object>)
+              agent.invoke(createCounterRequest("page-views", Operation.INCREMENT, null));
       System.out.printf(
           "Result: action=%s, counter=%s, previous-value=%d, new-value=%d%n",
-          result3.getAction(),
-          result3.getCounter(),
-          result3.getPreviousValue(),
-          result3.getNewValue());
+          result3.get("action"),
+          result3.get("counter"),
+          result3.get("previousValue"),
+          result3.get("newValue"));
 
       System.out.println("\n--- Updating counter by adding value ---");
-      CounterResponse result4 =
-          (CounterResponse)
-              agent.invoke(new CounterRequest("page-views", CounterRequest.Operation.UPDATE, 5L));
+      @SuppressWarnings("unchecked")
+      Map<String, Object> result4 =
+          (Map<String, Object>)
+              agent.invoke(createCounterRequest("page-views", Operation.UPDATE, 5L));
       System.out.printf(
           "Result: action=%s, counter=%s, previous-value=%d, added-value=%d, new-value=%d%n",
-          result4.getAction(),
-          result4.getCounter(),
-          result4.getPreviousValue(),
-          result4.getAddedValue(),
-          result4.getNewValue());
+          result4.get("action"),
+          result4.get("counter"),
+          result4.get("previousValue"),
+          result4.get("addedValue"),
+          result4.get("newValue"));
 
       System.out.println("\n--- Working with different counter ---");
-      CounterResponse result5 =
-          (CounterResponse)
-              agent.invoke(
-                  new CounterRequest("api-calls", CounterRequest.Operation.INCREMENT, null));
+      @SuppressWarnings("unchecked")
+      Map<String, Object> result5 =
+          (Map<String, Object>)
+              agent.invoke(createCounterRequest("api-calls", Operation.INCREMENT, null));
       System.out.printf(
           "Result: action=%s, counter=%s, previous-value=%d, new-value=%d%n",
-          result5.getAction(),
-          result5.getCounter(),
-          result5.getPreviousValue(),
-          result5.getNewValue());
+          result5.get("action"),
+          result5.get("counter"),
+          result5.get("previousValue"),
+          result5.get("newValue"));
 
       System.out.println("\n--- Final state check ---");
-      CounterResponse result6 =
-          (CounterResponse)
-              agent.invoke(new CounterRequest("page-views", CounterRequest.Operation.GET, null));
-      CounterResponse result7 =
-          (CounterResponse)
-              agent.invoke(new CounterRequest("api-calls", CounterRequest.Operation.GET, null));
-      System.out.println("page-views final value: " + result6.getValue());
-      System.out.println("api-calls final value: " + result7.getValue());
+      @SuppressWarnings("unchecked")
+      Map<String, Object> result6 =
+          (Map<String, Object>)
+              agent.invoke(createCounterRequest("page-views", Operation.GET, null));
+      @SuppressWarnings("unchecked")
+      Map<String, Object> result7 =
+          (Map<String, Object>)
+              agent.invoke(createCounterRequest("api-calls", Operation.GET, null));
+      System.out.println("page-views final value: " + result6.get("value"));
+      System.out.println("api-calls final value: " + result7.get("value"));
 
       System.out.println("\nNotice how:");
       System.out.println("- Counter values persist across invocations");
       System.out.println("- Different counters maintain separate state");
       System.out.println("- Various store operations (get, put, update) work correctly");
+      System.out.println("- HashMap provides flexible key-value data structure");
     }
   }
 }
