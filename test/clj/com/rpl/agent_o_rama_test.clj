@@ -1952,7 +1952,7 @@
             !id2
             {:agg-invoke-id   nil
              :agg-input-count 3
-             :agent-id        0
+             :agent-id        ?agent-id
              :agg-start-res   nil
              :emits           []
              :agent-task-id   ?agent-task-id

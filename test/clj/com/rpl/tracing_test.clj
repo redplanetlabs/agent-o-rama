@@ -1020,7 +1020,7 @@
           !id3
           {:started-agg?      true
            :agg-invoke-id     !agg1
-           :agent-id          0
+           :agent-id          ?agent-id
            :emits
            [{:invoke-id      !id4
              :fork-invoke-id nil

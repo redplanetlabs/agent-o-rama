@@ -13,7 +13,9 @@
     PStateStore]
    [com.rpl.rama
     Depot
-    PState]))
+    PState]
+   [java.util
+    UUID]))
 
 (def KV :kv)
 (def DOC :doc)
@@ -22,7 +24,7 @@
   [pstate-name :- String
    agent-name :- String
    agent-task-id :- Long
-   agent-id :- Long
+   agent-id :- UUID
    retry-num :- Long
    mirror? :- Boolean
    pstate-client :- PState
