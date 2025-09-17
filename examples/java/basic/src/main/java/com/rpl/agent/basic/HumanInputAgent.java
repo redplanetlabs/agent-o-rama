@@ -11,6 +11,8 @@ import com.rpl.agentorama.HumanInputRequest;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
+import dev.langchain4j.model.chat.ChatModel;
+
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.util.HashMap;
 import java.util.Map;
@@ -38,14 +40,11 @@ public class HumanInputAgent {
 
     @Override
     protected void defineAgents(AgentsTopology topology) {
-      // Declare OpenAI API key from environment
-      topology.declareAgentObject("openai-api-key", System.getenv("OPENAI_API_KEY"));
-
       // Declare OpenAI model builder
       topology.declareAgentObjectBuilder(
           "openai",
           setup -> {
-            String apiKey = (String) setup.getAgentObject("openai-api-key");
+            String apiKey = System.getenv("OPENAI_API_KEY");
             return OpenAiChatModel.builder().apiKey(apiKey).modelName("gpt-4o-mini").build();
           });
 
@@ -58,7 +57,8 @@ public class HumanInputAgent {
 
     @Override
     public void invoke(AgentNode agentNode, String userMessage) {
-      OpenAiChatModel openai = (OpenAiChatModel) agentNode.getAgentObject("openai");
+      // NOTE you can not use OpenAiChatModel as the type here
+      ChatModel openai = (ChatModel) agentNode.getAgentObject("openai");
 
       // Get AI response
       String response = openai.chat(userMessage);
@@ -95,6 +95,9 @@ public class HumanInputAgent {
 
   public static void main(String[] args) throws Exception {
     String apiKey = System.getenv("OPENAI_API_KEY");
+    if (apiKey == null) {
+      apiKey = System.getProperty("OPENAI_API_KEY");
+    }
     if (apiKey == null || apiKey.trim().isEmpty()) {
       System.out.println("Human Input Agent Example:");
       System.out.println("OPENAI_API_KEY environment variable not set.");
@@ -110,7 +113,7 @@ public class HumanInputAgent {
 
       // Launch the agent module
       HumanInputModule module = new HumanInputModule();
-      ipc.launchModule(module, new LaunchConfig(4, 2));
+      ipc.launchModule(module, new LaunchConfig(1, 1));
 
       // Get agent manager and client
       String moduleName = module.getModuleName();

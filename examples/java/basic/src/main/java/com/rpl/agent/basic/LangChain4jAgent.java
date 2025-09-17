@@ -8,6 +8,7 @@ import com.rpl.agentorama.AgentsTopology;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 
 /**
@@ -37,16 +38,16 @@ public class LangChain4jAgent {
 
       // Build OpenAI chat model with configuration
       topology.declareAgentObjectBuilder(
-          "openai-model",
-          setup -> {
-            String apiKey = (String) setup.getAgentObject("openai-api-key");
-            return OpenAiChatModel.builder()
-                .apiKey(apiKey)
-                .modelName("gpt-4o-mini")
-                .temperature(0.7)
-                .maxTokens(500)
-                .build();
-          });
+        "openai-model",
+        setup -> {
+          String apiKey = (String) setup.getAgentObject("openai-api-key");
+          return OpenAiChatModel.builder()
+              .apiKey(apiKey)
+              .modelName("gpt-4o-mini")
+              .temperature(0.7)
+              .maxTokens(500)
+              .build();
+        });
 
       topology.newAgent("LangChain4jAgent").node("chat", null, new ChatFunction());
     }
@@ -57,7 +58,8 @@ public class LangChain4jAgent {
 
     @Override
     public void invoke(AgentNode agentNode, String userMessage) {
-      OpenAiChatModel model = (OpenAiChatModel) agentNode.getAgentObject("openai-model");
+      // NOTE you can not use OpenAiChatModel as the type here
+      ChatModel model = (ChatModel) agentNode.getAgentObject("openai-model");
 
       // Send chat request to OpenAI using simple API
       String responseText = model.chat(userMessage);
