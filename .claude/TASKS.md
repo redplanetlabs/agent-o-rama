@@ -132,6 +132,8 @@ Include REFINE to refine the spec
 - [x] Fix the compile errors in the basic java examples in @examples/java/basic
        - `mvn package` can be used to compile them
 
+- [ ] Add missing tests for the basic java examples in @examples/java/basic
+
 - [ ] update the aggregation-agent example to show the return value of
       agg-start node being passed as last arg to agg-node
 
