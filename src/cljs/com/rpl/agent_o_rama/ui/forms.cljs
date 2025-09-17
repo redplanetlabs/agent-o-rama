@@ -235,8 +235,10 @@
              (when form-id
                ($ ModalFormContent {:form-id form-id :modal-data data}))
 
+             ;; Wrap component in proper scrollable container
              (when (:component data)
-               (:component data))))
+               ($ :div {:className "flex-1 min-h-0 overflow-y-auto"}
+                  (:component data)))))
        (.-body js/document)))))
 
 (defn required [value] (when (str/blank? value) "This field is required"))
