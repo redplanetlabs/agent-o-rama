@@ -238,9 +238,7 @@
           (throw
            (ex-info (str "Invalid "
                          (when-not (:is-valid? input-result)
-                                     (str "Input: " (:validation-error input-result)
-                                          "Schema: " (:input-json-schema schemas)))
+                           (str "Input schema:" (:input-json-schema schemas)))
                          (when-not (:is-valid? output-result)
-                           (str "Output: " (:validation-error output-result)
-                                "Schema: " (:output-json-schema schemas))))
+                           (str "Output schema" (:output-json-schema schemas))))
                     {})))))))
