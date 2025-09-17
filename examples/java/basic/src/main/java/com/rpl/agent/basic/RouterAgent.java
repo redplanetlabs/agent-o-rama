@@ -9,6 +9,7 @@ import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -36,7 +37,7 @@ public class RouterAgent {
       topology
           .newAgent("RouterAgent")
           // Router node: decides which processing node to send to
-          .node("route", new String[] {"handle-urgent", "handle-default"}, new RouteFunction())
+          .node("route", List.of("handle-urgent", "handle-default"), new RouteFunction())
           // Urgent message handler
           .node("handle-urgent", "finalize", new HandleUrgentFunction())
           // Default message handler

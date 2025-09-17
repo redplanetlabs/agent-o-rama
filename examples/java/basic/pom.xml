@@ -80,6 +80,9 @@
   </dependencies>
 
   <build>
+    <outputDirectory>target/classes</outputDirectory>
+    <testOutputDirectory>target/test-classes</testOutputDirectory>
+
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

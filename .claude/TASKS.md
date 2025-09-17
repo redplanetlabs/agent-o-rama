@@ -144,7 +144,7 @@ Include REFINE to refine the spec
 		- no need to test edge conditions
 		- one test per agent
 
-- [ ] for the basic java examples in @examples/java/basic:
+- [x] for the basic java examples in @examples/java/basic:
        - the types used for node arguments, and results should be replaced
          with HashMap instances.
 
@@ -156,5 +156,16 @@ Include REFINE to refine the spec
        protocol, like lc4j messages but someone could make any type
        editable by implementing json-freeze* and json-thaw* ok, I'll
        create an example with that
+
+- [ ] Generate questions about the project:
+        - Analyse the project, the glossary and user guides
+		- generate questions from the perspectives of:
+		   - a system architect
+		   - a developer
+		   - a devops
+		- generate questions at these levels:
+		   - begginer
+		   - intermediate
+		   - advanced
 
 # Large
