@@ -155,57 +155,101 @@
           ($ :span.font-medium.text-gray-600 label)
           ($ :span.font-semibold (format-metric-value metric-value))))))
 
+(defui CellContent [{:keys [content truncated? on-expand]}]
+  (let [content-str (common/pp content)
+        is-long? (> (count content-str) 100)]
+    ($ :div.relative.group
+       ($ :div {:className (if truncated? "max-w-xs truncate" "max-w-lg")}
+          content-str)
+       (when (and is-long? truncated?)
+         ($ :button.absolute.top-0.right-0.opacity-0.group-hover:opacity-100.transition-opacity.bg-blue-500.text-white.rounded.text-xs.px-2.py-1.hover:bg-blue-600
+            {:onClick #(on-expand content-str)
+             :title "Expand in modal"}
+            "↗")))))
+
+(defui ContentModal [{:keys [content title]}]
+  ($ :div.p-6.space-y-4
+     ($ :h4.text-lg.font-medium.text-gray-900.mb-4 (or title "Content"))
+     ($ :div.bg-gray-50.p-4.rounded.border.max-h-96.overflow-auto
+        ($ :pre.text-sm.font-mono.whitespace-pre-wrap content))))
+
 (defui ResultsTable [{:keys [results target module-id]}]
-  ($ :div
-     ($ :h3.text-xl.font-bold.mb-4 "Detailed Results")
-     ($ :div {:className (:container common/table-classes)}
-        ($ :table {:className (:table common/table-classes)}
-           ($ :thead {:className (:thead common/table-classes)}
-              ($ :tr
-                 ($ :th {:className (:th common/table-classes)} "Input")
-                 ($ :th {:className (:th common/table-classes)} "Reference Output")
-                 ($ :th {:className (:th common/table-classes)} "Output")))
-           ($ :tbody
-              (for [run results
-                    :let [evals (:evals run)
-                          all-metric-keys (mapcat keys (vals evals))
-                          metric-frequencies (frequencies all-metric-keys)
-                          duplicate-keys (->> metric-frequencies (filter (fn [[_ v]] (> v 1))) (map first) set)]]
-                ($ :tr.border-b {:key (:example-id run)}
-                   ($ :td {:className (:td common/table-classes)}
-                      ($ :div.max-w-xs.truncate (common/pp (:input run)))
-                      (let [first-invoke (get-in run [:agent-initiates 0 :agent-invoke])]
-                        (if first-invoke
-                          ($ :div.mt-2
-                             ($ :a.text-indigo-600.hover:text-indigo-900
-                                {:href (rfe/href :agent/invocation-detail
-                                                 {:module-id module-id
-                                                  :agent-name (get-in run [:agent-initiates 0 :agent-name])
-                                                  :invoke-id (str (:task-id first-invoke) "-" (:agent-invoke-id first-invoke))})
-                                 :target "_blank"}
-                                "View Trace"))
-                          ($ :div.mt-2 ($ :span.text-gray-400 "No trace")))))
-                   ($ :td {:className (:td common/table-classes)}
-                      ($ :div.max-w-xs.truncate (common/pp (:reference-output run))))
-                   ;; 0 is hardcoded, because this component only works for REGULAR experiments, not comparative ones
-                   (let [agent-result (get-in run [:agent-results 0])]
-                     ($ :td {:key i :className (:td common/table-classes)}
-                        ($ :div.max-w-xs
-                           ($ :div.truncate
-                              (if (:failure? (:result agent-result))
-                                ($ :div.space-y-2
-                                   (if-let [throwable (get-in agent-result [:result :val :throwable])]
-                                     ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
-                                        {:onClick #(state/dispatch [:modal/show :exception-detail
-                                                                    {:title "Error Details"
-                                                                     :component ($ ExceptionModal {:throwable throwable})}])}
-                                        "View Error")
-                                     ($ :span.text-red-500.font-semibold "FAIL")))
-                                (common/pp (:val (:result agent-result)))))
-                           ($ :div.mt-2
-                              ($ EvaluatorScores {:evals evals
-                                                  :failures (:eval-failures run)
-                                                  :duplicate-metric-keys duplicate-keys}))))))))))))
+  (let [[show-full-text? set-show-full-text] (uix/use-state false)]
+    ($ :div
+       ($ :div.flex.justify-between.items-center.mb-4
+          ($ :h3.text-xl.font-bold "Detailed Results")
+          ($ :label.flex.items-center.gap-2.text-sm.text-gray-600
+             ($ :input {:type "checkbox"
+                        :checked show-full-text?
+                        :onChange #(set-show-full-text (not show-full-text?))
+                        :className "rounded"})
+             "Show full text"))
+       ($ :div {:className (:container common/table-classes)}
+          ($ :table {:className (:table common/table-classes)}
+             ($ :thead {:className (:thead common/table-classes)}
+                ($ :tr
+                   ($ :th {:className (:th common/table-classes)} "Input")
+                   ($ :th {:className (:th common/table-classes)} "Reference Output")
+                   ($ :th {:className (:th common/table-classes)} "Output")))
+             ($ :tbody
+                (for [run results
+                      :let [evals (:evals run)
+                            all-metric-keys (mapcat keys (vals evals))
+                            metric-frequencies (frequencies all-metric-keys)
+                            duplicate-keys (->> metric-frequencies (filter (fn [[_ v]] (> v 1))) (map first) set)]]
+                  ($ :tr.border-b {:key (:example-id run)}
+                     ($ :td {:className (:td common/table-classes)}
+                        ($ CellContent {:content (:input run)
+                                        :truncated? (not show-full-text?)
+                                        :on-expand #(state/dispatch [:modal/show :content-detail
+                                                                     {:title "Input"
+                                                                      :component ($ ContentModal {:content % :title "Input"})}])})
+                        (let [first-invoke (get-in run [:agent-initiates 0 :agent-invoke])]
+                          (if first-invoke
+                            ($ :div.mt-2
+                               ($ :a.text-indigo-600.hover:text-indigo-900
+                                  {:href (rfe/href :agent/invocation-detail
+                                                   {:module-id module-id
+                                                    :agent-name (get-in run [:agent-initiates 0 :agent-name])
+                                                    :invoke-id (str (:task-id first-invoke) "-" (:agent-invoke-id first-invoke))})
+                                   :target "_blank"}
+                                  "View Trace"))
+                            ($ :div.mt-2 ($ :span.text-gray-400 "No trace")))))
+                     ($ :td {:className (:td common/table-classes)}
+                        ($ CellContent {:content (:reference-output run)
+                                        :truncated? (not show-full-text?)
+                                        :on-expand #(state/dispatch [:modal/show :content-detail
+                                                                     {:title "Reference Output"
+                                                                      :component ($ ContentModal {:content % :title "Reference Output"})}])}))
+                     ;; 0 is hardcoded, because this component only works for REGULAR experiments, not comparative ones
+                     (let [agent-result (get-in run [:agent-results 0])]
+                       ($ :td {:key i :className (:td common/table-classes)}
+                          ($ :div.max-w-xs
+                             ($ :div {:className (if show-full-text? "" "truncate")}
+                                (if (:failure? (:result agent-result))
+                                  ($ :div.space-y-2
+                                     (if-let [throwable (get-in agent-result [:result :val :throwable])]
+                                       ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
+                                          {:onClick #(state/dispatch [:modal/show :exception-detail
+                                                                      {:title "Error Details"
+                                                                       :component ($ ExceptionModal {:throwable throwable})}])}
+                                          "View Error")
+                                       ($ :span.text-red-500.font-semibold "FAIL")))
+                                  (let [output-content (common/pp (:val (:result agent-result)))
+                                        is-long? (> (count output-content) 100)]
+                                    ($ :div.relative.group
+                                       output-content
+                                       (when (and is-long? (not show-full-text?))
+                                         ($ :button.absolute.top-0.right-0.opacity-0.group-hover:opacity-100.transition-opacity.bg-blue-500.text-white.rounded.text-xs.px-2.py-1.hover:bg-blue-600
+                                            {:onClick #(state/dispatch [:modal/show :content-detail
+                                                                        {:title "Output"
+                                                                         :component ($ ContentModal {:content output-content :title "Output"})}])
+                                             :title "Expand in modal"}
+                                            "↗"))))))
+                             ($ :div.mt-2
+                                ($ EvaluatorScores {:evals evals
+                                                    :failures (:eval-failures run)
+                                                    :duplicate-metric-keys duplicate-keys})))))))))))))
 
 (defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
   (let [{:keys [data loading? error]}
