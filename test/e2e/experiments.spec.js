@@ -223,14 +223,13 @@ test.describe('Full Experiment Flow E2E Test', () => {
     // ---
     // PHASE 6: VERIFY EXPERIMENT RESULTS
     // ---
-    console.log('--- PHASE 6: VERIFY EXPERIMENT RESULTS ---');
-    const experimentRow = page.locator('table tbody tr').filter({ hasText: experimentName });
-    await expect(experimentRow).toBeVisible({ timeout: 15000 });
-
-    // Wait for completion and navigate to results
-    await expect(experimentRow.getByText('Completed')).toBeVisible({ timeout: 120000 });
+    // We navigate directly to the experiment detail page after starting
+    await expect(page).toHaveURL(/experiments\//, { timeout: 30000 });
+    // Wait until the page shows a status (Running or Completed)
+    await expect(page.getByText(/Running|Completed/)).toBeVisible({ timeout: 30000 });
+    // Then wait for completion
+    await expect(page.getByText('Completed')).toBeVisible({ timeout: 120000 });
     console.log('Experiment completed.');
-    await experimentRow.click();
     
     // Check for the evaluator results in the detailed view
     await expect(page.getByText('Detailed Results')).toBeVisible();

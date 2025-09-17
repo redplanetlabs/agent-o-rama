@@ -270,7 +270,8 @@
          {:query-key [:experiment-results module-id dataset-id experiment-id]
           :sente-event [:experiments/get-results {:module-id module-id
                                                   :dataset-id dataset-id
-                                                  :experiment-id experiment-id}]})
+                                                  :experiment-id experiment-id}]
+          :refetch-interval-ms 2000})
         ;; NEW: State for the details panel visibility
         [show-info? set-show-info] (uix/use-state false)]
 
