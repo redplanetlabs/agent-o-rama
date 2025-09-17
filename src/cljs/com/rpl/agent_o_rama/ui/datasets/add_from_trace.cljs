@@ -77,7 +77,6 @@
         output-template-field (forms/use-form-field form-id :output-template)
 
         ;; Props passed when the form was shown
-                ;; Props passed when the form was shown
         props (state/use-sub [:forms form-id])
         {:keys [module-id source-type source-args source-result source-emits]} props
 
@@ -88,6 +87,7 @@
         [preview-data set-preview-data] (uix/use-state nil)
         [preview-error set-preview-error] (uix/use-state nil)
         [dropdown-open? set-dropdown-open] (uix/use-state false)
+        [is-previewing set-is-previewing] (uix/use-state false)
 
         ;; Fetch available datasets
         {:keys [data loading?]} (queries/use-sente-query
@@ -104,6 +104,7 @@
      (fn []
        ;; Only run if we have required data
        (when (and debounced-dataset-id (not (str/blank? debounced-input-template)))
+         (set-is-previewing true)
          (sente/request! [:datasets/preview-from-trace
                           {:module-id module-id
                            :dataset-id debounced-dataset-id
@@ -111,15 +112,18 @@
                            :output-template debounced-output-template
                            :source-args source-args
                            :source-output output-template-source}]
-                         5000
+                         15000
                          (fn [reply]
-                           (if (:success reply)
-                             (do
-                               (set-preview-data (:data reply))
-                               (set-preview-error nil))
-                             (do
-                               (set-preview-data nil)
-                               (set-preview-error (:error reply)))))))
+                           (set-is-previewing false)
+                           (cond
+                             ;; Keep last good data on timeout; don't show error, just stop spinner
+                             (= reply :chsk/timeout) nil
+                             ;; Success: show preview, clear any previous error
+                             (:success reply) (do
+                                                (set-preview-data (:data reply))
+                                                (set-preview-error nil))
+                             ;; Error (non-timeout): show error but keep last preview
+                             :else (set-preview-error (:error reply))))))
        ;; No cleanup needed
        js/undefined)
      ;; Dependencies - effect runs when debounced values change
@@ -134,7 +138,7 @@
        ($ :div {:className "w-1/3 p-4 border-r overflow-auto"}
           ($ forms/form
              ($ :h4 {:className "font-semibold mb-4"} "Configuration")
-                          ;; Custom dropdown field for datasets
+             ;; Custom dropdown field for datasets
              ($ :div {:className "space-y-1"}
                 ($ :label {:className "block text-sm font-medium text-gray-700"}
                    "Target Dataset"
@@ -181,7 +185,7 @@
                 {:label "Reference Output Template (JSONPath)" :type :textarea :rows 4
                  :value (:value output-template-field) :on-change (:on-change output-template-field)
                  :error (:error output-template-field)})))
-       ($ PreviewPanel {:preview-data preview-data :error preview-error}))))
+       ($ PreviewPanel {:preview-data preview-data :error preview-error :is-previewing is-previewing}))))
 
 (forms/reg-form
  :add-from-trace
