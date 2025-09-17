@@ -73,7 +73,8 @@ test.describe('Full Experiment Flow E2E Test', () => {
     // ---
     console.log('--- PHASE 2: GENERATE TRACE DATA ---');
     await page.getByText('Overview').click();
-    await getResearchAgentRow(page); // Wait for overview to be ready
+    const row = await getResearchAgentRow(page); // Wait for overview to be ready
+    await row.click();
 
     // 2a. Manually run the agent
     console.log(`Running agent "${agentToRun}"...`);
@@ -85,6 +86,8 @@ test.describe('Full Experiment Flow E2E Test', () => {
     await expect(page).toHaveURL(/\/invocations\//, { timeout: 30000 });
     console.log('Navigated to invocation trace page.');
 
+    const feedbackNode = page.locator('.react-flow__node').filter({ hasText: 'feedback' });
+    await feedbackNode.click({ timeout: 60000 }); // wait for first node.
     const hitlPrompt = page.locator('.bg-amber-50');
     await expect(hitlPrompt).toBeVisible({ timeout: 60000 }); // Wait up to a minute for the first prompt
     await hitlPrompt.getByPlaceholder('Type your response...').fill('yes');
