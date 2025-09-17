@@ -11,7 +11,8 @@
    [clojure.string :as str]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    [reitit.frontend.easy :as rfe]
-   ["@heroicons/react/24/outline" :refer [PlusIcon TrashIcon ChevronDownIcon XMarkIcon]]))
+   ["@heroicons/react/24/outline" :refer [PlusIcon TrashIcon ChevronDownIcon XMarkIcon]]
+   ["react-dom" :refer [createPortal]]))
 
  ;; =============================================================================
 ;; NEW: TRANSFORMATION FUNCTION
@@ -101,6 +102,8 @@
 
 (defui EvaluatorSelector [{:keys [module-id selected-evaluators on-change]}]
   (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
+        trigger-ref (uix/use-ref nil)
+        [position set-position] (uix/use-state nil)
         {:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:evaluator-instances module-id]
@@ -108,7 +111,30 @@
           :enabled? (boolean module-id)})
         all-evaluators (or (:items data) [])
         selected-names (set (map :name selected-evaluators))
-        available-evaluators (remove #(contains? selected-names (:name %)) all-evaluators)]
+        available-evaluators (remove #(contains? selected-names (:name %)) all-evaluators)
+        recalc-position (fn []
+                          (when-let [el (.-current trigger-ref)]
+                            (let [rect (.getBoundingClientRect el)
+                                  top (+ (.-bottom rect) (.-scrollY js/window))
+                                  left (+ (.-left rect) (.-scrollX js/window))
+                                  width (.-width rect)]
+                              (set-position {:top top :left left :width width}))))]
+
+    (uix/use-effect
+     (fn []
+       (when dropdown-open?
+         (recalc-position)
+         (let [handle-click (fn [_] (set-dropdown-open false))
+               handle-recalc (fn [_] (recalc-position))]
+           (.addEventListener js/document "click" handle-click)
+           (.addEventListener js/window "scroll" handle-recalc true)
+           (.addEventListener js/window "resize" handle-recalc)
+           #(do
+              (.removeEventListener js/document "click" handle-click)
+              (.removeEventListener js/window "scroll" handle-recalc true)
+              (.removeEventListener js/window "resize" handle-recalc)))))
+     [dropdown-open?])
+
     ($ :<>
        ($ :div
 
@@ -134,31 +160,44 @@
                ($ :div.text-sm.text-gray-500.italic "No evaluators selected."))))
        ($ :div.relative
           ($ :button.inline-flex.items-center.gap-2.text-sm.text-blue-600.hover:underline
-             {:type "button" :onClick #(set-dropdown-open (not dropdown-open?))}
+             {:type "button"
+              :ref #(set! (.-current trigger-ref) %)
+              :onClick (fn [e]
+                         (.stopPropagation e)
+                         (if dropdown-open?
+                           (set-dropdown-open false)
+                           (set-dropdown-open true)))}
              ($ PlusIcon {:className "h-4 w-4"})
              "Add Evaluator")
-          (when dropdown-open?
-            ($ :div.origin-top-left.absolute.left-0.mt-2.w-80.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-10
-               ($ :div.py-1.max-h-60.overflow-y-auto
-                  (cond
-                    loading? ($ :div.px-4.py-2.text-sm.text-gray-500 "Loading...")
-                    error ($ :div.px-4.py-2.text-sm.text-red-500 "Error")
-                    (empty? available-evaluators) ($ :div.px-4.py-2.text-sm.text-gray-500 "No more evaluators to add.")
-                    :else (for [e available-evaluators]
-                            ($ :div.px-3.py-2.hover:bg-gray-50.cursor-pointer.border-b.border-gray-100.last:border-b-0
-                               {:key (:name e)
-                                :onClick #(do
-                                            (on-change (conj selected-evaluators {:name (:name e) :remote? false}))
-                                            (set-dropdown-open false))}
-                               ($ :div.flex.flex-col.gap-1
-                                  ($ :div.flex.items-center.justify-between
-                                     ($ :span.font-medium.text-gray-900 (:name e))
-                                     ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
-                                        {:className (evaluators/get-evaluator-type-badge-style (:type e))}
-                                        (evaluators/get-evaluator-type-display (:type e))))
-                                  (when-not (str/blank? (:description e))
-                                    ($ :span.text-sm.text-gray-600.max-w-xs.truncate (:description e)))
-                                  ($ :span.text-xs.text-gray-500.font-mono (:builder-name e)))))))))))))
+
+          (when (and dropdown-open? position)
+            (createPortal
+             ($ :div
+                {:className "origin-top-left rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 w-80"
+                 :style {:position "fixed"
+                         :top (+ (:top position) 8)
+                         :left (:left position)}}
+                ($ :div.py-1.max-h-60.overflow-y-auto
+                   (cond
+                     loading? ($ :div.px-4.py-2.text-sm.text-gray-500 "Loading...")
+                     error ($ :div.px-4.py-2.text-sm.text-red-500 "Error")
+                     (empty? available-evaluators) ($ :div.px-4.py-2.text-sm.text-gray-500 "No more evaluators to add.")
+                     :else (for [e available-evaluators]
+                             ($ :div.px-3.py-2.hover:bg-gray-50.cursor-pointer.border-b.border-gray-100.last:border-b-0
+                                {:key (:name e)
+                                 :onClick #(do
+                                             (on-change (conj selected-evaluators {:name (:name e) :remote? false}))
+                                             (set-dropdown-open false))}
+                                ($ :div.flex.flex-col.gap-1
+                                   ($ :div.flex.items-center.justify-between
+                                      ($ :span.font-medium.text-gray-900 (:name e))
+                                      ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
+                                         {:className (evaluators/get-evaluator-type-badge-style (:type e))}
+                                         (evaluators/get-evaluator-type-display (:type e))))
+                                   (when-not (str/blank? (:description e))
+                                     ($ :span.text-sm.text-gray-600.max-w-xs.truncate (:description e)))
+                                   ($ :span.text-xs.text-gray-500.font-mono (:builder-name e))))))))
+             (.-body js/document)))))))
 
 ;; =============================================================================
 ;; MAIN EXPERIMENT FORM COMPONENTS

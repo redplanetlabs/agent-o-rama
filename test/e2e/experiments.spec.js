@@ -191,23 +191,28 @@ test.describe('Full Experiment Flow E2E Test', () => {
 
     // 5a. Fill out the experiment form
     await expModal.getByLabel('Experiment Name').fill(experimentName);
-    await expModal.getByLabel('Node').check(); // Select Node target type
+    // Select Target Type: Node (the control is a <select>)
+    await expModal.locator('select').first().selectOption('node');
 
     // Select the agent and node
-    await expModal.getByRole('button', { name: 'Select an agent' }).click();
-    await expModal.getByText(agentToRun).click();
+    await expModal.getByRole('button', { name: /Select an agent/i }).click();
+    await expModal.getByText(agentToRun, { exact: true }).click();
     await expModal.getByLabel('Node Name').fill('write-section');
 
-    // Configure input mappings
-    const inputMappingField = expModal.getByLabel('Input Mappings').locator('input').first();
-    await inputMappingField.fill('$[0]'); // The first argument for write-section is `persona`
-    await expModal.getByRole('button', { name: 'Add Mapping' }).click();
-    await expModal.getByLabel('Input Mappings').locator('input').nth(1).fill('$[1]'); // second arg is `messages`
-    await expModal.getByLabel('Input Mappings').locator('input').nth(2).fill('$[2]'); // third arg is `context`
+    // Configure input mappings (ensure we have 3 and fill them)
+    const mappingsSection = expModal.locator('div').filter({ hasText: /^Input Mappings/ });
+    // Click Add Mapping until at least 3 inputs exist
+    for (let i = await mappingsSection.locator('input').count(); i < 3; i++) {
+      await expModal.getByRole('button', { name: 'Add Mapping' }).click();
+    }
+    await mappingsSection.locator('input').nth(0).fill('$[0]'); // persona
+    await mappingsSection.locator('input').nth(1).fill('$[1]'); // messages
+    await mappingsSection.locator('input').nth(2).fill('$[2]'); // context
 
     // Select the evaluator
     await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
-    await expModal.getByText(evaluatorName).click();
+    await expect(page.getByText(evaluatorName, { exact: true })).toBeVisible();
+    await page.getByText(evaluatorName, { exact: true }).click();
 
     // 5b. Start the experiment
     await expModal.getByRole('button', { name: 'Run Experiment' }).click();
