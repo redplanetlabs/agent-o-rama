@@ -45,29 +45,31 @@
        preview-data
        ($ :div {:className "space-y-4"}
           ;; Preview for Input
-          ($ :div
-             ($ :div {:className "flex justify-between items-center"}
+          ($ :div {:id "preview-input-section"}
+             ($ :div {:id "preview-input-header" :className "flex justify-between items-center"}
                 ($ :label {:className "text-xs font-medium text-gray-500"} "Dataset Input")
                 (when-let [input-preview (:input preview-data)]
-                  ($ :span {:className (if (:is-valid? input-preview)
+                  ($ :span {:id "preview-input-status"
+                            :className (if (:is-valid? input-preview)
                                          "text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full"
                                          "text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded-full")}
                      (if (:is-valid? input-preview) "Valid" "Invalid"))))
-             ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"} (common/pp (:transformed-data (:input preview-data))))
+             ($ :pre {:id "preview-input-data" :className "text-xs bg-white p-2 rounded border mt-1"} (common/pp (:transformed-data (:input preview-data))))
              (when-let [err (:validation-error (:input preview-data))]
-               ($ :p {:className "text-xs text-red-600 mt-1"} err)))
+               ($ :p {:id "preview-input-error" :className "text-xs text-red-600 mt-1"} err)))
           ;; Preview for Reference Output
-          ($ :div
-             ($ :div {:className "flex justify-between items-center"}
+          ($ :div {:id "preview-output-section"}
+             ($ :div {:id "preview-output-header" :className "flex justify-between items-center"}
                 ($ :label {:className "text-xs font-medium text-gray-500"} "Dataset Reference Output")
                 (when-let [output-preview (:output preview-data)]
-                  ($ :span {:className (if (:is-valid? output-preview)
+                  ($ :span {:id "preview-output-status"
+                            :className (if (:is-valid? output-preview)
                                          "text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full"
                                          "text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded-full")}
                      (if (:is-valid? output-preview) "Valid" "Invalid"))))
-             ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"} (common/pp (:transformed-data (:output preview-data))))
+             ($ :pre {:id "preview-output-data" :className "text-xs bg-white p-2 rounded border mt-1"} (common/pp (:transformed-data (:output preview-data))))
              (when-let [err (:validation-error (:output preview-data))]
-               ($ :p {:className "text-xs text-red-600 mt-1"} err))))
+               ($ :p {:id "preview-output-error" :className "text-xs text-red-600 mt-1"} err))))
        :else ($ :div {:className "text-sm text-gray-400 italic"} "Select a dataset to see a preview."))))
 
 (defui AddFromTraceForm [{:keys [form-id]}]

@@ -140,24 +140,20 @@ test.describe('Full Experiment Flow E2E Test', () => {
     console.log('Testing JSONPath templates...');
     const inputTemplate = addToDatasetModal.getByLabel('Input Template (JSONPath)');
     const outputTemplate = addToDatasetModal.getByLabel('Reference Output Template (JSONPath)');
-    const previewPane = addToDatasetModal.locator('div').filter({ hasText: /^Live Preview/ });
-    // Use header rows to scope: they have class "flex justify-between items-center"
-    const headerRows = previewPane.locator('div.flex.justify-between.items-center');
-    const inputHeader = headerRows.nth(0);
-    const outputHeader = headerRows.nth(1);
+    const previewPane = addToDatasetModal.locator('#preview-input-section').first();
 
     // Test valid path for full input array (schema expects an array)
     await inputTemplate.fill('$');
-    await expect(inputHeader.getByText('Valid')).toBeVisible({ timeout: 10000 });
+    await expect(addToDatasetModal.locator('#preview-input-status')).toHaveText('Valid', { timeout: 10000 });
 
     // Test invalid path
     await inputTemplate.fill('invalid-jsonpath');
-    await expect(inputHeader.getByText('Invalid')).toBeVisible({ timeout: 10000 });
+    await expect(addToDatasetModal.locator('#preview-input-status')).toHaveText('Invalid', { timeout: 10000 });
 
     // Test schema validation failure (string does not satisfy array schema)
     await inputTemplate.fill('$[0]');
-    await expect(inputHeader.getByText('Invalid')).toBeVisible({ timeout: 10000 });
-    await expect(inputSection.getByText(/array/i)).toBeVisible({ timeout: 10000 });
+    await expect(addToDatasetModal.locator('#preview-input-status')).toHaveText('Invalid', { timeout: 10000 });
+    await expect(addToDatasetModal.locator('#preview-input-error')).toContainText(/array/i, { timeout: 10000 });
     console.log('Schema validation failure correctly detected and displayed.');
 
     // Fix the input to be valid for submission (capture entire input array)
