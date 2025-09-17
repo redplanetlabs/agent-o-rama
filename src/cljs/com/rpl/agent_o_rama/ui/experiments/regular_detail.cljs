@@ -138,11 +138,21 @@
     (nil? value) ($ :span.italic.text-gray-400 "nil")
     :else ($ :span.italic.text-gray-400 "…")))
 
+(defui EvaluatorErrorModal [{:keys [eval-name error-str]}]
+  ($ :div.p-6.space-y-4
+     ($ :h4.text-lg.font-medium.text-gray-900.mb-4
+        (str "Evaluator Error: " (name eval-name)))
+     ($ :div.bg-red-50.p-4.rounded.border.border-red-200.max-h-96.overflow-auto
+        ($ :pre.text-sm.font-mono.whitespace-pre-wrap.text-red-800 error-str))))
+
 (defui EvaluatorScores [{:keys [evals failures duplicate-metric-keys]}]
   ($ :div.flex.flex-wrap.gap-1.items-center
      (for [[eval-name error-str] (sort-by key failures)]
-       ($ :div.px-2.py-1.rounded-md.text-xs.font-medium.bg-red-100.text-red-800
-          {:key (str "fail-" (name eval-name)) :title error-str}
+       ($ :button.px-2.py-1.rounded-md.text-xs.font-medium.bg-red-100.text-red-800.hover:bg-red-200.cursor-pointer.transition-colors
+          {:key (str "fail-" (name eval-name))
+           :onClick #(state/dispatch [:modal/show :evaluator-error
+                                      {:title "Evaluator Error"
+                                       :component ($ EvaluatorErrorModal {:eval-name eval-name :error-str error-str})}])}
           (str (name eval-name) ": Failed")))
      (for [[eval-name eval-result] (sort-by key evals)
            [metric-key metric-value] (sort-by key eval-result)
@@ -163,8 +173,7 @@
           content-str)
        (when (and is-long? truncated?)
          ($ :button.absolute.top-0.right-0.opacity-0.group-hover:opacity-100.transition-opacity.bg-blue-500.text-white.rounded.text-xs.px-2.py-1.hover:bg-blue-600
-            {:onClick #(on-expand content-str)
-             :title "Expand in modal"}
+            {:onClick #(on-expand content-str)}
             "↗")))))
 
 (defui ContentModal [{:keys [content title]}]
@@ -243,8 +252,7 @@
                                          ($ :button.absolute.top-0.right-0.opacity-0.group-hover:opacity-100.transition-opacity.bg-blue-500.text-white.rounded.text-xs.px-2.py-1.hover:bg-blue-600
                                             {:onClick #(state/dispatch [:modal/show :content-detail
                                                                         {:title "Output"
-                                                                         :component ($ ContentModal {:content output-content :title "Output"})}])
-                                             :title "Expand in modal"}
+                                                                         :component ($ ContentModal {:content output-content :title "Output"})}])}
                                             "↗"))))))
                              ($ :div.mt-2
                                 ($ EvaluatorScores {:evals evals
