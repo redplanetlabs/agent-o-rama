@@ -111,7 +111,7 @@
            (module
              [setup topologies]
              (declare-depot setup *reset-depot :random {:global? true})
-             (let [topology  (aor/agents-topology setup topologies)
+             (let [topology  (aor/agent-topology setup topologies)
                    s         (aor/underlying-stream-topology topology)
                    node-exec (symbol (po/agent-node-executor-name))
                    root-sym  (symbol (po/agent-root-task-global-name "foo"))
@@ -354,7 +354,7 @@
            (module
              [setup topologies]
              (declare-depot setup *reset-depot :random {:global? true})
-             (let [topology  (aor/agents-topology setup topologies)
+             (let [topology  (aor/agent-topology setup topologies)
                    s         (aor/underlying-stream-topology topology)
                    node-exec (symbol (po/agent-node-executor-name))
                    root-sym  (symbol (po/agent-root-task-global-name "foo"))
@@ -518,7 +518,7 @@
          (bind module
            (module
              [setup topologies]
-             (let [topology (aor/agents-topology setup topologies)]
+             (let [topology (aor/agent-topology setup topologies)]
                (aor/declare-key-value-store
                 topology
                 "$$kv"
@@ -593,7 +593,7 @@
      (bind module
        (module
          [setup topologies]
-         (let [topology (aor/agents-topology setup topologies)]
+         (let [topology (aor/agent-topology setup topologies)]
            (->
              topology
              (aor/new-agent "foo")

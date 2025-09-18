@@ -3,7 +3,7 @@
 
   Features demonstrated:
   - defagentmodule: Define an agent module
-  - agents-topology: Create agent topology
+  - agent-topology: Create agent topology
   - new-agent: Create a new agent
   - node: Define a single agent node
   - result!: Return final result from a node

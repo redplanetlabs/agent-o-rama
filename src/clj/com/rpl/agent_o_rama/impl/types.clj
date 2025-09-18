@@ -52,7 +52,7 @@
 
 (def ^:dynamic OPERATION-SOURCE nil)
 
-(def AGENTS-TOPOLOGY-NAME "_agents-topology")
+(def AGENT-TOPOLOGY-NAME "_agent-topology")
 (def AGENTS-MB-TOPOLOGY-NAME "_agents-mb-topology")
 
 (def NODE-KW :node)
@@ -660,20 +660,25 @@
 (defprotocol AgentTopologyInternal
   (declare-agent-object-builder-internal [this name afn options])
   (declare-evaluator-builder-internal [this type name description builder-fn
-                                       options]))
+                                       options])
+  (declare-action-builder-internal [this name description builder-fn options]))
 
 
-(defn declare-java-evaluator-builer
-  [this type name description builder-fn options]
-  (let [builder-fn (h/convert-jfn builder-fn)]
-    (declare-evaluator-builder-internal this
-                                        type
-                                        name
-                                        description
-                                        (fn [params]
-                                          (h/convert-jfn
-                                           (builder-fn params)))
-                                        (if options @options))))
+(defn convert-java-builder-fn
+  [builder-jfn]
+  (let [builder-fn (h/convert-jfn builder-jfn)]
+    (fn [params]
+      (h/convert-jfn
+       (builder-fn params)))))
+
+(defn declare-java-evaluator-builder
+  [this type name description builder-jfn options]
+  (declare-evaluator-builder-internal this
+                                      type
+                                      name
+                                      description
+                                      (convert-java-builder-fn builder-jfn)
+                                      (if options @options)))
 
 (defprotocol AgentClientInternal
   (stream-internal [this agent-invoke node callback-fn])

@@ -784,7 +784,7 @@
                           (queries/agent-get-current-graph-name "foo")))
 
          (dotimes [_ 10]
-           (let [{[agent-task-id agent-id] "_agents-topology"}
+           (let [{[agent-task-id agent-id] "_agent-topology"}
                  (foreign-append! depot
                                   (aor-types/->AgentInitiate ["hello"] nil nil))]
              (is (= 0
@@ -838,7 +838,7 @@
 
          (reset! task-counts-atom {})
          (dotimes [_ 10]
-           (let [{[agent-task-id agent-id] "_agents-topology"}
+           (let [{[agent-task-id agent-id] "_agent-topology"}
                  (foreign-append! depot (aor-types/->AgentInitiate [] nil nil))]
              (is (= 1
                     (foreign-select-one [(keypath agent-id) :graph-version]
@@ -2186,7 +2186,7 @@
            (module
              [setup topologies]
              (declare-depot setup *reset-depot :random)
-             (let [topology (aor/agents-topology setup topologies)
+             (let [topology (aor/agent-topology setup topologies)
                    s        (aor/underlying-stream-topology topology)]
                (->
                  topology
@@ -2849,7 +2849,7 @@
        (bind module
          (module
            [setup topologies]
-           (let [topology   (aor/agents-topology setup topologies)
+           (let [topology   (aor/agent-topology setup topologies)
                  node-exec  (symbol (po/agent-node-executor-name))
                  active-foo (symbol (po/agent-active-invokes-task-global-name
                                      "foo"))

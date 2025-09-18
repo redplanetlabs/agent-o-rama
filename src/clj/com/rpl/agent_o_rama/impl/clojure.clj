@@ -12,8 +12,8 @@
     CompletableFuture]))
 
 (defn new-agent
-  [^AgentTopology agents-topology name]
-  (.newAgent agents-topology name))
+  [^AgentTopology agent-topology name]
+  (.newAgent agent-topology name))
 
 (defn node
   [agent-graph name output-nodes-spec node-fn]

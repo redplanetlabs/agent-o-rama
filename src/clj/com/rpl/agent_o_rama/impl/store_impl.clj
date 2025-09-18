@@ -54,7 +54,7 @@
                       {:pstate-name (:pstate-name store-params)})))
   (let [start-time  (h/current-time-millis)
         _ (hook:initiating-pstate-write)
-        {ret aor-types/AGENTS-TOPOLOGY-NAME}
+        {ret aor-types/AGENT-TOPOLOGY-NAME}
         (foreign-append!
          (:write-depot store-params)
          (aor-types/->PStateWrite

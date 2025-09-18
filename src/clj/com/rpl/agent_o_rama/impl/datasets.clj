@@ -646,9 +646,14 @@
                                    failure-callback)))
 
 (defn create-remote-dataset!
+<<<<<<< HEAD
   [datasets-depot dataset-id cluster-conductor-host cluster-conductor-port
    module-name]
   (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
+=======
+  [datasets-depot dataset-id cluster-conductor-host cluster-conductor-port module-name]
+  (let [{error aor-types/AGENT-TOPOLOGY-NAME}
+>>>>>>> 2f1c3231 (agents-topology -> agent-topology and action builder definitions)
         (foreign-append!
          datasets-depot
          (aor-types/->valid-AddRemoteDataset dataset-id

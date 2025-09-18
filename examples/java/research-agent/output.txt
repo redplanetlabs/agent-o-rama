@@ -1,28 +1,28 @@
 [INFO] Scanning for projects...
-[INFO] 
+[INFO]
 [INFO] ----------------< com.rpl.agent:research-agent-example >----------------
 [INFO] Building Research Agent Example 1.0.0
 [INFO]   from pom.xml
 [INFO] --------------------------------[ jar ]---------------------------------
 [WARNING] 1 problem was encountered while building the effective model for org.javassist:javassist:jar:3.18.1-GA during dependency collection step for project (use -X to see details)
 [WARNING] 2 problems were encountered while building the effective model for org.apache.yetus:audience-annotations:jar:0.5.0 during dependency collection step for project (use -X to see details)
-[INFO] 
+[INFO]
 [INFO] --- exec:3.1.0:java (default-cli) @ research-agent-example ---
 Starting Multi-Analyst Research Agent...
 This agent will create specialized AI analysts to research your topic comprehensively.
 You'll be able to provide feedback on the analysts before the research begins.
 
 Starting Agent-o-rama UI on port 1974
-Enter a topic: 
+Enter a topic:
 Starting research process...
 
 2025-08-20T01:34:21.936Z Hugos-MacBook-Pro ERROR [taoensso.sente:2106] - Chsk router `event-msg-handler` error: [:chsk/ws-ping]
                                                       java.lang.Thread.run              Thread.java: 1583
-                                                                       ...                              
+                                                                       ...
         clojure.core.async.impl.concurrent/counted-thread-factory/reify/fn           concurrent.clj:   29
                         java.util.concurrent.ThreadPoolExecutor$Worker.run  ThreadPoolExecutor.java:  642
                          java.util.concurrent.ThreadPoolExecutor.runWorker  ThreadPoolExecutor.java: 1144
-                                                                       ...                              
+                                                                       ...
                                   clojure.core.async.impl.channels/appm/fn             channels.clj:   36
                                          clojure.core.async/do-alts/fn{x2}                async.clj:  294
                                            clojure.core.async/ioc-alts!/fn                async.clj:  427
@@ -33,7 +33,7 @@ Starting research process...
                                      taoensso.sente/-start-chsk-router!/fn               sente.cljc: 2084
 taoensso.sente/-start-chsk-router!/fn/state-machine--auto--/fn/inst-485641               sente.cljc: 2097
                       com.rpl.agent-o-rama.impl.ui.sente/event-msg-handler                sente.clj:   45
-                                                                       ...                              
+                                                                       ...
                           com.rpl.agent-o-rama.impl.ui.sente/eval486864/fn                sente.clj:   54
 java.lang.NullPointerException: Cannot invoke "clojure.lang.IFn.invoke(Object)" because "_QMARK_reply_fn" is null
 
@@ -45,13 +45,13 @@ Analyst{name='Simon Grant', role='Nutritionist', affiliation='UK Institute of Nu
 Analyst{name='Julie Fairweather', role='Registered Dietitian & Food Blogger', affiliation='Healthy Eating Blog', description='Focused on modern dietary trends and the adaptation of traditional meals to fit contemporary health preferences.'}
 Analyst{name='Raj Patel', role='Cultural Anthropologist', affiliation='Global Food Studies Institute', description='Investigates the cultural influences on British meals and their nutritional aspects, particularly in the context of globalization and fusion cuisine.'}
 
->> 
+>>
 QuestionsStartNode
 GenerateQuestionNode
 GenerateQuestionNode
 GenerateQuestionNode
 GenerateQuestionNode
-21:34:30.444 [Worker bb1ad573 00000000@2005 DTT 2 0-task-group-exec-0] ERROR rpl.rama.distributed.util.throwable-handler - Unexpected throwable! Will be treated as a fatal! {:event-tags [:stream :_agents-topology :ack-event]}
+21:34:30.444 [Worker bb1ad573 00000000@2005 DTT 2 0-task-group-exec-0] ERROR rpl.rama.distributed.util.throwable-handler - Unexpected throwable! Will be treated as a fatal! {:event-tags [:stream :_agent-topology :ack-event]}
 rpl.rama.distributed.exceptions.ReplicationFailed: null
 	at rpl.rama.platform.bytecode.VanillaFnFragChunk.invokeBasic(VanillaFnFragChunk.java:359) ~[rama-0.0.6-SNAPSHOT.jar:?]
 	at rpl.rama.distributed.topology.streaming.manager.write_durable_info_BANG_$ctn178863.failed_invoke(rpl/rama/distributed/topology/streaming/manager.clj:282) ~[?:?]
@@ -1145,11 +1145,11 @@ GenerateQuestionNode
 GenerateQuestionNode
 2025-08-20T01:34:59.013Z Hugos-MacBook-Pro ERROR [taoensso.sente:2106] - Chsk router `event-msg-handler` error: [:chsk/ws-pong]
                                                       java.lang.Thread.run              Thread.java: 1583
-                                                                       ...                              
+                                                                       ...
         clojure.core.async.impl.concurrent/counted-thread-factory/reify/fn           concurrent.clj:   29
                         java.util.concurrent.ThreadPoolExecutor$Worker.run  ThreadPoolExecutor.java:  642
                          java.util.concurrent.ThreadPoolExecutor.runWorker  ThreadPoolExecutor.java: 1144
-                                                                       ...                              
+                                                                       ...
                                   clojure.core.async.impl.channels/appm/fn             channels.clj:   36
                                          clojure.core.async/do-alts/fn{x2}                async.clj:  294
                                            clojure.core.async/ioc-alts!/fn                async.clj:  427
@@ -1160,7 +1160,7 @@ GenerateQuestionNode
                                      taoensso.sente/-start-chsk-router!/fn               sente.cljc: 2084
 taoensso.sente/-start-chsk-router!/fn/state-machine--auto--/fn/inst-485641               sente.cljc: 2097
                       com.rpl.agent-o-rama.impl.ui.sente/event-msg-handler                sente.clj:   45
-                                                                       ...                              
+                                                                       ...
                           com.rpl.agent-o-rama.impl.ui.sente/eval486864/fn                sente.clj:   54
 java.lang.NullPointerException: Cannot invoke "clojure.lang.IFn.invoke(Object)" because "_QMARK_reply_fn" is null
 
@@ -2791,11 +2791,11 @@ Caused by: rpl.rama.distributed.exceptions.CallbackException: Callback failure
 21:35:16.183 [clientside-cluster-manager-worp-client-event-loop-group localEventLoopGroup-4-8] ERROR rpl.rama.distributed.worp.client.clientside-protocol - got a rejection that couldn't be resolved back to a retryable message #rpl.rama.distributed.worp.core.domain.WireSendWithUnboundedCallbacksMessage{:deliverable-event #rpl.rama.distributed.worp.core.domain.DeliverableEvent{:event #object[rpl.rama.distributed.pobject.pstate.foreign.reactivity.mk_proxy_subscription_event$event 0x6461bc4b rpl.rama.distributed.pobject.pstate.foreign.reactivity.mk_proxy_subscription_event$event@6461bc4b], :task-id 2, :category :rpl.rama.distributed.types/client-category, :intent :read, :role-assert :leader}}
 2025-08-20T01:35:24.935Z Hugos-MacBook-Pro ERROR [taoensso.sente:2106] - Chsk router `event-msg-handler` error: [:chsk/ws-ping]
                                                       java.lang.Thread.run              Thread.java: 1583
-                                                                       ...                              
+                                                                       ...
         clojure.core.async.impl.concurrent/counted-thread-factory/reify/fn           concurrent.clj:   29
                         java.util.concurrent.ThreadPoolExecutor$Worker.run  ThreadPoolExecutor.java:  642
                          java.util.concurrent.ThreadPoolExecutor.runWorker  ThreadPoolExecutor.java: 1144
-                                                                       ...                              
+                                                                       ...
                                   clojure.core.async.impl.channels/appm/fn             channels.clj:   36
                                          clojure.core.async/do-alts/fn{x2}                async.clj:  294
                                            clojure.core.async/ioc-alts!/fn                async.clj:  427
@@ -2806,7 +2806,7 @@ Caused by: rpl.rama.distributed.exceptions.CallbackException: Callback failure
                                      taoensso.sente/-start-chsk-router!/fn               sente.cljc: 2084
 taoensso.sente/-start-chsk-router!/fn/state-machine--auto--/fn/inst-485641               sente.cljc: 2097
                       com.rpl.agent-o-rama.impl.ui.sente/event-msg-handler                sente.clj:   45
-                                                                       ...                              
+                                                                       ...
                           com.rpl.agent-o-rama.impl.ui.sente/eval486864/fn                sente.clj:   54
 java.lang.NullPointerException: Cannot invoke "clojure.lang.IFn.invoke(Object)" because "_QMARK_reply_fn" is null
 
@@ -2816,7 +2816,7 @@ GenerateQuestionNode
 GenerateQuestionNode
 GenerateQuestionNode
 21:35:33.463 [clientside-cluster-manager-worp-client-event-loop-group localEventLoopGroup-4-6] ERROR rpl.rama.distributed.worp.client.clientside-protocol - Unexpected channel pong timeout; closing channel. {:module-name com.rpl.agent.research.ResearchAgentModule, :module-instance-id bb1ad573-19b8-9cd8-68fb-0e6f684df992, :supervisor-id 00000000-0000-0000-0000-000000000000, :hostname 00000000-0000-0000-0000-000000000000-host, :port 2005, :last-pong-age-millis 30003, :last-pong-timeout-millis 30000}
-21:35:37.973 [Worker bb1ad573 00000000@2005 DTT 2 0-task-group-exec-0] ERROR rpl.rama.distributed.util.throwable-handler - Unexpected throwable! Will be treated as a fatal! {:event-tags [:stream :_agents-topology :ack-event]}
+21:35:37.973 [Worker bb1ad573 00000000@2005 DTT 2 0-task-group-exec-0] ERROR rpl.rama.distributed.util.throwable-handler - Unexpected throwable! Will be treated as a fatal! {:event-tags [:stream :_agent-topology :ack-event]}
 rpl.rama.distributed.exceptions.ReplicationFailed: null
 	at rpl.rama.platform.bytecode.VanillaFnFragChunk.invokeBasic(VanillaFnFragChunk.java:359) ~[rama-0.0.6-SNAPSHOT.jar:?]
 	at rpl.rama.distributed.topology.streaming.manager.write_durable_info_BANG_$ctn178863.failed_invoke(rpl/rama/distributed/topology/streaming/manager.clj:282) ~[?:?]
@@ -4120,11 +4120,11 @@ GenerateQuestionNode
 21:36:06.257 [Conductor-worp-client-event-loop-group localEventLoopGroup-1-2] ERROR rpl.rama.distributed.worp.client.clientside-protocol - Unexpected channel pong timeout; closing channel. {:module-name com.rpl.agent.research.ResearchAgentModule, :module-instance-id bb1ad573-19b8-9cd8-68fb-0e6f684df992, :supervisor-id 00000000-0000-0000-0000-000000000000, :hostname 00000000-0000-0000-0000-000000000000-host, :port 2005, :last-pong-age-millis 30004, :last-pong-timeout-millis 30000}
 2025-08-20T01:36:06.936Z Hugos-MacBook-Pro ERROR [taoensso.sente:2106] - Chsk router `event-msg-handler` error: [:chsk/ws-ping]
                                                       java.lang.Thread.run              Thread.java: 1583
-                                                                       ...                              
+                                                                       ...
         clojure.core.async.impl.concurrent/counted-thread-factory/reify/fn           concurrent.clj:   29
                         java.util.concurrent.ThreadPoolExecutor$Worker.run  ThreadPoolExecutor.java:  642
                          java.util.concurrent.ThreadPoolExecutor.runWorker  ThreadPoolExecutor.java: 1144
-                                                                       ...                              
+                                                                       ...
                                   clojure.core.async.impl.channels/appm/fn             channels.clj:   36
                                          clojure.core.async/do-alts/fn{x2}                async.clj:  294
                                            clojure.core.async/ioc-alts!/fn                async.clj:  427
@@ -4135,7 +4135,7 @@ GenerateQuestionNode
                                      taoensso.sente/-start-chsk-router!/fn               sente.cljc: 2084
 taoensso.sente/-start-chsk-router!/fn/state-machine--auto--/fn/inst-485641               sente.cljc: 2097
                       com.rpl.agent-o-rama.impl.ui.sente/event-msg-handler                sente.clj:   45
-                                                                       ...                              
+                                                                       ...
                           com.rpl.agent-o-rama.impl.ui.sente/eval486864/fn                sente.clj:   54
 java.lang.NullPointerException: Cannot invoke "clojure.lang.IFn.invoke(Object)" because "_QMARK_reply_fn" is null
 
