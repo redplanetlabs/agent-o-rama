@@ -95,11 +95,10 @@
                  (for [agent agents
                        :let [decoded-name (common/url-decode (:agent-name agent))]
                        :when (not= decoded-name "_aor-evaluator")]
-                   (do (println "decoded-name" decoded-name)
-                       ($ common/DropdownRow {:key decoded-name
-                                              :label decoded-name
-                                              :selected? (= selected-agent decoded-name)
-                                              :on-select #(handle-select decoded-name)})))
+                   ($ common/DropdownRow {:key decoded-name
+                                          :label decoded-name
+                                          :selected? (= selected-agent decoded-name)
+                                          :on-select #(handle-select decoded-name)}))
                  ($ :div.px-4.py-2.text-sm.text-gray-500 "No agents found in this module."))))))))
 
 (defui EvaluatorSelector [{:keys [module-id selected-evaluators on-change]}]
@@ -256,7 +255,7 @@
                        ($ TrashIcon {:className "h-4 w-4"}))))))
           ($ :button.mt-2.text-sm.text-blue-600.hover:underline
              {:type "button"
-              :onClick (fn [] (state/dispatch [:form/update-field form-id (conj path :input->args) (conj input-mappings "\"$\"")]))}
+              :onClick (fn [] (state/dispatch [:form/update-field form-id (conj path :input->args) (conj input-mappings "$")]))}
              "Add Mapping")))))
 
 (defui CreateExperimentForm [{:keys [form-id]}]
@@ -376,7 +375,7 @@
           (when (= (:value spec-type-field) :comparative)
             ($ :button.mt-4.flex.items-center.gap-2.text-sm.text-blue-600.hover:underline
                {:type "button"
-                :onClick (fn [] (state/dispatch [:form/update-field form-id [:spec :targets] (conj targets {:target-spec {:type :agent :agent-name nil} :input->args ["\"$\""]})]))}
+                :onClick (fn [] (state/dispatch [:form/update-field form-id [:spec :targets] (conj targets {:target-spec {:type :agent :agent-name nil} :input->args ["$"]})]))}
                ($ PlusIcon {:className "h-4 w-4"})
                "Add Another Target")))
 
@@ -422,7 +421,7 @@
              :selector {:type :all :tag ""}
              :spec {:type :regular
                     :targets [{:target-spec {:type :agent :agent-name nil}
-                               :input->args ["\"$\""]}]}
+                               :input->args ["$"]}]}
              :evaluators []
              :num-repetitions 1
              :concurrency 1}

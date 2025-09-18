@@ -17,11 +17,11 @@
                                                      (if (= new-type :regular)
                                                        ;; For regular, ensure we have exactly 1 target
                                                        (if (empty? targets)
-                                                         [{:target-spec {:type :agent :agent-name nil} :input->args ["\"$\""]}]
+                                                         [{:target-spec {:type :agent :agent-name nil} :input->args ["$"]}]
                                                          [(first targets)])
                                                        ;; For comparative, ensure we have at least 2 targets
                                                        (if (< (count targets) 2)
-                                                         (vec (take 2 (concat targets (repeat {:target-spec {:type :agent :agent-name nil} :input->args ["\"$\""]}))))
+                                                         (vec (take 2 (concat targets (repeat {:target-spec {:type :agent :agent-name nil} :input->args ["$"]}))))
                                                          targets))))])
 
      ;; Handle target type changes (when new-type is :agent or :node)
