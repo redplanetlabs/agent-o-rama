@@ -772,8 +772,54 @@
                     :onChange #(set-search-string (.. % -target -value))}))
 
              ;; Right side - Action buttons
-                          ;; Right side - Add Example button
              ($ :div.flex.items-center.space-x-4
+                ;; Export button
+                ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-green-600.hover:bg-green-700.cursor-pointer
+                   {:onClick (fn [_]
+                               (let [snapshot-param (when-not (str/blank? selected-snapshot-name)
+                                                      (str "?snapshot=" (common/url-encode selected-snapshot-name)))
+                                     href (str "/api/datasets/" (common/url-encode module-id) "/" (common/url-encode (str dataset-id)) "/export" snapshot-param)]
+                                 (set! (.-href js/window.location) href)))}
+                   "Export")
+
+                ;; Import button + hidden input
+                (let [[uploading? set-uploading!] (uix/use-state false)
+                      file-input-ref (uix/use-ref nil)]
+                  ($ :<>
+                     ($ :input {:ref file-input-ref
+                                :type "file"
+                                :accept ".jsonl,application/jsonl,application/octet-stream"
+                                :style {:display "none"}
+                                :onChange (fn [e]
+                                            (let [files (.. e -target -files)
+                                                  f (when (and files (> (.-length files) 0)) (aget files 0))]
+                                              (when f
+                                                (set-uploading! true)
+                                                (let [fd (js/FormData.)]
+                                                  (.append fd "file" f)
+                                                  (let [snapshot-param (when-not (str/blank? selected-snapshot-name)
+                                                                         (str "?snapshot=" (common/url-encode selected-snapshot-name)))
+                                                        url (str "/api/datasets/" (common/url-encode module-id) "/" (common/url-encode (str dataset-id)) "/import" snapshot-param)]
+                                                    (-> (js/fetch url #js {:method "POST" :body fd})
+                                                        (.then (fn [resp]
+                                                                 (if (.ok resp)
+                                                                   (.json resp)
+                                                                   (.json resp))))
+                                                        (.then (fn [data]
+                                                                 (set-uploading! false)
+                                                                 (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                                                 (js/alert (str "Import complete. Successes: " (.-success_count data) ", Failures: " (.-failure_count data)))))
+
+                                                        (.catch (fn [err]
+                                                                  (set-uploading! false)
+                                                                  (js/alert (str "Import failed: " err))))))))))})
+                     ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-indigo-600.hover:bg-indigo-700.cursor-pointer
+                        {:onClick (fn [_]
+                                    (when-let [node (.-current file-input-ref)]
+                                      (.click node)))}
+                        (if uploading? "Uploading..." "Import"))))
+
+                ;; Add Example button
                 ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer.disabled:bg-gray-400.disabled:cursor-not-allowed
                    {:onClick #(datasets-forms/show-add-example-modal!
                                {:module-id module-id
@@ -833,17 +879,17 @@
         active-tab (cond
                      (contains? comparative-routes route-name)
                      "comparative"
-                     
+
                      (contains? experiments-routes route-name)
                      "experiments"
-                     
+
                      :else "examples")
         [show-info? set-show-info] (uix/use-state false)
         {:keys [loading? error]}
         (queries/use-sente-query
          {:query-key [:dataset-props module-id dataset-id]
           :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
-          :enabled? (boolean (and module-id dataset-id)) })
+          :enabled? (boolean (and module-id dataset-id))})
         ;; not sure about doing it this way, why not. maybe we can eventually decouple fetching from views?
         dataset (state/use-sub [:queries :dataset-props module-id dataset-id :data])]
     ($ :div.h-full.flex.flex-col

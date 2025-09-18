@@ -9,10 +9,12 @@
    [com.rpl.agent-o-rama.impl.ui.handlers.evaluators]
    [com.rpl.agent-o-rama.impl.ui.handlers.invocations]
    [com.rpl.agent-o-rama.impl.ui.handlers.experiments]
+   [com.rpl.agent-o-rama.impl.ui.handlers.http :as http]
    [ring.util.response :as resp]
    [ring.middleware.resource :as resource]
    [ring.middleware.file :as ring-file]
-   [ring.middleware.defaults :refer [wrap-defaults site-defaults]]))
+   [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
+   [ring.middleware.multipart-params :refer [wrap-multipart-params]]))
 
 (defn spa-index-handler [_request]
   (-> (resp/resource-response "index.html")
@@ -35,6 +37,16 @@
         :get (sente/ring-ajax-get-or-ws-handshake request)
         :post (sente/ring-ajax-post request))
 
+      ;; Dataset export
+      (and (= method :get)
+           (re-matches #"/api/datasets/.+/.+/export" uri))
+      (http/handle-dataset-export request)
+
+      ;; Dataset import
+      (and (= method :post)
+           (re-matches #"/api/datasets/.+/.+/import" uri))
+      (http/handle-dataset-import request)
+
       ;; For any other route, return nil to let the next handler take over.
       :else nil)))
 
@@ -52,6 +64,7 @@
 ;; Keep wrap-defaults for Sente's session management
 (def handler
   (-> #'app-handler
+      wrap-multipart-params
       (wrap-defaults (-> site-defaults
                          (assoc-in [:security :anti-forgery] false)
                          (assoc-in [:security :ssl-redirect] false)))))
