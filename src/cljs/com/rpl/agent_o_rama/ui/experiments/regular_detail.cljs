@@ -11,17 +11,33 @@
    [com.rpl.agent-o-rama.ui.experiments.forms :as forms]))
 
 (defui ExperimentErrorPanel [{:keys [error-info]}]
-  ($ :div.bg-red-50.p-6.rounded-lg.border.border-red-200
-     ($ :h3.text-lg.font-semibold.text-red-800.mb-2 "Experiment Failed to Start")
-     ($ :p.text-sm.text-red-700.mb-4 (:error error-info))
-     (when-let [problems (:problems error-info)]
-       ($ :div
-          ($ :h4.text-sm.font-medium.text-red-800.mb-2 "Details:")
-          ($ :ul.list-disc.list-inside.space-y-2.pl-2
-             (for [[idx problem] (map-indexed vector problems)]
-               ($ :li.text-sm.text-red-700 {:key idx}
-                  ($ :span.font-mono.text-xs.bg-red-100.p-1.rounded.mt-1
-                     (pr-str problem)))))))))
+  (let [has-exception? (or (:via error-info) (:trace error-info))
+        [show-details? set-show-details] (uix/use-state false)
+        [show-trace? set-show-trace] (uix/use-state false)]
+    ($ :div.bg-red-50.p-6.rounded-lg.border.border-red-200
+       ($ :h3.text-lg.font-semibold.text-red-800.mb-2
+          (if has-exception? "Experiment Failed with Exception" "Experiment Failed to Start"))
+
+       ;; Handle the new exception structure
+       (if has-exception?
+         ($ :div.space-y-4
+            ;; Root cause message
+            (when-let [cause (:cause error-info)]
+              ($ :div
+                 ($ :h4.text-sm.font-medium.text-red-800.mb-2 "Error:")
+                 ($ :p.text-sm.text-red-700.bg-red-100.p-3.rounded.font-mono cause))))
+
+         ;; Handle the old error structure (fallback)
+         ($ :div
+            ($ :p.text-sm.text-red-700.mb-4 (:error error-info))
+            (when-let [problems (:problems error-info)]
+              ($ :div
+                 ($ :h4.text-sm.font-medium.text-red-800.mb-2 "Details:")
+                 ($ :ul.list-disc.list-inside.space-y-2.pl-2
+                    (for [[idx problem] (map-indexed vector problems)]
+                      ($ :li.text-sm.text-red-700 {:key idx}
+                         ($ :span.font-mono.text-xs.bg-red-100.p-1.rounded.mt-1
+                            (pr-str problem))))))))))))
 
  ;; NEW: Simple modal content to display exception details
 (defui ExceptionModal [{:keys [throwable]}]

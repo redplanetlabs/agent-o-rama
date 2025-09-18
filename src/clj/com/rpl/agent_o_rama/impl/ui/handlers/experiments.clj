@@ -81,15 +81,18 @@
     ;; 2. NEW LOGIC STARTS HERE: Check for early failure.
     (if-let [invoke (:experiment-invoke base-results)]
       ;; If we have the invoke coordinates for the experimenter agent...
-      (with-open [exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME)]
-        (if (aor/agent-invoke-complete? exp-client invoke)
-          ;; If the agent is complete, fetch its result.
-          (let [result (aor/agent-result exp-client invoke)]
-            ;; A successful run returns :done. Anything else is an error.
-            (if (not= :done result)
-              (assoc base-results :invocation-error result)
-              base-results))
-          ;; If the agent is not yet complete, just return the base results.
-          base-results))
+      (do
+        (with-open [exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME)]
+          (if (aor/agent-invoke-complete? exp-client invoke)
+            ;; If the agent is complete, fetch its result.
+            (let [result (try (aor/agent-result exp-client invoke)
+                              (catch Exception e
+                                (Throwable->map e)))]
+              ;; A successful run returns :done. Anything else is an error.
+              (if (not= :done result)
+                (assoc base-results :invocation-error result)
+                base-results))
+            ;; If the agent is not yet complete, just return the base results.
+            base-results)))
       ;; If there are no invoke coordinates, it's too early, return base results.
       base-results)))
