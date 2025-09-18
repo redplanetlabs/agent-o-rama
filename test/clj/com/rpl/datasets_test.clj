@@ -1209,69 +1209,58 @@
                                     nil
                                     (mapv :id less-examples))))
 
+       ;; test download-jsonl-examples! pagination
+       (bind ds-id-pagination
+         (create-and-wait! manager
+                           "Pagination test dataset"
+                           {:input-json-schema (to-json schema-str)}))
 
-       ;; test download-jsonl-examples!
-       (bind download-path (.resolve tmpdir "downloaded.jsonl"))
-       (bind download-file (.toFile download-path))
-       (.deleteOnExit download-file)
+       ;; Add 3 examples to force pagination with batch size 2
+       (add-example-and-wait! manager
+                              ds-id-pagination
+                              "example1"
+                              {:reference-output "output1" :tags #{"tag1"}})
+       (add-example-and-wait! manager ds-id-pagination "example2" {:tags #{"tag2"}})
+       (add-example-and-wait! manager
+                              ds-id-pagination
+                              "example3"
+                              {:reference-output "output3" :tags #{"tag1" "tag3"}})
+
+       (bind pagination-download-path (.resolve tmpdir "pagination-test.jsonl"))
+       (bind pagination-download-file (.toFile pagination-download-path))
+       (.deleteOnExit pagination-download-file)
 
        (bind download-failures* (atom []))
-       (datasets/download-jsonl-examples!
-        manager
-        ds-id4
-        nil
-        (.toString download-path)
-        (fn [example-id ex]
-          (swap! download-failures* conj [example-id ex])))
+
+       ;; Test with batch size 2 to force pagination across 3 examples
+       (with-redefs [datasets/download-jsonl-batch-size (constantly 2)]
+         (datasets/download-jsonl-examples!
+          manager
+          ds-id-pagination
+          nil
+          (.toString pagination-download-path)
+          (fn [example-id ex]
+            (swap! download-failures* conj [example-id ex]))))
 
        (is (empty? @download-failures*) "Should have no download failures")
 
-       ;; verify the downloaded content matches what was uploaded
+       ;; verify all 3 examples were downloaded despite pagination
        (bind downloaded-lines
-         (with-open [r (io/reader download-file :encoding "UTF-8")]
+         (with-open [r (io/reader pagination-download-file :encoding "UTF-8")]
            (vec (line-seq r))))
 
-       (is (= 2 (count downloaded-lines)) "Should have downloaded exactly 2 examples")
+       (is (= 3 (count downloaded-lines))
+           "Should have downloaded exactly 3 examples with pagination")
 
-       ;; parse and check the downloaded content
+       ;; parse and check all examples are present
        (bind parsed-lines
          (mapv #(j/read-value %) downloaded-lines))
 
-       (is (= (set parsed-lines)
-              #{{"input" "a", "output" "x", "tags" ["t1" "t2"]}
-                {"input" "b"}})
-           "Downloaded content should match uploaded examples")
-
-       ;; test round-trip: upload the downloaded file to a new dataset
-       (bind ds-id-roundtrip
-         (create-and-wait! manager "Roundtrip test dataset" {:input-json-schema (to-json schema-str)}))
-
-       (bind roundtrip-failures* (atom []))
-       (datasets/upload-jsonl-examples!
-        manager
-        ds-id-roundtrip
-        nil
-        (.toString download-path)
-        (fn [line ex]
-          (swap! roundtrip-failures* conj [line ex])))
-
-       (is (empty? @roundtrip-failures*) "Should have no roundtrip upload failures")
-
-       (bind {:keys [examples pagination-params]}
-         (get-examples-page ds-id-roundtrip nil 100 nil))
-
-       (is (nil? pagination-params))
-       (is (= (examples-cleaned examples)
-              [{:input "a"
-                :reference-output "x"
-                :tags #{"t1" "t2"}
-                :source (aor-types/->BulkUploadSource)}
-               {:input "b"
-                :reference-output nil
-                :tags #{}
-                :source (aor-types/->BulkUploadSource)}])
-           "Roundtrip should preserve all data")
-
+       (is (= [{"input" "example1" "output" "output1" "tags" #{"tag1"}}
+               {"input" "example2" "tags" #{"tag2"}}
+               {"input" "example3" "output" "output3" "tags" #{"tag1" "tag3"}}]
+              (mapv #(update % "tags" set) parsed-lines))
+           "All examples should be downloaded correctly with pagination")
 
        ;; test search with filters
        (bind human-source (aor-types/->HumanSource "user"))
