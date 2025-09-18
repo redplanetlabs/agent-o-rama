@@ -27,7 +27,7 @@ Every agent starts with an [agent module](../glossary.md#agent-module) definitio
 ```java
 public class MyModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         // Your agent definitions go here
     }
 }
@@ -176,16 +176,16 @@ Map<String, Object> result = invokeHandle.result();
 ```clojure
 (aor/defagentmodule ModuleWithResources
   [topology]
-  
+
   ;; Declare a static object
   (aor/declare-agent-object topology "config" {:api-key "secret"})
-  
+
   ;; Declare a built object (created per worker)
-  (aor/declare-agent-object-builder 
+  (aor/declare-agent-object-builder
     topology "ai-model"
     (fn [setup]
       (create-model {:api-key (get-api-key)})))
-  
+
   ;; Use in nodes
   (-> topology
       (aor/new-agent "SmartAgent")
@@ -201,15 +201,15 @@ Map<String, Object> result = invokeHandle.result();
 ```java
 public class ModuleWithResources extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         // Declare a static object
         topology.declareAgentObject("config", Map.of("apiKey", "secret"));
-        
+
         // Declare a built object (created per worker)
-        topology.declareAgentObjectBuilder("ai-model", setup -> 
+        topology.declareAgentObjectBuilder("ai-model", setup ->
             createModel(getApiKey())
         );
-        
+
         // Use in nodes
         topology.newAgent("SmartAgent")
             .node("process", null, (agentNode, input) -> {
@@ -230,15 +230,15 @@ Here's a complete example that shows all the concepts working together - an [age
 ```clojure
 (aor/defagentmodule OrderProcessingModule
   [topology]
-  
+
   ;; Shared database connection
   (aor/declare-agent-object-builder topology "db"
     (fn [setup] (create-db-connection)))
-  
+
   ;; Order processing agent
   (-> topology
       (aor/new-agent "OrderProcessor")
-      
+
       ;; Validate the order
       (aor/router-node "validate"
                        (fn [agent-node order]
@@ -246,7 +246,7 @@ Here's a complete example that shows all the concepts working together - an [age
                            (aor/emit! agent-node "check-inventory" order)
                            (aor/result! agent-node {:status "rejected"
                                                    :reason "Invalid order"}))))
-      
+
       ;; Check inventory
       (aor/node "check-inventory" "process-payment"
                 (fn [agent-node order]
@@ -255,7 +255,7 @@ Here's a complete example that shows all the concepts working together - an [age
                     (if available?
                       (aor/emit! agent-node "process-payment" order)
                       (aor/result! agent-node {:status "out-of-stock"})))))
-      
+
       ;; Process payment
       (aor/node "process-payment" "ship"
                 (fn [agent-node order]
@@ -263,7 +263,7 @@ Here's a complete example that shows all the concepts working together - an [age
                     (if (:success payment-result)
                       (aor/emit! agent-node "ship" order)
                       (aor/result! agent-node {:status "payment-failed"})))))
-      
+
       ;; Ship order
       (aor/node "ship" nil
                 (fn [agent-node order]
@@ -276,15 +276,15 @@ Here's a complete example that shows all the concepts working together - an [age
 ```java
 public class OrderProcessingModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         // Shared database connection
-        topology.declareAgentObjectBuilder("db", setup -> 
+        topology.declareAgentObjectBuilder("db", setup ->
             createDbConnection()
         );
-        
+
         // Order processing agent
         topology.newAgent("OrderProcessor")
-            
+
             // Validate the order
             .routerNode("validate", (agentNode, order) -> {
                 if (isValidOrder(order)) {
@@ -296,7 +296,7 @@ public class OrderProcessingModule extends AgentModule {
                     ));
                 }
             })
-            
+
             // Check inventory
             .node("check-inventory", "process-payment", (agentNode, order) -> {
                 Database db = agentNode.getAgentObject("db");
@@ -307,7 +307,7 @@ public class OrderProcessingModule extends AgentModule {
                     agentNode.result(Map.of("status", "out-of-stock"));
                 }
             })
-            
+
             // Process payment
             .node("process-payment", "ship", (agentNode, order) -> {
                 PaymentResult result = chargeCard(order.getPayment());
@@ -317,7 +317,7 @@ public class OrderProcessingModule extends AgentModule {
                     agentNode.result(Map.of("status", "payment-failed"));
                 }
             })
-            
+
             // Ship order
             .node("ship", null, (agentNode, order) -> {
                 String tracking = createShipment(order);

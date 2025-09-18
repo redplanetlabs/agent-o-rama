@@ -16,10 +16,10 @@ The foundation: use aggregation start nodes to fan out work, then aggregation no
 ```clojure
 (aor/defagentmodule ParallelSearchModule
   [topology]
-  
+
   (-> topology
       (aor/new-agent "SearchEngine")
-      
+
       ;; Start aggregation - returns correlation ID
       (aor/agg-start-node "search" "search-source"
                           (fn [agent-node query]
@@ -28,16 +28,16 @@ The foundation: use aggregation start nodes to fan out work, then aggregation no
                               (doseq [source sources]
                                 ;; Emit to search-source for each source
                                 (aor/emit! agent-node "search-source" source query)))))
-      
+
       ;; Process each source in parallel
       (aor/agg-node "search-source" "combine-results"
                     (fn [agent-node source query correlation-id]
                       ;; Search this source
                       (let [results (search-in source query)]
                         ;; Emit results with correlation ID
-                        (aor/emit! agent-node "combine-results" 
+                        (aor/emit! agent-node "combine-results"
                                   correlation-id results))))
-      
+
       ;; Combine all results
       (aor/node "combine-results" nil
                 (fn [agent-node correlation-id results]
@@ -50,9 +50,9 @@ The foundation: use aggregation start nodes to fan out work, then aggregation no
 ```java
 public class ParallelSearchModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         topology.newAgent("SearchEngine")
-            
+
             // Start aggregation - returns correlation ID
             .aggStartNode("search", "search-source", (agentNode, query) -> {
                 // Define sources to search
@@ -62,16 +62,16 @@ public class ParallelSearchModule extends AgentModule {
                     agentNode.emit("search-source", source, query);
                 }
             })
-            
+
             // Process each source in parallel
-            .aggNode("search-source", "combine-results", 
+            .aggNode("search-source", "combine-results",
                      (agentNode, source, query, correlationId) -> {
                 // Search this source
                 List<Object> results = searchIn(source, query);
                 // Emit results with correlation ID
                 agentNode.emit("combine-results", correlationId, results);
             })
-            
+
             // Combine all results
             .node("combine-results", null, (agentNode, correlationId, results) -> {
                 // All results arrive here together
@@ -90,10 +90,10 @@ For complex [aggregation](../terms/aggregation.md) logic, [multi-agg](../glossar
 ```clojure
 (aor/defagentmodule StatisticsModule
   [topology]
-  
+
   (-> topology
       (aor/new-agent "StatsCalculator")
-      
+
       ;; Start parallel calculations
       (aor/agg-start-node "calculate" "process-batch"
                           (fn [agent-node dataset]
@@ -101,7 +101,7 @@ For complex [aggregation](../terms/aggregation.md) logic, [multi-agg](../glossar
                             (let [batches (partition-all 1000 dataset)]
                               (doseq [batch batches]
                                 (aor/emit! agent-node "process-batch" batch)))))
-      
+
       ;; Process each batch
       (aor/agg-node "process-batch" "aggregate-stats"
                     (fn [agent-node batch correlation-id]
@@ -109,25 +109,25 @@ For complex [aggregation](../terms/aggregation.md) logic, [multi-agg](../glossar
                                   :sum (reduce + batch)
                                   :min (apply min batch)
                                   :max (apply max batch)}]
-                        (aor/emit! agent-node "aggregate-stats" 
+                        (aor/emit! agent-node "aggregate-stats"
                                   correlation-id stats))))
-      
+
       ;; Custom aggregation logic
       (aor/multi-agg "aggregate-stats" nil
         ;; Initialize accumulator
         :init (fn [] {:count 0 :sum 0 :min nil :max nil})
-        
+
         ;; Process each incoming result
         :on (fn [accumulator correlation-id stats]
               {:count (+ (:count accumulator) (:count stats))
                :sum (+ (:sum accumulator) (:sum stats))
                :min (min-safe (:min accumulator) (:min stats))
                :max (max-safe (:max accumulator) (:max stats))})
-        
+
         ;; Finalize and emit result
         :complete (fn [agent-node accumulator]
                     (let [mean (/ (:sum accumulator) (:count accumulator))]
-                      (aor/result! agent-node 
+                      (aor/result! agent-node
                         (assoc accumulator :mean mean)))))))
 ```
 
@@ -135,9 +135,9 @@ For complex [aggregation](../terms/aggregation.md) logic, [multi-agg](../glossar
 ```java
 public class StatisticsModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         topology.newAgent("StatsCalculator")
-            
+
             // Start parallel calculations
             .aggStartNode("calculate", "process-batch", (agentNode, dataset) -> {
                 // Split dataset into batches
@@ -146,7 +146,7 @@ public class StatisticsModule extends AgentModule {
                     agentNode.emit("process-batch", batch);
                 }
             })
-            
+
             // Process each batch
             .aggNode("process-batch", "aggregate-stats",
                      (agentNode, batch, correlationId) -> {
@@ -159,7 +159,7 @@ public class StatisticsModule extends AgentModule {
                 );
                 agentNode.emit("aggregate-stats", correlationId, stats);
             })
-            
+
             // Custom aggregation logic
             .multiAgg("aggregate-stats", null)
                 // Initialize accumulator
@@ -169,19 +169,19 @@ public class StatisticsModule extends AgentModule {
                     put("min", null);
                     put("max", null);
                 }})
-                
+
                 // Process each incoming result
                 .on((accumulator, correlationId, stats) -> {
                     Map<String, Object> acc = (Map<String, Object>) accumulator;
                     Map<String, Object> st = (Map<String, Object>) stats;
-                    
+
                     acc.put("count", (int)acc.get("count") + (int)st.get("count"));
                     acc.put("sum", (double)acc.get("sum") + (double)st.get("sum"));
                     acc.put("min", minSafe(acc.get("min"), st.get("min")));
                     acc.put("max", maxSafe(acc.get("max"), st.get("max")));
                     return acc;
                 })
-                
+
                 // Finalize and emit result
                 .complete((agentNode, accumulator) -> {
                     Map<String, Object> acc = (Map<String, Object>) accumulator;
@@ -205,7 +205,7 @@ Connect to any LangChain4j-supported model using [agent objects](../terms/agent-
 ```clojure
 (aor/defagentmodule ChatModule
   [topology]
-  
+
   ;; Declare the AI model
   (aor/declare-agent-object-builder topology "chat-model"
     (fn [setup]
@@ -214,24 +214,24 @@ Connect to any LangChain4j-supported model using [agent objects](../terms/agent-
           (.modelName "gpt-4")
           (.temperature 0.7)
           .build)))
-  
+
   (-> topology
       (aor/new-agent "ChatBot")
-      
+
       ;; Chat with context
       (aor/node "chat" nil
                 (fn [agent-node user-message context]
                   (let [model (aor/get-agent-object agent-node "chat-model")
                         ;; Build conversation history
-                        messages [(lc4j/system-message 
+                        messages [(lc4j/system-message
                                    "You are a helpful assistant.")
-                                 (lc4j/user-message 
+                                 (lc4j/user-message
                                    (str "Context: " context))
                                  (lc4j/user-message user-message)]
                         ;; Get AI response
-                        response (lc4j/chat model 
+                        response (lc4j/chat model
                                    (lc4j/chat-request messages))]
-                    (aor/result! agent-node 
+                    (aor/result! agent-node
                       {:response (lc4j/get-content response)
                        :tokens (:tokenUsage response)}))))))
 ```
@@ -240,7 +240,7 @@ Connect to any LangChain4j-supported model using [agent objects](../terms/agent-
 ```java
 public class ChatModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         // Declare the AI model
         topology.declareAgentObjectBuilder("chat-model", setup ->
             OpenAiChatModel.builder()
@@ -249,23 +249,23 @@ public class ChatModule extends AgentModule {
                 .temperature(0.7)
                 .build()
         );
-        
+
         topology.newAgent("ChatBot")
-            
+
             // Chat with context
             .node("chat", null, (agentNode, userMessage, context) -> {
                 ChatLanguageModel model = agentNode.getAgentObject("chat-model");
-                
+
                 // Build conversation history
                 List<ChatMessage> messages = List.of(
                     SystemMessage.from("You are a helpful assistant."),
                     UserMessage.from("Context: " + context),
                     UserMessage.from((String) userMessage)
                 );
-                
+
                 // Get AI response
                 Response<AiMessage> response = model.generate(messages);
-                
+
                 agentNode.result(Map.of(
                     "response", response.content().text(),
                     "tokens", response.tokenUsage()
@@ -283,7 +283,7 @@ Get structured data from LLMs using specialized [agent objects](../terms/agent-o
 ```clojure
 (aor/defagentmodule StructuredExtractionModule
   [topology]
-  
+
   ;; Model configured for JSON output
   (aor/declare-agent-object-builder topology "json-model"
     (fn [setup]
@@ -292,10 +292,10 @@ Get structured data from LLMs using specialized [agent objects](../terms/agent-o
           (.modelName "gpt-4")
           (.responseFormat "json_object")
           .build)))
-  
+
   (-> topology
       (aor/new-agent "DataExtractor")
-      
+
       ;; Extract structured data from text
       (aor/node "extract" nil
                 (fn [agent-node text schema]
@@ -304,11 +304,11 @@ Get structured data from LLMs using specialized [agent objects](../terms/agent-o
                                    "Schema: " (json/write-value-as-string schema) "\n"
                                    "Text: " text "\n"
                                    "Return valid JSON matching the schema.")
-                        response (lc4j/chat model 
-                                   (lc4j/chat-request 
+                        response (lc4j/chat model
+                                   (lc4j/chat-request
                                      [(lc4j/user-message prompt)]))]
                     ;; Parse JSON response
-                    (let [extracted (json/read-value 
+                    (let [extracted (json/read-value
                                      (lc4j/get-content response))]
                       (aor/result! agent-node extracted)))))))
 ```
@@ -317,7 +317,7 @@ Get structured data from LLMs using specialized [agent objects](../terms/agent-o
 ```java
 public class StructuredExtractionModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         // Model configured for JSON output
         topology.declareAgentObjectBuilder("json-model", setup ->
             OpenAiChatModel.builder()
@@ -326,13 +326,13 @@ public class StructuredExtractionModule extends AgentModule {
                 .responseFormat("json_object")
                 .build()
         );
-        
+
         topology.newAgent("DataExtractor")
-            
+
             // Extract structured data from text
             .node("extract", null, (agentNode, text, schema) -> {
                 ChatLanguageModel model = agentNode.getAgentObject("json-model");
-                
+
                 String prompt = String.format(
                     "Extract data from this text according to schema:\n" +
                     "Schema: %s\n" +
@@ -340,11 +340,11 @@ public class StructuredExtractionModule extends AgentModule {
                     "Return valid JSON matching the schema.",
                     toJson(schema), text
                 );
-                
+
                 Response<AiMessage> response = model.generate(
                     UserMessage.from(prompt)
                 );
-                
+
                 // Parse JSON response
                 Map<String, Object> extracted = parseJson(
                     response.content().text()
@@ -363,7 +363,7 @@ Stream tokens as they're generated using [streaming chunks](../glossary.md#strea
 ```clojure
 (aor/defagentmodule StreamingAIModule
   [topology]
-  
+
   ;; Streaming-capable model
   (aor/declare-agent-object-builder topology "streaming-model"
     (fn [setup]
@@ -371,10 +371,10 @@ Stream tokens as they're generated using [streaming chunks](../glossary.md#strea
           (.apiKey (System/getenv "OPENAI_API_KEY"))
           (.modelName "gpt-4")
           .build)))
-  
+
   (-> topology
       (aor/new-agent "StreamingChat")
-      
+
       ;; Stream AI response
       (aor/node "generate" nil
                 (fn [agent-node prompt]
@@ -382,17 +382,17 @@ Stream tokens as they're generated using [streaming chunks](../glossary.md#strea
                         ;; Token handler streams each chunk
                         handler (reify TokenStreamHandler
                                   (onNext [_ token]
-                                    (aor/stream-chunk! agent-node 
+                                    (aor/stream-chunk! agent-node
                                       {:type "token" :content token}))
                                   (onComplete [_ response]
                                     (aor/stream-chunk! agent-node
-                                      {:type "complete" 
+                                      {:type "complete"
                                        :stats (:tokenUsage response)}))
                                   (onError [_ error]
                                     (aor/stream-chunk! agent-node
                                       {:type "error" :message (.getMessage error)})))]
                     ;; Start streaming
-                    (.generate model 
+                    (.generate model
                       [(lc4j/user-message prompt)]
                       handler)
                     ;; Return when streaming completes
@@ -403,7 +403,7 @@ Stream tokens as they're generated using [streaming chunks](../glossary.md#strea
 ```java
 public class StreamingAIModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         // Streaming-capable model
         topology.declareAgentObjectBuilder("streaming-model", setup ->
             OpenAiStreamingChatModel.builder()
@@ -411,14 +411,14 @@ public class StreamingAIModule extends AgentModule {
                 .modelName("gpt-4")
                 .build()
         );
-        
+
         topology.newAgent("StreamingChat")
-            
+
             // Stream AI response
             .node("generate", null, (agentNode, prompt) -> {
-                StreamingChatLanguageModel model = 
+                StreamingChatLanguageModel model =
                     agentNode.getAgentObject("streaming-model");
-                
+
                 // Token handler streams each chunk
                 model.generate(
                     UserMessage.from((String) prompt),
@@ -430,7 +430,7 @@ public class StreamingAIModule extends AgentModule {
                                 "content", token
                             ));
                         }
-                        
+
                         @Override
                         public void onComplete(Response<AiMessage> response) {
                             agentNode.streamChunk(Map.of(
@@ -438,7 +438,7 @@ public class StreamingAIModule extends AgentModule {
                                 "stats", response.tokenUsage()
                             ));
                         }
-                        
+
                         @Override
                         public void onError(Throwable error) {
                             agentNode.streamChunk(Map.of(
@@ -448,7 +448,7 @@ public class StreamingAIModule extends AgentModule {
                         }
                     }
                 );
-                
+
                 // Return when streaming completes
                 agentNode.result(Map.of("status", "complete"));
             });
@@ -464,24 +464,24 @@ Let AI [agents](../terms/agent.md) use [tools sub agents](../glossary.md#tools-s
 ```clojure
 (aor/defagentmodule ToolCallingModule
   [topology]
-  
+
   ;; Define tools the AI can use
   (def weather-tool
     (lc4j/tool "get_weather"
                "Get current weather for a location"
                [{:name "location" :type "string" :required true}]
                (fn [params]
-                 {:temperature 72 
+                 {:temperature 72
                   :condition "sunny"
                   :location (:location params)})))
-  
+
   (def calculator-tool
     (lc4j/tool "calculate"
                "Perform mathematical calculations"
                [{:name "expression" :type "string" :required true}]
                (fn [params]
                  {:result (eval-math (:expression params))})))
-  
+
   ;; Model with tools
   (aor/declare-agent-object-builder topology "tools-model"
     (fn [setup]
@@ -490,10 +490,10 @@ Let AI [agents](../terms/agent.md) use [tools sub agents](../glossary.md#tools-s
           (.modelName "gpt-4")
           (.tools [weather-tool calculator-tool])
           .build)))
-  
+
   (-> topology
       (aor/new-agent "ToolAgent")
-      
+
       ;; Process with tools
       (aor/node "assist" nil
                 (fn [agent-node query]
@@ -505,7 +505,7 @@ Let AI [agents](../terms/agent.md) use [tools sub agents](../glossary.md#tools-s
                     ;; Check if tools were called
                     (if-let [tool-calls (:toolCalls response)]
                       (let [results (execute-tool-calls tool-calls)]
-                        (aor/result! agent-node 
+                        (aor/result! agent-node
                           {:answer (lc4j/get-content response)
                            :tools-used (map :name tool-calls)
                            :tool-results results}))
@@ -517,7 +517,7 @@ Let AI [agents](../terms/agent.md) use [tools sub agents](../glossary.md#tools-s
 ```java
 public class ToolCallingModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         // Define tools the AI can use
         Tool weatherTool = Tool.builder()
             .name("get_weather")
@@ -529,7 +529,7 @@ public class ToolCallingModule extends AgentModule {
                 "location", params.get("location")
             ))
             .build();
-        
+
         Tool calculatorTool = Tool.builder()
             .name("calculate")
             .description("Perform mathematical calculations")
@@ -538,7 +538,7 @@ public class ToolCallingModule extends AgentModule {
                 "result", evalMath(params.get("expression"))
             ))
             .build();
-        
+
         // Model with tools
         topology.declareAgentObjectBuilder("tools-model", setup ->
             OpenAiChatModel.builder()
@@ -547,24 +547,24 @@ public class ToolCallingModule extends AgentModule {
                 .tools(List.of(weatherTool, calculatorTool))
                 .build()
         );
-        
+
         topology.newAgent("ToolAgent")
-            
+
             // Process with tools
             .node("assist", null, (agentNode, query) -> {
                 ChatLanguageModel model = agentNode.getAgentObject("tools-model");
-                
+
                 // AI decides which tools to use
                 Response<AiMessage> response = model.generate(
                     UserMessage.from((String) query)
                 );
-                
+
                 // Check if tools were called
                 if (response.content().hasToolExecutionRequests()) {
-                    List<ToolExecutionRequest> toolCalls = 
+                    List<ToolExecutionRequest> toolCalls =
                         response.content().toolExecutionRequests();
                     Map<String, Object> results = executeToolCalls(toolCalls);
-                    
+
                     agentNode.result(Map.of(
                         "answer", response.content().text(),
                         "tools-used", toolCalls.stream()
@@ -590,31 +590,31 @@ Combine [aggregation](../terms/aggregation.md) with [agent objects](../terms/age
 ```clojure
 (aor/defagentmodule ParallelAIAnalysisModule
   [topology]
-  
+
   ;; Multiple specialized models
   (aor/declare-agent-object-builder topology "sentiment-model"
     (fn [setup] (create-sentiment-model)))
-  
+
   (aor/declare-agent-object-builder topology "summary-model"
     (fn [setup] (create-summary-model)))
-  
+
   (aor/declare-agent-object-builder topology "entity-model"
     (fn [setup] (create-entity-extraction-model)))
-  
+
   (-> topology
       (aor/new-agent "DocumentAnalyzer")
-      
+
       ;; Start parallel analysis
       (aor/agg-start-node "analyze" "run-analysis"
                           (fn [agent-node document]
                             ;; Run multiple analyses in parallel
-                            (aor/emit! agent-node "run-analysis" 
+                            (aor/emit! agent-node "run-analysis"
                                       "sentiment" document)
                             (aor/emit! agent-node "run-analysis"
                                       "summary" document)
                             (aor/emit! agent-node "run-analysis"
                                       "entities" document)))
-      
+
       ;; Run each analysis type
       (aor/agg-node "run-analysis" "combine"
                     (fn [agent-node analysis-type document correlation-id]
@@ -624,7 +624,7 @@ Combine [aggregation](../terms/aggregation.md) with [agent objects](../terms/age
                         (aor/emit! agent-node "combine"
                                   correlation-id
                                   {analysis-type result}))))
-      
+
       ;; Combine all results
       (aor/multi-agg "combine" nil
         :init (fn [] {})

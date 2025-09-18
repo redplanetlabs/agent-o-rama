@@ -26,20 +26,20 @@ The [key-value store](../terms/key-value-store.md) provides typed persistent sto
 ```clojure
 (aor/defagentmodule CacheModule
   [topology]
-  
+
   ;; Declare the store
   (aor/declare-key-value-store topology "cache" String Object)
-  
+
   (-> topology
       (aor/new-agent "CacheManager")
-      
+
       ;; Write to cache
       (aor/node "store" nil
                 (fn [agent-node key value]
                   (let [cache (aor/get-store agent-node "cache")]
                     (store/put! cache key value)
                     (aor/result! agent-node :stored))))
-      
+
       ;; Read from cache
       (aor/node "retrieve" nil
                 (fn [agent-node key]
@@ -52,19 +52,19 @@ The [key-value store](../terms/key-value-store.md) provides typed persistent sto
 ```java
 public class CacheModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         // Declare the store
         topology.declareKeyValueStore("cache", String.class, Object.class);
-        
+
         topology.newAgent("CacheManager")
-            
+
             // Write to cache
             .node("store", null, (agentNode, key, value) -> {
                 KeyValueStore cache = agentNode.getStore("cache");
                 cache.put(key, value);
                 agentNode.result("stored");
             })
-            
+
             // Read from cache
             .node("retrieve", null, (agentNode, key) -> {
                 KeyValueStore cache = agentNode.getStore("cache");
@@ -83,17 +83,17 @@ Document stores handle entities with multiple fields using field-based storage. 
 ```clojure
 (aor/defagentmodule UserModule
   [topology]
-  
+
   ;; Declare document store with field types
   (aor/declare-document-store topology "users" String
     {:name String
      :email String
      :score Long
      :preferences Object})
-  
+
   (-> topology
       (aor/new-agent "UserManager")
-      
+
       ;; Create user
       (aor/node "create-user" nil
                 (fn [agent-node user-id name email]
@@ -105,7 +105,7 @@ Document stores handle entities with multiple fields using field-based storage. 
                        :score 0
                        :preferences {}})
                     (aor/result! agent-node :created))))
-      
+
       ;; Update score
       (aor/node "update-score" nil
                 (fn [agent-node user-id points]
@@ -114,7 +114,7 @@ Document stores handle entities with multiple fields using field-based storage. 
                     ;; Update single field
                     (store/put-field! users user-id :score (+ current-score points))
                     (aor/result! agent-node :updated))))
-      
+
       ;; Get user data
       (aor/node "get-user" nil
                 (fn [agent-node user-id]
@@ -127,7 +127,7 @@ Document stores handle entities with multiple fields using field-based storage. 
 ```java
 public class UserModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         // Declare document store with field types
         Map<String, Class<?>> fields = Map.of(
             "name", String.class,
@@ -136,9 +136,9 @@ public class UserModule extends AgentModule {
             "preferences", Object.class
         );
         topology.declareDocumentStore("users", String.class, fields);
-        
+
         topology.newAgent("UserManager")
-            
+
             // Create user
             .node("create-user", null, (agentNode, userId, name, email) -> {
                 DocumentStore users = agentNode.getStore("users");
@@ -151,7 +151,7 @@ public class UserModule extends AgentModule {
                 ));
                 agentNode.result("created");
             })
-            
+
             // Update score
             .node("update-score", null, (agentNode, userId, points) -> {
                 DocumentStore users = agentNode.getStore("users");
@@ -160,7 +160,7 @@ public class UserModule extends AgentModule {
                 users.putField(userId, "score", currentScore + points);
                 agentNode.result("updated");
             })
-            
+
             // Get user data
             .node("get-user", null, (agentNode, userId) -> {
                 DocumentStore users = agentNode.getStore("users");
@@ -179,13 +179,13 @@ PState stores manage complex, nested data structures using path-based navigation
 ```clojure
 (aor/defagentmodule ConversationModule
   [topology]
-  
+
   ;; PState for conversation trees
   (aor/declare-pstate-store topology "conversations" String)
-  
+
   (-> topology
       (aor/new-agent "ConversationManager")
-      
+
       ;; Initialize conversation
       (aor/node "start-conversation" nil
                 (fn [agent-node conv-id user-id]
@@ -197,7 +197,7 @@ PState stores manage complex, nested data structures using path-based navigation
                        :metadata {:created (System/currentTimeMillis)
                                  :status "active"}})
                     (aor/result! agent-node :started))))
-      
+
       ;; Add message to conversation
       (aor/node "add-message" nil
                 (fn [agent-node conv-id message]
@@ -205,11 +205,11 @@ PState stores manage complex, nested data structures using path-based navigation
                     ;; Navigate path and append to messages array
                     (store/update-at! convs conv-id [:messages]
                       (fn [messages]
-                        (conj messages 
+                        (conj messages
                           {:text message
                            :timestamp (System/currentTimeMillis)})))
                     (aor/result! agent-node :added))))
-      
+
       ;; Update nested metadata
       (aor/node "update-status" nil
                 (fn [agent-node conv-id status]
@@ -217,13 +217,13 @@ PState stores manage complex, nested data structures using path-based navigation
                     ;; Update deep nested value
                     (store/put-at! convs conv-id [:metadata :status] status)
                     (aor/result! agent-node :updated))))
-      
+
       ;; Query nested data
       (aor/node "get-messages" nil
                 (fn [agent-node conv-id]
                   (let [convs (aor/get-store agent-node "conversations")]
                     ;; Get value at path
-                    (aor/result! agent-node 
+                    (aor/result! agent-node
                       (store/get-at convs conv-id [:messages])))))))
 ```
 
@@ -231,12 +231,12 @@ PState stores manage complex, nested data structures using path-based navigation
 ```java
 public class ConversationModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         // PState for conversation trees
         topology.declarePStateStore("conversations", String.class);
-        
+
         topology.newAgent("ConversationManager")
-            
+
             // Initialize conversation
             .node("start-conversation", null, (agentNode, convId, userId) -> {
                 PStateStore convs = agentNode.getStore("conversations");
@@ -252,7 +252,7 @@ public class ConversationModule extends AgentModule {
                 convs.put(convId, conversation);
                 agentNode.result("started");
             })
-            
+
             // Add message to conversation
             .node("add-message", null, (agentNode, convId, message) -> {
                 PStateStore convs = agentNode.getStore("conversations");
@@ -265,7 +265,7 @@ public class ConversationModule extends AgentModule {
                 convs.putAt(convId, List.of("messages"), messages);
                 agentNode.result("added");
             })
-            
+
             // Update nested metadata
             .node("update-status", null, (agentNode, convId, status) -> {
                 PStateStore convs = agentNode.getStore("conversations");
@@ -273,7 +273,7 @@ public class ConversationModule extends AgentModule {
                 convs.putAt(convId, List.of("metadata", "status"), status);
                 agentNode.result("updated");
             })
-            
+
             // Query nested data
             .node("get-messages", null, (agentNode, convId) -> {
                 PStateStore convs = agentNode.getStore("conversations");
@@ -315,12 +315,12 @@ Stores are shared across all [agents](../terms/agent.md) in an [agent module](..
 ```clojure
 (aor/defagentmodule SharedStateModule
   [topology]
-  
+
   ;; Shared task queue
   (aor/declare-key-value-store topology "task-queue" String Object)
   (aor/declare-document-store topology "task-status" String
     {:status String :assigned-to String :completed-at Long})
-  
+
   ;; Producer agent adds tasks
   (-> topology
       (aor/new-agent "TaskProducer")
@@ -331,7 +331,7 @@ Stores are shared across all [agents](../terms/agent.md) in an [agent module](..
                     (store/put! queue task-id task-data)
                     (store/put-field! status task-id :status "pending")
                     (aor/result! agent-node :queued)))))
-  
+
   ;; Consumer agent processes tasks
   (-> topology
       (aor/new-agent "TaskConsumer")
@@ -347,7 +347,7 @@ Stores are shared across all [agents](../terms/agent.md) in an [agent module](..
                     (process-task task)
                     ;; Mark complete
                     (store/put-multiple! status task-id
-                      {:status "complete" 
+                      {:status "complete"
                        :completed-at (System/currentTimeMillis)})
                     (aor/result! agent-node :processed))))))
 ```
@@ -356,7 +356,7 @@ Stores are shared across all [agents](../terms/agent.md) in an [agent module](..
 ```java
 public class SharedStateModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         // Shared task queue
         topology.declareKeyValueStore("task-queue", String.class, Object.class);
         topology.declareDocumentStore("task-status", String.class, Map.of(
@@ -364,7 +364,7 @@ public class SharedStateModule extends AgentModule {
             "assigned-to", String.class,
             "completed-at", Long.class
         ));
-        
+
         // Producer agent adds tasks
         topology.newAgent("TaskProducer")
             .node("add-task", null, (agentNode, taskId, taskData) -> {
@@ -374,7 +374,7 @@ public class SharedStateModule extends AgentModule {
                 status.putField(taskId, "status", "pending");
                 agentNode.result("queued");
             });
-        
+
         // Consumer agent processes tasks
         topology.newAgent("TaskConsumer")
             .node("process-task", null, (agentNode, taskId, workerId) -> {

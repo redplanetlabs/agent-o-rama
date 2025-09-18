@@ -64,7 +64,7 @@ public class TestModules {
     }
 
     @Override
-    protected void defineAgents(AgentsTopology topology) {
+    protected void defineAgents(AgentTopology topology) {
       topology.declareAgentObject("openai-key", System.getenv("OPENAI_API_KEY"));
       topology.declareAgentObjectBuilder("openai", (AgentObjectSetup setup) -> {
         return OpenAiChatModel.builder()

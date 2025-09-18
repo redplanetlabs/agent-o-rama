@@ -16,23 +16,23 @@ Create alternate execution paths by [forking](../glossary.md#fork) from existing
 ```clojure
 (aor/defagentmodule ExplorationModule
   [topology]
-  
+
   (-> topology
       (aor/new-agent "Explorer")
-      
+
       ;; Initial analysis
       (aor/node "analyze" "explore-options"
                 (fn [agent-node data]
                   (let [initial-analysis (analyze data)]
-                    (aor/emit! agent-node "explore-options" 
+                    (aor/emit! agent-node "explore-options"
                               initial-analysis))))
-      
+
       ;; Fork to explore different strategies
       (aor/node "explore-options" nil
                 (fn [agent-node analysis]
                   ;; This node won't complete immediately
                   ;; Client will fork from here
-                  (aor/stream-chunk! agent-node 
+                  (aor/stream-chunk! agent-node
                     {:status "ready-to-fork"
                      :options ["aggressive" "conservative" "balanced"]
                      :analysis analysis})))))
@@ -41,18 +41,18 @@ Create alternate execution paths by [forking](../glossary.md#fork) from existing
 (let [client (aor/agent-client manager "Explorer")
       ;; Start initial execution
       main-invoke (aor/agent-initiate client data)]
-  
+
   ;; Wait for fork point
   (Thread/sleep 100)
-  
+
   ;; Fork into multiple strategies
-  (let [aggressive-fork (aor/agent-fork main-invoke 
+  (let [aggressive-fork (aor/agent-fork main-invoke
                           {:strategy "aggressive"})
         conservative-fork (aor/agent-fork main-invoke
                             {:strategy "conservative"})
         balanced-fork (aor/agent-fork main-invoke
                          {:strategy "balanced"})]
-    
+
     ;; Get results from all forks
     {:aggressive (aor/agent-result aggressive-fork)
      :conservative (aor/agent-result conservative-fork)
@@ -63,15 +63,15 @@ Create alternate execution paths by [forking](../glossary.md#fork) from existing
 ```java
 public class ExplorationModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         topology.newAgent("Explorer")
-            
+
             // Initial analysis
             .node("analyze", "explore-options", (agentNode, data) -> {
                 Map<String, Object> initialAnalysis = analyze(data);
                 agentNode.emit("explore-options", initialAnalysis);
             })
-            
+
             // Fork to explore different strategies
             .node("explore-options", null, (agentNode, analysis) -> {
                 // This node won't complete immediately
@@ -120,24 +120,24 @@ Map<String, Object> results = Map.of(
 ```clojure
 (aor/defagentmodule DecisionTreeModule
   [topology]
-  
+
   (-> topology
       (aor/new-agent "DecisionTree")
-      
+
       ;; Evaluate current position
       (aor/router-node "evaluate"
                        (fn [agent-node state depth]
                          (cond
                            ;; Reached max depth
                            (>= depth 3)
-                           (aor/result! agent-node 
+                           (aor/result! agent-node
                              {:score (score-position state)})
-                           
+
                            ;; Terminal state
                            (terminal? state)
                            (aor/result! agent-node
                              {:score (final-score state)})
-                           
+
                            ;; Continue exploring
                            :else
                            (let [moves (generate-moves state)]
@@ -166,13 +166,13 @@ Map<String, Object> results = Map.of(
 ```java
 public class DecisionTreeModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         topology.newAgent("DecisionTree")
-            
+
             // Evaluate current position
             .routerNode("evaluate", (agentNode, state, depth) -> {
                 int d = (int) depth;
-                
+
                 if (d >= 3) {
                     // Reached max depth
                     agentNode.result(Map.of("score", scorePosition(state)));
@@ -199,11 +199,11 @@ public List<Map<String, Object>> exploreTree(AgentInvoke invoke, int depth) {
     if (depth >= 3) {
         return List.of(invoke.result());
     }
-    
+
     // Get available moves
     Map<String, Object> streamData = invoke.getStreamChunks().get(0);
     List<Object> moves = (List<Object>) streamData.get("moves");
-    
+
     // Fork for each move
     return moves.stream()
         .map(move -> {
@@ -232,7 +232,7 @@ Build test suites for your [agents](../terms/agent.md) using [datasets](../terms
 ```clojure
 (aor/defagentmodule TestableModule
   [topology]
-  
+
   (-> topology
       (aor/new-agent "Calculator")
       (aor/node "calculate" nil
@@ -246,7 +246,7 @@ Build test suites for your [agents](../terms/agent.md) using [datasets](../terms
       dataset-id (aor/create-dataset manager "math-tests"
                    {:description "Basic math operations"
                     :version "1.0"})]
-  
+
   ;; Add test cases
   (doseq [[input expected] [["2 + 2" 4]
                             ["10 * 5" 50]
@@ -256,7 +256,7 @@ Build test suites for your [agents](../terms/agent.md) using [datasets](../terms
       {:input input
        :expected-output expected
        :tags ["arithmetic" "basic"]}))
-  
+
   ;; Run tests
   (let [client (aor/agent-client manager "Calculator")]
     (for [entry (aor/get-dataset-entries manager dataset-id)]
@@ -271,7 +271,7 @@ Build test suites for your [agents](../terms/agent.md) using [datasets](../terms
 ```java
 public class TestableModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         topology.newAgent("Calculator")
             .node("calculate", null, (agentNode, expression) -> {
                 double result = evaluateExpression((String) expression);
@@ -328,13 +328,13 @@ Test conversational [agents](../terms/agent.md) with multi-turn [datasets](../te
 ```clojure
 (aor/defagentmodule ConversationalTestModule
   [topology]
-  
+
   ;; Declare conversation store
   (aor/declare-pstate-store topology "conversations" String)
-  
+
   (-> topology
       (aor/new-agent "Assistant")
-      
+
       ;; Handle conversation
       (aor/node "chat" nil
                 (fn [agent-node conv-id message]
@@ -345,7 +345,7 @@ Test conversational [agents](../terms/agent.md) with multi-turn [datasets](../te
                         ;; Generate response based on history
                         response (generate-response updated)]
                     ;; Update conversation
-                    (store/put! convs conv-id 
+                    (store/put! convs conv-id
                       (conj updated {:assistant response}))
                     (aor/result! agent-node response))))))
 
@@ -353,7 +353,7 @@ Test conversational [agents](../terms/agent.md) with multi-turn [datasets](../te
 (let [manager (aor/agent-manager cluster "ConversationalTestModule")
       dataset-id (aor/create-dataset manager "conversations"
                    {:type "multi-turn"})]
-  
+
   ;; Add conversation scenarios
   (aor/add-dataset-entry manager dataset-id
     {:scenario "greeting-flow"
@@ -363,13 +363,13 @@ Test conversational [agents](../terms/agent.md) with multi-turn [datasets](../te
               :expected-contains ["assistant" "AI" "help"]}
              {:input ["conv-1" "Goodbye"]
               :expected-contains ["Bye" "farewell" "later"]}]})
-  
+
   ;; Test conversation flow
   (let [client (aor/agent-client manager "Assistant")
         scenario (first (aor/get-dataset-entries manager dataset-id))]
     (for [turn (:turns scenario)]
       (let [result (apply aor/agent-invoke client (:input turn))
-            passed? (some #(string/includes? 
+            passed? (some #(string/includes?
                            (string/lower-case result)
                            (string/lower-case %))
                          (:expected-contains turn))]
@@ -390,7 +390,7 @@ Create [evaluators](../glossary.md#evaluators) for automatic testing against [da
 ```clojure
 (aor/defagentmodule EvaluationModule
   [topology]
-  
+
   (-> topology
       (aor/new-agent "TextClassifier")
       (aor/node "classify" nil
@@ -400,31 +400,31 @@ Create [evaluators](../glossary.md#evaluators) for automatic testing against [da
 
 ;; Define evaluator
 (let [manager (aor/agent-manager cluster "EvaluationModule")
-      
+
       ;; Create evaluator function
-      evaluator (aor/create-evaluator 
+      evaluator (aor/create-evaluator
                   "accuracy-evaluator"
                   (fn [expected actual]
                     {:correct? (= expected actual)
                      :expected expected
                      :actual actual}))
-      
+
       ;; Create test dataset
       dataset-id (aor/create-dataset manager "classification-tests" {})
-      
+
       ;; Add test data
       _ (doseq [[text label] [["I love this!" "positive"]
                               ["This is terrible" "negative"]
                               ["It's okay" "neutral"]]]
           (aor/add-dataset-entry manager dataset-id
             {:input text :expected label}))
-      
+
       ;; Run evaluation
       results (aor/run-evaluation manager
                 "TextClassifier"
                 dataset-id
                 evaluator)]
-  
+
   ;; Calculate metrics
   (let [correct (count (filter :correct? results))
         total (count results)]
@@ -438,7 +438,7 @@ Create [evaluators](../glossary.md#evaluators) for automatic testing against [da
 ```java
 public class EvaluationModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         topology.newAgent("TextClassifier")
             .node("classify", null, (agentNode, text) -> {
                 String classification = classifyText((String) text);
@@ -508,7 +508,7 @@ Multi-metric [evaluations](../glossary.md#evaluators) for comprehensive testing 
   (let [exp-set (set expected)
         act-set (set actual)
         intersection (clojure.set/intersection exp-set act-set)]
-    {:precision (if (empty? act-set) 0 
+    {:precision (if (empty? act-set) 0
                   (/ (count intersection) (count act-set)))
      :recall (if (empty? exp-set) 0
                (/ (count intersection) (count exp-set)))
@@ -521,11 +521,11 @@ Multi-metric [evaluations](../glossary.md#evaluators) for comprehensive testing 
 
 ;; Use comprehensive evaluator
 (let [manager (aor/agent-manager cluster "Module")
-      evaluator (aor/create-evaluator "comprehensive" 
+      evaluator (aor/create-evaluator "comprehensive"
                   comprehensive-evaluator)
-      results (aor/run-evaluation manager 
+      results (aor/run-evaluation manager
                 "Agent" dataset-id evaluator)]
-  
+
   ;; Aggregate metrics
   {:avg-precision (avg (map :precision results))
    :avg-recall (avg (map :recall results))
@@ -542,25 +542,25 @@ Here's a complete example using all system features: [forking](../glossary.md#fo
 ```clojure
 (aor/defagentmodule MLPipelineModule
   [topology]
-  
+
   ;; Stores for pipeline state
   (aor/declare-pstate-store topology "experiments" String)
   (aor/declare-document-store topology "results" String
-    {:accuracy Double :precision Double :recall Double 
+    {:accuracy Double :precision Double :recall Double
      :parameters Object :timestamp Long})
-  
+
   (-> topology
       (aor/new-agent "MLPipeline")
-      
+
       ;; Train model with parameters
       (aor/node "train" "evaluate"
                 (fn [agent-node dataset-id parameters]
                   (let [model (train-model dataset-id parameters)]
-                    (aor/stream-chunk! agent-node 
+                    (aor/stream-chunk! agent-node
                       {:status "training-complete"
                        :parameters parameters})
                     (aor/emit! agent-node "evaluate" model dataset-id))))
-      
+
       ;; Evaluate model
       (aor/node "evaluate" nil
                 (fn [agent-node model dataset-id]
@@ -568,7 +568,7 @@ Here's a complete example using all system features: [forking](../glossary.md#fo
                         results (aor/get-store agent-node "results")]
                     ;; Store results
                     (store/put-multiple! results (str (random-uuid))
-                      (assoc metrics 
+                      (assoc metrics
                         :parameters (:parameters model)
                         :timestamp (System/currentTimeMillis)))
                     (aor/result! agent-node metrics))))))
@@ -576,38 +576,38 @@ Here's a complete example using all system features: [forking](../glossary.md#fo
 ;; Hyperparameter search with forking
 (let [manager (aor/agent-manager cluster "MLPipelineModule")
       client (aor/agent-client manager "MLPipeline")
-      
+
       ;; Create training dataset
       dataset-id (create-training-dataset manager)
-      
+
       ;; Parameter grid
       param-grid [{:learning-rate 0.001 :batch-size 32}
                   {:learning-rate 0.01 :batch-size 32}
                   {:learning-rate 0.001 :batch-size 64}
                   {:learning-rate 0.01 :batch-size 64}]
-      
+
       ;; Start base execution
       base-invoke (aor/agent-initiate client dataset-id {})
-      
+
       ;; Fork for each parameter set
       forks (for [params param-grid]
               {:params params
                :invoke (aor/agent-fork base-invoke params)})
-      
+
       ;; Collect results
       results (for [{:keys [params invoke]} forks]
-                (assoc (aor/agent-result invoke) 
+                (assoc (aor/agent-result invoke)
                   :parameters params))
-      
+
       ;; Find best parameters
       best (apply max-key :accuracy results)]
-  
+
   ;; Create evaluator for best model
   (let [evaluator (aor/create-evaluator "best-model"
                     (fn [expected actual]
                       (= expected (predict best actual))))]
     ;; Run final evaluation
-    (aor/run-evaluation manager "MLPipeline" 
+    (aor/run-evaluation manager "MLPipeline"
       test-dataset-id evaluator)))
 ```
 

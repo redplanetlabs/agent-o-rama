@@ -16,10 +16,10 @@ Any [agent node](../glossary.md#agent-node) can emit [streaming chunks](../gloss
 ```clojure
 (aor/defagentmodule StreamingModule
   [topology]
-  
+
   (-> topology
       (aor/new-agent "DataStreamer")
-      
+
       ;; Stream processing progress
       (aor/node "process-batch" nil
                 (fn [agent-node items]
@@ -27,7 +27,7 @@ Any [agent node](../glossary.md#agent-node) can emit [streaming chunks](../gloss
                     ;; Process item
                     (let [result (process-item item)]
                       ;; Stream progress update
-                      (aor/stream-chunk! agent-node 
+                      (aor/stream-chunk! agent-node
                         {:progress (inc idx)
                          :total (count items)
                          :current item
@@ -42,9 +42,9 @@ Any [agent node](../glossary.md#agent-node) can emit [streaming chunks](../gloss
 ```java
 public class StreamingModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         topology.newAgent("DataStreamer")
-            
+
             // Stream processing progress
             .node("process-batch", null, (agentNode, items) -> {
                 List<Object> itemList = (List<Object>) items;
@@ -75,8 +75,8 @@ public class StreamingModule extends AgentModule {
 **Clojure:**
 ```clojure
 ;; Subscribe to all stream chunks
-(def subscription 
-  (aor/agent-stream-all client 
+(def subscription
+  (aor/agent-stream-all client
     (fn [chunk]
       (println "Progress:" (:progress chunk) "/" (:total chunk)))))
 
@@ -126,17 +126,17 @@ Use `get-human-input` within [agent nodes](../glossary.md#agent-node) to create 
 ```clojure
 (aor/defagentmodule ApprovalModule
   [topology]
-  
+
   (-> topology
       (aor/new-agent "ApprovalFlow")
-      
+
       ;; Check if approval needed
       (aor/node "check-amount" "process"
                 (fn [agent-node amount]
                   (if (> amount 1000)
                     (aor/emit! agent-node "request-approval" amount)
                     (aor/emit! agent-node "process" amount))))
-      
+
       ;; Request human approval
       (aor/node "request-approval" "process"
                 (fn [agent-node amount]
@@ -148,7 +148,7 @@ Use `get-human-input` within [agent nodes](../glossary.md#agent-node) to create 
                       "approve" (aor/emit! agent-node "process" amount)
                       "reject" (aor/result! agent-node {:status "rejected"})
                       "escalate" (aor/emit! agent-node "escalate" amount)))))
-      
+
       ;; Process transaction
       (aor/node "process" nil
                 (fn [agent-node amount]
@@ -160,9 +160,9 @@ Use `get-human-input` within [agent nodes](../glossary.md#agent-node) to create 
 ```java
 public class ApprovalModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         topology.newAgent("ApprovalFlow")
-            
+
             // Check if approval needed
             .node("check-amount", "process", (agentNode, amount) -> {
                 Double value = (Double) amount;
@@ -172,7 +172,7 @@ public class ApprovalModule extends AgentModule {
                     agentNode.emit("process", amount);
                 }
             })
-            
+
             // Request human approval
             .node("request-approval", "process", (agentNode, amount) -> {
                 // Request includes prompt and options
@@ -181,7 +181,7 @@ public class ApprovalModule extends AgentModule {
                     "options", List.of("approve", "reject", "escalate")
                 );
                 String response = (String) agentNode.getHumanInput(request);
-                
+
                 switch (response) {
                     case "approve":
                         agentNode.emit("process", amount);
@@ -194,7 +194,7 @@ public class ApprovalModule extends AgentModule {
                         break;
                 }
             })
-            
+
             // Process transaction
             .node("process", null, (agentNode, amount) -> {
                 processTransaction(amount);
@@ -217,7 +217,7 @@ The [agent client](../glossary.md#agent-client) must handle [human input request
 (when-let [request (aor/agent-next-human-input-request invoke-handle)]
   (println "Agent asks:" (:prompt request))
   (println "Options:" (:options request))
-  
+
   ;; Get user's choice (in real app, from UI)
   (let [user-choice (get-user-input)]
     ;; Send response back to agent
@@ -237,7 +237,7 @@ HumanInputRequest request = invokeHandle.nextHumanInputRequest();
 if (request != null) {
     System.out.println("Agent asks: " + request.getPrompt());
     System.out.println("Options: " + request.getOptions());
-    
+
     // Get user's choice (in real app, from UI)
     String userChoice = getUserInput();
     // Send response back to agent
@@ -256,10 +256,10 @@ Combine [streaming chunks](../glossary.md#streaming-chunk) with [human input req
 ```clojure
 (aor/defagentmodule InteractiveAnalysisModule
   [topology]
-  
+
   (-> topology
       (aor/new-agent "DataAnalyzer")
-      
+
       ;; Analyze with streaming updates
       (aor/node "analyze" "review"
                 (fn [agent-node data]
@@ -267,12 +267,12 @@ Combine [streaming chunks](../glossary.md#streaming-chunk) with [human input req
                     (doseq [step steps]
                       (aor/stream-chunk! agent-node {:status step})
                       (Thread/sleep 500))
-                    
+
                     ;; Generate initial results
                     (let [results (analyze-data data)]
                       (aor/stream-chunk! agent-node {:status "Complete" :results results})
                       (aor/emit! agent-node "review" results)))))
-      
+
       ;; Request review
       (aor/node "review" nil
                 (fn [agent-node results]
@@ -307,9 +307,9 @@ Combine [streaming chunks](../glossary.md#streaming-chunk) with [human input req
 ```java
 public class InteractiveAnalysisModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         topology.newAgent("DataAnalyzer")
-            
+
             // Analyze with streaming updates
             .node("analyze", "review", (agentNode, data) -> {
                 String[] steps = {"Loading", "Cleaning", "Processing", "Analyzing"};
@@ -317,13 +317,13 @@ public class InteractiveAnalysisModule extends AgentModule {
                     agentNode.streamChunk(Map.of("status", step));
                     Thread.sleep(500);
                 }
-                
+
                 // Generate initial results
                 Map<String, Object> results = analyzeData(data);
                 agentNode.streamChunk(Map.of("status", "Complete", "results", results));
                 agentNode.emit("review", results);
             })
-            
+
             // Request review
             .node("review", null, (agentNode, results) -> {
                 Map<String, Object> request = Map.of(
@@ -332,7 +332,7 @@ public class InteractiveAnalysisModule extends AgentModule {
                     "options", List.of("accept", "refine", "restart")
                 );
                 String response = (String) agentNode.getHumanInput(request);
-                
+
                 switch (response) {
                     case "accept":
                         agentNode.result(results);

@@ -621,7 +621,7 @@
 (defprotocol UnderlyingObjects
   (underlying-objects [this]))
 
-(defprotocol AgentsTopologyInternal
+(defprotocol AgentTopologyInternal
   (declare-agent-object-builder-internal [this name afn options])
   (declare-evaluator-builder-internal [this type name description builder-fn
                                        options]))

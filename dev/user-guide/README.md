@@ -52,7 +52,7 @@ And in Java:
 ```java
 public class HelloWorldModule extends AgentModule {
     @Override
-    public void configure(AgentsTopology topology) {
+    public void configure(AgentTopology topology) {
         topology.newAgent("Greeter")
             .node("greet", null, (agentNode, name) -> {
                 agentNode.result("Hello, " + name + "!");
