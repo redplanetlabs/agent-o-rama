@@ -834,11 +834,15 @@
                                 :type "file"
                                 :accept ".jsonl,application/jsonl,application/octet-stream"
                                 :style {:display "none"}
+                                :key (str "file-input-" dataset-id) ; Force re-render to clear previous selections
                                 :onChange (fn [e]
                                             (let [files (.. e -target -files)
                                                   f (when (and files (> (.-length files) 0)) (aget files 0))]
+                                              (js/console.log "File selected for import:" (.-name f) "size:" (.-size f))
                                               (when f
                                                 (set-uploading! true)
+                                                ;; Clear the input value to allow re-selecting the same file
+                                                (set! (.. e -target -value) "")
                                                 (let [fd (js/FormData.)
                                                       url (str "/api/datasets/" (common/url-encode module-id) "/" (common/url-encode (str dataset-id)) "/import")]
                                                   (.append fd "file" f)
