@@ -55,8 +55,11 @@
                                                   page-key)
                             examples (or examples [])]
                         (doseq [{:keys [input reference-output tags]} examples]
-                          (let [line-map (cond-> {"input" input}
-                                           (some? reference-output) (assoc "output" reference-output)
+                          (let [frozen-input (common/->ui-serializable input)
+                                frozen-output (when (some? reference-output)
+                                                (common/->ui-serializable reference-output))
+                                line-map (cond-> {"input" frozen-input}
+                                           (some? frozen-output) (assoc "output" frozen-output)
                                            (seq tags) (assoc "tags" (->> tags (map name) vec)))
                                 line-json (j/write-value-as-string line-map mapper)]
                             (when-not first?
