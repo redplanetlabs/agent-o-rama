@@ -66,7 +66,8 @@
   (agent-node-state [this])
   (release-acquired-objects! [this])
   (get-streaming-recorder [this])
-  (get-declared-objects [this]))
+  (get-declared-objects [this])
+  (get-agent-invoke [this]))
 
 (defprotocol StreamingRecorderInternal
   (waitFinish [this]))
@@ -459,6 +460,7 @@
      (get-streaming-recorder [this] streaming-recorder)
      (release-acquired-objects! [this]
        (release-acquired-objects! fetcher))
+     (get-agent-invoke [this] (aor-types/->AgentInvokeImpl agent-task-id agent-id))
      (agent-node-state [this]
        {:emits      @emits-vol
         :result     @result-vol

@@ -52,7 +52,8 @@
   [all-feedback all-score-sets]
   (doseq [[fb score-sets] (mapv vector all-feedback all-score-sets)]
     (doseq [{:keys [source created-at modified-at]} fb]
-      (when-not (aor-types/ExperimentSourceImpl? source)
+      (when-not (and (aor-types/EvalSourceImpl? source)
+                     (aor-types/ExperimentSourceImpl? (:source source)))
         (throw (ex-info "Expected ExperimentSource"
                         {:feedback fb})))
       (when-not (and created-at modified-at (= created-at modified-at))

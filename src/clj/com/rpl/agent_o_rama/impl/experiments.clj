@@ -478,7 +478,10 @@
                  eval-fn
                  input
                  reference-output
-                 outputs)]
+                 outputs)
+        source  (aor-types/->valid-EvalSourceImpl eval-name
+                                                  (anode/get-agent-invoke agent-node)
+                                                  source)]
     (validate-results! res)
     (when (and (= :regular eval-type) (not (empty? eval-infos)))
       (assert (= 1 (count eval-infos)))

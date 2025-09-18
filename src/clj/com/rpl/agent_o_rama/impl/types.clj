@@ -27,6 +27,7 @@
     AiSource
     ApiSource
     BulkUploadSource
+    EvalSource
     ExperimentSource
     HumanSource
     InfoSource]
@@ -156,6 +157,14 @@
   (getAgentName [this] agent-name)
   (getAgentInvoke [this] agent-invoke)
   (getSourceString [this] (str "agent[" module-name "/" agent-name "]")))
+
+(defaorrecord EvalSourceImpl
+  [eval-name :- String
+   agent-invoke :- AgentInvokeImpl
+   source :- (s/maybe InfoSource)]
+  EvalSource
+  (getEvalName [this] eval-name)
+  (getSourceString [this] (str "eval[" eval-name "]")))
 
 ;; Core types
 
