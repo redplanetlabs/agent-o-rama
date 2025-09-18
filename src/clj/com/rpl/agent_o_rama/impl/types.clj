@@ -10,9 +10,15 @@
    [com.rpl.agentorama
     AgentComplete
     AgentInvoke
+    AgentRef
     ExampleRun
     HumanInputRequest
     ToolInfo]
+   [com.rpl.agentorama.analytics
+    AgentInvokeStats
+    BasicAgentInvokeStats
+    SubagentInvokeStats
+    OpStats]
    [com.rpl.agentorama.impl
     NippyMap]
    [com.rpl.rama.integration
@@ -47,6 +53,33 @@
         (instance? NodeAggStart node) AGG-START-NODE-KW
         (instance? NodeAgg node) AGG-NODE-KW
         :else (throw (h/ex-info "Unexpected node type" {:class (class node)}))))
+
+(def NESTED-OP-TYPE-CLJ
+  {:store-read  NestedOpType/STORE_READ
+   :store-write NestedOpType/STORE_WRITE
+   :db-read     NestedOpType/DB_READ
+   :db-write    NestedOpType/DB_WRITE
+   :model-call  NestedOpType/MODEL_CALL
+   :tool-call   NestedOpType/TOOL_CALL
+   :agent-call  NestedOpType/AGENT_CALL
+   :human-input NestedOpType/HUMAN_INPUT
+   :other       NestedOpType/OTHER
+  })
+
+(def NESTED-OP-TYPE-JAVA
+  (into {} (for [[k v] NESTED-OP-TYPE-CLJ] [v k])))
+
+(defn nested-op-type->clj
+  [v]
+  (if-let [res (get NESTED-OP-TYPE-JAVA v)]
+    res
+    (throw (h/ex-info "Unknown nested op type" {:val v :type (class v)}))))
+
+(defn nested-op-type->java
+  [v]
+  (if-let [res (get NESTED-OP-TYPE-CLJ v)]
+    res
+    (throw (h/ex-info "Unknown nested op type" {:val v :type (class v)}))))
 
 ;; TODO: use flexible serialization for these to ease updating the
 ;; library? or just some of them?
@@ -506,30 +539,47 @@
 
 ;; Analytics
 
-(drp/defrecord+ OpStats
+(drp/defrecord+ OpStatsImpl
   [count :- Long
-   total-time-millis :- Long
-  ])
+   total-time-millis :- Long]
+  OpStats
+  (getCount [this] (int count))
+  (getTotalTimeMillis [this] total-time-millis))
 
-(drp/defrecord+ BasicAgentInvokeStats
-  [nested-op-stats :- {clojure.lang.Keyword OpStats}
+(drp/defrecord+ BasicAgentInvokeStatsImpl
+  [nested-op-stats :- {clojure.lang.Keyword OpStatsImpl}
    input-token-count :- Long
    output-token-count :- Long
    total-token-count :- Long
-   node-stats :- {String OpStats}
-  ])
+   node-stats :- {String OpStatsImpl}]
+  BasicAgentInvokeStats
+  (getNestedOpStats [this]
+    (transform MAP-KEYS nested-op-type->java nested-op-stats))
+  (getInputTokenCount [this] (int input-token-count))
+  (getOutputTokenCount [this] (int output-token-count))
+  (getTotalTokenCount [this] (int total-token-count))
+  (getNodeStats [this] node-stats))
 
-(drp/defrecord+ AgentRef
+(drp/defrecord+ AgentRefImpl
   [module-name :- String
-   agent-name :- String])
+   agent-name :- String]
+  AgentRef
+  (getModuleName [this] module-name)
+  (getAgentName [this] agent-name))
 
-(drp/defrecord+ SubagentInvokeStats
+(drp/defrecord+ SubagentInvokeStatsImpl
   [count :- Long
-   basic-stats :- BasicAgentInvokeStats])
+   basic-stats :- BasicAgentInvokeStatsImpl]
+  SubagentInvokeStats
+  (getCount [this] (int count))
+  (getBasicStats [this] basic-stats))
 
-(drp/defrecord+ AgentInvokeStats
-  [subagent-stats :- {AgentRef SubagentInvokeStats}
-   basic-stats :- BasicAgentInvokeStats])
+(drp/defrecord+ AgentInvokeStatsImpl
+  [subagent-stats :- {AgentRefImpl SubagentInvokeStatsImpl}
+   basic-stats :- BasicAgentInvokeStatsImpl]
+  AgentInvokeStats
+  (getSubagentStats [this] subagent-stats)
+  (getBasicStats [this] basic-stats))
 
 ;; Misc
 
