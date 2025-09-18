@@ -31,7 +31,7 @@
 (defn ai-stats [& args] (apply aor-types/->AgentInvokeStatsImpl args))
 (defn bai-stats [& args] (apply aor-types/->BasicAgentInvokeStatsImpl args))
 (defn op-stats [& args] (apply aor-types/->OpStatsImpl args))
-(defn nop-info [& args] (apply aor-types/->NestedOpInfo args))
+(defn nop-info [& args] (apply aor-types/->NestedOpInfoImpl args))
 (defn sa-ref [& args] (apply aor-types/->AgentRefImpl args))
 (defn sa-stats [& args] (apply aor-types/->SubagentInvokeStatsImpl args))
 

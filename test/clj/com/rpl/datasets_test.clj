@@ -788,7 +788,7 @@
        (is (some? created-at))
        (is (= created-at modified-at))
        (bind ar-source
-         (aor-types/->AgentRunSource "foo.Module" "agent1" (aor-types/->AgentInvokeImpl 1 2)))
+         (aor-types/->AgentRunSourceImpl "foo.Module" "agent1" (aor-types/->AgentInvokeImpl 1 2)))
        (binding [aor-types/OPERATION-SOURCE ar-source]
          (add-example-and-wait!
           manager
@@ -813,7 +813,7 @@
               [{:input  "example1-1"
                 :reference-output nil
                 :tags   #{}
-                :source (aor-types/->ApiSource)}
+                :source (aor-types/->ApiSourceImpl)}
                {:input  "example1-2"
                 :reference-output "output1-2"
                 :tags   #{"tag1" "tag2"}
@@ -824,12 +824,14 @@
        (bind {:keys [examples pagination-params]}
          (get-examples-page ds-id1 "snapshot1" 10 nil))
        (is (nil? pagination-params))
-       (is (= (examples-cleaned examples)
-              [{:input "example1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSource)}
-               {:input  "example1-2"
-                :reference-output "output1-2"
-                :tags   #{"tag1" "tag2"}
-                :source ar-source}]))
+       (is
+        (=
+         (examples-cleaned examples)
+         [{:input "example1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSourceImpl)}
+          {:input  "example1-2"
+           :reference-output "output1-2"
+           :tags   #{"tag1" "tag2"}
+           :source ar-source}]))
        (add-example-and-wait-java! manager
                                    ds-id1
                                    "snapshot1"
@@ -842,24 +844,29 @@
        (is
         (=
          (examples-cleaned examples)
-         [{:input "example1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSource)}
+         [{:input "example1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSourceImpl)}
           {:input  "example1-2"
            :reference-output "output1-2"
            :tags   #{"tag1" "tag2"}
            :source ar-source}
-          {:input "examples1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSource)}]))
+          {:input  "examples1-1"
+           :reference-output nil
+           :tags   #{}
+           :source (aor-types/->ApiSourceImpl)}]))
 
 
        ;; verify original isn't affected
        (bind {:keys [examples pagination-params]}
          (get-examples-page ds-id1 nil 10 nil))
        (is (nil? pagination-params))
-       (is (= (examples-cleaned examples)
-              [{:input "example1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSource)}
-               {:input  "example1-2"
-                :reference-output "output1-2"
-                :tags   #{"tag1" "tag2"}
-                :source ar-source}]))
+       (is
+        (=
+         (examples-cleaned examples)
+         [{:input "example1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSourceImpl)}
+          {:input  "example1-2"
+           :reference-output "output1-2"
+           :tags   #{"tag1" "tag2"}
+           :source ar-source}]))
 
        (aor/snapshot-dataset! manager ds-id1 "snapshot1" "snapshot2")
        (bind {:keys [examples pagination-params]}
@@ -868,12 +875,15 @@
        (is
         (=
          (examples-cleaned examples)
-         [{:input "example1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSource)}
+         [{:input "example1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSourceImpl)}
           {:input  "example1-2"
            :reference-output "output1-2"
            :tags   #{"tag1" "tag2"}
            :source ar-source}
-          {:input "examples1-1" :reference-output nil :tags #{} :source (aor-types/->ApiSource)}]))
+          {:input  "examples1-1"
+           :reference-output nil
+           :tags   #{}
+           :source (aor-types/->ApiSourceImpl)}]))
 
 
        (bind [id1 id2 id3] (mapv :id examples))
@@ -947,7 +957,7 @@
               [{:input  "!!example-1"
                 :reference-output "out1"
                 :tags   #{"bar"}
-                :source (aor-types/->ApiSource)}]))
+                :source (aor-types/->ApiSourceImpl)}]))
 
        (bind {:keys [examples pagination-params]}
          (get-examples-page ds-id1 "snapshot1" 10 nil))
@@ -956,7 +966,7 @@
               [{:input  "snapshot-example-1"
                 :reference-output "snap-out-1"
                 :tags   #{"a" "c"}
-                :source (aor-types/->ApiSource)}
+                :source (aor-types/->ApiSourceImpl)}
                {:input  "example1-2"
                 :reference-output "output1-2"
                 :tags   #{"tag1" "tag2"}
@@ -1033,12 +1043,12 @@
               [{:input  {"p1" [1 2 3]}
                 :reference-output "xyz"
                 :tags   #{}
-                :source (aor-types/->ApiSource)}
+                :source (aor-types/->ApiSourceImpl)}
                {:input  {"p1" []
                          "p2" "abc"}
                 :reference-output nil
                 :tags   #{}
-                :source (aor-types/->ApiSource)}]))
+                :source (aor-types/->ApiSourceImpl)}]))
 
        (bind [id1 id2] (mapv :id examples))
 
@@ -1072,12 +1082,12 @@
               [{:input  {"p1" [10]}
                 :reference-output "ww"
                 :tags   #{}
-                :source (aor-types/->ApiSource)}
+                :source (aor-types/->ApiSourceImpl)}
                {:input  {"p1" []
                          "p2" "abc"}
                 :reference-output nil
                 :tags   #{}
-                :source (aor-types/->ApiSource)}]))
+                :source (aor-types/->ApiSourceImpl)}]))
 
 
        (add-example-and-wait! manager
@@ -1097,16 +1107,16 @@
               [{:input  {"p1" [10]}
                 :reference-output "ww"
                 :tags   #{}
-                :source (aor-types/->ApiSource)}
+                :source (aor-types/->ApiSourceImpl)}
                {:input  {"p1" []
                          "p2" "abc"}
                 :reference-output nil
                 :tags   #{}
-                :source (aor-types/->ApiSource)}
+                :source (aor-types/->ApiSourceImpl)}
                {:input  {"p1" [7]}
                 :reference-output nil
                 :tags   #{}
-                :source (aor-types/->ApiSource)}
+                :source (aor-types/->ApiSourceImpl)}
               ]))
 
        (bind {:keys [examples pagination-params]}
@@ -1120,11 +1130,11 @@
               [{:input  {"p1" [8]}
                 :reference-output nil
                 :tags   #{}
-                :source (aor-types/->ApiSource)}
+                :source (aor-types/->ApiSourceImpl)}
                {:input  {"p1" [9]}
                 :reference-output nil
                 :tags   #{}
-                :source (aor-types/->ApiSource)}
+                :source (aor-types/->ApiSourceImpl)}
               ]))
 
        (aor/destroy-dataset! manager ds-id1)
@@ -1188,11 +1198,11 @@
               [{:input  "a"
                 :reference-output "x"
                 :tags   #{"t1" "t2"}
-                :source (aor-types/->BulkUploadSource)}
+                :source (aor-types/->BulkUploadSourceImpl)}
                {:input  "b"
                 :reference-output nil
                 :tags   #{}
-                :source (aor-types/->BulkUploadSource)}
+                :source (aor-types/->BulkUploadSourceImpl)}
               ]))
 
        (is (= (into {} (for [e examples] [(:id e) (dissoc e :id)]))
@@ -1211,8 +1221,8 @@
 
 
        ;; test search with filters
-       (bind human-source (aor-types/->HumanSource "user"))
-       (bind ai-source (aor-types/->AiSource))
+       (bind human-source (aor-types/->HumanSourceImpl "user"))
+       (bind ai-source (aor-types/->AiSourceImpl))
 
        (binding [aor-types/OPERATION-SOURCE human-source]
          (add-example-and-wait! manager

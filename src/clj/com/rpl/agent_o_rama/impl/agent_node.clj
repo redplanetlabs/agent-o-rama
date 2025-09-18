@@ -423,7 +423,7 @@
          (throw (h/ex-info "Info map must contain string keys" {:info info})))
        (vswap! nested-ops-vol
                conj
-               (aor-types/->NestedOpInfo
+               (aor-types/->NestedOpInfoImpl
                 start-time-millis
                 finish-time-millis
                 (aor-types/nested-op-type->clj type)
@@ -445,7 +445,7 @@
              ret     (.get cf)]
          (vswap! nested-ops-vol
                  conj
-                 (aor-types/->NestedOpInfo
+                 (aor-types/->NestedOpInfoImpl
                   start-time-millis
                   (h/current-time-millis)
                   :human-input

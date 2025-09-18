@@ -808,7 +808,7 @@
                input
                (.referenceOutput options)
                (into #{} (.tags options))
-               (or aor-types/OPERATION-SOURCE (aor-types/->ApiSource))
+               (or aor-types/OPERATION-SOURCE (aor-types/->ApiSourceImpl))
               ))
              (.thenApply
               (h/cf-function [{error aor-types/AGENTS-TOPOLOGY-NAME}]

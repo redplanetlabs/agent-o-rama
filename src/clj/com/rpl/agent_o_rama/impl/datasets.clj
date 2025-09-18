@@ -495,7 +495,7 @@
   (let [sem    (Semaphore. 100)
         mapper (j/object-mapper)]
     (with-open [r (io/reader path)]
-      (binding [aor-types/OPERATION-SOURCE (aor-types/->BulkUploadSource)]
+      (binding [aor-types/OPERATION-SOURCE (aor-types/->BulkUploadSourceImpl)]
         (doseq [line (line-seq r)]
           (when-not (str/blank? line)
             (let [m (try

@@ -18,9 +18,16 @@
    [com.rpl.agentorama.analytics
     AgentInvokeStats
     BasicAgentInvokeStats
+    NestedOpInfo
     SubagentInvokeStats
     OpStats]
-   [com.rpl.agentorama.sourcee
+   [com.rpl.agentorama.source
+    AgentRunSource
+    AiSource
+    ApiSource
+    BulkUploadSource
+    ExperimentSource
+    HumanSource
     InfoSource]
    [com.rpl.agentorama.impl
     NippyMap]
@@ -109,37 +116,43 @@
   [^InfoSource i]
   (.getSourceString i))
 
-(drp/defrecord+ HumanSource
+(drp/defrecord+ HumanSourceImpl
   [name :- String]
-  InfoSource
+  HumanSource
+  (getName [this] name)
   (getSourceString [this] (str "human[" name "]")))
 
-(drp/defrecord+ AiSource
+(drp/defrecord+ AiSourceImpl
   []
-  InfoSource
+  AiSource
   (getSourceString [this] "ai"))
 
-(drp/defrecord+ ApiSource
+(drp/defrecord+ ApiSourceImpl
   []
-  InfoSource
+  ApiSource
   (getSourceString [this] "api"))
 
-(drp/defrecord+ BulkUploadSource
+(drp/defrecord+ BulkUploadSourceImpl
   []
-  InfoSource
+  BulkUploadSource
   (getSourceString [this] "bulkUpload"))
 
-(drp/defrecord+ ExperimentSource
+(drp/defrecord+ ExperimentSourceImpl
   [dataset-id :- UUID
    experiment-id :- UUID]
-  InfoSource
+  ExperimentSource
+  (getDatasetId [this] dataset-id)
+  (getExperimentId [this] experiment-id)
   (getSourceString [this] "experiment"))
 
-(drp/defrecord+ AgentRunSource
+(drp/defrecord+ AgentRunSourceImpl
   [module-name :- String
    agent-name :- String
    agent-invoke :- AgentInvokeImpl]
-  InfoSource
+  AgentRunSource
+  (getModuleName [this] module-name)
+  (getAgentName [this] agent-name)
+  (getAgentInvoke [this] agent-invoke)
   (getSourceString [this] (str "agent[" module-name "/" agent-name "]")))
 
 ;; Core types
@@ -186,7 +199,7 @@
   [invoke-id :- UUID
    args :- [s/Any]])
 
-(drp/defrecord+ NestedOpInfo
+(drp/defrecord+ NestedOpInfoImpl
   [start-time-millis :- Long
    finish-time-millis :- Long
    type :-
@@ -200,7 +213,12 @@
            :human-input
            :other)
    ;; info for models contains token stats, input prompt, output, etc.
-   info :- (s/maybe {String s/Any})])
+   info :- (s/maybe {String s/Any})]
+  NestedOpInfo
+  (getStartTimeMillis [this] start-time-millis)
+  (getFinishTimeMillis [this] start-time-millis)
+  (getType [this] (nested-op-type->java type))
+  (getInfo [this] info))
 
 (drp/defrecord+ AgentNodeEmit
   [invoke-id :- UUID
@@ -222,7 +240,7 @@
    node-fn-res :- s/Any
    emits :- [AgentNodeEmit]
    result :- (s/maybe AgentResult)
-   nested-ops :- [NestedOpInfo]
+   nested-ops :- [NestedOpInfoImpl]
    finish-time-millis :- Long
    fork-context :- (s/maybe ForkContext)
   ])
@@ -238,7 +256,7 @@
    invoke-id :- UUID
    retry-num :- Long
    throwable-str :- String
-   nested-ops :- [NestedOpInfo]
+   nested-ops :- [NestedOpInfoImpl]
   ])
 
 (drp/defrecord+ ExceptionSummary

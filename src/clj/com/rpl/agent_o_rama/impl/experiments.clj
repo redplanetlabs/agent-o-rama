@@ -567,7 +567,7 @@
                                  (.getAgentClient agent-node (:agent-name target-spec))
                                  (.getAgentClient agent-node EVALUATOR-AGENT-NAME)))
                              targets)
-               source       (aor-types/->valid-ExperimentSource dataset-id id)
+               source       (aor-types/->valid-ExperimentSourceImpl dataset-id id)
                initiate-fns
                (mapv
                 (fn [{:keys [target-spec input->args]} client]
@@ -713,7 +713,7 @@
                              builder-params
                              (experiment-type->kw (class spec))
                              (to-eval-infos agent-initiates)
-                             (aor-types/->valid-ExperimentSource dataset-id id)))]
+                             (aor-types/->valid-ExperimentSourceImpl dataset-id id)))]
                        (store/pstate-transform!
                         [(keypath dataset-id :experiments id :results result-id)
                          (keypath :eval-initiates eval-name)

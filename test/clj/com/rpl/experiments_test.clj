@@ -52,7 +52,7 @@
   [all-feedback all-score-sets]
   (doseq [[fb score-sets] (mapv vector all-feedback all-score-sets)]
     (doseq [{:keys [source created-at modified-at]} fb]
-      (when-not (aor-types/ExperimentSource? source)
+      (when-not (aor-types/ExperimentSourceImpl? source)
         (throw (ex-info "Expected ExperimentSource"
                         {:feedback fb})))
       (when-not (and created-at modified-at (= created-at modified-at))
@@ -507,7 +507,7 @@
          (bind ais (select [:results MAP-VALS :agent-initiates MAP-VALS :agent-invoke] res))
          (is (every? aor-types/AgentInvokeImpl? ais))
          (doseq [{:keys [agent-invoke-id task-id]} ais]
-           (is (aor-types/ExperimentSource?
+           (is (aor-types/ExperimentSourceImpl?
                 (foreign-select-one [(keypath agent-invoke-id) :source] foo-root {:pkey task-id})
                )))
 

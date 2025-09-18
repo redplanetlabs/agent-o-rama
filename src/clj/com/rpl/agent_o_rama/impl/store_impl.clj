@@ -71,7 +71,7 @@
       (throw (:exception ret)))
     (vswap! (:nested-ops-vol store-params)
             conj
-            (aor-types/->NestedOpInfo
+            (aor-types/->NestedOpInfoImpl
              start-time
              finish-time
              :store-write
@@ -99,7 +99,7 @@
     (vswap!
      (:nested-ops-vol store-params)
      conj
-     (aor-types/->valid-NestedOpInfo
+     (aor-types/->valid-NestedOpInfoImpl
       start-time
       finish-time
       :store-read

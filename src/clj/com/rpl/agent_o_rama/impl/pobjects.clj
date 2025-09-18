@@ -9,6 +9,8 @@
     AgentDeclaredObjectsTaskGlobal
     AgentNodeExecutorTaskGlobal
     RamaClientsTaskGlobal]
+   [com.rpl.agentorama.source
+    InfoSource]
    [com.rpl.agent_o_rama.impl.types
     AgentInvokeStatsImpl
     AgentNodeEmit
@@ -18,8 +20,7 @@
     ExceptionSummary
     ExperimentInputSelector
     ForkContext
-    InfoSource
-    NestedOpInfo
+    NestedOpInfoImpl
     NodeHumanInputRequest
     HistoricalAgentGraphInfo
     Node
@@ -169,7 +170,7 @@
     {:agent-id            UUID
      :agent-task-id       Long
      :node                String
-     :nested-ops          [NestedOpInfo]
+     :nested-ops          [NestedOpInfoImpl]
      :emits               [AgentNodeEmit]
      :result              AgentResult
      :start-time-millis   Long
