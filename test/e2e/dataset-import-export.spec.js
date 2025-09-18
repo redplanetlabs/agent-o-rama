@@ -217,8 +217,13 @@ test.describe('Dataset Import/Export Round-trip', () => {
     
     // Verify the modal shows success
     await expect(importModal.getByText('Import Successful')).toBeVisible();
-    await expect(importModal.getByText('3')).toBeVisible(); // Success count
-    await expect(importModal.getByText('0')).toBeVisible(); // Failure count
+    
+    // Check success and failure counts more specifically
+    const successSection = importModal.locator('.bg-green-50');
+    await expect(successSection.locator('.text-2xl.font-bold').getByText('3')).toBeVisible(); // Success count
+    
+    const failureSection = importModal.locator('.bg-red-50');
+    await expect(failureSection.locator('.text-2xl.font-bold').getByText('0')).toBeVisible(); // Failure count
     
     // Close the modal
     await importModal.getByText('×').click();
@@ -271,9 +276,9 @@ test.describe('Dataset Import/Export Round-trip', () => {
     expect(outputText).toContain('sources');
     expect(outputText).toContain('0.95');
     
-    // Verify tags are preserved
-    await expect(exampleModal.getByText('geography')).toBeVisible();
-    await expect(exampleModal.getByText('easy')).toBeVisible();
+    // Verify tags are preserved (look specifically for tag elements, not JSON content)
+    await expect(exampleModal.locator('.bg-blue-100').getByText('geography')).toBeVisible();
+    await expect(exampleModal.locator('.bg-blue-100').getByText('easy')).toBeVisible();
     
     // Close the modal
     await page.keyboard.press('Escape');
@@ -296,9 +301,9 @@ test.describe('Dataset Import/Export Round-trip', () => {
     expect(mathOutputText).toContain('π * r²');
     expect(mathOutputText).toContain('steps');
     
-    // Verify tags for math example
-    await expect(exampleModal.getByText('mathematics')).toBeVisible();
-    await expect(exampleModal.getByText('geometry')).toBeVisible();
+    // Verify tags for math example (look specifically for tag elements)
+    await expect(exampleModal.locator('.bg-blue-100').getByText('mathematics')).toBeVisible();
+    await expect(exampleModal.locator('.bg-blue-100').getByText('geometry')).toBeVisible();
     
     await page.keyboard.press('Escape');
     console.log('Mathematical data integrity verified for imported example.');
@@ -318,9 +323,9 @@ test.describe('Dataset Import/Export Round-trip', () => {
     expect(codeOutputText).toContain('for (let i');
     expect(codeOutputText).toContain('explanation');
     
-    // Verify programming tags
-    await expect(exampleModal.getByText('programming')).toBeVisible();
-    await expect(exampleModal.getByText('javascript')).toBeVisible();
+    // Verify programming tags (look specifically for tag elements)
+    await expect(exampleModal.locator('.bg-blue-100').getByText('programming')).toBeVisible();
+    await expect(exampleModal.locator('.bg-blue-100').getByText('javascript')).toBeVisible();
     
     await page.keyboard.press('Escape');
     console.log('Code data integrity verified for imported example.');
@@ -374,8 +379,13 @@ test.describe('Dataset Import/Export Round-trip', () => {
       
       // Verify the modal shows partial success with errors
       await expect(errorModal.getByText('Import Completed with Errors')).toBeVisible();
-      await expect(errorModal.getByText('1')).toBeVisible(); // Success count
-      await expect(errorModal.getByText('2')).toBeVisible(); // Failure count
+      
+      // Check success and failure counts more specifically
+      const successSection = errorModal.locator('.bg-green-50');
+      await expect(successSection.locator('.text-2xl.font-bold').getByText('1')).toBeVisible(); // Success count
+      
+      const failureSection = errorModal.locator('.bg-red-50');
+      await expect(failureSection.locator('.text-2xl.font-bold').getByText('2')).toBeVisible(); // Failure count
       
       // Verify error details are shown
       await expect(errorModal.getByText('Error Details')).toBeVisible();
@@ -387,6 +397,7 @@ test.describe('Dataset Import/Export Round-trip', () => {
       console.log('Import error handling verified - partial success with failures reported.');
       
       // Cleanup
+      page.on('dialog', dialog => dialog.accept()); // Auto-accept confirm dialogs
       await page.getByText('Datasets & Experiments').click();
       await deleteDataset(page, testDatasetName);
       
@@ -432,7 +443,7 @@ test.describe('Dataset Import/Export Round-trip', () => {
     console.log('Import button is available and enabled in normal mode.');
     
     // Cleanup
-    page.on('dialog', dialog => dialog.accept());
+    page.on('dialog', dialog => dialog.accept()); // Auto-accept confirm dialogs
     await page.getByText('Datasets & Experiments').click();
     await deleteDataset(page, testDatasetName);
     

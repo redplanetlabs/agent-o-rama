@@ -82,7 +82,6 @@
 
 (defn handle-dataset-import
   [request]
-  (def request request)
   (let [{:keys [uri params multipart-params]} request
         [module-id dataset-id] (parse-import-params uri)
         snapshot (not-empty (get params :snapshot))
