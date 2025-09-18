@@ -14,6 +14,8 @@
     ExampleRun
     HumanInputRequest
     NestedOpType
+    RunInfo
+    RunType
     ToolInfo]
    [com.rpl.agentorama.analytics
     AgentInvokeStats
@@ -509,7 +511,7 @@
 
 
 ;; since this is stored in a PState
-(defaorrecord ^{:features {:nippy-8-byte-hash false}} StartExperiment
+(defaorrecord StartExperiment
   [id :- UUID
    name :- String
 
@@ -609,7 +611,7 @@
   (getSubagentStats [this] subagent-stats)
   (getBasicStats [this] basic-stats))
 
-(defaorrecord ^{:features {:nippy-8-byte-hash false}} FeedbackImpl
+(defaorrecord FeedbackImpl
   [scores :- {String Object}
    source :- InfoSource
    created-at :- Long
@@ -619,6 +621,30 @@
   (getSource [this] source)
   (getCreatedAt [this] created-at)
   (getModifiedAt [this] modified-at))
+
+
+(defaorrecord RunInfoImpl
+  [type :- (s/enum :agent :node)
+   latency-millis :- Long
+   feedback :- [FeedbackImpl]
+   agent-stats :- AgentInvokeStatsImpl
+   nested-ops :- [NestedOpInfoImpl]]
+  RunInfo
+  (getRunType [this]
+    (cond
+      (= type :agent)
+      RunType/AGENT
+
+      (= type :node)
+      RunType/NODE
+
+      :else
+      (throw (h/ex-info "Unexpected run type" {:type type}))))
+  (getLatencyMillis [this] latency-millis)
+  (getFeedback [this] feedback)
+  (getAgentStats [this] agent-stats)
+  (getNodeNestedOps [this] nested-ops))
+
 
 ;; Misc
 
