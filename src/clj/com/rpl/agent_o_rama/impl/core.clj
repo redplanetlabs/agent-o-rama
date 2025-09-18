@@ -200,7 +200,7 @@
 
 (defn define-agents!
   [setup topologies stream-topology mb-topology agent-graphs mirror-agents
-   store-info declared-objects evaluator-builders]
+   store-info declared-objects evaluator-builders action-builders]
   (declare-object* setup
                    (symbol (po/agents-store-info-name))
                    (aor-types/->valid-StoreInfo store-info {}))
@@ -220,6 +220,7 @@
                    (AgentDeclaredObjectsTaskGlobal.
                     declared-objects
                     evaluator-builders
+                    action-builders
                     (mk-agents-info agent-graphs mirror-agents)
                     (transform MAP-VALS
                                graph/resolve-agent-graph

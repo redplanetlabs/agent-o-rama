@@ -73,7 +73,8 @@
         mirror-agents-vol      (volatile! {})
         store-info-vol         (volatile! {})
         declared-objects-vol   (volatile! {})
-        evaluator-builders-vol (volatile! {})]
+        evaluator-builders-vol (volatile! {})
+        action-builders-vol    (volatile! {})]
     (reify
      AgentTopology
      (newAgent [this name]
@@ -202,7 +203,8 @@
         @mirror-agents-vol
         @store-info-vol
         @declared-objects-vol
-        @evaluator-builders-vol))
+        @evaluator-builders-vol
+        @action-builders-vol))
      aor-types/AgentTopologyInternal
      (declare-agent-object-builder-internal [this name afn options]
        (when-not (ifn? afn)
@@ -261,8 +263,30 @@
                  })
        ))
      (declare-action-builder-internal [this name description builder-fn options]
-                                      ;; TODO: <<<<>>>>
-     )
+       (when (contains? @action-builders-vol name)
+         (throw (h/ex-info "Action builder already declared" {:name name})))
+       (when (h/contains-string? name "/")
+         (throw (h/ex-info "Action builder name may not include '/'"
+                           {:name name})))
+       (when-not (ifn? builder-fn)
+         (throw (h/ex-info "Builder must be a function"
+                           {:type (class builder-fn)})))
+       (let [full-options (merge {:params {}}
+                                 options)]
+         (h/validate-options! name
+                              full-options
+                              {:params h/map-spec})
+         ;; params have exact same specification as evals
+         (evals/validate-params! (:params full-options))
+         (vswap! action-builders-vol
+                 assoc
+                 name
+                 {:builder-fn  builder-fn
+                  :type        type
+                  :description description
+                  :options     options
+                 })
+       ))
     )))
 
 (defn underlying-stream-topology

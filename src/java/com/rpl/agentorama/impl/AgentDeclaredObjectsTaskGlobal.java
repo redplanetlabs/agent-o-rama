@@ -14,6 +14,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   public static ThreadLocal<Long> ACQUIRE_TIMEOUT_MILLIS = new ThreadLocal<>();
   Map<String, Map<String, Object>> _builders;
   Map<String, Map<Keyword, Object>> _evaluatorBuilders;
+  Map<String, Map<Keyword, Object>> _actionBuilders;
   Map<String, List<String>> _agentsInfo;
   Map<String, Object> _agentGraphs;
 
@@ -28,10 +29,12 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   public AgentDeclaredObjectsTaskGlobal(
     Map<String, Map<String, Object>> builders,
     Map<String, Map<Keyword, Object>> evaluatorBuilders,
+    Map<String, Map<Keyword, Object>> actionBuilders,
     Map<String, List<String>> agentsInfo,
     Map<String, Object> agentGraphs) {
     _builders = builders;
     _evaluatorBuilders = evaluatorBuilders;
+    _actionBuilders = actionBuilders;
     _agentsInfo = agentsInfo;
     _agentGraphs = agentGraphs;
   }
@@ -42,6 +45,10 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
 
   public Map getEvaluatorBuilders() {
     return _evaluatorBuilders;
+  }
+
+  public Map getActionBuilders() {
+    return _actionBuilders;
   }
 
   public Map getAgentGraphs() {
