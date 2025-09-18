@@ -48,37 +48,34 @@
           datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
           ds-props (queries/get-dataset-properties datasets-pstate dataset-id)
           ds-name (:name ds-props)
-          page-limit 1000
-          ;; paginate through all examples
-          jsonl-str (loop [page-key nil
-                           acc (StringBuilder.)
-                           first? true]
-                      (let [{:keys [examples pagination-params] :as res}
-                            (foreign-invoke-query search-examples-query
-                                                  dataset-id
-                                                  snapshot
-                                                  {} ; no filters
-                                                  page-limit
-                                                  page-key)
-                            examples (or examples [])]
-                        (doseq [{:keys [input reference-output tags]} examples]
+          page-limit 10000
+          ;; Single query with 10k limit
+          {:keys [examples pagination-params] :as res}
+          (foreign-invoke-query search-examples-query
+                                dataset-id
+                                snapshot
+                                {} ; no filters
+                                page-limit
+                                nil) ; no page-key
+          examples (or examples [])]
+      ;; Throw if there are more items (pagination required)
+      (when (seq pagination-params)
+        (throw (ex-info "Dataset too large for export (>10k examples)"
+                        {:dataset-id dataset-id :example-count "10000+"})))
+      ;; Build JSONL with proper newlines
+      (let [jsonl-lines (for [{:keys [input reference-output tags]} examples]
                           (let [frozen-input (common/->ui-serializable input)
                                 frozen-output (when (some? reference-output)
                                                 (common/->ui-serializable reference-output))
                                 line-map (cond-> {"input" frozen-input}
                                            (some? frozen-output) (assoc "output" frozen-output)
-                                           (seq tags) (assoc "tags" (->> tags (map name) vec)))
-                                line-json (j/write-value-as-string line-map mapper)]
-                            (when-not first?
-                              (.append acc \newline))
-                            (.append acc line-json)))
-                        (if pagination-params
-                          (recur pagination-params acc false)
-                          (str acc))))]
-      (-> (resp/response jsonl-str)
-          (resp/content-type "application/jsonl; charset=utf-8")
-          (resp/header "Content-Disposition"
-                       (str "attachment; filename=\"" (dataset-filename ds-name) "\""))))))
+                                           (seq tags) (assoc "tags" (->> tags (map name) vec)))]
+                            (j/write-value-as-string line-map mapper)))
+            jsonl-str (str/join "\n" jsonl-lines)]
+        (-> (resp/response jsonl-str)
+            (resp/content-type "application/jsonl; charset=utf-8")
+            (resp/header "Content-Disposition"
+                         (str "attachment; filename=\"" (dataset-filename ds-name) "\"")))))))
 
 (def ^:const max-bytes (long (* 5 1024 1024)))
 
