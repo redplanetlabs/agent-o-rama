@@ -712,6 +712,49 @@
     (catch js/Error _
       (str json-data))))
 
+(defui ImportResultsModal [{:keys [success_count failure_count errors]}]
+  ($ :div.p-6
+     ;; Summary section
+     ($ :div.mb-6
+        ($ :div.flex.items-center.gap-4.mb-4
+           (if (zero? failure_count)
+             ($ :div.flex.items-center.gap-2.text-green-700
+                ($ :svg.h-6.w-6.text-green-600 {:fill "currentColor" :viewBox "0 0 20 20"}
+                   ($ :path {:fillRule "evenodd"
+                             :d "M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                             :clipRule "evenodd"}))
+                ($ :h3.text-lg.font-semibold "Import Successful"))
+             ($ :div.flex.items-center.gap-2.text-yellow-700
+                ($ :svg.h-6.w-6.text-yellow-600 {:fill "currentColor" :viewBox "0 0 20 20"}
+                   ($ :path {:fillRule "evenodd"
+                             :d "M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                             :clipRule "evenodd"}))
+                ($ :h3.text-lg.font-semibold "Import Completed with Errors"))))
+
+        ;; Stats
+        ($ :div.grid.grid-cols-2.gap-4.text-sm
+           ($ :div.bg-green-50.border.border-green-200.rounded-lg.p-3
+              ($ :div.text-green-800.font-medium "Successful")
+              ($ :div.text-2xl.font-bold.text-green-900 success_count))
+           ($ :div.bg-red-50.border.border-red-200.rounded-lg.p-3
+              ($ :div.text-red-800.font-medium "Failed")
+              ($ :div.text-2xl.font-bold.text-red-900 failure_count))))
+
+     ;; Errors section (only show if there are errors)
+     (when (and (seq errors) (> failure_count 0))
+       ($ :div.mt-6
+          ($ :h4.text-md.font-semibold.text-gray-900.mb-3 "Error Details")
+          ($ :div.max-h-96.overflow-y-auto.border.border-gray-200.rounded-lg
+             ($ :div.divide-y.divide-gray-200
+                (for [[idx error] (map-indexed vector errors)]
+                  ($ :div.p-4.hover:bg-gray-50 {:key idx}
+                     ($ :div.text-sm.font-medium.text-gray-900.mb-2
+                        (str "Line " (inc idx) ":"))
+                     ($ :div.text-xs.font-mono.text-gray-600.bg-gray-100.p-2.rounded.mb-2.break-all
+                        (:line_content error))
+                     ($ :div.text-sm.text-red-600
+                        (:error error))))))))))
+
 ;; =============================================================================
 ;; DATASET DETAIL EXAMPLES TAB COMPONENT
 ;; =============================================================================
@@ -800,15 +843,36 @@
                                                       url (str "/api/datasets/" (common/url-encode module-id) "/" (common/url-encode (str dataset-id)) "/import")]
                                                   (.append fd "file" f)
                                                   (-> (js/fetch url #js {:method "POST" :body fd})
-                                                      (.then (fn [resp] (.json resp)))
+                                                      (.then (fn [resp]
+                                                               (if (.-ok resp)
+                                                                 (.json resp)
+                                                                 (throw (js/Error. (str "HTTP " (.-status resp) ": " (.-statusText resp)))))))
                                                       (.then (fn [data]
                                                                (set-uploading! false)
-                                                                  ;; Refresh examples after import
+                                                               ;; Refresh examples after import
                                                                (refetch)
-                                                               (js/alert (str "Import complete. Successes: " (.-success_count data) ", Failures: " (.-failure_count data)))))
+                                                               ;; Show results modal instead of alert
+                                                               (state/dispatch [:modal/show :import-results
+                                                                                {:title "Import Results"
+                                                                                 :component ($ ImportResultsModal
+                                                                                               {:success_count (.-success_count data)
+                                                                                                :failure_count (.-failure_count data)
+                                                                                                :errors (js->clj (.-errors data) :keywordize-keys true)})}])))
                                                       (.catch (fn [err]
                                                                 (set-uploading! false)
-                                                                (js/alert (str "Import failed: " err)))))))))})
+                                                                (state/dispatch [:modal/show :import-error
+                                                                                 {:title "Import Failed"
+                                                                                  :component ($ :div.p-6
+                                                                                                ($ :div.flex.items-center.gap-2.text-red-700.mb-4
+                                                                                                   ($ :svg.h-6.w-6.text-red-600 {:fill "currentColor" :viewBox "0 0 20 20"}
+                                                                                                      ($ :path {:fillRule "evenodd"
+                                                                                                                :d "M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                                                                                                :clipRule "evenodd"}))
+                                                                                                   ($ :h3.text-lg.font-semibold "Import Failed"))
+                                                                                                ($ :div.text-sm.text-gray-700
+                                                                                                   ($ :p "The import operation failed with the following error:")
+                                                                                                   ($ :div.mt-2.p-3.bg-red-50.border.border-red-200.rounded.text-red-800.font-mono.text-xs
+                                                                                                      (str err))))}]))))))))})
                      ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-indigo-600.hover:bg-indigo-700.cursor-pointer.disabled:bg-gray-400.disabled:cursor-not-allowed
                         {:onClick (fn [_]
                                     (when-let [node (.-current file-input-ref)]

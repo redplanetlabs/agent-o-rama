@@ -211,8 +211,18 @@ test.describe('Dataset Import/Export Round-trip', () => {
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(downloadPath);
     
-    // Wait for the import to complete
-    await expect(page.getByText(/Import complete.*Successes: 3.*Failures: 0/)).toBeVisible({ timeout: 30000 });
+    // Wait for the import results modal to appear
+    const importModal = page.locator('[role="dialog"]');
+    await expect(importModal).toBeVisible({ timeout: 30000 });
+    
+    // Verify the modal shows success
+    await expect(importModal.getByText('Import Successful')).toBeVisible();
+    await expect(importModal.getByText('3')).toBeVisible(); // Success count
+    await expect(importModal.getByText('0')).toBeVisible(); // Failure count
+    
+    // Close the modal
+    await importModal.getByText('×').click();
+    await expect(importModal).not.toBeVisible();
     
     console.log('Import completed successfully with all examples.');
 
@@ -358,8 +368,21 @@ test.describe('Dataset Import/Export Round-trip', () => {
       const fileInput = page.locator('input[type="file"]');
       await fileInput.setInputFiles(tempFile);
       
-      // Wait for the import to complete with errors
-      await expect(page.getByText(/Import complete.*Successes: 1.*Failures: 2/)).toBeVisible({ timeout: 30000 });
+      // Wait for the import results modal to appear
+      const errorModal = page.locator('[role="dialog"]');
+      await expect(errorModal).toBeVisible({ timeout: 30000 });
+      
+      // Verify the modal shows partial success with errors
+      await expect(errorModal.getByText('Import Completed with Errors')).toBeVisible();
+      await expect(errorModal.getByText('1')).toBeVisible(); // Success count
+      await expect(errorModal.getByText('2')).toBeVisible(); // Failure count
+      
+      // Verify error details are shown
+      await expect(errorModal.getByText('Error Details')).toBeVisible();
+      
+      // Close the modal
+      await errorModal.getByText('×').click();
+      await expect(errorModal).not.toBeVisible();
       
       console.log('Import error handling verified - partial success with failures reported.');
       
