@@ -18,6 +18,7 @@
    [com.rpl.agentorama.analytics
     AgentInvokeStats
     BasicAgentInvokeStats
+    Feedback
     NestedOpInfo
     SubagentInvokeStats
     OpStats]
@@ -514,7 +515,6 @@
   ]
   ExperimentEvent)
 
-
 (drp/defrecord+ UpdateExperimentName
   [id :- UUID
    dataset-id :- UUID
@@ -598,6 +598,17 @@
   AgentInvokeStats
   (getSubagentStats [this] subagent-stats)
   (getBasicStats [this] basic-stats))
+
+(drp/defrecord+ ^{:features {:nippy-8-byte-hash false}} FeedbackImpl
+  [scores :- {String Object}
+   source :- InfoSource
+   created-at :- Long
+   modified-at :- Long]
+  Feedback
+  (getScores [this] scores)
+  (getSource [this] source)
+  (getCreatedAt [this] created-at)
+  (getModifiedAt [this] modified-at))
 
 ;; Misc
 

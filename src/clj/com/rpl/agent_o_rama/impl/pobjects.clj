@@ -19,6 +19,7 @@
     EvalNumberStats
     ExceptionSummary
     ExperimentInputSelector
+    FeedbackImpl
     ForkContext
     NestedOpInfoImpl
     NodeHumanInputRequest
@@ -96,11 +97,7 @@
   (str "$$_agent-root-" agent-name))
 
 (def FEEDBACK-SCHEMA
-  [(fixed-keys-schema
-    {:scores      {String Object}
-     :source      InfoSource
-     :created-at  Long
-     :modified-at Long})])
+  [FeedbackImpl])
 
 (def AGENT-ROOT-PSTATE-SCHEMA
   {UUID
