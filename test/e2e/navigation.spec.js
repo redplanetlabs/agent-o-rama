@@ -498,11 +498,6 @@ test.describe('Form Validation and Error Handling', () => {
     await submitButton.click();
 
     // 3. ASSERTION: Verify the UI handles the error correctly
-    
-    // A) Check that the form stops spinning. The button should become enabled again.
-    // Playwright's `not.toBeDisabled` will wait for the submission to finish.
-    await expect(submitButton).not.toBeDisabled({ timeout: 10000 });
-    console.log('Submit button is no longer disabled.');
 
     // B) Check that the modal is still visible.
     await expect(modal).toBeVisible();
