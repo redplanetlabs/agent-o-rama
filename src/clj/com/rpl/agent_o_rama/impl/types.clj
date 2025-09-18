@@ -13,12 +13,15 @@
     AgentRef
     ExampleRun
     HumanInputRequest
+    NestedOpType
     ToolInfo]
    [com.rpl.agentorama.analytics
     AgentInvokeStats
     BasicAgentInvokeStats
     SubagentInvokeStats
     OpStats]
+   [com.rpl.agentorama.sourcee
+    InfoSource]
    [com.rpl.agentorama.impl
     NippyMap]
    [com.rpl.rama.integration
@@ -102,45 +105,42 @@
 
 ;; Sources
 
-(definterface InfoSource
-  (source_string []))
-
 (defn source-string
   [^InfoSource i]
-  (.source_string i))
+  (.getSourceString i))
 
 (drp/defrecord+ HumanSource
   [name :- String]
   InfoSource
-  (source_string [this] (str "human[" name "]")))
+  (getSourceString [this] (str "human[" name "]")))
 
 (drp/defrecord+ AiSource
   []
   InfoSource
-  (source_string [this] "ai"))
+  (getSourceString [this] "ai"))
 
 (drp/defrecord+ ApiSource
   []
   InfoSource
-  (source_string [this] "api"))
+  (getSourceString [this] "api"))
 
 (drp/defrecord+ BulkUploadSource
   []
   InfoSource
-  (source_string [this] "bulkUpload"))
+  (getSourceString [this] "bulkUpload"))
 
 (drp/defrecord+ ExperimentSource
   [dataset-id :- UUID
    experiment-id :- UUID]
   InfoSource
-  (source_string [this] "experiment"))
+  (getSourceString [this] "experiment"))
 
 (drp/defrecord+ AgentRunSource
   [module-name :- String
    agent-name :- String
    agent-invoke :- AgentInvokeImpl]
   InfoSource
-  (source_string [this] (str "agent[" module-name "/" agent-name "]")))
+  (getSourceString [this] (str "agent[" module-name "/" agent-name "]")))
 
 ;; Core types
 

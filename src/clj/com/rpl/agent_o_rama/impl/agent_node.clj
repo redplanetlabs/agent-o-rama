@@ -19,7 +19,6 @@
     AgentObjectFetcher
     HumanInputRequest
     IUnderlying
-    NestedOpType
     StreamingRecorder]
    [com.rpl.agentorama.impl
     AgentDeclaredObjectsTaskGlobal
