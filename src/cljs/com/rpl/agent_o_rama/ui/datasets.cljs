@@ -636,7 +636,7 @@
                                            (when f
                                              (set-uploading! true)
                                              (let [fd (js/FormData.)
-                                                   url (str "/api/datasets/" (common/url-encode module-id) "/" (common/url-encode (str (random-uuid))) "/import")]
+                                                   url (str "/api/datasets/" (common/url-encode module-id) "/import")]
                                                (.append fd "file" f)
                                                (-> (js/fetch url #js {:method "POST" :body fd})
                                                    (.then (fn [resp] (.json resp)))

@@ -4,6 +4,7 @@
    [clojure.string :as str]
    [ring.util.response :as resp]
    [jsonista.core :as j]
+   [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.queries :as queries]
@@ -14,14 +15,20 @@
 
 (def ^:private mapper (j/object-mapper))
 
-(defn- parse-path-params
-  "Extract `[module-id dataset-id action]` from /api/datasets/:module-id/:dataset-id/:action"
+(defn- parse-export-params
+  "Extract module-id and dataset-id from export route: /api/datasets/:module-id/:dataset-id/export"
   [uri]
-  (when-let [[_ module-id dataset-id action]
-             (re-matches #"/api/datasets/([^/]+)/([^/]+)/(export|import)" uri)]
+  (when-let [[_ module-id dataset-id]
+             (re-matches #"/api/datasets/([^/]+)/([^/]+)/export" uri)]
     [(common/url-decode module-id)
-     (UUID/fromString (common/url-decode dataset-id))
-     action]))
+     (UUID/fromString (common/url-decode dataset-id))]))
+
+(defn- parse-import-params
+  "Extract module-id from import route: /api/datasets/:module-id/import"
+  [uri]
+  (when-let [[_ module-id]
+             (re-matches #"/api/datasets/([^/]+)/import" uri)]
+    [(common/url-decode module-id)]))
 
 (defn- dataset-filename
   [dataset-name]
@@ -32,7 +39,7 @@
 (defn handle-dataset-export
   [request]
   (let [{:keys [uri params]} request
-        [module-id dataset-id _] (parse-path-params uri)
+        [module-id dataset-id] (parse-export-params uri)
         snapshot (not-empty (get params "snapshot"))
         manager (common/get-manager module-id)]
     (when-not manager
@@ -77,16 +84,24 @@
 
 (defn handle-dataset-import
   [request]
-  (let [{:keys [uri params]} request
-        [module-id dataset-id _] (parse-path-params uri)
-        snapshot (not-empty (get params "snapshot"))
+  (let [{:keys [uri params multipart-params]} request
+        [module-id] (parse-import-params uri)
+        snapshot (not-empty (get params :snapshot))
         manager (common/get-manager module-id)
-        file-param (get params "file")
-        tempfile (:tempfile file-param)]
+        file-param (or (get multipart-params :file)
+                       (get multipart-params "file")
+                       (get params :file)
+                       (get params "file"))
+        tempfile (:tempfile file-param)
+        filename (:filename file-param)]
     (when-not manager
       (throw (ex-info "Unknown module" {:module-id module-id})))
     (when-not (and (map? file-param) (instance? java.io.File tempfile))
-      (throw (ex-info "Missing file upload under form field 'file'" {})))
+      (-> (resp/response (j/write-value-as-string
+                          {:error "Missing file upload under form field 'file'"}))
+          (resp/status 400)
+          (resp/content-type "application/json; charset=utf-8")
+          (throw)))
     (let [^java.io.File f tempfile]
       (when (> (.length f) max-bytes)
         (-> (resp/response (j/write-value-as-string
@@ -94,8 +109,11 @@
             (resp/status 413)
             (resp/content-type "application/json; charset=utf-8")
             (throw)))
-      ;; Count non-blank lines for success calculation
-      (let [total-lines (with-open [r (io/reader f)]
+      ;; Create a new dataset with filename as the name
+      (let [dataset-name (or filename "imported-dataset")
+            dataset-id (aor/create-dataset! manager dataset-name)
+            ;; Count non-blank lines for success calculation
+            total-lines (with-open [r (io/reader f)]
                           (->> (line-seq r)
                                (remove str/blank?)
                                count))
@@ -110,8 +128,9 @@
               body (j/write-value-as-string
                     {:success_count success-count
                      :failure_count failure-count
-                     :errors @failures*}
+                     :errors @failures*
+                     :dataset_id (str dataset-id)}
                     mapper)]
           (-> (resp/response body)
-              (resp/status (if (pos? failure-count) 200 200))
+              (resp/status 200)
               (resp/content-type "application/json; charset=utf-8")))))))
