@@ -622,37 +622,7 @@
              ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
                 {:onClick #(state/dispatch [:modal/show-form :create-dataset {:module-id module-id}])}
                 ($ PlusIcon {:className "h-5 w-5 mr-2"})
-                "Create Dataset")
-             (let [[uploading? set-uploading!] (uix/use-state false)
-                   file-input-ref (uix/use-ref nil)]
-               ($ :<>
-                  ($ :input {:ref file-input-ref
-                             :type "file"
-                             :accept ".jsonl,application/jsonl,application/octet-stream"
-                             :style {:display "none"}
-                             :onChange (fn [e]
-                                         (let [files (.. e -target -files)
-                                               f (when (and files (> (.-length files) 0)) (aget files 0))]
-                                           (when f
-                                             (set-uploading! true)
-                                             (let [fd (js/FormData.)
-                                                   url (str "/api/datasets/" (common/url-encode module-id) "/import")]
-                                               (.append fd "file" f)
-                                               (-> (js/fetch url #js {:method "POST" :body fd})
-                                                   (.then (fn [resp] (.json resp)))
-                                                   (.then (fn [data]
-                                                            (set-uploading! false)
-                                                            ;; Refresh datasets list after import
-                                                            (state/dispatch [:query/invalidate {:query-key-pattern [:datasets module-id]}])
-                                                            (js/alert (str "Import complete. Successes: " (.-success_count data) ", Failures: " (.-failure_count data)))))
-                                                   (.catch (fn [err]
-                                                             (set-uploading! false)
-                                                             (js/alert (str "Import failed: " err)))))))))})
-                  ($ :button.inline-flex.items-center.px-4.py-2.bg-indigo-600.text-white.rounded-md.hover:bg-indigo-700.transition-colors
-                     {:onClick (fn [_]
-                                 (when-let [node (.-current file-input-ref)]
-                                   (.click node)))}
-                     (if uploading? "Uploading..." "Import Dataset"))))))
+                "Create Dataset")))
 
        ;; Content
        (cond
@@ -802,9 +772,9 @@
                     :value search-string
                     :onChange #(set-search-string (.. % -target -value))}))
 
-             ;; Right side - Action buttons
+;; Right side - Action buttons
              ($ :div.flex.items-center.space-x-4
-                ;; Export button
+                   ;; Export button
                 ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-green-600.hover:bg-green-700.cursor-pointer
                    {:onClick (fn [_]
                                (let [snapshot-param (when-not (str/blank? selected-snapshot-name)
@@ -813,9 +783,41 @@
                                  (set! (.-href js/window.location) href)))}
                    "Export")
 
-                ;; Import is not available here; use the index page to create/import a dataset
+                   ;; Import button - next to export
+                (let [[uploading? set-uploading!] (uix/use-state false)
+                      file-input-ref (uix/use-ref nil)]
+                  ($ :<>
+                     ($ :input {:ref file-input-ref
+                                :type "file"
+                                :accept ".jsonl,application/jsonl,application/octet-stream"
+                                :style {:display "none"}
+                                :onChange (fn [e]
+                                            (let [files (.. e -target -files)
+                                                  f (when (and files (> (.-length files) 0)) (aget files 0))]
+                                              (when f
+                                                (set-uploading! true)
+                                                (let [fd (js/FormData.)
+                                                      url (str "/api/datasets/" (common/url-encode module-id) "/" (common/url-encode (str dataset-id)) "/import")]
+                                                  (.append fd "file" f)
+                                                  (-> (js/fetch url #js {:method "POST" :body fd})
+                                                      (.then (fn [resp] (.json resp)))
+                                                      (.then (fn [data]
+                                                               (set-uploading! false)
+                                                                  ;; Refresh examples after import
+                                                               (refetch)
+                                                               (js/alert (str "Import complete. Successes: " (.-success_count data) ", Failures: " (.-failure_count data)))))
+                                                      (.catch (fn [err]
+                                                                (set-uploading! false)
+                                                                (js/alert (str "Import failed: " err)))))))))})
+                     ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-indigo-600.hover:bg-indigo-700.cursor-pointer.disabled:bg-gray-400.disabled:cursor-not-allowed
+                        {:onClick (fn [_]
+                                    (when-let [node (.-current file-input-ref)]
+                                      (.click node)))
+                         :disabled is-read-only?
+                         :title (when is-read-only? "Cannot import into a read-only snapshot.")}
+                        (if uploading? "Uploading..." "Import"))))
 
-                ;; Add Example button
+                   ;; Add Example button
                 ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer.disabled:bg-gray-400.disabled:cursor-not-allowed
                    {:onClick #(datasets-forms/show-add-example-modal!
                                {:module-id module-id

@@ -24,11 +24,12 @@
      (UUID/fromString (common/url-decode dataset-id))]))
 
 (defn- parse-import-params
-  "Extract module-id from import route: /api/datasets/:module-id/import"
+  "Extract module-id and dataset-id from import route: /api/datasets/:module-id/:dataset-id/import"
   [uri]
-  (when-let [[_ module-id]
-             (re-matches #"/api/datasets/([^/]+)/import" uri)]
-    [(common/url-decode module-id)]))
+  (when-let [[_ module-id dataset-id]
+             (re-matches #"/api/datasets/([^/]+)/([^/]+)/import" uri)]
+    [(common/url-decode module-id)
+     (UUID/fromString (common/url-decode dataset-id))]))
 
 (defn- dataset-filename
   [dataset-name]
@@ -81,8 +82,9 @@
 
 (defn handle-dataset-import
   [request]
+  (def request request)
   (let [{:keys [uri params multipart-params]} request
-        [module-id] (parse-import-params uri)
+        [module-id dataset-id] (parse-import-params uri)
         snapshot (not-empty (get params :snapshot))
         manager (common/get-manager module-id)
         file-param (or (get multipart-params :file)
@@ -106,10 +108,8 @@
             (resp/status 413)
             (resp/content-type "application/json; charset=utf-8")
             (throw)))
-      ;; Create a new dataset with filename as the name
-      (let [dataset-name (or filename "imported-dataset")
-            dataset-id (aor/create-dataset! manager dataset-name)
-            ;; Count non-blank lines for success calculation
+      ;; Import into existing dataset
+      (let [;; Count non-blank lines for success calculation
             total-lines (with-open [r (io/reader f)]
                           (->> (line-seq r)
                                (remove str/blank?)
@@ -125,8 +125,7 @@
               body (j/write-value-as-string
                     {:success_count success-count
                      :failure_count failure-count
-                     :errors @failures*
-                     :dataset_id (str dataset-id)}
+                     :errors @failures*}
                     mapper)]
           (-> (resp/response body)
               (resp/status 200)

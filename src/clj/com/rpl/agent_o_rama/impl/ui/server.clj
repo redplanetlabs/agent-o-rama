@@ -42,9 +42,9 @@
            (re-matches #"/api/datasets/.+/.+/export" uri))
       (http/handle-dataset-export request)
 
-      ;; Dataset import (new route, no dataset-id in path)
+      ;; Dataset import - back to including dataset-id in path
       (and (= method :post)
-           (re-matches #"/api/datasets/.+/import" uri))
+           (re-matches #"/api/datasets/.+/.+/import" uri))
       (http/handle-dataset-import request)
 
       ;; For any other route, return nil to let the next handler take over.
