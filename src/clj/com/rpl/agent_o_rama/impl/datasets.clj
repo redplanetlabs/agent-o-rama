@@ -130,7 +130,8 @@
                   true
 
                   :else
-                  false)]
+                  false
+                )]
             (if ok?
               (Collections/emptySet)
               (let [errs (LinkedHashSet.)
@@ -142,7 +143,8 @@
                           (str "x-javaType: " path
                                " — expected " fqcn))
                 (.add errs (.build b))
-                errs)))))))))
+                errs))))
+       )))))
 
 (def META-SCHEMA
   (-> (JsonMetaSchema/builder
@@ -200,6 +202,7 @@
         meta       (.getSchema f meta-uri)
         violations (.validate meta root)]
     (into #{} (map #(.getMessage ^ValidationMessage %)) violations)))
+
 
 (defn normalize-json-schema*
   [json-schema]
@@ -285,25 +288,27 @@
   (let [time-millis (gen-anyvar "time-millis")]
     [[h/current-time-millis :> time-millis]
      [local-transform>
-      [(seg# keypath dataset-id)
-       (seg# multi-path
+       [(seg# keypath dataset-id)
+        (seg# multi-path
              [:props :modified-at (seg# termval time-millis)]
              apath)]
-      pstate]]))
+       pstate]]))
+
 
 (defbasicblocksegmacro update-dataset-example!
   [pstate dataset-id snapshot-name example-id apath]
   (let [time-millis (gen-anyvar "time-millis")]
     [[h/current-time-millis :> time-millis]
      [update-dataset!
-      pstate
-      dataset-id
-      [:snapshots
-       (seg# keypath snapshot-name example-id)
-       some?
-       (seg# multi-path
-             [:modified-at (seg# termval time-millis)]
-             apath)]]]))
+       pstate
+       dataset-id
+       [:snapshots
+        (seg# keypath snapshot-name example-id)
+        some?
+        (seg# multi-path
+          [:modified-at (seg# termval time-millis)]
+          apath
+          )]]]))
 
 (defn get-cluster-retriever
   [^AgentDeclaredObjectsTaskGlobal declared-objects-tg]
@@ -322,7 +327,8 @@
          ~@body)
        (finally
          (when host#
-           (close! retriever#))))))
+           (close! retriever#))
+       ))))
 
 (defn verify-remote-dataset
   [{:keys [dataset-id cluster-conductor-host cluster-conductor-port module-name] :as params}]
@@ -413,6 +419,7 @@
                          :created-at       *current-time-millis
                          :modified-at      *current-time-millis})])
 
+
     (case> UpdateDatasetExample
            :> {:keys [*snapshot-name *example-id *key *value]})
      (<<cond
@@ -473,7 +480,8 @@
      (update-dataset!
       $$datasets
       *dataset-id
-      [(keypath :snapshots *snapshot-name) NONE>]))))
+      [(keypath :snapshots *snapshot-name) NONE>])
+   )))
 
 (defn upload-jsonl-examples!
   "Best-effort JSONL uploader.
@@ -527,7 +535,8 @@
                                               (failure-callback line ex))))))
                         (catch Throwable t
                           (.release sem)
-                          (failure-callback line t))))))))))
+                          (failure-callback line t))))
+                  ))))))
         (.acquire sem 100)
         nil))))
 
