@@ -4,7 +4,6 @@
   (:require
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.ramaspecter.defrecord-plus :as drp]
    [rpl.schema.core :as s])
   (:import
    [com.rpl.agentorama.store
@@ -20,7 +19,7 @@
 (def KV :kv)
 (def DOC :doc)
 
-(drp/defrecord+ StoreParams
+(aor-types/defaorrecord StoreParams
   [pstate-name :- String
    agent-name :- String
    agent-task-id :- Long

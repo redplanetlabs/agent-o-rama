@@ -42,6 +42,11 @@
     CompletableFuture]))
 
 
+(defmacro defaorrecord
+  [name & args]
+  (let [s (with-meta name {:features {:nippy-8-byte-hash false}})]
+    `(drp/defrecord+ ~s ~@args)))
+
 (def ^:dynamic OPERATION-SOURCE nil)
 
 (def AGENTS-TOPOLOGY-NAME "_agents-topology")
@@ -92,13 +97,9 @@
     res
     (throw (h/ex-info "Unknown nested op type" {:val v :type (class v)}))))
 
-;; TODO: use flexible serialization for these to ease updating the
-;; library? or just some of them?
-
-
 (defprotocol EvalTarget)
 
-(drp/defrecord+ AgentInvokeImpl
+(defaorrecord AgentInvokeImpl
   [task-id :- Long
    agent-invoke-id :- UUID]
   AgentInvoke
@@ -106,7 +107,7 @@
   (getAgentInvokeId [this] agent-invoke-id)
   EvalTarget)
 
-(drp/defrecord+ EvalNodeTarget
+(defaorrecord EvalNodeTarget
   [task-id :- Long
    invoke-id :- UUID]
   EvalTarget)
@@ -117,28 +118,28 @@
   [^InfoSource i]
   (.getSourceString i))
 
-(drp/defrecord+ HumanSourceImpl
+(defaorrecord HumanSourceImpl
   [name :- String]
   HumanSource
   (getName [this] name)
   (getSourceString [this] (str "human[" name "]")))
 
-(drp/defrecord+ AiSourceImpl
+(defaorrecord AiSourceImpl
   []
   AiSource
   (getSourceString [this] "ai"))
 
-(drp/defrecord+ ApiSourceImpl
+(defaorrecord ApiSourceImpl
   []
   ApiSource
   (getSourceString [this] "api"))
 
-(drp/defrecord+ BulkUploadSourceImpl
+(defaorrecord BulkUploadSourceImpl
   []
   BulkUploadSource
   (getSourceString [this] "bulkUpload"))
 
-(drp/defrecord+ ExperimentSourceImpl
+(defaorrecord ExperimentSourceImpl
   [dataset-id :- UUID
    experiment-id :- UUID]
   ExperimentSource
@@ -146,7 +147,7 @@
   (getExperimentId [this] experiment-id)
   (getSourceString [this] "experiment"))
 
-(drp/defrecord+ AgentRunSourceImpl
+(defaorrecord AgentRunSourceImpl
   [module-name :- String
    agent-name :- String
    agent-invoke :- AgentInvokeImpl]
@@ -158,28 +159,28 @@
 
 ;; Core types
 
-(drp/defrecord+ AgentInitiate
+(defaorrecord AgentInitiate
   [args :- [s/Any]
    forced-agent-invoke-id :- (s/maybe UUID)
    source :- (s/maybe InfoSource)
   ])
 
-(drp/defrecord+ AgentResult
+(defaorrecord AgentResult
   [val :- s/Any
    failure? :- Boolean])
 
-(drp/defrecord+ AgentCompleteImpl
+(defaorrecord AgentCompleteImpl
   [result :- s/Any]
   AgentComplete
   (getResult [this] val))
 
 
-(drp/defrecord+ AgentNode
+(defaorrecord AgentNode
   [node :- (s/cond-pre Node NodeAggStart NodeAgg)
    output-nodes :- #{String}
    agg-context :- (s/maybe String)])
 
-(drp/defrecord+ AgentGraph
+(defaorrecord AgentGraph
   [node-map :- NippyMap ; {String AgentNode}
    start-node :- String
    update-mode :- (s/enum :continue :restart :drop)
@@ -188,7 +189,7 @@
   (prepareForTask [this task-id context])
   (close [this]))
 
-(drp/defrecord+ StoreInfo
+(defaorrecord StoreInfo
   [store-info :- {String clojure.lang.Keyword}
    ;; module-name -> pstate-name -> store-type
    mirror-store-info :- {String {String clojure.lang.Keyword}}]
@@ -196,11 +197,11 @@
   (prepareForTask [this task-id context])
   (close [this]))
 
-(drp/defrecord+ AggInput
+(defaorrecord AggInput
   [invoke-id :- UUID
    args :- [s/Any]])
 
-(drp/defrecord+ NestedOpInfoImpl
+(defaorrecord NestedOpInfoImpl
   [start-time-millis :- Long
    finish-time-millis :- Long
    type :-
@@ -221,7 +222,7 @@
   (getType [this] (nested-op-type->java type))
   (getInfo [this] info))
 
-(drp/defrecord+ AgentNodeEmit
+(defaorrecord AgentNodeEmit
   [invoke-id :- UUID
    fork-invoke-id :- (s/maybe UUID)
    target-task-id :- Long
@@ -229,12 +230,12 @@
    args :- [s/Any]
   ])
 
-(drp/defrecord+ ForkContext
+(defaorrecord ForkContext
   [invoke-id->new-args :- {UUID [s/Any]}
    affected-aggs :- (s/maybe #{UUID}) ; agg-start-node invoke-ids
   ])
 
-(drp/defrecord+ NodeComplete
+(defaorrecord NodeComplete
   [task-id :- Long
    invoke-id :- UUID
    retry-num :- Long
@@ -246,13 +247,13 @@
    fork-context :- (s/maybe ForkContext)
   ])
 
-(drp/defrecord+ RetryNodeComplete
+(defaorrecord RetryNodeComplete
   [invoke-id :- UUID
    retry-num :- Long
    fork-context :- (s/maybe ForkContext)
   ])
 
-(drp/defrecord+ NodeFailure
+(defaorrecord NodeFailure
   [task-id :- Long
    invoke-id :- UUID
    retry-num :- Long
@@ -260,39 +261,39 @@
    nested-ops :- [NestedOpInfoImpl]
   ])
 
-(drp/defrecord+ ExceptionSummary
+(defaorrecord ExceptionSummary
   [throwable-str :- String
    node :- String
    invoke-id :- UUID])
 
-(drp/defrecord+ AgentFailure
+(defaorrecord AgentFailure
   [agent-task-id :- Long
    agent-id :- UUID
    retry-num :- Long])
 
-(drp/defrecord+ RetryAgentInvoke
+(defaorrecord RetryAgentInvoke
   [agent-task-id :- Long
    agent-id :- UUID
    expected-retry-num :- Long])
 
-(drp/defrecord+ ForkAgentInvoke
+(defaorrecord ForkAgentInvoke
   [agent-task-id :- Long
    agent-id :- UUID
    invoke-id->new-args :- {UUID [s/Any]}])
 
-(drp/defrecord+ HistoricalAgentNodeInfo
+(defaorrecord HistoricalAgentNodeInfo
   [node-type :- clojure.lang.Keyword ; :node, :agg-node, :agg-start-node
    output-nodes :- #{String}
    agg-context :- (s/maybe String)
   ])
 
-(drp/defrecord+ HistoricalAgentGraphInfo
+(defaorrecord HistoricalAgentGraphInfo
   [node-map :- {String HistoricalAgentNodeInfo}
    start-node :- String
    uuid :- String
   ])
 
-(drp/defrecord+ NodeStreamingResult
+(defaorrecord NodeStreamingResult
   [agent-task-id :- Long
    agent-id :- UUID
    node :- String
@@ -301,12 +302,12 @@
    streaming-index :- Long
    value :- Object])
 
-(drp/defrecord+ StreamingChunk
+(defaorrecord StreamingChunk
   [invoke-id :- UUID
    index :- Long
    chunk :- Object])
 
-(drp/defrecord+ NodeHumanInputRequest
+(defaorrecord NodeHumanInputRequest
   [agent-task-id :- Long
    agent-id :- UUID
    node :- String
@@ -319,11 +320,11 @@
   (getNodeInvokeId [this] invoke-id)
   (getPrompt [this] prompt))
 
-(drp/defrecord+ HumanInput
+(defaorrecord HumanInput
   [request :- NodeHumanInputRequest
    response :- String])
 
-(drp/defrecord+ NodeOp
+(defaorrecord NodeOp
   [invoke-id :- UUID
    fork-invoke-id :- (s/maybe UUID)
    fork-context :- (s/maybe ForkContext)
@@ -331,11 +332,11 @@
    args :- [s/Any]
    agg-invoke-id :- (s/maybe UUID)])
 
-(drp/defrecord+ AggAckOp
+(defaorrecord AggAckOp
   [agg-invoke-id :- UUID
    ack-val :- Long])
 
-(drp/defrecord+ PStateWrite
+(defaorrecord PStateWrite
   [agent-name :- String
    agent-task-id :- Long
    agent-id :- UUID
@@ -344,7 +345,7 @@
    path :- s/Any
    key :- s/Any])
 
-(drp/defrecord+ ToolInfoImpl
+(defaorrecord ToolInfoImpl
   [tool-specification :- ToolSpecification
    tool-fn :- clojure.lang.IFn
    include-context? :- Boolean]
@@ -354,7 +355,7 @@
 
 ;; Datasets
 
-(drp/defrecord+ CreateDataset
+(defaorrecord CreateDataset
   [dataset-id :- UUID
    name :- String
    description :- (s/maybe String)
@@ -362,22 +363,22 @@
    output-json-schema :- (s/maybe String)
   ])
 
-(drp/defrecord+ AddRemoteDataset
+(defaorrecord AddRemoteDataset
   [dataset-id :- UUID
    cluster-conductor-host :- (s/maybe String)
    cluster-conductor-port :- (s/maybe Long)
    module-name :- String
   ])
 
-(drp/defrecord+ UpdateDatasetProperty
+(defaorrecord UpdateDatasetProperty
   [dataset-id :- UUID
    key :- clojure.lang.Keyword
    value :- Object])
 
-(drp/defrecord+ DestroyDataset
+(defaorrecord DestroyDataset
   [dataset-id :- UUID])
 
-(drp/defrecord+ AddDatasetExample
+(defaorrecord AddDatasetExample
   [dataset-id :- UUID
    snapshot-name :- (s/maybe String)
    example-id :- UUID
@@ -387,36 +388,36 @@
    source :- (s/maybe InfoSource)
   ])
 
-(drp/defrecord+ UpdateDatasetExample
+(defaorrecord UpdateDatasetExample
   [dataset-id :- UUID
    snapshot-name :- (s/maybe String)
    example-id :- UUID
    key :- clojure.lang.Keyword
    value :- Object])
 
-(drp/defrecord+ RemoveDatasetExample
+(defaorrecord RemoveDatasetExample
   [dataset-id :- UUID
    snapshot-name :- (s/maybe String)
    example-id :- UUID])
 
-(drp/defrecord+ AddDatasetExampleTag
+(defaorrecord AddDatasetExampleTag
   [dataset-id :- UUID
    snapshot-name :- (s/maybe String)
    example-id :- UUID
    tag :- String])
 
-(drp/defrecord+ RemoveDatasetExampleTag
+(defaorrecord RemoveDatasetExampleTag
   [dataset-id :- UUID
    snapshot-name :- (s/maybe String)
    example-id :- UUID
    tag :- String])
 
-(drp/defrecord+ DatasetSnapshot
+(defaorrecord DatasetSnapshot
   [dataset-id :- UUID
    from-snapshot-name :- (s/maybe String)
    to-snapshot-name :- String])
 
-(drp/defrecord+ RemoveDatasetSnapshot
+(defaorrecord RemoveDatasetSnapshot
   [dataset-id :- UUID
    snapshot-name :- String])
 
@@ -424,7 +425,7 @@
 
 (definterface EvaluatorEvent)
 
-(drp/defrecord+ AddEvaluator
+(defaorrecord AddEvaluator
   [name :- String
    builder-name :- String
    params :- {String Object}
@@ -435,11 +436,11 @@
   ]
   EvaluatorEvent)
 
-(drp/defrecord+ RemoveEvaluator
+(defaorrecord RemoveEvaluator
   [name :- String]
   EvaluatorEvent)
 
-(drp/defrecord+ ExampleRunImpl
+(defaorrecord ExampleRunImpl
   [input :- Object
    reference-output :- Object
    output :- Object]
@@ -454,52 +455,52 @@
 
 (defprotocol ExperimentInputSelector)
 
-(drp/defrecord+ TagSelector
+(defaorrecord TagSelector
   [tag :- String]
   ExperimentInputSelector)
 
-(drp/defrecord+ ExampleIdsSelector
+(defaorrecord ExampleIdsSelector
   [example-ids :- [UUID]]
   ExperimentInputSelector)
 
 
-(drp/defrecord+ EvaluatorSelector
+(defaorrecord EvaluatorSelector
   [name :- String
    remote? :- Boolean])
 
 
 (defprotocol TargetSpec)
 
-(drp/defrecord+ AgentTarget
+(defaorrecord AgentTarget
   [agent-name :- String]
   TargetSpec)
 
-(drp/defrecord+ NodeTarget
+(defaorrecord NodeTarget
   [agent-name :- String
    node :- String]
   TargetSpec)
 
 
-(drp/defrecord+ ExperimentTarget
+(defaorrecord ExperimentTarget
   [target-spec :- (s/protocol TargetSpec)
    input->args :- [String]])
 
 (defprotocol ExperimentSpec
   (experiment-targets [this]))
 
-(drp/defrecord+ RegularExperiment
+(defaorrecord RegularExperiment
   [target :- ExperimentTarget]
   ExperimentSpec
   (experiment-targets [this] [target]))
 
-(drp/defrecord+ ComparativeExperiment
+(defaorrecord ComparativeExperiment
   [targets :- [ExperimentTarget]]
   ExperimentSpec
   (experiment-targets [this] targets))
 
 
 ;; since this is stored in a PState
-(drp/defrecord+ ^{:features {:nippy-8-byte-hash false}} StartExperiment
+(defaorrecord ^{:features {:nippy-8-byte-hash false}} StartExperiment
   [id :- UUID
    name :- String
 
@@ -515,27 +516,27 @@
   ]
   ExperimentEvent)
 
-(drp/defrecord+ UpdateExperimentName
+(defaorrecord UpdateExperimentName
   [id :- UUID
    dataset-id :- UUID
    name :- String]
   ExperimentEvent)
 
-(drp/defrecord+ DeleteExperiment
+(defaorrecord DeleteExperiment
   [id :- UUID
    dataset-id :- UUID]
   ExperimentEvent)
 
-(drp/defrecord+ ExperimentNodeInvoke
+(defaorrecord ExperimentNodeInvoke
   [agent-name :- String
    node :- String
    args :- [Object]])
 
-(drp/defrecord+ EvalInfo
+(defaorrecord EvalInfo
   [agent-name :- String
    target :- (s/protocol EvalTarget)])
 
-(drp/defrecord+ EvalInvoke
+(defaorrecord EvalInvoke
   [input :- (s/maybe Object)
    reference-output :- (s/maybe Object)
    outputs :- [Object]
@@ -548,7 +549,7 @@
   ])
 
 ;; used in PState
-(drp/defrecord+ EvalNumberStats
+(defaorrecord EvalNumberStats
   [total :- Number
    count :- Long
    min :- Number
@@ -557,14 +558,14 @@
 
 ;; Analytics
 
-(drp/defrecord+ OpStatsImpl
+(defaorrecord OpStatsImpl
   [count :- Long
    total-time-millis :- Long]
   OpStats
   (getCount [this] (int count))
   (getTotalTimeMillis [this] total-time-millis))
 
-(drp/defrecord+ BasicAgentInvokeStatsImpl
+(defaorrecord BasicAgentInvokeStatsImpl
   [nested-op-stats :- {clojure.lang.Keyword OpStatsImpl}
    input-token-count :- Long
    output-token-count :- Long
@@ -578,28 +579,28 @@
   (getTotalTokenCount [this] (int total-token-count))
   (getNodeStats [this] node-stats))
 
-(drp/defrecord+ AgentRefImpl
+(defaorrecord AgentRefImpl
   [module-name :- String
    agent-name :- String]
   AgentRef
   (getModuleName [this] module-name)
   (getAgentName [this] agent-name))
 
-(drp/defrecord+ SubagentInvokeStatsImpl
+(defaorrecord SubagentInvokeStatsImpl
   [count :- Long
    basic-stats :- BasicAgentInvokeStatsImpl]
   SubagentInvokeStats
   (getCount [this] (int count))
   (getBasicStats [this] basic-stats))
 
-(drp/defrecord+ AgentInvokeStatsImpl
+(defaorrecord AgentInvokeStatsImpl
   [subagent-stats :- {AgentRefImpl SubagentInvokeStatsImpl}
    basic-stats :- BasicAgentInvokeStatsImpl]
   AgentInvokeStats
   (getSubagentStats [this] subagent-stats)
   (getBasicStats [this] basic-stats))
 
-(drp/defrecord+ ^{:features {:nippy-8-byte-hash false}} FeedbackImpl
+(defaorrecord ^{:features {:nippy-8-byte-hash false}} FeedbackImpl
   [scores :- {String Object}
    source :- InfoSource
    created-at :- Long
@@ -613,7 +614,7 @@
 ;; Misc
 
 ;; used for PState writes
-(drp/defrecord+ DirectTaskId
+(defaorrecord DirectTaskId
   [task-id :- Long])
 
 ;; Internal protocols
@@ -651,7 +652,7 @@
 
 ;; Configs
 
-(drp/defrecord+ ChangeConfig
+(defaorrecord ChangeConfig
   [key :- String
    val :- Object])
 
