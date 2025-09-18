@@ -61,90 +61,88 @@
 
 (def java-type-keyword
   (reify
-   Keyword
-   (getValue [_] "x-javaType")
-   (^JsonValidator newValidator
-     [_ ^SchemaLocation schemaLocation
-      ^JsonNodePath evaluationPath
-      ^JsonNode schemaNode
-      ^JsonSchema _parent
-      ^ValidationContext _ctx]
-     (let [^String fqcn (.asText schemaNode)
-           ^Class clazz (Class/forName fqcn false (clojure.lang.RT/baseLoader))]
-       (reify
-        JsonValidator
-        (getKeyword [_] "x-javaType")
-        (getSchemaLocation [_] schemaLocation)
-        (getEvaluationPath [_] evaluationPath)
-        (validate
-          [_ _ec node _root at]
-          (let [ok?
-                (cond
-                  (instance? POJONode node)
-                  (let [pojo (.getPojo ^POJONode node)]
-                    (and pojo (.isInstance clazz pojo)))
+    Keyword
+    (getValue [_] "x-javaType")
+    (^JsonValidator newValidator
+      [_ ^SchemaLocation schemaLocation
+       ^JsonNodePath evaluationPath
+       ^JsonNode schemaNode
+       ^JsonSchema _parent
+       ^ValidationContext _ctx]
+      (let [^String fqcn (.asText schemaNode)
+            ^Class clazz (Class/forName fqcn false (clojure.lang.RT/baseLoader))]
+        (reify
+          JsonValidator
+          (getKeyword [_] "x-javaType")
+          (getSchemaLocation [_] schemaLocation)
+          (getEvaluationPath [_] evaluationPath)
+          (validate
+            [_ _ec node _root at]
+            (let [ok?
+                  (cond
+                    (instance? POJONode node)
+                    (let [pojo (.getPojo ^POJONode node)]
+                      (and pojo (.isInstance clazz pojo)))
 
-                  (and (= clazz String)
-                       (instance? com.fasterxml.jackson.databind.node.TextNode
-                                  node))
-                  true
+                    (and (= clazz String)
+                         (instance? com.fasterxml.jackson.databind.node.TextNode
+                                    node))
+                    true
 
-                  (and (= clazz Long)
-                       (instance? com.fasterxml.jackson.databind.node.LongNode
-                                  node))
-                  true
+                    (and (= clazz Long)
+                         (instance? com.fasterxml.jackson.databind.node.LongNode
+                                    node))
+                    true
 
-                  (and (= clazz Integer)
-                       (instance? com.fasterxml.jackson.databind.node.IntNode
-                                  node))
-                  true
+                    (and (= clazz Integer)
+                         (instance? com.fasterxml.jackson.databind.node.IntNode
+                                    node))
+                    true
 
-                  (and (= clazz Double)
-                       (instance? com.fasterxml.jackson.databind.node.DoubleNode
-                                  node))
-                  true
+                    (and (= clazz Double)
+                         (instance? com.fasterxml.jackson.databind.node.DoubleNode
+                                    node))
+                    true
 
-                  (and (= clazz java.math.BigDecimal)
-                       (instance?
-                        com.fasterxml.jackson.databind.node.DecimalNode
-                        node))
-                  true
+                    (and (= clazz java.math.BigDecimal)
+                         (instance?
+                          com.fasterxml.jackson.databind.node.DecimalNode
+                          node))
+                    true
 
-                  (and (= clazz Boolean)
-                       (instance?
-                        com.fasterxml.jackson.databind.node.BooleanNode
-                        node))
-                  true
+                    (and (= clazz Boolean)
+                         (instance?
+                          com.fasterxml.jackson.databind.node.BooleanNode
+                          node))
+                    true
 
-                  (and (= clazz nil) (.isNull node))
-                  true
+                    (and (= clazz nil) (.isNull node))
+                    true
 
-                  (and (= clazz Map)
-                       (instance? com.fasterxml.jackson.databind.node.ObjectNode
-                                  node))
-                  true
+                    (and (= clazz Map)
+                         (instance? com.fasterxml.jackson.databind.node.ObjectNode
+                                    node))
+                    true
 
-                  (and (= clazz List)
-                       (instance? com.fasterxml.jackson.databind.node.ArrayNode
-                                  node))
-                  true
+                    (and (= clazz List)
+                         (instance? com.fasterxml.jackson.databind.node.ArrayNode
+                                    node))
+                    true
 
-                  :else
-                  false
-                )]
-            (if ok?
-              (Collections/emptySet)
-              (let [errs (LinkedHashSet.)
-                    path (str at)
-                    b    (ValidationMessage/builder)]
-                (.code b "x-javaType")
-                (.arguments b (into-array Object [fqcn]))
-                (.message b
-                          (str "x-javaType: " path
-                               " — expected " fqcn))
-                (.add errs (.build b))
-                errs))))
-       )))))
+                    :else
+                    false)]
+              (if ok?
+                (Collections/emptySet)
+                (let [errs (LinkedHashSet.)
+                      path (str at)
+                      b (ValidationMessage/builder)]
+                  (.code b "x-javaType")
+                  (.arguments b (into-array Object [fqcn]))
+                  (.message b
+                            (str "x-javaType: " path
+                                 " — expected " fqcn))
+                  (.add errs (.build b))
+                  errs)))))))))
 
 (def META-SCHEMA
   (-> (JsonMetaSchema/builder
@@ -157,15 +155,15 @@
   (JsonSchemaFactory/getInstance
    SpecVersion$VersionFlag/V202012
    (reify
-    Consumer
-    (accept [_ fb]
-      (let [^JsonSchemaFactory$Builder fb fb]
-        (.metaSchemas fb
-                      (reify
-                       Consumer
-                       (accept [_ m]
-                         (.put ^Map m META META-SCHEMA))))
-        (.defaultMetaSchemaIri fb META))))))
+     Consumer
+     (accept [_ fb]
+       (let [^JsonSchemaFactory$Builder fb fb]
+         (.metaSchemas fb
+                       (reify
+                         Consumer
+                         (accept [_ m]
+                           (.put ^Map m META META-SCHEMA))))
+         (.defaultMetaSchemaIri fb META))))))
 
 (defn build-schema
   ^JsonSchema [m]
@@ -198,17 +196,16 @@
 (defn schema-validation-errors
   [^JsonNode root]
   (let [^JsonSchemaFactory f ^JsonSchemaFactory FACTORY
-        meta-uri   (java.net.URI/create (.getIri (JsonMetaSchema/getV202012)))
-        meta       (.getSchema f meta-uri)
+        meta-uri (java.net.URI/create (.getIri (JsonMetaSchema/getV202012)))
+        meta (.getSchema f meta-uri)
         violations (.validate meta root)]
     (into #{} (map #(.getMessage ^ValidationMessage %)) violations)))
-
 
 (defn normalize-json-schema*
   [json-schema]
   (try
     (let [^JsonNode root (.readTree ^ObjectMapper MAPPER ^String json-schema)
-          errors         (when (some? root) (schema-validation-errors root))]
+          errors (when (some? root) (schema-validation-errors root))]
       (cond
         (nil? root)
         {:error "Invalid JSON schema: empty input."}
@@ -249,13 +246,13 @@
 (deframaop normalize-json-schema>
   [*json-schema]
   (<<if (some? *json-schema)
-    (normalize-json-schema* *json-schema :> *res)
-    (<<if (map? *res)
-      (ack-return> (get *res :error))
-     (else>)
-      (:> *res))
-   (else>)
-    (:> nil)))
+        (normalize-json-schema* *json-schema :> *res)
+        (<<if (map? *res)
+              (ack-return> (get *res :error))
+              (else>)
+              (:> *res))
+        (else>)
+        (:> nil)))
 
 (defn validate-with-schema*
   [^String json-schema value]
@@ -275,40 +272,38 @@
 (deframaop validate-with-schema>
   [*json-schema *value]
   (<<if (some? *json-schema)
-    (validate-with-schema* *json-schema *value :> *res)
-    (<<if (some? *res)
-      (ack-return> *res)
-     (else>)
-      (:>))
-   (else>)
-    (:>)))
+        (validate-with-schema* *json-schema *value :> *res)
+        (<<if (some? *res)
+              (ack-return> *res)
+              (else>)
+              (:>))
+        (else>)
+        (:>)))
 
 (defbasicblocksegmacro update-dataset!
   [pstate dataset-id apath]
   (let [time-millis (gen-anyvar "time-millis")]
     [[h/current-time-millis :> time-millis]
      [local-transform>
-       [(seg# keypath dataset-id)
-        (seg# multi-path
+      [(seg# keypath dataset-id)
+       (seg# multi-path
              [:props :modified-at (seg# termval time-millis)]
              apath)]
-       pstate]]))
-
+      pstate]]))
 
 (defbasicblocksegmacro update-dataset-example!
   [pstate dataset-id snapshot-name example-id apath]
   (let [time-millis (gen-anyvar "time-millis")]
     [[h/current-time-millis :> time-millis]
      [update-dataset!
-       pstate
-       dataset-id
-       [:snapshots
-        (seg# keypath snapshot-name example-id)
-        some?
-        (seg# multi-path
-          [:modified-at (seg# termval time-millis)]
-          apath
-          )]]]))
+      pstate
+      dataset-id
+      [:snapshots
+       (seg# keypath snapshot-name example-id)
+       some?
+       (seg# multi-path
+             [:modified-at (seg# termval time-millis)]
+             apath)]]]))
 
 (defn get-cluster-retriever
   [^AgentDeclaredObjectsTaskGlobal declared-objects-tg]
@@ -327,8 +322,7 @@
          ~@body)
        (finally
          (when host#
-           (close! retriever#))
-       ))))
+           (close! retriever#))))))
 
 (defn verify-remote-dataset
   [{:keys [dataset-id cluster-conductor-host cluster-conductor-port module-name] :as params}]
@@ -336,14 +330,14 @@
     "Cannot set conductor port without setting conductor host"
     (try
       (with-datasets-pstate
-       (po/agent-declared-objects-task-global)
-       params
-       [datasets]
-       (let [exists? (foreign-select-one [(keypath dataset-id) :props :name (view some?)]
-                                         datasets)]
-         (when-not exists?
-           (throw (h/ex-info "Remote dataset does not exist in specified module" {})))
-         nil))
+        (po/agent-declared-objects-task-global)
+        params
+        [datasets]
+        (let [exists? (foreign-select-one [(keypath dataset-id) :props :name (view some?)]
+                                          datasets)]
+          (when-not exists?
+            (throw (h/ex-info "Remote dataset does not exist in specified module" {})))
+          nil))
       (catch Throwable t
         (format "Failed to connect to remote dataset %s" (h/throwable->str t))))))
 
@@ -356,132 +350,130 @@
                  (instance? AddRemoteDataset *data)
                  (some? *props)))
    (<<subsource *data
-    (case> CreateDataset
-           :> {:keys [*name *description *input-json-schema
-                       *output-json-schema]})
-     (normalize-json-schema> *input-json-schema :> *isnorm)
-     (normalize-json-schema> *output-json-schema :> *osnorm)
-     (h/current-time-millis :> *current-time-millis)
-     (local-transform> [(keypath *dataset-id) :props
-                        (termval {:name              *name
-                                  :description       *description
-                                  :input-json-schema *isnorm
-                                  :output-json-schema *osnorm
-                                  :created-at        *current-time-millis
-                                  :modified-at       *current-time-millis})]
-                       $$datasets)
+                (case> CreateDataset
+                       :> {:keys [*name *description *input-json-schema
+                                  *output-json-schema]})
+                (normalize-json-schema> *input-json-schema :> *isnorm)
+                (normalize-json-schema> *output-json-schema :> *osnorm)
+                (h/current-time-millis :> *current-time-millis)
+                (local-transform> [(keypath *dataset-id) :props
+                                   (termval {:name *name
+                                             :description *description
+                                             :input-json-schema *isnorm
+                                             :output-json-schema *osnorm
+                                             :created-at *current-time-millis
+                                             :modified-at *current-time-millis})]
+                                  $$datasets)
 
-    (case> AddRemoteDataset
-           :> {:keys [*cluster-conductor-host *cluster-conductor-port *module-name]})
-     (verify-remote-dataset *data :> *error)
-     (<<if *error
-       (ack-return> *error)
-      (else>)
-       (h/current-time-millis :> *current-time-millis)
-       (local-transform> [(keypath *dataset-id)
-                          :props
-                          (termval {:cluster-conductor-host *cluster-conductor-host
-                                    :cluster-conductor-port *cluster-conductor-port
-                                    :module-name *module-name
-                                    :created-at  *current-time-millis
-                                    :modified-at *current-time-millis})]
-                         $$datasets))
+                (case> AddRemoteDataset
+                       :> {:keys [*cluster-conductor-host *cluster-conductor-port *module-name]})
+                (verify-remote-dataset *data :> *error)
+                (<<if *error
+                      (ack-return> *error)
+                      (else>)
+                      (h/current-time-millis :> *current-time-millis)
+                      (local-transform> [(keypath *dataset-id)
+                                         :props
+                                         (termval {:cluster-conductor-host *cluster-conductor-host
+                                                   :cluster-conductor-port *cluster-conductor-port
+                                                   :module-name *module-name
+                                                   :created-at *current-time-millis
+                                                   :modified-at *current-time-millis})]
+                                        $$datasets))
 
-    (case> UpdateDatasetProperty :> {:keys [*key *value]})
-     (update-dataset! $$datasets
-                      *dataset-id
-                      [:props (keypath *key) (termval *value)])
+                (case> UpdateDatasetProperty :> {:keys [*key *value]})
+                (update-dataset! $$datasets
+                                 *dataset-id
+                                 [:props (keypath *key) (termval *value)])
 
-    (case> DestroyDataset)
-     (local-transform> [(keypath *dataset-id :snapshots MAP-VALS) NONE>]
-                       $$datasets)
-     (|direct (ops/current-task-id))
-     (local-transform> [(keypath *dataset-id) NONE>]
-                       $$datasets)
+                (case> DestroyDataset)
+                (local-transform> [(keypath *dataset-id :snapshots MAP-VALS) NONE>]
+                                  $$datasets)
+                (|direct (ops/current-task-id))
+                (local-transform> [(keypath *dataset-id) NONE>]
+                                  $$datasets)
 
-    (case> AddDatasetExample
-           :> {:keys [*snapshot-name *example-id *input *reference-output
-                       *tags *source]})
-     (get *props :input-json-schema :> *input-json-schema)
-     (get *props :output-json-schema :> *output-json-schema)
-     (validate-with-schema> *input-json-schema *input)
-     (<<if (some? *reference-output)
-       (validate-with-schema> *output-json-schema *reference-output))
-     (h/current-time-millis :> *current-time-millis)
-     (update-dataset! $$datasets
-                      *dataset-id
-                      [(keypath :snapshots *snapshot-name *example-id)
-                       (termval
-                        {:input            *input
-                         :reference-output *reference-output
-                         :tags             *tags
-                         :source           *source
-                         :created-at       *current-time-millis
-                         :modified-at      *current-time-millis})])
+                (case> AddDatasetExample
+                       :> {:keys [*snapshot-name *example-id *input *reference-output
+                                  *tags *source]})
+                (get *props :input-json-schema :> *input-json-schema)
+                (get *props :output-json-schema :> *output-json-schema)
+                (validate-with-schema> *input-json-schema *input)
+                (<<if (some? *reference-output)
+                      (validate-with-schema> *output-json-schema *reference-output))
+                (h/current-time-millis :> *current-time-millis)
+                (update-dataset! $$datasets
+                                 *dataset-id
+                                 [(keypath :snapshots *snapshot-name *example-id)
+                                  (termval
+                                   {:input *input
+                                    :reference-output *reference-output
+                                    :tags *tags
+                                    :source *source
+                                    :created-at *current-time-millis
+                                    :modified-at *current-time-millis})])
 
+                (case> UpdateDatasetExample
+                       :> {:keys [*snapshot-name *example-id *key *value]})
+                (<<cond
+                 (case> (= *key :input))
+                 (get *props :input-json-schema :> *input-json-schema)
+                 (validate-with-schema> *input-json-schema *value)
 
-    (case> UpdateDatasetExample
-           :> {:keys [*snapshot-name *example-id *key *value]})
-     (<<cond
-      (case> (= *key :input))
-       (get *props :input-json-schema :> *input-json-schema)
-       (validate-with-schema> *input-json-schema *value)
+                 (case> (= *key :reference-output))
+                 (get *props :output-json-schema :> *output-json-schema)
+                 (validate-with-schema> *output-json-schema *value)
 
-      (case> (= *key :reference-output))
-       (get *props :output-json-schema :> *output-json-schema)
-       (validate-with-schema> *output-json-schema *value)
+                 (default>))
+                (update-dataset-example!
+                 $$datasets
+                 *dataset-id
+                 *snapshot-name
+                 *example-id
+                 [(keypath *key) (termval *value)])
 
-      (default>))
-     (update-dataset-example!
-      $$datasets
-      *dataset-id
-      *snapshot-name
-      *example-id
-      [(keypath *key) (termval *value)])
+                (case> RemoveDatasetExample :> {:keys [*snapshot-name *example-id]})
+                (update-dataset!
+                 $$datasets
+                 *dataset-id
+                 [(keypath :snapshots *snapshot-name *example-id) NONE>])
 
-    (case> RemoveDatasetExample :> {:keys [*snapshot-name *example-id]})
-     (update-dataset!
-      $$datasets
-      *dataset-id
-      [(keypath :snapshots *snapshot-name *example-id) NONE>])
+                (case> AddDatasetExampleTag :> {:keys [*snapshot-name *example-id *tag]})
+                (update-dataset-example!
+                 $$datasets
+                 *dataset-id
+                 *snapshot-name
+                 *example-id
+                 [:tags NONE-ELEM (termval *tag)])
 
-    (case> AddDatasetExampleTag :> {:keys [*snapshot-name *example-id *tag]})
-     (update-dataset-example!
-      $$datasets
-      *dataset-id
-      *snapshot-name
-      *example-id
-      [:tags NONE-ELEM (termval *tag)])
+                (case> RemoveDatasetExampleTag
+                       :> {:keys [*snapshot-name *example-id *tag]})
+                (update-dataset-example!
+                 $$datasets
+                 *dataset-id
+                 *snapshot-name
+                 *example-id
+                 [:tags (set-elem *tag) NONE>])
 
-    (case> RemoveDatasetExampleTag
-           :> {:keys [*snapshot-name *example-id *tag]})
-     (update-dataset-example!
-      $$datasets
-      *dataset-id
-      *snapshot-name
-      *example-id
-      [:tags (set-elem *tag) NONE>])
-
-    (case> DatasetSnapshot
-           :> {:keys [*from-snapshot-name *to-snapshot-name]})
+                (case> DatasetSnapshot
+                       :> {:keys [*from-snapshot-name *to-snapshot-name]})
      ;; to update modified-at
-     (update-dataset! $$datasets *dataset-id STOP)
-     (local-select> [(keypath *dataset-id :snapshots *from-snapshot-name)
-                     ALL]
-                    $$datasets
-                    {:allow-yield? true}
-                    :> [*example-id *example])
-     (local-transform>
-      [(keypath *dataset-id :snapshots *to-snapshot-name *example-id)
-       (termval *example)]
-      $$datasets)
+                (update-dataset! $$datasets *dataset-id STOP)
+                (local-select> [(keypath *dataset-id :snapshots *from-snapshot-name)
+                                ALL]
+                               $$datasets
+                               {:allow-yield? true}
+                               :> [*example-id *example])
+                (local-transform>
+                 [(keypath *dataset-id :snapshots *to-snapshot-name *example-id)
+                  (termval *example)]
+                 $$datasets)
 
-    (case> RemoveDatasetSnapshot :> {:keys [*snapshot-name]})
-     (update-dataset!
-      $$datasets
-      *dataset-id
-      [(keypath :snapshots *snapshot-name) NONE>])
-   )))
+                (case> RemoveDatasetSnapshot :> {:keys [*snapshot-name]})
+                (update-dataset!
+                 $$datasets
+                 *dataset-id
+                 [(keypath :snapshots *snapshot-name) NONE>]))))
 
 (defn upload-jsonl-examples!
   "Best-effort JSONL uploader.
@@ -492,7 +484,7 @@
    Lines look like:
      {\"input\": <json>, \"output\": <json optional>, \"tags\": [\"...\"] optional }"
   [^AgentManager manager dataset-id snapshot-name path failure-callback]
-  (let [sem    (Semaphore. 100)
+  (let [sem (Semaphore. 100)
         mapper (j/object-mapper)]
     (with-open [r (io/reader path)]
       (binding [aor-types/OPERATION-SOURCE (aor-types/->BulkUploadSource)]
@@ -504,7 +496,7 @@
                         (failure-callback line ex)
                         ::parse-failed))]
               (when-not (identical? ::parse-failed m)
-                (let [input  (get m "input")
+                (let [input (get m "input")
                       output (get m "output")
                       tags-v (get m "tags")]
                   (if-not (or (nil? tags-v)
@@ -514,7 +506,7 @@
                      (ex-info
                       "Tags must be an array of strings or omitted"
                       {:tags tags-v}))
-                    (let [tags    (if (nil? tags-v) #{} (set tags-v))
+                    (let [tags (if (nil? tags-v) #{} (set tags-v))
                           options (AddDatasetExampleOptions.)]
                       (set! (.snapshotName options) snapshot-name)
                       (set! (.tags options) tags)
@@ -528,17 +520,77 @@
                                                        options)]
                           (.whenComplete cf
                                          (reify
-                                          BiConsumer
-                                          (accept [_ _ ex]
-                                            (.release sem)
-                                            (when ex
-                                              (failure-callback line ex))))))
+                                           BiConsumer
+                                           (accept [_ _ ex]
+                                             (.release sem)
+                                             (when ex
+                                               (failure-callback line ex))))))
                         (catch Throwable t
                           (.release sem)
-                          (failure-callback line t))))
-                  ))))))
+                          (failure-callback line t))))))))))
         (.acquire sem 100)
         nil))))
+
+(defn download-jsonl-examples!
+  "Downloads dataset examples to a JSONL file.
+   
+   path is String path where UTF-8 JSONL file will be written
+   failure-callback is (fn [example-id ex]) for any per-example failure
+   
+   Lines written like:
+     {\"input\": <json>, \"output\": <json optional>, \"tags\": [\"...\"] optional}"
+  [^AgentManager manager dataset-id snapshot-name path failure-callback]
+  (let [{:keys [search-examples-query multi-examples-query]} (aor-types/underlying-objects manager)
+        mapper (j/object-mapper)]
+    (with-open [w (io/writer path :encoding "UTF-8")]
+      (loop [next-key nil
+             total-written 0]
+        (let [;; Query for a batch of examples
+              result (try
+                       (foreign-invoke-query search-examples-query
+                                             dataset-id
+                                             snapshot-name
+                                             {} ; no filters
+                                             100 ; batch size
+                                             next-key)
+                       (catch Exception ex
+                         (failure-callback nil ex)
+                         nil))]
+          (when result
+            (let [{:keys [examples pagination-params]} result
+                  example-ids (mapv :id examples)]
+              (when (seq example-ids)
+                ;; Fetch the full example data for all examples in batch
+                (let [full-examples (try
+                                      (foreign-invoke-query multi-examples-query
+                                                            dataset-id
+                                                            snapshot-name
+                                                            example-ids)
+                                      (catch Exception ex
+                                        (failure-callback nil ex)
+                                        {}))]
+                  (doseq [example-id example-ids]
+                    (when-let [example-data (get full-examples example-id)]
+                      (try
+                        (let [json-obj (cond-> {"input" (:input example-data)}
+
+                                         ;; Add output if present
+                                         (some? (:reference-output example-data))
+                                         (assoc "output" (:reference-output example-data))
+
+                                         ;; Add tags if present and non-empty
+                                         (seq (:tags example-data))
+                                         (assoc "tags" (vec (:tags example-data))))]
+                          ;; Write the JSON line
+                          (.write w (j/write-value-as-string json-obj mapper))
+                          (.write w "\n"))
+                        (catch Exception ex
+                          (failure-callback example-id ex)))))))
+
+              ;; Continue if there are more examples
+              (if (and pagination-params (seq examples))
+                (recur pagination-params (+ total-written (count examples)))
+                total-written))))))))
 
 (defn create-remote-dataset!
   [datasets-depot dataset-id cluster-conductor-host cluster-conductor-port module-name]

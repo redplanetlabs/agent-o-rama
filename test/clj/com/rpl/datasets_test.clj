@@ -15,7 +15,8 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.test-common :as tc])
+   [com.rpl.test-common :as tc]
+   [jsonista.core :as j])
   (:import
    [com.fasterxml.jackson.databind
     ObjectMapper
@@ -1208,6 +1209,68 @@
                                     nil
                                     (mapv :id less-examples))))
 
+
+       ;; test download-jsonl-examples!
+       (bind download-path (.resolve tmpdir "downloaded.jsonl"))
+       (bind download-file (.toFile download-path))
+       (.deleteOnExit download-file)
+
+       (bind download-failures* (atom []))
+       (datasets/download-jsonl-examples!
+        manager
+        ds-id4
+        nil
+        (.toString download-path)
+        (fn [example-id ex]
+          (swap! download-failures* conj [example-id ex])))
+
+       (is (empty? @download-failures*) "Should have no download failures")
+
+       ;; verify the downloaded content matches what was uploaded
+       (bind downloaded-lines
+         (with-open [r (io/reader download-file :encoding "UTF-8")]
+           (vec (line-seq r))))
+
+       (is (= 2 (count downloaded-lines)) "Should have downloaded exactly 2 examples")
+
+       ;; parse and check the downloaded content
+       (bind parsed-lines
+         (mapv #(j/read-value %) downloaded-lines))
+
+       (is (= (set parsed-lines)
+              #{{"input" "a", "output" "x", "tags" ["t1" "t2"]}
+                {"input" "b"}})
+           "Downloaded content should match uploaded examples")
+
+       ;; test round-trip: upload the downloaded file to a new dataset
+       (bind ds-id-roundtrip
+         (create-and-wait! manager "Roundtrip test dataset" {:input-json-schema (to-json schema-str)}))
+
+       (bind roundtrip-failures* (atom []))
+       (datasets/upload-jsonl-examples!
+        manager
+        ds-id-roundtrip
+        nil
+        (.toString download-path)
+        (fn [line ex]
+          (swap! roundtrip-failures* conj [line ex])))
+
+       (is (empty? @roundtrip-failures*) "Should have no roundtrip upload failures")
+
+       (bind {:keys [examples pagination-params]}
+         (get-examples-page ds-id-roundtrip nil 100 nil))
+
+       (is (nil? pagination-params))
+       (is (= (examples-cleaned examples)
+              [{:input "a"
+                :reference-output "x"
+                :tags #{"t1" "t2"}
+                :source (aor-types/->BulkUploadSource)}
+               {:input "b"
+                :reference-output nil
+                :tags #{}
+                :source (aor-types/->BulkUploadSource)}])
+           "Roundtrip should preserve all data")
 
 
        ;; test search with filters
