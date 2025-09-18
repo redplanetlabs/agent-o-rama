@@ -118,7 +118,7 @@
          manager dataset-id snapshot (.getPath f)
          (fn [line ex]
            (vswap! failures* conj {:line_content line
-                                   :error (h/throwable->str ex)})))
+                                   :error (ex-message ex)})))
         (let [failure-count (count @failures*)
               success-count (max 0 (- total-lines failure-count))
               body (j/write-value-as-string
