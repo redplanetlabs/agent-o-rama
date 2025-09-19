@@ -11,19 +11,12 @@
    ["use-debounce" :refer [useDebounce]]
    ["@heroicons/react/24/outline" :refer [ChevronDownIcon]]))
 
-;; Removed - no longer needed for simplified form
-
-;; Removed - no longer needed for simplified form
-
-;; Removed - no longer needed for simplified form
-
 (defui AddFromTraceForm [{:keys [form-id]}]
   (let [;; Form fields
         dataset-id-field (forms/use-form-field form-id :dataset-id)
         input-data-field (forms/use-form-field form-id :input-data)
         output-data-field (forms/use-form-field form-id :output-data)
 
-;; Props passed when the form was shown
         props (state/use-sub [:forms form-id])
         {:keys [module-id source-args source-result source-emits error]} props
 
@@ -33,9 +26,9 @@
         [is-validating set-is-validating] (uix/use-state false)
 
         ;; Debounced values for real-time validation
-        debounced-dataset-id (useDebounce (:value dataset-id-field) 500)
-        debounced-input-data (useDebounce (:value input-data-field) 500)
-        debounced-output-data (useDebounce (:value output-data-field) 500)
+        [debounced-dataset-id, _] (useDebounce (:value dataset-id-field) 500)
+        [debounced-input-data, _] (useDebounce (:value input-data-field) 500)
+        [debounced-output-data, _] (useDebounce (:value output-data-field) 500)
 
         ;; Fetch available datasets
 
@@ -44,6 +37,32 @@
                                  {:query-key [:datasets module-id]
                                   :sente-event [:datasets/get-all {:module-id module-id}]})]
 
+    ;; Add this right after the let binding, before the ($ :div ...) JSX:
+
+    (println "debounced-dataset-id" debounced-dataset-id)
+    (println "debounced-input-data" debounced-input-data)
+    (println "debounced-output-data" debounced-output-data)
+
+    (useEffect
+     (fn []
+       (when (and debounced-dataset-id 
+                  (not (str/blank? debounced-input-data))
+                  (not (str/blank? debounced-output-data)))
+         (set-is-validating true)
+         (sente/request! [:datasets/validate-direct-data
+                          {:module-id module-id
+                           :dataset-id debounced-dataset-id
+                           :input-data debounced-input-data
+                           :output-data debounced-output-data}]
+                         10000
+                         (fn [reply]
+                           (set-is-validating false)
+                           (if (:success reply)
+                             (set-validation-state (:data reply))
+                             (set-validation-state nil)))))
+       js/undefined)
+     (clj->js [debounced-dataset-id debounced-input-data debounced-output-data]))
+    
     ($ :div {:className "max-w-4xl mx-auto p-6"}
        ($ forms/form
           ($ :div {:className "space-y-6"}
@@ -87,7 +106,7 @@
                   ($ :p {:className "text-sm text-red-600 mt-1"} (:error dataset-id-field))
                   ($ :div {:className "mt-1 h-5"})))
 
-;; Input Data
+             ;; Input Data
              ($ :div
                 ($ forms/form-field
                    {:label "Input Data"
@@ -112,7 +131,7 @@
 
                          :else nil)))))
 
-;; Output Data  
+             ;; Output Data  
              ($ :div
                 ($ forms/form-field
                    {:label "Reference Output Data"
