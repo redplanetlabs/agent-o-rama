@@ -225,10 +225,12 @@
         output-schema (:output-json-schema schemas)]
     (if-not schemas
       (throw (ex-info "Dataset not found" {:dataset-id dataset-id}))
-      (let [parsed-input  (try (j/read-value input-data)  (catch Exception e
-                                                            (throw (ex-info (str "Invalid input JSON: " (.getMessage e)) {}))))
-            parsed-output (try (j/read-value output-data) (catch Exception e
-                                                            (throw (ex-info (str "Invalid output JSON: " (.getMessage e)) {}))))
+      (let [parsed-input (try (j/read-value input-data)
+                              (catch Exception e
+                                (throw (ex-info (str "Invalid input JSON: " (.getMessage e)) {}))))
+            parsed-output (try (j/read-value output-data)
+                               (catch Exception e
+                                 (throw (ex-info (str "Invalid output JSON: " (.getMessage e)) {}))))
             input-validation  (when input-schema
                                 (datasets/validate-with-schema* input-schema parsed-input))
             output-validation (when output-schema

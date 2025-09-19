@@ -8,7 +8,6 @@
 
 ;; We need to reference the multimethod from sente namespace
 ;; Since we can't require it directly due to circular dependency,
-;; we'll use a qualified symbol to extend it
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :agents/get-all
   [_ uid]
   (for [[module-name agent-name]

@@ -10,8 +10,6 @@
    [java.net URLEncoder URLDecoder]
    [java.util UUID]))
 
-;; --- Shared Helper Functions (Moved from old agents.clj) ---
-
 (defn url-encode [s]
   "Encode string for safe use in URLs using standard URL encoding"
   (java.net.URLEncoder/encode ^String s "UTF-8"))
@@ -90,8 +88,7 @@
   [{:keys [?data] :as ev-msg}]
   (if-not (map? ?data)
     ev-msg ; Return original message if there's no data map to process
-    (let [;; --- NEW STEP: Deserialize from UI format first ---
-          thawed-data (from-ui-serializable ?data)
+    (let [thawed-data (from-ui-serializable ?data)
 
           ;; --- The rest of the function operates on thawed-data ---
           decoded-module-id (when-let [mid (:module-id thawed-data)]
@@ -121,6 +118,3 @@
 
       ;; Return the event message with the enriched data map
       (assoc ev-msg :?data enriched-data))))
-
-;; --- New API Handler Wrapper ---
-
