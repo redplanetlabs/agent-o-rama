@@ -1,145 +1,41 @@
 (ns com.rpl.agent-o-rama.ui.datasets.add-from-trace
   (:require
-   [uix.core :as uix :refer [defui defhook $]]
+   [uix.core :as uix :refer [defui $]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
    [clojure.string :as str]
-   ["react" :refer [useEffect]]
-   ["use-debounce" :refer [useDebounce]]
    ["@heroicons/react/24/outline" :refer [ChevronDownIcon]]))
 
-(defhook use-debounced-value
-  "Returns a debounced value that only updates after the specified delay."
-  [value delay-ms]
-  (let [[debounced-value] (useDebounce value delay-ms)]
-    debounced-value))
+;; Removed - no longer needed for simplified form
 
-(defui SourceDataPanel [{:keys [source-type source-args source-result source-emits]}]
-  ($ :div {:className "w-1/3 p-4 bg-gray-50 border-r overflow-auto"}
-     ($ :h4 {:className "font-semibold mb-2"} "Source Data (from Trace)")
-     ($ :div {:className "space-y-4"}
-        ($ :div
-           ($ :label {:className "text-xs font-medium text-gray-500"}
-              "Node Input Arguments")
-           ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"} (common/pp source-args)))
-        ($ :div
-           ($ :label {:className "text-xs font-medium text-gray-500"}
-              "Node Emitted Data")
-           ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"}
-              (common/pp source-emits))))))
+;; Removed - no longer needed for simplified form
 
-(defui PreviewPanel [{:keys [preview-data error is-previewing]}]
-  ($ :div {:className "w-1/3 p-4 overflow-auto"}
-     ($ :div {:className "flex justify-between items-center mb-2"}
-        ($ :h4 {:className "font-semibold"} "Live Preview")
-        (when is-previewing
-          ($ :div {:className "flex items-center gap-1 text-xs text-gray-500"}
-             ($ common/spinner {:size :small})
-             "Updating...")))
-     (cond
-       error ($ :div {:className "bg-red-50 p-2 rounded border border-red-200 text-red-700 text-xs whitespace-pre-wrap"} error)
-       preview-data
-       ($ :div {:className "space-y-4"}
-          ;; Preview for Input
-          ($ :div {:id "preview-input-section"}
-             ($ :div {:id "preview-input-header" :className "flex justify-between items-center"}
-                ($ :label {:className "text-xs font-medium text-gray-500"} "Dataset Input")
-                (when-let [input-preview (:input preview-data)]
-                  ($ :span {:id "preview-input-status"
-                            :className (if (:is-valid? input-preview)
-                                         "text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full"
-                                         "text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded-full")}
-                     (if (:is-valid? input-preview) "Valid" "Invalid"))))
-             ($ :pre {:id "preview-input-data" :className "text-xs bg-white p-2 rounded border mt-1"} (common/pp (:transformed-data (:input preview-data))))
-             (when-let [err (:validation-error (:input preview-data))]
-               ($ :p {:id "preview-input-error" :className "text-xs text-red-600 mt-1"} err)))
-          ;; Preview for Reference Output
-          ($ :div {:id "preview-output-section"}
-             ($ :div {:id "preview-output-header" :className "flex justify-between items-center"}
-                ($ :label {:className "text-xs font-medium text-gray-500"} "Dataset Reference Output")
-                (when-let [output-preview (:output preview-data)]
-                  ($ :span {:id "preview-output-status"
-                            :className (if (:is-valid? output-preview)
-                                         "text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full"
-                                         "text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded-full")}
-                     (if (:is-valid? output-preview) "Valid" "Invalid"))))
-             ($ :pre {:id "preview-output-data" :className "text-xs bg-white p-2 rounded border mt-1"} (common/pp (:transformed-data (:output preview-data))))
-             (when-let [err (:validation-error (:output preview-data))]
-               ($ :p {:id "preview-output-error" :className "text-xs text-red-600 mt-1"} err))))
-       :else ($ :div {:className "text-sm text-gray-400 italic"} "Select a dataset to see a preview."))))
+;; Removed - no longer needed for simplified form
 
 (defui AddFromTraceForm [{:keys [form-id]}]
   (let [;; Form fields
         dataset-id-field (forms/use-form-field form-id :dataset-id)
-        input-template-field (forms/use-form-field form-id :input-template)
-        output-template-field (forms/use-form-field form-id :output-template)
+        input-data-field (forms/use-form-field form-id :input-data)
+        output-data-field (forms/use-form-field form-id :output-data)
 
 ;; Props passed when the form was shown
         props (state/use-sub [:forms form-id])
-        {:keys [module-id source-type source-args source-result source-emits]} props
+        {:keys [module-id source-args source-result source-emits]} props
 
-        ;; Since we now pass simplified data for both input and output, use source-args
-        output-template-source source-args
-
-        ;; Local state for preview
-        [preview-data set-preview-data] (uix/use-state nil)
-        [preview-error set-preview-error] (uix/use-state nil)
+        ;; Local state
         [dropdown-open? set-dropdown-open] (uix/use-state false)
-        [is-previewing set-is-previewing] (uix/use-state false)
 
         ;; Fetch available datasets
         {:keys [data loading?]} (queries/use-sente-query
                                  {:query-key [:datasets module-id]
-                                  :sente-event [:datasets/get-all {:module-id module-id}]})
+                                  :sente-event [:datasets/get-all {:module-id module-id}]})]
 
-        ;; Debounced values for form fields
-        debounced-dataset-id (use-debounced-value (:value dataset-id-field) 300)
-        debounced-input-template (use-debounced-value (:value input-template-field) 300)
-        debounced-output-template (use-debounced-value (:value output-template-field) 300)]
-
-    ;; Effect for live preview that runs when debounced values change
-    (useEffect
-     (fn []
-       ;; Only run if we have required data
-       (when (and debounced-dataset-id (not (str/blank? debounced-input-template)))
-         (set-is-previewing true)
-         (sente/request! [:datasets/preview-from-trace
-                          {:module-id module-id
-                           :dataset-id debounced-dataset-id
-                           :input-template debounced-input-template
-                           :output-template debounced-output-template
-                           :source-args source-args
-                           :source-output output-template-source}]
-                         15000
-                         (fn [reply]
-                           (set-is-previewing false)
-                           (cond
-                             ;; Keep last good data on timeout; don't show error, just stop spinner
-                             (= reply :chsk/timeout) nil
-                             ;; Success: show preview, clear any previous error
-                             (:success reply) (do
-                                                (set-preview-data (:data reply))
-                                                (set-preview-error nil))
-                             ;; Error (non-timeout): show error but keep last preview
-                             :else (set-preview-error (:error reply))))))
-       ;; No cleanup needed
-       js/undefined)
-     ;; Dependencies - effect runs when debounced values change
-     (clj->js [debounced-dataset-id debounced-input-template debounced-output-template]))
-
-    ($ :div {:className "flex h-full"}
-       ($ SourceDataPanel {:source-type source-type
-                           :source-args source-args
-                           :source-result source-result
-                           :source-emits source-emits})
-       ;; Center Panel: Controls
-       ($ :div {:className "w-1/3 p-4 border-r overflow-auto"}
-          ($ forms/form
-             ($ :h4 {:className "font-semibold mb-4"} "Configuration")
-             ;; Custom dropdown field for datasets
+    ($ :div {:className "max-w-4xl mx-auto p-6"}
+       ($ forms/form
+          ($ :div {:className "space-y-6"}
+             ;; Dataset Selection
              ($ :div {:className "space-y-1"}
                 ($ :label {:className "block text-sm font-medium text-gray-700"}
                    "Target Dataset"
@@ -178,15 +74,26 @@
                 (if (:error dataset-id-field)
                   ($ :p {:className "text-sm text-red-600 mt-1"} (:error dataset-id-field))
                   ($ :div {:className "mt-1 h-5"})))
+
+             ;; Input Data
              ($ forms/form-field
-                {:label "Input Template (JSONPath)" :type :textarea :rows 4
-                 :value (:value input-template-field) :on-change (:on-change input-template-field)
-                 :error (:error input-template-field)})
+                {:label "Input Data"
+                 :type :textarea
+                 :rows 8
+                 :value (:value input-data-field)
+                 :on-change (:on-change input-data-field)
+                 :error (:error input-data-field)
+                 :help-text "Edit the input data for this dataset example"})
+
+             ;; Output Data  
              ($ forms/form-field
-                {:label "Reference Output Template (JSONPath)" :type :textarea :rows 4
-                 :value (:value output-template-field) :on-change (:on-change output-template-field)
-                 :error (:error output-template-field)})))
-       ($ PreviewPanel {:preview-data preview-data :error preview-error :is-previewing is-previewing}))))
+                {:label "Reference Output Data"
+                 :type :textarea
+                 :rows 8
+                 :value (:value output-data-field)
+                 :on-change (:on-change output-data-field)
+                 :error (:error output-data-field)
+                 :help-text "Edit the expected output data for this dataset example"}))))))
 
 (forms/reg-form
  :add-from-trace
@@ -194,30 +101,32 @@
   :main
   {:initial-fields
    (fn [props]
-     (merge
-      {:dataset-id ""
-       ;; Simple defaults - just use $ for everything
-       :input-template "$"
-       :output-template "$"}
-      props))
-   :validators {:dataset-id [forms/required]}
+     (let [{:keys [source-args source-result source-emits]} props
+           ;; Use source-result if available, otherwise fall back to source-emits
+           output-data (or source-result source-emits)]
+       (merge
+        {:dataset-id ""
+         ;; Pre-fill input with source args, output with result/emits
+         :input-data (common/pp source-args)
+         :output-data (common/pp output-data)}
+        props)))
+   :validators {:dataset-id [forms/required]
+                :input-data [forms/required forms/valid-json]
+                :output-data [forms/required forms/valid-json]}
    :ui (fn [{:keys [form-id]}] ($ AddFromTraceForm {:form-id form-id}))
    :modal-props (fn [props] {:title (or (:title props) "Add to Dataset") :submit-text "Add Example"})}
   :on-submit
   {:event
    (fn [_db form-state]
-     ;; On submit, we call the add-from-trace endpoint that does both preview and add
+     ;; On submit, we send the direct data - backend will validate JSON and schema
      (let [{:keys [module-id]} form-state
            dataset-id (:dataset-id form-state)
-           input-template (:input-template form-state)
-           output-template (:output-template form-state)
-           source-args (:source-args form-state)]
-       [:datasets/add-from-trace
+           input-data (:input-data form-state)
+           output-data (:output-data form-state)]
+       [:datasets/add-example
         {:module-id module-id
          :dataset-id dataset-id
-         :input-template input-template
-         :output-template output-template
-         :source-args source-args
-         :source-output source-args}]))
+         :input-data input-data
+         :output-data output-data}]))
    :on-success-invalidate (fn [_db {:keys [module-id dataset-id]} _reply]
                             {:query-key-pattern [:dataset-examples module-id dataset-id]})}})
