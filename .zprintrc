@@ -84,6 +84,9 @@
   "defmodule" :arg1-body
   "defnav" :arg1-body
   "defnk" :arg1-body
+  "defaorrecord" [:arg2-extend
+                  {:list       {:indent-arg 2}
+                   :next-inner {:list {:indent-arg 1}}}]
   "defrecord+" [:arg2-extend
                 {:list       {:indent-arg 2}
                  :next-inner {:list {:indent-arg 1}}}]

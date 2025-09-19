@@ -9,17 +9,19 @@
     AgentDeclaredObjectsTaskGlobal
     AgentNodeExecutorTaskGlobal
     RamaClientsTaskGlobal]
+   [com.rpl.agentorama.source
+    InfoSource]
    [com.rpl.agent_o_rama.impl.types
-    AgentInvokeStats
+    AgentInvokeStatsImpl
     AgentNodeEmit
     AgentResult
     AggInput
     EvalNumberStats
     ExceptionSummary
     ExperimentInputSelector
+    FeedbackImpl
     ForkContext
-    InfoSource
-    NestedOpInfo
+    NestedOpInfoImpl
     NodeHumanInputRequest
     HistoricalAgentGraphInfo
     Node
@@ -90,23 +92,15 @@
   []
   "*_agent-clients")
 
-(defn agent-id-gen-task-global-name
-  [name]
-  (str "$$_agent-id-gen-" name))
-
 (defn agent-root-task-global-name
   [agent-name]
   (str "$$_agent-root-" agent-name))
 
 (def FEEDBACK-SCHEMA
-  [(fixed-keys-schema
-    {:scores      {String Object}
-     :source      InfoSource
-     :created-at  Long
-     :modified-at Long})])
+  [FeedbackImpl])
 
 (def AGENT-ROOT-PSTATE-SCHEMA
-  {Long
+  {UUID
    (fixed-keys-schema
     {:root-invoke-id     UUID
      :invoke-args        [Object]
@@ -118,13 +112,14 @@
      :finish-time-millis Long
      :last-progress-time-millis Long
      :retry-num          Long
-     :stats              AgentInvokeStats
+     :source             InfoSource
+     :stats              AgentInvokeStatsImpl
      :feedback           FEEDBACK-SCHEMA
      :human-requests     (set-schema NodeHumanInputRequest {:subindex? true})
      :fork-of            (fixed-keys-schema
-                          {:parent-agent-id Long
+                          {:parent-agent-id UUID
                            :fork-context    ForkContext})
-     :forks              (set-schema Long {:subindex? true}) ; agent ids
+     :forks              (set-schema UUID {:subindex? true}) ; agent ids
      :streaming          (map-schema
                           String           ; node name
                           (fixed-keys-schema
@@ -145,7 +140,7 @@
   (str "$$_agent-active-invokes-" agent-name))
 
 (def AGENT-ACTIVE-INVOKES-PSTATE-SCHEMA
-  {Long Boolean})
+  {UUID Boolean})
 
 (defn agent-valid-invokes-task-global-name
   [agent-name]
@@ -169,10 +164,10 @@
 (def AGENT-NODE-PSTATE-SCHEMA
   {UUID ; invoke-id
    (fixed-keys-schema
-    {:agent-id            Long
+    {:agent-id            UUID
      :agent-task-id       Long
      :node                String
-     :nested-ops          [NestedOpInfo]
+     :nested-ops          [NestedOpInfoImpl]
      :emits               [AgentNodeEmit]
      :result              AgentResult
      :start-time-millis   Long
@@ -356,10 +351,6 @@
   (-> (agent-declared-objects-task-global)
       .getAgentGraphs
       (get name)))
-
-(defn agent-id-gen-task-global
-  [name]
-  (this-module-pobject-task-global (agent-id-gen-task-global-name name)))
 
 (defn agent-root-task-global
   [name]

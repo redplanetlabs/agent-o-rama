@@ -24,7 +24,7 @@ public class TestSnippets {
       );
   }
 
-  public static void declareEvaluatorBuilders(AgentsTopology topology) {
+  public static void declareEvaluatorBuilders(AgentTopology topology) {
     topology.declareEvaluatorBuilder("jeb1", "java builder 1", (Map<String, String> buildParams) -> {
       return (AgentObjectFetcher fetcher, String input, Long refOutput, String output) -> {
         Map ret = new HashMap();

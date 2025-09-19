@@ -7,6 +7,8 @@
              "-Xmx6g"
              "-XX:+UseG1GC"
              "-XX:MetaspaceSize=500000000"
+             ;; Ensure stack traces are not elided
+             "-XX:-OmitStackTraceInFastThrow"
              ;; this gives us stack traces directly in output instead of an edn
              ;; file in tmp, which will be lost on CI
              "-Dclojure.main.report=stderr"
@@ -49,7 +51,8 @@
                                             "src/cljs"
                                             "resource"
                                             "examples/clj/src"]
-                        :test-paths        ["test/clj" "examples/clj/test"]
+                        :test-paths        ["test/clj"
+                                            "examples/clj/test"]
                         :java-source-paths ["src/java" "test/java"]
                         :dependencies
                         [[org.clojure/clojure "1.12.0"]

@@ -7,12 +7,12 @@
     AgentClient
     AgentInvoke
     AgentNode
-    AgentsTopology]
+    AgentTopology]
    [java.util.concurrent
     CompletableFuture]))
 
 (defn new-agent
-  [^AgentsTopology agents-topology name]
+  [^AgentTopology agents-topology name]
   (.newAgent agents-topology name))
 
 (defn node

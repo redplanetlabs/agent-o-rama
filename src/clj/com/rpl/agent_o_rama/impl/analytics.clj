@@ -9,10 +9,10 @@
    [com.rpl.rama.ops :as ops]))
 
 
-(def EMPTY-OP-STATS (aor-types/->valid-OpStats 0 0))
-(def EMPTY-BASIC-STATS (aor-types/->valid-BasicAgentInvokeStats {} 0 0 0 {}))
-(def EMPTY-SUBAGENT-STATS (aor-types/->valid-SubagentInvokeStats 0 EMPTY-BASIC-STATS))
-(def EMPTY-AGENT-STATS (aor-types/->valid-AgentInvokeStats {} EMPTY-BASIC-STATS))
+(def EMPTY-OP-STATS (aor-types/->valid-OpStatsImpl 0 0))
+(def EMPTY-BASIC-STATS (aor-types/->valid-BasicAgentInvokeStatsImpl {} 0 0 0 {}))
+(def EMPTY-SUBAGENT-STATS (aor-types/->valid-SubagentInvokeStatsImpl 0 EMPTY-BASIC-STATS))
+(def EMPTY-AGENT-STATS (aor-types/->valid-AgentInvokeStatsImpl {} EMPTY-BASIC-STATS))
 
 (defn adder
   [v]
@@ -23,7 +23,7 @@
   [m1 m2]
   (merge-with
    (fn [o1 o2]
-     (aor-types/->valid-OpStats
+     (aor-types/->valid-OpStatsImpl
       (+ (:count o1) (:count o2))
       (+ (:total-time-millis o1) (:total-time-millis o2))))
    m1
@@ -31,7 +31,7 @@
 
 (defn combine-basic-stats
   [b1 b2]
-  (aor-types/->valid-BasicAgentInvokeStats
+  (aor-types/->valid-BasicAgentInvokeStatsImpl
    (merge-op-stats (:nested-op-stats b1) (:nested-op-stats b2))
    (+ (:input-token-count b1) (:input-token-count b2))
    (+ (:output-token-count b1) (:output-token-count b2))
@@ -49,7 +49,7 @@
   [m1 m2]
   (merge-with
    (fn [sa1 sa2]
-     (aor-types/->valid-SubagentInvokeStats
+     (aor-types/->valid-SubagentInvokeStatsImpl
       (+ (:count sa1) (:count sa2))
       (combine-basic-stats (:basic-stats sa1) (:basic-stats sa2))))
    m1
@@ -60,7 +60,7 @@
   (fn [existing]
     (if (nil? stats)
       existing
-      (aor-types/->valid-AgentInvokeStats
+      (aor-types/->valid-AgentInvokeStatsImpl
        (merge-subagent-stats (:subagent-stats existing) (:subagent-stats stats))
        (combine-basic-stats (:basic-stats existing) (:basic-stats stats))))))
 
@@ -93,11 +93,11 @@
             ;; just in case user sets these themselves
             (when (and (string? agent-module-name)
                        (string? agent-name)
-                       (aor-types/AgentInvokeStats? sub-stats))
+                       (aor-types/AgentInvokeStatsImpl? sub-stats))
               (transform h/VOLATILE #(merge-subagent-stats % (:subagent-stats sub-stats)) sa-vol)
               (multi-transform
                [h/VOLATILE
-                (keypath (aor-types/->valid-AgentRef agent-module-name agent-name))
+                (keypath (aor-types/->valid-AgentRefImpl agent-module-name agent-name))
                 (nil->val EMPTY-SUBAGENT-STATS)
                 (multi-path
                  [:count (term inc)]
@@ -105,12 +105,12 @@
                sa-vol)
             )))
       ))
-    (aor-types/->valid-AgentInvokeStats
+    (aor-types/->valid-AgentInvokeStatsImpl
      @sa-vol
-     (aor-types/->valid-BasicAgentInvokeStats
+     (aor-types/->valid-BasicAgentInvokeStatsImpl
       @nops-vol
       (:input @tc-vol)
       (:output @tc-vol)
       (:total @tc-vol)
-      {node (aor-types/->valid-OpStats 1 (- finish-time-millis start-time-millis))}
+      {node (aor-types/->valid-OpStatsImpl 1 (- finish-time-millis start-time-millis))}
      ))))

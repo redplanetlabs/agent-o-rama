@@ -57,8 +57,6 @@
     BiConsumer
     Consumer]))
 
-(def ^:dynamic EXAMPLE-SOURCE nil)
-
 (def ^ObjectMapper MAPPER (ObjectMapper.))
 (def META "urn:agent-o-rama:meta:java-types-2020-12")
 
@@ -490,7 +488,7 @@
   (let [sem (Semaphore. 100)
         mapper (j/object-mapper)]
     (with-open [r (io/reader path)]
-      (binding [EXAMPLE-SOURCE (aor-types/->BulkUploadSource)]
+      (binding [aor-types/OPERATION-SOURCE (aor-types/->BulkUploadSourceImpl)]
         (doseq [line (line-seq r)]
           (when-not (str/blank? line)
             (let [m (try
@@ -533,6 +531,84 @@
                           (failure-callback line t))))))))))
         (.acquire sem 100)
         nil))))
+
+(defn download-jsonl-batch-size
+  "Configurable batch size for download pagination,
+  Factored out to be overridden in tests."
+  []
+  100)
+
+(defn download-jsonl-examples-impl!
+  "Implementation of download-jsonl-examples! that takes a writer instead of path.
+
+   writer is a java.io.Writer where UTF-8 JSONL will be written
+   failure-callback is (fn [example-id ex]) for any per-example failure
+
+   Lines written like:
+     {\"input\": <json>, \"output\": <json optional>, \"tags\": [\"...\"] optional}"
+  [^AgentManager manager dataset-id snapshot-name writer failure-callback]
+  (let [{:keys [search-examples-query multi-examples-query]} (aor-types/underlying-objects manager)
+        mapper (j/object-mapper)]
+    (loop [next-key nil
+           total-written 0]
+      (let [;; Query for a batch of examples
+            result (try
+                     (foreign-invoke-query search-examples-query
+                                           dataset-id
+                                           snapshot-name
+                                           {} ; no filters
+                                           (download-jsonl-batch-size)
+                                           next-key)
+                     (catch Exception ex
+                       (failure-callback nil ex)
+                       nil))]
+        (when result
+          (let [{:keys [examples pagination-params]} result
+                example-ids (mapv :id examples)]
+            (when (seq example-ids)
+              ;; Fetch the full example data for all examples in batch
+              (let [full-examples (try
+                                    (foreign-invoke-query multi-examples-query
+                                                          dataset-id
+                                                          snapshot-name
+                                                          example-ids)
+                                    (catch Exception ex
+                                      (failure-callback nil ex)
+                                      {}))]
+                (doseq [example-id example-ids]
+                  (when-let [example-data (get full-examples example-id)]
+                    (try
+                      (let [json-obj (cond-> {"input" (:input example-data)}
+
+                                       ;; Add output if present
+                                       (some? (:reference-output example-data))
+                                       (assoc "output" (:reference-output example-data))
+
+                                       ;; Add tags if present and non-empty
+                                       (seq (:tags example-data))
+                                       (assoc "tags" (vec (:tags example-data))))]
+                        ;; Write the JSON line
+                        (.write writer (j/write-value-as-string json-obj mapper))
+                        (.write writer "\n"))
+                      (catch Exception ex
+                        (failure-callback example-id ex)))))))
+
+            ;; Continue if there are more examples
+            (if (and pagination-params (seq examples))
+              (recur pagination-params (+ total-written (count examples)))
+              total-written)))))))
+
+(defn download-jsonl-examples!
+  "Downloads dataset examples to a JSONL file.
+
+   path is String path where UTF-8 JSONL file will be written
+   failure-callback is (fn [example-id ex]) for any per-example failure
+
+   Lines written like:
+     {\"input\": <json>, \"output\": <json optional>, \"tags\": [\"...\"] optional}"
+  [^AgentManager manager dataset-id snapshot-name path failure-callback]
+  (with-open [w (io/writer path :encoding "UTF-8")]
+    (download-jsonl-examples-impl! manager dataset-id snapshot-name w failure-callback)))
 
 (defn create-remote-dataset!
   [datasets-depot dataset-id cluster-conductor-host cluster-conductor-port module-name]

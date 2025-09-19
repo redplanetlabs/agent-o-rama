@@ -2,16 +2,59 @@
 
 This directory contains example implementations of AI agents using the agent-o-rama framework.
 
-## Examples
+## Example Types
+
+### App based Examples
+
+Real-world application scenarios demonstrating multiple features working
+together:
+
 - `react.clj` - ReAct pattern implementation with tool calling
 - `chatbot.clj` - Basic chatbot example
 - `research_agent.clj` - Multi-step research and analysis agent
 - `todo.clj` - Todo management with long-term memory
 - `customer_support.clj` - Customer support agent
 
+### Basic Examples (`com.rpl.agent.basic.*`)
+
+Isolated examples demonstrating individual agent-o-rama features. Each
+example focuses on a specific feature or small set of related features,
+progressing from basic concepts to advanced patterns.
+
+#### Foundation Examples
+1. **`basic_agent`** - Agent definition, single node, sync invocation
+2. **`multi_node_agent`** - Agent graph with multiple nodes and emissions
+3. **`router_agent`** - Conditional routing between different processing nodes
+4. **`async_agent`** - Asynchronous initiation and result handling
+5. **`agent_objects_agent`** - Static and builder-based agent objects
+6. **`langchain4j_agent`** - LangChain4j chat model integration
+
+#### State Management Examples
+7. **`keyvalue_store_agent`** - Key-value store operations
+8. **`document_store_agent`** - Document store with field operations
+9. **`pstate_store_agent`** - PState store with path operations
+
+#### Communication Examples
+10. **`streaming_agent`** - Stream chunks from nodes
+11. **`human_input_agent`** - Request and handle human input
+
+#### Advanced Patterns
+12. **`aggregation_agent`** - Fan-out/fan-in with agg-start-node and agg-node
+13. **`multi_agg_agent`** - Custom aggregation logic with multi-agg
+14. **`structured_langchain4j_agent`** - JSON structured output with LangChain4j
+15. **`streaming_langchain4j_agent`** - Real-time streaming with LangChain4j models
+16. **`tools_agent`** - LangChain4j tools integration
+
+#### System Features
+17. **`forking_agent`** - Agent execution branching
+18. **`dataset_agent`** - Dataset creation and management
+19. **`evaluator_agent`** - Evaluator creation and execution
+
 ## Running Examples
 
-To run an example:
+### App based Examples
+
+To run a complex example:
 
 ```bash
 lein repl
@@ -26,9 +69,59 @@ Then in the REPL:
 ;; For other examples, see their respective run functions
 ```
 
+### Basic Examples
+
+Each basic example is a self-contained namespace with a `-main` function:
+
+```bash
+# Run specific basic example
+lein run -m com.rpl.agent.basic.basic-agent
+lein run -m com.rpl.agent.basic.multi-node-agent
+lein run -m com.rpl.agent.basic.async-agent
+lein run -m com.rpl.agent.basic.router-agent
+lein run -m com.rpl.agent.basic.agent-objects-agent
+lein run -m com.rpl.agent.basic.keyvalue-store-agent
+lein run -m com.rpl.agent.basic.document-store-agent
+lein run -m com.rpl.agent.basic.pstate-store-agent
+lein run -m com.rpl.agent.basic.streaming-agent
+lein run -m com.rpl.agent.basic.human-input-agent
+lein run -m com.rpl.agent.basic.aggregation-agent
+lein run -m com.rpl.agent.basic.multi-agg-agent
+lein run -m com.rpl.agent.basic.structured-langchain4j-agent
+lein run -m com.rpl.agent.basic.streaming-langchain4j-agent
+lein run -m com.rpl.agent.basic.tools-agent
+lein run -m com.rpl.agent.basic.forking-agent
+lein run -m com.rpl.agent.basic.dataset-agent
+lein run -m com.rpl.agent.basic.evaluator-agent
+lein run -m com.rpl.agent.basic.langchain4j-agent
+```
+
+Or from REPL:
+```clojure
+lein with-profile +dev repl
+(require '[com.rpl.agent.basic.basic-agent :as basic])
+(basic/-main)
+```
+
+**Note**: Examples may take several minutes to start up due to Rama initialization.
+
+### Feature Dependencies
+
+Basic examples are ordered to build understanding progressively:
+
+- **Foundation** (1-6): Core agent system required for all other examples
+- **State Management** (7-9): Independent storage and resource patterns
+- **Communication** (10-11): Real-time interaction patterns
+- **Advanced Patterns** (12-16): Complex execution and integration patterns
+- **System Features** (17-19): Full-system capabilities
+
+Each example includes detailed comments explaining the demonstrated
+features and their usage patterns.
+
 ## Testing
 
-The project includes tests that don't require API keys to validate core functionality:
+The project includes tests that don't require API keys to validate core
+functionality:
 
 ```bash
 # Run all tests
@@ -52,7 +145,8 @@ The examples use:
 
 ## Development
 
-The project is configured with reflection warnings enabled. To check for warnings:
+The project is configured with reflection warnings enabled. To check for
+warnings:
 
 ```bash
 lein compile

@@ -168,7 +168,7 @@
 
 
 (deframaop init-root
-  [*agent-name *agent-id *retry-num *args]
+  [*agent-name *agent-id *retry-num *args *source]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
     $$root-count (po/agent-root-count-task-global *agent-name)]
@@ -187,33 +187,28 @@
                :last-progress-time-millis *current-time-millis
                :retry-num         *retry-num
                :stats             ana/EMPTY-AGENT-STATS
+               :source            *source
                :start-time-millis *current-time-millis})]
     $$root)
    (:> *invoke-id)))
 
 (defn init-retry-num [] 0)
 
-(deframaop gen-id
-  [$$id]
-  (local-select> STAY $$id :> *ret)
-  (local-transform> (term inc) $$id)
-  (:> *ret))
-
 (deframaop intake-agent-initiate
   [*agent-name *data]
   (<<with-substitutions
-   [$$id-gen (po/agent-id-gen-task-global *agent-name)
-    $$active (po/agent-active-invokes-task-global *agent-name)
+   [$$active (po/agent-active-invokes-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
    (get *data :args :> *args)
    (ops/current-task-id :> *agent-task-id)
    (get *data :forced-agent-invoke-id :> *forced-agent-id)
+   (get *data :source :> *source)
    (<<if (some? *forced-agent-id)
      (identity *forced-agent-id :> *agent-id)
     (else>)
-     (gen-id $$id-gen :> *agent-id))
+     (h/random-uuid7 :> *agent-id))
    (init-retry-num :> *retry-num)
-   (init-root *agent-name *agent-id *retry-num *args :> *invoke-id)
+   (init-root *agent-name *agent-id *retry-num *args *source :> *invoke-id)
    (local-transform> [(keypath *agent-id) (termval true)]
                      $$active)
    (aor-types/->valid-NodeOp *invoke-id
@@ -260,6 +255,7 @@
                       *graph-version :graph-version
                       *args :invoke-args
                       *result :result
+                      *source :source
 
                       {:keys [*fork-context
                               *parent-root-invoke-id]}
@@ -296,7 +292,7 @@
      (<<if (= :restart *handle-mode)
        (local-transform> [(keypath *root-invoke-id) (termval nil)]
                          $$gc)
-       (init-root *agent-name *agent-id *retry-num *args :> *root-invoke-id)
+       (init-root *agent-name *agent-id *retry-num *args *source :> *root-invoke-id)
       (else>)
        (identity *root-invoke-id :> *root-invoke-id))
 
@@ -328,7 +324,6 @@
   [*agent-name {:keys [*agent-task-id *agent-id *invoke-id->new-args]}]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
-    $$id-gen (po/agent-id-gen-task-global *agent-name)
     $$active (po/agent-active-invokes-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)
     %affected-aggs (queries/fork-affected-aggs-query-task-global *agent-name)]
@@ -347,12 +342,13 @@
    (aor-types/->ForkContext *invoke-id->new-args
                             *affected-aggs
                             :> *fork-context)
-   (gen-id $$id-gen :> *fork-agent-id)
+   (h/random-uuid7 :> *fork-agent-id)
    (init-retry-num :> *retry-num)
    (init-root *agent-name
               *fork-agent-id
               *retry-num
               *invoke-args
+              nil
               :> *invoke-id)
    (local-select> [(keypath *fork-agent-id) :graph-version]
                   $$root

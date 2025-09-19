@@ -4,7 +4,7 @@ This glossary defines terms that have project-specific meanings in the
 agent-o-rama framework, either different from or more constrained than
 their general computing definitions.
 
-## Agent
+## [Agent](terms/agent.md)
 
 A distributed, stateful computational unit that executes a directed,
 possibly cyclic, graph of nodes. Agents are the primary execution
@@ -18,6 +18,10 @@ with AI models through LangChain4j.
 Client-side interface for invoking and interacting with specific
 agents. Obtained from an agent manager, it provides invoke, streaming,
 and human input capabilities for a particular agent type.
+
+## Agent Complete
+
+Final state of an agent execution indicating successful termination with result.
 
 ## Agent Graph
 
@@ -46,7 +50,7 @@ objects into a deployable Rama module. Defined using `defagentmodule`
 macro, contains agent definitions, store declarations, and agent object
 builders.
 
-## Agent Node
+## [Agent Node](terms/agent-node.md)
 
 An individual execution unit within an agent graph that performs
 specific computation and can emit to other nodes or return
@@ -54,7 +58,7 @@ results. Defined with `aor/node` function, receives an `agent-node`
 parameter that provides access to stores, agent objects, and control
 functions like `emit!` and `result!`.
 
-## Agent Objects
+## [Agent Objects](terms/agent-objects.md)
 
 Shared resources (like AI models, databases, APIs) that agents can
 access during execution. Declared via `declare-agent-object` or
@@ -67,28 +71,52 @@ The final output value returned by an agent execution, signaling
 completion of the agent graph traversal. Set via `result!` function
 within agent nodes, retrieved via `agent-result` on client side.
 
+## [Agent Step](terms/agent-step.md)
+
+An individual execution unit returned by agent processing, can be result, human input request, or continuation.
+
+## Agent Throttling
+
+Rate-limiting mechanism for log messages to prevent overwhelming output in distributed execution.
+
+## Agent Trace
+
+Execution monitoring system that captures agent node transitions and data flow for debugging.
+
 ## Agents Topology
 
 The top-level container for defining agents, stores, and objects within
 a module. Created via `agents-topology` function, provides methods for
 declaring agents and resources.
 
-## Aggregation
+## [Aggregation](terms/aggregation.md)
 
 A distributed computation pattern for collecting and combining results
 from multiple node executions, using `agg-start-node`, `agg-node`, and
 `multi-agg` constructs. Enables scatter-gather patterns, parallel
 processing, and result combination across agent graph executions.
 
-## Dataset
+## [Dataset](terms/dataset.md)
 
 A managed collection of input/output examples for agent testing and
 evaluation. Created and managed via agent manager dataset functions for
 tracking agent performance and behavior.
 
+## Document Store
+
+A schema-flexible store for complex nested data structures in agents.
+
 ## Evaluators
 
 Functions for measuring agent performance against datasets.
+
+## Example Run
+
+A single execution instance within an experiment for tracking input/output pairs.
+
+## [Experiment](terms/experiment.md)
+
+A structured test run comparing agent performance across datasets with specific evaluators.
 
 ## Fork
 
@@ -102,11 +130,19 @@ A mechanism for agents to request input from human users during
 execution. Created via `get-human-input` within agent nodes, handled via
 client API to enable human-in-the-loop workflows.
 
+## [Key-Value Store](terms/key-value-store.md)
+
+A typed store for simple key-value pairs with specified key/value classes.
+
 ## Multi-Agg
 
 A flexible aggregation mechanism that allows custom combination logic
 for distributed computations. Defined via `multi-agg` macro with `init`
 and `on` clauses for sophisticated result aggregation patterns.
+
+## PState Store
+
+A persistent state store backed by Rama's PState for durable agent data.
 
 ## Node Emit
 

@@ -567,23 +567,25 @@
                                  (.getAgentClient agent-node (:agent-name target-spec))
                                  (.getAgentClient agent-node EVALUATOR-AGENT-NAME)))
                              targets)
+               source       (aor-types/->valid-ExperimentSourceImpl dataset-id id)
                initiate-fns
                (mapv
                 (fn [{:keys [target-spec input->args]} client]
                   (let [agent-name         (:agent-name target-spec)
                         parsed-input->args (mapv parse-input-spec input->args)]
                     (fn [input]
-                      (let [args (convert-input->args input parsed-input->args)]
-                        (if (aor-types/AgentTarget? target-spec)
-                          {:agent-name   agent-name
-                           :agent-invoke (apply c/agent-initiate client args)}
-                          {:agent-name   EVALUATOR-AGENT-NAME
-                           :agent-invoke (c/agent-initiate client
-                                                           (aor-types/->valid-ExperimentNodeInvoke
-                                                            agent-name
-                                                            (:node target-spec)
-                                                            args))})
-                      ))))
+                      (binding [aor-types/OPERATION-SOURCE source]
+                        (let [args (convert-input->args input parsed-input->args)]
+                          (if (aor-types/AgentTarget? target-spec)
+                            {:agent-name   agent-name
+                             :agent-invoke (apply c/agent-initiate client args)}
+                            {:agent-name   EVALUATOR-AGENT-NAME
+                             :agent-invoke (c/agent-initiate client
+                                                             (aor-types/->valid-ExperimentNodeInvoke
+                                                              agent-name
+                                                              (:node target-spec)
+                                                              args))})
+                        )))))
                 targets
                 clients)]
            (doseq [[result-id example-id] result+example-ids]
@@ -711,7 +713,7 @@
                              builder-params
                              (experiment-type->kw (class spec))
                              (to-eval-infos agent-initiates)
-                             (aor-types/->valid-ExperimentSource dataset-id id)))]
+                             (aor-types/->valid-ExperimentSourceImpl dataset-id id)))]
                        (store/pstate-transform!
                         [(keypath dataset-id :experiments id :results result-id)
                          (keypath :eval-initiates eval-name)
@@ -849,8 +851,7 @@
   [*data]
   (<<with-substitutions
    [$$datasets (po/datasets-task-global)
-    *agent-depot (po/agent-depot-task-global EVALUATOR-AGENT-NAME)
-    $$id-gen (po/agent-id-gen-task-global EVALUATOR-AGENT-NAME)]
+    *agent-depot (po/agent-depot-task-global EVALUATOR-AGENT-NAME)]
    (<<subsource *data
     (case> StartExperiment :> {:keys [*id *dataset-id]})
      (|hash *dataset-id)
@@ -864,8 +865,8 @@
      (|direct *task-id)
      ;; have to do it this way since cannot do :ack on the depot append since it's running as part
      ;; of the same stream topology
-     (at/gen-id $$id-gen :> *agent-invoke-id)
-     (aor-types/->valid-AgentInitiate [*data] *start-time-millis *agent-invoke-id :> *initiate)
+     (h/random-uuid7 :> *agent-invoke-id)
+     (aor-types/->valid-AgentInitiate [*data] *agent-invoke-id nil :> *initiate)
      (depot-partition-append!
       *agent-depot
       *initiate

@@ -346,9 +346,9 @@
                       :> *res)
     )))
 
-(defn max-invoke-id
+(defn max-uuid
   []
-  Long/MAX_VALUE)
+  (java.util.UUID. -1 -1))
 
 (defn declare-get-invokes-page-topology
   [topologies agent-name]
@@ -358,7 +358,7 @@
    (po/agent-root-task-global-name agent-name)
    relevant-invoke-submap
    to-invokes-page-result
-   max-invoke-id))
+   max-uuid))
 
 (defn declare-agent-get-names-query-topology
   [topologies agent-names]
@@ -387,10 +387,6 @@
   [pages-map page-size]
   (to-page-result pages-map page-size :dataset-id :datasets :dataset-id))
 
-(defn max-dataset-id
-  []
-  (java.util.UUID. -1 -1))
-
 
 ;; returns map of form:
 ;; {:datasets
@@ -407,7 +403,7 @@
    (po/datasets-task-global-name)
    dataset-info
    to-dataset-page-result
-   max-dataset-id))
+   max-uuid))
 
 (defn search-pagination-size
   []

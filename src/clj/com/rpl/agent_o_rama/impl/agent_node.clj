@@ -19,7 +19,6 @@
     AgentObjectFetcher
     HumanInputRequest
     IUnderlying
-    NestedOpType
     StreamingRecorder]
    [com.rpl.agentorama.impl
     AgentDeclaredObjectsTaskGlobal
@@ -133,33 +132,6 @@
          (verify-successful-cf! cf)))
     )))
 
-(def NESTED-OP-TYPE-CLJ
-  {:store-read  NestedOpType/STORE_READ
-   :store-write NestedOpType/STORE_WRITE
-   :db-read     NestedOpType/DB_READ
-   :db-write    NestedOpType/DB_WRITE
-   :model-call  NestedOpType/MODEL_CALL
-   :tool-call   NestedOpType/TOOL_CALL
-   :agent-call  NestedOpType/AGENT_CALL
-   :human-input NestedOpType/HUMAN_INPUT
-   :other       NestedOpType/OTHER
-  })
-
-(def NESTED-OP-TYPE-JAVA
-  (into {} (for [[k v] NESTED-OP-TYPE-CLJ] [v k])))
-
-(defn nested-op-type->clj
-  [v]
-  (if-let [res (get NESTED-OP-TYPE-JAVA v)]
-    res
-    (throw (h/ex-info "Unknown nested op type" {:val v :type (class v)}))))
-
-(defn nested-op-type->java
-  [v]
-  (if-let [res (get NESTED-OP-TYPE-CLJ v)]
-    res
-    (throw (h/ex-info "Unknown nested op type" {:val v :type (class v)}))))
-
 (defn- no-async!
   []
   (throw (h/ex-info "Async API not implemented for subagents" {})))
@@ -174,7 +146,7 @@
   ;; can be nil when trying evaluators
   (when agent-node
     (.recordNestedOp agent-node
-                     (nested-op-type->java nested-op-type)
+                     (aor-types/nested-op-type->java nested-op-type)
                      start-time-millis
                      finish-time-millis
                      info-map)))
@@ -451,10 +423,10 @@
          (throw (h/ex-info "Info map must contain string keys" {:info info})))
        (vswap! nested-ops-vol
                conj
-               (aor-types/->NestedOpInfo
+               (aor-types/->NestedOpInfoImpl
                 start-time-millis
                 finish-time-millis
-                (nested-op-type->clj type)
+                (aor-types/nested-op-type->clj type)
                 info)))
      (getHumanInput
        [this prompt]
@@ -473,7 +445,7 @@
              ret     (.get cf)]
          (vswap! nested-ops-vol
                  conj
-                 (aor-types/->NestedOpInfo
+                 (aor-types/->NestedOpInfoImpl
                   start-time-millis
                   (h/current-time-millis)
                   :human-input

@@ -3,11 +3,11 @@ package com.rpl.agentorama;
 import com.rpl.rama.*;
 
 public abstract class AgentsModule implements RamaModule {
-  protected abstract void defineAgents(AgentsTopology topology);
+  protected abstract void defineAgents(AgentTopology topology);
 
   @Override
   public void define(Setup setup, Topologies topologies) {
-    AgentsTopology at = AgentsTopology.create(setup, topologies);
+    AgentTopology at = AgentTopology.create(setup, topologies);
     defineAgents(at);
     at.define();
   }

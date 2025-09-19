@@ -30,7 +30,7 @@
     AgentNode
     AgentObjectFetcher
     AgentObjectSetup
-    AgentsTopology
+    AgentTopology
     AgentStream
     AgentStreamByInvoke
     CreateEvaluatorOptions
@@ -75,7 +75,7 @@
         declared-objects-vol   (volatile! {})
         evaluator-builders-vol (volatile! {})]
     (reify
-     AgentsTopology
+     AgentTopology
      (newAgent [this name]
        (check-unique-agent-name! agents-vol mirror-agents-vol name)
        (let [ret (graph/mk-agent-graph)]
@@ -195,7 +195,7 @@
         @store-info-vol
         @declared-objects-vol
         @evaluator-builders-vol))
-     aor-types/AgentsTopologyInternal
+     aor-types/AgentTopologyInternal
      (declare-agent-object-builder-internal [this name afn options]
        (when-not (ifn? afn)
          (throw (h/ex-info "Object builder must be a function"
@@ -255,30 +255,30 @@
     )))
 
 (defn underlying-stream-topology
-  [^AgentsTopology at]
+  [^AgentTopology at]
   (.getStreamTopology at))
 
 (defn define-agents!
-  [^AgentsTopology at]
+  [^AgentTopology at]
   (.define at))
 
 (defn declare-key-value-store
-  [^AgentsTopology agents-topology name key-class val-class]
+  [^AgentTopology agents-topology name key-class val-class]
   (.declareKeyValueStore agents-topology name key-class val-class))
 
 (defn declare-document-store
-  [^AgentsTopology agents-topology name key-class & key-val-classes]
+  [^AgentTopology agents-topology name key-class & key-val-classes]
   (.declareDocumentStore agents-topology
                          name
                          key-class
                          (into-array Object key-val-classes)))
 
 (defn declare-pstate-store
-  [^AgentsTopology agents-topology name schema]
+  [^AgentTopology agents-topology name schema]
   (declare-pstate* (.getStreamTopology agents-topology) (symbol name) schema))
 
 (defn declare-agent-object
-  [^AgentsTopology agents-topology name val]
+  [^AgentTopology agents-topology name val]
   (.declareAgentObject agents-topology name val))
 
 (defn declare-agent-object-builder
@@ -333,7 +333,7 @@
                                                  options)))
 
 (defn declare-cluster-agent
-  [^AgentsTopology agents-topology local-name module-name agent-name]
+  [^AgentTopology agents-topology local-name module-name agent-name]
   (.declareClusterAgent agents-topology local-name module-name agent-name))
 
 (defn setup-object-name
@@ -572,8 +572,8 @@
               agent-depot
               (aor-types/->AgentInitiate
                (vec args)
-               (h/current-time-millis)
-               nil))
+               nil
+               aor-types/OPERATION-SOURCE))
              (h/cf-function [{[agent-task-id agent-id]
                               aor-types/AGENTS-TOPOLOGY-NAME}]
                (aor-types/->AgentInvokeImpl agent-task-id agent-id)
@@ -808,7 +808,7 @@
                input
                (.referenceOutput options)
                (into #{} (.tags options))
-               (or datasets/EXAMPLE-SOURCE (aor-types/->ApiSource))
+               (or aor-types/OPERATION-SOURCE (aor-types/->ApiSourceImpl))
               ))
              (.thenApply
               (h/cf-function [{error aor-types/AGENTS-TOPOLOGY-NAME}]

@@ -94,11 +94,6 @@
      {:key-partitioner apart/task-id-key-partitioner})
     (declare-pstate*
      stream-topology
-     (symbol (po/agent-id-gen-task-global-name agent-name))
-     Long
-     {:initial-value 0})
-    (declare-pstate*
-     stream-topology
      (symbol (po/agent-config-task-global-name agent-name))
      po/AGENT-CONFIG-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})

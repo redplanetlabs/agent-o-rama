@@ -28,12 +28,12 @@
     FinishReason
     TokenUsage]))
 
-(defn ai-stats [& args] (apply aor-types/->AgentInvokeStats args))
-(defn bai-stats [& args] (apply aor-types/->BasicAgentInvokeStats args))
-(defn op-stats [& args] (apply aor-types/->OpStats args))
-(defn nop-info [& args] (apply aor-types/->NestedOpInfo args))
-(defn sa-ref [& args] (apply aor-types/->AgentRef args))
-(defn sa-stats [& args] (apply aor-types/->SubagentInvokeStats args))
+(defn ai-stats [& args] (apply aor-types/->AgentInvokeStatsImpl args))
+(defn bai-stats [& args] (apply aor-types/->BasicAgentInvokeStatsImpl args))
+(defn op-stats [& args] (apply aor-types/->OpStatsImpl args))
+(defn nop-info [& args] (apply aor-types/->NestedOpInfoImpl args))
+(defn sa-ref [& args] (apply aor-types/->AgentRefImpl args))
+(defn sa-stats [& args] (apply aor-types/->SubagentInvokeStatsImpl args))
 
 (deftest mk-node-stats-test
   (is (= (ana/mk-node-stats "a" 3 5 [])

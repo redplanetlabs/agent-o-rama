@@ -15,7 +15,7 @@ import java.util.Arrays;
 public class ReActModule extends AgentsModule {
 
   @Override
-  protected void defineAgents(AgentsTopology topology) {
+  protected void defineAgents(AgentTopology topology) {
     // Declare OpenAI API key from environment
     topology.declareAgentObject("openai-api-key", System.getenv("OPENAI_API_KEY"));
 
