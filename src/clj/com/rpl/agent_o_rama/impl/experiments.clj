@@ -717,7 +717,7 @@
                    eval-counter (volatile! -1)]
                (when-not (selected-any? [MAP-VALS :result :failure? identity] agent-results)
                  (doseq [[eval-name
-                          {:keys [builder-name builder-params]} :as em]
+                          {:keys [builder-name builder-params] :as em}]
                          eval-info-map
 
                          :when (and (not (contains? curr-evals eval-name))
