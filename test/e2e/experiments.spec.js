@@ -147,15 +147,22 @@ test.describe('Full Experiment Flow E2E Test', () => {
     await addToDatasetModal.getByText(datasetName).click();
     console.log('Selected target dataset.');
 
-    // 3c. New simplified form: direct JSON textareas (pre-filled). Just assert they are present.
-    console.log('Verifying direct JSON textareas...');
+    // 3c. New simplified form: direct JSON textareas (pre-filled).
+    console.log('Validating direct JSON textareas with schema feedback...');
     const inputTextarea = addToDatasetModal.getByLabel('Input Data');
     const outputTextarea = addToDatasetModal.getByLabel('Reference Output Data');
     await expect(inputTextarea).toBeVisible();
     await expect(outputTextarea).toBeVisible();
-    // Optionally, ensure they contain JSON (basic sanity)
     await expect(inputTextarea).not.toHaveValue('');
     await expect(outputTextarea).not.toHaveValue('');
+
+    // Enter JSON that is valid JSON but does NOT satisfy the dataset input schema (expects array)
+    await inputTextarea.fill('"not-an-array"');
+    await expect(addToDatasetModal.getByText(/Schema error/i)).toBeVisible({ timeout: 10000 });
+
+    // Now enter JSON that satisfies the schema: [string, any, string]
+    await inputTextarea.fill('["persona", [], "context"]');
+    await expect(addToDatasetModal.getByText('✓ Valid input data')).toBeVisible({ timeout: 10000 });
 
     // 3d. Submit to add the example
     await addToDatasetModal.getByRole('button', { name: 'Add Example' }).click();
@@ -241,9 +248,9 @@ test.describe('Full Experiment Flow E2E Test', () => {
     const passChip = outputCell.locator('a').filter({ hasText: new RegExp(`${evaluatorNamePass}/concise\\?`) }).first();
     const failChip = outputCell.locator('a').filter({ hasText: new RegExp(`${evaluatorNameFail}/concise\\?`) }).first();
     await expect(passChip).toBeVisible();
-    await expect(passChip).toContainText('✓');
+    await expect(passChip).toContainText('?T');
     await expect(failChip).toBeVisible();
-    await expect(failChip).toContainText('✗');
+    await expect(failChip).toContainText('?F');
     console.log('Evaluator scores for both pass and fail correctly displayed.');
 
     
