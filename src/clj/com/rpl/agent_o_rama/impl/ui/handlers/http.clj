@@ -45,34 +45,22 @@
         manager (common/get-manager module-id)]
     (when-not manager
       (throw (ex-info "Unknown module" {:module-id module-id})))
-    (let [{:keys [search-examples-query]} (aor-types/underlying-objects manager)
-          datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
+    (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
           ds-props (queries/get-dataset-properties datasets-pstate dataset-id)
           ds-name (:name ds-props)
-          page-limit 10000
-          ;; Single query with 10k limit
-          {:keys [examples pagination-params] :as res}
-          (foreign-invoke-query search-examples-query
-                                dataset-id
-                                snapshot
-                                {} ; no filters
-                                page-limit
-                                nil) ; no page-key
-          examples (or examples [])]
-      ;; Throw if there are more items (pagination required)
-      (when (seq pagination-params)
-        (throw (ex-info "Dataset too large for export (>10k examples)"
-                        {:dataset-id dataset-id :example-count "10000+"})))
-      ;; Build JSONL with proper newlines
-      (let [jsonl-lines (for [{:keys [input reference-output tags]} examples]
-                          (let [frozen-input (common/->ui-serializable input)
-                                frozen-output (when (some? reference-output)
-                                                (common/->ui-serializable reference-output))
-                                line-map (cond-> {"input" frozen-input}
-                                           (some? frozen-output) (assoc "output" frozen-output)
-                                           (seq tags) (assoc "tags" (->> tags (map name) vec)))]
-                            (j/write-value-as-string line-map mapper)))
-            jsonl-str (str/join "\n" jsonl-lines)]
+          output (java.io.StringWriter.)
+          failures* (volatile! [])]
+      ;; Use the centralized download function
+      (datasets/download-jsonl-examples-impl!
+       manager
+       dataset-id
+       snapshot
+       output
+       (fn [example-id ex]
+         (vswap! failures* conj {:example-id example-id :error (ex-message ex)})))
+      ;; If there were failures, we could log them or handle them differently
+      ;; For now, we'll include successful examples in the response
+      (let [jsonl-str (.toString output)]
         (-> (resp/response jsonl-str)
             (resp/content-type "application/jsonl; charset=utf-8")
             (resp/header "Content-Disposition"
@@ -87,9 +75,7 @@
         snapshot (not-empty (get params :snapshot))
         manager (common/get-manager module-id)
         file-param (or (get multipart-params :file)
-                       (get multipart-params "file")
-                       (get params :file)
-                       (get params "file"))
+                       (get params :file))
         tempfile (:tempfile file-param)
         filename (:filename file-param)]
     (when-not manager
