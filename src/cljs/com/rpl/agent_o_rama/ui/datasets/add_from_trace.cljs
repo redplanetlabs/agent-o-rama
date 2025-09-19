@@ -23,14 +23,14 @@
      ($ :div {:className "space-y-4"}
         ($ :div
            ($ :label {:className "text-xs font-medium text-gray-500"}
-              (if (= source-type :agent) "Agent Initial Arguments" "Node Input Arguments"))
+              "Node Input Arguments")
            ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"} (common/pp source-args)))
         ($ :div
            ($ :label {:className "text-xs font-medium text-gray-500"}
-              (if (= source-type :agent) "Agent Final Result" "Node Emitted Data"))
+              "Node Emitted Data")
            ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"}
-              ;; Display the correct source for the output template
-              (common/pp (if (= source-type :agent) source-result source-emits)))))))
+              ;; Since we're now passing the same simplified data for both, just show source-args
+              (common/pp source-args))))))
 
 (defui PreviewPanel [{:keys [preview-data error is-previewing]}]
   ($ :div {:className "w-1/3 p-4 overflow-auto"}
@@ -78,12 +78,12 @@
         input-template-field (forms/use-form-field form-id :input-template)
         output-template-field (forms/use-form-field form-id :output-template)
 
-        ;; Props passed when the form was shown
+;; Props passed when the form was shown
         props (state/use-sub [:forms form-id])
         {:keys [module-id source-type source-args source-result source-emits]} props
 
-        ;; Determine the correct source for the output template
-        output-template-source (if (= source-type :agent) source-result source-emits)
+        ;; Since we now pass simplified data for both input and output, use source-args
+        output-template-source source-args
 
         ;; Local state for preview
         [preview-data set-preview-data] (uix/use-state nil)
@@ -208,20 +208,17 @@
   {:event
    (fn [_db form-state]
      ;; On submit, we call the add-from-trace endpoint that does both preview and add
-     (let [{:keys [module-id source-type]} form-state
+     (let [{:keys [module-id]} form-state
            dataset-id (:dataset-id form-state)
            input-template (:input-template form-state)
            output-template (:output-template form-state)
-           source-args (:source-args form-state)
-           source-result (:source-result form-state)
-           source-emits (:source-emits form-state)
-           output-template-source (if (= source-type :agent) source-result source-emits)]
+           source-args (:source-args form-state)]
        [:datasets/add-from-trace
         {:module-id module-id
          :dataset-id dataset-id
          :input-template input-template
          :output-template output-template
          :source-args source-args
-         :source-output output-template-source}]))
+         :source-output source-args}]))
    :on-success-invalidate (fn [_db {:keys [module-id dataset-id]} _reply]
                             {:query-key-pattern [:dataset-examples module-id dataset-id]})}})

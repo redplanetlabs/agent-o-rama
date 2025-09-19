@@ -227,6 +227,28 @@
                                     :title "Value Details"
                                     :truncate-length truncate-length}))))
 
+(defn transform-node-data-for-dataset
+  "Transform node data from app-db to simplified format for dataset.
+   Returns {\"node\" node-name, \"args\" [...]} with string keys.
+   If there's a result, grab the value inside of it.
+   If there's no result, grab the emits."
+  [raw-node-data node-name]
+  (let [result (:result raw-node-data)
+        emits (:emits raw-node-data)]
+    (cond
+      ;; If there's a result, use its value
+      result {"node" node-name "args" [(:val result)]}
+      ;; If there are emits, use the actual emitted values directly
+      (seq emits) {"node" node-name "args" (mapv #(first (:args %)) emits)}
+      ;; Default case if no result or emits
+      :else {"node" node-name "args" []})))
+
+(defn transform-agent-data-for-dataset
+  "Transform agent data from app-db to simplified format for dataset.
+   Returns {\"node\" 'agent', \"args\" [...]} with string keys."
+  [invoke-args result-val]
+  {"node" "agent" "args" [result-val]})
+
 (defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes module-id agent-name invoke-id]}]
   (let [data (when selected-node
                (js->clj (.-data selected-node) :keywordize-keys true))
@@ -299,16 +321,15 @@
                      {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
                       :onClick (fn [e]
                                  (.stopPropagation e)
-                                 ;; Get data from app-db (graph-data) instead of converted component data
+                                 ;; Get data from app-db (graph-data) and transform to simplified format
                                  (let [raw-node-data (get graph-data node-id)
-                                       raw-input (:input raw-node-data)
-                                       raw-emits (:emits raw-node-data)]
+                                       transformed-data (transform-node-data-for-dataset raw-node-data node-name)]
                                    (state/dispatch [:modal/show-form :add-from-trace
                                                     {:module-id module-id
                                                      :title (str "Add Node '" node-name "' to Dataset")
                                                      :source-type :node
-                                                     :source-args raw-input
-                                                     :source-emits raw-emits}])))}
+                                                     :source-args transformed-data
+                                                     :source-emits transformed-data}])))}
                      "Add to Dataset")))
 
             (when result
@@ -653,15 +674,16 @@
                ($ :button
                   {:className "w-full text-sm font-medium py-2 px-4 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
                    :onClick (fn []
-                              ;; Get data directly from app-db (summary-data) instead of converted component data
+                              ;; Get data directly from app-db (summary-data) and transform to simplified format
                               (let [raw-result (:result summary-data)
-                                    raw-result-val (:val raw-result)]
+                                    raw-result-val (:val raw-result)
+                                    transformed-data (transform-agent-data-for-dataset (:invoke-args summary-data) raw-result-val)]
                                 (state/dispatch [:modal/show-form :add-from-trace
                                                  {:module-id module-id
                                                   :title "Add Agent Invocation to Dataset"
                                                   :source-type :agent
-                                                  :source-args (:invoke-args summary-data)
-                                                  :source-result raw-result-val}])))}
+                                                  :source-args transformed-data
+                                                  :source-result transformed-data}])))}
                   "Add to Dataset"))))
 
        ($ exceptions-panel {:summary-data summary-data

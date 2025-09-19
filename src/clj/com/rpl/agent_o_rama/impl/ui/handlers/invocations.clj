@@ -33,11 +33,6 @@
         [agent-task-id agent-id] invoke-pair
         is-initial-load? (boolean initial?)
 
-        ;; Debug logging
-        _ (println "DEBUG: invoke-pair =" invoke-pair)
-        _ (println "DEBUG: agent-task-id =" agent-task-id "agent-id =" agent-id)
-        _ (println "DEBUG: is-initial-load? =" is-initial-load?)
-
         ;; This query is now safe because root-pstate is correctly sourced
         summary-info (merge
                       {:forks (foreign-select-one [(keypath agent-id) :forks (sorted-set-range-to-end 100)]
@@ -48,26 +43,19 @@
                                           {:pkey agent-task-id}))
 
         root-invoke-id (when is-initial-load?
-                         (let [result (foreign-select-one [(keypath agent-id) :root-invoke-id] root-pstate {:pkey agent-task-id})]
-                           (println "DEBUG: root-invoke-id lookup result =" result)
-                           result))
+                         (foreign-select-one [(keypath agent-id) :root-invoke-id] root-pstate {:pkey agent-task-id}))
 
         historical-graph (when is-initial-load?
                            (when-let [graph-version (:graph-version summary-info)]
                              (foreign-select-one [(keypath graph-version)] history-pstate {:pkey agent-task-id})))
 
         start-pairs (if is-initial-load?
-                      (do
-                        (println "DEBUG: creating start-pairs with agent-task-id =" agent-task-id "root-invoke-id =" root-invoke-id)
-                        [[agent-task-id root-invoke-id]])
+                      [[agent-task-id root-invoke-id]]
                       leaves)
-
-        _ (println "DEBUG: start-pairs =" start-pairs)
 
         page-limit (if is-initial-load? 1000 100)
 
         dynamic-trace (when (seq start-pairs)
-                        (println "DEBUG: calling foreign-invoke-query with args:" agent-task-id start-pairs page-limit)
                         (foreign-invoke-query tracing-query agent-task-id start-pairs page-limit))
 
         cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
