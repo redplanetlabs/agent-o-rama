@@ -182,7 +182,7 @@
          (bind ds-module-name (get-module-name ds-module))
          (bind manager (aor/agent-manager ipc module-name))
          (bind ds-manager (aor/agent-manager ipc ds-module-name))
-         (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
+         (bind exp-client (aor/agent-client manager aor-types/EVALUATOR-AGENT-NAME))
          (bind foo-root
            (foreign-pstate ipc
                            module-name
@@ -190,7 +190,7 @@
          (bind exp-root
            (foreign-pstate ipc
                            module-name
-                           (po/agent-root-task-global-name exp/EVALUATOR-AGENT-NAME)))
+                           (po/agent-root-task-global-name aor-types/EVALUATOR-AGENT-NAME)))
 
          (bind global-actions-depot
            (foreign-depot ipc module-name (po/global-actions-depot-name)))
@@ -1100,7 +1100,7 @@
        (rtest/launch-module! ipc module {:tasks 2 :threads 2})
        (bind module-name (get-module-name module))
        (bind manager (aor/agent-manager ipc module-name))
-       (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
+       (bind exp-client (aor/agent-client manager aor-types/EVALUATOR-AGENT-NAME))
        (bind global-actions-depot
          (foreign-depot ipc module-name (po/global-actions-depot-name)))
        (bind results
@@ -1469,7 +1469,7 @@
        (rtest/launch-module! ipc module {:tasks 2 :threads 2})
        (bind module-name (get-module-name module))
        (bind manager (aor/agent-manager ipc module-name))
-       (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
+       (bind exp-client (aor/agent-client manager aor-types/EVALUATOR-AGENT-NAME))
        (bind global-actions-depot
          (foreign-depot ipc module-name (po/global-actions-depot-name)))
        (bind results
@@ -1838,7 +1838,7 @@
      (rtest/launch-module! ipc module {:tasks 2 :threads 2})
      (bind module-name (get-module-name module))
      (bind manager (aor/agent-manager ipc module-name))
-     (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
+     (bind exp-client (aor/agent-client manager aor-types/EVALUATOR-AGENT-NAME))
      (bind global-actions-depot
        (foreign-depot ipc module-name (po/global-actions-depot-name)))
      (bind search

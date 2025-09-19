@@ -4,12 +4,12 @@
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
-   [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.feedback :as fb]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.stats :as stats]
    [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.store :as store]
@@ -31,8 +31,6 @@
    [java.util.concurrent
     CompletableFuture]
   ))
-
-(def EVALUATOR-AGENT-NAME "_aor-evaluator")
 
 (defn get-cluster-retriever
   [agent-node]
@@ -540,7 +538,7 @@
   [topology]
   (->
     topology
-    (c/new-agent EVALUATOR-AGENT-NAME)
+    (c/new-agent aor-types/EVALUATOR-AGENT-NAME)
     (c/node
      "start"
      "root"
@@ -596,7 +594,7 @@
                              (fn [{:keys [target-spec]}]
                                (if (aor-types/AgentTarget? target-spec)
                                  (.getAgentClient agent-node (:agent-name target-spec))
-                                 (.getAgentClient agent-node EVALUATOR-AGENT-NAME)))
+                                 (.getAgentClient agent-node aor-types/EVALUATOR-AGENT-NAME)))
                              targets)
                source       (aor-types/->valid-ExperimentSourceImpl dataset-id id)
                initiate-fns
@@ -610,7 +608,7 @@
                           (if (aor-types/AgentTarget? target-spec)
                             {:agent-name   agent-name
                              :agent-invoke (apply c/agent-initiate client args)}
-                            {:agent-name   EVALUATOR-AGENT-NAME
+                            {:agent-name   aor-types/EVALUATOR-AGENT-NAME
                              :agent-invoke (c/agent-initiate client
                                                              (aor-types/->valid-ExperimentNodeInvoke
                                                               agent-name
@@ -667,7 +665,7 @@
                            (submap [:start-time-millis :finish-time-millis :stats])]
                           root
                           {:pkey task-id})
-                         basic-stats (ana/aggregated-basic-stats stats)]
+                         basic-stats (stats/aggregated-basic-stats stats)]
                      (store/pstate-transform!
                       [(keypath dataset-id :experiments id :results result-id :agent-results)
                        (nil->val (sorted-map))
@@ -696,7 +694,7 @@
          [retriever]
          (let [eval-info     (all-evaluator-info retriever experiment)
                eval-info-map (relevant-eval-info agent-node eval-info #{:regular :comparative})
-               eval-client   (.getAgentClient agent-node EVALUATOR-AGENT-NAME)
+               eval-client   (.getAgentClient agent-node aor-types/EVALUATOR-AGENT-NAME)
                local-ds      (local-datasets-store retriever)
                datasets      (datasets-pstate retriever)
                local-ds      (local-datasets-store retriever)]
@@ -876,7 +874,7 @@
   [*data]
   (<<with-substitutions
    [$$datasets (po/datasets-task-global)
-    *agent-depot (po/agent-depot-task-global EVALUATOR-AGENT-NAME)]
+    *agent-depot (po/agent-depot-task-global aor-types/EVALUATOR-AGENT-NAME)]
    (<<subsource *data
     (case> StartExperiment :> {:keys [*id *dataset-id]})
      (|hash *dataset-id)

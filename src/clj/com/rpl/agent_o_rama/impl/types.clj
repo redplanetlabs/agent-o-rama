@@ -57,6 +57,7 @@
 
 (def AGENT-TOPOLOGY-NAME "_agent-topology")
 (def AGENTS-MB-TOPOLOGY-NAME "_agents-mb-topology")
+(def EVALUATOR-AGENT-NAME "_aor-evaluator")
 
 (def NODE-KW :node)
 (def AGG-START-NODE-KW :agg-start-node)
@@ -118,7 +119,7 @@
    node-invoke-id :- UUID]
   NodeInvoke
   (getTaskId [this] task-id)
-  (getNodeInvokeId :- UUID)
+  (getNodeInvokeId [this] node-invoke-id)
   EvalTarget)
 
 ;; Sources

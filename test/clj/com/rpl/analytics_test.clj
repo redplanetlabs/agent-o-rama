@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.stats :as stats]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
@@ -36,11 +37,11 @@
 (defn sa-stats [& args] (apply aor-types/->SubagentInvokeStatsImpl args))
 
 (deftest mk-node-stats-test
-  (is (= (ana/mk-node-stats "a" 3 5 [])
+  (is (= (stats/mk-node-stats "a" 3 5 [])
          (ai-stats {} (bai-stats {} 0 0 0 {"a" (op-stats 1 2)}))))
   (is
    (=
-    (ana/mk-node-stats
+    (stats/mk-node-stats
      "bb"
      3
      6
@@ -93,7 +94,7 @@
       0
       0
       {"abc" (op-stats 1 3)}))
-    (ana/mk-node-stats
+    (stats/mk-node-stats
      "abc"
      3
      6
@@ -188,7 +189,7 @@
         215
         {"abc" (op-stats 1031 1063)
          "q"   (op-stats 3 6)})
-       (ana/aggregated-basic-stats
+       (stats/aggregated-basic-stats
         (ai-stats
          {(sa-ref "M1" "A1")
           (sa-stats 4

@@ -3,12 +3,12 @@
         [com.rpl.rama path])
   (:require
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
-   [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.partitioner :as apart]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.stats :as stats]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.ops :as ops])
@@ -110,7 +110,7 @@
      (local-transform>
       [(keypath *agent-id)
        (multi-path [:last-progress-time-millis (termval (h/current-time-millis))]
-                   [:stats (term (ana/agent-stats-merger *stats))])]
+                   [:stats (term (stats/agent-stats-merger *stats))])]
       $$root))
 
    (<<if (some? *result)
@@ -186,7 +186,7 @@
                :ack-val           (h/half-uuid *invoke-id)
                :last-progress-time-millis *current-time-millis
                :retry-num         *retry-num
-               :stats             ana/EMPTY-AGENT-STATS
+               :stats             stats/EMPTY-AGENT-STATS
                :source            *source
                :start-time-millis *current-time-millis})]
     $$root)
@@ -506,7 +506,7 @@
                        $$nodes))
 
 
-   (ana/mk-node-stats *node *start-time-millis *finish-time-millis *nested-ops :> *stats)
+   (stats/mk-node-stats *node *start-time-millis *finish-time-millis *nested-ops :> *stats)
    (handle-node-complete-emits
     *agent-name
     *agent-task-id
