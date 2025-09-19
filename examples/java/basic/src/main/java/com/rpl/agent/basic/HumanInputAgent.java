@@ -6,7 +6,7 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentStep;
 import com.rpl.agentorama.AgentsModule;
-import com.rpl.agentorama.AgentsTopology;
+import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.HumanInputRequest;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
@@ -39,7 +39,7 @@ public class HumanInputAgent {
   public static class HumanInputModule extends AgentsModule {
 
     @Override
-    protected void defineAgents(AgentsTopology topology) {
+    protected void defineAgents(AgentTopology topology) {
       // Declare OpenAI model builder
       topology.declareAgentObjectBuilder(
           "openai",

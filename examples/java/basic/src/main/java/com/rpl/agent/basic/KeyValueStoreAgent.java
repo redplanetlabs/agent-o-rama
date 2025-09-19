@@ -4,7 +4,7 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentsModule;
-import com.rpl.agentorama.AgentsTopology;
+import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.agentorama.store.KeyValueStore;
 import com.rpl.rama.test.InProcessCluster;
@@ -70,7 +70,7 @@ public class KeyValueStoreAgent {
   public static class KeyValueStoreModule extends AgentsModule {
 
     @Override
-    protected void defineAgents(AgentsTopology topology) {
+    protected void defineAgents(AgentTopology topology) {
       // Declare a key-value store for counters (String -> Long)
       topology.declareKeyValueStore("$$counters", String.class, Long.class);
 

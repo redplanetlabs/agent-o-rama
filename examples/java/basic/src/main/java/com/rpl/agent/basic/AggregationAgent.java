@@ -4,7 +4,7 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentsModule;
-import com.rpl.agentorama.AgentsTopology;
+import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.BuiltIn;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.agentorama.ops.RamaVoidFunction3;
@@ -38,7 +38,7 @@ public class AggregationAgent {
   public static class AggregationModule extends AgentsModule {
 
     @Override
-    protected void defineAgents(AgentsTopology topology) {
+    protected void defineAgents(AgentTopology topology) {
       topology
           .newAgent("AggregationAgent")
           // Start aggregation by distributing work to parallel processors

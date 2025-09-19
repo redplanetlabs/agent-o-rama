@@ -5,7 +5,7 @@ import com.rpl.agentorama.AgentInvoke;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentsModule;
-import com.rpl.agentorama.AgentsTopology;
+import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -36,7 +36,7 @@ public class StreamingAgent {
   public static class StreamingAgentModule extends AgentsModule {
 
     @Override
-    protected void defineAgents(AgentsTopology topology) {
+    protected void defineAgents(AgentTopology topology) {
       topology.newAgent("StreamingAgent").node("process-data", null, new ProcessDataFunction());
     }
   }

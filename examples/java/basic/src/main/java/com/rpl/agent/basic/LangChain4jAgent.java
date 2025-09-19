@@ -4,7 +4,7 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentsModule;
-import com.rpl.agentorama.AgentsTopology;
+import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -32,7 +32,7 @@ public class LangChain4jAgent {
   public static class LangChain4jModule extends AgentsModule {
 
     @Override
-    protected void defineAgents(AgentsTopology topology) {
+    protected void defineAgents(AgentTopology topology) {
       // Declare OpenAI API key as agent object
       topology.declareAgentObject("openai-api-key", System.getenv("OPENAI_API_KEY"));
 

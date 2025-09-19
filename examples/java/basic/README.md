@@ -69,7 +69,7 @@ The `BasicModule` class extends `AgentsModule` and defines a simple topology:
 ```java
 public static class BasicModule extends AgentsModule {
   @Override
-  protected void defineAgents(AgentsTopology topology) {
+  protected void defineAgents(AgentTopology topology) {
     topology.newAgent("BasicAgent").node("process", null, new ProcessFunction());
   }
 }
