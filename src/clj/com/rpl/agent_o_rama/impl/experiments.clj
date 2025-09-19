@@ -622,11 +622,20 @@
                    (store/pstate-select-one
                     [(keypath dataset-id :experiments id :results result-id)]
                     local-ds)
-                   input         (when (< (count agent-initiates) (count targets))
-                                   (foreign-select-one
-                                    [(keypath dataset-id :snapshots snapshot example-id :input)]
-                                    datasets))
-                   initiates-vol (volatile! [])]
+                   [input :as inputv] (when (< (count agent-initiates) (count targets))
+                                        (foreign-select
+                                         [(keypath dataset-id
+                                                   :snapshots
+                                                   snapshot
+                                                   (must example-id)
+                                                   :input)]
+                                         datasets))
+                   _ (when (empty? inputv)
+                       (throw (h/ex-info "Did not find example"
+                                         {:dataset-id dataset-id
+                                          :snapshot   snapshot
+                                          :example-id example-id})))
+                   initiates-vol      (volatile! [])]
                (when-not (some? (:example-id currm))
                  (store/pstate-transform!
                   [(keypath dataset-id :experiments id :results result-id :example-id)

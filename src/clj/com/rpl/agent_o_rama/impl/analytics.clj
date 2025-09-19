@@ -99,9 +99,10 @@
                    ^CompletableFuture
                    (aor-types/subagent-next-step-async eval-client
                                                        eval-agent-invoke))]
-              (if (instance? Throwable result)
-                {"success?" false "failure" (h/throwable->str result)}
-                {"success?" true "stats" stats}))
+              (merge {"invoke" eval-agent-invoke}
+                     (if (instance? Throwable result)
+                       {"success?" false "failure" (h/throwable->str result)}
+                       {"success?" true "stats" stats})))
           ))))
     :description
     "Run an evaluator to add feedback to a node or agent"
@@ -112,3 +113,19 @@
        "Evaluator to use"
       }}}
    }})
+
+(defbasicblocksegmacro handle-analytics-tick
+  [agent-names]
+  ;; TODO: <<<<>>>>
+  ;;  - use config for max concurrency
+  ;;  - need DVV for each agent as to where it's computing up to
+  ;;      - can be on each task
+  ;;  - do <<batch to go to all tasks
+  ;;    - TODO: how to handle chained rules?
+  ;;      - maybe if have a chain, don't keep going
+  ;;        - or keep track of which ones need to keep being checked
+  ;;      - no, rules are handled independently...
+  ;;    - if don't sample something, still should write action state to it
+  ;;      - would be really good to do those in chunks, especially for low sample rate
+  ;;      - can have "PStateWrites" depot append
+)

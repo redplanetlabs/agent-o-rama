@@ -3,6 +3,7 @@
         [com.rpl.rama path])
   (:require
    [clojure.set :as set]
+   [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.datasets :as datasets]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.experiments :as exp]
@@ -35,6 +36,7 @@
 
 (def SUBSTITUTE-TICK-DEPOTS false)
 (def DEFAULT-GC-TICK-MILLIS 10000)
+(def DEFAULT-ANALYTICS-TICK-MILLIS 10000)
 
 ;; for agent-o-rama namespace
 (defn hook:building-plain-agent-object [name o])
@@ -226,13 +228,24 @@
                                graph/resolve-agent-graph
                                agent-graphs)
                    ))
-
-  (let [pstate-write-depot-sym   (symbol (po/agent-pstate-write-depot-name))
-        datasets-depot-sym       (symbol (po/datasets-depot-name))
-        global-actions-depot-sym (symbol (po/global-actions-depot-name))]
+  (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))
+        datasets-depot-sym (symbol (po/datasets-depot-name))
+        global-actions-depot-sym (symbol (po/global-actions-depot-name))
+        analytics-tick-depot-sym (symbol (po/agent-analytics-tick-depot-name))
+        agent-names (-> agent-graphs
+                        keys
+                        vec)]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
     (declare-depot* setup datasets-depot-sym (hash-by :dataset-id))
     (declare-depot* setup global-actions-depot-sym :random {:global? true})
+    (if SUBSTITUTE-TICK-DEPOTS
+      (declare-depot* setup
+                      analytics-tick-depot-sym
+                      :random
+                      {:global? true})
+      (declare-tick-depot* setup
+                           analytics-tick-depot-sym
+                           DEFAULT-ANALYTICS-TICK-MILLIS))
     (declare-pstate*
      stream-topology
      (symbol (po/datasets-task-global-name))
@@ -249,6 +262,10 @@
                                          depot-sym
                                          "depot.max.entries.per.partition"
                                          500))
+    (<<sources mb-topology
+     (source> analytics-tick-depot-sym :> %mb)
+      (%mb)
+      (ana/handle-analytics-tick agent-names))
     (<<sources stream-topology
      (source> pstate-write-depot-sym
                {:retry-mode :none}

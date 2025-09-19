@@ -96,6 +96,10 @@
   [agent-name]
   (str "$$_agent-root-" agent-name))
 
+(defn agent-analytics-tick-depot-name
+  []
+  (str "*_agent-analytics-tick-depot"))
+
 (def FEEDBACK-SCHEMA
   (fixed-keys-schema
    {:actions {String Object}
