@@ -5,7 +5,10 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.ui.sente :as sente]
    [clojure.string :as str]
+   ["react" :refer [useEffect]]
+   ["use-debounce" :refer [useDebounce]]
    ["@heroicons/react/24/outline" :refer [ChevronDownIcon]]))
 
 ;; Removed - no longer needed for simplified form
@@ -22,10 +25,19 @@
 
 ;; Props passed when the form was shown
         props (state/use-sub [:forms form-id])
-        {:keys [module-id source-args source-result source-emits]} props
+        {:keys [module-id source-args source-result source-emits error]} props
 
         ;; Local state
         [dropdown-open? set-dropdown-open] (uix/use-state false)
+        [validation-state set-validation-state] (uix/use-state nil)
+        [is-validating set-is-validating] (uix/use-state false)
+
+        ;; Debounced values for real-time validation
+        debounced-dataset-id (useDebounce (:value dataset-id-field) 500)
+        debounced-input-data (useDebounce (:value input-data-field) 500)
+        debounced-output-data (useDebounce (:value output-data-field) 500)
+
+        ;; Fetch available datasets
 
         ;; Fetch available datasets
         {:keys [data loading?]} (queries/use-sente-query
@@ -75,25 +87,58 @@
                   ($ :p {:className "text-sm text-red-600 mt-1"} (:error dataset-id-field))
                   ($ :div {:className "mt-1 h-5"})))
 
-             ;; Input Data
-             ($ forms/form-field
-                {:label "Input Data"
-                 :type :textarea
-                 :rows 8
-                 :value (:value input-data-field)
-                 :on-change (:on-change input-data-field)
-                 :error (:error input-data-field)
-                 :help-text "Edit the input data for this dataset example"})
+;; Input Data
+             ($ :div
+                ($ forms/form-field
+                   {:label "Input Data"
+                    :type :textarea
+                    :rows 8
+                    :value (:value input-data-field)
+                    :on-change (:on-change input-data-field)
+                    :error (:error input-data-field)
+                    :help-text "Edit the input data for this dataset example"})
+                (when validation-state
+                  (let [input-validation (:input validation-state)]
+                    ($ :div {:className "mt-1 text-sm"}
+                       (cond
+                         (:parse-error input-validation)
+                         ($ :p {:className "text-red-600"} (:parse-error input-validation))
 
-             ;; Output Data  
-             ($ forms/form-field
-                {:label "Reference Output Data"
-                 :type :textarea
-                 :rows 8
-                 :value (:value output-data-field)
-                 :on-change (:on-change output-data-field)
-                 :error (:error output-data-field)
-                 :help-text "Edit the expected output data for this dataset example"}))))))
+                         (:validation-error input-validation)
+                         ($ :p {:className "text-red-600"} (str "Schema error: " (:validation-error input-validation)))
+
+                         (:is-valid? input-validation)
+                         ($ :p {:className "text-green-600"} "✓ Valid input data")
+
+                         :else nil)))))
+
+;; Output Data  
+             ($ :div
+                ($ forms/form-field
+                   {:label "Reference Output Data"
+                    :type :textarea
+                    :rows 8
+                    :value (:value output-data-field)
+                    :on-change (:on-change output-data-field)
+                    :error (:error output-data-field)
+                    :help-text "Edit the expected output data for this dataset example"})
+                (when validation-state
+                  (let [output-validation (:output validation-state)]
+                    ($ :div {:className "mt-1 text-sm"}
+                       (cond
+                         (:parse-error output-validation)
+                         ($ :p {:className "text-red-600"} (:parse-error output-validation))
+
+                         (:validation-error output-validation)
+                         ($ :p {:className "text-red-600"} (str "Schema error: " (:validation-error output-validation)))
+
+                         (:is-valid? output-validation)
+                         ($ :p {:className "text-green-600"} "✓ Valid output data")
+
+                         :else nil)))))
+
+             ;; Display backend validation errors
+             ($ forms/form-error {:error error}))))))
 
 (forms/reg-form
  :add-from-trace
@@ -118,12 +163,12 @@
   :on-submit
   {:event
    (fn [_db form-state]
-     ;; On submit, we send the direct data - backend will validate JSON and schema
+     ;; Use the new direct data endpoint
      (let [{:keys [module-id]} form-state
            dataset-id (:dataset-id form-state)
            input-data (:input-data form-state)
            output-data (:output-data form-state)]
-       [:datasets/add-example
+       [:datasets/add-direct-data
         {:module-id module-id
          :dataset-id dataset-id
          :input-data input-data

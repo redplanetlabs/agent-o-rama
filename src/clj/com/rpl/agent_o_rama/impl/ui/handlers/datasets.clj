@@ -196,49 +196,63 @@
 ;; PREVIEW FROM TRACE HANDLER
 ;; =============================================================================
 
-(defn- transform-and-validate [template source-data schema-str]
-  (try
-    (let [transformed (com.rpl.agent-o-rama.impl.helpers/read-json-path source-data template)
-          validation-error (when schema-str
-                             (datasets/validate-with-schema* schema-str transformed))]
-      {:transformed-data transformed
-       :is-valid? (nil? validation-error)
-       :validation-error validation-error})
-    (catch Exception e
-      {:transformed-data nil
-       :is-valid? false
-       :validation-error (str "Invalid JSONPath template: " (.getMessage e))})))
-
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/preview-from-trace
-  [{:keys [manager dataset-id input-template output-template source-args source-output]} uid]
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/validate-direct-data
+  [{:keys [manager dataset-id input-data output-data]} uid]
   (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
         schemas (queries/get-dataset-properties datasets-pstate dataset-id)]
     (if-not schemas
       (throw (ex-info "Dataset not found" {:dataset-id dataset-id}))
-      {:input (transform-and-validate input-template source-args (:input-json-schema schemas))
-       :output (transform-and-validate output-template source-output (:output-json-schema schemas))})))
+      (let [;; Parse JSON data
+            parsed-input (try (j/read-value input-data) (catch Exception e nil))
+            parsed-output (try (j/read-value output-data) (catch Exception e nil))
+            ;; Validate against schemas
+            input-validation (when parsed-input
+                               (datasets/validate-with-schema* (:input-json-schema schemas) parsed-input))
+            output-validation (when parsed-output
+                                (datasets/validate-with-schema* (:output-json-schema schemas) parsed-output))]
+        {:input {:is-valid? (and parsed-input (nil? input-validation))
+                 :validation-error input-validation
+                 :parse-error (when-not parsed-input "Invalid JSON format")}
+         :output {:is-valid? (and parsed-output (nil? output-validation))
+                  :validation-error output-validation
+                  :parse-error (when-not parsed-output "Invalid JSON format")}}))))
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-from-trace
-  [{:keys [manager dataset-id input-template output-template source-args source-output]} uid]
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-direct-data
+  [{:keys [manager dataset-id input-data output-data]} uid]
   (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
         schemas (queries/get-dataset-properties datasets-pstate dataset-id)]
     (if-not schemas
       (throw (ex-info "Dataset not found" {:dataset-id dataset-id}))
-      (let [input-result (transform-and-validate input-template source-args (:input-json-schema schemas))
-            output-result (transform-and-validate output-template source-output (:output-json-schema schemas))]
-        (if (and (:is-valid? input-result) (:is-valid? output-result))
+      (let [;; Parse JSON data
+            parsed-input
+            (try 
+              (j/read-value input-data)
+              (catch Exception e
+                (throw (ex-info (str "Invalid input JSON: " (.getMessage e)) {}))))
+            
+            parsed-output
+            (try 
+              (j/read-value output-data)
+              (catch Exception e
+                (throw (ex-info (str "Invalid output JSON: " (.getMessage e)) {}))))
+            
+            ;; Validate against schemas
+            input-validation
+            (datasets/validate-with-schema* (:input-json-schema schemas) parsed-input)
+            
+            output-validation
+            (datasets/validate-with-schema* (:output-json-schema schemas) parsed-output)]
+        (cond
+          input-validation
+          (throw (ex-info (str "Input schema validation failed: " input-validation) {}))
+
+          output-validation
+          (throw (ex-info (str "Output schema validation failed: " output-validation) {}))
+          :else
           ;; Both are valid, add the example
           (do
             (aor/add-dataset-example! manager
                                       dataset-id
-                                      (:transformed-data input-result)
-                                      {:reference-output (:transformed-data output-result)})
-            {:status :ok})
-          ;; Invalid data, return error
-          (throw
-           (ex-info (str "Invalid "
-                         (when-not (:is-valid? input-result)
-                           (str "Input schema:" (:input-json-schema schemas)))
-                         (when-not (:is-valid? output-result)
-                           (str "Output schema" (:output-json-schema schemas))))
-                    {})))))))
+                                      parsed-input
+                                      {:reference-output parsed-output})
+            {:status :ok}))))))
