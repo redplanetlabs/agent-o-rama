@@ -32,7 +32,7 @@
 
 (defn pstate-write!
   [pstate-name path k]
-  (simpl/do-pstate-write
+  (simpl/do-pstate-write!
    (.getPStateWriteDepot (rama-clients))
    nil
    pstate-name
@@ -50,7 +50,7 @@
     (fn [{:keys [name]}]
       (let [evals-pstate (retrieve-pstate (po/evaluators-task-global-name))
             eval-info    (foreign-select-one (keypath name) evals-pstate)
-            client       (get-agent-client aor-types/EVALUATOR-AGENT-NAME)]
+            eval-client  (get-agent-client aor-types/EVALUATOR-AGENT-NAME)]
         (when (nil? eval-info)
           (throw (h/ex-info "Evaluator doesn't exist" {:name name})))
         (fn [fetcher input output {:keys [action-name agent-name] :as run-info}]
