@@ -147,29 +147,15 @@ test.describe('Full Experiment Flow E2E Test', () => {
     await addToDatasetModal.getByText(datasetName).click();
     console.log('Selected target dataset.');
 
-    // 3c. Test JSONPath and preview pane
-    console.log('Testing JSONPath templates...');
-    const inputTemplate = addToDatasetModal.getByLabel('Input Template (JSONPath)');
-    const outputTemplate = addToDatasetModal.getByLabel('Reference Output Template (JSONPath)');
-    const previewPane = addToDatasetModal.locator('#preview-input-section').first();
-
-    // Test valid path for full input array (schema expects an array)
-    await inputTemplate.fill('$');
-    await expect(addToDatasetModal.locator('#preview-input-status')).toHaveText('Valid', { timeout: 10000 });
-
-    // Test invalid path
-    await inputTemplate.fill('invalid-jsonpath');
-    await expect(addToDatasetModal.locator('#preview-input-status')).toHaveText('Invalid', { timeout: 10000 });
-
-    // Test schema validation failure (string does not satisfy array schema)
-    await inputTemplate.fill('$[0]');
-    await expect(addToDatasetModal.locator('#preview-input-status')).toHaveText('Invalid', { timeout: 10000 });
-    await expect(addToDatasetModal.locator('#preview-input-error')).toContainText(/array/i, { timeout: 10000 });
-    console.log('Schema validation failure correctly detected and displayed.');
-
-    // Fix the input to be valid for submission (capture entire input array)
-    await inputTemplate.fill('$');
-    await outputTemplate.fill('$'); // The full emits string
+    // 3c. New simplified form: direct JSON textareas (pre-filled). Just assert they are present.
+    console.log('Verifying direct JSON textareas...');
+    const inputTextarea = addToDatasetModal.getByLabel('Input Data');
+    const outputTextarea = addToDatasetModal.getByLabel('Reference Output Data');
+    await expect(inputTextarea).toBeVisible();
+    await expect(outputTextarea).toBeVisible();
+    // Optionally, ensure they contain JSON (basic sanity)
+    await expect(inputTextarea).not.toHaveValue('');
+    await expect(outputTextarea).not.toHaveValue('');
 
     // 3d. Submit to add the example
     await addToDatasetModal.getByRole('button', { name: 'Add Example' }).click();
