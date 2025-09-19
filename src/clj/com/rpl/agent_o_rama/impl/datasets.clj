@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.ops :as ops]
    [com.rpl.agent-o-rama.impl.json-serialize :as jser]
+   [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
    [jsonista.core :as j])
   (:import
    [com.fasterxml.jackson.databind
@@ -586,9 +587,11 @@
 
                                        ;; Add tags if present and non-empty
                                        (seq (:tags example-data))
-                                       (assoc "tags" (vec (:tags example-data))))]
+                                       (assoc "tags" (vec (:tags example-data))))
+                            ;; Apply special serialization for AiMessage and other special objects
+                            serialized-obj (common/->ui-serializable json-obj)]
                         ;; Write the JSON line
-                        (.write writer (j/write-value-as-string json-obj mapper))
+                        (.write writer (j/write-value-as-string serialized-obj mapper))
                         (.write writer "\n"))
                       (catch Exception ex
                         (failure-callback example-id ex)))))))

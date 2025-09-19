@@ -43,8 +43,10 @@
         [module-id dataset-id] (parse-export-params uri)
         snapshot (not-empty (get params "snapshot"))
         manager (common/get-manager module-id)]
+
     (when-not manager
       (throw (ex-info "Unknown module" {:module-id module-id})))
+    
     (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
           ds-props (queries/get-dataset-properties datasets-pstate dataset-id)
           ds-name (:name ds-props)
@@ -60,6 +62,7 @@
          (vswap! failures* conj {:example-id example-id :error (ex-message ex)})))
       ;; If there were failures, we could log them or handle them differently
       ;; For now, we'll include successful examples in the response
+      ;; TODO throw failures.
       (let [jsonl-str (.toString output)]
         (-> (resp/response jsonl-str)
             (resp/content-type "application/jsonl; charset=utf-8")
