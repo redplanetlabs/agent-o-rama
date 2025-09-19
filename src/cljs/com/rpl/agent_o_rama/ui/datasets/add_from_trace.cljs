@@ -37,12 +37,6 @@
                                  {:query-key [:datasets module-id]
                                   :sente-event [:datasets/get-all {:module-id module-id}]})]
 
-    ;; Add this right after the let binding, before the ($ :div ...) JSX:
-
-    (println "debounced-dataset-id" debounced-dataset-id)
-    (println "debounced-input-data" debounced-input-data)
-    (println "debounced-output-data" debounced-output-data)
-
     (useEffect
      (fn []
        (when (and debounced-dataset-id 
@@ -106,7 +100,32 @@
                   ($ :p {:className "text-sm text-red-600 mt-1"} (:error dataset-id-field))
                   ($ :div {:className "mt-1 h-5"})))
 
-             ;; Input Data
+             ;; Schema display (place right after the dataset dropdown block)
+             (let [selected-ds (some->> (:datasets data)
+                                        (filter #(= (:dataset-id %) (:value dataset-id-field)))
+                                        first)]
+               (when (and selected-ds
+                          (or (:input-json-schema selected-ds)
+                              (:output-json-schema selected-ds)))
+                 ($ :div {:className "space-y-4 p-4 bg-gray-50 border rounded-md"}
+                    ($ :h4 {:className "font-semibold text-gray-700"} "Dataset Schema")
+
+                    ;; Input schema
+                    (when-let [in-schema (:input-json-schema selected-ds)]
+                      ($ :div {:className "space-y-2"}
+                         ($ :label {:className "block text-sm font-medium text-gray-600"} "Expected Input Format")
+                         ($ :pre {:className "text-xs bg-white p-3 rounded border overflow-auto max-h-48"}
+                            (common/pp-json in-schema))))
+
+                    ;; Output schema
+                    (when-let [out-schema (:output-json-schema selected-ds)]
+                      ($ :div {:className "space-y-2"}
+                         ($ :label {:className "block text-sm font-medium text-gray-600"} "Expected Output Format")
+                         ($ :pre {:className "text-xs bg-white p-3 rounded border overflow-auto max-h-48"}
+                            (common/pp-json out-schema)))))))
+             
+                                        ;
+                                        ; Input Data
              ($ :div
                 ($ forms/form-field
                    {:label "Input Data"
