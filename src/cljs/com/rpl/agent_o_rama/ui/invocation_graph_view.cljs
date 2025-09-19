@@ -243,6 +243,14 @@
       ;; Default case if no result or emits
       :else {"node" node-name "args" []})))
 
+(defn transform-node-input-for-dataset
+  "Transform node input data from app-db to simplified format for dataset.
+   Returns {\"node\" node-name, \"args\" [...]} with string keys.
+   Uses the actual input arguments that were passed to the node."
+  [raw-node-data node-name]
+  (let [input (:input raw-node-data)]
+    {"node" node-name "args" (if (vector? input) input [input])}))
+
 (defn transform-agent-data-for-dataset
   "Transform agent data from app-db to simplified format for dataset.
    Returns {\"node\" 'agent', \"args\" [...]} with string keys."
@@ -321,15 +329,16 @@
                      {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
                       :onClick (fn [e]
                                  (.stopPropagation e)
-                                 ;; Get data from app-db (graph-data) and transform to simplified format
+;; Get data from app-db (graph-data) and transform to simplified format
                                  (let [raw-node-data (get graph-data node-id)
-                                       transformed-data (transform-node-data-for-dataset raw-node-data node-name)]
+                                       input-data (transform-node-input-for-dataset raw-node-data node-name)
+                                       output-data (transform-node-data-for-dataset raw-node-data node-name)]
                                    (state/dispatch [:modal/show-form :add-from-trace
                                                     {:module-id module-id
                                                      :title (str "Add Node '" node-name "' to Dataset")
                                                      :source-type :node
-                                                     :source-args transformed-data
-                                                     :source-emits transformed-data}])))}
+                                                     :source-args input-data
+                                                     :source-emits output-data}])))}
                      "Add to Dataset")))
 
             (when result

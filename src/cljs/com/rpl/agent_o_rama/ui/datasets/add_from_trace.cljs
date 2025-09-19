@@ -29,8 +29,7 @@
            ($ :label {:className "text-xs font-medium text-gray-500"}
               "Node Emitted Data")
            ($ :pre {:className "text-xs bg-white p-2 rounded border mt-1"}
-              ;; Since we're now passing the same simplified data for both, just show source-args
-              (common/pp source-args))))))
+              (common/pp source-emits))))))
 
 (defui PreviewPanel [{:keys [preview-data error is-previewing]}]
   ($ :div {:className "w-1/3 p-4 overflow-auto"}
