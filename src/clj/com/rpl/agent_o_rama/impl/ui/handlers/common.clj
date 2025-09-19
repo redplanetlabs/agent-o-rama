@@ -75,9 +75,15 @@
    jser/json-thaw*
    data))
 
-(defn parse-url-pair [s]
-  (let [[task-id agent-id] (clojure.string/split s #"-")]
-    [(parse-long task-id) (parse-long agent-id)]))
+(defn parse-url-pair [^String s]
+  (let [first-dash-idx (.indexOf s "-")]
+    (if (= first-dash-idx -1)
+      ;; No dash found, treat as single value
+      [(parse-long s) nil]
+      ;; Split only on the first dash
+      (let [task-id-str (.substring s 0 first-dash-idx)
+            agent-id-str (.substring s (inc first-dash-idx))]
+        [(parse-long task-id-str) (java.util.UUID/fromString agent-id-str)]))))
 
 (defn preprocess-event-msg
   "Cleans, parses, and enriches an incoming Sente event message."

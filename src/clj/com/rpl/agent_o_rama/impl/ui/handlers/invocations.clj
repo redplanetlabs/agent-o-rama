@@ -25,13 +25,18 @@
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-graph-page
   [{:keys [client invoke-pair leaves initial?]} _uid] ; Renamed uid to _uid as it's unused
   (let [;; Correctly get all underlying objects from the agent-specific client
-        client-objects     (aor-types/underlying-objects client)
-        tracing-query      (:tracing-query client-objects)
-        root-pstate        (:root-pstate client-objects) ; <-- FIX: Use client-objects
-        history-pstate     (:graph-history-pstate client-objects) ; <-- FIX: Use client-objects
+        client-objects (aor-types/underlying-objects client)
+        tracing-query (:tracing-query client-objects)
+        root-pstate (:root-pstate client-objects) ; <-- FIX: Use client-objects
+        history-pstate (:graph-history-pstate client-objects) ; <-- FIX: Use client-objects
 
         [agent-task-id agent-id] invoke-pair
-        is-initial-load?   (boolean initial?)
+        is-initial-load? (boolean initial?)
+
+        ;; Debug logging
+        _ (println "DEBUG: invoke-pair =" invoke-pair)
+        _ (println "DEBUG: agent-task-id =" agent-task-id "agent-id =" agent-id)
+        _ (println "DEBUG: is-initial-load? =" is-initial-load?)
 
         ;; This query is now safe because root-pstate is correctly sourced
         summary-info (merge
@@ -43,30 +48,37 @@
                                           {:pkey agent-task-id}))
 
         root-invoke-id (when is-initial-load?
-                         (foreign-select-one [(keypath agent-id) :root-invoke-id] root-pstate {:pkey agent-task-id}))
-        
+                         (let [result (foreign-select-one [(keypath agent-id) :root-invoke-id] root-pstate {:pkey agent-task-id})]
+                           (println "DEBUG: root-invoke-id lookup result =" result)
+                           result))
+
         historical-graph (when is-initial-load?
                            (when-let [graph-version (:graph-version summary-info)]
                              (foreign-select-one [(keypath graph-version)] history-pstate {:pkey agent-task-id})))
-        
+
         start-pairs (if is-initial-load?
-                      [[agent-task-id root-invoke-id]]
+                      (do
+                        (println "DEBUG: creating start-pairs with agent-task-id =" agent-task-id "root-invoke-id =" root-invoke-id)
+                        [[agent-task-id root-invoke-id]])
                       leaves)
-        
+
+        _ (println "DEBUG: start-pairs =" start-pairs)
+
         page-limit (if is-initial-load? 1000 100)
-        
+
         dynamic-trace (when (seq start-pairs)
+                        (println "DEBUG: calling foreign-invoke-query with args:" agent-task-id start-pairs page-limit)
                         (foreign-invoke-query tracing-query agent-task-id start-pairs page-limit))
-        
+
         cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
                         (-> m common/remove-implicit-nodes))
-        
+
         next-leaves (:next-task-invoke-pairs dynamic-trace)
-        
+
         root-status (foreign-select-one [(keypath agent-id) (submap [:result :finish-time-millis])]
                                         root-pstate
                                         {:pkey agent-task-id})
-        
+
         agent-is-complete? (boolean (or (:finish-time-millis root-status) (:result root-status)))]
 
     (cond-> {:is-complete agent-is-complete?}
