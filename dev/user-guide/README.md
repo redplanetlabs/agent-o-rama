@@ -1,20 +1,36 @@
 # Agent-O-Rama User Guide
 
-Welcome to Agent-O-Rama: your framework for building distributed AI agents that scale.
+Welcome to Agent-O-Rama (AOR): your framework for building distributed AI agents that scale.
 
 You're about to learn how to create [agents](../glossary.md#agent) that think, remember, and collaborate. Agents that handle real-world complexity with grace. This guide takes you from your first agent to production-ready systems.
+
+## What is Agent-O-Rama?
+
+Agent-O-Rama is a distributed framework for building stateful AI agents that execute across clusters. Think of it as your bridge between AI models and distributed computing: you define intelligent workflows as graphs of connected nodes, and AOR handles the scaling, fault tolerance, and state management automatically.
+
+### Built on Rama
+
+Agent-O-Rama is implemented using Red Planet Labs' Rama distributed computing platform. Rama provides the distributed runtime foundation that makes AOR possible:
+
+- **Distributed execution**: Your [agents](../glossary.md#agent) run across multiple machines with automatic partitioning
+- **Fault tolerance**: Built-in retry mechanisms and state recovery across node failures
+- **Event sourcing**: All agent state changes are durably stored and recoverable
+- **Stream processing**: Real-time data flows through your agent graphs
+- **Microbatch processing**: Efficient batched operations for high-throughput scenarios
+
+You don't need to understand Rama internals to use AOR effectively, but knowing it's there explains why your agents scale seamlessly from development to production clusters.
 
 > **Quick Reference**: For detailed explanations of agent-o-rama terminology, see the [Glossary](../glossary.md) and [Terms Documentation](../terms/).
 
 ## What You'll Build
 
-Agent-O-Rama lets you create:
+With Agent-O-Rama, you create:
 - **[Distributed Agents](../terms/agent.md)** that execute [agent graphs](../glossary.md#agent-graph) across multiple machines
 - **Stateful Workflows** using [key-value stores](../terms/key-value-store.md) and distributed state management
 - **Parallel Processing** with [aggregation](../terms/aggregation.md) patterns handling thousands of requests simultaneously
 - **AI Integrations** leveraging [agent objects](../terms/agent-objects.md) and LangChain4j models
 
-Think of [agents](../terms/agent.md) as smart workers in your distributed system. Each agent follows a graph of [nodes](../glossary.md#agent-node), maintains its own state through stores, and communicates via [node emissions](../glossary.md#node-emit). You define the logic through [agent modules](../glossary.md#agent-module); Agent-O-Rama handles the distribution, scaling, and fault tolerance.
+Think of [agents](../terms/agent.md) as intelligent workers in your distributed system: they follow workflows defined as graphs of [nodes](../glossary.md#agent-node), remember state through stores, and coordinate via [node emissions](../glossary.md#node-emit). You focus on the business logic in your [agent modules](../glossary.md#agent-module) - AOR handles the complexity of distribution, scaling, and fault tolerance.
 
 ## Your Journey
 
@@ -28,7 +44,7 @@ Start here and work through in order:
 
 ## Quick Taste
 
-Here's your first [agent](../terms/agent.md) in Clojure:
+Here's your first [agent](../terms/agent.md) - a simple greeter in Clojure:
 
 ```clojure
 (aor/defagentmodule HelloWorldModule
@@ -45,9 +61,9 @@ Here's your first [agent](../terms/agent.md) in Clojure:
 ;; => "Hello, World!"
 ```
 
-This creates an [agent module](../glossary.md#agent-module) with a single [agent](../terms/agent.md) containing one [node](../glossary.md#agent-node). The node receives input, processes it, and returns an [agent result](../glossary.md#agent-result) using `result!`.
+You've just created an [agent module](../glossary.md#agent-module) containing a single [agent](../terms/agent.md) with one [node](../glossary.md#agent-node). The node takes input, processes it, and returns an [agent result](../glossary.md#agent-result) using `result!`.
 
-And in Java:
+The same agent in Java:
 
 ```java
 public class HelloWorldModule extends AgentModule {
@@ -66,7 +82,7 @@ String result = client.invoke("World");
 // => "Hello, World!"
 ```
 
-That's it. You've defined an [agent](../terms/agent.md), deployed it to a distributed system using an [agent topology](../glossary.md#agent-topology), and invoked it through an [agent client](../glossary.md#agent-client). The framework handles everything else.
+That's it: you've defined an [agent](../terms/agent.md), deployed it across a distributed system using an [agents topology](../glossary.md#agents-topology), and invoked it through an [agent client](../glossary.md#agent-client). AOR handles all the distributed computing complexity behind the scenes.
 
 ## Next Step
 

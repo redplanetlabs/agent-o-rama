@@ -1,17 +1,18 @@
 # Core Concepts
 
-You build Agent-O-Rama systems from three fundamental pieces: [agents](../terms/agent.md), [nodes](../glossary.md#agent-node), and [graphs](../glossary.md#agent-graph). Master these, and everything else follows naturally.
+You build Agent-O-Rama systems from three fundamental pieces: [agents](../terms/agent.md), [nodes](../glossary.md#agent-node), and [graphs](../glossary.md#agent-graph). Master these three concepts, and everything else clicks into place.
 
 > **Reference**: See the [Agent](../terms/agent.md) and [Agent Node](../terms/agent-node.md) documentation for comprehensive details.
 
-## Agents: Your Distributed Workers
+## Agents: Your Intelligent Workers
 
-An [agent](../terms/agent.md) is a distributed, stateful computational unit that executes a directed graph of [nodes](../glossary.md#agent-node). Think of it as a smart worker that:
-- Follows a defined workflow (its [agent graph](../glossary.md#agent-graph))
-- Maintains its own state through [stores](../glossary.md#key-value-store)
-- Runs distributed across your cluster with automatic partitioning
-- Handles failures automatically with [retry mechanisms](../glossary.md#retry-mechanism)
-- Communicates via [node emissions](../glossary.md#node-emit) and [agent results](../glossary.md#agent-result)
+An [agent](../terms/agent.md) is your distributed, stateful worker that executes workflows defined as directed graphs of [nodes](../glossary.md#agent-node). Think of each agent as an intelligent employee in your system:
+
+- **Follows workflows**: Each agent executes its [agent graph](../glossary.md#agent-graph) from start to finish
+- **Remembers state**: Maintains persistent data through [stores](../glossary.md#key-value-store) across executions
+- **Scales automatically**: Runs distributed across your cluster with automatic partitioning
+- **Handles failures**: Recovers gracefully with built-in [retry mechanisms](../glossary.md#retry-mechanism)
+- **Coordinates work**: Communicates via [node emissions](../glossary.md#node-emit) and returns [agent results](../glossary.md#agent-result)
 
 Every agent starts with an [agent module](../glossary.md#agent-module) definition that packages agents, stores, and [agent objects](../terms/agent-objects.md) into a deployable unit:
 
@@ -33,15 +34,16 @@ public class MyModule extends AgentModule {
 }
 ```
 
-## Nodes: The Building Blocks
+## Nodes: Your Processing Steps
 
-An [agent node](../glossary.md#agent-node) is an individual execution unit within an [agent graph](../glossary.md#agent-graph) that performs specific computation. Each node:
-- Performs a specific computation with access to [stores](../glossary.md#key-value-store) and [agent objects](../terms/agent-objects.md)
-- Receives input from previous nodes or the initial [agent invoke](../glossary.md#agent-invoke)
-- Can [emit](../glossary.md#node-emit) data to other nodes or return a final [agent result](../glossary.md#agent-result)
-- Executes within distributed [task globals](../glossary.md#task-global) for state management
+An [agent node](../glossary.md#agent-node) is where the actual work happens - each node represents one step in your agent's workflow. Nodes are powerful because they:
 
-A node is just a function that receives an `agent-node` context and your data:
+- **Do focused work**: Each node handles one specific computation with access to [stores](../glossary.md#key-value-store) and [agent objects](../terms/agent-objects.md)
+- **Receive input**: Get data from previous nodes or from the initial [agent invoke](../glossary.md#agent-invoke)
+- **Pass data forward**: Use [emit](../glossary.md#node-emit) to send data to other nodes or return final [agent results](../glossary.md#agent-result)
+- **Execute distributed**: Run across your cluster with distributed [task globals](../glossary.md#task-global) managing state
+
+Creating a node is straightforward - it's just a function that receives an `agent-node` context and your data:
 
 **Clojure:**
 ```clojure
@@ -63,14 +65,21 @@ A node is just a function that receives an `agent-node` context and your data:
 })
 ```
 
-Nodes have three key operations:
-- **`emit!`**: Send data via [node emit](../glossary.md#node-emit) to trigger execution of downstream nodes
-- **`result!`**: Return the final [agent result](../glossary.md#agent-result) and complete the agent execution
+Your nodes have three key operations to control flow:
+- **`emit!`**: Send data via [node emit](../glossary.md#node-emit) to trigger downstream nodes
+- **`result!`**: Return the final [agent result](../glossary.md#agent-result) and complete execution
 - **`stream-chunk!`**: Send [streaming chunks](../glossary.md#streaming-chunk) to active [streaming subscriptions](../glossary.md#streaming-subscription)
 
-## Graphs: Connecting the Dots
+## Graphs: Your Workflow Definition
 
-An [agent graph](../glossary.md#agent-graph) is a directed graph structure that defines the execution flow of an agent, consisting of interconnected [nodes](../glossary.md#agent-node) with specified output relationships. You build graphs by chaining nodes together:
+An [agent graph](../glossary.md#agent-graph) connects your nodes into a workflow. Think of it as a flowchart: data flows from node to node following the connections you define. Graphs are flexible - they support:
+
+- **Sequential processing**: Linear chains from start to finish
+- **Conditional routing**: Nodes that choose different paths based on data
+- **Cycles**: Loops for iterative processing or retry logic
+- **Parallel execution**: Multiple paths executing simultaneously
+
+You build graphs by chaining nodes together:
 
 **Clojure:**
 ```clojure
@@ -330,6 +339,8 @@ public class OrderProcessingModule extends AgentModule {
 }
 ```
 
-## What's Next?
+## You've Got the Foundation
 
-You now understand the core building blocks: [agents](../terms/agent.md), [agent nodes](../glossary.md#agent-node), [agent graphs](../glossary.md#agent-graph), and [agent objects](../terms/agent-objects.md). Next, learn how agents maintain and share distributed state in [State Management](02-state-management.md).
+You now control the core building blocks of Agent-O-Rama: [agents](../terms/agent.md) that execute workflows, [agent nodes](../glossary.md#agent-node) that do the work, [agent graphs](../glossary.md#agent-graph) that define the flow, and [agent objects](../terms/agent-objects.md) that share resources. These pieces combine to create intelligent, distributed systems that scale from your laptop to production clusters.
+
+Next, you'll discover how agents remember and share data across executions in [State Management](02-state-management.md).
