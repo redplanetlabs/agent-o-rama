@@ -197,48 +197,36 @@
 ;; =============================================================================
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/validate-direct-data
-  [{:keys [manager dataset-id input-data output-data]} uid]
+  [{:keys [manager dataset-id input output]} uid]
   (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
         schemas (queries/get-dataset-properties datasets-pstate dataset-id)
-        input-schema  (:input-json-schema schemas)
+        input-schema (:input-json-schema schemas)
         output-schema (:output-json-schema schemas)]
     (if-not schemas
       (throw (ex-info "Dataset not found" {:dataset-id dataset-id}))
-      (let [parsed-input  (try (j/read-value input-data)  (catch Exception _ nil))
-            parsed-output (try (j/read-value output-data) (catch Exception _ nil))
-            input-validation  (when (and parsed-input  input-schema)
-                                (datasets/validate-with-schema* input-schema parsed-input))
-            output-validation (when (and parsed-output output-schema)
-                                (datasets/validate-with-schema* output-schema parsed-output))]
-        {:input  {:is-valid? (and parsed-input (or (nil? input-schema) (nil? input-validation)))
-                  :validation-error input-validation
-                  :parse-error (when-not parsed-input "Invalid JSON format")}
-         :output {:is-valid? (and parsed-output (or (nil? output-schema) (nil? output-validation)))
-                  :validation-error output-validation
-                  :parse-error (when-not parsed-output "Invalid JSON format")}}))))
+      (let [input-validation (when input-schema (datasets/validate-with-schema* input-schema input))
+            output-validation (when output-schema (datasets/validate-with-schema* output-schema output))]
+        {:input {:is-valid? (or (nil? input-schema) (nil? input-validation))
+                 :validation-error input-validation}
+         :output {:is-valid? (or (nil? output-schema) (nil? output-validation))
+                  :validation-error output-validation}}))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-direct-data
-  [{:keys [manager dataset-id input-data output-data]} uid]
+  [{:keys [manager dataset-id input output]} uid]
   (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
         schemas (queries/get-dataset-properties datasets-pstate dataset-id)
-        input-schema  (:input-json-schema schemas)
+        input-schema (:input-json-schema schemas)
         output-schema (:output-json-schema schemas)]
     (if-not schemas
       (throw (ex-info "Dataset not found" {:dataset-id dataset-id}))
-      (let [parsed-input (try (j/read-value input-data)
-                              (catch Exception e
-                                (throw (ex-info (str "Invalid input JSON: " (.getMessage e)) {}))))
-            parsed-output (try (j/read-value output-data)
-                               (catch Exception e
-                                 (throw (ex-info (str "Invalid output JSON: " (.getMessage e)) {}))))
-            input-validation  (when input-schema
-                                (datasets/validate-with-schema* input-schema parsed-input))
+      (let [input-validation (when input-schema
+                               (datasets/validate-with-schema* input-schema input))
             output-validation (when output-schema
-                                (datasets/validate-with-schema* output-schema parsed-output))]
+                                (datasets/validate-with-schema* output-schema output))]
         (cond
-          input-validation  (throw (ex-info (str "Input schema validation failed: " input-validation) {}))
+          input-validation (throw (ex-info (str "Input schema validation failed: " input-validation) {}))
           output-validation (throw (ex-info (str "Output schema validation failed: " output-validation) {}))
           :else (do
-                  (aor/add-dataset-example! manager dataset-id parsed-input
-                                            {:reference-output parsed-output})
-                  {:status :ok})))))))
+                  (aor/add-dataset-example! manager dataset-id input
+                                            {:reference-output output})
+                  {:status :ok}))))))

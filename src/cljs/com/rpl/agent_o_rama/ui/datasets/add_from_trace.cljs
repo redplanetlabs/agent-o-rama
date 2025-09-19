@@ -11,6 +11,13 @@
    ["use-debounce" :refer [useDebounce]]
    ["@heroicons/react/24/outline" :refer [ChevronDownIcon]]))
 
+(defn parse-json->cljs [s]
+  (try
+    (-> (js/JSON.parse s)
+        (js->clj :keywordize-keys false))
+    (catch :default e
+      ::parse-error)))
+
 (defui AddFromTraceForm [{:keys [form-id]}]
   (let [;; Form fields
         dataset-id-field (forms/use-form-field form-id :dataset-id)
@@ -39,24 +46,35 @@
 
     (useEffect
      (fn []
-       (when (and debounced-dataset-id 
+       (when (and debounced-dataset-id
                   (not (str/blank? debounced-input-data))
                   (not (str/blank? debounced-output-data)))
-         (set-is-validating true)
-         (sente/request! [:datasets/validate-direct-data
-                          {:module-id module-id
-                           :dataset-id debounced-dataset-id
-                           :input-data debounced-input-data
-                           :output-data debounced-output-data}]
-                         10000
-                         (fn [reply]
-                           (set-is-validating false)
-                           (if (:success reply)
-                             (set-validation-state (:data reply))
-                             (set-validation-state nil)))))
+         (let [parsed-input (parse-json->cljs debounced-input-data)
+               parsed-output (parse-json->cljs debounced-output-data)]
+           (cond
+             (= ::parse-error parsed-input)
+             (set-validation-state {:input {:parse-error "Invalid JSON format"}})
+
+             (= ::parse-error parsed-output)
+             (set-validation-state {:output {:parse-error "Invalid JSON format"}})
+
+             :else
+             (do
+               (set-is-validating true)
+               (sente/request! [:datasets/validate-direct-data
+                                {:module-id module-id
+                                 :dataset-id debounced-dataset-id
+                                 :input parsed-input
+                                 :output parsed-output}]
+                               10000
+                               (fn [reply]
+                                 (set-is-validating false)
+                                 (if (:success reply)
+                                   (set-validation-state (:data reply))
+                                   (set-validation-state nil))))))))
        js/undefined)
      (clj->js [debounced-dataset-id debounced-input-data debounced-output-data]))
-    
+
     ($ :div {:className "max-w-4xl mx-auto p-6"}
        ($ forms/form
           ($ :div {:className "space-y-6"}
@@ -123,7 +141,7 @@
                          ($ :label {:className "block text-sm font-medium text-gray-600"} "Expected Output Format")
                          ($ :pre {:className "text-xs bg-white p-3 rounded border overflow-auto max-h-48"}
                             (common/pp-json out-schema)))))))
-             
+
                                         ;
                                         ; Input Data
              ($ :div
@@ -201,15 +219,25 @@
   :on-submit
   {:event
    (fn [_db form-state]
-     ;; Use the new direct data endpoint
+     ;; Parse JSON on frontend and send parsed data
      (let [{:keys [module-id]} form-state
            dataset-id (:dataset-id form-state)
-           input-data (:input-data form-state)
-           output-data (:output-data form-state)]
-       [:datasets/add-direct-data
-        {:module-id module-id
-         :dataset-id dataset-id
-         :input-data input-data
-         :output-data output-data}]))
+           input-str (:input-data form-state)
+           output-str (:output-data form-state)
+           parsed-input (parse-json->cljs input-str)
+           parsed-output (parse-json->cljs output-str)]
+       (cond
+         (= ::parse-error parsed-input)
+         [:db/set-value [:forms (:form-id form-state) :error] "Input is not valid JSON"]
+
+         (= ::parse-error parsed-output)
+         [:db/set-value [:forms (:form-id form-state) :error] "Output is not valid JSON"]
+
+         :else
+         [:datasets/add-direct-data
+          {:module-id module-id
+           :dataset-id dataset-id
+           :input parsed-input
+           :output parsed-output}])))
    :on-success-invalidate (fn [_db {:keys [module-id dataset-id]} _reply]
                             {:query-key-pattern [:dataset-examples module-id dataset-id]})}})
