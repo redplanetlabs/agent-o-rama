@@ -23,6 +23,10 @@
   "Converts a ClojureScript data structure to a JSON string."
   (js/JSON.stringify (clj->js x)))
 
+(defn pp-json [x]
+  "Converts a ClojureScript data structure to a pretty-printed JSON string."
+  (js/JSON.stringify (clj->js x) nil 2))
+
 (defn format-timestamp [ms]
   (if (number? ms)
     (let [date (js/Date. ms)

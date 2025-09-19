@@ -106,9 +106,9 @@
            output-data (or source-result source-emits)]
        (merge
         {:dataset-id ""
-         ;; Pre-fill input with source args, output with result/emits
-         :input-data (common/pp source-args)
-         :output-data (common/pp output-data)}
+         ;; Pre-fill input with source args, output with result/emits as JSON
+         :input-data (common/pp-json source-args)
+         :output-data (common/pp-json output-data)}
         props)))
    :validators {:dataset-id [forms/required]
                 :input-data [forms/required forms/valid-json]
