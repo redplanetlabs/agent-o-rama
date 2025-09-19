@@ -14,6 +14,7 @@
     ExampleRun
     HumanInputRequest
     NestedOpType
+    NodeInvoke
     RunInfo
     RunType
     ToolInfo]
@@ -51,6 +52,8 @@
     `(drp/defrecord+ ~s ~@args)))
 
 (def ^:dynamic OPERATION-SOURCE nil)
+(def ^:dynamic FORCED-AGENT-INVOKE-ID nil)
+(def ^:dynamic FORCED-AGENT-TASK-ID nil)
 
 (def AGENT-TOPOLOGY-NAME "_agent-topology")
 (def AGENTS-MB-TOPOLOGY-NAME "_agents-mb-topology")
@@ -110,9 +113,12 @@
   (getAgentInvokeId [this] agent-invoke-id)
   EvalTarget)
 
-(defaorrecord EvalNodeTarget
+(defaorrecord NodeInvokeImpl
   [task-id :- Long
-   invoke-id :- UUID]
+   node-invoke-id :- UUID]
+  NodeInvoke
+  (getTaskId [this] task-id)
+  (getNodeInvokeId :- UUID)
   EvalTarget)
 
 ;; Sources
@@ -172,6 +178,7 @@
 
 (defaorrecord AgentInitiate
   [args :- [s/Any]
+   forced-agent-task-id :- (s/maybe Long)
    forced-agent-invoke-id :- (s/maybe UUID)
    source :- (s/maybe InfoSource)
   ])
@@ -347,11 +354,14 @@
   [agg-invoke-id :- UUID
    ack-val :- Long])
 
-(defaorrecord PStateWrite
+(defaorrecord PStateWriteAgentSource
   [agent-name :- String
    agent-task-id :- Long
    agent-id :- UUID
-   retry-num :- Long
+   retry-num :- Long])
+
+(defaorrecord PStateWrite
+  [agent-source :- (s/maybe PStateWriteAgentSource)
    pstate-name :- String
    path :- s/Any
    key :- s/Any])
@@ -624,12 +634,22 @@
 
 
 (defaorrecord RunInfoImpl
-  [type :- (s/enum :agent :node)
+  [action-name :- String
+   agent-name :- String
+   node-name :- (s/maybe String)
+   agent-invoke :- AgentInvokeImpl
+   node-invoke :- (s/maybe NodeInvokeImpl)
+   type :- (s/enum :agent :node)
    latency-millis :- Long
    feedback :- [FeedbackImpl]
-   agent-stats :- AgentInvokeStatsImpl
-   nested-ops :- [NestedOpInfoImpl]]
+   agent-stats :- (s/maybe AgentInvokeStatsImpl)
+   nested-ops :- (s/maybe [NestedOpInfoImpl])]
   RunInfo
+  (getActionName [this] action-name)
+  (getAgentName [this] agent-name)
+  (getNodeName [this] node-name)
+  (getAgentInvoke [this] agent-invoke)
+  (getNodeInvoke [this] node-invoke)
   (getRunType [this]
     (cond
       (= type :agent)

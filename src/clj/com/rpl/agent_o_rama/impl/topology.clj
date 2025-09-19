@@ -197,13 +197,16 @@
 (deframaop intake-agent-initiate
   [*agent-name *data]
   (<<with-substitutions
-   [$$active (po/agent-active-invokes-task-global *agent-name)
+   [$$root (po/agent-root-task-global *agent-name)
+    $$active (po/agent-active-invokes-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
    (get *data :args :> *args)
    (ops/current-task-id :> *agent-task-id)
    (get *data :forced-agent-invoke-id :> *forced-agent-id)
    (get *data :source :> *source)
    (<<if (some? *forced-agent-id)
+     ;; stop if already exists for idempotency
+     (local-select> [(keypath *forced-agent-id) nil?] $$root)
      (identity *forced-agent-id :> *agent-id)
     (else>)
      (h/random-uuid7 :> *agent-id))

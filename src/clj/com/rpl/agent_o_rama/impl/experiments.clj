@@ -493,7 +493,7 @@
            (.getStore agent-node (po/agent-root-task-global-name agent-name))
            (aor-types/->DirectTaskId (:task-id target)))
 
-          (aor-types/EvalNodeTarget? target)
+          (aor-types/NodeInvokeImpl? target)
           (store/pstate-transform!
            [(keypath (:agent-invoke-id target)) (fb/add-feedback-path res source)]
            (.getStore agent-node (po/agent-node-task-global-name agent-name))
@@ -504,6 +504,31 @@
         )))
     (c/result! agent-node res)
   ))
+
+(defn initiate-eval
+  [eval-client
+   {:keys [input-json-path reference-output-json-path output-json-path]}
+   eval-type
+   input
+   reference-output
+   outputs
+   eval-name
+   builder-name
+   builder-params
+   eval-infos
+   source]
+  (c/agent-initiate
+   eval-client
+   (aor-types/->valid-EvalInvoke
+    (maybe-get-json-path input-json-path input)
+    (maybe-get-json-path reference-output-json-path reference-output)
+    (mapv #(maybe-get-json-path output-json-path %) outputs)
+    eval-name
+    builder-name
+    builder-params
+    eval-type
+    eval-infos
+    source)))
 
 (defn hook:running-invoke-node [result+example-ids])
 (defn hook:initiate-target [i])
@@ -694,8 +719,7 @@
                    eval-counter (volatile! -1)]
                (when-not (selected-any? [MAP-VALS :result :failure? identity] agent-results)
                  (doseq [[eval-name
-                          {:keys [input-json-path reference-output-json-path output-json-path
-                                  builder-name builder-params]}]
+                          {:keys [builder-name builder-params]} :as em]
                          eval-info-map
 
                          :when (and (not (contains? curr-evals eval-name))
@@ -704,22 +728,17 @@
                    (hook:initiate-eval (vswap! eval-counter inc))
                    (when-not (contains? @eval-initiates eval-name)
                      (let [inv
-                           (c/agent-initiate
-                            eval-client
-                            (aor-types/->valid-EvalInvoke
-                             (maybe-get-json-path input-json-path input)
-                             (maybe-get-json-path reference-output-json-path reference-output)
-                             (select [MAP-VALS
-                                      :result
-                                      :val
-                                      (view (fn [v] (maybe-get-json-path output-json-path v)))]
-                                     agent-results)
-                             eval-name
-                             builder-name
-                             builder-params
-                             (experiment-type->kw (class spec))
-                             (to-eval-infos agent-initiates)
-                             (aor-types/->valid-ExperimentSourceImpl dataset-id id)))]
+                           (initiate-eval eval-client
+                                          em
+                                          (experiment-type->kw (class spec))
+                                          input
+                                          reference-output
+                                          (select [MAP-VALS :result :val] agent-results)
+                                          eval-name
+                                          builder-name
+                                          builder-params
+                                          (to-eval-infos agent-initiates)
+                                          (aor-types/->valid-ExperimentSourceImpl dataset-id id))]
                        (store/pstate-transform!
                         [(keypath dataset-id :experiments id :results result-id)
                          (keypath :eval-initiates eval-name)
@@ -872,7 +891,7 @@
      ;; have to do it this way since cannot do :ack on the depot append since it's running as part
      ;; of the same stream topology
      (h/random-uuid7 :> *agent-invoke-id)
-     (aor-types/->valid-AgentInitiate [*data] *agent-invoke-id nil :> *initiate)
+     (aor-types/->valid-AgentInitiate [*data] nil *agent-invoke-id nil :> *initiate)
      (depot-partition-append!
       *agent-depot
       *initiate

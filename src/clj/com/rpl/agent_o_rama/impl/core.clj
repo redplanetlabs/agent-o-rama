@@ -252,12 +252,13 @@
     (<<sources stream-topology
      (source> pstate-write-depot-sym
                {:retry-mode :none}
-              :> {:keys [*pstate-name *path *agent-name *agent-task-id
-                          *agent-id *retry-num *key]})
-      (<<if (apart/valid-retry-num? *agent-name
-                                    *agent-task-id
-                                    *agent-id
-                                    *retry-num)
+              :> {:keys [*agent-source *pstate-name *path *key]})
+      (identity *agent-source :> {:keys [*agent-name *agent-task-id *agent-id *retry-num]})
+      (<<if (or> (nil? *agent-source)
+                 (apart/valid-retry-num? *agent-name
+                                         *agent-task-id
+                                         *agent-id
+                                         *retry-num))
         (<<if (aor-types/DirectTaskId? *key)
           (|direct (get *key :task-id)))
         (this-module-pobject-task-global *pstate-name :> $$p)

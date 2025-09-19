@@ -5,6 +5,41 @@ import java.util.*;
 
 public interface RunInfo {
   /**
+   * Returns name of the action.
+   *
+   * @return action name
+   */
+  String getActionName();
+
+  /**
+   * Returns agent name this run was from.
+   *
+   * @return agent name
+   */
+  String getAgentName();
+
+  /**
+   * Get agent invoke for the run
+   *
+   * @return agent invoke
+   */
+  AgentInvoke getAgentInvoke();
+
+  /**
+   * If this is RunInfo for a node, returns node name this run was from. Otherwise, returns null.
+   *
+   * @return node name
+   */
+  String getNodeName();
+
+  /**
+   * If this is RunInfo for a node, returns node invoke information. Otherwise, returns null.
+   *
+   * @return node invoke
+   */
+  NodeInvoke getNodeInvoke();
+
+  /**
    * Returns whether this is a run info for an agent or a node.
    *
    * @return run type

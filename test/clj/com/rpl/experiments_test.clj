@@ -200,10 +200,14 @@
 
          (bind root-feedback
            (fn [{:keys [task-id agent-invoke-id]}]
-             (foreign-select-one [(keypath agent-invoke-id) :feedback] foo-root {:pkey task-id})))
+             (foreign-select-one [(keypath agent-invoke-id) :feedback :results]
+                                 foo-root
+                                 {:pkey task-id})))
          (bind exp-root-feedback
            (fn [{:keys [task-id agent-invoke-id]}]
-             (foreign-select-one [(keypath agent-invoke-id) :feedback] exp-root {:pkey task-id})))
+             (foreign-select-one [(keypath agent-invoke-id) :feedback :results]
+                                 exp-root
+                                 {:pkey task-id})))
 
          (aor/create-evaluator! manager
                                 "concise2"

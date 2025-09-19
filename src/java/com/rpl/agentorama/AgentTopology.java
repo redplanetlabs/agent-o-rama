@@ -66,13 +66,13 @@ public interface AgentTopology {
       String name,
       String description,
       RamaFunction1<Map<String, String>,
-                    RamaFunction4<AgentObjectFetcher, Input, Output, RunInfo, Void>> builder);
+                    RamaFunction4<AgentObjectFetcher, Input, Output, RunInfo, Map>> builder);
 
    <Input, Output> void declareActionBuilder(
       String name,
       String description,
       RamaFunction1<Map<String, String>,
-                    RamaFunction4<AgentObjectFetcher, Input, Output, RunInfo, Void>> builder,
+                    RamaFunction4<AgentObjectFetcher, Input, Output, RunInfo, Map>> builder,
       ActionBuilderOptions options);
 
 

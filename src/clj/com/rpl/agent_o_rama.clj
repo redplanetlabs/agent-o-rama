@@ -613,7 +613,8 @@
               agent-depot
               (aor-types/->AgentInitiate
                (vec args)
-               nil
+               aor-types/FORCED-AGENT-TASK-ID
+               aor-types/FORCED-AGENT-INVOKE-ID
                aor-types/OPERATION-SOURCE))
              (h/cf-function [{[agent-task-id agent-id]
                               aor-types/AGENT-TOPOLOGY-NAME}]

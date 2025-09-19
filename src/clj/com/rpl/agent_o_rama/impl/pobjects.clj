@@ -97,7 +97,9 @@
   (str "$$_agent-root-" agent-name))
 
 (def FEEDBACK-SCHEMA
-  [FeedbackImpl])
+  (fixed-keys-schema
+   {:actions {String Object}
+    :results [FeedbackImpl]}))
 
 (def AGENT-ROOT-PSTATE-SCHEMA
   {UUID

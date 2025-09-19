@@ -54,15 +54,20 @@
 
 (defdepotpartitioner agent-depot-partitioner
   [data num-partitions]
-  (cond (or (aor-types/NodeComplete? data)
-            (aor-types/NodeFailure? data))
-        (:task-id data)
+  (cond
+    (or (aor-types/NodeComplete? data)
+        (aor-types/NodeFailure? data))
+    (:task-id data)
 
-        (aor-types/ForkAgentInvoke? data)
-        (:agent-task-id data)
+    (aor-types/ForkAgentInvoke? data)
+    (:agent-task-id data)
 
-        :else
-        (next-agent-task num-partitions)))
+    (and (aor-types/AgentInitiate? data)
+         (:forced-agent-task-id data))
+    (:forced-agent-task-id data)
+
+    :else
+    (next-agent-task num-partitions)))
 
 (defn task-id-key-partitioner
   [num-partitions task-id]
