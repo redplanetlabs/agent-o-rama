@@ -2,6 +2,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama path])
   (:require
+   [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.feedback :as fb]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -13,7 +14,9 @@
   (:import
    [com.rpl.agentorama.impl
     AgentDeclaredObjectsTaskGlobal
-    RamaClientsTaskGlobal]))
+    RamaClientsTaskGlobal]
+   [java.util.concurrent
+    CompletableFuture]))
 
 ;; TODO: <<<>>>> need to be bound with :num-tasks, :declared-objects, and :rama-clients
 (def ^:dynamic ACTION-HELPERS)
@@ -91,18 +94,21 @@
                                  (:builder-params eval-info)
                                  [(aor-types/->valid-EvalInfo agent-name target)]
                                  nil))
-            ;; TODO: <<<<>>>>
-            ;;  - now wait for result
-            ;;    - don't need to do anything else
-            ;;    - TODO: how does microbatching know what's happening in order to mark this as
-            ;;    complete?
+            (let [{:keys [stats result]}
+                  (.get
+                   ^CompletableFuture
+                   (aor-types/subagent-next-step-async eval-client
+                                                       eval-agent-invoke))]
+              (if (instance? Throwable result)
+                {"success?" false "failure" (h/throwable->str result)}
+                {"success?" true "stats" stats}))
           ))))
     :description
-    ""
+    "Run an evaluator to add feedback to a node or agent"
     :options
     {:params
      {"name"
       {:description
-       "Evaluator name to use"
+       "Evaluator to use"
       }}}
    }})
