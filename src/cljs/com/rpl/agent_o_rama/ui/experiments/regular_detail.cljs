@@ -146,8 +146,8 @@
 
 (defn format-metric-value [value]
   (cond
-    (true? value) ($ :span.text-green-700 "✓")
-    (false? value) ($ :span.text-red-700 "✗")
+    (true? value) ($ :span.text-green-700 "T")
+    (false? value) ($ :span.text-red-700 "F")
     (and (number? value) (<= 0 value) (<= value 1)) (str (int (* 100 value)) "/100")
     (number? value) (str value)
     (string? value) (if (> (count value) 20) (str (subs value 0 17) "…") value)
