@@ -513,6 +513,49 @@
                            filter
                            {:emits [(aor-types/->AgentNodeEmit id nil 0 "a" [0 "1abc2"])]}))
 
+
+
+     (bind token-filter
+       (fn [k v]
+         (aor-types/->valid-TokenCountFilter k (aor-types/->valid-ComparatorSpec :> v))))
+     (bind root-stats
+       (ai-stats
+        {(sa-ref "M1" "A1")
+         (sa-stats 4
+                   (bai-stats {:other    (op-stats 5 10)
+                               :db-write (op-stats 3 7)}
+                              1
+                              2
+                              3
+                              {"abc" (op-stats 1020 1040)
+                               "q"   (op-stats 1 2)}))
+
+        }
+        (bai-stats
+         {:agent-call (op-stats 6 25)}
+         10
+         11
+         12
+         {"abc" (op-stats 1 3)})))
+
+     (is (not (tp-rule-matches? root
+                                (token-filter :input 11)
+                                {:stats root-stats})))
+     (is (tp-rule-matches? root
+                           (token-filter :input 10)
+                           {:stats root-stats}))
+     (is (not (tp-rule-matches? root
+                                (token-filter :output 13)
+                                {:stats root-stats})))
+     (is (tp-rule-matches? root
+                           (token-filter :output 12)
+                           {:stats root-stats}))
+     (is (not (tp-rule-matches? root
+                                (token-filter :total 15)
+                                {:stats root-stats})))
+     (is (tp-rule-matches? root
+                           (token-filter :total 14)
+                           {:stats root-stats}))
      ;; TODO: <<<<>>>>>
      ;;   - test all RuleFilter for dependency-rule-ids and rule-matches?
      ;;     - TokenCountFilter
