@@ -624,11 +624,9 @@
                     local-ds)
                    [input :as inputv] (when (< (count agent-initiates) (count targets))
                                         (foreign-select
-                                         [(keypath dataset-id
-                                                   :snapshots
-                                                   snapshot
-                                                   (must example-id)
-                                                   :input)]
+                                         [(keypath dataset-id :snapshots snapshot)
+                                          (must example-id)
+                                          :input]
                                          datasets))
                    _ (when (empty? inputv)
                        (throw (h/ex-info "Did not find example"
