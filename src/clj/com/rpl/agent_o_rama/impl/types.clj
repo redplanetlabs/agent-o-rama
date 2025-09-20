@@ -715,7 +715,7 @@
 (defaorrecord LatencyFilter
   [comparator-spec :- ComparatorSpec])
 
-;; if there were any exceptions, even if it succeeded?
+;; if there were any exceptions, even if it succeeded
 (defaorrecord ErrorFilter
   [])
 

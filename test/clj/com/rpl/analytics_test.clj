@@ -436,9 +436,31 @@
         {:start-time-millis  10
          :finish-time-millis 21}))
 
+   (bind filter (aor-types/->valid-ErrorFilter))
+   (is (not (aor-types/rule-matches? filter {:run-type :agent})))
+   (is (not (aor-types/rule-matches? filter {:run-type :node})))
+   (is (not (aor-types/rule-matches? filter {:run-type :agent :exception-summaries []})))
+   (is
+    (aor-types/rule-matches?
+     filter
+     {:run-type :agent :exception-summaries [(aor-types/->ExceptionSummary "aaa" "bbb" rule-id)]}))
+   (is
+    (not
+     (aor-types/rule-matches?
+      filter
+      {:run-type :node :exception-summaries [(aor-types/->ExceptionSummary "aaa" "bbb" rule-id)]})))
+   (is
+    (not
+     (aor-types/rule-matches?
+      filter
+      {:run-type :node :exceptions []})))
+   (is
+    (aor-types/rule-matches?
+     filter
+     {:run-type :node :exceptions ["abc"]}))
+
    ;; TODO: <<<<>>>>>
    ;;   - test all RuleFilter for dependency-rule-ids and rule-matches?
-   ;;     - ErrorFilter
    ;;     - InputMatchFilter
    ;;     - OutputMatchFilter
    ;;     - TokenCountFilter
