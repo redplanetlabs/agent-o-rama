@@ -447,6 +447,7 @@
 
      (bind filter
        (aor-types/->valid-LatencyFilter (aor-types/->valid-ComparatorSpec :> 10)))
+     (is (= #{} (aor-types/dependency-rule-ids filter)))
      (is (not (tp-rule-matches?
                root
                filter
@@ -464,6 +465,7 @@
            :finish-time-millis 21}))
 
      (bind filter (aor-types/->valid-ErrorFilter))
+     (is (= #{} (aor-types/dependency-rule-ids filter)))
      (is (not (tp-rule-matches? root filter {})))
      (is (not (tp-rule-matches? nodes filter {})))
      (is (not (tp-rule-matches? root filter {:exception-summaries []})))
@@ -487,6 +489,7 @@
 
      (bind filter
        (aor-types/->valid-InputMatchFilter "$[0].a" #"abc"))
+     (is (= #{} (aor-types/dependency-rule-ids filter)))
      (is (not (tp-rule-matches? root filter {:invoke-args [{"a" "aaa"} {"b" "abc"}]})))
      (is (tp-rule-matches? root filter {:invoke-args [{"a" "qqqabcqqq"}]}))
      (is (not (tp-rule-matches? nodes filter {:input [{"a" "aaa"}]})))
@@ -494,6 +497,7 @@
 
      (bind filter
        (aor-types/->valid-OutputMatchFilter "$[0].args[1]" #"abc"))
+     (is (= #{} (aor-types/dependency-rule-ids filter)))
      (is (not (tp-rule-matches? root
                                 filter
                                 {:result (aor-types/->AgentResult [{"args" [1 "aaa"]}] false)})))
@@ -518,6 +522,8 @@
      (bind token-filter
        (fn [k v]
          (aor-types/->valid-TokenCountFilter k (aor-types/->valid-ComparatorSpec :> v))))
+     (is (= #{} (aor-types/dependency-rule-ids (token-filter :input 1))))
+
      (bind root-stats
        (ai-stats
         {(sa-ref "M1" "A1")
@@ -556,9 +562,55 @@
      (is (tp-rule-matches? root
                            (token-filter :total 14)
                            {:stats root-stats}))
+
+
+     (bind nested-ops
+       [(aor-types/->NestedOpInfoImpl
+         0
+         0
+         :other
+         {"inputTokenCount"  1000
+          "outputTokenCount" 1000
+          "totalTokenCount"  1000})
+        (aor-types/->NestedOpInfoImpl
+         0
+         0
+         :model-call
+         {"inputTokenCount" 1
+          "totalTokenCount" 3})
+        (aor-types/->NestedOpInfoImpl
+         0
+         0
+         :model-call
+         {"inputTokenCount"  10
+          "outputTokenCount" 11
+          "totalTokenCount"  12})
+        (aor-types/->NestedOpInfoImpl
+         0
+         0
+         :model-call
+         {"outputTokenCount" 101})])
+
+     (is (not (tp-rule-matches? nodes
+                                (token-filter :input 11)
+                                {:nested-ops nested-ops})))
+     (is (tp-rule-matches? nodes
+                           (token-filter :input 10)
+                           {:nested-ops nested-ops}))
+     (is (not (tp-rule-matches? nodes
+                                (token-filter :output 112)
+                                {:nested-ops nested-ops})))
+     (is (tp-rule-matches? nodes
+                           (token-filter :output 111)
+                           {:nested-ops nested-ops}))
+     (is (not (tp-rule-matches? nodes
+                                (token-filter :total 15)
+                                {:nested-ops nested-ops})))
+     (is (tp-rule-matches? nodes
+                           (token-filter :total 14)
+                           {:nested-ops nested-ops}))
      ;; TODO: <<<<>>>>>
      ;;   - test all RuleFilter for dependency-rule-ids and rule-matches?
-     ;;     - TokenCountFilter
      ;;     - AndFilter
      ;;     - OrFilter
      ;;     - NotFilter
