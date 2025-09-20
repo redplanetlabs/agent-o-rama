@@ -707,8 +707,6 @@
 
     (throw (h/ex-info "Unknonw comparator" {:comparator comparator}))))
 
-;; TODO: <<<<>>>> need rule-id for the dependency... UI should list rules that are of the
-;; aor/eval type
 (defaorrecord FeedbackFilter
   [rule-id :- UUID
    feedback-key :- String
@@ -742,6 +740,8 @@
 (defaorrecord NotFilter
   [filter :- RuleFilter])
 
+(definterface RuleEvent)
+
 (defaorrecord AddRule
   [name :- String
    id :- UUID
@@ -751,11 +751,13 @@
    action-params :- {String String}
    filter :- RuleFilter
    sampling-rate :- Double
-   start-time-millis :- Long
-  ])
+   start-time-millis :- Long]
+  RuleEvent)
 
 (defaorrecord DeleteRule
-  [name :- String])
+  [agent-name :- String
+   name :- String]
+  RuleEvent)
 
 ;; Misc
 

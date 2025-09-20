@@ -30,7 +30,8 @@
     AggAckOp
     EvaluatorEvent
     ExperimentEvent
-    NodeOp]
+    NodeOp
+    RuleEvent]
    [java.util.concurrent
     CompletableFuture]))
 
@@ -163,6 +164,7 @@
     (queries/declare-fork-affected-aggs-query-topology topologies agent-name)
     (queries/declare-get-invokes-page-topology topologies agent-name)
     (queries/declare-get-current-graph topologies agent-name)
+    (queries/declare-agent-all-rules-query-topology topologies agent-name)
 
     (<<sources stream-topology
      (source> agent-config-depot-sym {:retry-mode :all-after} :> *data)
@@ -246,7 +248,10 @@
         analytics-tick-depot-sym (symbol (po/agent-analytics-tick-depot-name))
         agent-names (-> agent-graphs
                         keys
-                        vec)]
+                        set)
+        action-names (-> action-builders
+                         keys
+                         set)]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
     (declare-depot* setup datasets-depot-sym (hash-by :dataset-id))
     (declare-depot* setup global-actions-depot-sym :random {:global? true})
@@ -308,6 +313,9 @@
 
        (case> (instance? ExperimentEvent *data))
         (exp/handle-experiments-op *data)
+
+       (case> (instance? RuleEvent *data))
+        (ana/handle-rule-event *data agent-names action-names)
 
        (default>)
         (throw! (h/ex-info "Unexpected global action type" {:type (class *data)})))

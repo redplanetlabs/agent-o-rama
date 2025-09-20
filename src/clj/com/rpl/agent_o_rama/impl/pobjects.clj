@@ -322,7 +322,6 @@
 
 (defn agent-action-state-task-global-name
   [agent-name]
-  []
   (str "$$_agent-action-state-" agent-name ""))
 
 (def AGENT-ACTION-STATE-PSTATE-SCHEMA
@@ -330,7 +329,6 @@
 
 (defn agent-rules-task-global-name
   [agent-name]
-  []
   (str "$$_agent-rules-" agent-name ""))
 
 (def AGENT-RULES-PSTATE-SCHEMA

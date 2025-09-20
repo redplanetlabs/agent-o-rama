@@ -378,5 +378,5 @@
 
 
 ;; TODO: <<<<>>>>>
-;;   - test h/node->output
+;;   - test h/node->output in helpers-test
 ;;   - test all RuleFilter for dependency-rule-ids and rule-matches?

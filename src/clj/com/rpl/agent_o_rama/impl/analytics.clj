@@ -17,7 +17,9 @@
     AgentDeclaredObjectsTaskGlobal
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
+    AddRule
     AndFilter
+    DeleteRule
     ErrorFilter
     FeedbackFilter
     InputMatchFilter
@@ -223,6 +225,44 @@
     (not (rule-matches? (:filter this) info)))
 )
 
+(defn check-rule-dependency-conflict
+  [rules id]
+  (let [conflict (select-first [ALL
+                                (selected? :filter
+                                           (view aor-types/dependency-rule-ids)
+                                           #(contains? % id))
+                                :name]
+                               rules)]
+    (when (some? conflict)
+      (format "Deletion failed because rule '%s' depends on it" conflict))))
+
+(deframaop handle-rule-event
+  [{:keys [*agent-name] :as *data} *agent-names *action-names]
+  (filter> (contains? *agent-names *agent-name))
+  (<<with-substitutions
+   [$$rules (po/agent-rules-task-global-name *agent-name)]
+   (<<subsource *data
+    (case> AddRule :> {:keys [*name *id *action-name]})
+     (local-select> [(keypath *name) :id] $$rules :> *curr-id)
+     (<<cond
+      (case> (and> (some? *curr-id) (not= *curr-id *id)))
+       (ack-return> (format "Rule '%s' already exists" *name))
+
+      (case> (not (contains? *action-names *action-name)))
+       (ack-return> (format "Action '%s' doesn't exist" *action-name))
+
+      (default>)
+       (local-transform> [(keypath *name) (termval *data)] $$rules))
+
+    (case> DeleteRule :> {:keys [*name]})
+     (local-select> [(must *name) :id] $$rules :> *id)
+     (local-select> (subselect MAP-VALS) $$rules :> *rules)
+     (check-rule-dependency-conflict *rules *id :> *error-str)
+     (<<if (some? *error-str)
+       (ack-return> *error-str)
+      (else>)
+       (local-transform> [(keypath *name) NONE>] $$rules))
+   )))
 
 (defbasicblocksegmacro handle-analytics-tick
   [agent-names]
@@ -239,3 +279,35 @@
   ;;      - would be really good to do those in chunks, especially for low sample rate
   ;;      - can have "PStateWrites" depot append
 )
+
+
+
+(defn add-rule!
+  [global-actions-depot name agent-name
+   {:keys [node-name action-name action-params filter sampling-rate start-time-millis]}]
+  (let [{error aor-types/AGENT-TOPOLOGY-NAME}
+        (foreign-append!
+         global-actions-depot
+         (aor-types/->valid-AddRule
+          name
+          (h/random-uuid7)
+          agent-name
+          node-name
+          action-name
+          action-params
+          filter
+          sampling-rate
+          start-time-millis))]
+    (when error
+      (throw (h/ex-info "Error adding rule" {:info error})))))
+
+(defn delete-rule!
+  [global-actions-depot agent-name name]
+  (let [{error aor-types/AGENT-TOPOLOGY-NAME}
+        (foreign-append!
+         global-actions-depot
+         (aor-types/->valid-DeleteRule
+          agent-name
+          name))]
+    (when error
+      (throw (h/ex-info "Error adding rule" {:info error})))))
