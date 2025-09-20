@@ -484,10 +484,37 @@
        filter
        {:exceptions ["abc"]}))
 
+
+     (bind filter
+       (aor-types/->valid-InputMatchFilter "$[0].a" #"abc"))
+     (is (not (tp-rule-matches? root filter {:invoke-args [{"a" "aaa"} {"b" "abc"}]})))
+     (is (tp-rule-matches? root filter {:invoke-args [{"a" "qqqabcqqq"}]}))
+     (is (not (tp-rule-matches? nodes filter {:input [{"a" "aaa"}]})))
+     (is (tp-rule-matches? nodes filter {:input [{"a" "qqqabcqqq"}]}))
+
+     (bind filter
+       (aor-types/->valid-OutputMatchFilter "$[0].args[1]" #"abc"))
+     (is (not (tp-rule-matches? root
+                                filter
+                                {:result (aor-types/->AgentResult [{"args" [1 "aaa"]}] false)})))
+     (is (tp-rule-matches? root
+                           filter
+                           {:result (aor-types/->AgentResult [{"args" [1 "1abc2"]}] false)}))
+     (is (not (tp-rule-matches? nodes
+                                filter
+                                {:result (aor-types/->AgentResult [{"args" [1 "aaa"]}] false)})))
+     (is (tp-rule-matches? nodes
+                           filter
+                           {:result (aor-types/->AgentResult [{"args" [1 "1abc2"]}] false)}))
+     (is (not (tp-rule-matches? nodes
+                                filter
+                                {:emits [(aor-types/->AgentNodeEmit id nil 0 "a" [0 "aaa"])]})))
+     (is (tp-rule-matches? nodes
+                           filter
+                           {:emits [(aor-types/->AgentNodeEmit id nil 0 "a" [0 "1abc2"])]}))
+
      ;; TODO: <<<<>>>>>
      ;;   - test all RuleFilter for dependency-rule-ids and rule-matches?
-     ;;     - InputMatchFilter
-     ;;     - OutputMatchFilter
      ;;     - TokenCountFilter
      ;;     - AndFilter
      ;;     - OrFilter
