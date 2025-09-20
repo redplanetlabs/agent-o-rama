@@ -129,13 +129,6 @@
    }})
 
 
-
-
-(defprotocol RuleFilter
-  (dependency-rule-ids [this])
-  (rule-matches? [this info]))
-
-
 (defn- agent-run-type?
   [info]
   (= :agent (:run-type info)))
@@ -211,22 +204,24 @@
     ))
 
   AndFilter
-  (dependency-rule-ids [this] (apply set/union (mapv dependency-rule-ids (:filters this))))
+  (dependency-rule-ids [this]
+    (apply set/union (mapv aor-types/dependency-rule-ids (:filters this))))
   (rule-matches? [this info]
-    (every? #(rule-matches? % info) (:filters this)))
+    (every? #(aor-types/rule-matches? % info) (:filters this)))
 
 
   OrFilter
-  (dependency-rule-ids [this] (apply set/union (mapv dependency-rule-ids (:filters this))))
+  (dependency-rule-ids [this]
+    (apply set/union (mapv aor-types/dependency-rule-ids (:filters this))))
   (rule-matches? [this info]
-    (if (some #(rule-matches? % info) (:filters this))
+    (if (some #(aor-types/rule-matches? % info) (:filters this))
       true
       false))
 
   NotFilter
-  (dependency-rule-ids [this] (dependency-rule-ids (:filter this)))
+  (dependency-rule-ids [this] (aor-types/dependency-rule-ids (:filter this)))
   (rule-matches? [this info]
-    (not (rule-matches? (:filter this) info)))
+    (not (aor-types/rule-matches? (:filter this) info)))
 )
 
 (defn check-rule-dependency-conflict

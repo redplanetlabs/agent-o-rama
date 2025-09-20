@@ -609,9 +609,36 @@
      (is (tp-rule-matches? nodes
                            (token-filter :total 14)
                            {:nested-ops nested-ops}))
+
+     (bind filter (aor-types/->valid-AndFilter []))
+     (is (tp-rule-matches? root filter {}))
+     (bind filter
+       (aor-types/->valid-AndFilter
+        [(aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :> 10))
+         (aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :< 20))]))
+     (is (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 111}))
+     (is (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 118}))
+     (is (not (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 110})))
+     (is (not (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 120})))
+
+     (bind filter (aor-types/->valid-OrFilter []))
+     (is (not (tp-rule-matches? root filter {})))
+     (bind filter
+       (aor-types/->valid-OrFilter
+        [(aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :< 10))
+         (aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :> 20))]))
+     (is (not (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 111})))
+     (is (not (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 118})))
+     (is (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 101}))
+     (is (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 125}))
+
+
+     (bind filter
+       (aor-types/->valid-NotFilter
+        (aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :> 10))))
+     (is (tp-rule-matches? root filter {:start-time-millis 10 :finish-time-millis 18}))
+     (is (not (tp-rule-matches? root filter {:start-time-millis 10 :finish-time-millis 100})))
+
      ;; TODO: <<<<>>>>>
-     ;;   - test all RuleFilter for dependency-rule-ids and rule-matches?
-     ;;     - AndFilter
-     ;;     - OrFilter
-     ;;     - NotFilter
+     ;;   - test all RuleFilter for dependency-rule-ids
     )))
