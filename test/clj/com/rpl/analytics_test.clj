@@ -379,92 +379,117 @@
 
 (deftest comparator-spec-test
          ;; TODO: <<<<>>>>
+         ;; (aor-types/comparator-spec-matches? spec v)
 )
 
 (deftest rule-filters-test
-  (letlocals
-   (bind rule-id (h/random-uuid7))
-   (bind ai (aor-types/->valid-AgentInvokeImpl 0 (h/random-uuid7)))
-   (bind filter
-     (aor-types/->valid-FeedbackFilter rule-id "abc" (aor-types/->valid-ComparatorSpec := 6)))
+  ;; use actual PState schemas to ensure data matches what it would in full application
+  (with-open [root  (rtest/create-test-pstate po/AGENT-ROOT-PSTATE-SCHEMA)
+              nodes (rtest/create-test-pstate po/AGENT-NODE-PSTATE-SCHEMA)]
+    (letlocals
 
-   (bind matching-source
-     (aor-types/->valid-EvalSourceImpl
-      "blah"
-      ai
-      (aor-types/->valid-ActionSourceImpl rule-id "qqq")))
+     (bind id (h/random-uuid7))
+     (bind tp-rule-matches?
+       (fn [pstate filter data]
+         (rtest/test-pstate-transform [(keypath id) (termval data)] pstate)
+         (aor-types/rule-matches? filter
+                                  (assoc (into {}
+                                               (rtest/test-pstate-select-one (keypath id) pstate))
+                                   :run-type (if (identical? pstate root) :agent :node)))
+       ))
 
-   (is (= #{rule-id} (aor-types/dependency-rule-ids filter)))
 
-   (is (not
-        (aor-types/rule-matches?
-         filter
-         {:feedback {:results [(aor-types/->FeedbackImpl {"abc" 6}
-                                                         (aor-types/->AiSourceImpl)
-                                                         0
-                                                         0)]}})))
-   (is (aor-types/rule-matches?
+     (bind rule-id (h/random-uuid7))
+     (bind ai (aor-types/->valid-AgentInvokeImpl 0 (h/random-uuid7)))
+     (bind filter
+       (aor-types/->valid-FeedbackFilter rule-id "abc" (aor-types/->valid-ComparatorSpec := 6)))
+
+     (bind matching-source
+       (aor-types/->valid-EvalSourceImpl
+        "blah"
+        ai
+        (aor-types/->valid-ActionSourceImpl rule-id "qqq")))
+
+     (is (= #{rule-id} (aor-types/dependency-rule-ids filter)))
+
+     (is (not
+          (tp-rule-matches?
+           root
+           filter
+           {:feedback {:results [(aor-types/->FeedbackImpl {"abc" 6}
+                                                           (aor-types/->AiSourceImpl)
+                                                           0
+                                                           0)]}})))
+     (is (tp-rule-matches?
+          root
+          filter
+          {:feedback {:results [(aor-types/->valid-FeedbackImpl
+                                 {"abc" 6}
+                                 matching-source
+                                 0
+                                 0)]}}))
+     (is (not
+          (tp-rule-matches?
+           nodes
+           filter
+           {:feedback {:results [(aor-types/->FeedbackImpl {"def" 6}
+                                                           matching-source
+                                                           0
+                                                           0)]}})))
+     (is (not (tp-rule-matches?
+               nodes
+               filter
+               {:feedback {:results [(aor-types/->valid-FeedbackImpl
+                                      {"abc" "6"}
+                                      matching-source
+                                      0
+                                      0)]}})))
+
+     (bind filter
+       (aor-types/->valid-LatencyFilter (aor-types/->valid-ComparatorSpec :> 10)))
+     (is (not (tp-rule-matches?
+               root
+               filter
+               {:start-time-millis  10
+                :finish-time-millis 20})))
+     (is (tp-rule-matches?
+          root
+          filter
+          {:start-time-millis  10
+           :finish-time-millis 21}))
+     (is (tp-rule-matches?
+          nodes
+          filter
+          {:start-time-millis  10
+           :finish-time-millis 21}))
+
+     (bind filter (aor-types/->valid-ErrorFilter))
+     (is (not (tp-rule-matches? root filter {})))
+     (is (not (tp-rule-matches? nodes filter {})))
+     (is (not (tp-rule-matches? root filter {:exception-summaries []})))
+     (is
+      (tp-rule-matches?
+       root
+       filter
+       {:exception-summaries [(aor-types/->ExceptionSummary "aaa" "bbb" rule-id)]}))
+     (is
+      (not
+       (tp-rule-matches?
+        nodes
         filter
-        {:feedback {:results [(aor-types/->valid-FeedbackImpl
-                               {"abc" 6}
-                               matching-source
-                               0
-                               0)]}}))
-   (is (not
-        (aor-types/rule-matches?
-         filter
-         {:feedback {:results [(aor-types/->FeedbackImpl {"def" 6}
-                                                         matching-source
-                                                         0
-                                                         0)]}})))
-   (is (not (aor-types/rule-matches?
-             filter
-             {:feedback {:results [(aor-types/->valid-FeedbackImpl
-                                    {"abc" "6"}
-                                    matching-source
-                                    0
-                                    0)]}})))
+        {:exceptions []})))
+     (is
+      (tp-rule-matches?
+       nodes
+       filter
+       {:exceptions ["abc"]}))
 
-   (bind filter
-     (aor-types/->valid-LatencyFilter (aor-types/->valid-ComparatorSpec :> 10)))
-   (is (not (aor-types/rule-matches?
-             filter
-             {:start-time-millis  10
-              :finish-time-millis 20})))
-   (is (aor-types/rule-matches?
-        filter
-        {:start-time-millis  10
-         :finish-time-millis 21}))
-
-   (bind filter (aor-types/->valid-ErrorFilter))
-   (is (not (aor-types/rule-matches? filter {:run-type :agent})))
-   (is (not (aor-types/rule-matches? filter {:run-type :node})))
-   (is (not (aor-types/rule-matches? filter {:run-type :agent :exception-summaries []})))
-   (is
-    (aor-types/rule-matches?
-     filter
-     {:run-type :agent :exception-summaries [(aor-types/->ExceptionSummary "aaa" "bbb" rule-id)]}))
-   (is
-    (not
-     (aor-types/rule-matches?
-      filter
-      {:run-type :node :exception-summaries [(aor-types/->ExceptionSummary "aaa" "bbb" rule-id)]})))
-   (is
-    (not
-     (aor-types/rule-matches?
-      filter
-      {:run-type :node :exceptions []})))
-   (is
-    (aor-types/rule-matches?
-     filter
-     {:run-type :node :exceptions ["abc"]}))
-
-   ;; TODO: <<<<>>>>>
-   ;;   - test all RuleFilter for dependency-rule-ids and rule-matches?
-   ;;     - InputMatchFilter
-   ;;     - OutputMatchFilter
-   ;;     - TokenCountFilter
-   ;;     - AndFilter
-   ;;     - OrFilter
-   ;;     - NotFilter
-  ))
+     ;; TODO: <<<<>>>>>
+     ;;   - test all RuleFilter for dependency-rule-ids and rule-matches?
+     ;;     - InputMatchFilter
+     ;;     - OutputMatchFilter
+     ;;     - TokenCountFilter
+     ;;     - AndFilter
+     ;;     - OrFilter
+     ;;     - NotFilter
+    )))
