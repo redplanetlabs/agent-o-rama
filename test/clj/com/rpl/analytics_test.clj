@@ -400,6 +400,7 @@
 
 
      (bind rule-id (h/random-uuid7))
+     (bind rule-id2 (h/random-uuid7))
      (bind ai (aor-types/->valid-AgentInvokeImpl 0 (h/random-uuid7)))
      (bind filter
        (aor-types/->valid-FeedbackFilter rule-id "abc" (aor-types/->valid-ComparatorSpec := 6)))
@@ -621,6 +622,13 @@
      (is (not (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 110})))
      (is (not (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 120})))
 
+     (bind filter
+       (aor-types/->valid-AndFilter
+        [(aor-types/->valid-FeedbackFilter rule-id "a" (aor-types/->ComparatorSpec :> 10))
+         (aor-types/->valid-FeedbackFilter rule-id "b" (aor-types/->ComparatorSpec :> 10))
+         (aor-types/->valid-FeedbackFilter rule-id2 "a" (aor-types/->ComparatorSpec :> 10))]))
+     (is (= #{rule-id rule-id2} (aor-types/dependency-rule-ids filter)))
+
      (bind filter (aor-types/->valid-OrFilter []))
      (is (not (tp-rule-matches? root filter {})))
      (bind filter
@@ -631,6 +639,12 @@
      (is (not (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 118})))
      (is (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 101}))
      (is (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 125}))
+     (bind filter
+       (aor-types/->valid-OrFilter
+        [(aor-types/->valid-FeedbackFilter rule-id "a" (aor-types/->ComparatorSpec :> 10))
+         (aor-types/->valid-FeedbackFilter rule-id "b" (aor-types/->ComparatorSpec :> 10))
+         (aor-types/->valid-FeedbackFilter rule-id2 "a" (aor-types/->ComparatorSpec :> 10))]))
+     (is (= #{rule-id rule-id2} (aor-types/dependency-rule-ids filter)))
 
 
      (bind filter
@@ -638,7 +652,8 @@
         (aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :> 10))))
      (is (tp-rule-matches? root filter {:start-time-millis 10 :finish-time-millis 18}))
      (is (not (tp-rule-matches? root filter {:start-time-millis 10 :finish-time-millis 100})))
-
-     ;; TODO: <<<<>>>>>
-     ;;   - test all RuleFilter for dependency-rule-ids
+     (bind filter
+       (aor-types/->valid-NotFilter
+        (aor-types/->valid-FeedbackFilter rule-id "a" (aor-types/->ComparatorSpec :> 10))))
+     (is (= #{rule-id} (aor-types/dependency-rule-ids filter)))
     )))
