@@ -82,7 +82,7 @@
         sa-vol   (volatile! {})]
     (doseq [{:keys [start-time-millis finish-time-millis type info] :as nested-op} nested-ops]
       (let [delta-millis (- finish-time-millis start-time-millis)
-            token-counts (h/nested-op-token-counts nested-op)]
+            token-counts (nested-op-token-counts nested-op)]
         (multi-transform [h/VOLATILE
                           (keypath type)
                           (nil->val EMPTY-OP-STATS)

@@ -155,7 +155,7 @@
      po/PENDING-RETRIES-PSTATE-SCHEMA)
     (declare-pstate*
      mb-topology
-     (symbol (po/agent-action-state-global-name agent-name))
+     (symbol (po/agent-action-state-task-global-name agent-name))
      po/AGENT-ACTION-STATE-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
 

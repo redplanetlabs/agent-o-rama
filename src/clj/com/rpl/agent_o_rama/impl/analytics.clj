@@ -2,6 +2,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama path])
   (:require
+   [clojure.set :as set]
    [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.feedback :as fb]
@@ -141,15 +142,18 @@
 
 (extend-protocol aor-types/RuleFilter
   FeedbackFilter
-  (dependency-rule-ids [this] #{rule-id})
+  (dependency-rule-ids [this] #{(:rule-id this)})
   (rule-matches? [this info]
     (selected-any?
      [:feedback
       :results
       ALL
-      (selected? :source #(instance? EvalSource %)
-                 :source #(instance? ActionSource %)
-                 :rule-id (pred= (:rule-id this)))
+      (selected? :source
+                 aor-types/EvalSourceImpl?
+                 :source
+                 aor-types/ActionSourceImpl?
+                 :rule-id
+                 (pred= (:rule-id this)))
       :scores
       (must (:feedback-key this))
       #(aor-types/comparator-spec-matches? (:comparator-spec this) %)]
@@ -192,7 +196,7 @@
   (dependency-rule-ids [this] #{})
   (rule-matches? [this info]
     (let [token-counts
-          (if (agent-node-type? info)
+          (if (agent-run-type? info)
             (let [combined (stats/aggregated-basic-stats (:stats info))]
               {:input  (:input-token-count combined)
                :output (:output-token-count combined)

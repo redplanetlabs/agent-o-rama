@@ -720,7 +720,7 @@
   [])
 
 (defaorrecord InputMatchFilter
-  [json-path :- StringFilter
+  [json-path :- String
    regex :- java.util.regex.Pattern])
 
 (defaorrecord OutputMatchFilter
@@ -732,13 +732,13 @@
    comparator-spec :- ComparatorSpec])
 
 (defaorrecord AndFilter
-  [filters :- RuleFilter])
+  [filters :- [(s/protocol RuleFilter)]])
 
 (defaorrecord OrFilter
-  [filters :- RuleFilter])
+  [filters :- [(s/protocol RuleFilter)]])
 
 (defaorrecord NotFilter
-  [filter :- RuleFilter])
+  [filter :- (s/protocol RuleFilter)])
 
 (definterface RuleEvent)
 
@@ -749,7 +749,7 @@
    node-name :- (s/maybe String)
    action-name :- String
    action-params :- {String String}
-   filter :- RuleFilter
+   filter :- (s/protocol RuleFilter)
    sampling-rate :- Double
    start-time-millis :- Long]
   RuleEvent)
