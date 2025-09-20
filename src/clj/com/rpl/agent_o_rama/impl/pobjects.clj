@@ -102,7 +102,9 @@
 
 (def FEEDBACK-SCHEMA
   (fixed-keys-schema
-   {:actions {String Object}
+   {:actions {String (fixed-keys-schema
+                      {:complete? Boolean
+                       :state     Object})}
     :results [FeedbackImpl]}))
 
 (def AGENT-ROOT-PSTATE-SCHEMA
@@ -317,6 +319,22 @@
             :output-json-path String
             :reference-output-json-path String
            })})
+
+(defn agent-action-state-task-global-name
+  [agent-name]
+  []
+  (str "$$_agent-action-state-" agent-name ""))
+
+(def AGENT-ACTION-STATE-PSTATE-SCHEMA
+  java.util.Map)
+
+(defn agent-rules-task-global-name
+  [agent-name]
+  []
+  (str "$$_agent-rules-" agent-name ""))
+
+(def AGENT-RULES-PSTATE-SCHEMA
+  java.util.Map)
 
 ;; Task global fetch helpers
 

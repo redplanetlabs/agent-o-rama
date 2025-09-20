@@ -7,6 +7,7 @@
    [com.rpl.agent-o-rama.impl.feedback :as fb]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.stats :as stats]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
@@ -15,6 +16,16 @@
    [com.rpl.agentorama.impl
     AgentDeclaredObjectsTaskGlobal
     RamaClientsTaskGlobal]
+   [com.rpl.agent_o_rama.impl.types
+    AndFilter
+    ErrorFilter
+    FeedbackFilter
+    InputMatchFilter
+    LatencyFilter
+    NotFilter
+    OrFilter
+    OutputMatchFilter
+    TokenCountFilter]
    [java.util.concurrent
     CompletableFuture]))
 
@@ -113,6 +124,105 @@
        "Evaluator to use"
       }}}
    }})
+
+
+
+
+(defprotocol RuleFilter
+  (dependency-rule-ids [this])
+  (rule-matches? [this info]))
+
+
+(defn- agent-run-type?
+  [info]
+  (= :agent (:run-type info)))
+
+(extend-protocol aor-types/RuleFilter
+  FeedbackFilter
+  (dependency-rule-ids [this] #{rule-id})
+  (rule-matches? [this info]
+    (selected-any?
+     [:feedback
+      :results
+      ALL
+      (selected? :source #(instance? EvalSource %)
+                 :source #(instance? ActionSource %)
+                 :rule-id (pred= (:rule-id this)))
+      :scores
+      (must (:feedback-key this))
+      #(aor-types/comparator-spec-matches? (:comparator-spec this) %)]
+     info))
+
+  LatencyFilter
+  (dependency-rule-ids [this] #{})
+  (rule-matches? [this {:keys [start-time-millis finish-time-millis]}]
+    (and start-time-millis
+         finish-time-millis
+         (aor-types/comparator-spec-matches? (:comparator-spec this)
+                                             (- finish-time-millis start-time-millis))))
+
+  ErrorFilter
+  (dependency-rule-ids [this] #{})
+  (rule-matches? [this info]
+    (if (agent-run-type? info)
+      (not (empty? (:exception-summaries info)))
+      (not (empty? (:exceptions info)))
+    ))
+
+  InputMatchFilter
+  (dependency-rule-ids [this] #{})
+  (rule-matches? [this info]
+    (let [o (if (agent-run-type? info) (:invoke-args info) (:input info))]
+      (some? (re-find (:regex this) (h/read-json-path o (:json-path this))))))
+
+  OutputMatchFilter
+  (dependency-rule-ids [this] #{})
+  (rule-matches? [this info]
+    (let [output (if (agent-run-type? info)
+                   (-> info
+                       :result
+                       :val)
+                   (h/node->output (:result info) (:emits info)))]
+      (some? (re-find (:regex this) (h/read-json-path output (:json-path this))))
+    ))
+
+  TokenCountFilter
+  (dependency-rule-ids [this] #{})
+  (rule-matches? [this info]
+    (let [token-counts
+          (if (agent-node-type? info)
+            (let [combined (stats/aggregated-basic-stats (:stats info))]
+              {:input  (:input-token-count combined)
+               :output (:output-token-count combined)
+               :total  (:total-token-count combined)})
+            (-> info
+                :nested-ops
+                stats/nested-op-stats
+                :token-counts))]
+      (aor-types/comparator-spec-matches?
+       (:comparator-spec this)
+       (get token-counts (:type this)))
+    ))
+
+  AndFilter
+  (dependency-rule-ids [this] (apply set/union (mapv dependency-rule-ids (:filters this))))
+  (rule-matches? [this info]
+    (every? #(rule-matches? % info) (:filters this)))
+
+
+  OrFilter
+  (dependency-rule-ids [this] (apply set/union (mapv dependency-rule-ids (:filters this))))
+  (rule-matches? [this info]
+    (if (some #(rule-matches? % info) (:filters this))
+      true
+      false))
+
+  NotFilter
+  (dependency-rule-ids [this] (dependency-rule-ids (:filter this)))
+  (rule-matches? [this info]
+    (not (rule-matches? (:filter this) info)))
+)
+
 
 (defbasicblocksegmacro handle-analytics-tick
   [agent-names]

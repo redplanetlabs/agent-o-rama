@@ -99,6 +99,13 @@
      (symbol (po/agent-config-task-global-name agent-name))
      po/AGENT-CONFIG-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
+    (declare-pstate*
+     stream-topology
+     (symbol (po/agent-rules-task-global-name agent-name))
+     po/AGENT-RULES-PSTATE-SCHEMA
+     {:global?       true
+      :initial-value (sorted-map)})
+
 
     (if SUBSTITUTE-TICK-DEPOTS
       (do
@@ -145,6 +152,11 @@
      mb-topology
      (symbol (po/pending-retries-task-global-name agent-name))
      po/PENDING-RETRIES-PSTATE-SCHEMA)
+    (declare-pstate*
+     mb-topology
+     (symbol (po/agent-action-state-global-name agent-name))
+     po/AGENT-ACTION-STATE-PSTATE-SCHEMA
+     {:key-partitioner apart/task-id-key-partitioner})
 
     (retries/declare-check-impl mb-topology agent-name)
     (queries/declare-tracing-query-topology topologies agent-name)

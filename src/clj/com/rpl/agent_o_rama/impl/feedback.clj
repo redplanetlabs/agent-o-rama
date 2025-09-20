@@ -15,7 +15,7 @@
 
 (defn action-state-path
   ^:direct-nav [action-name]
-  (path :feedback :actions (keypath action-name)))
+  (path :feedback :actions (keypath action-name) :state))
 
 (defn set-action-state-path
   ^:direct-nav [action-name val]

@@ -324,3 +324,13 @@
     (if port
       (assoc m "conductor.port" port)
       m)))
+
+(defn node->output
+  [result emits]
+  (if (some? result)
+    (:val result)
+    (mapv
+     (fn [{:keys [node-name args]}]
+       {"node" node-name
+        "args" args})
+     emits)))

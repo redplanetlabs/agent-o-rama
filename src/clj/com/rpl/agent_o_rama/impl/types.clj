@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.impl.types
   (:use [com.rpl.rama.path])
   (:require
+   [clojure.set :as set]
    [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.serialize]
@@ -26,6 +27,7 @@
     SubagentInvokeStats
     OpStats]
    [com.rpl.agentorama.source
+    ActionSource
     AgentRunSource
     AiSource
     ApiSource
@@ -174,6 +176,13 @@
   EvalSource
   (getEvalName [this] eval-name)
   (getSourceString [this] (str "eval[" eval-name "]")))
+
+(defaorrecord ActionSourceImpl
+  [rule-id :- UUID
+   rule-name :- String]
+  ActionSource
+  (getRuleName [this] rule-name)
+  (getSourceString [this] (str "action[" rule-name "]")))
 
 ;; Core types
 
@@ -633,7 +642,6 @@
   (getCreatedAt [this] created-at)
   (getModifiedAt [this] modified-at))
 
-
 (defaorrecord RunInfoImpl
   [action-name :- String
    agent-name :- String
@@ -666,6 +674,88 @@
   (getAgentStats [this] agent-stats)
   (getNodeNestedOps [this] nested-ops))
 
+;; Rules
+
+(defprotocol RuleFilter
+  (dependency-rule-ids [this])
+  (rule-matches? [this info]))
+
+(defaorrecord ComparatorSpec
+  [comparator :- (s/enum := :not= :< :> :<= :>=)
+   value :- Object])
+
+(defn comparator-spec-matches?
+  [{:keys [comparator value]} v]
+  (condp =
+    :=
+    (= v value)
+
+    :not=
+    (not= v value)
+
+    :<
+    (< v value)
+
+    :>
+    (> v value)
+
+    :<=
+    (<= v value)
+
+    :>=
+    (>= v value)
+
+    (throw (h/ex-info "Unknonw comparator" {:comparator comparator}))))
+
+;; TODO: <<<<>>>> need rule-id for the dependency... UI should list rules that are of the
+;; aor/eval type
+(defaorrecord FeedbackFilter
+  [rule-id :- UUID
+   feedback-key :- String
+   comparator-spec :- ComparatorSpec])
+
+(defaorrecord LatencyFilter
+  [comparator-spec :- ComparatorSpec])
+
+;; if there were any exceptions, even if it succeeded?
+(defaorrecord ErrorFilter
+  [])
+
+(defaorrecord InputMatchFilter
+  [json-path :- StringFilter
+   regex :- java.util.regex.Pattern])
+
+(defaorrecord OutputMatchFilter
+  [json-path :- String
+   regex :- java.util.regex.Pattern])
+
+(defaorrecord TokenCountFilter
+  [type :- (s/enum :input :output :total)
+   comparator-spec :- ComparatorSpec])
+
+(defaorrecord AndFilter
+  [filters :- RuleFilter])
+
+(defaorrecord OrFilter
+  [filters :- RuleFilter])
+
+(defaorrecord NotFilter
+  [filter :- RuleFilter])
+
+(defaorrecord AddRule
+  [name :- String
+   id :- UUID
+   agent-name :- String
+   node-name :- (s/maybe String)
+   action-name :- String
+   action-params :- {String String}
+   filter :- RuleFilter
+   sampling-rate :- Double
+   start-time-millis :- Long
+  ])
+
+(defaorrecord DeleteRule
+  [name :- String])
 
 ;; Misc
 

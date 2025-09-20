@@ -62,32 +62,42 @@
        (merge-subagent-stats (:subagent-stats existing) (:subagent-stats stats))
        (combine-basic-stats (:basic-stats existing) (:basic-stats stats))))))
 
-(defn mk-node-stats
-  [node start-time-millis finish-time-millis nested-ops]
+
+(defn nested-op-token-counts
+  [{:keys [type info]}]
+  (if (= :model-call type)
+    {:input  (get info "inputTokenCount" 0)
+     :output (get info "outputTokenCount" 0)
+     :total  (get info "totalTokenCount" 0)}
+    {:input  0
+     :output 0
+     :total  0}))
+
+(defn nested-op-stats
+  [nested-ops]
   (let [tc-vol   (volatile! {:input  0
                              :output 0
                              :total  0})
         nops-vol (volatile! {})
         sa-vol   (volatile! {})]
-    (doseq [{:keys [start-time-millis finish-time-millis type info]} nested-ops]
-      (let [delta-millis (- finish-time-millis start-time-millis)]
+    (doseq [{:keys [start-time-millis finish-time-millis type info] :as nested-op} nested-ops]
+      (let [delta-millis (- finish-time-millis start-time-millis)
+            token-counts (h/nested-op-token-counts nested-op)]
         (multi-transform [h/VOLATILE
                           (keypath type)
                           (nil->val EMPTY-OP-STATS)
                           (multi-path [:count (term inc)]
                                       [:total-time-millis (term (adder delta-millis))])]
                          nops-vol)
-        (when (= :model-call type)
-          (multi-transform [h/VOLATILE
-                            (multi-path [:input (term (adder (get info "inputTokenCount" 0)))]
-                                        [:output (term (adder (get info "outputTokenCount" 0)))]
-                                        [:total (term (adder (get info "totalTokenCount" 0)))])]
-                           tc-vol))
+        (multi-transform [h/VOLATILE
+                          (multi-path [:input (term (adder (:input token-counts)))]
+                                      [:output (term (adder (:output token-counts)))]
+                                      [:total (term (adder (:total token-counts)))])]
+                         tc-vol)
         (when (= :agent-call type)
           (let [agent-module-name (get info "agent-module-name")
                 agent-name        (get info "agent-name")
-                sub-stats         (get info "stats")
-               ]
+                sub-stats         (get info "stats")]
             ;; just in case user sets these themselves
             (when (and (string? agent-module-name)
                        (string? agent-name)
@@ -103,12 +113,20 @@
                sa-vol)
             )))
       ))
+    {:subagent-stats  @sa-vol
+     :nested-op-stats @nops-vol
+     :token-counts    @tc-vol}))
+
+(defn mk-node-stats
+  [node start-time-millis finish-time-millis nested-ops]
+  (let [nstats       (nested-op-stats nested-ops)
+        token-counts (:token-counts nstats)]
     (aor-types/->valid-AgentInvokeStatsImpl
-     @sa-vol
+     (:subagent-stats nstats)
      (aor-types/->valid-BasicAgentInvokeStatsImpl
-      @nops-vol
-      (:input @tc-vol)
-      (:output @tc-vol)
-      (:total @tc-vol)
+      (:nested-op-stats nstats)
+      (:input token-counts)
+      (:output token-counts)
+      (:total token-counts)
       {node (aor-types/->valid-OpStatsImpl 1 (- finish-time-millis start-time-millis))}
      ))))
