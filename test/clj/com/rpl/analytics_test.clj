@@ -425,9 +425,19 @@
                                     0
                                     0)]}})))
 
+   (bind filter
+     (aor-types/->valid-LatencyFilter (aor-types/->valid-ComparatorSpec :> 10)))
+   (is (not (aor-types/rule-matches?
+             filter
+             {:start-time-millis  10
+              :finish-time-millis 20})))
+   (is (aor-types/rule-matches?
+        filter
+        {:start-time-millis  10
+         :finish-time-millis 21}))
+
    ;; TODO: <<<<>>>>>
    ;;   - test all RuleFilter for dependency-rule-ids and rule-matches?
-   ;;     - LatencyFilter
    ;;     - ErrorFilter
    ;;     - InputMatchFilter
    ;;     - OutputMatchFilter
