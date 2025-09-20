@@ -378,9 +378,40 @@
 
 
 (deftest comparator-spec-test
-         ;; TODO: <<<<>>>>
-         ;; (aor-types/comparator-spec-matches? spec v)
-)
+  (letlocals
+   (bind spec (aor-types/->valid-ComparatorSpec := 6))
+   (is (aor-types/comparator-spec-matches? spec 6))
+   (is (not (aor-types/comparator-spec-matches? spec 7)))
+   (is (not (aor-types/comparator-spec-matches? spec "6")))
+   (bind spec (aor-types/->valid-ComparatorSpec := "aaa"))
+   (is (aor-types/comparator-spec-matches? spec "aaa"))
+   (is (not (aor-types/comparator-spec-matches? spec "abc")))
+
+   (bind spec (aor-types/->valid-ComparatorSpec :not= 6))
+   (is (not (aor-types/comparator-spec-matches? spec 6)))
+   (is (aor-types/comparator-spec-matches? spec 7))
+   (is (aor-types/comparator-spec-matches? spec "6"))
+
+   (bind spec (aor-types/->valid-ComparatorSpec :< 10))
+   (is (not (aor-types/comparator-spec-matches? spec 10)))
+   (is (not (aor-types/comparator-spec-matches? spec 11)))
+   (is (aor-types/comparator-spec-matches? spec 9))
+
+   (bind spec (aor-types/->valid-ComparatorSpec :> 10))
+   (is (not (aor-types/comparator-spec-matches? spec 10)))
+   (is (not (aor-types/comparator-spec-matches? spec 9)))
+   (is (aor-types/comparator-spec-matches? spec 11))
+
+   (bind spec (aor-types/->valid-ComparatorSpec :<= 10))
+   (is (aor-types/comparator-spec-matches? spec 10))
+   (is (not (aor-types/comparator-spec-matches? spec 11)))
+   (is (aor-types/comparator-spec-matches? spec 9))
+
+   (bind spec (aor-types/->valid-ComparatorSpec :>= 10))
+   (is (aor-types/comparator-spec-matches? spec 10))
+   (is (not (aor-types/comparator-spec-matches? spec 9)))
+   (is (aor-types/comparator-spec-matches? spec 11))
+  ))
 
 (deftest rule-filters-test
   ;; use actual PState schemas to ensure data matches what it would in full application
