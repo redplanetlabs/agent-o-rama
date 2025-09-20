@@ -686,7 +686,7 @@
 
 (defn comparator-spec-matches?
   [{:keys [comparator value]} v]
-  (condp =
+  (condp = comparator
     :=
     (= v value)
 

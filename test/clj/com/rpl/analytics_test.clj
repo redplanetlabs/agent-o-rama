@@ -377,6 +377,62 @@
     )))
 
 
-;; TODO: <<<<>>>>>
-;;   - test h/node->output in helpers-test
-;;   - test all RuleFilter for dependency-rule-ids and rule-matches?
+(deftest comparator-spec-test
+         ;; TODO: <<<<>>>>
+)
+
+(deftest rule-filters-test
+  (letlocals
+   (bind rule-id (h/random-uuid7))
+   (bind ai (aor-types/->valid-AgentInvokeImpl 0 (h/random-uuid7)))
+   (bind filter
+     (aor-types/->valid-FeedbackFilter rule-id "abc" (aor-types/->valid-ComparatorSpec := 6)))
+
+   (bind matching-source
+     (aor-types/->valid-EvalSourceImpl
+      "blah"
+      ai
+      (aor-types/->valid-ActionSourceImpl rule-id "qqq")))
+
+   (is (= #{rule-id} (aor-types/dependency-rule-ids filter)))
+
+   (is (not
+        (aor-types/rule-matches?
+         filter
+         {:feedback {:results [(aor-types/->FeedbackImpl {"abc" 6}
+                                                         (aor-types/->AiSourceImpl)
+                                                         0
+                                                         0)]}})))
+   (is (aor-types/rule-matches?
+        filter
+        {:feedback {:results [(aor-types/->valid-FeedbackImpl
+                               {"abc" 6}
+                               matching-source
+                               0
+                               0)]}}))
+   (is (not
+        (aor-types/rule-matches?
+         filter
+         {:feedback {:results [(aor-types/->FeedbackImpl {"def" 6}
+                                                         matching-source
+                                                         0
+                                                         0)]}})))
+   (is (not (aor-types/rule-matches?
+             filter
+             {:feedback {:results [(aor-types/->valid-FeedbackImpl
+                                    {"abc" "6"}
+                                    matching-source
+                                    0
+                                    0)]}})))
+
+   ;; TODO: <<<<>>>>>
+   ;;   - test all RuleFilter for dependency-rule-ids and rule-matches?
+   ;;     - LatencyFilter
+   ;;     - ErrorFilter
+   ;;     - InputMatchFilter
+   ;;     - OutputMatchFilter
+   ;;     - TokenCountFilter
+   ;;     - AndFilter
+   ;;     - OrFilter
+   ;;     - NotFilter
+  ))
