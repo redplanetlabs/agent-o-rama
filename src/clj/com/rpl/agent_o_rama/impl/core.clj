@@ -154,11 +154,6 @@
      mb-topology
      (symbol (po/pending-retries-task-global-name agent-name))
      po/PENDING-RETRIES-PSTATE-SCHEMA)
-    (declare-pstate*
-     mb-topology
-     (symbol (po/agent-action-state-task-global-name agent-name))
-     po/AGENT-ACTION-STATE-PSTATE-SCHEMA
-     {:key-partitioner apart/task-id-key-partitioner})
 
     (retries/declare-check-impl mb-topology agent-name)
     (queries/declare-tracing-query-topology topologies agent-name)
@@ -249,10 +244,7 @@
         analytics-tick-depot-sym (symbol (po/agent-analytics-tick-depot-name))
         agent-names (-> agent-graphs
                         keys
-                        set)
-        action-names (-> action-builders
-                         keys
-                         set)]
+                        set)]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
     (declare-depot* setup datasets-depot-sym (hash-by :dataset-id))
     (declare-depot* setup global-actions-depot-sym :random {:global? true})
@@ -321,7 +313,7 @@
         (exp/handle-experiments-op *data)
 
        (case> (instance? RuleEvent *data))
-        (ana/handle-rule-event *data agent-names action-names)
+        (ana/handle-rule-event *data agent-names)
 
        (case> (instance? ChangeConfig *data))
         (at/handle-global-config *data)

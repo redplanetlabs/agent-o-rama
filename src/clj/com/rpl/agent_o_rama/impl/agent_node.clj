@@ -795,6 +795,13 @@
    (local-select> STAY $$config :> *config-map)
    (:> (aor-types/get-config *config-map *config))))
 
+(deframafn read-global-config
+  [*config]
+  (<<with-substitutions
+   [$$global-config (po/agent-global-config-task-global)]
+   (local-select> STAY $$global-config :> *config-map)
+   (:> (aor-types/get-config *config-map *config))))
+
 (deframaop handle-node-invoke
   [*agent-name *agent-task-id *agent-id *node-fn *invoke-id *retry-num
    *next-node *args *agg-invoke-id *fork-context]

@@ -324,17 +324,12 @@
             :reference-output-json-path String
            })})
 
-(defn agent-action-state-task-global-name
-  [agent-name]
-  (str "$$_agent-action-state-" agent-name ""))
-
-(def AGENT-ACTION-STATE-PSTATE-SCHEMA
-  java.util.Map)
-
 (defn agent-rules-task-global-name
   [agent-name]
   (str "$$_agent-rules-" agent-name ""))
 
+
+;; name -> {:definition AddRule :cursors {task-id -> UUID}}
 (def AGENT-RULES-PSTATE-SCHEMA
   java.util.Map)
 
@@ -410,6 +405,10 @@
 (defn agent-config-task-global
   [name]
   (this-module-pobject-task-global (agent-config-task-global-name name)))
+
+(defn agent-rules-task-global
+  [name]
+  (this-module-pobject-task-global (agent-rules-task-global-name name)))
 
 (defn agent-global-config-task-global
   []

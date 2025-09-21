@@ -129,6 +129,12 @@
    }})
 
 
+(defn all-action-builders
+  []
+  (let [declared-objects (po/agent-declared-objects-task-global)]
+    (merge BUILT-IN-ACTIONS
+           (.getActionBuilders declared-objects))))
+
 (defn- agent-run-type?
   [info]
   (= :agent (:run-type info)))
@@ -235,23 +241,37 @@
     (when (some? conflict)
       (format "Deletion failed because rule '%s' depends on it" conflict))))
 
+(defn mk-cursor-map
+  [start-time-millis]
+  (let [^com.rpl.rama.ModuleInstanceInfo module-instance-info (ops/module-instance-info)
+        num-tasks (.getNumTasks module-instance-info)
+        uuid      (h/min-uuid7 start-time-millis)]
+    (into {}
+          (for [i (range 0 num-tasks)]
+            [i uuid]
+          ))))
+
 (deframaop handle-rule-event
-  [{:keys [*agent-name] :as *data} *agent-names *action-names]
+  [{:keys [*agent-name] :as *data} *agent-names]
   (filter> (contains? *agent-names *agent-name))
+  (keys (all-action-builders) :> *action-names)
   (<<with-substitutions
-   [$$rules (po/agent-rules-task-global-name *agent-name)]
+   [$$rules (po/agent-rules-task-global *agent-name)]
    (<<subsource *data
-    (case> AddRule :> {:keys [*name *id *action-name]})
+    (case> AddRule :> {:keys [*name *id *action-name *start-time-millis]})
      (local-select> [(keypath *name) :id] $$rules :> *curr-id)
      (<<cond
       (case> (and> (some? *curr-id) (not= *curr-id *id)))
        (ack-return> (format "Rule '%s' already exists" *name))
-
       (case> (not (contains? *action-names *action-name)))
        (ack-return> (format "Action '%s' doesn't exist" *action-name))
 
       (default>)
-       (local-transform> [(keypath *name) (termval *data)] $$rules))
+       (mk-cursor-map *start-time-millis :> *cursor-map)
+       (local-transform> [(keypath *name)
+                          (multi-path [:definition (termval *data)]
+                                      [:cursors (termval *cursor-map)])]
+                         $$rules))
 
     (case> DeleteRule :> {:keys [*name]})
      (local-select> [(must *name) :id] $$rules :> *id)
@@ -265,14 +285,20 @@
 
 (defbasicblocksegmacro handle-analytics-tick
   [agent-names]
-  [
+  [[identity agent-names :> '*agent-names]
+   [anode/read-config aor-types/MAX-ACTIONS-CONCURRENCY-CONFIG :> '*max-concurrency]
+
    ;
    ; [<<batch
    ;
    ;  ]
    ;; TODO: <<<<>>>>
-   ;;  - use config for max concurrency
    ;;  - need DVV for each agent as to where it's computing up to for each rule
+   ;;     - po/agent-rules-task-global
+   ;;       {rule-id -> }
+   ;;       - deleting a rule shoudl delete from this too
+   ;;         - should just unify the PStates... just have the $$rules PState
+   ;;           - and on add, it should store the UUID per task of where to start
    ;;  - do <<batch to go to all tasks
    ;;    - TODO: how to handle chained rules?
    ;;      - maybe if have a chain, don't keep going
