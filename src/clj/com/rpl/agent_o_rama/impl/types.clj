@@ -809,10 +809,13 @@
   [key :- String
    val :- Object])
 
+;; agent configs
 (def ALL-CONFIGS {})
+;; global configs
+(def ALL-GLOBAL-CONFIGS {})
 
-(defmacro defconfig
-  [name schema-fn doc config-default]
+(defmacro defconfig*
+  [global name schema-fn doc config-default]
   (let [cname      (-> name
                        str
                        str/lower-case
@@ -840,8 +843,16 @@
           :doc       ~doc
           :default   ~config-default
           :change-fn ~change-sym})
-       (alter-var-root (var ALL-CONFIGS) assoc ~cname ~csym)
+       (alter-var-root (var ~global) assoc ~cname ~csym)
      )))
+
+(defmacro defconfig
+  [name schema-fn doc config-default]
+  `(defconfig* ALL-CONFIGS ~name ~schema-fn ~doc ~config-default))
+
+(defmacro defglobalconfig
+  [name schema-fn doc config-default]
+  `(defconfig* ALL-GLOBAL-CONFIGS ~name ~schema-fn ~doc ~config-default))
 
 (defn get-config
   [m config]
@@ -878,3 +889,12 @@
   positive-long?
   "Maximum number of agent traces to keep per task"
   5000)
+
+
+;; TODO: <<<<>>>> consider parameter for action builders that should be limited by this
+;;  - and rename to MAX-LIMITED-ACTIONS-CONCURRENCY
+(defglobalconfig
+ MAX-ACTIONS-CONCURRENCY
+ positive-long?
+ "Maximum number of actions (e.g. online evaluations) that can be executing at once across all agents and all tasks"
+ 10)

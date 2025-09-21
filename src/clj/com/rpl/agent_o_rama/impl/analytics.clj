@@ -265,19 +265,23 @@
 
 (defbasicblocksegmacro handle-analytics-tick
   [agent-names]
-  ;; TODO: <<<<>>>>
-  ;;  - use config for max concurrency
-  ;;  - need DVV for each agent as to where it's computing up to
-  ;;      - can be on each task
-  ;;  - do <<batch to go to all tasks
-  ;;    - TODO: how to handle chained rules?
-  ;;      - maybe if have a chain, don't keep going
-  ;;        - or keep track of which ones need to keep being checked
-  ;;      - no, rules are handled independently...
-  ;;    - if don't sample something, still should write action state to it
-  ;;      - would be really good to do those in chunks, especially for low sample rate
-  ;;      - can have "PStateWrites" depot append
-)
+  [
+   ;
+   ; [<<batch
+   ;
+   ;  ]
+   ;; TODO: <<<<>>>>
+   ;;  - use config for max concurrency
+   ;;  - need DVV for each agent as to where it's computing up to for each rule
+   ;;  - do <<batch to go to all tasks
+   ;;    - TODO: how to handle chained rules?
+   ;;      - maybe if have a chain, don't keep going
+   ;;        - or keep track of which ones need to keep being checked
+   ;;      - no, rules are handled independently...
+   ;;    - if don't sample something, still should write action state to it
+   ;;      - would be really good to do those in chunks, especially for low sample rate
+   ;;      - can have "PStateWrites" depot append
+  ])
 
 
 

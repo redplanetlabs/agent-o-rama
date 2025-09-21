@@ -816,6 +816,13 @@
    (|all)
    (local-transform> [(keypath *key) (termval *val)] $$config)))
 
+(deframaop handle-global-config
+  [{:keys [*key *val]}]
+  (<<with-substitutions
+   [$$global-config (po/agent-global-config-task-global)]
+   (|all)
+   (local-transform> [(keypath *key) (termval *val)] $$global-config)))
+
 (deframafn node-complete?
   [*agent-name *next-node *invoke-id]
   (<<with-substitutions

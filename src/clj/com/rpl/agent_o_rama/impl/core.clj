@@ -28,6 +28,7 @@
     AgentNodeExecutorTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     AggAckOp
+    ChangeConfig
     EvaluatorEvent
     ExperimentEvent
     NodeOp
@@ -272,6 +273,11 @@
      (symbol (po/evaluators-task-global-name))
      po/EVALUATORS-PSTATE-SCHEMA
      {:global? true})
+    (declare-pstate*
+     stream-topology
+     (symbol (po/agent-global-config-task-global-name))
+     po/AGENT-CONFIG-PSTATE-SCHEMA
+     {:key-partitioner apart/task-id-key-partitioner})
 
     (doseq [depot-sym [pstate-write-depot-sym datasets-depot-sym
                        global-actions-depot-sym]]
@@ -316,6 +322,9 @@
 
        (case> (instance? RuleEvent *data))
         (ana/handle-rule-event *data agent-names action-names)
+
+       (case> (instance? ChangeConfig *data))
+        (at/handle-global-config *data)
 
        (default>)
         (throw! (h/ex-info "Unexpected global action type" {:type (class *data)})))

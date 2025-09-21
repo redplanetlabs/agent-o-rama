@@ -222,6 +222,10 @@
   [agent-name]
   (str "$$_agent-config-" agent-name))
 
+(defn agent-global-config-task-global-name
+  []
+  (str "$$_agent-global-config"))
+
 (def AGENT-CONFIG-PSTATE-SCHEMA
   java.util.Map)
 
@@ -406,6 +410,10 @@
 (defn agent-config-task-global
   [name]
   (this-module-pobject-task-global (agent-config-task-global-name name)))
+
+(defn agent-global-config-task-global
+  []
+  (this-module-pobject-task-global (agent-global-config-task-global-name)))
 
 (defn datasets-task-global
   []
