@@ -244,18 +244,18 @@
           (if (empty? input-mappings)
             ($ :div.text-xs.text-gray-500.italic.py-2 "No mappings yet. Add one to provide arguments.")
             ($ :div.space-y-2
-               (for [[i mapping] (map-indexed vector input-mappings)]
-                 ($ :div.flex.items-center.gap-2 {:key i}
+               (for [[i {:keys [id value]}] (map-indexed vector input-mappings)]
+                 ($ :div.flex.items-center.gap-2 {:key id}
                     ($ :input.flex-1.p-1.border.border-gray-300.rounded-md.font-mono.text-sm
-                       {:value mapping
-                        :on-change (fn [e] (state/dispatch [:form/update-field form-id (conj path :input->args i) (.. e -target -value)]))})
+                       {:value value
+                        :on-change (fn [e] (state/dispatch [:form/update-field form-id (conj path :input->args i :value) (.. e -target -value)]))})
                     ($ :button.p-1.text-red-500.hover:text-red-700
                        {:type "button"
-                        :onClick (fn [] (state/dispatch [:form/update-field form-id (conj path :input->args) (vec (remove (fn [m] (= m mapping)) input-mappings))]))}
+                        :onClick (fn [] (state/dispatch [:form/update-field form-id (conj path :input->args) (vec (remove #(= (:id %) id) input-mappings))]))}
                        ($ TrashIcon {:className "h-4 w-4"}))))))
           ($ :button.mt-2.text-sm.text-blue-600.hover:underline
              {:type "button"
-              :onClick (fn [] (state/dispatch [:form/update-field form-id (conj path :input->args) (conj input-mappings "$")]))}
+              :onClick (fn [] (state/dispatch [:form/update-field form-id (conj path :input->args) (conj input-mappings {:id (random-uuid) :value "$"})]))}
              "Add Mapping")))))
 
 (defui CreateExperimentForm [{:keys [form-id]}]
@@ -275,7 +275,7 @@
 
         ;; Target config fields
         form (forms/use-form form-id)
-        spec-type-field (forms/use-form-field form-id [:spec :type])
+        spec-type (get-in form [:spec :type])
         targets (or (get-in form [:spec :targets]) [])]
 
     ($ forms/form
@@ -339,26 +339,13 @@
        ;; Target Configuration Section
        ($ :div.mb-8
           ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "Target Configuration")
-          ($ :div.mb-4
-             ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Experiment Type")
-             ($ :div.space-y-2
-                ($ :div.flex.items-center
-                   ($ :input {:type "radio" :id "regular-exp" :name "exp-type"
-                              :checked (or (= (:value spec-type-field) :regular) (nil? (:value spec-type-field)))
-                              :on-change #(state/dispatch [:form/set-experiment-target-type form-id 0 :regular])})
-                   ($ :label.ml-3 {:htmlFor "regular-exp"} "Regular (Single Target)"))
-                ($ :div.flex.items-center
-                   ($ :input {:type "radio" :id "comp-exp" :name "exp-type"
-                              :checked (= (:value spec-type-field) :comparative)
-                              :on-change #(state/dispatch [:form/set-experiment-target-type form-id 0 :comparative])})
-                   ($ :label.ml-3 {:htmlFor "comp-exp"} "Comparative (A/B Test Multiple Targets)"))))
 
           ($ :div.space-y-4
-             (let [num-targets (if (or (= (:value spec-type-field) :regular) (nil? (:value spec-type-field)))
+             (let [num-targets (if (= spec-type :regular)
                                  1
                                  (count targets))]
                (for [i (range num-targets)
-                     :let [is-comparative? (= (:value spec-type-field) :comparative)]]
+                     :let [is-comparative? (= spec-type :comparative)]]
                  ($ :div.relative.pt-6 {:key i}
                     (when (and is-comparative? (> i 0))
                       ($ :div.border-t.my-4))
@@ -372,10 +359,10 @@
                                        (state/dispatch [:form/update-field form-id [:spec :targets] new-targets])))}
                          ($ TrashIcon {:className "h-4 w-4"})))))))
 
-          (when (= (:value spec-type-field) :comparative)
+          (when (= spec-type :comparative)
             ($ :button.mt-4.flex.items-center.gap-2.text-sm.text-blue-600.hover:underline
                {:type "button"
-                :onClick (fn [] (state/dispatch [:form/update-field form-id [:spec :targets] (conj targets {:target-spec {:type :agent :agent-name nil} :input->args ["$"]})]))}
+                :onClick (fn [] (state/dispatch [:form/update-field form-id [:spec :targets] (conj targets {:target-spec {:type :agent :agent-name nil} :input->args [{:id (random-uuid) :value "$"}]})]))}
                ($ PlusIcon {:className "h-4 w-4"})
                "Add Another Target")))
 
@@ -419,9 +406,10 @@
              :description ""
              :snapshot ""
              :selector {:type :all :tag ""}
-             :spec {:type :regular
-                    :targets [{:target-spec {:type :agent :agent-name nil}
-                               :input->args ["$"]}]}
+             :spec
+             {:type :regular
+              :targets [{:target-spec {:type :agent :agent-name nil}
+                         :input->args [{:id (random-uuid) :value "$"}]}]}
              :evaluators []
              :num-repetitions 1
              :concurrency 1}
@@ -439,12 +427,18 @@
   (fn [db form-state]
     (println "form-state" form-state)
     (let [{:keys [form-id module-id dataset-id spec]} form-state
-          spec-type (get spec :type)]
+          spec-type (get spec :type)
+      ;; Convert input->args back to simple strings for the backend
+          cleaned-form-state (update-in form-state [:spec :targets]
+                                        (fn [targets]
+                                          (mapv (fn [target]
+                                                  (update target :input->args (fn [args] (mapv :value args))))
+                                                targets)))]
       (sente/request!
        [:experiments/start
         {:module-id module-id
          :dataset-id dataset-id
-         :form-data form-state}]
+         :form-data cleaned-form-state}]
        15000
        (fn [reply]
          (state/dispatch [:db/set-value [:forms form-id :submitting?] false])

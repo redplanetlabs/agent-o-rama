@@ -27,7 +27,9 @@
              {:onClick #(state/dispatch [:modal/show-form :create-experiment
                                          {:module-id module-id
                                           :dataset-id dataset-id
-                                          :spec {:type :comparative}}])}
+                                          :spec {:type :comparative
+                                                 :targets [{:target-spec {:type :agent :agent-name nil} :input->args ["$"]}
+                                                           {:target-spec {:type :agent :agent-name nil} :input->args ["$"]}]}}])}
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Run New Comparative Experiment"))
 

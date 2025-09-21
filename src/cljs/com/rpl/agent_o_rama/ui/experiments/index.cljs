@@ -25,8 +25,11 @@
        ;; Header
        ($ :div.flex.justify-between.items-center.mb-6
           ($ :h2.text-2xl.font-bold "Experiments")
-          ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.cursor-pointer
-             {:onClick #(state/dispatch [:modal/show-form :create-experiment {:module-id module-id :dataset-id dataset-id}])}
+          ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
+             {:onClick #(state/dispatch [:modal/show-form :create-experiment
+                                         {:module-id module-id
+                                          :dataset-id dataset-id
+                                          :spec {:type :regular}}])}
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Run New Experiment"))
 
