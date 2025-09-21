@@ -3,6 +3,7 @@
         [com.rpl.rama path])
   (:require
    [clojure.set :as set]
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.feedback :as fb]
@@ -12,6 +13,7 @@
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops])
   (:import
    [com.rpl.agentorama.impl
@@ -141,7 +143,7 @@
 
 (extend-protocol aor-types/RuleFilter
   FeedbackFilter
-  (dependency-rule-ids [this] #{(:rule-id this)})
+  (dependency-rule-names [this] #{(:rule-name this)})
   (rule-matches? [this info]
     (selected-any?
      [:feedback
@@ -151,15 +153,15 @@
                  aor-types/EvalSourceImpl?
                  :source
                  aor-types/ActionSourceImpl?
-                 :rule-id
-                 (pred= (:rule-id this)))
+                 :rule-name
+                 (pred= (:rule-name this)))
       :scores
       (must (:feedback-key this))
       #(aor-types/comparator-spec-matches? (:comparator-spec this) %)]
      info))
 
   LatencyFilter
-  (dependency-rule-ids [this] #{})
+  (dependency-rule-names [this] #{})
   (rule-matches? [this {:keys [start-time-millis finish-time-millis]}]
     (and start-time-millis
          finish-time-millis
@@ -167,7 +169,7 @@
                                              (- finish-time-millis start-time-millis))))
 
   ErrorFilter
-  (dependency-rule-ids [this] #{})
+  (dependency-rule-names [this] #{})
   (rule-matches? [this info]
     (if (agent-run-type? info)
       (not (empty? (:exception-summaries info)))
@@ -175,13 +177,13 @@
     ))
 
   InputMatchFilter
-  (dependency-rule-ids [this] #{})
+  (dependency-rule-names [this] #{})
   (rule-matches? [this info]
     (let [o (if (agent-run-type? info) (:invoke-args info) (:input info))]
       (some? (re-find (:regex this) (h/read-json-path o (:json-path this))))))
 
   OutputMatchFilter
-  (dependency-rule-ids [this] #{})
+  (dependency-rule-names [this] #{})
   (rule-matches? [this info]
     (let [output (if (agent-run-type? info)
                    (-> info
@@ -192,7 +194,7 @@
     ))
 
   TokenCountFilter
-  (dependency-rule-ids [this] #{})
+  (dependency-rule-names [this] #{})
   (rule-matches? [this info]
     (let [token-counts
           (if (agent-run-type? info)
@@ -210,32 +212,32 @@
     ))
 
   AndFilter
-  (dependency-rule-ids [this]
-    (apply set/union (mapv aor-types/dependency-rule-ids (:filters this))))
+  (dependency-rule-names [this]
+    (apply set/union (mapv aor-types/dependency-rule-names (:filters this))))
   (rule-matches? [this info]
     (every? #(aor-types/rule-matches? % info) (:filters this)))
 
 
   OrFilter
-  (dependency-rule-ids [this]
-    (apply set/union (mapv aor-types/dependency-rule-ids (:filters this))))
+  (dependency-rule-names [this]
+    (apply set/union (mapv aor-types/dependency-rule-names (:filters this))))
   (rule-matches? [this info]
     (if (some #(aor-types/rule-matches? % info) (:filters this))
       true
       false))
 
   NotFilter
-  (dependency-rule-ids [this] (aor-types/dependency-rule-ids (:filter this)))
+  (dependency-rule-names [this] (aor-types/dependency-rule-names (:filter this)))
   (rule-matches? [this info]
     (not (aor-types/rule-matches? (:filter this) info)))
 )
 
 (defn check-rule-dependency-conflict
-  [rules id]
+  [rules name]
   (let [conflict (select-first [ALL
                                 (selected? :filter
-                                           (view aor-types/dependency-rule-ids)
-                                           #(contains? % id))
+                                           (view aor-types/dependency-rule-names)
+                                           #(contains? % name))
                                 :name]
                                rules)]
     (when (some? conflict)
@@ -251,8 +253,16 @@
             [i uuid]
           ))))
 
+(defn agent-names-set
+  []
+  (-> (po/agent-declared-objects-task-global)
+      .getAgentGraphs
+      keys
+      set))
+
 (deframaop handle-rule-event
-  [{:keys [*agent-name] :as *data} *agent-names]
+  [{:keys [*agent-name] :as *data}]
+  (agent-names-set :> *agent-names)
   (filter> (contains? *agent-names *agent-name))
   (keys (all-action-builders) :> *action-names)
   (<<with-substitutions
@@ -274,31 +284,60 @@
                          $$rules))
 
     (case> DeleteRule :> {:keys [*name]})
-     (local-select> [(must *name) :id] $$rules :> *id)
      (local-select> (subselect MAP-VALS) $$rules :> *rules)
-     (check-rule-dependency-conflict *rules *id :> *error-str)
+     (check-rule-dependency-conflict *rules *name :> *error-str)
      (<<if (some? *error-str)
        (ack-return> *error-str)
       (else>)
        (local-transform> [(keypath *name) NONE>] $$rules))
    )))
 
-(defbasicblocksegmacro handle-analytics-tick
-  [agent-names]
-  [[identity agent-names :> '*agent-names]
-   [anode/read-config aor-types/MAX-ACTIONS-CONCURRENCY-CONFIG :> '*max-concurrency]
+(deframafn read-rules
+  []
+  (<<batch
+    (ops/explode (agent-names-set) :> *agent-name)
+    (po/agent-rules-task-global *agent-name :> $$rules)
+    (local-select> STAY $$rules :> *rules)
+    (aggs/+map-agg *agent-name *rules :> *ret))
+  (:> *ret))
 
-   ;
-   ; [<<batch
-   ;
-   ;  ]
+(deframaop find-qualified-offsets
+  []
+  (read-rules :> *agent->rule->info)
+  (select> [ALL (collect-one FIRST) LAST
+            ALL (collect-one FIRST) LAST]
+    *agent->rule->info
+    :> [*agent-name *rule-name *rule-info])
+  ;; TODO: <<<>>>> I don't need ID dependencies if enforce removal...
+  ; (aor-types/dependency-rule-names)
+
+  (select> [:cursors
+            ALL (collect-one FIRST LAST)]
+    *rule-info
+    :> [*task-id *offset])
+  ;; TODO: <<<<>>>> check dependency rules to find max offset and filter out if not caught up
+  (|direct *task-id)
+  ;; TODO: <<<>>> query root/node as necessary to find matching offsets
+  ;;    - get a range with sorted-map-range-from of size 100, then check
+
+
+
+)
+
+(defbasicblocksegmacro handle-analytics-tick
+  []
+  [[anode/read-config aor-types/MAX-ACTIONS-CONCURRENCY-CONFIG :> '*max-concurrency]
+
+   [<<batch
+    [find-qualified-offsets :> '*task-id]
+
+    ;; TODO: <<<<>>>>
+    ;;  - for each agent/rule
+    ;;   - for each task cursor
+    ;;   - check if dependency rules have processed that far already
+
+   ]
    ;; TODO: <<<<>>>>
-   ;;  - need DVV for each agent as to where it's computing up to for each rule
-   ;;     - po/agent-rules-task-global
-   ;;       {rule-id -> }
-   ;;       - deleting a rule shoudl delete from this too
-   ;;         - should just unify the PStates... just have the $$rules PState
-   ;;           - and on add, it should store the UUID per task of where to start
    ;;  - do <<batch to go to all tasks
    ;;    - TODO: how to handle chained rules?
    ;;      - maybe if have a chain, don't keep going

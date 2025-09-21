@@ -430,19 +430,17 @@
        ))
 
 
-     (bind rule-id (h/random-uuid7))
-     (bind rule-id2 (h/random-uuid7))
      (bind ai (aor-types/->valid-AgentInvokeImpl 0 (h/random-uuid7)))
      (bind filter
-       (aor-types/->valid-FeedbackFilter rule-id "abc" (aor-types/->valid-ComparatorSpec := 6)))
+       (aor-types/->valid-FeedbackFilter "xyz" "abc" (aor-types/->valid-ComparatorSpec := 6)))
 
      (bind matching-source
        (aor-types/->valid-EvalSourceImpl
         "blah"
         ai
-        (aor-types/->valid-ActionSourceImpl rule-id "qqq")))
+        (aor-types/->valid-ActionSourceImpl "xyz")))
 
-     (is (= #{rule-id} (aor-types/dependency-rule-ids filter)))
+     (is (= #{"xyz"} (aor-types/dependency-rule-names filter)))
 
      (is (not
           (tp-rule-matches?
@@ -479,7 +477,7 @@
 
      (bind filter
        (aor-types/->valid-LatencyFilter (aor-types/->valid-ComparatorSpec :> 10)))
-     (is (= #{} (aor-types/dependency-rule-ids filter)))
+     (is (= #{} (aor-types/dependency-rule-names filter)))
      (is (not (tp-rule-matches?
                root
                filter
@@ -497,7 +495,7 @@
            :finish-time-millis 21}))
 
      (bind filter (aor-types/->valid-ErrorFilter))
-     (is (= #{} (aor-types/dependency-rule-ids filter)))
+     (is (= #{} (aor-types/dependency-rule-names filter)))
      (is (not (tp-rule-matches? root filter {})))
      (is (not (tp-rule-matches? nodes filter {})))
      (is (not (tp-rule-matches? root filter {:exception-summaries []})))
@@ -505,7 +503,7 @@
       (tp-rule-matches?
        root
        filter
-       {:exception-summaries [(aor-types/->ExceptionSummary "aaa" "bbb" rule-id)]}))
+       {:exception-summaries [(aor-types/->ExceptionSummary "aaa" "bbb" (h/random-uuid7))]}))
      (is
       (not
        (tp-rule-matches?
@@ -521,7 +519,7 @@
 
      (bind filter
        (aor-types/->valid-InputMatchFilter "$[0].a" #"abc"))
-     (is (= #{} (aor-types/dependency-rule-ids filter)))
+     (is (= #{} (aor-types/dependency-rule-names filter)))
      (is (not (tp-rule-matches? root filter {:invoke-args [{"a" "aaa"} {"b" "abc"}]})))
      (is (tp-rule-matches? root filter {:invoke-args [{"a" "qqqabcqqq"}]}))
      (is (not (tp-rule-matches? nodes filter {:input [{"a" "aaa"}]})))
@@ -529,7 +527,7 @@
 
      (bind filter
        (aor-types/->valid-OutputMatchFilter "$[0].args[1]" #"abc"))
-     (is (= #{} (aor-types/dependency-rule-ids filter)))
+     (is (= #{} (aor-types/dependency-rule-names filter)))
      (is (not (tp-rule-matches? root
                                 filter
                                 {:result (aor-types/->AgentResult [{"args" [1 "aaa"]}] false)})))
@@ -554,7 +552,7 @@
      (bind token-filter
        (fn [k v]
          (aor-types/->valid-TokenCountFilter k (aor-types/->valid-ComparatorSpec :> v))))
-     (is (= #{} (aor-types/dependency-rule-ids (token-filter :input 1))))
+     (is (= #{} (aor-types/dependency-rule-names (token-filter :input 1))))
 
      (bind root-stats
        (ai-stats
@@ -655,10 +653,10 @@
 
      (bind filter
        (aor-types/->valid-AndFilter
-        [(aor-types/->valid-FeedbackFilter rule-id "a" (aor-types/->ComparatorSpec :> 10))
-         (aor-types/->valid-FeedbackFilter rule-id "b" (aor-types/->ComparatorSpec :> 10))
-         (aor-types/->valid-FeedbackFilter rule-id2 "a" (aor-types/->ComparatorSpec :> 10))]))
-     (is (= #{rule-id rule-id2} (aor-types/dependency-rule-ids filter)))
+        [(aor-types/->valid-FeedbackFilter "xyz" "a" (aor-types/->ComparatorSpec :> 10))
+         (aor-types/->valid-FeedbackFilter "xyz" "b" (aor-types/->ComparatorSpec :> 10))
+         (aor-types/->valid-FeedbackFilter "cba" "a" (aor-types/->ComparatorSpec :> 10))]))
+     (is (= #{"xyz" "cba"} (aor-types/dependency-rule-names filter)))
 
      (bind filter (aor-types/->valid-OrFilter []))
      (is (not (tp-rule-matches? root filter {})))
@@ -672,10 +670,10 @@
      (is (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 125}))
      (bind filter
        (aor-types/->valid-OrFilter
-        [(aor-types/->valid-FeedbackFilter rule-id "a" (aor-types/->ComparatorSpec :> 10))
-         (aor-types/->valid-FeedbackFilter rule-id "b" (aor-types/->ComparatorSpec :> 10))
-         (aor-types/->valid-FeedbackFilter rule-id2 "a" (aor-types/->ComparatorSpec :> 10))]))
-     (is (= #{rule-id rule-id2} (aor-types/dependency-rule-ids filter)))
+        [(aor-types/->valid-FeedbackFilter "xyz" "a" (aor-types/->ComparatorSpec :> 10))
+         (aor-types/->valid-FeedbackFilter "xyz" "b" (aor-types/->ComparatorSpec :> 10))
+         (aor-types/->valid-FeedbackFilter "cba" "a" (aor-types/->ComparatorSpec :> 10))]))
+     (is (= #{"xyz" "cba"} (aor-types/dependency-rule-names filter)))
 
 
      (bind filter
@@ -685,6 +683,6 @@
      (is (not (tp-rule-matches? root filter {:start-time-millis 10 :finish-time-millis 100})))
      (bind filter
        (aor-types/->valid-NotFilter
-        (aor-types/->valid-FeedbackFilter rule-id "a" (aor-types/->ComparatorSpec :> 10))))
-     (is (= #{rule-id} (aor-types/dependency-rule-ids filter)))
+        (aor-types/->valid-FeedbackFilter "xyz" "a" (aor-types/->ComparatorSpec :> 10))))
+     (is (= #{"xyz"} (aor-types/dependency-rule-names filter)))
     )))

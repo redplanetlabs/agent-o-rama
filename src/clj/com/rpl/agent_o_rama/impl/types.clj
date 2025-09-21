@@ -178,8 +178,7 @@
   (getSourceString [this] (str "eval[" eval-name "]")))
 
 (defaorrecord ActionSourceImpl
-  [rule-id :- UUID
-   rule-name :- String]
+  [rule-name :- String]
   ActionSource
   (getRuleName [this] rule-name)
   (getSourceString [this] (str "action[" rule-name "]")))
@@ -677,7 +676,7 @@
 ;; Rules
 
 (defprotocol RuleFilter
-  (dependency-rule-ids [this])
+  (dependency-rule-names [this])
   (rule-matches? [this info]))
 
 (defaorrecord ComparatorSpec
@@ -708,7 +707,7 @@
     (throw (h/ex-info "Unknonw comparator" {:comparator comparator}))))
 
 (defaorrecord FeedbackFilter
-  [rule-id :- UUID
+  [rule-name :- String
    feedback-key :- String
    comparator-spec :- ComparatorSpec])
 

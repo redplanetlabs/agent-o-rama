@@ -238,13 +238,10 @@
                                graph/resolve-agent-graph
                                agent-graphs)
                    ))
-  (let [pstate-write-depot-sym (symbol (po/agent-pstate-write-depot-name))
-        datasets-depot-sym (symbol (po/datasets-depot-name))
+  (let [pstate-write-depot-sym   (symbol (po/agent-pstate-write-depot-name))
+        datasets-depot-sym       (symbol (po/datasets-depot-name))
         global-actions-depot-sym (symbol (po/global-actions-depot-name))
-        analytics-tick-depot-sym (symbol (po/agent-analytics-tick-depot-name))
-        agent-names (-> agent-graphs
-                        keys
-                        set)]
+        analytics-tick-depot-sym (symbol (po/agent-analytics-tick-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
     (declare-depot* setup datasets-depot-sym (hash-by :dataset-id))
     (declare-depot* setup global-actions-depot-sym :random {:global? true})
@@ -280,7 +277,7 @@
     (<<sources mb-topology
      (source> analytics-tick-depot-sym :> %mb)
       (%mb)
-      (ana/handle-analytics-tick agent-names))
+      (ana/handle-analytics-tick))
     (<<sources stream-topology
      (source> pstate-write-depot-sym
                {:retry-mode :none}
@@ -313,7 +310,7 @@
         (exp/handle-experiments-op *data)
 
        (case> (instance? RuleEvent *data))
-        (ana/handle-rule-event *data agent-names)
+        (ana/handle-rule-event *data)
 
        (case> (instance? ChangeConfig *data))
         (at/handle-global-config *data)
