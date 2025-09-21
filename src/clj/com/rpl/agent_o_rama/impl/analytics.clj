@@ -144,7 +144,7 @@
 (extend-protocol aor-types/RuleFilter
   FeedbackFilter
   (dependency-rule-names [this] #{(:rule-name this)})
-  (rule-matches? [this info]
+  (rule-filter-matches? [this info]
     (selected-any?
      [:feedback
       :results
@@ -162,7 +162,7 @@
 
   LatencyFilter
   (dependency-rule-names [this] #{})
-  (rule-matches? [this {:keys [start-time-millis finish-time-millis]}]
+  (rule-filter-matches? [this {:keys [start-time-millis finish-time-millis]}]
     (and start-time-millis
          finish-time-millis
          (aor-types/comparator-spec-matches? (:comparator-spec this)
@@ -170,7 +170,7 @@
 
   ErrorFilter
   (dependency-rule-names [this] #{})
-  (rule-matches? [this info]
+  (rule-filter-matches? [this info]
     (if (agent-run-type? info)
       (not (empty? (:exception-summaries info)))
       (not (empty? (:exceptions info)))
@@ -178,13 +178,13 @@
 
   InputMatchFilter
   (dependency-rule-names [this] #{})
-  (rule-matches? [this info]
+  (rule-filter-matches? [this info]
     (let [o (if (agent-run-type? info) (:invoke-args info) (:input info))]
       (some? (re-find (:regex this) (h/read-json-path o (:json-path this))))))
 
   OutputMatchFilter
   (dependency-rule-names [this] #{})
-  (rule-matches? [this info]
+  (rule-filter-matches? [this info]
     (let [output (if (agent-run-type? info)
                    (-> info
                        :result
@@ -195,7 +195,7 @@
 
   TokenCountFilter
   (dependency-rule-names [this] #{})
-  (rule-matches? [this info]
+  (rule-filter-matches? [this info]
     (let [token-counts
           (if (agent-run-type? info)
             (let [combined (stats/aggregated-basic-stats (:stats info))]
@@ -214,22 +214,22 @@
   AndFilter
   (dependency-rule-names [this]
     (apply set/union (mapv aor-types/dependency-rule-names (:filters this))))
-  (rule-matches? [this info]
-    (every? #(aor-types/rule-matches? % info) (:filters this)))
+  (rule-filter-matches? [this info]
+    (every? #(aor-types/rule-filter-matches? % info) (:filters this)))
 
 
   OrFilter
   (dependency-rule-names [this]
     (apply set/union (mapv aor-types/dependency-rule-names (:filters this))))
-  (rule-matches? [this info]
-    (if (some #(aor-types/rule-matches? % info) (:filters this))
+  (rule-filter-matches? [this info]
+    (if (some #(aor-types/rule-filter-matches? % info) (:filters this))
       true
       false))
 
   NotFilter
   (dependency-rule-names [this] (aor-types/dependency-rule-names (:filter this)))
-  (rule-matches? [this info]
-    (not (aor-types/rule-matches? (:filter this) info)))
+  (rule-filter-matches? [this info]
+    (not (aor-types/rule-filter-matches? (:filter this) info)))
 )
 
 (defn check-rule-dependency-conflict
@@ -247,7 +247,7 @@
   [start-time-millis]
   (let [^com.rpl.rama.ModuleInstanceInfo module-instance-info (ops/module-instance-info)
         num-tasks (.getNumTasks module-instance-info)
-        uuid      (h/min-uuid7 start-time-millis)]
+        uuid      (h/min-uuid7-at-timestamp start-time-millis)]
     (into {}
           (for [i (range 0 num-tasks)]
             [i uuid]
@@ -304,20 +304,23 @@
 (deframaop find-qualified-offsets
   []
   (read-rules :> *agent->rule->info)
-  (select> [ALL (collect-one FIRST) LAST
-            ALL (collect-one FIRST) LAST]
-    *agent->rule->info
-    :> [*agent-name *rule-name *rule-info])
-  ;; TODO: <<<>>>> I don't need ID dependencies if enforce removal...
-  ; (aor-types/dependency-rule-names)
-
-  (select> [:cursors
-            ALL (collect-one FIRST LAST)]
+  (ops/explode *agent->rule->info :> [*agent-name *rule->info])
+  (ops/explode *rule->info :> [*rule-name *rule-info])
+  (aor-types/dependency-rule-names (-> *rule-info
+                                       (get :definition)
+                                       (get :filter))
+                                   :> *dependency-names)
+  (select> [:cursors ALL (collect-one FIRST LAST)]
     *rule-info
     :> [*task-id *offset])
-  ;; TODO: <<<<>>>> check dependency rules to find max offset and filter out if not caught up
+  (<<batch
+    (ops/explode *dependency-names :> *dname)
+    (select> [(keypath *dname) :cursors (keypath *task-id)] *rule->info :> *other-offset)
+    (aggs/+min *other-offset :> *dep-end-offset))
+  (or> *dep-end-offset (h/max-uuid) :> *end-offset)
   (|direct *task-id)
   ;; TODO: <<<>>> query root/node as necessary to find matching offsets
+  ;;    - go no higher than *end-offset
   ;;    - get a range with sorted-map-range-from of size 100, then check
 
 

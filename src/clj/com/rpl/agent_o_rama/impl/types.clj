@@ -677,7 +677,7 @@
 
 (defprotocol RuleFilter
   (dependency-rule-names [this])
-  (rule-matches? [this info]))
+  (rule-filter-matches? [this info]))
 
 (defaorrecord ComparatorSpec
   [comparator :- (s/enum := :not= :< :> :<= :>=)

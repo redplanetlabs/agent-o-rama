@@ -351,10 +351,6 @@
                       :> *res)
     )))
 
-(defn max-uuid
-  []
-  (java.util.UUID. -1 -1))
-
 (defn declare-get-invokes-page-topology
   [topologies agent-name]
   (declare-get-distributed-page-topology
@@ -363,7 +359,7 @@
    (po/agent-root-task-global-name agent-name)
    relevant-invoke-submap
    to-invokes-page-result
-   max-uuid))
+   h/max-uuid))
 
 (defn declare-agent-get-names-query-topology
   [topologies agent-names]
@@ -409,7 +405,7 @@
    (po/datasets-task-global-name)
    dataset-info
    to-dataset-page-result
-   max-uuid))
+   h/max-uuid))
 
 (defn search-pagination-size
   []

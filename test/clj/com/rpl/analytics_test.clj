@@ -420,13 +420,14 @@
     (letlocals
 
      (bind id (h/random-uuid7))
-     (bind tp-rule-matches?
+     (bind tp-rule-filter-matches?
        (fn [pstate filter data]
          (rtest/test-pstate-transform [(keypath id) (termval data)] pstate)
-         (aor-types/rule-matches? filter
-                                  (assoc (into {}
-                                               (rtest/test-pstate-select-one (keypath id) pstate))
-                                   :run-type (if (identical? pstate root) :agent :node)))
+         (aor-types/rule-filter-matches? filter
+                                         (assoc (into {}
+                                                      (rtest/test-pstate-select-one (keypath id)
+                                                                                    pstate))
+                                          :run-type (if (identical? pstate root) :agent :node)))
        ))
 
 
@@ -443,14 +444,14 @@
      (is (= #{"xyz"} (aor-types/dependency-rule-names filter)))
 
      (is (not
-          (tp-rule-matches?
+          (tp-rule-filter-matches?
            root
            filter
            {:feedback {:results [(aor-types/->FeedbackImpl {"abc" 6}
                                                            (aor-types/->AiSourceImpl)
                                                            0
                                                            0)]}})))
-     (is (tp-rule-matches?
+     (is (tp-rule-filter-matches?
           root
           filter
           {:feedback {:results [(aor-types/->valid-FeedbackImpl
@@ -459,14 +460,14 @@
                                  0
                                  0)]}}))
      (is (not
-          (tp-rule-matches?
+          (tp-rule-filter-matches?
            nodes
            filter
            {:feedback {:results [(aor-types/->FeedbackImpl {"def" 6}
                                                            matching-source
                                                            0
                                                            0)]}})))
-     (is (not (tp-rule-matches?
+     (is (not (tp-rule-filter-matches?
                nodes
                filter
                {:feedback {:results [(aor-types/->valid-FeedbackImpl
@@ -478,17 +479,17 @@
      (bind filter
        (aor-types/->valid-LatencyFilter (aor-types/->valid-ComparatorSpec :> 10)))
      (is (= #{} (aor-types/dependency-rule-names filter)))
-     (is (not (tp-rule-matches?
+     (is (not (tp-rule-filter-matches?
                root
                filter
                {:start-time-millis  10
                 :finish-time-millis 20})))
-     (is (tp-rule-matches?
+     (is (tp-rule-filter-matches?
           root
           filter
           {:start-time-millis  10
            :finish-time-millis 21}))
-     (is (tp-rule-matches?
+     (is (tp-rule-filter-matches?
           nodes
           filter
           {:start-time-millis  10
@@ -496,22 +497,22 @@
 
      (bind filter (aor-types/->valid-ErrorFilter))
      (is (= #{} (aor-types/dependency-rule-names filter)))
-     (is (not (tp-rule-matches? root filter {})))
-     (is (not (tp-rule-matches? nodes filter {})))
-     (is (not (tp-rule-matches? root filter {:exception-summaries []})))
+     (is (not (tp-rule-filter-matches? root filter {})))
+     (is (not (tp-rule-filter-matches? nodes filter {})))
+     (is (not (tp-rule-filter-matches? root filter {:exception-summaries []})))
      (is
-      (tp-rule-matches?
+      (tp-rule-filter-matches?
        root
        filter
        {:exception-summaries [(aor-types/->ExceptionSummary "aaa" "bbb" (h/random-uuid7))]}))
      (is
       (not
-       (tp-rule-matches?
+       (tp-rule-filter-matches?
         nodes
         filter
         {:exceptions []})))
      (is
-      (tp-rule-matches?
+      (tp-rule-filter-matches?
        nodes
        filter
        {:exceptions ["abc"]}))
@@ -520,32 +521,35 @@
      (bind filter
        (aor-types/->valid-InputMatchFilter "$[0].a" #"abc"))
      (is (= #{} (aor-types/dependency-rule-names filter)))
-     (is (not (tp-rule-matches? root filter {:invoke-args [{"a" "aaa"} {"b" "abc"}]})))
-     (is (tp-rule-matches? root filter {:invoke-args [{"a" "qqqabcqqq"}]}))
-     (is (not (tp-rule-matches? nodes filter {:input [{"a" "aaa"}]})))
-     (is (tp-rule-matches? nodes filter {:input [{"a" "qqqabcqqq"}]}))
+     (is (not (tp-rule-filter-matches? root filter {:invoke-args [{"a" "aaa"} {"b" "abc"}]})))
+     (is (tp-rule-filter-matches? root filter {:invoke-args [{"a" "qqqabcqqq"}]}))
+     (is (not (tp-rule-filter-matches? nodes filter {:input [{"a" "aaa"}]})))
+     (is (tp-rule-filter-matches? nodes filter {:input [{"a" "qqqabcqqq"}]}))
 
      (bind filter
        (aor-types/->valid-OutputMatchFilter "$[0].args[1]" #"abc"))
      (is (= #{} (aor-types/dependency-rule-names filter)))
-     (is (not (tp-rule-matches? root
-                                filter
-                                {:result (aor-types/->AgentResult [{"args" [1 "aaa"]}] false)})))
-     (is (tp-rule-matches? root
-                           filter
-                           {:result (aor-types/->AgentResult [{"args" [1 "1abc2"]}] false)}))
-     (is (not (tp-rule-matches? nodes
-                                filter
-                                {:result (aor-types/->AgentResult [{"args" [1 "aaa"]}] false)})))
-     (is (tp-rule-matches? nodes
-                           filter
-                           {:result (aor-types/->AgentResult [{"args" [1 "1abc2"]}] false)}))
-     (is (not (tp-rule-matches? nodes
-                                filter
-                                {:emits [(aor-types/->AgentNodeEmit id nil 0 "a" [0 "aaa"])]})))
-     (is (tp-rule-matches? nodes
-                           filter
-                           {:emits [(aor-types/->AgentNodeEmit id nil 0 "a" [0 "1abc2"])]}))
+     (is (not
+          (tp-rule-filter-matches? root
+                                   filter
+                                   {:result (aor-types/->AgentResult [{"args" [1 "aaa"]}] false)})))
+     (is (tp-rule-filter-matches? root
+                                  filter
+                                  {:result (aor-types/->AgentResult [{"args" [1 "1abc2"]}] false)}))
+     (is (not
+          (tp-rule-filter-matches? nodes
+                                   filter
+                                   {:result (aor-types/->AgentResult [{"args" [1 "aaa"]}] false)})))
+     (is (tp-rule-filter-matches? nodes
+                                  filter
+                                  {:result (aor-types/->AgentResult [{"args" [1 "1abc2"]}] false)}))
+     (is
+      (not (tp-rule-filter-matches? nodes
+                                    filter
+                                    {:emits [(aor-types/->AgentNodeEmit id nil 0 "a" [0 "aaa"])]})))
+     (is (tp-rule-filter-matches? nodes
+                                  filter
+                                  {:emits [(aor-types/->AgentNodeEmit id nil 0 "a" [0 "1abc2"])]}))
 
 
 
@@ -574,24 +578,24 @@
          12
          {"abc" (op-stats 1 3)})))
 
-     (is (not (tp-rule-matches? root
-                                (token-filter :input 11)
-                                {:stats root-stats})))
-     (is (tp-rule-matches? root
-                           (token-filter :input 10)
-                           {:stats root-stats}))
-     (is (not (tp-rule-matches? root
-                                (token-filter :output 13)
-                                {:stats root-stats})))
-     (is (tp-rule-matches? root
-                           (token-filter :output 12)
-                           {:stats root-stats}))
-     (is (not (tp-rule-matches? root
-                                (token-filter :total 15)
-                                {:stats root-stats})))
-     (is (tp-rule-matches? root
-                           (token-filter :total 14)
-                           {:stats root-stats}))
+     (is (not (tp-rule-filter-matches? root
+                                       (token-filter :input 11)
+                                       {:stats root-stats})))
+     (is (tp-rule-filter-matches? root
+                                  (token-filter :input 10)
+                                  {:stats root-stats}))
+     (is (not (tp-rule-filter-matches? root
+                                       (token-filter :output 13)
+                                       {:stats root-stats})))
+     (is (tp-rule-filter-matches? root
+                                  (token-filter :output 12)
+                                  {:stats root-stats}))
+     (is (not (tp-rule-filter-matches? root
+                                       (token-filter :total 15)
+                                       {:stats root-stats})))
+     (is (tp-rule-filter-matches? root
+                                  (token-filter :total 14)
+                                  {:stats root-stats}))
 
 
      (bind nested-ops
@@ -621,35 +625,37 @@
          :model-call
          {"outputTokenCount" 101})])
 
-     (is (not (tp-rule-matches? nodes
-                                (token-filter :input 11)
-                                {:nested-ops nested-ops})))
-     (is (tp-rule-matches? nodes
-                           (token-filter :input 10)
-                           {:nested-ops nested-ops}))
-     (is (not (tp-rule-matches? nodes
-                                (token-filter :output 112)
-                                {:nested-ops nested-ops})))
-     (is (tp-rule-matches? nodes
-                           (token-filter :output 111)
-                           {:nested-ops nested-ops}))
-     (is (not (tp-rule-matches? nodes
-                                (token-filter :total 15)
-                                {:nested-ops nested-ops})))
-     (is (tp-rule-matches? nodes
-                           (token-filter :total 14)
-                           {:nested-ops nested-ops}))
+     (is (not (tp-rule-filter-matches? nodes
+                                       (token-filter :input 11)
+                                       {:nested-ops nested-ops})))
+     (is (tp-rule-filter-matches? nodes
+                                  (token-filter :input 10)
+                                  {:nested-ops nested-ops}))
+     (is (not (tp-rule-filter-matches? nodes
+                                       (token-filter :output 112)
+                                       {:nested-ops nested-ops})))
+     (is (tp-rule-filter-matches? nodes
+                                  (token-filter :output 111)
+                                  {:nested-ops nested-ops}))
+     (is (not (tp-rule-filter-matches? nodes
+                                       (token-filter :total 15)
+                                       {:nested-ops nested-ops})))
+     (is (tp-rule-filter-matches? nodes
+                                  (token-filter :total 14)
+                                  {:nested-ops nested-ops}))
 
      (bind filter (aor-types/->valid-AndFilter []))
-     (is (tp-rule-matches? root filter {}))
+     (is (tp-rule-filter-matches? root filter {}))
      (bind filter
        (aor-types/->valid-AndFilter
         [(aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :> 10))
          (aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :< 20))]))
-     (is (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 111}))
-     (is (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 118}))
-     (is (not (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 110})))
-     (is (not (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 120})))
+     (is (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 111}))
+     (is (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 118}))
+     (is (not
+          (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 110})))
+     (is (not
+          (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 120})))
 
      (bind filter
        (aor-types/->valid-AndFilter
@@ -659,15 +665,17 @@
      (is (= #{"xyz" "cba"} (aor-types/dependency-rule-names filter)))
 
      (bind filter (aor-types/->valid-OrFilter []))
-     (is (not (tp-rule-matches? root filter {})))
+     (is (not (tp-rule-filter-matches? root filter {})))
      (bind filter
        (aor-types/->valid-OrFilter
         [(aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :< 10))
          (aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :> 20))]))
-     (is (not (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 111})))
-     (is (not (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 118})))
-     (is (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 101}))
-     (is (tp-rule-matches? root filter {:start-time-millis 100 :finish-time-millis 125}))
+     (is (not
+          (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 111})))
+     (is (not
+          (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 118})))
+     (is (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 101}))
+     (is (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 125}))
      (bind filter
        (aor-types/->valid-OrFilter
         [(aor-types/->valid-FeedbackFilter "xyz" "a" (aor-types/->ComparatorSpec :> 10))
@@ -679,8 +687,9 @@
      (bind filter
        (aor-types/->valid-NotFilter
         (aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :> 10))))
-     (is (tp-rule-matches? root filter {:start-time-millis 10 :finish-time-millis 18}))
-     (is (not (tp-rule-matches? root filter {:start-time-millis 10 :finish-time-millis 100})))
+     (is (tp-rule-filter-matches? root filter {:start-time-millis 10 :finish-time-millis 18}))
+     (is (not
+          (tp-rule-filter-matches? root filter {:start-time-millis 10 :finish-time-millis 100})))
      (bind filter
        (aor-types/->valid-NotFilter
         (aor-types/->valid-FeedbackFilter "xyz" "a" (aor-types/->ComparatorSpec :> 10))))

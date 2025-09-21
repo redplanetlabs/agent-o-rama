@@ -203,12 +203,16 @@
   []
   (str (random-uuid7)))
 
-(defn min-uuid7
+(defn min-uuid7-at-timestamp
   [^long millis]
   (let [ms-bits (bit-shift-left millis 16)
         hi      (bit-or ms-bits (bit-shift-left 0x7 12))
         lo      (bit-shift-left 0x2 62)]
     (UUID. hi lo)))
+
+(defn max-uuid
+  []
+  (java.util.UUID. -1 -1))
 
 (defn half-uuid
   [^UUID uuid]
