@@ -13,44 +13,44 @@ entities in the system, defined using `defagentmodule` and created with
 through stores, communicate via emissions between nodes, and integrate
 with AI models through LangChain4j.
 
-## Agent Client
+## [Agent Client](terms/agent-client.md)
 
 Client-side interface for invoking and interacting with specific
 agents. Obtained from an agent manager, it provides invoke, streaming,
 and human input capabilities for a particular agent type.
 
-## Agent Complete
+## [Agent Complete](terms/agent-complete.md)
 
 Final state of an agent execution indicating successful termination with result.
 
-## Agent Emit
+## [Agent Emit](terms/agent-emit.md)
 
 The mechanism by which agent nodes send data to other nodes in the agent
 graph, enabling flow control and data passing. Called via `emit!`
 function with target node name and arguments, triggers execution of
 downstream nodes.
 
-## Agent Graph
+## [Agent Graph](terms/agent-graph.md)
 
 A directed graph structure that defines the execution flow of an agent,
 consisting of interconnected nodes with specified output
 relationships. Created via `new-agent` and built by chaining `node`
 calls, the graph defines the agent's execution logic and control flow.
 
-## Agent Invoke
+## [Agent Invoke](terms/agent-invoke.md)
 
 A handle representing a specific invocation/execution instance of an
 agent, used to track and interact with running agents. Created by
 `agent-initiate` or `agent-invoke`, used with client functions like
 `agent-result`, `agent-next-step`, and streaming operations.
 
-## Agent Manager
+## [Agent Manager](terms/agent-manager.md)
 
 Client-side interface for managing and interacting with deployed agents
 in a cluster. Created via `agent-manager` function, it provides access
 to agent clients and dataset management capabilities.
 
-## Agent Module
+## [Agent Module](terms/agent-module.md)
 
 A complete agent system definition that packages agents, stores, and
 objects into a deployable Rama module. Defined using `defagentmodule`
@@ -65,7 +65,7 @@ results. Defined with `aor/node` function, receives an `agent-node`
 parameter that provides access to stores, agent objects, and control
 functions like `emit!` and `result!`.
 
-## Agent Node Function
+## [Agent Node Function](terms/agent-node-function.md)
 
 The user-defined function that implements the logic for a specific agent
 node. Receives an `agent-node` parameter for accessing framework
@@ -80,7 +80,7 @@ access during execution. Declared via `declare-agent-object` or
 `declare-agent-object-builder`, accessed via `get-agent-object` within
 agent nodes.
 
-## Agent Result
+## [Agent Result](terms/agent-result.md)
 
 The final output value returned by an agent execution, signaling
 completion of the agent graph traversal. Set via `result!` function
@@ -90,21 +90,21 @@ within agent nodes, retrieved via `agent-result` on client side.
 
 An individual execution unit returned by agent processing, can be result, human input request, or continuation.
 
-## Agent Throttling
+## [Agent Throttling](terms/agent-throttling.md)
 
 Rate-limiting mechanism for log messages to prevent overwhelming output in distributed execution.
 
-## Agent Trace
+## [Agent Trace](terms/agent-trace.md)
 
 Execution monitoring system that captures agent node transitions and data flow for debugging.
 
-## Agent Topology
+## [Agents Topology](terms/agents-topology.md)
 
 The top-level container for defining agents, stores, and objects within
 a module. Created via `agent-topology` function, provides methods for
 declaring agents and resources.
 
-## Agent Topology Builder
+## [Agent Topology Builder](terms/agent-topology-builder.md)
 
 The fluent interface for constructing agent definitions through method
 chaining. Provides methods like `new-agent`, `node`, `agg-start-node`,
@@ -123,15 +123,15 @@ A managed collection of input/output examples for agent testing and
 evaluation. Created and managed via agent manager dataset functions for
 tracking agent performance and behavior.
 
-## Document Store
+## [Document Store](terms/document-store.md)
 
 A schema-flexible store for complex nested data structures in agents.
 
-## Evaluators
+## [Evaluators](terms/evaluators.md)
 
 Functions for measuring agent performance against datasets.
 
-## Example Run
+## [Example Run](terms/example-run.md)
 
 A single execution instance within an experiment for tracking input/output pairs.
 
@@ -139,25 +139,25 @@ A single execution instance within an experiment for tracking input/output pairs
 
 A structured test run comparing agent performance across datasets with specific evaluators.
 
-## Fork
+## [Fork](terms/fork.md)
 
 A mechanism to create new execution branches from existing agent
 invocations with modified parameters. Used via `agent-fork` and related
 async functions, enables parallel execution variants.
 
-## Human Input Request
+## [Human Input Request](terms/human-input-request.md)
 
 A mechanism for agents to request input from human users during
 execution. Created via `get-human-input` within agent nodes, handled via
 client API to enable human-in-the-loop workflows.
 
-## IPC (In-Process Cluster)
+## [IPC (In-Process Cluster)](terms/ipc.md)
 
 A local Rama cluster instance used for development and testing. Created
 via `create-ipc` for running agents in a single process without
 requiring a distributed cluster setup.
 
-## Java Interop
+## [Java Interop](terms/java-interop.md)
 
 Bidirectional integration between Clojure agent definitions and Java
 client code. Agent modules can be used from Java applications, and Java
@@ -168,96 +168,100 @@ and LangChain4j integration.
 
 A typed store for simple key-value pairs with specified key/value classes.
 
-## LangChain4j Integration
+## [LangChain4j Integration](terms/langchain4j-integration.md)
 
 Integration with the LangChain4j library for AI model interactions,
 providing chat models, tool calling, JSON schema generation, and
 structured output parsing. Enables seamless AI integration within agent
 execution flows.
 
-## Multi-Agg
+## [Multi-Agg](terms/multi-agg.md)
 
 A flexible aggregation mechanism that allows custom combination logic
 for distributed computations. Defined via `multi-agg` macro with `init`
 and `on` clauses for sophisticated result aggregation patterns.
 
-## PState Store
+## [PState Store](terms/pstate-store.md)
 
 A persistent state store backed by Rama's PState for durable agent data.
 
-## Module
+## [Module](terms/module.md)
 
 A deployable unit containing agent definitions, stores, and shared
 objects. Defined using `defagentmodule` macro, represents a complete
 agent system that can be launched on a Rama cluster. Modules are
 identified by name and can reference agents from other modules.
 
-## Node Emit
+## [Node Emit](terms/node-emit.md)
 
 The mechanism by which agent nodes send data to other nodes in the agent
 graph, enabling flow control and data passing. Called via `emit!`
 function with target node name and arguments, triggers execution of
 downstream nodes.
 
-## Retry Mechanism
+## Rama
+
+## Red Planet Labs
+
+## [Retry Mechanism](terms/retry-mechanism.md)
 
 Automatic retry logic for handling failed or stalled agent
 executions. Configured via agent options, handles execution failures
 transparently to improve system resilience.
 
-## Streaming Chunk
+## [Streaming Chunk](terms/streaming-chunk.md)
 
 An individual piece of streaming data emitted from an agent node during
 execution. Emitted via `stream-chunk!` function within agent nodes,
 received by streaming subscriptions for real-time data flow.
 
-## Streaming Subscription
+## [Streaming Subscription](terms/streaming-subscription.md)
 
 A client-side subscription to receive streaming data from specific agent
 nodes during execution. Created via `agent-stream`,
 `agent-stream-specific`, or `agent-stream-all` functions, used to
 monitor real-time outputs from agent nodes.
 
-## Sub Agents
+## [Sub Agents](terms/sub-agents.md)
 
 Agents that run within other agents, but with limited functionality (no
 async API or streaming). Referenced in error messages indicating
 restricted capabilities for sub-agent contexts.
 
-## Task Global
+## [Task Global](terms/task-global.md)
 
 Distributed state containers that manage agent execution state across
 the cluster. Internal implementation detail for state management across
 Rama tasks in the distributed system.
 
-## Tools Sub Agent
+## [Tools Sub Agent](terms/tools-sub-agent.md)
 
 A specialized agent type that executes tool functions, created via
 `newToolsAgent`. Built with tool specifications and automatically
 handles tool execution with aggregation patterns for AI tool calling
 workflows.
 
-## Update Mode
+## [Update Mode](terms/update-mode.md)
 
 Controls how agent graphs handle updates (continue, restart, or
 drop). Set via `set-update-mode` on agent graphs to determine behavior
 when graph definitions change.
 
-## Rama Platform
+## [Rama Platform](terms/rama-platform.md)
 
 The underlying distributed computing platform that agent-o-rama is built
 upon. Provides the distributed runtime, persistent state management,
 partitioning, and scalability features that enable agents to run across
 multiple machines with high performance and fault tolerance.
 
-## Tool Calling
+## [Tool Calling](terms/tool-calling.md)
 
 Integration pattern for connecting AI models with external functions and
 APIs. Agents can define tool specifications using LangChain4j schemas
 and execute tools based on AI model decisions, enabling sophisticated
 AI-driven workflows with external system integration.
 
-## User Interface (UI)
+## [User Interface (UI)](terms/user-interface.md)
 
 A ClojureScript-based web interface for monitoring and visualizing
 agent execution in real-time. Provides debugging tools, state
