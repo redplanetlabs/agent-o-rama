@@ -270,9 +270,13 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     await expect(rerunModal.locator('select').first()).toHaveValue('node');
     await expect(rerunModal.getByRole('button', { name: agentToRun })).toBeVisible();
     await expect(rerunModal.getByLabel('Node Name')).toHaveValue('write-section');
-    await expect(rerunModal.locator('input').nth(2)).toHaveValue('$[0]');
-    await expect(rerunModal.locator('input').nth(3)).toHaveValue('$[1]');
-    await expect(rerunModal.locator('input').nth(4)).toHaveValue('$[2]');
+    
+    // Verify input mappings using more specific selectors
+    const inputMappingsSection = rerunModal.locator('div').filter({ hasText: /^Input Mappings/ });
+    await expect(inputMappingsSection.locator('input.font-mono').nth(0)).toHaveValue('$[0]');
+    await expect(inputMappingsSection.locator('input.font-mono').nth(1)).toHaveValue('$[1]');
+    await expect(inputMappingsSection.locator('input.font-mono').nth(2)).toHaveValue('$[2]');
+    
     await expect(rerunModal.getByText(evaluatorNamePass, { exact: true })).toBeVisible();
     await expect(rerunModal.getByText(evaluatorNameFail, { exact: true })).toBeVisible();
     console.log('Verified that the re-run form is correctly pre-filled.');
@@ -322,7 +326,7 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     
     // Verify both experiments exist before deleting the dataset
     await page.getByRole('link', { name: datasetName }).click();
-    await page.getByRole('link', { name: 'Experiments' }).click();
+    await page.getByRole('link', { name: 'Experiments', exact: true }).click();
     await expect(page.getByText(experimentName, { exact: true })).toBeVisible();
     await expect(page.getByText(rerunExperimentName, { exact: true })).toBeVisible();
     console.log('Verified both experiments are listed before cleanup.');
