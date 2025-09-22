@@ -6,11 +6,11 @@ You're about to learn how to create [agents](../glossary.md#agent) that think, r
 
 ## What is Agent-O-Rama?
 
-Agent-O-Rama is a distributed framework for building stateful AI agents that execute across clusters. Think of it as your bridge between AI models and distributed computing: you define intelligent workflows as graphs of connected nodes, and AOR handles the scaling, fault tolerance, and state management automatically.
+Agent-O-Rama (also referred to as AOR) is a distributed framework for building stateful AI agents that execute across clusters. Think of it as your bridge between AI models and distributed computing: you define intelligent workflows as graphs of connected nodes, and AOR handles the scaling, fault tolerance, and state management automatically.
 
-### Built on Rama
+### The Power of Rama
 
-Agent-O-Rama is implemented using Red Planet Labs' Rama distributed computing platform. Rama provides the distributed runtime foundation that makes AOR possible:
+Agent-O-Rama is implemented using Rama, Red Planet Labs' (RPL) groundbreaking distributed computing platform. You don't write distributed code - you write agent logic, and Rama handles the rest. This powerful foundation means your agents automatically get:
 
 - **Distributed execution**: Your [agents](../glossary.md#agent) run across multiple machines with automatic partitioning
 - **Fault tolerance**: Built-in retry mechanisms and state recovery across node failures
@@ -18,7 +18,11 @@ Agent-O-Rama is implemented using Red Planet Labs' Rama distributed computing pl
 - **Stream processing**: Real-time data flows through your agent graphs
 - **Microbatch processing**: Efficient batched operations for high-throughput scenarios
 
-You don't need to understand Rama internals to use AOR effectively, but knowing it's there explains why your agents scale seamlessly from development to production clusters.
+Rama is what makes Agent-O-Rama possible: it provides the robust distributed foundation that turns your agent definitions into scalable, fault-tolerant systems. While you don't need to understand Rama internals to use AOR effectively, it's Rama that ensures your agents scale seamlessly from development to production clusters.
+
+### About Red Planet Labs
+
+Red Planet Labs (RPL) created both Agent-O-Rama and the underlying Rama platform. RPL specializes in distributed systems that make complex infrastructure simple: you focus on your business logic, and their technology handles the distributed computing challenges. With Agent-O-Rama, RPL brings this same philosophy to AI agents - making it easy to build production-ready, distributed AI systems without wrestling with infrastructure complexity.
 
 > **Quick Reference**: For detailed explanations of agent-o-rama terminology, see the [Glossary](../glossary.md) and [Terms Documentation](../terms/).
 

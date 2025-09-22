@@ -2,11 +2,15 @@
 
 Scale your [agents](../terms/agent.md) with parallel processing using [aggregation](../terms/aggregation.md). Integrate AI models seamlessly through [agent objects](../terms/agent-objects.md). These patterns transform simple agents into powerful, intelligent distributed systems.
 
+With Agent-O-Rama (AOR), advanced doesn't mean complex. You express what you want: "process these items in parallel, then combine the results." AOR and Rama handle the distributed execution, synchronization, and fault tolerance.
+
 > **Reference**: See [Aggregation](../terms/aggregation.md) and [Agent Objects](../terms/agent-objects.md) documentation for comprehensive details.
 
 ## Aggregation: Parallel Processing at Scale
 
 [Aggregation](../terms/aggregation.md) is a distributed computation pattern for collecting and combining results from multiple [node executions](../glossary.md#agent-node), enabling scatter-gather operations and parallel processing within [agent graphs](../glossary.md#agent-graph). Think MapReduce, but simpler and more flexible.
+
+You scatter work across nodes. They process in parallel. Results automatically flow back and combine. No coordination code. No synchronization primitives. Just `agg-start-node` and `agg-node`, and AOR orchestrates the rest.
 
 ### Basic Aggregation
 

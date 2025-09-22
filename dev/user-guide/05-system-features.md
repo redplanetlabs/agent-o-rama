@@ -2,11 +2,15 @@
 
 Take control of your [agent](../terms/agent.md) systems. [Fork](../glossary.md#fork) executions for exploration. Build [datasets](../terms/dataset.md) for testing. [Evaluate](../glossary.md#evaluators) performance systematically.
 
+These are the features that turn Agent-O-Rama (AOR) from a framework into a complete platform. You get production-ready tools for testing, monitoring, and optimization built right in. No bolting on external tools. No integration headaches. Just AOR and Rama working together to make your agents production-ready.
+
 > **Reference**: See [Dataset](../terms/dataset.md) and [Experiment](../terms/experiment.md) documentation for comprehensive evaluation details.
 
 ## Forking: Branching Execution Paths
 
 [Forking](../glossary.md#fork) creates new execution branches from existing [agent invocations](../glossary.md#agent-invoke) with modified parameters. Explore alternatives, test variations, or implement speculative execution from any point in [agent graph](../glossary.md#agent-graph) execution.
+
+Think of it as git branching for agent execution: start an agent, fork at a decision point, explore multiple paths in parallel. Compare results. Choose the best. All without restarting from scratch.
 
 ### Basic Forking
 

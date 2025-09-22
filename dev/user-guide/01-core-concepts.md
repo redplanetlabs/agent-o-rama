@@ -1,6 +1,8 @@
 # Core Concepts
 
-You build Agent-O-Rama systems from three fundamental pieces: [agents](../terms/agent.md), [nodes](../glossary.md#agent-node), and [graphs](../glossary.md#agent-graph). Master these three concepts, and everything else clicks into place.
+You build Agent-O-Rama (AOR) systems from three fundamental pieces: [agents](../terms/agent.md), [nodes](../glossary.md#agent-node), and [graphs](../glossary.md#agent-graph). Master these three concepts, and everything else clicks into place.
+
+Here's the beautiful thing: you don't think about distributed systems when building with AOR. You think about workflows. You think about what your agent needs to do, step by step. Rama handles turning those steps into a distributed, fault-tolerant system that scales.
 
 > **Reference**: See the [Agent](../terms/agent.md) and [Agent Node](../terms/agent-node.md) documentation for comprehensive details.
 
@@ -33,6 +35,34 @@ public class MyModule extends AgentModule {
     }
 }
 ```
+
+## See It In Action: Your First Agent
+
+Before we dive into the details, let's see a real agent in action. This simple greeter agent shows how agents, nodes, and graphs work together:
+
+**Clojure:**
+```clojure
+(aor/defagentmodule GreeterModule
+  [topology]
+  (-> topology
+      (aor/new-agent "Greeter")
+      (aor/node "greet" nil  ; "greet" node, no next node
+                (fn [agent-node name]
+                  (let [message (str "Hello, " name "! Welcome to AOR.")]
+                    (aor/result! agent-node message))))))
+
+;; Using the agent
+(def client (aor/agent-client manager "Greeter"))
+(aor/agent-invoke client "Alice")
+;; => "Hello, Alice! Welcome to AOR."
+```
+
+What just happened? You created an agent with one node. That node took input (a name), processed it (created a greeting), and returned a result. Simple. But here's what AOR and Rama did behind the scenes:
+- Distributed your agent across available compute resources
+- Made it fault-tolerant (if a node fails, it retries)
+- Made it scalable (thousands of greetings can run in parallel)
+
+You wrote a function. AOR made it enterprise-ready.
 
 ## Nodes: Your Processing Steps
 

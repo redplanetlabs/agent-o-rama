@@ -1,6 +1,8 @@
 # State Management
 
-Your agents need memory: they track conversations, store results, and share data across distributed executions. Agent-O-Rama gives you three powerful distributed stores, each designed for specific data patterns.
+Your agents need memory: they track conversations, store results, and share data across distributed executions. Agent-O-Rama (AOR) gives you three powerful distributed stores, each designed for specific data patterns.
+
+Here's what makes AOR's state management special: you get distributed, durable, consistent storage without writing a single line of distributed systems code. Rama handles the replication, partitioning, and fault tolerance. You just store and retrieve data.
 
 > **Reference**: See [Key-Value Store](../terms/key-value-store.md) documentation for comprehensive storage details.
 
@@ -295,17 +297,33 @@ Pick your store based on your data pattern:
 - Want maximum performance
 - Don't need field-level updates
 
+*Example scenario*: Caching AI model responses, storing session tokens, managing simple flags.
+
 **Use Document Store when you:**
 - Have entities with multiple attributes
 - Need to update individual fields
 - Want structured but flat data
 - Query by specific fields
 
+*Example scenario*: User profiles, product catalogs, order records - anything with fixed fields that change independently.
+
 **Use PState when you:**
 - Have deeply nested structures
 - Need path-based navigation
 - Store tree-like or graph data
 - Update nested values frequently
+
+*Example scenario*: Conversation histories with threaded replies, workflow state machines, hierarchical configurations.
+
+## The Power of Distributed State
+
+Remember: every store operation in AOR is automatically:
+- **Replicated**: Your data exists on multiple nodes
+- **Consistent**: All agents see the same data
+- **Durable**: Survives crashes and restarts
+- **Fast**: Local caching means microsecond access
+
+You write `store/put!`. Rama delivers enterprise-grade distributed storage.
 
 ## Cross-Agent State Sharing
 

@@ -26,6 +26,10 @@ The user guide MUST contain a paragraph on how agent-o-rama is
 implemented using Rama, and that agent-o-rama is also referred to as
 AOR.
 
+The user guide MUST contain a paragraph on Red Planet Labs mentioning
+agent-o-rama and Rama, and that Red Planet Labs is also referred to as
+RPL.
+
 - read @dev/glossary.md
 - read @dev/terms/ files
 - see the @examples/clj/src/com/rpl/agent/basic examples to see

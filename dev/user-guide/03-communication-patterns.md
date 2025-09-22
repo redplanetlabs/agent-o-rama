@@ -2,11 +2,15 @@
 
 Agents don't just compute: they communicate. Stream real-time updates through [streaming chunks](../glossary.md#streaming-chunk). Request [human input](../glossary.md#human-input-request). Build interactive systems that respond as things happen.
 
+This is where Agent-O-Rama (AOR) shines: you get real-time, bidirectional communication in a distributed system without managing WebSockets, message queues, or pub/sub infrastructure. Rama handles the complexity. You focus on what to communicate.
+
 > **Reference**: See comprehensive communication pattern documentation in the [Glossary](../glossary.md) for streaming and human input concepts.
 
 ## Streaming: Real-Time Data Flow
 
 [Streaming chunks](../glossary.md#streaming-chunk) let your [agents](../terms/agent.md) send data as it's generated from any [agent node](../glossary.md#agent-node). Perfect for progress updates, live monitoring, or AI responses with real-time feedback.
+
+Think of it: your agent processes a large dataset. Instead of waiting for everything to complete, you stream updates as each item finishes. Your UI updates in real-time. Users see progress. No polling. No complexity. Just `stream-chunk!` and AOR handles the rest.
 
 ### Emitting Stream Chunks
 
