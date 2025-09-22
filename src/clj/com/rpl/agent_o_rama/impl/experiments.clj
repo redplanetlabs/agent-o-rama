@@ -332,7 +332,10 @@
 (defn validate-results!
   [o]
   (when-not (and (map? o) (every? string? (keys o)))
-    (throw (h/ex-info "Invalid map of results" {:return o}))))
+    (throw
+     (h/ex-info
+      "Invalid map of results (must be map with string keys)"
+      {:return o}))))
 
 (defn non-summary-evaluate!
   [agent-node eval-type eval-fn input reference-output outputs]
