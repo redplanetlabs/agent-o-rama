@@ -329,7 +329,6 @@
                      {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
                       :onClick (fn [e]
                                  (.stopPropagation e)
-;; Get data from app-db (graph-data) and transform to simplified format
                                  (let [raw-node-data (get graph-data node-id)
                                        input-data (transform-node-input-for-dataset raw-node-data node-name)
                                        output-data (transform-node-data-for-dataset raw-node-data node-name)]
@@ -339,7 +338,7 @@
                                                      :source-type :node
                                                      :source-args input-data
                                                      :source-emits output-data}])))}
-                     "Add to Dataset")))
+                     "Add node to Dataset")))
 
             (when result
               ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4"}
@@ -677,13 +676,10 @@
                                     :color (if failure? "red" "green")
                                     :truncate-length 100
                                     :depth 0})
-            ;; Add to Dataset button for overall trace
-                        ;; Add to Dataset button for overall trace
             ($ :div {:className "mt-4"}
                ($ :button
                   {:className "w-full text-sm font-medium py-2 px-4 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
                    :onClick (fn []
-                              ;; Get data directly from app-db (summary-data) and transform to simplified format
                               (let [input-data (:invoke-args summary-data)
                                     output-data (:val (:result summary-data))]
                                 (state/dispatch [:modal/show-form :add-from-trace
