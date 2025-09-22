@@ -684,15 +684,14 @@
                   {:className "w-full text-sm font-medium py-2 px-4 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
                    :onClick (fn []
                               ;; Get data directly from app-db (summary-data) and transform to simplified format
-                              (let [raw-result (:result summary-data)
-                                    raw-result-val (:val raw-result)
-                                    transformed-data (transform-agent-data-for-dataset (:invoke-args summary-data) raw-result-val)]
+                              (let [input-data (:invoke-args summary-data)
+                                    output-data (:val (:result summary-data))]
                                 (state/dispatch [:modal/show-form :add-from-trace
                                                  {:module-id module-id
                                                   :title "Add Agent Invocation to Dataset"
                                                   :source-type :agent
-                                                  :source-args transformed-data
-                                                  :source-result transformed-data}])))}
+                                                  :source-args input-data
+                                                  :source-result output-data}])))}
                   "Add to Dataset"))))
 
        ($ exceptions-panel {:summary-data summary-data
