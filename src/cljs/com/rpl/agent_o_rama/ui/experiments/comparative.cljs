@@ -28,8 +28,8 @@
                                          {:module-id module-id
                                           :dataset-id dataset-id
                                           :spec {:type :comparative
-                                                 :targets [{:target-spec {:type :agent :agent-name nil} :input->args ["$"]}
-                                                           {:target-spec {:type :agent :agent-name nil} :input->args ["$"]}]}}])}
+                                                 :targets [{:target-spec {:type :agent :agent-name nil} :input->args [{:id (random-uuid) :value "$"}]}
+                                                           {:target-spec {:type :agent :agent-name nil} :input->args [{:id (random-uuid) :value "$"}]}]}}])}
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Run New Comparative Experiment"))
 

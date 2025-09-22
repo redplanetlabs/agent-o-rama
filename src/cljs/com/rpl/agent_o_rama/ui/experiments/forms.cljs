@@ -23,7 +23,14 @@
   [info]
   (let [spec (:spec info)
         is-regular? (contains? spec :target)
-        targets (if is-regular? [(:target spec)] (:targets spec))]
+        targets (if is-regular? [(:target spec)] (:targets spec))
+        normalize-mappings (fn [args]
+                             (->> (or args [])
+                                  (mapv (fn [a]
+                                          (if (and (map? a) (contains? a :id) (contains? a :value))
+                                            a
+                                            {:id (random-uuid)
+                                             :value (if (string? a) a (str a))})))))]
     {;; Add a custom title for the modal when re-running
      :title (str "Re-run Experiment: " (:name info))
      ;; Prepend name to indicate it's a copy
@@ -45,7 +52,7 @@
                           {:target-spec (if (:node ts)
                                           (assoc ts :type :node)
                                           (assoc ts :type :agent))
-                           :input->args (:input->args t)}))
+                           :input->args (normalize-mappings (:input->args t))}))
                       targets)}
      :evaluators (:evaluators info)
      :num-repetitions (:num-repetitions info)
