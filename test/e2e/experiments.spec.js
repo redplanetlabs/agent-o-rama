@@ -16,6 +16,7 @@ const datasetName = `e2e-exp-dataset-${uniqueId}`;
 const evaluatorNamePass = `e2e-exp-evaluator-pass-${uniqueId}`;
 const evaluatorNameFail = `e2e-exp-evaluator-fail-${uniqueId}`;
 const experimentName = `e2e-full-flow-experiment-${uniqueId}`;
+const rerunExperimentName = `e2e-rerun-experiment-${uniqueId}`; // New constant for the re-run
 const agentToRun = 'researcher'; // As defined in the research_agent.clj example
 
 // Define a schema that matches the node's full input shape:
@@ -34,12 +35,12 @@ const failingInputSchema = JSON.stringify({
 // TEST SUITE
 // =============================================================================
 
-test.describe('Full Experiment Flow E2E Test', () => {
+test.describe('Full Experiment Flow E2E Test with Re-run', () => {
   // Use a single test block for this sequential flow.
   // We'll increase the timeout for the entire test to account for multiple long-running agent/experiment tasks.
   test.setTimeout(5 * 60 * 1000); // 5 minutes
 
-  test('should create resources, generate a trace, add to dataset, and run a successful experiment', async ({ page }) => {
+  test('should create, run, re-run, and clean up an experiment successfully', async ({ page }) => {
     // ---
     // PHASE 1: SETUP - Create Dataset and Evaluator
     // ---
@@ -253,15 +254,80 @@ test.describe('Full Experiment Flow E2E Test', () => {
     await expect(failChip).toContainText('?F');
     console.log('Evaluator scores for both pass and fail correctly displayed.');
 
+    // ---
+    // NEW PHASE 7: RE-RUN EXPERIMENT
+    // ---
+    console.log('--- PHASE 7: RE-RUN EXPERIMENT ---');
     
+    // 7a. Click the "Re-run Experiment" button
+    await page.getByRole('button', { name: 'Re-run Experiment' }).click();
+    const rerunModal = page.locator('[role="dialog"]');
+    await expect(rerunModal).toBeVisible();
+    console.log('Re-run modal opened.');
+
+    // 7b. Verify the form is pre-filled with the original experiment's data
+    await expect(rerunModal.getByLabel('Experiment Name')).toHaveValue(`Copy of ${experimentName}`);
+    await expect(rerunModal.locator('select').first()).toHaveValue('node');
+    await expect(rerunModal.getByRole('button', { name: agentToRun })).toBeVisible();
+    await expect(rerunModal.getByLabel('Node Name')).toHaveValue('write-section');
+    await expect(rerunModal.locator('input').nth(2)).toHaveValue('$[0]');
+    await expect(rerunModal.locator('input').nth(3)).toHaveValue('$[1]');
+    await expect(rerunModal.locator('input').nth(4)).toHaveValue('$[2]');
+    await expect(rerunModal.getByText(evaluatorNamePass, { exact: true })).toBeVisible();
+    await expect(rerunModal.getByText(evaluatorNameFail, { exact: true })).toBeVisible();
+    console.log('Verified that the re-run form is correctly pre-filled.');
+
+    // 7c. Modify the name and run the new experiment
+    await rerunModal.getByLabel('Experiment Name').fill(rerunExperimentName);
+    await rerunModal.getByRole('button', { name: 'Run Experiment' }).click();
+    await expect(rerunModal).not.toBeVisible();
+    console.log('Re-run experiment started.');
+
     // ---
-    // PHASE 7: CLEANUP
+    // NEW PHASE 8: VERIFY RE-RUN EXPERIMENT RESULTS
     // ---
-    console.log('--- PHASE 7: CLEANUP ---');
+    console.log('--- PHASE 8: VERIFY RE-RUN EXPERIMENT RESULTS ---');
+    
+    // The page should navigate to the new experiment's detail page
+    await expect(page).toHaveURL(/experiments\//, { timeout: 30000 });
+    // The URL should NOT contain the old experiment's ID. This is a bit tricky to assert,
+    // but we can ensure the new experiment's name is on the page.
+    await expect(page.getByRole('heading', { name: rerunExperimentName })).toBeVisible();
+
+    // Wait for completion and verify results, just like the first run
+    await expect(page.getByText('Completed')).toBeVisible({ timeout: 120000 });
+    console.log('Re-run experiment completed.');
+    
+    const rerunResultsTable = page.locator('table').filter({ hasText: 'Input' });
+    const rerunResultRow = rerunResultsTable.locator('tbody tr').first();
+    const rerunOutputCell = rerunResultRow.locator('td').nth(2);
+    const rerunPassChip = rerunOutputCell.locator('a').filter({ hasText: new RegExp(`${evaluatorNamePass}/concise\\?`) }).first();
+    const rerunFailChip = rerunOutputCell.locator('a').filter({ hasText: new RegExp(`${evaluatorNameFail}/concise\\?`) }).first();
+    await expect(rerunPassChip).toBeVisible();
+    await expect(rerunPassChip).toContainText('?T');
+    await expect(rerunFailChip).toBeVisible();
+    await expect(rerunFailChip).toContainText('?F');
+    console.log('Evaluator scores for the re-run experiment verified.');
+
+
+    // ---
+    // PHASE 9: CLEANUP (Updated)
+    // ---
+    console.log('--- PHASE 9: CLEANUP ---');
     // Set up auto-accept for confirm dialogs
     page.on('dialog', dialog => dialog.accept());
     
-    // Delete the dataset (which also deletes the experiment)
+    // Navigate back to the dataset page. Deleting the dataset will also delete BOTH experiments.
+    await page.getByText('Datasets & Experiments').click();
+    
+    // Verify both experiments exist before deleting the dataset
+    await page.getByRole('link', { name: datasetName }).click();
+    await page.getByRole('link', { name: 'Experiments' }).click();
+    await expect(page.getByText(experimentName, { exact: true })).toBeVisible();
+    await expect(page.getByText(rerunExperimentName, { exact: true })).toBeVisible();
+    console.log('Verified both experiments are listed before cleanup.');
+
+    // Navigate back again to delete the dataset
     await page.getByText('Datasets & Experiments').click();
     await deleteDataset(page, datasetName);
     
@@ -270,6 +336,6 @@ test.describe('Full Experiment Flow E2E Test', () => {
     await deleteEvaluator(page, evaluatorNamePass);
     await deleteEvaluator(page, evaluatorNameFail);
     
-    console.log('--- Test successfully completed and cleaned up. ---');
+    console.log('--- Test successfully completed and cleaned up all resources. ---');
   });
 });
