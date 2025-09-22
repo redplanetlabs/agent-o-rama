@@ -25,8 +25,7 @@
 (defn event-msg-handler
   "Smart router that preprocesses the event and then finds the dispatched handler."
   [ev-msg]
-  (let [;; <<<< NEW PRE-PROCESSING STEP >>>>
-        processed-ev-msg (common/preprocess-event-msg ev-msg)
+  (let [processed-ev-msg (common/preprocess-event-msg ev-msg)
 
         ;; The rest of the function now operates on the processed message
         {:keys [id ?reply-fn ?data uid]} processed-ev-msg
