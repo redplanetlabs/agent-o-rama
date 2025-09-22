@@ -28,7 +28,7 @@ Development runtime enabling single-process agent execution. Simulates distribut
 - Access: `InProcessCluster` class
 
 ## Relationships
-- Uses: [Rama Platform](rama-platform.md)
+- Uses: [Rama](rama.md)
 - Used by: [Agent Manager](agent-manager.md), [User Interface](user-interface.md)
 
 ## Examples

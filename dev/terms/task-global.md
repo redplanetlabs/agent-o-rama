@@ -28,7 +28,7 @@ Internal state management for distributed agent execution. Coordinates execution
 - Access: Not user-accessible
 
 ## Relationships
-- Uses: [Rama Platform](rama-platform.md)
+- Uses: [Rama](rama.md)
 - Used by: Framework internals
 
 ## Examples

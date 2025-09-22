@@ -117,6 +117,10 @@ from multiple node executions, using `agg-start-node`, `agg-node`, and
 `multi-agg` constructs. Enables scatter-gather patterns, parallel
 processing, and result combination across agent graph executions.
 
+## [Cluster Manager](terms/cluster-manager.md)
+
+An interface for managing and connecting to Rama clusters, providing access to deployed modules and their agents through connection management and factory methods.
+
 ## [Dataset](terms/dataset.md)
 
 A managed collection of input/output examples for agent testing and
@@ -155,7 +159,7 @@ client API to enable human-in-the-loop workflows.
 
 A local Rama cluster instance used for development and testing. Created
 via `create-ipc` for running agents in a single process without
-requiring a distributed cluster setup.
+requiring a distributed cluster setup. It is a Cluster Manager.
 
 ## [Java Interop](terms/java-interop.md)
 
@@ -181,17 +185,6 @@ A flexible aggregation mechanism that allows custom combination logic
 for distributed computations. Defined via `multi-agg` macro with `init`
 and `on` clauses for sophisticated result aggregation patterns.
 
-## [PState Store](terms/pstate-store.md)
-
-A persistent state store backed by Rama's PState for durable agent data.
-
-## [Module](terms/module.md)
-
-A deployable unit containing agent definitions, stores, and shared
-objects. Defined using `defagentmodule` macro, represents a complete
-agent system that can be launched on a Rama cluster. Modules are
-identified by name and can reference agents from other modules.
-
 ## [Node Emit](terms/node-emit.md)
 
 The mechanism by which agent nodes send data to other nodes in the agent
@@ -199,9 +192,30 @@ graph, enabling flow control and data passing. Called via `emit!`
 function with target node name and arguments, triggers execution of
 downstream nodes.
 
-## Rama
+## [PState Store](terms/pstate-store.md)
 
-## Red Planet Labs
+Persistent store backed by Rama's PState for durable data.
+
+## [Rama](terms/rama.md)
+
+The distributed computing platform providing stream processing,
+persistent state management, and horizontal scaling infrastructure that
+serves as the foundational runtime for agent-o-rama.
+
+The underlying distributed computing platform that agent-o-rama is built
+upon. Provides the distributed runtime, persistent state management,
+partitioning, and scalability features that enable agents to run across
+multiple machines with high performance and fault tolerance.
+
+## [Rama Module](terms/module.md)
+
+A deployable unit containing depots, pstates and topologies.  It can be
+launched on a Rama cluster. Rama modules are identified by name and can
+reference partitioned objects from other Rama modules.
+
+## [Red Planet Labs](terms/red-planet-labs.md)
+
+The company that created the Rama distributed computing platform and agent-o-rama framework, developing infrastructure for building real-time, scalable distributed applications.
 
 ## [Retry Mechanism](terms/retry-mechanism.md)
 
@@ -221,6 +235,10 @@ A client-side subscription to receive streaming data from specific agent
 nodes during execution. Created via `agent-stream`,
 `agent-stream-specific`, or `agent-stream-all` functions, used to
 monitor real-time outputs from agent nodes.
+
+## [Store](terms/store.md)
+
+A persistent storage abstraction providing typed access to distributed data within agent execution contexts, encapsulating different storage backends with uniform access patterns.
 
 ## [Sub Agents](terms/sub-agents.md)
 
@@ -247,12 +265,6 @@ Controls how agent graphs handle updates (continue, restart, or
 drop). Set via `set-update-mode` on agent graphs to determine behavior
 when graph definitions change.
 
-## [Rama Platform](terms/rama-platform.md)
-
-The underlying distributed computing platform that agent-o-rama is built
-upon. Provides the distributed runtime, persistent state management,
-partitioning, and scalability features that enable agents to run across
-multiple machines with high performance and fault tolerance.
 
 ## [Tool Calling](terms/tool-calling.md)
 

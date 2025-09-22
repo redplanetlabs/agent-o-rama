@@ -1,65 +1,50 @@
 # Agent
 
-A distributed, stateful computational unit that executes directed graphs of interconnected nodes to solve complex AI workflows across cluster infrastructure.
+## Definition
+A distributed, stateful computational unit that executes through a directed graph of interconnected nodes. Agents represent autonomous processing entities that can maintain persistent state, communicate between execution steps, and integrate with external systems.
 
-## Purpose
+## Architecture Role
+Agents serve as the primary execution entities in the agent-o-rama framework, orchestrating complex workflows across distributed infrastructure. Each agent encapsulates business logic within node functions and coordinates with other agents and external resources through the Rama platform.
 
-Agents solve fundamental challenges in building scalable AI systems:
+## Operations
+Agents can be invoked with arguments, forked to create parallel execution branches, and streamed to receive real-time outputs. Agents emit data between nodes, store and retrieve persistent state, and request human input during execution.
 
-- **Distributed State Management**: Maintain persistent state across distributed nodes using Rama's fault-tolerant infrastructure
-- **Scalable AI Workflows**: Execute multi-step AI reasoning patterns (ReAct, multi-agent collaboration) across compute clusters
-- **Integration Bridge**: Unite AI models (LangChain4j) with distributed systems (Rama) through unified programming model
-- **Human-in-the-Loop**: Support interactive workflows requiring human input at arbitrary execution points
+## Invariants
+Each agent execution maintains a unique identifier throughout its lifecycle. Agents must complete with either a result or failure state. State modifications are isolated per agent execution context.
 
-## Architecture
+## Key Clojure API
+- Primary functions: `agent-invoke`, `agent-initiate`, `agent-fork`, `agent-result`
+- Creation: `new-agent` within `defagentmodule`
+- Access: `agent-client` from `agent-manager`
 
-### Graph-Based Execution
-Agents execute as directed graphs where nodes represent computation steps. Nodes communicate via emissions and can access shared state through stores and agent objects.
+## Key Java API
+- Primary functions: `AgentClient.invoke()`, `AgentClient.initiate()`, `AgentClient.fork()`
+- Creation: `AgentTopology.newAgent()`
+- Access: `AgentManager.getAgentClient()`
 
-### Distributed Runtime
-- **Task Distribution**: Automatic partitioning across Rama tasks for horizontal scaling
-- **State Continuity**: Agent execution state persists across node failures and cluster changes
-- **Fault Tolerance**: Built-in retry mechanisms and distributed error handling
+## Relationships
+- Uses: [agent-node], [agent-graph], [store], [agent-objects]
+- Used by: [agent-client], [agent-manager], [experiment]
 
-### State Management
-- **Persistent Stores**: Key-value, document, and PState stores for long-term memory
-- **Agent Objects**: Shared resources (AI models, APIs) with lifecycle management
-- **Transactional Updates**: Atomic, consistent state changes across distributed system
+```dot
+digraph agent_relationships {
+    rankdir=TB;
 
-## Integration
+    Agent [shape=box, style=filled, fillcolor=lightblue];
 
-### Rama Platform
-Agents leverage Rama's distributed computing capabilities through stream and microbatch topologies, automatic partitioning, and event sourcing via depots.
+    // Uses
+    Agent -> AgentNode [label="contains"];
+    Agent -> AgentGraph [label="executes"];
+    Agent -> Store [label="accesses"];
+    Agent -> AgentObjects [label="uses"];
 
-### LangChain4j
-Seamless integration with AI models through agent objects, automatic tool calling aggregation, and streaming response handling.
-
-## Usage Patterns
-
-**Definition:**
-```clojure
-(aor/defagentmodule TodoModule [topology]
-  (aor/declare-key-value-store topology "store" String Object)
-  (-> topology
-      (aor/new-agent "TodoAgent")
-      (aor/node "process" "respond" process-fn)
-      (aor/node "respond" nil respond-fn)))
+    // Used by
+    AgentClient -> Agent [label="invokes"];
+    AgentManager -> Agent [label="manages"];
+    Experiment -> Agent [label="evaluates"];
+}
 ```
 
-**Multi-Step Reasoning:**
-```clojure
-(aor/node "chat" "chat"
-  (fn [agent-node messages]
-    (let [response (ai-chat messages)]
-      (if (needs-tools? response)
-        (aor/emit! agent-node "chat" (execute-tools response))
-        (aor/result! agent-node response)))))
-```
-
-**Human Interaction:**
-```clojure
-(let [approval (aor/get-human-input agent-node "Approve action?")]
-  (when approval (execute-action)))
-```
-
-Agents provide production-ready distributed AI orchestration with comprehensive monitoring, automatic scaling, and seamless integration between AI models and distributed infrastructure.
+## Examples
+- Clojure: `examples/clj/src/com/rpl/agent/basic/basic_agent.clj`
+- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/BasicAgent.java`

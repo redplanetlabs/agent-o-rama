@@ -1,0 +1,194 @@
+digraph agent_o_rama_concepts {
+    rankdir=TB;
+    splines=ortho;
+    nodesep=0.5;
+    ranksep=0.8;
+
+    // Root concepts
+    subgraph cluster_foundation {
+        label="Foundation";
+        style=filled;
+        fillcolor=lightblue;
+
+        rama [shape=box, style=filled, fillcolor=cornflowerblue];
+        red_planet_labs [shape=box, style=filled, fillcolor=cornflowerblue, label="Red Planet Labs"];
+    }
+
+    // Infrastructure layer
+    subgraph cluster_infrastructure {
+        label="Infrastructure Layer";
+        style=filled;
+        fillcolor=lightgreen;
+
+        rama_platform [label="Rama Platform"];
+        ipc [label="IPC"];
+        pstate_store [label="PState Store"];
+        task_global [label="Task Global"];
+        cluster_manager [label="Cluster Manager"];
+    }
+
+    // Client access layer
+    subgraph cluster_client {
+        label="Client Access Layer";
+        style=filled;
+        fillcolor=lightyellow;
+
+        agent_manager [label="Agent Manager"];
+        agent_client [label="Agent Client"];
+        agent_invoke [label="Agent Invoke"];
+        java_interop [label="Java Interop"];
+    }
+
+    // Agent definition layer
+    subgraph cluster_agent_definition {
+        label="Agent Definition Layer";
+        style=filled;
+        fillcolor=lightcyan;
+
+        agent_module [label="Agent Module"];
+        agents_topology [label="Agents Topology"];
+        agent_graph [label="Agent Graph"];
+        agent_node [label="Agent Node"];
+        agent_topology_builder [label="Agent Topology Builder"];
+    }
+
+    // Storage layer
+    subgraph cluster_storage {
+        label="Storage Layer";
+        style=filled;
+        fillcolor=lightpink;
+
+        store [label="Store"];
+        key_value_store [label="Key-Value Store"];
+        document_store [label="Document Store"];
+    }
+
+    // AI Integration
+    subgraph cluster_ai {
+        label="AI Integration";
+        style=filled;
+        fillcolor=lightsteelblue;
+
+        agent_objects [label="Agent Objects"];
+        langchain4j_integration [label="LangChain4j Integration"];
+        tool_calling [label="Tool Calling"];
+        tools_sub_agent [label="Tools Sub Agent"];
+        sub_agents [label="Sub Agents"];
+    }
+
+    // Execution features
+    subgraph cluster_execution {
+        label="Execution Features";
+        style=filled;
+        fillcolor=lightgray;
+
+        agent_node_function [label="Agent Node Function"];
+        agent_emit [label="Agent Emit"];
+        node_emit [label="Node Emit"];
+        agent_result [label="Agent Result"];
+        streaming_chunk [label="Streaming Chunk"];
+        streaming_subscription [label="Streaming Subscription"];
+        human_input_request [label="Human Input Request"];
+        fork [label="Fork"];
+        retry_mechanism [label="Retry Mechanism"];
+        agent_complete [label="Agent Complete"];
+        aggregation [label="Aggregation"];
+        multi_agg [label="Multi-Agg"];
+        update_mode [label="Update Mode"];
+        agent_throttling [label="Agent Throttling"];
+    }
+
+    // Monitoring and analysis
+    subgraph cluster_monitoring {
+        label="Monitoring & Analysis";
+        style=filled;
+        fillcolor=mistyrose;
+
+        dataset [label="Dataset"];
+        evaluators [label="Evaluators"];
+        experiment [label="Experiment"];
+        example_run [label="Example Run"];
+        user_interface [label="User Interface"];
+        agent_trace [label="Agent Trace"];
+    }
+
+    // Main agent concept
+    agent [shape=doubleoctagon, style=filled, fillcolor=gold, label="Agent"];
+
+    // Foundation relationships
+    rama -> rama_platform;
+    red_planet_labs -> rama;
+
+    // Infrastructure relationships
+    rama_platform -> ipc;
+    rama_platform -> pstate_store;
+    rama_platform -> task_global;
+    ipc -> cluster_manager;
+
+    // Client access relationships
+    cluster_manager -> agent_manager;
+    agent_manager -> agent_client;
+    agent_manager -> dataset;
+    agent_client -> agent_invoke;
+    agent_client -> human_input_request;
+    agent_client -> java_interop;
+
+    // Agent definition relationships
+    agent_module -> agents_topology;
+    agents_topology -> store;
+    agents_topology -> agent_objects;
+    agents_topology -> agent_topology_builder;
+    agent_topology_builder -> agent_graph;
+    agent_graph -> agent_node;
+    agent_graph -> aggregation;
+    agent_graph -> update_mode;
+
+    // Storage relationships
+    store -> key_value_store;
+    store -> pstate_store;
+    key_value_store -> document_store;
+
+    // AI integration relationships
+    agent_objects -> langchain4j_integration;
+    langchain4j_integration -> tool_calling;
+    tool_calling -> tools_sub_agent;
+    tools_sub_agent -> sub_agents;
+
+    // Execution feature relationships
+    agent_node -> agent_node_function;
+    agent_node -> streaming_chunk;
+    agent_node -> human_input_request;
+    agent_node -> agent_throttling;
+    agent_node_function -> agent_emit;
+    agent_node_function -> node_emit;
+    agent_node_function -> agent_result;
+    aggregation -> multi_agg;
+    agent_invoke -> fork;
+    agent_invoke -> retry_mechanism;
+    agent_invoke -> streaming_subscription;
+    agent_invoke -> agent_complete;
+    agent_invoke -> example_run;
+    agent_result -> agent_complete;
+    streaming_chunk -> streaming_subscription;
+
+    // Monitoring relationships
+    dataset -> evaluators;
+    example_run -> experiment;
+    experiment -> evaluators;
+    ipc -> user_interface;
+    user_interface -> agent_trace;
+    agent_trace -> agent_emit;
+
+    // Main agent relationships (composite concept)
+    agent_node -> agent;
+    agent_graph -> agent;
+    store -> agent;
+    agent_objects -> agent;
+    agent_client -> agent [style=dashed, label="manages"];
+    experiment -> agent [style=dashed, label="evaluates"];
+
+    // Additional dependency relationships
+    agent_module -> agent_manager [style=dashed];
+    agent_module -> java_interop [style=dashed];
+    tool_calling -> agent_node [style=dashed];
+}

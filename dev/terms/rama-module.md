@@ -1,4 +1,4 @@
-# Module
+# Rama Module
 
 ## Definition
 Deployable unit containing agent definitions, stores, and shared objects.

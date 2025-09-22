@@ -28,7 +28,7 @@ High-performance distributed storage with complex querying. Provides ACID proper
 - Access: `PStateStore` interface
 
 ## Relationships
-- Uses: Rama PState platform
+- Uses: Rama PStates
 - Used by: [Agent Node](agent-node.md)
 
 ## Examples
