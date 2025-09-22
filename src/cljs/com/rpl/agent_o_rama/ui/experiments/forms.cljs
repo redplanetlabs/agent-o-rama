@@ -409,18 +409,19 @@
   :main
   {:initial-fields
    (fn [props]
-     (merge {:name ""
-             :description ""
-             :snapshot ""
-             :selector {:type :all :tag ""}
-             :spec
-             {:type :regular
-              :targets [{:target-spec {:type :agent :agent-name nil}
-                         :input->args [{:id (random-uuid) :value "$"}]}]}
-             :evaluators []
-             :num-repetitions 1
-             :concurrency 1}
-            props))
+     (let [base {:name ""
+                 :description ""
+                 :snapshot ""
+                 :selector {:type :all :tag ""}
+                 :spec {:type :regular
+                        :targets [{:target-spec {:type :agent :agent-name nil}
+                                   :input->args [{:id (random-uuid) :value "$"}]}]}
+                 :evaluators []
+                 :num-repetitions 1
+                 :concurrency 1}
+           merged (merge base props)
+           merged-spec (merge (:spec base) (:spec props))]
+       (assoc merged :spec merged-spec)))
    :validators
    {:name [forms/required]
     :evaluators [(fn [v] (when (empty? v) "At least one evaluator is required"))]}
