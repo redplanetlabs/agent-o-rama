@@ -303,26 +303,30 @@
                        (set-loading true)
                        (set-error nil)
 
-                       (let [run-data (case evaluator-type
-                                        :regular {:input (js/JSON.stringify (clj->js (:input example)))
-                                                  :referenceOutput (js/JSON.stringify (clj->js (:reference-output example)))
-                                                  :output model-output-input}
-                                        :comparative {:input (js/JSON.stringify (clj->js (:input example)))
-                                                      :referenceOutput (js/JSON.stringify (clj->js (:reference-output example)))
-                                                      :outputs (mapv :value model-outputs-input)}
-                                        :summary {:dataset-id dataset-id
-                                                  :example-ids selected-example-ids})]
-                         (sente/request!
-                          [:evaluators/run {:module-id module-id
-                                            :name (:name selected-evaluator)
-                                            :type evaluator-type
-                                            :run-data run-data}]
-                          60000 ; Generous timeout
-                          (fn [reply]
-                            (set-loading false)
-                            (if (:success reply)
-                              (set-evaluation-result (:data reply))
-                              (set-error (:error reply))))))))]
+                       (try
+                         (let [run-data (case evaluator-type
+                                          :regular {:input (:input example) ; Already cljs data
+                                                    :referenceOutput (:reference-output example) ; Already cljs data
+                                                    :output (-> model-output-input js/JSON.parse js->clj)} ; <--- PARSE HERE
+                                          :comparative {:input (:input example)
+                                                        :referenceOutput (:reference-output example)
+                                                        :outputs (mapv #(-> % :value js/JSON.parse js->clj) model-outputs-input)} ; <--- PARSE HERE
+                                          :summary {:dataset-id dataset-id
+                                                    :example-ids selected-example-ids})]
+                           (sente/request!
+                            [:evaluators/run {:module-id module-id
+                                              :name (:name selected-evaluator)
+                                              :type evaluator-type
+                                              :run-data run-data}]
+                            60000 ; Generous timeout
+                            (fn [reply]
+                              (set-loading false)
+                              (if (:success reply)
+                                (set-evaluation-result (:data reply))
+                                (set-error (:error reply))))))
+                         (catch js/Error e
+                           (set-loading false)
+                           (set-error (str "Invalid JSON in one of the output fields: " (.-message e)))))))]
 
     ;; Clear evaluation result when evaluator changes
     (uix/use-effect

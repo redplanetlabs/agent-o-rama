@@ -54,23 +54,19 @@
                   :summary aor/try-summary-evaluator
                   (throw (ex-info "Invalid evaluator type" {:type type})))
 
-        ;; Parse JSON strings from run-data where necessary
-        parsed-input (when-let [input (:input run-data)]
-                       (j/read-value input))
-        parsed-ref-output (when-let [ref-output (:referenceOutput run-data)]
-                            (j/read-value ref-output))
-        parsed-output (when-let [output (:output run-data)]
-                        (j/read-value output))
-        ;; For comparative, outputs is already a cljs vector of strings
-        parsed-outputs (when-let [outputs (:outputs run-data)]
-                         (mapv j/read-value outputs))]
+        ;; No parsing needed for input, output, or outputs.
+        ;; They are already Clojure data structures.
+        input (:input run-data)
+        ref-output (:referenceOutput run-data)
+        output (:output run-data)
+        outputs (:outputs run-data)]
 
     (case type
       :regular
-      (eval-fn manager name parsed-input parsed-ref-output parsed-output)
+      (eval-fn manager name input ref-output output)
 
       :comparative
-      (eval-fn manager name parsed-input parsed-ref-output parsed-outputs)
+      (eval-fn manager name input ref-output outputs)
 
       :summary
       (let [underlying-objects (aor-types/underlying-objects manager)

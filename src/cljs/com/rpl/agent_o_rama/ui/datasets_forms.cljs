@@ -194,7 +194,20 @@
                  :submit-text "Add Example"}}
   :on-submit
   {:event (fn [db form-state]
-            [:datasets/add-example form-state])
+            (try
+              (let [parsed-input (-> (:input form-state) js/JSON.parse js->clj)
+                    parsed-output (when-not (str/blank? (:output form-state))
+                                    (-> (:output form-state) js/JSON.parse js->clj))]
+                ;; Return the Sente event with PARSED data
+                [:datasets/add-example (assoc form-state
+                                              :input parsed-input
+                                              :output parsed-output)])
+              (catch js/Error e
+                ;; If parsing fails, update the form with an error instead of sending.
+                (state/dispatch [:db/set-value [:forms (:form-id form-state) :error]
+                                 (str "Invalid JSON: " (.-message e))])
+                ;; Return nil to prevent Sente request from being sent
+                nil)))
    :on-success-invalidate (fn [db {:keys [module-id dataset-id]} _reply]
                             {:query-key-pattern [:dataset-examples module-id dataset-id]})}})
 

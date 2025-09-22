@@ -57,19 +57,13 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-example
   [{:keys [manager dataset-id snapshot-name input output]} uid]
-  (try
-    ;; Input/Output from the UI will be JSON strings. We must parse them.
-    (let [parsed-input (when-not (str/blank? input) (j/read-value input))
-          parsed-output (when-not (str/blank? output) (j/read-value output))]
-      (aor/add-dataset-example! manager
-                                dataset-id
-                                parsed-input
-                                {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)
-                                 :reference-output parsed-output})
-      {:status :ok})
-    (catch com.fasterxml.jackson.core.JsonParseException e
-      (throw (ex-info (str "Invalid JSON provided: " (.getOriginalMessage e))
-                      {:field (if (str/includes? (.getMessage e) "input") :input :output)})))))
+  ;; No parsing needed! The data is already in the correct format.
+  (aor/add-dataset-example! manager
+                            dataset-id
+                            input
+                            {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)
+                             :reference-output output})
+  {:status :ok})
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-snapshot-names
   [{:keys [manager dataset-id]} uid]
