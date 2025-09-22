@@ -76,9 +76,7 @@
 (defn parse-url-pair [^String s]
   (let [first-dash-idx (.indexOf s "-")]
     (if (= first-dash-idx -1)
-      ;; No dash found, treat as single value
-      [(parse-long s) nil]
-      ;; Split only on the first dash
+      (throw (ex-info "Invalid URL pair" {:url-pair s}))
       (let [task-id-str (.substring s 0 first-dash-idx)
             agent-id-str (.substring s (inc first-dash-idx))]
         [(parse-long task-id-str) (java.util.UUID/fromString agent-id-str)]))))
