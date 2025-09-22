@@ -276,8 +276,6 @@
 ;; DATASET FORM EVENTS
 ;; =============================================================================
 
-;; DELETED: :dataset/edit event handler has been moved to the :on-submit function in the :edit-dataset form spec
-
 (state/reg-event :dataset/edit-example
                  (fn [db {:keys [module-id dataset-id snapshot-name example-id form-fields]}]
                    (let [input (get form-fields :input "")
@@ -308,13 +306,6 @@
                          (state/dispatch [:form/set-submitting form-id false])
                          (state/dispatch [:form/set-error form-id (str "Invalid JSON: " (.-message e))]))))
                    nil))
-
-;; NOTE: This event handler has been moved to datasets_forms.cljs 
-;; as part of the :new-snapshot form registration. The old callback-based
-;; approach has been replaced with direct state dispatch.
-;; 
-;; (state/reg-event :dataset/create-snapshot ...)
-
 ;; =============================================================================
 ;; BULK OPERATION EVENTS
 ;; =============================================================================
@@ -334,12 +325,3 @@
                           (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}]))
                         (js/alert (str "Failed to delete examples: " (:error reply))))))
                    nil))
-
- ;; =============================================================================
-;; EVALUATOR FORM EVENTS
-;; =============================================================================
-
-;; NOTE: This old event handler has been replaced by the new form system
-;; in evaluators.cljs. The form now handles its own submission via :on-submit.
-;; Keeping this comment as a reminder of the migration.
-

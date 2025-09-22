@@ -361,19 +361,6 @@
                                                           ($ :span.inline-flex.items-center.px-2.py-0.5.rounded-full.text-xs.font-medium
                                                              {:className (get-evaluator-type-badge-style (:type evaluator))}
                                                              (get-evaluator-type-display (:type evaluator))))}))))))))
-
-;; =============================================================================
-;; SNAPSHOT MANAGER
-;; =============================================================================
-
-;; =============================================================================
-;; SNAPSHOT MANAGER - MOVED TO DEDICATED FILE
-;; =============================================================================
-
-;; The SnapshotManager component has been moved to:
-;; com.rpl.agent-o-rama.ui.datasets.snapshot-selector
-;; This provides better code organization and reusability.
-
 ;; =============================================================================
 ;; CONTEXTUAL ACTION BAR
 ;; =============================================================================
@@ -595,8 +582,6 @@
   (rfe/href :module/dataset-detail
             {:module-id module-id
              :dataset-id dataset-id}))
-
-;; DELETED: show-edit-dataset-modal! function has been replaced by the declarative :edit-dataset form spec
 
 ;; =============================================================================
 ;; MAIN DATASETS INDEX PAGE
