@@ -218,8 +218,8 @@
        ($ :div.flex.items-center.gap-4.mb-4
           ($ :label.text-sm.font-medium "Target Type:")
           ($ :select.p-1.border.border-gray-300.rounded-md
-             {:value (or (:value target-spec-type-field) :agent)
-              :on-change #(state/dispatch [:form/set-experiment-target-type form-id index (keyword (.. % -target -value))])}
+             {:value (name (or (:value target-spec-type-field) :agent))
+              :onChange #(state/dispatch [:form/set-experiment-target-type form-id index (keyword (.. % -target -value))])}
              ($ :option {:value "agent"} "Agent")
              ($ :option {:value "node"} "Node")))
 
