@@ -23,6 +23,13 @@ and human input capabilities for a particular agent type.
 
 Final state of an agent execution indicating successful termination with result.
 
+## Agent Emit
+
+The mechanism by which agent nodes send data to other nodes in the agent
+graph, enabling flow control and data passing. Called via `emit!`
+function with target node name and arguments, triggers execution of
+downstream nodes.
+
 ## Agent Graph
 
 A directed graph structure that defines the execution flow of an agent,
@@ -58,6 +65,14 @@ results. Defined with `aor/node` function, receives an `agent-node`
 parameter that provides access to stores, agent objects, and control
 functions like `emit!` and `result!`.
 
+## Agent Node Function
+
+The user-defined function that implements the logic for a specific agent
+node. Receives an `agent-node` parameter for accessing framework
+services and additional arguments from the node invocation or emission.
+Functions can call `emit!`, `result!`, `stream-chunk!`, and other
+framework operations.
+
 ## [Agent Objects](terms/agent-objects.md)
 
 Shared resources (like AI models, databases, APIs) that agents can
@@ -88,6 +103,12 @@ Execution monitoring system that captures agent node transitions and data flow f
 The top-level container for defining agents, stores, and objects within
 a module. Created via `agent-topology` function, provides methods for
 declaring agents and resources.
+
+## Agent Topology Builder
+
+The fluent interface for constructing agent definitions through method
+chaining. Provides methods like `new-agent`, `node`, `agg-start-node`,
+and `agg-node` to build complex agent execution graphs declaratively.
 
 ## [Aggregation](terms/aggregation.md)
 
@@ -130,9 +151,29 @@ A mechanism for agents to request input from human users during
 execution. Created via `get-human-input` within agent nodes, handled via
 client API to enable human-in-the-loop workflows.
 
+## IPC (In-Process Cluster)
+
+A local Rama cluster instance used for development and testing. Created
+via `create-ipc` for running agents in a single process without
+requiring a distributed cluster setup.
+
+## Java Interop
+
+Bidirectional integration between Clojure agent definitions and Java
+client code. Agent modules can be used from Java applications, and Java
+objects can be integrated into agent execution through agent objects
+and LangChain4j integration.
+
 ## [Key-Value Store](terms/key-value-store.md)
 
 A typed store for simple key-value pairs with specified key/value classes.
+
+## LangChain4j Integration
+
+Integration with the LangChain4j library for AI model interactions,
+providing chat models, tool calling, JSON schema generation, and
+structured output parsing. Enables seamless AI integration within agent
+execution flows.
 
 ## Multi-Agg
 
@@ -143,6 +184,13 @@ and `on` clauses for sophisticated result aggregation patterns.
 ## PState Store
 
 A persistent state store backed by Rama's PState for durable agent data.
+
+## Module
+
+A deployable unit containing agent definitions, stores, and shared
+objects. Defined using `defagentmodule` macro, represents a complete
+agent system that can be launched on a Rama cluster. Modules are
+identified by name and can reference agents from other modules.
 
 ## Node Emit
 
@@ -194,3 +242,24 @@ workflows.
 Controls how agent graphs handle updates (continue, restart, or
 drop). Set via `set-update-mode` on agent graphs to determine behavior
 when graph definitions change.
+
+## Rama Platform
+
+The underlying distributed computing platform that agent-o-rama is built
+upon. Provides the distributed runtime, persistent state management,
+partitioning, and scalability features that enable agents to run across
+multiple machines with high performance and fault tolerance.
+
+## Tool Calling
+
+Integration pattern for connecting AI models with external functions and
+APIs. Agents can define tool specifications using LangChain4j schemas
+and execute tools based on AI model decisions, enabling sophisticated
+AI-driven workflows with external system integration.
+
+## User Interface (UI)
+
+A ClojureScript-based web interface for monitoring and visualizing
+agent execution in real-time. Provides debugging tools, state
+inspection, and execution flow visualization. Started via `start-ui`
+function and accessible through web browser when agents are running.
