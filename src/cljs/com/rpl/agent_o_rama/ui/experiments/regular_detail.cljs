@@ -183,7 +183,9 @@
   (let [content-str (common/pp content)
         is-long? (> (count content-str) 100)]
     ($ :div.relative.group
-       ($ :div {:className (if truncated? "max-w-xs truncate" "max-w-lg")}
+       ($ :div {:className (if truncated?
+                             "max-w-xs truncate"
+                             "max-w-xl whitespace-pre-wrap break-words")}
           content-str)
        (when (and is-long? truncated?)
          ($ :button.absolute.top-0.right-0.opacity-0.group-hover:opacity-100.transition-opacity.bg-blue-500.text-white.rounded.text-xs.px-2.py-1.hover:bg-blue-600
@@ -261,9 +263,13 @@
                      ;; MODIFIED: Output Cell (now simplified)
                      (let [agent-result (get-in run [:agent-results 0])]
                        ($ :td {:key "output-cell" :className (:td common/table-classes)}
-                          ($ :div.max-w-xs
+                          ($ :div {:className (if show-full-text?
+                                                "max-w-xl whitespace-pre-wrap break-words"
+                                                "max-w-xs")}
                              ;; The agent's raw output
-                             ($ :div {:className (if show-full-text? "" "truncate")}
+                             ($ :div {:className (if show-full-text?
+                                                   "whitespace-pre-wrap break-words"
+                                                   "truncate")}
                                 (if (:failure? (:result agent-result))
                                   ($ :div.space-y-2
                                      (if-let [throwable (get-in agent-result [:result :val :throwable])]
@@ -282,9 +288,7 @@
                                             {:onClick #(state/dispatch [:modal/show :content-detail
                                                                         {:title "Output"
                                                                          :component ($ ContentModal {:content output-content :title "Output"})}])}
-                                            "↗"))))))
-                             ;; Link to the agent trace
-                             )))
+                                            "↗")))))))))
                      ;; Trace Column (separate from output)
                      ($ :td {:key "trace-cell" :className (common/cn (:td common/table-classes) "text-center")}
                         (let [first-invoke (get-in run [:agent-initiates 0 :agent-invoke])]
