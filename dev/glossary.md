@@ -65,6 +65,10 @@ results. Defined with `aor/node` function, receives an `agent-node`
 parameter that provides access to stores, agent objects, and control
 functions like `emit!` and `result!`.
 
+## [Agent Node Declaration](terms/agent-node-declaration.md)
+
+Blueprint for computation units within agent graphs, defining node name, target, and function. Forms the building blocks of agent graph topology through `aor/node` declarations that specify unique node names, target connections, and execution logic.
+
 ## [Agent Node Function](terms/agent-node-function.md)
 
 The user-defined function that implements the logic for a specific agent

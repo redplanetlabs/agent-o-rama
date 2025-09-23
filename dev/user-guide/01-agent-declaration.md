@@ -85,7 +85,7 @@ The graph starts at the first defined node and flows through connections until r
 
 ## Node Declaration
 
-[Agent nodes](../terms/agent-node.md) are your units of computation. The declaration pattern:
+[Agent node declarations](../terms/agent-node-declaration.md) are blueprints for your computation units. The declaration pattern:
 
 ```clojure
 (aor/node
@@ -94,8 +94,13 @@ The graph starts at the first defined node and flows through connections until r
  node-function)        ; your logic
 ```
 
+The [agent node declaration](../terms/agent-node-declaration.md) specifies:
+- Node name (unique identifier)
+- Target node (or nil for terminal nodes)
+- [Node function](../terms/agent-node-function.md) containing your logic
+
 The [node function](../terms/agent-node-function.md) receives:
-- `agent-node` - access to framework services
+- `agent-node` - runtime [agent node](../terms/agent-node.md) with access to framework services
 - Additional arguments from invocation or emissions
 
 ## Agent Result

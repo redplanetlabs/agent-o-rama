@@ -29,7 +29,7 @@ Here's the complete multi_node_agent.clj showing connected nodes:
 (aor/defagentmodule MultiNodeAgentModule
   [topology]
 
-  ;; Thread the agent through multiple node definitions
+  ;; Thread the agent through multiple node declarations
   (-> (aor/new-agent topology "MultiNodeAgent")
 
       ;; First node: receive input and forward it
@@ -276,10 +276,11 @@ You've learned agent execution patterns:
 
 1. **[Node Emit](../terms/node-emit.md)**: Flow control between nodes
 2. **[Agent Graph](../terms/agent-graph.md)**: Directed execution structure
-3. **[Aggregation](../terms/aggregation.md)**: Parallel scatter-gather processing
-4. **[Multi-Agg](../terms/multi-agg.md)**: Custom aggregation logic
-5. **[Human Input Request](../terms/human-input-request.md)**: Human-in-the-loop workflows
-6. **[Sub-Agents](../terms/sub-agents.md)**: Agent-to-agent invocation
+3. **[Agent Node Declaration](../terms/agent-node-declaration.md)**: Blueprint for computation units
+4. **[Aggregation](../terms/aggregation.md)**: Parallel scatter-gather processing
+5. **[Multi-Agg](../terms/multi-agg.md)**: Custom aggregation logic
+6. **[Human Input Request](../terms/human-input-request.md)**: Human-in-the-loop workflows
+7. **[Sub-Agents](../terms/sub-agents.md)**: Agent-to-agent invocation
 
 These patterns enable complex distributed workflows.
 
