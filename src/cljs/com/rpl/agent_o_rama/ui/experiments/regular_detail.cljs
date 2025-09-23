@@ -146,8 +146,8 @@
 
 (defn format-metric-value [value]
   (cond
-    (true? value) ($ :span.text-green-700 "T")
-    (false? value) ($ :span.text-red-700 "F")
+    (true? value) ($ :span.text-green-700 "True")
+    (false? value) ($ :span.text-red-700 "False")
     (and (number? value) (<= 0 value) (<= value 1)) (str (int (* 100 value)) "/100")
     (number? value) (str value)
     (string? value) (if (> (count value) 20) (str (subs value 0 17) "…") value)
@@ -155,22 +155,17 @@
     :else ($ :span.italic.text-gray-400 "…")))
 
 ;; NEW COMPONENT: Renders the content of a single evaluator result cell
-(defui EvaluatorResultCell [{:keys [run eval-name module-id]}]
+(defui EvaluatorResultCell [{:keys [run eval-name metric-key module-id]}]
   (let [eval-result (get-in run [:evals eval-name])
+        metric-value (get eval-result metric-key)
         eval-failure (get-in run [:eval-failures eval-name])
         eval-invoke (get-in run [:eval-initiates eval-name])
         cell-content (cond
                        eval-failure
-                       ($ :div.px-2.py-1.rounded-md.text-xs.font-medium.bg-red-100.text-red-800.hover:bg-red-200.transition-colors
-                          "Failed")
+                       ($ :span.text-red-700.font-semibold "Failed")
 
-                       eval-result
-                       ($ :div.flex.flex-col.gap-1.items-start
-                          (for [[metric-key metric-value] (sort-by key eval-result)]
-                            ($ :div.flex.items-center.gap-1.5.px-2.py-1.rounded-md.text-xs.bg-gray-100.text-gray-800.border.border-gray-200
-                               {:key (name metric-key)}
-                               ($ :span.font-medium.text-gray-600 (name metric-key))
-                               ($ :span.font-semibold (format-metric-value metric-value)))))
+                       (some? metric-value)
+                       (format-metric-value metric-value)
 
                        :else
                        ($ :span.text-gray-400 "—"))
@@ -179,9 +174,9 @@
                          {:module-id module-id
                           :agent-name "_aor-evaluator"
                           :invoke-id (str (:task-id eval-invoke) "-" (:agent-invoke-id eval-invoke))}))]
-    ($ :td {:className (:td common/table-classes)}
+    ($ :td.px-4.py-3.text-sm.text-gray-700.text-center
        (if href
-         ($ :a.no-underline {:href href :target "_blank" :title "View evaluator trace"} cell-content)
+         ($ :a.no-underline.text-inherit {:href href :target "_blank" :title "View evaluator trace"} cell-content)
          cell-content))))
 
 (defui CellContent [{:keys [content truncated? on-expand]}]
@@ -203,11 +198,28 @@
 
 (defui ResultsTable [{:keys [results target module-id]}]
   (let [[show-full-text? set-show-full-text] (uix/use-state false)
-        ;; NEW: Get a sorted, unique list of all evaluator names from the results.
-        evaluator-names (->> results
-                             (mapcat #(keys (:evals %)))
-                             (distinct)
-                             (sort))]
+        ;; Smart header logic with metric collision detection
+        evaluator-columns (let [;; 1. Get all [eval-name, metric-key] pairs
+                                all-eval-metric-pairs (for [run results
+                                                            [eval-name metrics] (:evals run)
+                                                            metric-key (keys metrics)]
+                                                        [eval-name metric-key])
+                                ;; 2. Find metric keys that appear in more than one evaluator
+                                metric-key-counts (->> all-eval-metric-pairs (map second) frequencies)
+                                duplicate-metric-keys (->> metric-key-counts
+                                                           (filter #(< 1 (second %)))
+                                                           (map first)
+                                                           set)
+                                ;; 3. Get all unique [eval-name, metric-key] pairs and sort them
+                                unique-pairs (->> all-eval-metric-pairs distinct (sort-by (juxt first second)))]
+                            ;; 4. Build the final column definitions with display names
+                            (mapv (fn [[eval-name metric-key]]
+                                    {:eval-name eval-name
+                                     :metric-key metric-key
+                                     :display-name (if (contains? duplicate-metric-keys metric-key)
+                                                     (str (name eval-name) "/" (name metric-key))
+                                                     (name metric-key))})
+                                  unique-pairs))]
     ($ :div
        ($ :div.flex.justify-between.items-center.mb-4
           ($ :h3.text-xl.font-bold "Detailed Results")
@@ -224,10 +236,11 @@
                    ($ :th {:className (:th common/table-classes)} "Input")
                    ($ :th {:className (:th common/table-classes)} "Reference Output")
                    ($ :th {:className (:th common/table-classes)} "Output")
-                   ;; NEW: Dynamically generate a th for each evaluator
-                   (for [eval-name evaluator-names]
-                     ($ :th {:key eval-name :className (:th common/table-classes)}
-                        eval-name))))
+                   ($ :th {:className (common/cn (:th common/table-classes) "text-center")} "Trace")
+                   ;; Dynamically generate a th for each evaluator metric
+                   (for [{:keys [display-name]} evaluator-columns]
+                     ($ :th {:key display-name :className (common/cn (:th common/table-classes) "text-center")}
+                        display-name))))
              ($ :tbody
                 (for [run results]
                   ($ :tr.border-b {:key (:example-id run)}
@@ -271,22 +284,25 @@
                                                                          :component ($ ContentModal {:content output-content :title "Output"})}])}
                                             "↗"))))))
                              ;; Link to the agent trace
-                             (let [first-invoke (get-in run [:agent-initiates 0 :agent-invoke])]
-                               (if first-invoke
-                                 ($ :div.mt-2
-                                    ($ :a.text-indigo-600.hover:text-indigo-900
-                                       {:href (rfe/href :agent/invocation-detail
-                                                        {:module-id module-id
-                                                         :agent-name (get-in run [:agent-initiates 0 :agent-name])
-                                                         :invoke-id (str (:task-id first-invoke) "-" (:agent-invoke-id first-invoke))})
-                                        :target "_blank"}
-                                       "View Trace"))
-                                 ($ :div.mt-2 ($ :span.text-gray-400 "No trace")))))))
-                     ;; NEW: Dynamically generate a td for each evaluator
-                     (for [eval-name evaluator-names]
-                       ($ EvaluatorResultCell {:key (str "eval-" eval-name)
+                             )))
+                     ;; Trace Column (separate from output)
+                     ($ :td {:key "trace-cell" :className (common/cn (:td common/table-classes) "text-center")}
+                        (let [first-invoke (get-in run [:agent-initiates 0 :agent-invoke])]
+                          (if first-invoke
+                            ($ :a.inline-flex.items-center.px-3.py-1.text-sm.text-indigo-600.hover:text-indigo-900.bg-indigo-50.hover:bg-indigo-100.rounded-md.transition-colors
+                               {:href (rfe/href :agent/invocation-detail
+                                                {:module-id module-id
+                                                 :agent-name (get-in run [:agent-initiates 0 :agent-name])
+                                                 :invoke-id (str (:task-id first-invoke) "-" (:agent-invoke-id first-invoke))})
+                                :target "_blank"}
+                               "View Trace")
+                            ($ :span.text-gray-400 "—"))))
+                     ;; Dynamically generate a td for each evaluator metric
+                     (for [{:keys [eval-name metric-key display-name]} evaluator-columns]
+                       ($ EvaluatorResultCell {:key display-name
                                                :run run
                                                :eval-name eval-name
+                                               :metric-key metric-key
                                                :module-id module-id}))))))))))
 
 (defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
