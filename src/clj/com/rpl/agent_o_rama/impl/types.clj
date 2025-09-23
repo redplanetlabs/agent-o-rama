@@ -704,7 +704,7 @@
     :>=
     (>= v value)
 
-    (throw (h/ex-info "Unknonw comparator" {:comparator comparator}))))
+    (throw (h/ex-info "Unknown comparator" {:comparator comparator}))))
 
 (defaorrecord FeedbackFilter
   [rule-name :- String
