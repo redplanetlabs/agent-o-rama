@@ -12,6 +12,8 @@
    [com.jayway.jsonpath
     JsonPath
     Predicate]
+   [com.rpl.agentorama
+    AgentFailedException]
    [com.rpl.agentorama.impl
     AORExceptionInfo]
    [com.rpl.rama.helpers
@@ -336,10 +338,22 @@
       (assoc m "conductor.port" port)
       m)))
 
+(defn result->output
+  [{:keys [failure? val] :as result}]
+  (cond
+    (nil? result)
+    (AgentFailedException. "No result")
+
+    failure?
+    (AgentFailedException. (str val))
+
+    :else
+    val))
+
 (defn node->output
   [result emits]
   (if (some? result)
-    (:val result)
+    (result->output result)
     (mapv
      (fn [{:keys [node-name args]}]
        {"node" node-name

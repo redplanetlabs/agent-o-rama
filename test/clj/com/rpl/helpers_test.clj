@@ -38,6 +38,7 @@
          (h/validate-options! "context" {:ab -1 :bb 23} spec)))
   ))
 
+;; TODO: <<<<>>>> test with failed result
 (deftest node->output-test
   (is (= 123 (h/node->output (aor-types/->AgentResult 123 false) 12345)))
   (is (= [{"node" "abc" "args" [1 2 3]}

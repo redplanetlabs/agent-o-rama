@@ -397,6 +397,24 @@
   (when (and start-time-millis finish-time-millis)
     (- finish-time-millis start-time-millis)))
 
+(defn run-action!
+  [action-fn input output run-info]
+  (let [fetcher (anode/mk-fetcher)
+        cf      (CompletableFuture.)]
+    (anode/submit-virtual-task!
+     nil
+     (fn []
+       (try
+         (let [m (action-fn fetcher input output run-info)]
+           (when-not (and (map? m) (every? string? (keys m)))
+             (throw (h/ex-info "Action return must be map with string keys" {:reeturn m})))
+           (.complete cf {:success? true :info-map m}))
+         (catch Throwable t
+           (.complete cf {:success? false :info-map {"exception" (h/throwable->str t)}}))
+       )))
+    cf))
+
+
 (deframaop run-actions!
   [*items *agent->rule->info *cache-pstate-name]
   (<<with-substitutions
@@ -425,12 +443,16 @@
                                     (get *data :agent-id)
                                     :> *agent-invoke)
        (identity *offset :> *node-invoke)
+       (get *data :input :> *input)
+       (h/node->output (get *data :result) (get *data :emits) :> *output)
       (else>)
        (identity :agent :> *type)
        (get *data :stats :> *agent-stats)
        (identity nil :> *nested-ops)
        (aor-types/->AgentInvokeImpl *task-id *offset :> *agent-invoke)
-       (identity nil :> *node-invoke))
+       (identity nil :> *node-invoke)
+       (get *data :invoke-args :> *input)
+       (h/result->output (get *data :result) :> *output))
      (select> [:feedback :results NIL->VECTOR] *data :> *feedback)
      (aor-types/->valid-RunInfoImpl *action-name
                                     *agent-name
@@ -441,11 +463,9 @@
                                     (data->latency-millis *data)
                                     *feedback
                                     *agent-stats
-                                    *nested-ops)
-
-     ;; TODO: <<<<>>>>
-     ;;  - run action on virtual thread and wait on it with completable-future>
-     (...run-action! *action-fn *data :> *cf)
+                                    *nested-ops
+                                    :> *run-info)
+     (run-action! *action-fn *input *output *run-info :> *cf)
      (completable-future> *cf :> {:keys [*success? *info-map]}))
    (h/current-time-millis :> *action-finish-time-millis)
    (aor-types/->valid-ActionLog *action-start-time-millis
