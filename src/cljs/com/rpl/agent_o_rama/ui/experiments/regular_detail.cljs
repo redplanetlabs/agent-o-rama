@@ -181,7 +181,7 @@
           ["bg-gray-100 text-gray-800" (format-metric-value metric-value) (str display-name ": " (pr-str metric-value))])]
 
     ($ :a.inline-flex.items-center.px-2.py-1.rounded-full.text-xs.font-medium.transition-colors.hover:shadow-md
-       {:className badge-style
+       {:className (str "p-1 " badge-style)
         :href href
         :target "_blank"
         :title title-text
