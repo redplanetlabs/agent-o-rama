@@ -268,6 +268,12 @@
      po/AGENT-CONFIG-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
 
+    (declare-pstate*
+     mb-topology
+     (symbol (po/action-log-task-global-name))
+     po/ACTION-LOG-PSTATE-SCHEMA
+     {:key-partitioner apart/task-id-key-partitioner})
+
     (doseq [depot-sym [pstate-write-depot-sym datasets-depot-sym
                        global-actions-depot-sym]]
       (set-launch-depot-dynamic-option!* setup

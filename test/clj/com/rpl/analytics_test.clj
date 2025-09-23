@@ -695,3 +695,43 @@
         (aor-types/->valid-FeedbackFilter "xyz" "a" (aor-types/->ComparatorSpec :> 10))))
      (is (= #{"xyz"} (aor-types/dependency-rule-names filter)))
     )))
+
+(deftest to-action-queue-test
+  (let [data {0 {"A" {"A-R1" {:offsets [0]}
+                      "A-R2" {:offsets [1 2 3]}}
+                 "B" {"B-R1" {:offsets []}
+                      "B-R2" {:offsets [12]}
+                      "B-R3" {:offsets [13 14 15 16]}}}
+              1 {"A" {"A-R1" {:offsets [4 5]}
+                      "A-R2" {:offsets [6]}}
+                 "B" {"B-R1" {:offsets [17]}
+                      "B-R2" {:offsets [18 19]}
+                      "B-R3" {:offsets [20 21 22]}}}
+              2 {"A" {"A-R1" {:offsets [7 8 9]}}
+                 "B" {"B-R1" {:offsets [24 25 26]}
+                      "B-R2" {:offsets [27]}
+                      "B-R3" {:offsets [28 29 30 31 32 33 34 35 36]}}}}
+        out  (vec (ana/to-action-queue data))]
+    ;; 1. Offsets for each task/agent/rule are emitted in order
+    (doseq [[task agents] data
+            [agent rules] agents
+            [rule {:keys [offsets]}] rules]
+      (let [emitted (->> out
+                         (filter #(and (= (:task-id %) task)
+                                       (= (:agent-name %) agent)
+                                       (= (:rule-name %) rule)))
+                         (map :offset))]
+        (is (= offsets emitted)
+            (str "Offsets not preserved for " [task agent rule]))))
+
+    ;; 2. Every offset across input is included exactly once
+    (let [input-offsets  (->> data
+                              (mapcat (fn [[t agents]]
+                                        (for [[a rules] agents
+                                              [r {:keys [offsets]}] rules
+                                              o         offsets]
+                                          {:task-id t :agent-name a :rule-name r :offset o})))
+                              set)
+          output-offsets (set out)]
+      (is (= input-offsets output-offsets)
+          "All offsets should be present exactly once in output"))))

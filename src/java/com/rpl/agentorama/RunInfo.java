@@ -46,11 +46,11 @@ public interface RunInfo {
    */
   RunType getRunType();
   /**
-   * Return latency of this run.
+   * Return latency of this run. May be null if the node failed and never completed.
    *
    * @return latency in milliseconds
    */
-  long getLatencyMillis();
+  Long getLatencyMillis();
   /**
    * Get all feedback on this run.
    *

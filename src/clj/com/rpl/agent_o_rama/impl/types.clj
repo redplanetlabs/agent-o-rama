@@ -648,7 +648,7 @@
    agent-invoke :- AgentInvokeImpl
    node-invoke :- (s/maybe NodeInvokeImpl)
    type :- (s/enum :agent :node)
-   latency-millis :- Long
+   latency-millis :- (s/maybe Long)
    feedback :- [FeedbackImpl]
    agent-stats :- (s/maybe AgentInvokeStatsImpl)
    nested-ops :- (s/maybe [NestedOpInfoImpl])]
@@ -757,6 +757,12 @@
   [agent-name :- String
    name :- String]
   RuleEvent)
+
+(defaorrecord ActionLog
+  [start-time-millis :- Long
+   finish-time-millis :- Long
+   success? :- Boolean
+   info-map :- {String Object}])
 
 ;; Misc
 
@@ -897,3 +903,9 @@
  positive-long?
  "Maximum number of actions (e.g. online evaluations) that can be executing at once across all agents and all tasks"
  10)
+
+(defglobalconfig
+ ACTIONS-PROCESSING-ITERATION-TIME-MILLIS
+ positive-long?
+ "Maximum amount of time to spend processing actions per iteration"
+ 5000)

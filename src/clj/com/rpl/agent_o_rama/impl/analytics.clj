@@ -301,55 +301,232 @@
     (aggs/+map-agg *agent-name *rules :> *ret))
   (:> *ret))
 
+(defn safe-last-key
+  [m alternate]
+  (if (empty? m)
+    alternate
+    (h/last-key m)))
+
+(defn action-target-pstate
+  [agent-name node-name]
+  (if (nil? node-name)
+    (po/agent-root-task-global agent-name)
+    (po/agent-node-task-global agent-name)))
+
+(defn scan-amt [] 100)
+
 (deframaop find-qualified-offsets
-  []
-  (read-rules :> *agent->rule->info)
-  (ops/explode *agent->rule->info :> [*agent-name *rule->info])
-  (ops/explode *rule->info :> [*rule-name *rule-info])
-  (aor-types/dependency-rule-names (-> *rule-info
-                                       (get :definition)
-                                       (get :filter))
-                                   :> *dependency-names)
-  (select> [:cursors ALL (collect-one FIRST LAST)]
-    *rule-info
-    :> [*task-id *offset])
-  (<<batch
-    (ops/explode *dependency-names :> *dname)
-    (select> [(keypath *dname) :cursors (keypath *task-id)] *rule->info :> *other-offset)
-    (aggs/+min *other-offset :> *dep-end-offset))
-  (or> *dep-end-offset (h/max-uuid) :> *end-offset)
-  (|direct *task-id)
-  ;; TODO: <<<>>> query root/node as necessary to find matching offsets
-  ;;    - go no higher than *end-offset
-  ;;    - get a range with sorted-map-range-from of size 100, then check
+  [*agent->rule->info *cache-pstate-name]
+  (<<with-substitutions
+   [$$cache (this-module-pobject-task-global *cache-pstate-name)]
+   (ops/explode-map *agent->rule->info :> *agent-name *rule->info)
+   (ops/explode-map *rule->info :> *rule-name *rule-info)
+   (get *rule-info :definition :> {:keys [*filter *node-name *sampling-rate]})
+   (aor-types/dependency-rule-names *filter :> *dependency-names)
+   (select> [:cursors ALL (collect-one FIRST LAST)]
+     *rule-info
+     :> [*task-id *offset])
+   (<<batch
+     (ops/explode *dependency-names :> *dname)
+     (select> [(keypath *dname) :cursors (keypath *task-id)] *rule->info :> *other-offset)
+     (aggs/+min *other-offset :> *dep-end-offset))
+   (or> *dep-end-offset (h/max-uuid) :> *end-offset)
+   (|direct *task-id)
+   (action-target-pstate *agent-name *node-name :> $$p)
+   (<<ramafn %match?
+     [*data]
+     (:> (and> (< (rand) *sampling-rate)
+               (aor-types/rule-filter-matches? *filter *data))))
+   (scan-amt :> *scan-amt)
+   (local-select> [(sorted-map-range-from *offset *scan-amt)
+                   (sorted-map-range *offset *end-offset)]
+                  $$p
+                  :> *m)
+   (local-transform> [(keypath *agent-name *rule-name) (termval *m)] $$cache)
+   (safe-last-key *m *end-offset :> *end-scan-offset)
+   (select> (subselect ALL
+                       (selected? LAST (pred %match?))
+                       FIRST)
+     *m
+     :> *matching-offsets)
+   (:> *agent-name *rule-name *task-id *matching-offsets *end-scan-offset)))
 
 
+(defn to-action-queue
+  [task->agent->rule->info]
+  (letfn [(rr [colls]
+              (lazy-seq
+               (let [active (seq (filter seq colls))]
+                 (when active
+                   (concat (map first active)
+                           (rr (map rest active)))))))]
+    (let [tasks     (shuffle (keys task->agent->rule->info))
+          task-seqs (for [t tasks]
+                      (rr
+                       (for [a (shuffle (keys (get task->agent->rule->info t)))]
+                         (rr
+                          (for [r (shuffle (keys (select-any (keypath t a)
+                                                             task->agent->rule->info)))]
+                            (let [offs (select-any (keypath t a r :offsets)
+                                                   task->agent->rule->info)]
+                              (when (seq offs)
+                                (map (fn [off]
+                                       {:task-id    t
+                                        :agent-name a
+                                        :rule-name  r
+                                        :offset     off})
+                                     offs))))))))]
+      (rr task-seqs))))
 
+(def BUILD-ERROR ::builder-error)
+
+(defn build-action-fn
+  [builder-fn params]
+  (if (nil? builder-fn)
+    {BUILD-ERROR {"error" "Action builder does not exist"}}
+    (try
+      (builder-fn params)
+      (catch Throwable t
+        {BUILD-ERROR {"error"     "Action failed to build"
+                      "exception" (h/throwable->str t)}}
+
+      ))))
+
+(defn data->latency-millis
+  [{:keys [start-time-millis finish-time-millis]}]
+  (when (and start-time-millis finish-time-millis)
+    (- finish-time-millis start-time-millis)))
+
+(deframaop run-actions!
+  [*items *agent->rule->info *cache-pstate-name]
+  (<<with-substitutions
+   [$$cache (this-module-pobject-task-global *cache-pstate-name)
+    $$action-log (po/action-log-task-global)]
+   (ops/explode *items :> {:keys [*task-id *agent-name *rule-name *offset]})
+
+   (select> (keypath *agent-name *rule-name :definition)
+     *agent->rule->info
+     :> {:keys [*action-name *action-params *node-name]})
+   (|direct *task-id)
+   (all-action-builders :> *action-builders)
+   (get *action-builders *action-name :> {:keys [*builder-fn]})
+   (build-action-fn *builder-fn *action-params :> *action-fn)
+   (h/current-time-millis :> *action-start-time-millis)
+   (<<if (and> (map? *action-fn) (contains? *action-fn BUILD-ERROR))
+     (get *action-fn BUILD-ERROR :> *info-map)
+     (identity false :> *success?)
+    (else>)
+     (local-select> (keypath *agent-name *rule-name *offset) $$cache :> *data)
+     (<<if (some? *node-name)
+       (identity :node :> *type)
+       (identity nil :> *agent-stats)
+       (get *data :nested-ops :> *nested-ops)
+       (aor-types/->AgentInvokeImpl (get *data :agent-task-id)
+                                    (get *data :agent-id)
+                                    :> *agent-invoke)
+       (identity *offset :> *node-invoke)
+      (else>)
+       (identity :agent :> *type)
+       (get *data :stats :> *agent-stats)
+       (identity nil :> *nested-ops)
+       (aor-types/->AgentInvokeImpl *task-id *offset :> *agent-invoke)
+       (identity nil :> *node-invoke))
+     (select> [:feedback :results NIL->VECTOR] *data :> *feedback)
+     (aor-types/->valid-RunInfoImpl *action-name
+                                    *agent-name
+                                    *node-name
+                                    *agent-invoke
+                                    *node-invoke
+                                    *type
+                                    (data->latency-millis *data)
+                                    *feedback
+                                    *agent-stats
+                                    *nested-ops)
+
+     ;; TODO: <<<<>>>>
+     ;;  - run action on virtual thread and wait on it with completable-future>
+     (...run-action! *action-fn *data :> *cf)
+     (completable-future> *cf :> {:keys [*success? *info-map]}))
+   (h/current-time-millis :> *action-finish-time-millis)
+   (aor-types/->valid-ActionLog *action-start-time-millis
+                                *action-finish-time-millis
+                                *success?
+                                *info-map
+                                :> *action-log)
+   (local-transform> [(keypath *agent-name *rule-name) AFTER-ELEM (termval *action-log)]
+                     $$action-log)
+  ))
+
+(defn action-iter-complete?
+  [first-iter? queue start-time-millis target-millis]
+  (let [time-delta (- (h/current-time-millis) start-time-millis)]
+    (or (empty? queue)
+        (and (not first-iter?)
+             (> time-delta target-millis)))))
+
+(defn compute-new-cursors
+  [match-info rem-queue]
+  ;; TODO: <<<<>>>>
+  ;;  - match-info is task-id -> agent-name -> rule-name -> {:end-scan-offset ...}
+  ;;  - rem-queue is [{:task-id ... :agent-name ... :rule-name ... :offset ...}]
 )
+
+(deframafn update-rule-offsets!
+  [*match-info *rem-queue]
+  (compute-new-cursors *match-info *rem-queue :> *agent->rule->cursors)
+  (<<atomic
+    (ops/explode-map *agent->rule->cursors :> *agent-name *rule->cursors)
+    (po/agent-rules-task-global *agent-name :> $$rules)
+    (ops/explode-map *rule->cursors :> *rule-name *cursors)
+    (local-transform> [(keypath *rule-name) :cursors (termval *cursors)] $$rules))
+  (:>))
 
 (defbasicblocksegmacro handle-analytics-tick
   []
-  [[anode/read-config aor-types/MAX-ACTIONS-CONCURRENCY-CONFIG :> '*max-concurrency]
+  (let [match-info-pstate (gen-pstatevar "match-info")
+        cache-pstate (gen-pstatevar "cache")
+        cache-pstate-name (str cache-pstate)]
+    [[anode/read-config aor-types/MAX-ACTIONS-CONCURRENCY-CONFIG :> '*max-concurrency]
+     [anode/read-config aor-types/ACTIONS-PROCESSING-ITERATION-TIME-MILLIS-CONFIG :> '*target-millis]
+     [read-rules :> '*agent->rule->info]
+     [<<batch
+      [filter> false]
+      [materialize> :> cache-pstate]]
+     [<<batch
+      [find-qualified-offsets '*agent->rule->info cache-pstate-name
+        :> '*agent-name '*rule-name '*task-id '*offsets '*end-scan-offset]
+      [|global]
+      [+compound
+        {'*task-id
+          {'*agent-name
+            {'*rule-name
+              {:offsets (seg# aggs/+last '*offsets)
+               :end-scan-offset (seg# aggs/+last '*end-scan-offset)}}}}
+        :> match-info-pstate]]
+     [ops/vget match-info-pstate :> '*match-info]
+     [to-action-queue '*match-info :> '*queue]
+     [h/current-time-millis :> '*actions-start-time-millis]
+     [loop<-
+       ['*queue '*queue
+        '*first-iter? true
+        :> *rem-queue]
+       [<<if (seg# action-iter-complete? '*first-iter? '*queue '*actions-start-time-millis '*target-millis)
+         [:>]
+        [else>]
+         [split-at '*queue :> ['*items '*rest-queue]]
+         [<<batch
+           [run-actions! '*items '*agent->rule->info cache-pstate-name]]
+       [continue> '*rest-queue false]
+       ]]
+     [update-rule-offsets! '*match-info '*rem-queue]
 
-   [<<batch
-    [find-qualified-offsets :> '*task-id]
 
-    ;; TODO: <<<<>>>>
-    ;;  - for each agent/rule
-    ;;   - for each task cursor
-    ;;   - check if dependency rules have processed that far already
 
-   ]
-   ;; TODO: <<<<>>>>
-   ;;  - do <<batch to go to all tasks
-   ;;    - TODO: how to handle chained rules?
-   ;;      - maybe if have a chain, don't keep going
-   ;;        - or keep track of which ones need to keep being checked
-   ;;      - no, rules are handled independently...
-   ;;    - if don't sample something, still should write action state to it
-   ;;      - would be really good to do those in chunks, especially for low sample rate
-   ;;      - can have "PStateWrites" depot append
-  ])
+     ;; TODO: <<<<>>>>
+     ;;   - so the real result should be to take the minimum offset remaining for each task ID, or if none use the end-scan-offset
+     ;;   - update state for each rule based on what's remaining in the queue or the end-scan-offset
+     ;;
+    ]))
 
 
 

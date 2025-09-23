@@ -102,9 +102,7 @@
 
 (def FEEDBACK-SCHEMA
   (fixed-keys-schema
-   {:actions {String (fixed-keys-schema
-                      {:complete? Boolean
-                       :state     Object})}
+   {:actions {String Object}
     :results [FeedbackImpl]}))
 
 (def AGENT-ROOT-PSTATE-SCHEMA
@@ -202,6 +200,18 @@
      :agg-start-invoke-id UUID
      :agg-finished?       Boolean
     })})
+
+(defn action-log-task-global-name
+  []
+  (str "$$_agent-action-log"))
+
+(def ACTION-LOG-PSTATE-SCHEMA
+  {String ; agent-name
+   (map-schema
+    String ; rule-name
+    (vector-schema ActionLog {:subindex? true})
+    {:subindex? true})})
+
 
 (defn graph-history-task-global-name
   [agent-name]
@@ -421,6 +431,10 @@
 (defn evaluators-task-global
   []
   (this-module-pobject-task-global (evaluators-task-global-name)))
+
+(defn action-log-task-global
+  []
+  (this-module-pobject-task-global (action-log-task-global-name)))
 
 (defn log-throttler
   []
