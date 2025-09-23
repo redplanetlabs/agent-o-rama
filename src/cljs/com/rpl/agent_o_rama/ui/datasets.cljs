@@ -909,7 +909,7 @@
                                        ($ :div.text-center.text-gray-500
                                           ($ :p "No examples yet.")
                                           ($ :p.text-sm.mt-1 "Click 'Add Example' to get started.")))
-                  :else ($ :div.h-full.overflow-auto
+                  :else ($ :div.h-full.overflow-auto.min-h-screen
                            ($ ExamplesList {:examples examples
                                             :module-id module-id
                                             :dataset-id dataset-id
