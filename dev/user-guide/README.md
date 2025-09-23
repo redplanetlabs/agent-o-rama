@@ -2,7 +2,7 @@
 
 Welcome to Agent-O-Rama (AOR): your framework for building distributed AI agents that scale.
 
-You're about to learn how to create [agents](../glossary.md#agent) that think, remember, and collaborate. Agents that handle real-world complexity with grace. This guide takes you from your first agent to production-ready systems.
+You're about to learn how to create [agents](../glossary.md#agent) that think, remember, and collaborate. This guide takes you from your first agent to production-ready systems.
 
 ## What is Agent-O-Rama?
 
@@ -10,7 +10,7 @@ Agent-O-Rama (also referred to as AOR) is a distributed framework for building s
 
 ### The Power of Rama
 
-Agent-O-Rama is implemented using Rama, Red Planet Labs' (RPL) groundbreaking distributed computing platform. You don't write distributed code - you write agent logic, and Rama handles the rest. This powerful foundation means your agents automatically get:
+Agent-O-Rama is implemented using Rama, Red Planet Labs' (RPL) distributed computing platform. You don't write distributed code - you write agent logic, and Rama handles the rest. This foundation means your agents automatically get:
 
 - **Distributed execution**: Your [agents](../glossary.md#agent) run across multiple machines with automatic partitioning
 - **Fault tolerance**: Built-in retry mechanisms and state recovery across node failures
@@ -18,7 +18,7 @@ Agent-O-Rama is implemented using Rama, Red Planet Labs' (RPL) groundbreaking di
 - **Stream processing**: Real-time data flows through your agent graphs
 - **Microbatch processing**: Efficient batched operations for high-throughput scenarios
 
-Rama is what makes Agent-O-Rama possible: it provides the robust distributed foundation that turns your agent definitions into scalable, fault-tolerant systems. While you don't need to understand Rama internals to use AOR effectively, it's Rama that ensures your agents scale seamlessly from development to production clusters.
+Rama is what makes Agent-O-Rama possible: it provides the distributed foundation that turns your agent definitions into scalable, fault-tolerant systems. While you don't need to understand Rama internals to use AOR effectively, it's Rama that ensures your agents scale seamlessly from development to production clusters.
 
 ### About Red Planet Labs
 
@@ -40,11 +40,14 @@ Think of [agents](../terms/agent.md) as intelligent workers in your distributed 
 
 Start here and work through in order:
 
-1. **[Core Concepts](01-core-concepts.md)**: [Agents](../terms/agent.md), [nodes](../glossary.md#agent-node), and [graphs](../glossary.md#agent-graph) - the building blocks
-2. **[State Management](02-state-management.md)**: [Key-value stores](../terms/key-value-store.md) and distributed state patterns
-3. **[Communication Patterns](03-communication-patterns.md)**: [Streaming chunks](../glossary.md#streaming-chunk) and [human input](../glossary.md#human-input-request)
-4. **[Advanced Patterns](04-advanced-patterns.md)**: [Aggregation](../terms/aggregation.md) and [agent object](../terms/agent-objects.md) integration
-5. **[System Features](05-system-features.md)**: [Forking](../glossary.md#fork), [datasets](../terms/dataset.md), and [evaluators](../glossary.md#evaluators)
+1. **[Agent Declaration](01-agent-declaration.md)**: [Agent modules](../terms/agent-module.md), [topology](../terms/agents-topology.md), and [graphs](../terms/agent-graph.md) - defining your agents
+2. **[Rama Infrastructure](02-rama-infrastructure.md)**: [Cluster management](../terms/cluster-manager.md), [IPC](../terms/ipc.md), and module lifecycle
+3. **[Client Interaction](03-client-interaction.md)**: [Agent manager](../terms/agent-manager.md), [client](../terms/agent-client.md), and [invocation](../terms/agent-invoke.md) patterns
+4. **[Agent Execution](04-agent-execution.md)**: [Node emissions](../terms/node-emit.md), routing, and [aggregation](../terms/aggregation.md)
+5. **[Storage and Objects](05-storage-and-objects.md)**: [Stores](../terms/store.md) and [agent objects](../terms/agent-objects.md) for state and resources
+6. **[Streaming](06-streaming.md)**: Real-time data with [streaming chunks](../terms/streaming-chunk.md) and subscriptions
+7. **[AI Integration](07-ai-integration.md)**: [LangChain4j](../terms/langchain4j-integration.md) and [tool calling](../terms/tool-calling.md)
+8. **[Experimentation](08-experimentation.md)**: [Datasets](../terms/dataset.md), [evaluators](../terms/evaluators.md), and testing
 
 ## Quick Taste
 
@@ -90,4 +93,4 @@ That's it: you've defined an [agent](../terms/agent.md), deployed it across a di
 
 ## Next Step
 
-Ready to dive deeper? Start with [Core Concepts](01-core-concepts.md) to understand how [agent graphs](../glossary.md#agent-graph), [node emissions](../glossary.md#node-emit), and [agent objects](../terms/agent-objects.md) really work.
+Ready to dive deeper? Start with [Agent Declaration](01-agent-declaration.md) to understand how to define [agent modules](../terms/agent-module.md), build [agent graphs](../glossary.md#agent-graph), and create your first agents.

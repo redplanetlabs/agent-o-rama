@@ -21,6 +21,7 @@ It uses a direct, conversational, and empowering style:
   - Use colons to introduce lists or explanations
   - Avoid academic jargon or overly formal language
   - Be confident and declarative rather than tentative
+  - do not use flowery or self praising, self-aggrandizing language
 
 The user guide MUST contain a paragraph on how agent-o-rama is
 implemented using Rama, and that agent-o-rama is also referred to as
@@ -30,8 +31,10 @@ The user guide MUST contain a paragraph on Red Planet Labs mentioning
 agent-o-rama and Rama, and that Red Planet Labs is also referred to as
 RPL.
 
+
 - read @dev/glossary.md
 - read @dev/terms/ files
+- read @dev/concept-hierarchy.md
 - see the @examples/clj/src/com/rpl/agent/basic examples to see
   how concepts build up.  Also @examples/clj/README.md.
 - Analyse the guide document in the context of the current project.

@@ -7,9 +7,10 @@ Client-side subscription receiving streaming data from agent nodes.
 Real-time data pipeline from agents to clients. Enables monitoring, progress tracking, and incremental results delivery.
 
 ## Operations
-- `agent-stream` - Subscribe to streams
-- `agent-stream-specific` - Filter by nodes
-- `agent-stream-all` - All nodes
+Subscribe to stream:
+- `agent-stream` -  from first invoke of an agent node
+- `agent-stream-specific` - from a specific invoke of an agent node
+- `agent-stream-all` - from all invocations of a node (chunks are grouped by invocation-id, as a map from invocation-id to sequence of chunks)
 - Process chunks asynchronously
 
 ## Invariants
