@@ -34,7 +34,7 @@
    [java.util.concurrent
     CompletableFuture]))
 
-;; TODO: <<<>>>> need to be bound with :num-tasks, :declared-objects, and :rama-clients
+;; TODO: <<<<>>>> need to be bound with :num-tasks, :declared-objects, and :rama-clients
 (def ^:dynamic ACTION-HELPERS)
 (defn declared-objects ^AgentDeclaredObjectsTaskGlobal [] (:declared-objects ACTION-HELPERS))
 (defn rama-clients ^RamaClientsTaskGlobal [] (:rama-clients ACTION-HELPERS))
@@ -335,6 +335,7 @@
    (action-target-pstate *agent-name *node-name :> $$p)
    (<<ramafn %match?
      [*data]
+     ;; TODO: <<<<>>>> exclude ExperimentSource
      (:> (and> (< (rand) *sampling-rate)
                (aor-types/rule-filter-matches? *filter *data))))
    (scan-amt :> *scan-amt)
@@ -405,6 +406,7 @@
      nil
      (fn []
        (try
+         ;; TODO: <<<<>>>>> bind ACTION-HELPERS
          (let [m (action-fn fetcher input output run-info)]
            (when-not (and (map? m) (every? string? (keys m)))
              (throw (h/ex-info "Action return must be map with string keys" {:reeturn m})))

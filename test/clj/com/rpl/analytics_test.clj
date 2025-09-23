@@ -735,3 +735,19 @@
           output-offsets (set out)]
       (is (= input-offsets output-offsets)
           "All offsets should be present exactly once in output"))))
+
+(deftest actions-test
+         ;; TODO: <<<<>>>>
+         ;;  - test one agent with just online evals
+         ;;  - another agent has dependent rules
+         ;;  - verify filters work
+         ;;  - verify sampling rate
+         ;;  - verify respects max concurrency
+         ;;  - verify how much it does in one iteration
+         ;;  - agent invokes from experiments are skipped
+         ;;  - start from time for rule
+         ;;  - error handling:
+         ;;    - online eval throws exception
+         ;;      - online eval doesn't return map
+         ;;    - action doesn't return map
+)
