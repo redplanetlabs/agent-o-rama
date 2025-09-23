@@ -1,4 +1,4 @@
-# Agent Throttling
+# Log Throttling
 
 ## Definition
 Rate-limiting mechanism for log messages in distributed agent execution.

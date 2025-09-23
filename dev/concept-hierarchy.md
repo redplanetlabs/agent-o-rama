@@ -5,27 +5,27 @@ This document shows the dependency relationships between concepts in agent-o-ram
 ## Tree Structure
 
 ```
-rama/
-├── rama-platform/
+rama
 │   ├── pstate-store
 │   ├── task-global
-│   └── ipc/
-│       ├── cluster-manager/
-│       │   └── agent-manager/
-│       │       ├── agent-client/
-│       │       │   ├── agent-invoke/
-│       │       │   │   ├── fork
-│       │       │   │   ├── agent-complete/
-│       │       │   │   │   └── agent-result
-│       │       │   │   ├── streaming-subscription/
-│       │       │   │   │   └── streaming-chunk
-│       │       │   │   ├── retry-mechanism
-│       │       │   │   └── example-run/
-│       │       │   │       └── experiment/
-│       │       │   │           └── evaluators
-│       │       │   ├── human-input-request
-│       │       │   └── java-interop
+│   └── cluster-manager
+│       ├── ipc
+│       └── agent-manager
+│           ├── agent-client/
+│           │   ├── agent-invoke/
+│           │   │   ├── fork
+│           │   │   ├── agent-complete/
+│           │   │   │   └── agent-result
+│           │   │   ├── streaming-subscription/
+│           │   │   │   └── streaming-chunk
+│           │   │   ├── retry-mechanism
+│           │   │   ├── human-input-request
 │       │       └── dataset
+│           │   │   └── example-run/
+│           │   │   │       └── experiment/
+│           │   │   │           └── evaluators
+│       │       │   └── java-interop
+
 │       └── user-interface/
 │           └── agent-trace
 ├── agent-module/

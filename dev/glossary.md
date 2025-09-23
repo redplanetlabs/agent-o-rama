@@ -90,10 +90,6 @@ within agent nodes, retrieved via `agent-result` on client side.
 
 An individual execution unit returned by agent processing, can be result, human input request, or continuation.
 
-## [Agent Throttling](terms/agent-throttling.md)
-
-Rate-limiting mechanism for log messages to prevent overwhelming output in distributed execution.
-
 ## [Agent Trace](terms/agent-trace.md)
 
 Execution monitoring system that captures agent node transitions and data flow for debugging.
@@ -178,6 +174,11 @@ Integration with the LangChain4j library for AI model interactions,
 providing chat models, tool calling, JSON schema generation, and
 structured output parsing. Enables seamless AI integration within agent
 execution flows.
+
+## Log Throttling
+
+Rate-limiting mechanism for log messages to prevent overwhelming output
+in distributed execution.
 
 ## [Multi-Agg](terms/multi-agg.md)
 
