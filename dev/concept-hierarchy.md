@@ -5,57 +5,73 @@ This document shows the dependency relationships between concepts in agent-o-ram
 ## Tree Structure
 
 ```
+red-planet-labs
+├── rama
+└── agent-o-rama
+
+agent-module (declaration)
+└── agent-topology
+    └── agent-graph
+        └── agent-node-declaration
+            └── agent-node-function
+                └── agent-node
+                    └── agent-result
+
 rama
-│   ├── pstate-store
-│   ├── task-global
-│   └── cluster-manager
-│       ├── ipc
-│       └── agent-manager
-│           ├── agent-client/
-│           │   ├── agent-invoke/
-│           │   │   ├── fork
-│           │   │   ├── agent-complete/
-│           │   │   │   └── agent-result
-│           │   │   ├── streaming-subscription/
-│           │   │   │   └── streaming-chunk
-│           │   │   ├── retry-mechanism
-│           │   │   ├── human-input-request
-│       │       └── dataset
-│           │   │   └── example-run/
-│           │   │   │       └── experiment/
-│           │   │   │           └── evaluators
-│       │       │   └── java-interop
+├── cluster-manager
+│   ├── rama-module
+│   │   ├── agent-module
+│   │   └── module-lifecycle
+│   └── ipc
 
-│       └── user-interface/
-│           └── agent-trace
-├── agent-module/
-│   └── agents-topology/
-│       ├── store/
-│       │   ├── key-value-store/
-│       │   │   └── document-store
-│       │   └── pstate-store (shared)
-│       ├── agent-objects/
-│       │   └── langchain4j-integration/
-│       │       └── tool-calling/
-│       │           └── tools-sub-agent/
-│       │               └── sub-agents
-│       └── agent-topology-builder/
-│           └── agent-graph/
-│               ├── agent-node/
-│               │   ├── agent-node-function/
-│               │   │   ├── agent-emit
-│               │   │   ├── node-emit (alias)
-│               │   │   └── agent-result (shared)
-│               │   ├── streaming-chunk (shared)
-│               │   ├── human-input-request (shared)
-│               │   └── agent-throttling
-│               ├── aggregation/
-│               │   └── multi-agg
-│               └── update-mode
-└── agent (composed concept using multiple branches)
+agent-module
+└── agent-topology
+    └── agent-manager
+        └── agent-client
+            └── agent-invoke
+                ├── agent-complete
+                │   └── agent-result
+                │       └── agent-trace
+                └── retry-mechanism
+                    └── update-mode
 
-red-planet-labs/
-└── (creates rama and agent-o-rama ecosystem)
+agent-topology
+└── agent-graph
+    └── agent-node-declaration
+        └── agent-node-function
+            ├── agent-mode-emit
+            ├── aggregation
+            ├── multi-agg
+            ├── human-input-request
+            └── sub-agents
+
+agent-object
+├── agent-object-builder
+├── rama-pstate
+└── store
+    ├── key-value-store
+    ├── document-store
+    └── pstate-store
+
+streaming
+├── streaming-subscription
+└── streaming-chunk
+
+langchain4j-integration
+├── tool-calling
+└── tools-sub-agent
+
+experiments
+└── agent-topology
+    └── evaluator-builder
+        └── evaluator
+            └── dataset
+                └── experiment
+                    └── experiment-run
+
+fork
+
+log-throttling
 ```
 
 ## Root Concepts
@@ -66,48 +82,77 @@ red-planet-labs/
 
 ## Dependency Flow Analysis
 
-### Infrastructure Layer (Built on Rama)
-- **rama-platform**: Direct abstraction over Rama capabilities
-- **ipc**: Local development cluster implementation
-- **pstate-store**: Persistent state management
-- **task-global**: Distributed state containers
+### Foundation Layer
+- **red-planet-labs**: Organization creating the technology ecosystem
+- **rama**: Core distributed computing platform
+- **agent-o-rama**: Agent framework built on Rama
 
-### Client Access Layer
-- **cluster-manager**: Manages connections to Rama clusters
-- **agent-manager**: Central client interface for deployed modules
-- **agent-client**: Interface for specific agent interactions
-- **agent-invoke**: Handle for individual agent executions
-
-### Agent Definition Layer
-- **agent-module**: Deployable agent system package
-- **agents-topology**: Container for agent definitions
+### Agent Declaration (Chapter 1)
+- **agent-module**: Initial declaration of agent system
+- **agent-topology**: Container for agent definitions
 - **agent-graph**: Directed execution flow structure
-- **agent-node**: Individual computation units
+- **agent-node-declaration**: Blueprint for computation units
+- **agent-node-function**: Function implementations
+- **agent-node**: Instantiated computation unit
+- **agent-result**: Output from agent execution
 
-### Storage Abstractions
-- **store**: Base persistent storage abstraction
-- **key-value-store**: Simple typed key-value pairs
-- **document-store**: Schema-flexible nested structures (builds on key-value)
-- **pstate-store**: Rama-backed durable storage
+### Rama Infrastructure (Chapter 2)
+- **cluster-manager**: Manages connections to Rama clusters
+- **rama-module**: Rama's module system
+- **module-lifecycle**: Module deployment and management
+- **ipc**: Local development cluster implementation
 
-### AI Integration
-- **agent-objects**: Shared resources like AI models
-- **langchain4j-integration**: AI model interaction library
-- **tool-calling**: External function execution
-- **tools-sub-agent**: Specialized tool execution agent
-
-### Monitoring and Analysis
-- **dataset**: Collections of input/output examples
-- **evaluators**: Performance measurement functions
-- **experiment**: Systematic evaluation framework
-- **user-interface**: Real-time monitoring and visualization
-
-### Execution Features
-- **streaming-chunk**: Real-time partial results
-- **streaming-subscription**: Client-side streaming receivers
-- **human-input-request**: Human-in-the-loop workflows
-- **fork**: Parallel execution branching
+### Client Interaction (Chapter 3)
+- **agent-module**: Client-facing module interface
+- **agent-topology**: Runtime topology access
+- **agent-manager**: Central client interface
+- **agent-client**: Interface for specific agents
+- **agent-invoke**: Handle for individual executions
+- **agent-complete**: Execution completion handling
+- **agent-trace**: Execution history and debugging
 - **retry-mechanism**: Automatic failure recovery
+- **update-mode**: State update strategies
+
+### Agent Execution (Chapter 4)
+- **agent-topology**: Execution context
+- **agent-graph**: Flow control structure
+- **agent-node-declaration**: Node templates
+- **agent-node-function**: Execution logic
+- **agent-mode-emit**: Output emission modes
+- **aggregation**: Result aggregation
+- **multi-agg**: Multiple aggregation patterns
+- **human-input-request**: Human-in-the-loop workflows
+- **sub-agents**: Nested agent execution
+
+### Storage and Objects (Chapter 5)
+- **agent-object**: Shared resources container
+- **agent-object-builder**: Resource construction
+- **rama-pstate**: Rama persistent state
+- **store**: Base storage abstraction
+- **key-value-store**: Simple typed pairs
+- **document-store**: Nested structures
+- **pstate-store**: Rama-backed storage
+
+### Streaming (Chapter 6)
+- **streaming-subscription**: Client-side receivers
+- **streaming-chunk**: Partial result delivery
+
+### AI Integration (Chapter 7)
+- **langchain4j-integration**: AI model library
+- **tool-calling**: External function execution
+- **tools-sub-agent**: Tool execution agents
+
+### Experimentation (Chapter 8)
+- **experiments**: Evaluation framework
+- **evaluator-builder**: Metric construction
+- **evaluator**: Performance measurement
+- **dataset**: Input/output collections
+- **experiment**: Test execution
+- **experiment-run**: Individual test runs
+
+### Additional Features
+- **fork**: Parallel execution branching
+- **log-throttling**: Log rate limiting
 
 ## Composite Concepts
 
@@ -117,6 +162,9 @@ red-planet-labs/
 - Evaluated by experiment framework
 
 ## Notes
+
+- chapter 2 logically comes before chapter 1, but we want to start
+  exploring agents before jumping into rama
 
 - Dependencies flow from leaves → roots (higher-level concepts depend on lower-level ones)
 - Some concepts (like `pstate-store`, `agent-result`) appear in multiple branches as shared dependencies
