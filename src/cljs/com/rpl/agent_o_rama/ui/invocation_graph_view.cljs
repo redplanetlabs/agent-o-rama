@@ -201,7 +201,7 @@
       (map? data)
       ($ :div {:className "mt-1 space-y-1 pl-2 border-l border-gray-200 rounded-sm"
                :style {:background-color "rgba(0, 0, 0, 0.02)"}}
-         (for [[k v] (sort-by key data)]
+         (for [[k v] (sort-by (comp str key) data)]
            ($ :div {:key (str k)}
               ($ :div {:className "flex items-start gap-1"}
                  ($ :span {:className "text-gray-500 font-medium"} (str (name k) ":"))
