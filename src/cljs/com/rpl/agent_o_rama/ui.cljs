@@ -76,7 +76,7 @@
 (defui main-layout []
   ($ :div.flex.h-screen.bg-gray-50
      ($ sidebar-nav)
-     ($ :div.flex-1.flex.flex-col.min-h-0
+     ($ :div.flex-1.flex.flex-col.min-h-0.min-w-0
         ($ breadcrumb)
         ($ :div.flex-1.overflow-auto
            ($ ViewStack))

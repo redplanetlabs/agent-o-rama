@@ -154,35 +154,35 @@
     (nil? value) ($ :span.italic.text-gray-400 "nil")
     :else ($ :span.italic.text-gray-400 "…")))
 
-(defui EvaluatorScores [{:keys [evals failures duplicate-metric-keys eval-initiates module-id]}]
-  ($ :div.flex.flex-wrap.gap-1.items-center
-     (for [[eval-name error-str] (sort-by key failures)]
-       (let [eval-invoke (get eval-initiates eval-name)]
-         ($ :a.px-2.py-1.rounded-md.text-xs.font-medium.bg-red-100.text-red-800.hover:bg-red-200.cursor-pointer.transition-colors.no-underline
-            {:key (str "fail-" (name eval-name))
-             :href (when eval-invoke
-                     (rfe/href :agent/invocation-detail
-                               {:module-id module-id
-                                :agent-name "_aor-evaluator"
-                                :invoke-id (str (:task-id eval-invoke) "-" (:agent-invoke-id eval-invoke))}))
-             :target "_blank"}
-            (str (name eval-name) ": Failed"))))
-     (for [[eval-name eval-result] (sort-by key evals)
-           [metric-key metric-value] (sort-by key eval-result)
-           :let [label (if (contains? duplicate-metric-keys metric-key)
-                         (str (name eval-name) "/" (name metric-key))
-                         (name metric-key))
-                 eval-invoke (get eval-initiates eval-name)]]
-       ($ :a.flex.items-center.gap-1.5.px-2.py-1.rounded-md.text-xs.bg-gray-100.text-gray-800.border.border-gray-200.hover:bg-gray-200.cursor-pointer.transition-colors.no-underline
-          {:key (str (name eval-name) "-" (name metric-key))
-           :href (when eval-invoke
-                   (rfe/href :agent/invocation-detail
-                             {:module-id module-id
-                              :agent-name "_aor-evaluator"
-                              :invoke-id (str (:task-id eval-invoke) "-" (:agent-invoke-id eval-invoke))}))
-           :target "_blank"}
-          ($ :span.font-medium.text-gray-600 label)
-          ($ :span.font-semibold (format-metric-value metric-value))))))
+;; NEW COMPONENT: Renders the content of a single evaluator result cell
+(defui EvaluatorResultCell [{:keys [run eval-name module-id]}]
+  (let [eval-result (get-in run [:evals eval-name])
+        eval-failure (get-in run [:eval-failures eval-name])
+        eval-invoke (get-in run [:eval-initiates eval-name])
+        cell-content (cond
+                       eval-failure
+                       ($ :div.px-2.py-1.rounded-md.text-xs.font-medium.bg-red-100.text-red-800.hover:bg-red-200.transition-colors
+                          "Failed")
+
+                       eval-result
+                       ($ :div.flex.flex-col.gap-1.items-start
+                          (for [[metric-key metric-value] (sort-by key eval-result)]
+                            ($ :div.flex.items-center.gap-1.5.px-2.py-1.rounded-md.text-xs.bg-gray-100.text-gray-800.border.border-gray-200
+                               {:key (name metric-key)}
+                               ($ :span.font-medium.text-gray-600 (name metric-key))
+                               ($ :span.font-semibold (format-metric-value metric-value)))))
+
+                       :else
+                       ($ :span.text-gray-400 "—"))
+        href (when eval-invoke
+               (rfe/href :agent/invocation-detail
+                         {:module-id module-id
+                          :agent-name "_aor-evaluator"
+                          :invoke-id (str (:task-id eval-invoke) "-" (:agent-invoke-id eval-invoke))}))]
+    ($ :td {:className (:td common/table-classes)}
+       (if href
+         ($ :a.no-underline {:href href :target "_blank" :title "View evaluator trace"} cell-content)
+         cell-content))))
 
 (defui CellContent [{:keys [content truncated? on-expand]}]
   (let [content-str (common/pp content)
@@ -202,7 +202,12 @@
         ($ :pre.text-sm.font-mono.whitespace-pre-wrap content))))
 
 (defui ResultsTable [{:keys [results target module-id]}]
-  (let [[show-full-text? set-show-full-text] (uix/use-state false)]
+  (let [[show-full-text? set-show-full-text] (uix/use-state false)
+        ;; NEW: Get a sorted, unique list of all evaluator names from the results.
+        evaluator-names (->> results
+                             (mapcat #(keys (:evals %)))
+                             (distinct)
+                             (sort))]
     ($ :div
        ($ :div.flex.justify-between.items-center.mb-4
           ($ :h3.text-xl.font-bold "Detailed Results")
@@ -218,41 +223,33 @@
                 ($ :tr
                    ($ :th {:className (:th common/table-classes)} "Input")
                    ($ :th {:className (:th common/table-classes)} "Reference Output")
-                   ($ :th {:className (:th common/table-classes)} "Output")))
+                   ($ :th {:className (:th common/table-classes)} "Output")
+                   ;; NEW: Dynamically generate a th for each evaluator
+                   (for [eval-name evaluator-names]
+                     ($ :th {:key eval-name :className (:th common/table-classes)}
+                        eval-name))))
              ($ :tbody
-                (for [run results
-                      :let [evals (:evals run)
-                            all-metric-keys (mapcat keys (vals evals))
-                            metric-frequencies (frequencies all-metric-keys)
-                            duplicate-keys (->> metric-frequencies (filter (fn [[_ v]] (> v 1))) (map first) set)]]
+                (for [run results]
                   ($ :tr.border-b {:key (:example-id run)}
+                     ;; Input Cell
                      ($ :td {:className (:td common/table-classes)}
                         ($ CellContent {:content (:input run)
                                         :truncated? (not show-full-text?)
                                         :on-expand #(state/dispatch [:modal/show :content-detail
                                                                      {:title "Input"
-                                                                      :component ($ ContentModal {:content % :title "Input"})}])})
-                        (let [first-invoke (get-in run [:agent-initiates 0 :agent-invoke])]
-                          (if first-invoke
-                            ($ :div.mt-2
-                               ($ :a.text-indigo-600.hover:text-indigo-900
-                                  {:href (rfe/href :agent/invocation-detail
-                                                   {:module-id module-id
-                                                    :agent-name (get-in run [:agent-initiates 0 :agent-name])
-                                                    :invoke-id (str (:task-id first-invoke) "-" (:agent-invoke-id first-invoke))})
-                                   :target "_blank"}
-                                  "View Trace"))
-                            ($ :div.mt-2 ($ :span.text-gray-400 "No trace")))))
+                                                                      :component ($ ContentModal {:content % :title "Input"})}])}))
+                     ;; Reference Output Cell
                      ($ :td {:className (:td common/table-classes)}
                         ($ CellContent {:content (:reference-output run)
                                         :truncated? (not show-full-text?)
                                         :on-expand #(state/dispatch [:modal/show :content-detail
                                                                      {:title "Reference Output"
                                                                       :component ($ ContentModal {:content % :title "Reference Output"})}])}))
-                     ;; 0 is hardcoded, because this component only works for REGULAR experiments, not comparative ones
+                     ;; MODIFIED: Output Cell (now simplified)
                      (let [agent-result (get-in run [:agent-results 0])]
-                       ($ :td {:key i :className (:td common/table-classes)}
+                       ($ :td {:key "output-cell" :className (:td common/table-classes)}
                           ($ :div.max-w-xs
+                             ;; The agent's raw output
                              ($ :div {:className (if show-full-text? "" "truncate")}
                                 (if (:failure? (:result agent-result))
                                   ($ :div.space-y-2
@@ -273,12 +270,24 @@
                                                                         {:title "Output"
                                                                          :component ($ ContentModal {:content output-content :title "Output"})}])}
                                             "↗"))))))
-                             ($ :div.mt-2
-                                ($ EvaluatorScores {:evals evals
-                                                    :failures (:eval-failures run)
-                                                    :duplicate-metric-keys duplicate-keys
-                                                    :eval-initiates (:eval-initiates run)
-                                                    :module-id module-id})))))))))))))
+                             ;; Link to the agent trace
+                             (let [first-invoke (get-in run [:agent-initiates 0 :agent-invoke])]
+                               (if first-invoke
+                                 ($ :div.mt-2
+                                    ($ :a.text-indigo-600.hover:text-indigo-900
+                                       {:href (rfe/href :agent/invocation-detail
+                                                        {:module-id module-id
+                                                         :agent-name (get-in run [:agent-initiates 0 :agent-name])
+                                                         :invoke-id (str (:task-id first-invoke) "-" (:agent-invoke-id first-invoke))})
+                                        :target "_blank"}
+                                       "View Trace"))
+                                 ($ :div.mt-2 ($ :span.text-gray-400 "No trace")))))))
+                     ;; NEW: Dynamically generate a td for each evaluator
+                     (for [eval-name evaluator-names]
+                       ($ EvaluatorResultCell {:key (str "eval-" eval-name)
+                                               :run run
+                                               :eval-name eval-name
+                                               :module-id module-id}))))))))))
 
 (defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
   (let [{:keys [data loading? error]}

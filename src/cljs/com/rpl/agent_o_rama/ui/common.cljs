@@ -120,11 +120,11 @@
        (str/join " ")))
 
 (def table-classes
-  {:container "bg-white shadow sm:rounded-md overflow-auto"
+  {:container "bg-white shadow sm:rounded-md overflow-x-auto"
    :table "min-w-full divide-y divide-gray-200"
    :thead "bg-gray-50"
    :th "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-   :td "px-6 py-4 text-sm text-gray-900"
+   :td "px-6 py-4 text-sm text-gray-900 whitespace-nowrap"
    :td-right "px-6 py-4 whitespace-nowrap text-right text-sm font-medium"})
 
 (defui spinner [{:keys [size]}]
