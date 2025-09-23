@@ -12,6 +12,7 @@
    [com.rpl.agentorama.source
     InfoSource]
    [com.rpl.agent_o_rama.impl.types
+    ActionLog
     AgentInvokeStatsImpl
     AgentNodeEmit
     AgentResult

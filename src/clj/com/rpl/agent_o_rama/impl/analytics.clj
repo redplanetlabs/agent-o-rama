@@ -479,7 +479,7 @@
          rem-queue)]
     (reduce
      (fn [m [task-id agent-name rule-name end-scanned-offset]]
-       (set-offset m agent-name rule-name task-id offset))
+       (set-offset m agent-name rule-name task-id end-scanned-offset))
      agent->rule->cursors
      (select [ALL (collect-one FIRST) LAST
               ALL (collect-one FIRST) LAST
@@ -526,7 +526,7 @@
      [loop<-
        ['*queue '*queue
         '*first-iter? true
-        :> *rem-queue]
+        :> '*rem-queue]
        [<<if (seg# action-iter-complete? '*first-iter? '*queue '*actions-start-time-millis '*target-millis)
          [:>]
         [else>]
@@ -537,8 +537,6 @@
        ]]
      [update-rule-offsets! '*match-info '*rem-queue]
     ]))
-
-
 
 (defn add-rule!
   [global-actions-depot name agent-name
