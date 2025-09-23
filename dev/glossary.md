@@ -179,7 +179,7 @@ providing chat models, tool calling, JSON schema generation, and
 structured output parsing. Enables seamless AI integration within agent
 execution flows.
 
-## Log Throttling
+## [Log Throttling](terms/log-throttling.md)
 
 Rate-limiting mechanism for log messages to prevent overwhelming output
 in distributed execution.
