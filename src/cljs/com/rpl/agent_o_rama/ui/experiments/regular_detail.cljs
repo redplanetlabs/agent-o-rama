@@ -47,10 +47,7 @@
         ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-auto.max-h-80.font-mono
            (common/pp throwable)))))
 
-(defui StatCard [{:keys [label value]}]
-  ($ :div.bg-gray-50.p-4.rounded-lg.border
-     ($ :div.text-sm.text-gray-600 label)
-     ($ :div.text-2xl.font-bold.text-gray-900 value)))
+;; Removed old StatCard component - replaced with table-based summary
 
  ;; NEW: Added DetailItem component for rendering key-value pairs in the info panel.
 (defui DetailItem [{:keys [label children]}]
@@ -125,51 +122,74 @@
            ($ PlayIcon {:className "h-5 w-5 mr-2"})
            "Re-run Experiment"))))
 
-(defui SummaryPanel [{:keys [data]}] ;; Changed props to accept full data object
-  (let [;; Destructure all necessary data at the top
+;; NEW: Table-based summary components for compact data display
+(defui StatCell [{:keys [label value tooltip]}]
+  ($ :td.px-4.py-3.border-b.border-gray-200.whitespace-nowrap
+     {:title tooltip}
+     ($ :div.text-xs.font-medium.text-gray-500.uppercase.tracking-wider label)
+     ($ :div.text-xl.font-semibold.text-gray-900.mt-1 value)))
+
+(defui SummaryEvaluatorCell [{:keys [eval-name metrics]}]
+  ($ :td.px-4.py-3.border-b.border-gray-200
+     ($ :div.text-xs.font-medium.text-gray-500.uppercase.tracking-wider
+        (str "Eval: " (name eval-name)))
+     ($ :div.mt-1.space-y-1
+        (for [[metric-key metric-value] metrics]
+          ($ :div.flex.justify-between.text-sm {:key (name metric-key)}
+             ($ :span.text-gray-600 (name metric-key))
+             ($ :span.font-semibold.text-gray-900.ml-2 (format-metric-value metric-value)))))))
+
+(defui SummaryStatsTable [{:keys [data]}]
+  (let [;; --- Destructure all necessary data from the main `data` prop ---
         results (vals (:results data))
-        summary-evals (:summary-evals data)
         latency-stats (:latency-number-stats data)
         token-stats (:total-token-number-stats data)
+        summary-evals (:summary-evals data)
 
-        ;; Existing calculations
-        total-examples (count results)
-        passed-count (count (filter #(not-any? :failure? (vals (:agent-results %))) results))
-        pass-rate (if (pos? total-examples)
-                    (str (int (* 100 (/ passed-count total-examples))) "%")
-                    "N/A")
+        ;; --- Perform calculations for each required metric ---
+        num-examples (or (:count latency-stats) 0)
 
-        ;; NEW CALCULATIONS
-        ;; Calculate average latency
+        success-rate (let [passed-count (count (filter #(not-any? :failure? (vals (:agent-results %))) results))]
+                       (if (pos? num-examples)
+                         (str (int (* 100 (/ passed-count num-examples))) "%")
+                         "N/A"))
+
         avg-latency (let [total (:total latency-stats 0)
                           count (:count latency-stats 0)]
                       (if (pos? count)
-                        (str (int (/ total count)) "ms")
+                        (str (int (/ total count)) " ms")
                         "N/A"))
 
-        ;; Get total tokens
-        total-tokens (let [total (:total token-stats 0)]
-                       (if (pos? total)
-                         (.toLocaleString total) ;; Format with commas
-                         "N/A"))]
+        p99-latency (if-let [p99 (get-in latency-stats [:percentiles 0.99])]
+                      (str p99 " ms")
+                      "N/A")
 
-    ;; Updated the grid layout and added new StatCards
-    ($ :div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-4.gap-4 ;; Adjusted grid columns
-       ($ StatCard {:label "Total Examples" :value total-examples})
-       ($ StatCard {:label "Success Rate" :value pass-rate})
+        avg-total-tokens (let [total (:total token-stats 0)
+                               count (:count token-stats 0)]
+                           (if (pos? count)
+                             (.toLocaleString (int (/ total count)))
+                             "N/A"))]
 
-       ;; NEW STAT CARDS
-       ($ StatCard {:label "Avg. Latency" :value avg-latency})
-       ($ StatCard {:label "Total Tokens" :value total-tokens})
+    ($ :div.mb-6
+       ($ :div.overflow-x-auto.bg-white.rounded-lg.border.border-gray-200.shadow-sm
+          ($ :table.min-w-full
+             ($ :tbody
+                ($ :tr
+                   ($ StatCell {:label "# Examples" :value num-examples})
+                   ($ StatCell {:label "Success Rate" :value success-rate})
+                   ($ StatCell {:label "Avg Latency" :value avg-latency})
+                   ($ StatCell {:label "P99 Latency"
+                                :value p99-latency
+                                :tooltip "99% of runs completed faster than this time."})
+                   ($ StatCell {:label "Avg Total Tokens"
+                                :value avg-total-tokens
+                                :tooltip "Average total tokens (input + output) per example."})
 
-       ;; This existing loop for summary evaluators will now work correctly
-       (for [[eval-name eval-result] summary-evals
-             [metric value] eval-result]
-         ($ StatCard {:key (str eval-name metric)
-                      :label (str (name eval-name) " - " (name metric))
-                      :value (if (float? value)
-                               (str (Math/round (* 100 value)) "/100")
-                               (str value))})))))
+                   ;; Dynamically create a column for each summary evaluator
+                   (for [[eval-name metrics] summary-evals]
+                     ($ SummaryEvaluatorCell {:key (name eval-name)
+                                              :eval-name eval-name
+                                              :metrics metrics})))))))))
 
 (defn format-metric-value [value]
   (cond
@@ -443,7 +463,7 @@
               (when show-info?
                 ($ ExperimentInfoPanel {:info (:experiment-info data)}))
 
-              ($ SummaryPanel {:data data})
+              ($ SummaryStatsTable {:data data})
               ($ ResultsTable {:results (vals (:results data))
                                :target (get-in data [:experiment-info :spec :target])
                                :module-id module-id}))
