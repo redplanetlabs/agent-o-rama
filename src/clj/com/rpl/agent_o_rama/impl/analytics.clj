@@ -466,10 +466,27 @@
 
 (defn compute-new-cursors
   [match-info rem-queue]
-  ;; TODO: <<<<>>>>
-  ;;  - match-info is task-id -> agent-name -> rule-name -> {:end-scan-offset ...}
-  ;;  - rem-queue is [{:task-id ... :agent-name ... :rule-name ... :offset ...}]
-)
+  (let [set-offset
+        (fn [m agent-name rule-name task-id offset]
+          (setval [(keypath agent-name rule-name task-id) nil?]
+                  offset
+                  m))
+        agent->rule->cursors
+        (reduce
+         (fn [m {:keys [agent-name task-id rule-name offset]}]
+           (set-offset m agent-name rule-name task-id offset))
+         {}
+         rem-queue)]
+    (reduce
+     (fn [m [task-id agent-name rule-name end-scanned-offset]]
+       (set-offset m agent-name rule-name task-id offset))
+     agent->rule->cursors
+     (select [ALL (collect-one FIRST) LAST
+              ALL (collect-one FIRST) LAST
+              ALL (collect-one FIRST) LAST
+              :end-scan-offset]
+             match-info)
+    )))
 
 (deframafn update-rule-offsets!
   [*match-info *rem-queue]
@@ -519,13 +536,6 @@
        [continue> '*rest-queue false]
        ]]
      [update-rule-offsets! '*match-info '*rem-queue]
-
-
-
-     ;; TODO: <<<<>>>>
-     ;;   - so the real result should be to take the minimum offset remaining for each task ID, or if none use the end-scan-offset
-     ;;   - update state for each rule based on what's remaining in the queue or the end-scan-offset
-     ;;
     ]))
 
 
