@@ -154,30 +154,60 @@
     (nil? value) ($ :span.italic.text-gray-400 "nil")
     :else ($ :span.italic.text-gray-400 "…")))
 
-;; NEW COMPONENT: Renders the content of a single evaluator result cell
-(defui EvaluatorResultCell [{:keys [run eval-name metric-key module-id]}]
-  (let [eval-result (get-in run [:evals eval-name])
-        metric-value (get eval-result metric-key)
-        eval-failure (get-in run [:eval-failures eval-name])
-        eval-invoke (get-in run [:eval-initiates eval-name])
-        cell-content (cond
-                       eval-failure
-                       ($ :span.text-red-700.font-semibold "Failed")
-
-                       (some? metric-value)
-                       (format-metric-value metric-value)
-
-                       :else
-                       ($ :span.text-gray-400 "—"))
+;; NEW COMPONENTS: Evaluator capsules for compact display within Output column
+(defui EvaluatorCapsule [{:keys [eval-name metric-key metric-value eval-failure eval-invoke module-id]}]
+  (let [display-name (str (name eval-name) "/" (name metric-key))
         href (when eval-invoke
                (rfe/href :agent/invocation-detail
                          {:module-id module-id
                           :agent-name "_aor-evaluator"
-                          :invoke-id (str (:task-id eval-invoke) "-" (:agent-invoke-id eval-invoke))}))]
-    ($ :td.px-4.py-3.text-sm.text-gray-700.text-center
-       (if href
-         ($ :a.no-underline.text-inherit {:href href :target "_blank" :title "View evaluator trace"} cell-content)
-         cell-content))))
+                          :invoke-id (str (:task-id eval-invoke) "-" (:agent-invoke-id eval-invoke))}))
+
+        [badge-style content-text title-text]
+        (cond
+          eval-failure
+          ["bg-red-100 text-red-800" "Failed" (str "Evaluation failed: " eval-failure)]
+
+          (true? metric-value)
+          ["bg-green-100 text-green-800" "✓T" (str display-name ": True")]
+
+          (false? metric-value)
+          ["bg-yellow-100 text-yellow-800" "✗F" (str display-name ": False")]
+
+          (number? metric-value)
+          ["bg-blue-100 text-blue-800" (format-metric-value metric-value) (str display-name ": " metric-value)]
+
+          :else
+          ["bg-gray-100 text-gray-800" (format-metric-value metric-value) (str display-name ": " (pr-str metric-value))])]
+
+    ($ :a.inline-flex.items-center.px-2.py-1.rounded-full.text-xs.font-medium.transition-colors.hover:shadow-md
+       {:className badge-style
+        :href href
+        :target "_blank"
+        :title title-text
+        :onClick (fn [e] (.stopPropagation e))} ;; Prevent row click
+       ($ :span.font-semibold.mr-1.truncate {:style {:maxWidth "10rem"}}
+          display-name)
+       ($ :span.font-mono content-text))))
+
+(defui EvaluatorCapsulesContainer [{:keys [run module-id]}]
+  ($ :div.mt-2.flex.flex-wrap.gap-1
+     ;; Render capsules for successful evaluations
+     (for [[eval-name metrics] (:evals run)
+           [metric-key metric-value] metrics]
+       ($ EvaluatorCapsule {:key (str eval-name metric-key)
+                            :eval-name eval-name
+                            :metric-key metric-key
+                            :metric-value metric-value
+                            :eval-invoke (get-in run [:eval-initiates eval-name])
+                            :module-id module-id}))
+     ;; Render capsules for failed evaluations
+     (for [[eval-name failure-info] (:eval-failures run)]
+       ($ EvaluatorCapsule {:key (str eval-name "-failure")
+                            :eval-name eval-name
+                            :eval-failure failure-info
+                            :eval-invoke (get-in run [:eval-initiates eval-name])
+                            :module-id module-id}))))
 
 (defui CellContent [{:keys [content truncated? on-expand]}]
   (let [content-str (common/pp content)
@@ -198,7 +228,6 @@
      ($ :div.bg-gray-50.p-4.rounded.border.max-h-96.overflow-auto
         ($ :pre.text-sm.font-mono.whitespace-pre-wrap content))))
 
-;; NEW: Filter buttons component
 (defui FilterButton [{:keys [label is-active? on-click]}]
   ($ :button
      {:onClick on-click
@@ -282,12 +311,7 @@
                   ($ :tr
                      ($ :th {:className (:th common/table-classes)} "Input")
                      ($ :th {:className (:th common/table-classes)} "Reference Output")
-                     ($ :th {:className (:th common/table-classes)} "Output")
-                     ($ :th {:className (common/cn (:th common/table-classes) "text-center")} "Trace")
-                     ;; Dynamically generate a th for each evaluator metric
-                     (for [{:keys [display-name]} evaluator-columns]
-                       ($ :th {:key display-name :className (common/cn (:th common/table-classes) "text-center")}
-                          display-name))))
+                     ($ :th {:className (common/cn (:th common/table-classes) "w-1/3")} "Output & Evaluations")))
                ($ :tbody
                   (for [run filtered-results]
                     ($ :tr.border-b {:key (:example-id run)}
@@ -308,51 +332,36 @@
                        ;; MODIFIED: Output Cell (now simplified)
                        (let [agent-result (get-in run [:agent-results 0])]
                          ($ :td {:key "output-cell" :className (:td common/table-classes)}
-                            ($ :div {:className (if show-full-text?
-                                                  "max-w-xl whitespace-pre-wrap break-words"
-                                                  "max-w-xs")}
-                               ;; The agent's raw output
+                            ($ :div {:className "flex flex-col gap-2"}
                                ($ :div {:className (if show-full-text?
-                                                     "whitespace-pre-wrap break-words"
-                                                     "truncate")}
-                                  (if (:failure? (:result agent-result))
-                                    ($ :div.space-y-2
-                                       (if-let [throwable (get-in agent-result [:result :val :throwable])]
-                                         ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
-                                            {:onClick #(state/dispatch [:modal/show :exception-detail
-                                                                        {:title "Error Details"
-                                                                         :component ($ ExceptionModal {:throwable throwable})}])}
-                                            "View Error")
-                                         ($ :span.text-red-500.font-semibold "FAIL")))
-                                    (let [output-content (common/pp (:val (:result agent-result)))
-                                          is-long? (> (count output-content) 100)]
-                                      ($ :div.relative.group
-                                         output-content
-                                         (when (and is-long? (not show-full-text?))
-                                           ($ :button.absolute.top-0.right-0.opacity-0.group-hover:opacity-100.transition-opacity.bg-blue-500.text-white.rounded.text-xs.px-2.py-1.hover:bg-blue-600
-                                              {:onClick #(state/dispatch [:modal/show :content-detail
-                                                                          {:title "Output"
-                                                                           :component ($ ContentModal {:content output-content :title "Output"})}])}
-                                              "↗")))))))))
+                                                     "max-w-xl whitespace-pre-wrap break-words"
+                                                     "max-w-xs")}
+                                  ;; The agent's raw output
+                                  ($ :div {:className (if show-full-text?
+                                                        "whitespace-pre-wrap break-words"
+                                                        "truncate")}
+                                     (if (:failure? (:result agent-result))
+                                       ($ :div.space-y-2
+                                          (if-let [throwable (get-in agent-result [:result :val :throwable])]
+                                            ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
+                                               {:onClick #(state/dispatch [:modal/show :exception-detail
+                                                                           {:title "Error Details"
+                                                                            :component ($ ExceptionModal {:throwable throwable})}])}
+                                               "View Error")
+                                            ($ :span.text-red-500.font-semibold "FAIL")))
+                                       (let [output-content (common/pp (:val (:result agent-result)))
+                                             is-long? (> (count output-content) 100)]
+                                         ($ :div.relative.group
+                                            output-content
+                                            (when (and is-long? (not show-full-text?))
+                                              ($ :button.absolute.top-0.right-0.opacity-0.group-hover:opacity-100.transition-opacity.bg-blue-500.text-white.rounded.text-xs.px-2.py-1.hover:bg-blue-600
+                                                 {:onClick #(state/dispatch [:modal/show :content-detail
+                                                                             {:title "Output"
+                                                                              :component ($ ContentModal {:content output-content :title "Output"})}])}
+                                                 "↗")))))))
+                               ($ EvaluatorCapsulesContainer {:run run :module-id module-id}))))
                        ;; Trace Column (separate from output)
-                       ($ :td {:key "trace-cell" :className (common/cn (:td common/table-classes) "text-center")}
-                          (let [first-invoke (get-in run [:agent-initiates 0 :agent-invoke])]
-                            (if first-invoke
-                              ($ :a.inline-flex.items-center.px-3.py-1.text-sm.text-indigo-600.hover:text-indigo-900.bg-indigo-50.hover:bg-indigo-100.rounded-md.transition-colors
-                                 {:href (rfe/href :agent/invocation-detail
-                                                  {:module-id module-id
-                                                   :agent-name (get-in run [:agent-initiates 0 :agent-name])
-                                                   :invoke-id (str (:task-id first-invoke) "-" (:agent-invoke-id first-invoke))})
-                                  :target "_blank"}
-                                 "View Trace")
-                              ($ :span.text-gray-400 "—"))))
-                       ;; Dynamically generate a td for each evaluator metric
-                       (for [{:keys [eval-name metric-key display-name]} evaluator-columns]
-                         ($ EvaluatorResultCell {:key display-name
-                                                 :run run
-                                                 :eval-name eval-name
-                                                 :metric-key metric-key
-                                                 :module-id module-id})))))))))))
+                       )))))))))
 
 (defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
   (let [{:keys [data loading? error]}
