@@ -5,7 +5,8 @@
   - defagentmodule: Define an agent module
   - agent-topology: Create agent topology
   - new-agent: Create a new agent
-  - node: Define a single agent node
+  - agent node function: Define a single agent node declaration
+  - agent-node: Use agent-node argument
   - result!: Return final result from a node
   - agent-manager: Create client manager
   - agent-client: Get client for specific agent

@@ -161,13 +161,6 @@ A local Rama cluster instance used for development and testing. Created
 via `create-ipc` for running agents in a single process without
 requiring a distributed cluster setup. It is a Cluster Manager.
 
-## [Java Interop](terms/java-interop.md)
-
-Bidirectional integration between Clojure agent definitions and Java
-client code. Agent modules can be used from Java applications, and Java
-objects can be integrated into agent execution through agent objects
-and LangChain4j integration.
-
 ## [Key-Value Store](terms/key-value-store.md)
 
 A typed store for simple key-value pairs with specified key/value classes.
@@ -250,12 +243,6 @@ A persistent storage abstraction providing typed access to distributed data with
 Agents that run within other agents, but with limited functionality (no
 async API or streaming). Referenced in error messages indicating
 restricted capabilities for sub-agent contexts.
-
-## [Task Global](terms/task-global.md)
-
-Distributed state containers that manage agent execution state across
-the cluster. Internal implementation detail for state management across
-Rama tasks in the distributed system.
 
 ## [Tools Sub Agent](terms/tools-sub-agent.md)
 
