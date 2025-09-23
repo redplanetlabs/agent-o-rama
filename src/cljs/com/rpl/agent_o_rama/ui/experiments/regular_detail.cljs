@@ -198,8 +198,47 @@
      ($ :div.bg-gray-50.p-4.rounded.border.max-h-96.overflow-auto
         ($ :pre.text-sm.font-mono.whitespace-pre-wrap content))))
 
+;; NEW: Filter buttons component
+(defui FilterButton [{:keys [label is-active? on-click]}]
+  ($ :button
+     {:onClick on-click
+      :className (common/cn
+                  "px-3 py-1 text-xs font-medium rounded-full border transition-colors"
+                  (if is-active?
+                    "bg-blue-600 text-white border-blue-600"
+                    "bg-white text-gray-600 border-gray-300 hover:bg-gray-100"))}
+     label))
+
+(defui FilterButtons [{:keys [active-filter on-change]}]
+  ($ :div.flex.items-center.gap-2
+     ($ FilterButton {:label "All"
+                      :is-active? (= active-filter :all)
+                      :on-click #(on-change :all)})
+     ($ FilterButton {:label "Success"
+                      :is-active? (= active-filter :success)
+                      :on-click #(on-change :success)})
+     ($ FilterButton {:label "Failure"
+                      :is-active? (= active-filter :failure)
+                      :on-click #(on-change :failure)})))
+
 (defui ResultsTable [{:keys [results target module-id]}]
   (let [[show-full-text? set-show-full-text] (uix/use-state false)
+        [active-filter set-active-filter] (uix/use-state :all)
+
+        ;; NEW: Filtering logic
+        is-failure? (fn [run]
+                      (let [agent-failed? (get-in run [:agent-results 0 :result :failure?])
+                            eval-failed? (some (fn [[_eval-name metrics]]
+                                                 (some false? (vals metrics)))
+                                               (:evals run))]
+                        (or agent-failed? eval-failed?)))
+        is-success? (fn [run] (not (is-failure? run)))
+
+        filtered-results (case active-filter
+                           :all results
+                           :success (filter is-success? results)
+                           :failure (filter is-failure? results))
+
         ;; Smart header logic with metric collision detection
         evaluator-columns (let [;; 1. Get all [eval-name, metric-key] pairs
                                 all-eval-metric-pairs (for [run results
@@ -225,89 +264,95 @@
     ($ :div
        ($ :div.flex.justify-between.items-center.mb-4
           ($ :h3.text-xl.font-bold "Detailed Results")
-          ($ :label.flex.items-center.gap-2.text-sm.text-gray-600
-             ($ :input {:type "checkbox"
-                        :checked show-full-text?
-                        :onChange #(set-show-full-text (not show-full-text?))
-                        :className "rounded"})
-             "Show full text"))
-       ($ :div {:className (:container common/table-classes)}
-          ($ :table {:className (:table common/table-classes)}
-             ($ :thead {:className (:thead common/table-classes)}
-                ($ :tr
-                   ($ :th {:className (:th common/table-classes)} "Input")
-                   ($ :th {:className (:th common/table-classes)} "Reference Output")
-                   ($ :th {:className (:th common/table-classes)} "Output")
-                   ($ :th {:className (common/cn (:th common/table-classes) "text-center")} "Trace")
-                   ;; Dynamically generate a th for each evaluator metric
-                   (for [{:keys [display-name]} evaluator-columns]
-                     ($ :th {:key display-name :className (common/cn (:th common/table-classes) "text-center")}
-                        display-name))))
-             ($ :tbody
-                (for [run results]
-                  ($ :tr.border-b {:key (:example-id run)}
-                     ;; Input Cell
-                     ($ :td {:className (:td common/table-classes)}
-                        ($ CellContent {:content (:input run)
-                                        :truncated? (not show-full-text?)
-                                        :on-expand #(state/dispatch [:modal/show :content-detail
-                                                                     {:title "Input"
-                                                                      :component ($ ContentModal {:content % :title "Input"})}])}))
-                     ;; Reference Output Cell
-                     ($ :td {:className (:td common/table-classes)}
-                        ($ CellContent {:content (:reference-output run)
-                                        :truncated? (not show-full-text?)
-                                        :on-expand #(state/dispatch [:modal/show :content-detail
-                                                                     {:title "Reference Output"
-                                                                      :component ($ ContentModal {:content % :title "Reference Output"})}])}))
-                     ;; MODIFIED: Output Cell (now simplified)
-                     (let [agent-result (get-in run [:agent-results 0])]
-                       ($ :td {:key "output-cell" :className (:td common/table-classes)}
-                          ($ :div {:className (if show-full-text?
-                                                "max-w-xl whitespace-pre-wrap break-words"
-                                                "max-w-xs")}
-                             ;; The agent's raw output
-                             ($ :div {:className (if show-full-text?
-                                                   "whitespace-pre-wrap break-words"
-                                                   "truncate")}
-                                (if (:failure? (:result agent-result))
-                                  ($ :div.space-y-2
-                                     (if-let [throwable (get-in agent-result [:result :val :throwable])]
-                                       ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
-                                          {:onClick #(state/dispatch [:modal/show :exception-detail
-                                                                      {:title "Error Details"
-                                                                       :component ($ ExceptionModal {:throwable throwable})}])}
-                                          "View Error")
-                                       ($ :span.text-red-500.font-semibold "FAIL")))
-                                  (let [output-content (common/pp (:val (:result agent-result)))
-                                        is-long? (> (count output-content) 100)]
-                                    ($ :div.relative.group
-                                       output-content
-                                       (when (and is-long? (not show-full-text?))
-                                         ($ :button.absolute.top-0.right-0.opacity-0.group-hover:opacity-100.transition-opacity.bg-blue-500.text-white.rounded.text-xs.px-2.py-1.hover:bg-blue-600
-                                            {:onClick #(state/dispatch [:modal/show :content-detail
-                                                                        {:title "Output"
-                                                                         :component ($ ContentModal {:content output-content :title "Output"})}])}
-                                            "↗")))))))))
-                     ;; Trace Column (separate from output)
-                     ($ :td {:key "trace-cell" :className (common/cn (:td common/table-classes) "text-center")}
-                        (let [first-invoke (get-in run [:agent-initiates 0 :agent-invoke])]
-                          (if first-invoke
-                            ($ :a.inline-flex.items-center.px-3.py-1.text-sm.text-indigo-600.hover:text-indigo-900.bg-indigo-50.hover:bg-indigo-100.rounded-md.transition-colors
-                               {:href (rfe/href :agent/invocation-detail
-                                                {:module-id module-id
-                                                 :agent-name (get-in run [:agent-initiates 0 :agent-name])
-                                                 :invoke-id (str (:task-id first-invoke) "-" (:agent-invoke-id first-invoke))})
-                                :target "_blank"}
-                               "View Trace")
-                            ($ :span.text-gray-400 "—"))))
-                     ;; Dynamically generate a td for each evaluator metric
-                     (for [{:keys [eval-name metric-key display-name]} evaluator-columns]
-                       ($ EvaluatorResultCell {:key display-name
-                                               :run run
-                                               :eval-name eval-name
-                                               :metric-key metric-key
-                                               :module-id module-id}))))))))))
+          ($ :div.flex.items-center.gap-4
+             ($ FilterButtons {:active-filter active-filter
+                               :on-change set-active-filter})
+             ($ :label.flex.items-center.gap-2.text-sm.text-gray-600
+                ($ :input {:type "checkbox"
+                           :checked show-full-text?
+                           :onChange #(set-show-full-text (not show-full-text?))
+                           :className "rounded"})
+                "Show full text")))
+       (if (empty? filtered-results)
+         ($ :div.text-center.py-8.text-gray-500.bg-gray-50.rounded-lg
+            "No results match the current filter.")
+         ($ :div {:className (:container common/table-classes)}
+            ($ :table {:className (:table common/table-classes)}
+               ($ :thead {:className (:thead common/table-classes)}
+                  ($ :tr
+                     ($ :th {:className (:th common/table-classes)} "Input")
+                     ($ :th {:className (:th common/table-classes)} "Reference Output")
+                     ($ :th {:className (:th common/table-classes)} "Output")
+                     ($ :th {:className (common/cn (:th common/table-classes) "text-center")} "Trace")
+                     ;; Dynamically generate a th for each evaluator metric
+                     (for [{:keys [display-name]} evaluator-columns]
+                       ($ :th {:key display-name :className (common/cn (:th common/table-classes) "text-center")}
+                          display-name))))
+               ($ :tbody
+                  (for [run filtered-results]
+                    ($ :tr.border-b {:key (:example-id run)}
+                       ;; Input Cell
+                       ($ :td {:className (:td common/table-classes)}
+                          ($ CellContent {:content (:input run)
+                                          :truncated? (not show-full-text?)
+                                          :on-expand #(state/dispatch [:modal/show :content-detail
+                                                                       {:title "Input"
+                                                                        :component ($ ContentModal {:content % :title "Input"})}])}))
+                       ;; Reference Output Cell
+                       ($ :td {:className (:td common/table-classes)}
+                          ($ CellContent {:content (:reference-output run)
+                                          :truncated? (not show-full-text?)
+                                          :on-expand #(state/dispatch [:modal/show :content-detail
+                                                                       {:title "Reference Output"
+                                                                        :component ($ ContentModal {:content % :title "Reference Output"})}])}))
+                       ;; MODIFIED: Output Cell (now simplified)
+                       (let [agent-result (get-in run [:agent-results 0])]
+                         ($ :td {:key "output-cell" :className (:td common/table-classes)}
+                            ($ :div {:className (if show-full-text?
+                                                  "max-w-xl whitespace-pre-wrap break-words"
+                                                  "max-w-xs")}
+                               ;; The agent's raw output
+                               ($ :div {:className (if show-full-text?
+                                                     "whitespace-pre-wrap break-words"
+                                                     "truncate")}
+                                  (if (:failure? (:result agent-result))
+                                    ($ :div.space-y-2
+                                       (if-let [throwable (get-in agent-result [:result :val :throwable])]
+                                         ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
+                                            {:onClick #(state/dispatch [:modal/show :exception-detail
+                                                                        {:title "Error Details"
+                                                                         :component ($ ExceptionModal {:throwable throwable})}])}
+                                            "View Error")
+                                         ($ :span.text-red-500.font-semibold "FAIL")))
+                                    (let [output-content (common/pp (:val (:result agent-result)))
+                                          is-long? (> (count output-content) 100)]
+                                      ($ :div.relative.group
+                                         output-content
+                                         (when (and is-long? (not show-full-text?))
+                                           ($ :button.absolute.top-0.right-0.opacity-0.group-hover:opacity-100.transition-opacity.bg-blue-500.text-white.rounded.text-xs.px-2.py-1.hover:bg-blue-600
+                                              {:onClick #(state/dispatch [:modal/show :content-detail
+                                                                          {:title "Output"
+                                                                           :component ($ ContentModal {:content output-content :title "Output"})}])}
+                                              "↗")))))))))
+                       ;; Trace Column (separate from output)
+                       ($ :td {:key "trace-cell" :className (common/cn (:td common/table-classes) "text-center")}
+                          (let [first-invoke (get-in run [:agent-initiates 0 :agent-invoke])]
+                            (if first-invoke
+                              ($ :a.inline-flex.items-center.px-3.py-1.text-sm.text-indigo-600.hover:text-indigo-900.bg-indigo-50.hover:bg-indigo-100.rounded-md.transition-colors
+                                 {:href (rfe/href :agent/invocation-detail
+                                                  {:module-id module-id
+                                                   :agent-name (get-in run [:agent-initiates 0 :agent-name])
+                                                   :invoke-id (str (:task-id first-invoke) "-" (:agent-invoke-id first-invoke))})
+                                  :target "_blank"}
+                                 "View Trace")
+                              ($ :span.text-gray-400 "—"))))
+                       ;; Dynamically generate a td for each evaluator metric
+                       (for [{:keys [eval-name metric-key display-name]} evaluator-columns]
+                         ($ EvaluatorResultCell {:key display-name
+                                                 :run run
+                                                 :eval-name eval-name
+                                                 :metric-key metric-key
+                                                 :module-id module-id})))))))))))
 
 (defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
   (let [{:keys [data loading? error]}
