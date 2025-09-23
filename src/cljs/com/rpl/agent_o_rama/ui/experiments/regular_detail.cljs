@@ -125,17 +125,44 @@
            ($ PlayIcon {:className "h-5 w-5 mr-2"})
            "Re-run Experiment"))))
 
-(defui SummaryPanel [{:keys [summary-evals results]}]
-  (let [total-examples (count results)
-        ;; Calculate success rate based on whether any agent failed
+(defui SummaryPanel [{:keys [data]}] ;; Changed props to accept full data object
+  (let [;; Destructure all necessary data at the top
+        results (vals (:results data))
+        summary-evals (:summary-evals data)
+        latency-stats (:latency-number-stats data)
+        token-stats (:total-token-number-stats data)
+
+        ;; Existing calculations
+        total-examples (count results)
         passed-count (count (filter #(not-any? :failure? (vals (:agent-results %))) results))
         pass-rate (if (pos? total-examples)
                     (str (int (* 100 (/ passed-count total-examples))) "%")
-                    "N/A")]
-    ($ :div.grid.grid-cols-1.md:grid-cols-3.gap-4
+                    "N/A")
+
+        ;; NEW CALCULATIONS
+        ;; Calculate average latency
+        avg-latency (let [total (:total latency-stats 0)
+                          count (:count latency-stats 0)]
+                      (if (pos? count)
+                        (str (int (/ total count)) "ms")
+                        "N/A"))
+
+        ;; Get total tokens
+        total-tokens (let [total (:total token-stats 0)]
+                       (if (pos? total)
+                         (.toLocaleString total) ;; Format with commas
+                         "N/A"))]
+
+    ;; Updated the grid layout and added new StatCards
+    ($ :div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-4.gap-4 ;; Adjusted grid columns
        ($ StatCard {:label "Total Examples" :value total-examples})
        ($ StatCard {:label "Success Rate" :value pass-rate})
-       ;; Dynamic cards for each summary evaluator metric
+
+       ;; NEW STAT CARDS
+       ($ StatCard {:label "Avg. Latency" :value avg-latency})
+       ($ StatCard {:label "Total Tokens" :value total-tokens})
+
+       ;; This existing loop for summary evaluators will now work correctly
        (for [[eval-name eval-result] summary-evals
              [metric value] eval-result]
          ($ StatCard {:key (str eval-name metric)
@@ -416,8 +443,7 @@
               (when show-info?
                 ($ ExperimentInfoPanel {:info (:experiment-info data)}))
 
-              ($ SummaryPanel {:summary-evals (:summary-evals data)
-                               :results (vals (:results data))})
+              ($ SummaryPanel {:data data})
               ($ ResultsTable {:results (vals (:results data))
                                :target (get-in data [:experiment-info :spec :target])
                                :module-id module-id}))
