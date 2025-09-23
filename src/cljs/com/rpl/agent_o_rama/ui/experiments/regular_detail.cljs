@@ -419,36 +419,21 @@
                                                   :experiment-id experiment-id}]
           :refetch-interval-ms 2000})
         ;; NEW: State for the details panel visibility
-        [show-info? set-show-info] (uix/use-state false)]
+        [show-info? set-show-info] (uix/use-state false)
+        inv-error (:invocation-error data)
+        status (cond
+                 inv-error :failed
+                 (:finish-time-millis data) :completed
+                 :else :running)]
 
     (cond
       loading? ($ :div.p-6.text-center.py-12 ($ common/spinner {:size :large}))
       error ($ :div.p-6.text-red-500.text-center.py-8 "Error loading experiment results: " error)
 
-      (and data (:invocation-error data))
-      ($ :div.p-6.space-y-6
-         ($ ExperimentHeader {:info (:experiment-info data)
-                              :status :failed
-                                                            ;; NEW: Implement the on-rerun handler
-                              :on-rerun #(let [form-props (-> (:experiment-info data)
-                                                              forms/experiment-info->form-state
-                                                              (assoc :module-id module-id
-                                                                     :dataset-id dataset-id))]
-                                           (state/dispatch [:modal/show-form :create-experiment form-props]))
-                              :module-id module-id
-                              :dataset-id dataset-id
-                              ;; NEW: Pass state and handler to header
-                              :show-info? show-info?
-                              :on-toggle-info #(set-show-info (not show-info?))})
-         ;; NEW: Conditionally render the info panel
-         (when show-info?
-           ($ ExperimentInfoPanel {:info (:experiment-info data)}))
-         ($ ExperimentErrorPanel {:error-info (:invocation-error data)}))
-
       data ($ :div.p-6.space-y-6
               ($ ExperimentHeader {:info (:experiment-info data)
-                                   :status (if (:finish-time-millis data) :completed :running)
-                                                                      ;; NEW: Implement the on-rerun handler
+                                   :status status
+                                   ;; NEW: Implement the on-rerun handler
                                    :on-rerun #(let [form-props (-> (:experiment-info data)
                                                                    forms/experiment-info->form-state
                                                                    (assoc :module-id module-id
@@ -462,6 +447,10 @@
               ;; NEW: Conditionally render the info panel
               (when show-info?
                 ($ ExperimentInfoPanel {:info (:experiment-info data)}))
+
+              ;; NEW: Show error inline without hiding rest of page
+              (when inv-error
+                ($ ExperimentErrorPanel {:error-info inv-error}))
 
               ($ SummaryStatsTable {:data data})
               ($ ResultsTable {:results (vals (:results data))
