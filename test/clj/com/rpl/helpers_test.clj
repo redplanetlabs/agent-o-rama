@@ -3,7 +3,10 @@
         [com.rpl.test-helpers])
   (:require
    [com.rpl.agent-o-rama.impl.helpers :as h]
-   [com.rpl.agent-o-rama.impl.types :as aor-types]))
+   [com.rpl.agent-o-rama.impl.types :as aor-types])
+  (:import
+   [com.rpl.agentorama
+    AgentFailedException]))
 
 (deftest invoke-test
   (loop [args         []
@@ -38,9 +41,11 @@
          (h/validate-options! "context" {:ab -1 :bb 23} spec)))
   ))
 
-;; TODO: <<<<>>>> test with failed result
 (deftest node->output-test
   (is (= 123 (h/node->output (aor-types/->AgentResult 123 false) 12345)))
+  (is (instance? AgentFailedException
+                 (h/node->output (aor-types/->AgentResult "failed..." true) [])))
+  (is (instance? AgentFailedException (h/result->output nil)))
   (is (= [{"node" "abc" "args" [1 2 3]}
           {"node" "defg" "args" ["a" 3]}
           {"node" "abc" "args" ["aa" "bb"]}]
