@@ -102,6 +102,108 @@ Create [evaluator builders](../terms/evaluator-builder.md) in your agent module:
            :criteria-met (:criteria evaluation)})))))
 ```
 
+### Provided Evaluator Builders
+
+Agent-o-rama includes [provided evaluator builders](../terms/provided-evaluator-builders.md) for common evaluation tasks. These save you from implementing standard metrics:
+
+#### aor/llm-judge
+
+AI-powered evaluation using large language models:
+
+```clojure
+;; Create LLM judge with custom criteria
+(aor/create-evaluator! manager "quality-judge" "aor/llm-judge"
+  {"model" "gpt-4o"
+   "temperature" "0.2"
+   "prompt" "Rate the response on helpfulness (0-10): %output"})
+
+;; Test the evaluator
+(aor/try-evaluator manager "quality-judge"
+  input reference-output actual-output)
+```
+
+#### aor/conciseness
+
+Boolean evaluator for length constraints:
+
+```clojure
+;; Create conciseness evaluator with character limit
+(aor/create-evaluator! manager "brief-check" "aor/conciseness"
+  {"threshold" "150"})
+
+;; Works with strings and LangChain4j messages
+(aor/try-evaluator manager "brief-check"
+  input reference-output "This is a concise response")
+;; => {:score true} if under 150 characters
+```
+
+#### aor/f1-score
+
+Classification metrics for binary tasks:
+
+```clojure
+;; Create F1-score evaluator for sentiment analysis
+(aor/create-evaluator! manager "sentiment-f1" "aor/f1-score"
+  {"positiveValue" "positive"})
+
+;; Returns comprehensive classification metrics
+(aor/try-evaluator manager "sentiment-f1"
+  input "positive" "positive")
+;; => {:score 1.0 :precision 1.0 :recall 1.0}
+```
+
+#### Complete Provided Builders Example
+
+Here's how to use all three provided builders:
+
+```clojure
+(ns com.rpl.agent.basic.provided-evaluator-builders-agent
+  (:require
+   [com.rpl.agent-o-rama :as aor]
+   [com.rpl.rama :as rama]
+   [com.rpl.rama.test :as rtest]))
+
+(aor/defagentmodule ProvidedEvaluatorBuildersModule
+  [topology]
+
+  ;; Declare OpenAI model for LLM judge
+  (aor/declare-agent-object-builder topology "test-model"
+    (fn [_setup]
+      (-> (OpenAiChatModel/builder)
+          (.apiKey (System/getenv "OPENAI_API_KEY"))
+          (.modelName "gpt-4o-mini")
+          .build)))
+
+  ;; Test agent that generates different response types
+  (-> topology
+      (aor/new-agent "TextGenerator")
+      (aor/node "generate" nil
+        (fn [agent-node input-type]
+          (let [result (case input-type
+                         "short" "Yes"
+                         "medium" "This is a medium-length response"
+                         "long" "This is a much longer response that contains more detailed information..."
+                         "positive" "positive"
+                         "negative" "negative")]
+            (aor/result! agent-node result))))))
+
+(defn create-demo-evaluators [manager]
+  ;; LLM judge evaluator
+  (aor/create-evaluator! manager "llm-judge" "aor/llm-judge"
+    {"model" "test-model"
+     "prompt" "Rate the quality of this response (0-10): %output"})
+
+  ;; Conciseness evaluator
+  (aor/create-evaluator! manager "conciseness" "aor/conciseness"
+    {"threshold" "50"})
+
+  ;; F1-score evaluator
+  (aor/create-evaluator! manager "f1-score" "aor/f1-score"
+    {"positiveValue" "positive"}))
+```
+
+These provided builders cover the most common evaluation scenarios and serve as references for creating your own custom evaluators.
+
 ### Create Evaluator Instances
 
 Configure evaluators with specific parameters:
@@ -291,9 +393,10 @@ You've learned experimentation patterns:
 1. **[Dataset](../terms/dataset.md)**: Managed test data collections
 2. **[Evaluators](../terms/evaluators.md)**: Performance measurement functions
 3. **[Evaluator Builder](../terms/evaluator-builder.md)**: Metric construction patterns
-4. **[Experiment](../terms/experiment.md)**: Structured test execution
-5. **[Example Run](../terms/example-run.md)**: Individual test instances
-6. **[Fork](../terms/fork.md)**: Parallel execution testing
+4. **[Provided Evaluator Builders](../terms/provided-evaluator-builders.md)**: Built-in builders for common evaluation tasks (aor/llm-judge, aor/conciseness, aor/f1-score)
+5. **[Experiment](../terms/experiment.md)**: Structured test execution
+6. **[Example Run](../terms/example-run.md)**: Individual test instances
+7. **[Fork](../terms/fork.md)**: Parallel execution testing
 
 These patterns enable systematic agent validation and improvement.
 

@@ -19,10 +19,10 @@ agent-module (declaration)
 
 rama
 ├── cluster-manager
-│   ├── rama-module
-│   │   ├── agent-module
-│   │   └── module-lifecycle
-│   └── ipc
+    ├── rama-module
+    │   ├── agent-module
+    │   └── module-lifecycle
+    └── ipc
 
 agent-module
 └── agent-topology
@@ -64,11 +64,11 @@ langchain4j-integration
 experiments
 └── agent-topology
     └── evaluator-builder
-        └── evaluator
-            └── dataset
-                └── experiment
-                    └── experiment-run
-
+        ├── evaluator
+        │   └── dataset
+        │       └── experiment
+        │           └── experiment-run
+        └-- provided-evaluator-builders
 fork
 
 log-throttling
@@ -149,6 +149,7 @@ log-throttling
 - **dataset**: Input/output collections
 - **experiment**: Test execution
 - **experiment-run**: Individual test runs
+- **provided-evaluator-builders**: Provided evaluator builders
 
 ### Additional Features
 - **fork**: Parallel execution branching

@@ -47,7 +47,7 @@ Start here and work through in order:
 5. **[Storage and Objects](05-storage-and-objects.md)**: [Stores](../terms/store.md) and [agent objects](../terms/agent-objects.md) for state and resources
 6. **[Streaming](06-streaming.md)**: Real-time data with [streaming chunks](../terms/streaming-chunk.md) and subscriptions
 7. **[AI Integration](07-ai-integration.md)**: [LangChain4j](../terms/langchain4j-integration.md) and [tool calling](../terms/tool-calling.md)
-8. **[Experimentation](08-experimentation.md)**: [Datasets](../terms/dataset.md), [evaluators](../terms/evaluators.md), and testing
+8. **[Experimentation](08-experimentation.md)**: [Datasets](../terms/dataset.md), [evaluators](../terms/evaluators.md), and [provided evaluator builders](../terms/provided-evaluator-builders.md)
 
 ## Quick Taste
 

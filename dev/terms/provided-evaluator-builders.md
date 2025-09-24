@@ -90,3 +90,7 @@ Custom evaluator builders can be declared alongside provided ones using:
 - `aor/declare-summary-evaluator-builder` - Cross-example aggregation functions
 
 The provided builders serve as reference implementations and cover the most common evaluation scenarios in agent-o-rama deployments.
+
+## Examples
+- Clojure: `examples/clj/src/com/rpl/agent/basic/provided_evaluator_builders_agent.clj`
+- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/ProvidedEvaluatorBuildersAgent.java`
