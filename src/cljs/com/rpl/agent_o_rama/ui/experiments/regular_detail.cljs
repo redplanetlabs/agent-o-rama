@@ -360,8 +360,8 @@
                      ($ :th {:className (:th common/table-classes)} "Reference Output")
                      ($ :th {:className (common/cn (:th common/table-classes) "w-1/3")} "Output & Evaluations")))
                ($ :tbody
-                  (for [run filtered-results]
-                    ($ :tr.border-b {:key (:example-id run)}
+                  (for [[idx run] (map-indexed vector filtered-results)]
+                    ($ :tr.border-b {:key (str (:example-id run) "-" idx)}
                        ;; Input Cell
                        ($ :td {:className (:td common/table-classes)}
                           ($ CellContent {:content (:input run)
