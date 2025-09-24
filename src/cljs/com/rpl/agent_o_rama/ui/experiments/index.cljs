@@ -27,15 +27,15 @@
 
         experiments (get data :items)
 
-        ;; NEW: Determine all unique evaluator columns from all visible experiments
+        ;; Determine all unique evaluator columns from all visible experiments
         all-evaluator-names (->> experiments
                                  (mapcat #(get-in % [:experiment-info :evaluators]))
                                  (map :name)
+                                 (remove nil?)
                                  distinct
                                  sort)]
 
     ($ :div.p-6
-       ;; Header (remains the same)
        ($ :div.flex.justify-between.items-center.mb-6
           ($ :h2.text-2xl.font-bold "Experiments")
           ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
@@ -46,7 +46,6 @@
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Run New Experiment"))
 
-       ;; --- NEW TABLE STRUCTURE ---
        (cond
          loading? ($ :div.text-center.py-12 ($ common/spinner {:size :large}))
          error ($ :div.text-red-500.text-center.py-8 "Error loading experiments: " error)
@@ -56,34 +55,28 @@
             ($ :h3.mt-2.text-sm.font-medium.text-gray-900 "No experiments run yet")
             ($ :p.mt-1.text-sm.text-gray-500 "Run your first experiment to evaluate agent performance."))
          :else
-         ($ :div {:className (common/cn (:container common/table-classes) "overflow-x-auto")} ;; Make container scrollable
+         ($ :div {:className (common/cn (:container common/table-classes) "overflow-x-auto")}
             ($ :table {:className (:table common/table-classes)}
                ($ :thead {:className (:thead common/table-classes)}
                   ($ :tr
                      ($ :th {:className (:th common/table-classes)} "Experiment Name")
                      ($ :th {:className (:th common/table-classes)} "Status")
                      ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "# Examples")
-                     ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Success Rate")
                      ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Avg Latency (ms)")
                      ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "P99 Latency (ms)")
                      ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Avg Total Tokens")
-                     ;; Dynamically create a header for each evaluator
                      (for [eval-name all-evaluator-names]
-                       ($ :th {:key eval-name :className (common/cn (:th common/table-classes) "text-right")}
-                          ($ :div.truncate {:title eval-name} (str "Eval: " eval-name))))))
+                       ($ :th {:key (str (or eval-name "unknown-eval"))
+                               :className (common/cn (:th common/table-classes) "text-right")}
+                          ($ :div.truncate {:title (or eval-name "unknown")}
+                             (str "Eval: " (or eval-name "unknown")))))))
                ($ :tbody
                   (for [exp experiments
                         :let [info (:experiment-info exp)
                               latency-stats (:latency-number-stats exp)
                               token-stats (:total-token-number-stats exp)
                               eval-stats (:eval-number-stats exp)
-                              num-examples (or (:count latency-stats) 0)
-                              ;; Calculate success rate
-                              success-rate (let [passed-count (or (get-in exp [:eval-number-stats "pass-rate" :total]) 0)
-                                                 total-count (get-in exp [:eval-number-stats "pass-rate" :count] 0)]
-                                             (if (pos? total-count)
-                                               (str (int (* 100 (/ passed-count total-count))) "%")
-                                               "N/A"))]]
+                              num-examples (or (:count latency-stats) 0)]]
                     ($ :tr {:key (:id info)
                             :className "hover:bg-gray-50 cursor-pointer"
                             :onClick (fn [_]
@@ -104,9 +97,6 @@
                        ;; # Examples
                        ($ StatCell {:value num-examples})
 
-                       ;; Success Rate 
-                       ($ StatCell {:value success-rate :tooltip "Pass rate from evaluators"})
-
                        ;; Avg Latency
                        ($ StatCell {:value (when (and latency-stats (pos? num-examples))
                                              (int (/ (:total latency-stats) num-examples)))})
@@ -121,12 +111,17 @@
                        ;; Dynamic columns for each evaluator
                        (for [eval-name all-evaluator-names]
                          (let [eval-metrics (get eval-stats eval-name)
-                               ;; Display the first metric's pass rate if boolean, otherwise first value
                                metric-key (first (keys eval-metrics))
                                metric-data (get eval-metrics metric-key)
-                               display-value (when metric-data
-                                               (if (contains? #{0 1} (:total metric-data)) ;; Check if it's a boolean-like metric
-                                                 (str (int (* 100 (/ (:total metric-data) (:count metric-data)))) "%")
-                                                 (int (/ (:total metric-data) (:count metric-data)))))]
-                           ($ StatCell {:key eval-name :value display-value :tooltip (str "Avg. " (name metric-key))}))))))))))))
+                               display-value (let [total (or (:total metric-data) 0)
+                                                   count (or (:count metric-data) 0)]
+                                               (if (pos? count)
+                                                 (.toFixed (/ total count) 2)
+                                                 "N/A"))
+                               tooltip (if metric-key
+                                         (str "Avg. " (str metric-key))
+                                         "Avg.")]
+                           ($ StatCell {:key (str (or eval-name "unknown-eval"))
+                                        :value display-value
+                                        :tooltip tooltip}))))))))))))
 
