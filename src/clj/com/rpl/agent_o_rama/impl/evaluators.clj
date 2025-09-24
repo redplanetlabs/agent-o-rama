@@ -35,7 +35,7 @@
   (spec/and
    (spec/keys :opt-un [::description ::default])
    (fn [m]
-     (and (map? m)
+     (and (instance? java.util.Map m)
           (every? allowed-entry-keys (keys m))))))
 
 (spec/def ::params

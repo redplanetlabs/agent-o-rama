@@ -280,7 +280,7 @@
 
 (defn map-spec
   [v]
-  (when-not (map? v)
+  (when-not (instance? java.util.Map v)
     "value must be a map"))
 
 (defn string-spec

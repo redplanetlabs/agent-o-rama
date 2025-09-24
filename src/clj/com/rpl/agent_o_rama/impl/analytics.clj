@@ -463,7 +463,7 @@
                     :declared-objects declared-objects-tg
                     :rama-clients     rama-clients}]
            (let [m (action-fn fetcher input output run-info)]
-             (when-not (and (map? m) (every? string? (keys m)))
+             (when-not (and (instance? java.util.Map m) (every? string? (keys m)))
                (throw (h/ex-info "Action return must be map with string keys" {:reeturn m})))
              (.complete cf {:success? true :info-map m}))
            (catch Throwable t
