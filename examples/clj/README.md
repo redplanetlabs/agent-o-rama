@@ -49,6 +49,7 @@ progressing from basic concepts to advanced patterns.
 17. **`forking_agent`** - Agent execution branching
 18. **`dataset_agent`** - Dataset creation and management
 19. **`evaluator_agent`** - Evaluator creation and execution
+20. **`provided_evaluator_builders_agent`** - Built-in evaluator builders (aor/llm-judge, aor/conciseness, aor/f1-score)
 
 ## Running Examples
 
@@ -93,6 +94,7 @@ lein run -m com.rpl.agent.basic.tools-agent
 lein run -m com.rpl.agent.basic.forking-agent
 lein run -m com.rpl.agent.basic.dataset-agent
 lein run -m com.rpl.agent.basic.evaluator-agent
+lein run -m com.rpl.agent.basic.provided-evaluator-builders-agent
 lein run -m com.rpl.agent.basic.langchain4j-agent
 ```
 

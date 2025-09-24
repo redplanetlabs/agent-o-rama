@@ -152,7 +152,7 @@ Include REFINE to refine the spec
       builders", which should list the builders in
       com.rpl.agent-o-rama.impl.evaluators
 
-- [ ] Add a "Provided evaluator builders" basic example, which should
+- [x] Add a "Provided evaluator builders" basic example, which should
       show how to use the builders in
       com.rpl.agent-o-rama.impl.evaluators
 
