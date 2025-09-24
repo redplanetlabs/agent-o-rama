@@ -40,7 +40,7 @@
       ["" {:name :module/datasets, :views [datasets/index]}]
       ["/:dataset-id"
        {:name :module/dataset, :views [datasets/detail]}
-       ["" {:name :module/dataset-detail, :views [experiments/index]}]
+       ["" {:name :module/dataset-detail, :views [datasets/detail-examples]}]
        ["/examples" {:name :module/dataset-detail.examples, :views [datasets/detail-examples]}]
        ["/experiments" {:name :module/dataset-detail.experiments, :views [experiments/index]}]
        ["/experiments/:experiment-id" {:name :module/dataset-detail.experiment-detail, :views [experiments-detail/regular-experiment-detail-page]}]

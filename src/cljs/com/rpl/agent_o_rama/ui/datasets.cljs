@@ -579,7 +579,7 @@
                                        "Delete")))))))))))))))
 
 (defn get-dataset-path [module-id dataset-id]
-  (rfe/href :module/dataset-detail
+  (rfe/href :module/dataset-detail.examples
             {:module-id module-id
              :dataset-id dataset-id}))
 
@@ -642,7 +642,7 @@
                           ($ :tr {:key dsid
                                   :className "hover:bg-gray-50 cursor-pointer"
                                   :onClick (fn [_]
-                                             (rfe/push-state :module/dataset-detail
+                                             (rfe/push-state :module/dataset-detail.examples
                                                              {:module-id module-id
                                                               :dataset-id dsid}))}
                              ($ :td {:className (:td common/table-classes)}
@@ -1002,6 +1002,11 @@
             ;; Tab navigation bar
             ($ :div.bg-white.border-b.border-gray-200
                ($ :nav.flex.space-x-8.px-6
+                  ($ :a {:href (rfe/href :module/dataset-detail.examples {:module-id module-id, :dataset-id dataset-id}),
+                         :className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
+                                               {"border-indigo-500 text-indigo-600" (= active-tab "examples")
+                                                "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "examples")})}
+                     "Examples")
                   ($ :a {:href (rfe/href :module/dataset-detail.experiments {:module-id module-id, :dataset-id dataset-id}),
                          :className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
                                                {"border-indigo-500 text-indigo-600" (= active-tab "experiments")
@@ -1011,10 +1016,5 @@
                          :className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
                                                {"border-indigo-500 text-indigo-600" (= active-tab "comparative")
                                                 "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "comparative")})}
-                     "Comparative Experiments")
-                  ($ :a {:href (rfe/href :module/dataset-detail.examples {:module-id module-id, :dataset-id dataset-id}),
-                         :className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
-                                               {"border-indigo-500 text-indigo-600" (= active-tab "examples")
-                                                "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "examples")})}
-                     "Examples"))))
+                     "Comparative Experiments"))))
          :else ($ :div.p-6 "Dataset not found.")))))
