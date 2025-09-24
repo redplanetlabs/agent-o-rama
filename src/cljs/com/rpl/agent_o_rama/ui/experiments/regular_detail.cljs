@@ -185,7 +185,7 @@
                                 :value avg-total-tokens
                                 :tooltip "Average total tokens (input + output) per example."})
 
-                   ;; Dynamically create a column for each summary evaluator
+                   ;; Dynamically create a column for each summary evaluator TODO move this below
                    (for [[eval-name metrics] summary-evals]
                      ($ SummaryEvaluatorCell {:key (name eval-name)
                                               :eval-name eval-name
@@ -315,28 +315,7 @@
                            :success (filter is-success? results)
                            :failure (filter is-failure? results))
 
-        ;; Smart header logic with metric collision detection
-        evaluator-columns (let [;; 1. Get all [eval-name, metric-key] pairs
-                                all-eval-metric-pairs (for [run results
-                                                            [eval-name metrics] (:evals run)
-                                                            metric-key (keys metrics)]
-                                                        [eval-name metric-key])
-                                ;; 2. Find metric keys that appear in more than one evaluator
-                                metric-key-counts (->> all-eval-metric-pairs (map second) frequencies)
-                                duplicate-metric-keys (->> metric-key-counts
-                                                           (filter #(< 1 (second %)))
-                                                           (map first)
-                                                           set)
-                                ;; 3. Get all unique [eval-name, metric-key] pairs and sort them
-                                unique-pairs (->> all-eval-metric-pairs distinct (sort-by (juxt first second)))]
-                            ;; 4. Build the final column definitions with display names
-                            (mapv (fn [[eval-name metric-key]]
-                                    {:eval-name eval-name
-                                     :metric-key metric-key
-                                     :display-name (if (contains? duplicate-metric-keys metric-key)
-                                                     (str (name eval-name) "/" (name metric-key))
-                                                     (name metric-key))})
-                                  unique-pairs))]
+        ]
     ($ :div
        ($ :div.flex.justify-between.items-center.mb-4
           ($ :h3.text-xl.font-bold "Detailed Results")

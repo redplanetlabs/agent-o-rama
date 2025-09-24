@@ -25,15 +25,57 @@
           :enabled? (boolean (and module-id dataset-id))
           :refresh-interval-ms 1000})
 
-        experiments (get data :items)
-
-        ;; Determine all unique evaluator columns from all visible experiments
-        all-evaluator-names (->> experiments
-                                 (mapcat #(get-in % [:experiment-info :evaluators]))
-                                 (map :name)
-                                 (remove nil?)
-                                 distinct
-                                 sort)]
+        metric->title
+        (fn [metric-key]
+          (cond
+            (keyword? metric-key) (name metric-key)
+            (symbol? metric-key) (name metric-key)
+            :else (str metric-key)))
+        experiments
+        (get data :items)
+        eval-metrics-by-evaluator
+        (->> experiments
+             (map :eval-number-stats)
+             (keep identity)
+             (mapcat seq)
+             (reduce (fn [acc [eval-name metrics]]
+                       (if eval-name
+                         (update acc eval-name
+                                 (fnil into #{})
+                                 (keys (or metrics {})))
+                         acc))
+                     {}))
+        all-evaluator-names
+        (-> eval-metrics-by-evaluator keys sort vec)
+        metric->evaluators
+        (reduce-kv
+         (fn [acc eval-name metric-keys]
+           (reduce (fn [m metric-key]
+                     (update m metric-key (fnil conj #{}) eval-name))
+                   acc
+                   metric-keys))
+         {}
+         eval-metrics-by-evaluator)
+        ambiguous-metrics
+        (->> metric->evaluators
+             (keep (fn [[metric-key eval-names]]
+                     (when (> (count eval-names) 1)
+                       metric-key)))
+             set)
+        evaluator-columns
+        (->> all-evaluator-names
+             (mapcat (fn [eval-name]
+                       (let [metric-keys (sort (or (seq (get eval-metrics-by-evaluator eval-name)) []))]
+                         (for [metric-key metric-keys
+                               :let [metric-label (metric->title metric-key)
+                                     column-label (if (contains? ambiguous-metrics metric-key)
+                                                    (str eval-name "/" metric-label)
+                                                    metric-label)]]
+                           {:column-key (str eval-name "::" metric-label)
+                            :label column-label
+                            :eval-name eval-name
+                            :metric-key metric-key}))))
+             vec)]
 
     ($ :div.p-6
        ($ :div.flex.justify-between.items-center.mb-6
@@ -65,11 +107,11 @@
                      ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Avg Latency (ms)")
                      ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "P99 Latency (ms)")
                      ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Avg Total Tokens")
-                     (for [eval-name all-evaluator-names]
-                       ($ :th {:key (str (or eval-name "unknown-eval"))
+                     (for [{:keys [column-key label]} evaluator-columns]
+                       ($ :th {:key column-key
                                :className (common/cn (:th common/table-classes) "text-right")}
-                          ($ :div.truncate {:title (or eval-name "unknown")}
-                             (str "Eval: " (or eval-name "unknown")))))))
+                          ($ :div.truncate {:title label}
+                             label)))))
                ($ :tbody
                   (for [exp experiments
                         :let [info (:experiment-info exp)
@@ -109,19 +151,19 @@
                                              (int (/ (:total token-stats) num-examples)))})
 
                        ;; Dynamic columns for each evaluator
-                       (for [eval-name all-evaluator-names]
-                         (let [eval-metrics (get eval-stats eval-name)
-                               metric-key (first (keys eval-metrics))
-                               metric-data (get eval-metrics metric-key)
-                               display-value (let [total (or (:total metric-data) 0)
-                                                   count (or (:count metric-data) 0)]
-                                               (if (pos? count)
-                                                 (.toFixed (/ total count) 2)
-                                                 "N/A"))
-                               tooltip (if metric-key
-                                         (str "Avg. " (str metric-key))
-                                         "Avg.")]
-                           ($ StatCell {:key (str (or eval-name "unknown-eval"))
+                       (for [{:keys [column-key eval-name metric-key]} evaluator-columns]
+                         (let [metric-data (get-in eval-stats [eval-name metric-key])
+                               count (:count metric-data)
+                               total (:total metric-data)
+                               display-value (when (and metric-data
+                                                        (pos? (or count 0))
+                                                        (some? total))
+                                               (.toFixed (/ total count) 2))
+                               metric-label (metric->title metric-key)
+                               tooltip (if (contains? ambiguous-metrics metric-key)
+                                         (str "Avg. " metric-label " (" eval-name ")")
+                                         (str "Avg. " metric-label))]
+                           ($ StatCell {:key column-key
                                         :value display-value
                                         :tooltip tooltip}))))))))))))
 
