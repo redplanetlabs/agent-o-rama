@@ -156,6 +156,10 @@ Include REFINE to refine the spec
       show how to use the builders in
       com.rpl.agent-o-rama.impl.evaluators
 
+- [x] Add a "Provided evaluator builders" basic example (java), which
+      should show how to use the builders in
+      com.rpl.agent-o-rama.impl.evaluators
+
 - [ ] update the aggregation-agent example to show the return value of
       agg-start node being passed as last arg to agg-node
 
