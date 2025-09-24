@@ -43,13 +43,13 @@
                             :value (:value description-field)
                             :on-change (:on-change description-field)
                             :error (:error description-field)})
-       ($ forms/form-field {:label "Input JSON Schema"
+       ($ forms/form-field {:label "Input JSON Schema (Optional)"
                             :type :textarea
                             :value (:value input-schema-field)
                             :on-change (:on-change input-schema-field)
                             :error (:error input-schema-field)
                             :placeholder example-schema})
-       ($ forms/form-field {:label "Output JSON Schema"
+       ($ forms/form-field {:label "Output JSON Schema (Optional)"
                             :type :textarea
                             :value (:value output-schema-field)
                             :on-change (:on-change output-schema-field)
