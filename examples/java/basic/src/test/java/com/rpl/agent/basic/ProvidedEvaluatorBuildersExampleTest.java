@@ -7,10 +7,12 @@ import static org.junit.Assert.assertTrue;
 
 import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
+import com.rpl.agentorama.ExampleRun;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.Test;
 
 /**
@@ -73,7 +75,7 @@ public class ProvidedEvaluatorBuildersExampleTest {
       assertTrue("Should create F1-score evaluator", evaluatorNames.containsKey("f1-score"));
 
       // Verify evaluators exist by searching for them
-      List<String> searchResults = manager.searchEvaluators("");
+      Set<String> searchResults = manager.searchEvaluators("");
       assertTrue("Should find at least 3 evaluators", searchResults.size() >= 3);
     }
   }
@@ -131,12 +133,12 @@ public class ProvidedEvaluatorBuildersExampleTest {
       String f1Name = evaluatorNames.get("f1-score");
 
       // Create test examples with known results
-      List<Map<String, Object>> examples =
+      List<ExampleRun> examples =
           List.of(
-              manager.mkExampleRun("input1", "positive", "positive"), // TP
-              manager.mkExampleRun("input2", "negative", "negative"), // TN
-              manager.mkExampleRun("input3", "positive", "negative"), // FN
-              manager.mkExampleRun("input4", "negative", "positive")); // FP
+              ExampleRun.create("input1", "positive", "positive"), // TP
+              ExampleRun.create("input2", "negative", "negative"), // TN
+              ExampleRun.create("input3", "positive", "negative"), // FN
+              ExampleRun.create("input4", "negative", "positive")); // FP
 
       @SuppressWarnings("unchecked")
       Map<String, Object> f1Result =

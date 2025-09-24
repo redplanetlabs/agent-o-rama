@@ -5,6 +5,8 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.CreateEvaluatorOptions;
+import com.rpl.agentorama.ExampleRun;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -116,7 +118,11 @@ public class ProvidedEvaluatorBuildersExample {
             + " \"maximum\": 10}}, \"required\": [\"score\"]}");
 
     manager.createEvaluator(
-        "quality-judge", "aor/llm-judge", llmParams, "AI-powered quality evaluation");
+        "quality-judge",
+        "aor/llm-judge",
+        llmParams,
+        "AI-powered quality evaluation",
+        new CreateEvaluatorOptions());
     evaluatorNames.put("llm-judge", "quality-judge");
 
     // Create conciseness evaluator (aor/conciseness)
@@ -127,7 +133,8 @@ public class ProvidedEvaluatorBuildersExample {
         "brief-check",
         "aor/conciseness",
         conciseParams,
-        "Checks if response is under 25 characters");
+        "Checks if response is under 25 characters",
+        new CreateEvaluatorOptions());
     evaluatorNames.put("conciseness", "brief-check");
 
     // Create F1-score evaluator (aor/f1-score)
@@ -135,7 +142,11 @@ public class ProvidedEvaluatorBuildersExample {
     f1Params.put("positiveValue", "positive");
 
     manager.createEvaluator(
-        "sentiment-f1", "aor/f1-score", f1Params, "F1 score for sentiment classification");
+        "sentiment-f1",
+        "aor/f1-score",
+        f1Params,
+        "F1 score for sentiment classification",
+        new CreateEvaluatorOptions());
     evaluatorNames.put("f1-score", "sentiment-f1");
 
     return evaluatorNames;
@@ -191,12 +202,12 @@ public class ProvidedEvaluatorBuildersExample {
 
       // Test aor/f1-score evaluator (summary type - requires multiple examples)
       System.out.println("\n4. Testing aor/f1-score evaluator...");
-      List<Map<String, Object>> examples =
+      List<ExampleRun> examples =
           List.of(
-              manager.mkExampleRun("input1", "positive", posOutput),
-              manager.mkExampleRun("input2", "negative", negOutput),
-              manager.mkExampleRun("input3", "positive", "positive"),
-              manager.mkExampleRun("input4", "negative", "positive")); // This one is wrong
+              ExampleRun.create("input1", "positive", posOutput),
+              ExampleRun.create("input2", "negative", negOutput),
+              ExampleRun.create("input3", "positive", "positive"),
+              ExampleRun.create("input4", "negative", "positive")); // This one is wrong
 
       @SuppressWarnings("unchecked")
       Map<String, Object> f1Result =
