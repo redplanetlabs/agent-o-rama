@@ -18,6 +18,8 @@
    [com.rpl.test-common :as tc]
    [meander.epsilon :as m])
   (:import
+   [com.rpl.aortest
+    TestSnippets]
    [dev.langchain4j.data.message
     AiMessage
     UserMessage]
@@ -736,59 +738,104 @@
       (is (= input-offsets output-offsets)
           "All offsets should be present exactly once in output"))))
 
+(def ACTIONS)
+
 (deftest actions-test
-  (with-open [ipc (rtest/create-ipc)]
-    (letlocals
-     (bind module
-       (aor/agentmodule
-        [topology]
-        (aor/declare-agent-object-builder
-         topology
-         "my-model"
-         (fn [setup] (->MockChatModel)))
-        (-> topology
-            (aor/new-agent "foo")
-            (aor/node
-             "start"
-             "node1"
-             (fn [agent-node]
-               ))
-            ))
-       ))
-     (rtest/launch-module! ipc module {:tasks 2 :threads 2})
-     (bind module-name (get-module-name module))
-     (bind agent-manager (aor/agent-manager ipc module-name))
-     (bind foo (aor/agent-client agent-manager "foo"))
-     (bind fib (aor/agent-client agent-manager "fib"))
+  (with-redefs [ACTIONS (atom [])]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (aor/declare-action-builder
+           topology
+           "action1"
+           "does a thing"
+           (fn [params]
+             (fn [fetcher input output run-info]
+               (swap! ACTIONS conj
+                 [:action1 input output
+                  (select-keys run-info [:action-name :agent-name :node-name :type])])
+               {"abc" "ccc"
+                "xyz" "..."}
+             )))
+          (aor/declare-action-builder
+           topology
+           "action2"
+           "does a thing 2"
+           (fn [params]
+             (fn [fetcher input output run-info]
+               (swap! ACTIONS conj
+                 [:action2 input output params])
+               {"abc" (str input "-" output)
+                "xyz" "zyx"}))
+           {:params {"a1" {:description "param1" :default "1"}
+                     "a2" {:description "param2"}}})
+          (TestSnippets/declareActionBuilders topology)
+          (-> topology
+              (aor/new-agent "foo")
+              (aor/node
+               "start"
+               "node1"
+               (fn [agent-node input]
+                 (aor/emit! agent-node "node1" (str input "!"))))
+              (aor/node
+               "node1"
+               nil
+               (fn [agent-node input]
+                 (aor/result! agent-node (str input "?")))))
+          (-> topology
+              (aor/new-agent "bar")
+              (aor/node
+               "begin"
+               "n1"
+               (fn [agent-node input]
+                 (aor/emit! agent-node "node1" (str input "+"))))
+              (aor/node
+               "n1"
+               nil
+               (fn [agent-node input]
+                 (aor/result! agent-node (str input "-")))))
+         ))
+       (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind foo (aor/agent-client agent-manager "foo"))
+       (bind bar (aor/agent-client agent-manager "bar"))
 
-     (bind foo-root
-       (foreign-pstate ipc
-                       module-name
-                       (po/agent-root-task-global-name "foo")))
-     (bind fib-root
-       (foreign-pstate ipc
-                       module-name
-                       (po/agent-root-task-global-name "fib")))
+       (bind foo-root
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "foo")))
+       (bind bar-root
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "bar")))
 
-     ;; TODO: <<<<>>>>
-     ;;  - test one agent with just online evals
-     ;;     - verify feedback added to nodes/agents
-     ;;  - another agent has dependent rules
-     ;;  - verify filters work
-     ;;  - verify sampling rate
-     ;;  - verify respects max concurrency
-     ;;  - verify how much it does in one iteration
-     ;;  - agent invokes from experiments are skipped
-     ;;  - start from time for rule
-     ;;  - error handling:
-     ;;    - online eval throws exception
-     ;;      - online eval doesn't return map
-     ;;    - action doesn't return map
+       ;; TODO: <<<<>>>>
+       ;;  - need better logic to skip failed runs
+       ;;   - default to not looking at incomplete agents/nodes
 
-     ;; TODO: <<<<>>>>
-     ;;  - ana/add-rule!
-     ;;  - ana/delete-rule!
-     ;;     - verify dependency checking
-     ;;  - ana/fetch-agent-rules
-     ;;     - use unerlying-objects to get it
-    )))
+       ;; TODO: <<<<>>>>
+       ;;  - TODO: use both clojure and both java action builders
+       ;;  - test one agent with just online evals
+       ;;     - verify feedback added to nodes/agents
+       ;;  - another agent has dependent rules
+       ;;  - verify filters work
+       ;;  - verify sampling rate
+       ;;  - verify respects max concurrency
+       ;;  - verify how much it does in one iteration
+       ;;  - agent invokes from experiments are skipped
+       ;;  - start from time for rule
+       ;;  - error handling:
+       ;;    - online eval throws exception
+       ;;      - online eval doesn't return map
+       ;;    - action doesn't return map
+
+       ;; TODO: <<<<>>>>
+       ;;  - ana/add-rule!
+       ;;  - ana/delete-rule!
+       ;;     - verify dependency checking
+       ;;  - ana/fetch-agent-rules
+       ;;     - use unerlying-objects to get it
+      ))))

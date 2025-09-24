@@ -7,9 +7,9 @@ import com.rpl.agentorama.impl.AORHelpers;
 public interface ActionBuilderOptions {
   interface Impl extends ActionBuilderOptions {
     
-    EvaluatorBuilderOptions.Impl param(String name, String description);
+    ActionBuilderOptions.Impl param(String name, String description);
     
-    EvaluatorBuilderOptions.Impl param(String name, String description, String defaultValue);
+    ActionBuilderOptions.Impl param(String name, String description, String defaultValue);
     
   }
 
@@ -20,11 +20,11 @@ public interface ActionBuilderOptions {
     return (Impl) AORHelpers.MAKE_ACTION_BUILDER_OPTIONS.invoke();
   }
   
-  static EvaluatorBuilderOptions.Impl param(String name, String description) {
+  static ActionBuilderOptions.Impl param(String name, String description) {
     return create().param(name, description);
   }
   
-  static EvaluatorBuilderOptions.Impl param(String name, String description, String defaultValue) {
+  static ActionBuilderOptions.Impl param(String name, String description, String defaultValue) {
     return create().param(name, description, defaultValue);
   }
   

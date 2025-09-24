@@ -124,9 +124,9 @@
   ])
 
 (def ACTION-BUILDER-OPTIONS-METHODS
-  [["param" "EvaluatorBuilderOptions.Impl"
+  [["param" "ActionBuilderOptions.Impl"
     [["String" "name"] ["String" "description"]]]
-   ["param" "EvaluatorBuilderOptions.Impl"
+   ["param" "ActionBuilderOptions.Impl"
     [["String" "name"] ["String" "description"] ["String" "defaultValue"]]]
   ])
 

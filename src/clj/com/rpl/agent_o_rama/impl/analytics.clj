@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.impl.feedback :as fb]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.retries :as retries]
    [com.rpl.agent-o-rama.impl.stats :as stats]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.queries :as queries]
@@ -34,7 +35,6 @@
    [java.util.concurrent
     CompletableFuture]))
 
-;; TODO: <<<<>>>> need to be bound with :num-tasks, :declared-objects, and :rama-clients
 (def ^:dynamic ACTION-HELPERS)
 (defn declared-objects ^AgentDeclaredObjectsTaskGlobal [] (:declared-objects ACTION-HELPERS))
 (defn rama-clients ^RamaClientsTaskGlobal [] (:rama-clients ACTION-HELPERS))
@@ -315,6 +315,47 @@
 
 (defn scan-amt [] 100)
 
+(defn experiment-source?
+  [data]
+  (and (contains? data :source)
+       (aor-types/ExperimentSourceImpl? (:source data))))
+
+(defn max-node-scan-time
+  []
+  (- (h/current-time-millis) (* 1000 60 2)))
+
+(defn compute-end-offset
+  [dep-offset max-scan-offset]
+  (cond
+    (and (nil? dep-offset) (nil? max-scan-offset))
+    (h/max-uuid)
+
+    (nil? dep-offset)
+    max-scan-offset
+
+    (nil? max-scan-offset)
+    dep-offset
+
+    :else
+    (if (< (compare dep-offset max-scan-offset) 0)
+      dep-offset
+      max-scan-offset
+    )))
+
+(defn complete-node-map
+  [m node-name node-exec]
+  (if (nil? node-name)
+    m
+    (let [invalid-offset?
+          (fn [[k data]]
+            (not (or (contains? data :finish-time-millis)
+                     (contains? data :invoked-agg-invoke-id)
+                     (not (retries/invoke-id-executing? node-exec k)))))
+          first-invalid-offset (select-first [ALL invalid-offset? FIRST] m)]
+      (if (nil? first-invalid-offset)
+        m
+        (select-any (sorted-map-range-to first-invalid-offset) m)))))
+
 (deframaop find-qualified-offsets
   [*agent->rule->info *cache-pstate-name]
   (<<with-substitutions
@@ -330,17 +371,25 @@
      (ops/explode *dependency-names :> *dname)
      (select> [(keypath *dname) :cursors (keypath *task-id)] *rule->info :> *other-offset)
      (aggs/+min *other-offset :> *dep-end-offset))
-   (or> *dep-end-offset (h/max-uuid) :> *end-offset)
    (|direct *task-id)
+   (<<if (some? *node-name)
+     (h/min-uuid7-at-timestamp (max-node-scan-time) :> *max-scan-offset)
+    (else>)
+     (po/agent-active-invokes-task-global *agent-name :> $$active)
+     (local-select> [(subselect FIRST) (view first) (view first)] $$active :> *max-scan-offset))
+   (compute-end-offset *dep-end-offset *max-scan-offset :> *end-offset)
    (action-target-pstate *agent-name *node-name :> $$p)
    (<<ramafn %match?
      [*data]
-     ;; TODO: <<<<>>>> exclude ExperimentSource
      (:> (and> (< (rand) *sampling-rate)
+               (not (experiment-source? *data))
+               (not (contains? *data :invoked-agg-invoke-id))
                (aor-types/rule-filter-matches? *filter *data))))
    (scan-amt :> *scan-amt)
+   (po/agent-node-executor-task-global :> *node-exec)
    (local-select> [(sorted-map-range-from *offset *scan-amt)
-                   (sorted-map-range *offset *end-offset)]
+                   (sorted-map-range *offset *end-offset)
+                   (view complete-node-map *node-name *node-exec)]
                   $$p
                   :> *m)
    (local-transform> [(keypath *agent-name *rule-name) (termval *m)] $$cache)
@@ -400,22 +449,27 @@
 
 (defn run-action!
   [action-fn input output run-info]
-  (let [fetcher (anode/mk-fetcher)
-        cf      (CompletableFuture.)]
+  (let [fetcher      (anode/mk-fetcher)
+        cf           (CompletableFuture.)
+        declared-objects-tg (po/agent-declared-objects-task-global)
+        rama-clients (po/agents-clients-task-global)
+        num-tasks    (.getNumTasks ^com.rpl.rama.ModuleInstanceInfo (ops/module-instance-info))]
     (anode/submit-virtual-task!
      nil
      (fn []
        (try
-         ;; TODO: <<<<>>>>> bind ACTION-HELPERS
-         (let [m (action-fn fetcher input output run-info)]
-           (when-not (and (map? m) (every? string? (keys m)))
-             (throw (h/ex-info "Action return must be map with string keys" {:reeturn m})))
-           (.complete cf {:success? true :info-map m}))
-         (catch Throwable t
-           (.complete cf {:success? false :info-map {"exception" (h/throwable->str t)}}))
-       )))
+         (binding [ACTION-HELPERS
+                   {:num-tasks        num-tasks
+                    :declared-objects declared-objects-tg
+                    :rama-clients     rama-clients}]
+           (let [m (action-fn fetcher input output run-info)]
+             (when-not (and (map? m) (every? string? (keys m)))
+               (throw (h/ex-info "Action return must be map with string keys" {:reeturn m})))
+             (.complete cf {:success? true :info-map m}))
+           (catch Throwable t
+             (.complete cf {:success? false :info-map {"exception" (h/throwable->str t)}}))
+         ))))
     cf))
-
 
 (deframaop run-actions!
   [*items *agent->rule->info *cache-pstate-name]
