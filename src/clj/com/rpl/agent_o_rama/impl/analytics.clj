@@ -410,7 +410,7 @@
                  (when active
                    (concat (map first active)
                            (rr (map rest active)))))))]
-    (let [tasks     (shuffle (keys task->agent->rule->info))
+    (let [tasks     (shuffle (or (keys task->agent->rule->info) []))
           task-seqs (for [t tasks]
                       (rr
                        (for [a (shuffle (keys (get task->agent->rule->info t)))]
@@ -579,8 +579,8 @@
   (let [match-info-pstate (gen-pstatevar "match-info")
         cache-pstate (gen-pstatevar "cache")
         cache-pstate-name (str cache-pstate)]
-    [[anode/read-config aor-types/MAX-ACTIONS-CONCURRENCY-CONFIG :> '*max-concurrency]
-     [anode/read-config aor-types/ACTIONS-PROCESSING-ITERATION-TIME-MILLIS-CONFIG :> '*target-millis]
+    [[anode/read-global-config aor-types/MAX-ACTIONS-CONCURRENCY-CONFIG :> '*max-concurrency]
+     [anode/read-global-config aor-types/ACTIONS-PROCESSING-ITERATION-TIME-MILLIS-CONFIG :> '*target-millis]
      [read-rules :> '*agent->rule->info]
      [<<batch
       [filter> false]
@@ -604,13 +604,13 @@
         '*first-iter? true
         :> '*rem-queue]
        [<<if (seg# action-iter-complete? '*first-iter? '*queue '*actions-start-time-millis '*target-millis)
-         [:>]
+         [:> '*queue]
         [else>]
-         [split-at '*queue :> ['*items '*rest-queue]]
+         [split-at '*queue '*max-concurrency :> ['*items '*rest-queue]]
          [<<batch
            [run-actions! '*items '*agent->rule->info cache-pstate-name]]
-       [continue> '*rest-queue false]
-       ]]
+         [continue> '*rest-queue false]
+         ]]
      [update-rule-offsets! '*match-info '*rem-queue]
     ]))
 
