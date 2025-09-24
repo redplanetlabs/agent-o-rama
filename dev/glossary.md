@@ -190,6 +190,15 @@ graph, enabling flow control and data passing. Called via `emit!`
 function with target node name and arguments, triggers execution of
 downstream nodes.
 
+## [Provided Evaluator Builders](terms/provided-evaluator-builders.md)
+
+Built-in evaluator builder functions available in agent-o-rama for
+common evaluation tasks. These include `aor/llm-judge` for AI-based
+evaluation, `aor/conciseness` for length-based assessment, and
+`aor/f1-score` for classification metrics. Declared in
+`com.rpl.agent-o-rama.impl.evaluators` and used via `create-evaluator!`
+with specific builder names and parameters.
+
 ## [PState Store](terms/pstate-store.md)
 
 Persistent store backed by Rama's PState for durable data.

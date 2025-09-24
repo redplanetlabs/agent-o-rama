@@ -148,6 +148,14 @@ Include REFINE to refine the spec
        - the types used for node arguments, and results should be replaced
          with HashMap instances.
 
+- [x] add a glossary entry, and term description for "Provided evaluator
+      builders", which should list the builders in
+      com.rpl.agent-o-rama.impl.evaluators
+
+- [ ] Add a "Provided evaluator builders" basic example, which should
+      show how to use the builders in
+      com.rpl.agent-o-rama.impl.evaluators
+
 - [ ] update the aggregation-agent example to show the return value of
       agg-start node being passed as last arg to agg-node
 
