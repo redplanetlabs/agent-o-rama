@@ -5,6 +5,7 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.ui.experiments.evaluators :as evaluators]
    [clojure.string :as str]
    [reitit.frontend.easy :as rfe]))
 
@@ -25,57 +26,11 @@
           :enabled? (boolean (and module-id dataset-id))
           :refresh-interval-ms 1000})
 
-        metric->title
-        (fn [metric-key]
-          (cond
-            (keyword? metric-key) (name metric-key)
-            (symbol? metric-key) (name metric-key)
-            :else (str metric-key)))
         experiments
         (get data :items)
-        eval-metrics-by-evaluator
-        (->> experiments
-             (map :eval-number-stats)
-             (keep identity)
-             (mapcat seq)
-             (reduce (fn [acc [eval-name metrics]]
-                       (if eval-name
-                         (update acc eval-name
-                                 (fnil into #{})
-                                 (keys (or metrics {})))
-                         acc))
-                     {}))
-        all-evaluator-names
-        (-> eval-metrics-by-evaluator keys sort vec)
-        metric->evaluators
-        (reduce-kv
-         (fn [acc eval-name metric-keys]
-           (reduce (fn [m metric-key]
-                     (update m metric-key (fnil conj #{}) eval-name))
-                   acc
-                   metric-keys))
-         {}
-         eval-metrics-by-evaluator)
-        ambiguous-metrics
-        (->> metric->evaluators
-             (keep (fn [[metric-key eval-names]]
-                     (when (> (count eval-names) 1)
-                       metric-key)))
-             set)
-        evaluator-columns
-        (->> all-evaluator-names
-             (mapcat (fn [eval-name]
-                       (let [metric-keys (sort (or (seq (get eval-metrics-by-evaluator eval-name)) []))]
-                         (for [metric-key metric-keys
-                               :let [metric-label (metric->title metric-key)
-                                     column-label (if (contains? ambiguous-metrics metric-key)
-                                                    (str eval-name "/" metric-label)
-                                                    metric-label)]]
-                           {:column-key (str eval-name "::" metric-label)
-                            :label column-label
-                            :eval-name eval-name
-                            :metric-key metric-key}))))
-             vec)]
+        {:keys [columns ambiguous-metrics] :as evaluator-metadata}
+        (evaluators/collect-column-metadata
+         (map :eval-number-stats experiments))]
 
     ($ :div.p-6
        ($ :div.flex.justify-between.items-center.mb-6
@@ -107,7 +62,7 @@
                      ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Avg Latency (ms)")
                      ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "P99 Latency (ms)")
                      ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Avg Total Tokens")
-                     (for [{:keys [column-key label]} evaluator-columns]
+                     (for [{:keys [column-key label]} columns]
                        ($ :th {:key column-key
                                :className (common/cn (:th common/table-classes) "text-right")}
                           ($ :div.truncate {:title label}
@@ -151,7 +106,7 @@
                                              (int (/ (:total token-stats) num-examples)))})
 
                        ;; Dynamic columns for each evaluator
-                       (for [{:keys [column-key eval-name metric-key]} evaluator-columns]
+                       (for [{:keys [column-key eval-name metric-key ambiguous? metric-label]} columns]
                          (let [metric-data (get-in eval-stats [eval-name metric-key])
                                count (:count metric-data)
                                total (:total metric-data)
@@ -159,8 +114,7 @@
                                                         (pos? (or count 0))
                                                         (some? total))
                                                (.toFixed (/ total count) 2))
-                               metric-label (metric->title metric-key)
-                               tooltip (if (contains? ambiguous-metrics metric-key)
+                               tooltip (if ambiguous?
                                          (str "Avg. " metric-label " (" eval-name ")")
                                          (str "Avg. " metric-label))]
                            ($ StatCell {:key column-key

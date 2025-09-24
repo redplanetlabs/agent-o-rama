@@ -5,6 +5,7 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.ui.experiments.evaluators :as evaluators]
    [clojure.string :as str]
    [reitit.frontend.easy :as rfe]
    ;; NEW: Require the forms namespace to access the transformation function
@@ -129,15 +130,22 @@
      ($ :div.text-xs.font-medium.text-gray-500.uppercase.tracking-wider label)
      ($ :div.text-xl.font-semibold.text-gray-900.mt-1 value)))
 
-(defui SummaryEvaluatorCell [{:keys [eval-name metrics]}]
-  ($ :td.px-4.py-3.border-b.border-gray-200
-     ($ :div.text-xs.font-medium.text-gray-500.uppercase.tracking-wider
-        (str "Eval: " (name eval-name)))
-     ($ :div.mt-1.space-y-1
-        (for [[metric-key metric-value] metrics]
-          ($ :div.flex.justify-between.text-sm {:key (name metric-key)}
-             ($ :span.text-gray-600 (name metric-key))
-             ($ :span.font-semibold.text-gray-900.ml-2 (format-metric-value metric-value)))))))
+(defui SummaryEvaluatorCell [{:keys [eval-name metrics columns]}]
+  (let [eval-label (evaluators/identifier-title eval-name)
+        columns (or (seq columns)
+                    (evaluators/columns-for-evaluator
+                     (evaluators/collect-column-metadata {eval-name metrics})
+                     eval-name))]
+    ($ :td.px-4.py-3.border-b.border-gray-200
+       ($ :div.text-xs.font-medium.text-gray-500.uppercase.tracking-wider
+          (or eval-label (str eval-name)))
+       ($ :div.mt-1.space-y-1
+          (for [{:keys [metric-key label metric-label]} columns
+                :let [metric-value (get metrics metric-key)
+                      display-label (or label metric-label (evaluators/metric-title metric-key))]]
+            ($ :div.flex.justify-between.text-sm {:key (str eval-name "-" metric-key)}
+               ($ :span.text-gray-600 display-label)
+               ($ :span.font-semibold.text-gray-900.ml-2 (format-metric-value metric-value))))))))
 
 (defui SummaryStatsTable [{:keys [data]}]
   (let [;; --- Destructure all necessary data from the main `data` prop ---
@@ -145,6 +153,7 @@
         latency-stats (:latency-number-stats data)
         token-stats (:total-token-number-stats data)
         summary-evals (:summary-evals data)
+        summary-metadata (evaluators/collect-column-metadata summary-evals)
 
         ;; --- Perform calculations for each required metric ---
         num-examples (or (:count latency-stats) 0)
@@ -186,10 +195,12 @@
                                 :tooltip "Average total tokens (input + output) per example."})
 
                    ;; Dynamically create a column for each summary evaluator TODO move this below
-                   (for [[eval-name metrics] summary-evals]
-                     ($ SummaryEvaluatorCell {:key (name eval-name)
+                   (for [[eval-name metrics] summary-evals
+                         :let [columns (evaluators/columns-for-evaluator summary-metadata eval-name)]]
+                     ($ SummaryEvaluatorCell {:key (str eval-name)
                                               :eval-name eval-name
-                                              :metrics metrics})))))))))
+                                              :metrics metrics
+                                              :columns columns})))))))))
 
 (defn format-metric-value [value]
   (cond
@@ -202,30 +213,42 @@
     :else ($ :span.italic.text-gray-400 "…")))
 
 ;; NEW COMPONENTS: Evaluator capsules for compact display within Output column
-(defui EvaluatorCapsule [{:keys [eval-name metric-key metric-value eval-failure eval-invoke module-id]}]
-  (let [display-name (str (name eval-name) "/" (name metric-key))
+(defui EvaluatorCapsule [{:keys [eval-name metric-key metric-value eval-failure eval-invoke module-id columns-metadata]}]
+  (let [eval-label (or (evaluators/identifier-title eval-name) (str eval-name))
+        metric-info (when (and columns-metadata metric-key)
+                      (evaluators/label-for columns-metadata eval-name metric-key))
+        label (cond
+                eval-failure eval-label
+                metric-info (:label metric-info)
+                metric-key (str eval-label "/" (evaluators/metric-title metric-key))
+                :else eval-label)
+        tooltip-label (or (:label metric-info) label)
         href (when eval-invoke
                (rfe/href :agent/invocation-detail
                          {:module-id module-id
                           :agent-name "_aor-evaluator"
                           :invoke-id (str (:task-id eval-invoke) "-" (:agent-invoke-id eval-invoke))}))
-
         [badge-style content-text title-text]
         (cond
           eval-failure
-          ["bg-red-100 text-red-800" "Failed" (str "Evaluation failed: " eval-failure)]
+          ["bg-red-100 text-red-800" "Failed"
+           (str tooltip-label ": " (if (string? eval-failure)
+                                     eval-failure
+                                     (common/pp eval-failure)))]
 
           (true? metric-value)
-          ["bg-green-100 text-green-800" "✓T" (str display-name ": True")]
+          ["bg-green-100 text-green-800" "✓T" (str tooltip-label ": True")]
 
           (false? metric-value)
-          ["bg-yellow-100 text-yellow-800" "✗F" (str display-name ": False")]
+          ["bg-yellow-100 text-yellow-800" "✗F" (str tooltip-label ": False")]
 
           (number? metric-value)
-          ["bg-blue-100 text-blue-800" (format-metric-value metric-value) (str display-name ": " metric-value)]
+          ["bg-blue-100 text-blue-800" (format-metric-value metric-value)
+           (str tooltip-label ": " metric-value)]
 
           :else
-          ["bg-gray-100 text-gray-800" (format-metric-value metric-value) (str display-name ": " (pr-str metric-value))])]
+          ["bg-gray-100 text-gray-800" (format-metric-value metric-value)
+           (str tooltip-label ": " (pr-str metric-value))])]
 
     ($ :a.inline-flex.items-center.px-2.py-1.rounded-full.text-xs.font-medium.transition-colors.hover:shadow-md
        {:className (common/cn "p-1 rounded-sm" badge-style)
@@ -234,10 +257,10 @@
         :title title-text
         :onClick (fn [e] (.stopPropagation e))} ;; Prevent row click
        ($ :span.font-semibold.mr-1.truncate {:style {:maxWidth "10rem"}}
-          display-name)
+          label)
        ($ :span.font-mono content-text))))
 
-(defui EvaluatorCapsulesContainer [{:keys [run module-id]}]
+(defui EvaluatorCapsulesContainer [{:keys [run module-id columns-metadata]}]
   ($ :div.mt-2.flex.flex-wrap.gap-1
      ;; Render capsules for successful evaluations
      (for [[eval-name metrics] (:evals run)
@@ -247,14 +270,16 @@
                             :metric-key metric-key
                             :metric-value metric-value
                             :eval-invoke (get-in run [:eval-initiates eval-name])
-                            :module-id module-id}))
+                            :module-id module-id
+                            :columns-metadata columns-metadata}))
      ;; Render capsules for failed evaluations
      (for [[eval-name failure-info] (:eval-failures run)]
        ($ EvaluatorCapsule {:key (str eval-name "-failure")
                             :eval-name eval-name
                             :eval-failure failure-info
                             :eval-invoke (get-in run [:eval-initiates eval-name])
-                            :module-id module-id}))))
+                            :module-id module-id
+                            :columns-metadata columns-metadata}))))
 
 (defui CellContent [{:keys [content truncated? on-expand]}]
   (let [content-str (common/pp content)
@@ -313,9 +338,7 @@
         filtered-results (case active-filter
                            :all results
                            :success (filter is-success? results)
-                           :failure (filter is-failure? results))
-
-        ]
+                           :failure (filter is-failure? results))]
     ($ :div
        ($ :div.flex.justify-between.items-center.mb-4
           ($ :h3.text-xl.font-bold "Detailed Results")
@@ -339,7 +362,8 @@
                      ($ :th {:className (:th common/table-classes)} "Reference Output")
                      ($ :th {:className (common/cn (:th common/table-classes) "w-1/3")} "Output & Evaluations")))
                ($ :tbody
-                  (for [[idx run] (map-indexed vector filtered-results)]
+                  (for [[idx run] (map-indexed vector filtered-results)
+                        :let [evaluator-metadata (evaluators/collect-column-metadata (:evals run))]]
                     ($ :tr.border-b {:key (str (:example-id run) "-" idx)}
                        ;; Input Cell
                        ($ :td {:className (:td common/table-classes)}
@@ -355,14 +379,13 @@
                                           :on-expand #(state/dispatch [:modal/show :content-detail
                                                                        {:title "Reference Output"
                                                                         :component ($ ContentModal {:content % :title "Reference Output"})}])}))
-                       ;; MODIFIED: Output Cell (now simplified)
+                       ;; Output Cell with evaluator capsules
                        (let [agent-result (get-in run [:agent-results 0])]
                          ($ :td {:key "output-cell" :className (:td common/table-classes)}
                             ($ :div {:className "flex flex-col gap-2"}
                                ($ :div {:className (if show-full-text?
                                                      "max-w-xl whitespace-pre-wrap break-words"
                                                      "max-w-xs")}
-                                  ;; The agent's raw output
                                   ($ :div {:className (if show-full-text?
                                                         "whitespace-pre-wrap break-words"
                                                         "truncate")}
@@ -385,9 +408,10 @@
                                                                              {:title "Output"
                                                                               :component ($ ContentModal {:content output-content :title "Output"})}])}
                                                  "↗")))))))
-                               ($ EvaluatorCapsulesContainer {:run run :module-id module-id}))))
-                       ;; Trace Column (separate from output)
-                       )))))))))
+                               ($ EvaluatorCapsulesContainer {:run run
+                                                              :module-id module-id
+                                                              :columns-metadata evaluator-metadata})))))))))))))
+                       ;; Trace Column placeholder (if needed later)
 
 (defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
   (let [{:keys [data loading? error]}
