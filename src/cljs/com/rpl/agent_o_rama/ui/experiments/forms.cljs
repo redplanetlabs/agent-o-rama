@@ -390,13 +390,13 @@
                 {:label "Number of Repetitions"
                  :type :number
                  :value (or (get form :num-repetitions) 1)
-                 :on-change #(state/dispatch [:form/update-field form-id :num-repetitions (js/parseInt (.. % -target -value))])
+                 :on-change #(state/dispatch [:form/update-field form-id :num-repetitions (js/parseInt %)])
                  :placeholder "1"})
              ($ forms/form-field
                 {:label "Concurrency Level"
                  :type :number
                  :value (or (get form :concurrency) 1)
-                 :on-change #(state/dispatch [:form/update-field form-id :concurrency (js/parseInt (.. % -target -value))])
+                 :on-change #(state/dispatch [:form/update-field form-id :concurrency (js/parseInt %)])
                  :placeholder "1"}))))))
 
 ;; =============================================================================
