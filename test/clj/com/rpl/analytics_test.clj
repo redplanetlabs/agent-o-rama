@@ -737,17 +737,58 @@
           "All offsets should be present exactly once in output"))))
 
 (deftest actions-test
-         ;; TODO: <<<<>>>>
-         ;;  - test one agent with just online evals
-         ;;  - another agent has dependent rules
-         ;;  - verify filters work
-         ;;  - verify sampling rate
-         ;;  - verify respects max concurrency
-         ;;  - verify how much it does in one iteration
-         ;;  - agent invokes from experiments are skipped
-         ;;  - start from time for rule
-         ;;  - error handling:
-         ;;    - online eval throws exception
-         ;;      - online eval doesn't return map
-         ;;    - action doesn't return map
-)
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (aor/declare-agent-object-builder
+         topology
+         "my-model"
+         (fn [setup] (->MockChatModel)))
+        (-> topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             "node1"
+             (fn [agent-node]
+               ))
+            ))
+       ))
+     (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+     (bind module-name (get-module-name module))
+     (bind agent-manager (aor/agent-manager ipc module-name))
+     (bind foo (aor/agent-client agent-manager "foo"))
+     (bind fib (aor/agent-client agent-manager "fib"))
+
+     (bind foo-root
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-root-task-global-name "foo")))
+     (bind fib-root
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-root-task-global-name "fib")))
+
+     ;; TODO: <<<<>>>>
+     ;;  - test one agent with just online evals
+     ;;     - verify feedback added to nodes/agents
+     ;;  - another agent has dependent rules
+     ;;  - verify filters work
+     ;;  - verify sampling rate
+     ;;  - verify respects max concurrency
+     ;;  - verify how much it does in one iteration
+     ;;  - agent invokes from experiments are skipped
+     ;;  - start from time for rule
+     ;;  - error handling:
+     ;;    - online eval throws exception
+     ;;      - online eval doesn't return map
+     ;;    - action doesn't return map
+
+     ;; TODO: <<<<>>>>
+     ;;  - ana/add-rule!
+     ;;  - ana/delete-rule!
+     ;;     - verify dependency checking
+     ;;  - ana/fetch-agent-rules
+     ;;     - use unerlying-objects to get it
+    )))

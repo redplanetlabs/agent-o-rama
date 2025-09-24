@@ -589,3 +589,7 @@
           name))]
     (when error
       (throw (h/ex-info "Error adding rule" {:info error})))))
+
+(defn fetch-agent-rules
+  [agent-rules-pstate]
+  (foreign-select-one STAY agent-rules-pstate))

@@ -49,10 +49,6 @@
   [agent-name]
   (str "_agent-get-current-graph-" agent-name))
 
-(defn agent-all-rules-name
-  [agent-name]
-  (str "_aor-agent-all-rules-" agent-name))
-
 (defn get-datasets-page-query-name
   []
   "_aor-get-datasets")
@@ -883,17 +879,6 @@
        :results (merge-examples-to-results *results-map *example-id->example)
        :> *res)
       (|origin))))
-
-(defn declare-agent-all-rules-query-topology
-  [topologies agent-name]
-  (let [psym (symbol (po/agent-rules-task-global-name agent-name))]
-    (<<query-topology topologies
-      (agent-all-rules-name agent-name)
-      [:> *res]
-      (|global)
-      (local-select> STAY psym :> *res)
-      (|origin)
-    )))
 
 ;; direct queries on PStates
 

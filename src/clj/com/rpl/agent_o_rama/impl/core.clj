@@ -160,7 +160,6 @@
     (queries/declare-fork-affected-aggs-query-topology topologies agent-name)
     (queries/declare-get-invokes-page-topology topologies agent-name)
     (queries/declare-get-current-graph topologies agent-name)
-    (queries/declare-agent-all-rules-query-topology topologies agent-name)
 
     (<<sources stream-topology
      (source> agent-config-depot-sym {:retry-mode :all-after} :> *data)
