@@ -69,9 +69,10 @@
                                10000
                                (fn [reply]
                                  (set-is-validating false)
-                                 (if (:success reply)
-                                   (set-validation-state (:data reply))
-                                   (set-validation-state nil))))))))
+                                 ;; Only update state on success.
+                                 ;; On timeout or other failure, do nothing to preserve the last known state.
+                                 (when (:success reply)
+                                   (set-validation-state (:data reply)))))))))
        js/undefined)
      (clj->js [debounced-dataset-id debounced-input-data debounced-output-data]))
 
@@ -212,8 +213,8 @@
          :output-data (common/pp-json output-data)}
         props)))
    :validators {:dataset-id [forms/required]
-                :input-data [forms/required forms/valid-json]
-                :output-data [forms/required forms/valid-json]}
+                :input-data [forms/required]
+                :output-data [forms/required]}
    :ui (fn [{:keys [form-id]}] ($ AddFromTraceForm {:form-id form-id}))
    :modal-props (fn [props] {:title (or (:title props) "Add to Dataset") :submit-text "Add Example"})}
   :on-submit
