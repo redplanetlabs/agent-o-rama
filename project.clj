@@ -46,21 +46,23 @@
   [["releases"
     {:id "maven-releases"
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
-  :profiles {:dev {:resource-paths ["test/resources/"]
-                   :source-paths ["src/clj"
-                                  "src/cljs"
-                                  "resource"
-                                  "examples/clj/src"]
-                   :test-paths ["test/clj"
-                                "examples/clj/test"]
-                   :java-source-paths ["src/java" "test/java"]
-                   :dependencies
-                   [[org.clojure/clojure "1.12.0"]
-                    [meander/epsilon "0.0.650"]
-                    [dev.langchain4j/langchain4j-open-ai "1.4.0"]
-                    [dev.langchain4j/langchain4j-web-search-engine-tavily
-                     "1.3.0-beta9"]
-                    [thheller/shadow-cljs "3.1.7"]]}
+  :profiles {:dev      {:resource-paths    ["test/resources/"]
+                        :source-paths      ["src/clj"
+                                            "src/cljs"
+                                            "resource"
+                                            "examples/clj/src"
+                                            "dev"]
+                        :test-paths        ["test/clj"
+                                            "examples/clj/test"]
+                        :java-source-paths ["src/java" "test/java"]
+                        :dependencies
+                        [[org.clojure/clojure "1.12.0"]
+                         [meander/epsilon "0.0.650"]
+                         [dev.langchain4j/langchain4j-open-ai "1.4.0"]
+                         [dev.langchain4j/langchain4j-web-search-engine-tavily
+                          "1.3.0-beta9"]
+                         [thheller/shadow-cljs "3.1.7"]
+                         [clj-kondo "2025.09.22"]]}
              :provided {:dependencies
                         ;; TODO: fix Rama version
                         [[com.rpl/rama "0.0.6-SNAPSHOT"]
