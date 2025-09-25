@@ -186,6 +186,10 @@
          (.releaseAgentObject declared-objects-tg name o)))
     )))
 
+(defn gen-node-id
+  []
+  (h/random-uuid7))
+
 (defn mk-agent-node
   [agent-name agent-graph agent-task-id agent-id curr-node invoke-id retry-num
    store-info ^RamaClientsTaskGlobal rama-clients]
@@ -234,7 +238,7 @@
           emits-vol
           conj
           (aor-types/->valid-AgentNodeEmit
-           (h/random-uuid7)
+           (gen-node-id)
            nil
            (if (selected-any? [:node-map (keypath node) :node
                                #(instance? Node %)]

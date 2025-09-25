@@ -21,6 +21,8 @@
    [java.io
     PrintWriter
     StringWriter]
+   [java.time
+    Instant]
    [java.util
     UUID]
    [java.util.concurrent
@@ -205,12 +207,13 @@
   []
   (str (random-uuid7)))
 
+(defn random-uuid7-at-timestamp
+  [^long millis]
+  (UuidCreator/getTimeOrderedEpoch (Instant/ofEpochMilli millis)))
+
 (defn min-uuid7-at-timestamp
   [^long millis]
-  (let [ms-bits (bit-shift-left millis 16)
-        hi      (bit-or ms-bits (bit-shift-left 0x7 12))
-        lo      (bit-shift-left 0x2 62)]
-    (UUID. hi lo)))
+  (UuidCreator/getTimeOrderedEpochMin (Instant/ofEpochMilli millis)))
 
 (defn max-uuid
   []

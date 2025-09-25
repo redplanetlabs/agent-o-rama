@@ -356,6 +356,10 @@
         m
         (select-any (sorted-map-range-to first-invalid-offset) m)))))
 
+(defn sample?
+  [sampling-rate]
+  (< (rand) sampling-rate))
+
 (deframaop find-qualified-offsets
   [*agent->rule->info *cache-pstate-name]
   (<<with-substitutions
@@ -379,12 +383,6 @@
      (local-select> [(subselect FIRST) (view first) (view first)] $$active :> *max-scan-offset))
    (compute-end-offset *dep-end-offset *max-scan-offset :> *end-offset)
    (action-target-pstate *agent-name *node-name :> $$p)
-   (<<ramafn %match?
-     [*data]
-     (:> (and> (< (rand) *sampling-rate)
-               (not (experiment-source? *data))
-               (not (contains? *data :invoked-agg-invoke-id))
-               (aor-types/rule-filter-matches? *filter *data))))
    (scan-amt :> *scan-amt)
    (po/agent-node-executor-task-global :> *node-exec)
    (local-select> [(sorted-map-range-from *offset *scan-amt)
@@ -394,6 +392,12 @@
                   :> *m)
    (local-transform> [(keypath *agent-name *rule-name) (termval *m)] $$cache)
    (safe-last-key *m *end-offset :> *end-scan-offset)
+   (<<ramafn %match?
+     [*data]
+     (:> (and> (not (experiment-source? *data))
+               (not (contains? *data :invoked-agg-invoke-id))
+               (aor-types/rule-filter-matches? *filter *data)
+               (sample? *sampling-rate))))
    (select> (subselect ALL
                        (selected? LAST (pred %match?))
                        FIRST)

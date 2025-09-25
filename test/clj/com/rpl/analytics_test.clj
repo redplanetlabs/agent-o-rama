@@ -6,10 +6,12 @@
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.stats :as stats]
+   [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
@@ -20,6 +22,8 @@
   (:import
    [com.rpl.aortest
     TestSnippets]
+   [com.rpl.rama.helpers
+    TopologyUtils]
    [dev.langchain4j.data.message
     AiMessage
     UserMessage]
@@ -738,124 +742,156 @@
       (is (= input-offsets output-offsets)
           "All offsets should be present exactly once in output"))))
 
+(deftest sample?-test
+  (letlocals
+   (bind counter (volatile! 0))
+   (dotimes [_ 10000]
+     (if (ana/sample? 0.5) (vswap! counter inc)))
+   (is (< 4500 @counter 5500))
+   (bind counter (volatile! 0))
+   (dotimes [_ 10000]
+     (if (ana/sample? 0.25) (vswap! counter inc)))
+   (is (< 2000 @counter 3000))
+  ))
+
 (def ACTIONS)
 
 (deftest actions-test
-  (with-redefs [ACTIONS (atom [])]
-    (with-open [ipc (rtest/create-ipc)]
-      (letlocals
-       (bind module
-         (aor/agentmodule
-          [topology]
-          (aor/declare-action-builder
-           topology
-           "action1"
-           "does a thing"
-           (fn [params]
-             (fn [fetcher input output run-info]
-               (swap! ACTIONS conj
-                 [:action1 input output
-                  (select-keys run-info [:action-name :agent-name :node-name :type])])
-               {"abc" "ccc"
-                "xyz" "..."}
-             )))
-          (aor/declare-action-builder
-           topology
-           "action2"
-           "does a thing 2"
-           (fn [params]
-             (fn [fetcher input output run-info]
-               (swap! ACTIONS conj
-                 [:action2 input output params])
-               {"abc" (str input "-" output)
-                "xyz" "zyx"}))
-           {:params {"a1" {:description "param1" :default "1"}
-                     "a2" {:description "param2"}}})
-          (TestSnippets/declareActionBuilders topology)
-          (-> topology
-              (aor/new-agent "foo")
-              (aor/node
-               "start"
-               "node1"
-               (fn [agent-node input]
-                 (aor/emit! agent-node "node1" (str input "!"))))
-              (aor/node
-               "node1"
-               nil
-               (fn [agent-node input]
-                 (aor/result! agent-node (str input "?")))))
-          (-> topology
-              (aor/new-agent "bar")
-              (aor/node
-               "begin"
-               "n1"
-               (fn [agent-node input]
-                 (aor/emit! agent-node "node1" (str input "+"))))
-              (aor/node
-               "n1"
-               nil
-               (fn [agent-node input]
-                 (aor/result! agent-node (str input "-")))))
-         ))
-       (rtest/launch-module! ipc module {:tasks 2 :threads 2})
-       (bind module-name (get-module-name module))
-       (bind agent-manager (aor/agent-manager ipc module-name))
-       (bind global-actions-depot
-         (:global-actions-depot (aor-types/underlying-objects agent-manager)))
-       (bind foo (aor/agent-client agent-manager "foo"))
-       (bind bar (aor/agent-client agent-manager "bar"))
+  (let [sample-rates (atom 0)
+        sample-atom  (atom true)]
+    (with-redefs [ACTIONS           (atom [])
 
-       (bind foo-root
-         (foreign-pstate ipc
-                         module-name
-                         (po/agent-root-task-global-name "foo")))
-       (bind bar-root
-         (foreign-pstate ipc
-                         module-name
-                         (po/agent-root-task-global-name "bar")))
+                  ana/sample?
+                  (fn [sampling-rate]
+                    (swap! sample-rates conj sampling-rate)
+                    @sample-atom)
+
+                  anode/gen-node-id
+                  (fn [& args]
+                    (h/random-uuid7-at-timestamp (h/current-time-millis)))
+
+                  at/gen-new-agent-id
+                  (fn [agent-name]
+                    (if (#{"foo" "bar"} agent-name)
+                      (do
+                        (let [ret (h/random-uuid7-at-timestamp (h/current-time-millis))]
+                          (TopologyUtils/advanceSimTime 10000)
+                          ret
+                        ))
+                      (h/random-uuid7)))]
+      (with-open [ipc (rtest/create-ipc)
+                  _ (TopologyUtils/startSimTime)]
+        (letlocals
+         (bind module
+           (aor/agentmodule
+            [topology]
+            (aor/declare-action-builder
+             topology
+             "action1"
+             "does a thing"
+             (fn [params]
+               (fn [fetcher input output run-info]
+                 (swap! ACTIONS conj
+                   [:action1 input output
+                    (select-keys run-info [:action-name :agent-name :node-name :type])])
+                 {"abc" "ccc"
+                  "xyz" "..."}
+               )))
+            (aor/declare-action-builder
+             topology
+             "action2"
+             "does a thing 2"
+             (fn [params]
+               (fn [fetcher input output run-info]
+                 (swap! ACTIONS conj
+                   [:action2 input output params])
+                 {"abc" (str input "-" output)
+                  "xyz" "zyx"}))
+             {:params {"a1" {:description "param1" :default "1"}
+                       "a2" {:description "param2"}}})
+            (TestSnippets/declareActionBuilders topology)
+            (-> topology
+                (aor/new-agent "foo")
+                (aor/node
+                 "start"
+                 "node1"
+                 (fn [agent-node input]
+                   (aor/emit! agent-node "node1" (str input "!"))))
+                (aor/node
+                 "node1"
+                 nil
+                 (fn [agent-node input]
+                   (aor/result! agent-node (str input "?")))))
+            (-> topology
+                (aor/new-agent "bar")
+                (aor/node
+                 "begin"
+                 "n1"
+                 (fn [agent-node input]
+                   (aor/emit! agent-node "node1" (str input "+"))))
+                (aor/node
+                 "n1"
+                 nil
+                 (fn [agent-node input]
+                   (aor/result! agent-node (str input "-")))))
+           ))
+         (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+         (bind module-name (get-module-name module))
+         (bind agent-manager (aor/agent-manager ipc module-name))
+         (bind global-actions-depot
+           (:global-actions-depot (aor-types/underlying-objects agent-manager)))
+         (bind foo (aor/agent-client agent-manager "foo"))
+         (bind bar (aor/agent-client agent-manager "bar"))
+
+         (bind foo-root
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name "foo")))
+         (bind bar-root
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name "bar")))
 
 
-       ;; TODO: <<<<>>>>
-       ;;  - wrap generation of agent IDs / node IDs
-       ;;   - node ID generates random one based on current time
-       ;;   - agent ID generates based on current time and then advances by 10s or something
-       ;;   - then start-time-millis can work to select
-       ;; TODO: <<<<>>>>>
-       ;; - wrap sampling rate filter part to control what gets taken and what doesn't
-       ; (ana/add-rule! global-actions-depot
-       ;                "eval1"
-       ;                "foo"
-       ;                {:action-name       "aor/eval"
-       ;                 :action-params     {"name" "concise2"}
-       ;                 :filter            ... ;: TODO
-       ;                 :sampling-rate     0.5
-       ;                 :start-time-millis ... ;; TODO
-       ;                })
+         ;; TODO: <<<<>>>>
+         ;;  - wrap generation of agent IDs / node IDs
+         ;;   - node ID generates random one based on current time
+         ;;   - agent ID generates based on current time and then advances by 10s or something
+         ;;   - then start-time-millis can work to select
+         (ana/add-rule! global-actions-depot
+                        "eval1"
+                        "foo"
+                        {:action-name       "aor/eval"
+                         :action-params     {"name" "concise2"}
+                         :filter            (aor-types/->AndFilter [])
+                         :sampling-rate     0.5
+                         :start-time-millis 25000
+                        })
 
-       ;; TODO: <<<<>>>>
-       ;;  - need better logic to skip failed runs
-       ;;   - default to not looking at incomplete agents/nodes
+         ;; TODO: <<<<>>>>
+         ;;  - need better logic to skip failed runs
+         ;;   - default to not looking at incomplete agents/nodes
 
-       ;; TODO: <<<<>>>>
-       ;;  - TODO: use both clojure and both java action builders
-       ;;  - test one agent with just online evals
-       ;;     - verify feedback added to nodes/agents
-       ;;  - another agent has dependent rules
-       ;;  - verify filters work
-       ;;  - verify sampling rate
-       ;;  - verify respects max concurrency
-       ;;  - verify how much it does in one iteration
-       ;;  - agent invokes from experiments are skipped
-       ;;  - start from time for rule
-       ;;  - error handling:
-       ;;    - online eval throws exception
-       ;;      - online eval doesn't return map
-       ;;    - action doesn't return map
+         ;; TODO: <<<<>>>>
+         ;;  - TODO: use both clojure and both java action builders
+         ;;  - test one agent with just online evals
+         ;;     - verify feedback added to nodes/agents
+         ;;  - another agent has dependent rules
+         ;;  - verify filters work
+         ;;  - verify sampling rate
+         ;;  - verify respects max concurrency
+         ;;  - verify how much it does in one iteration
+         ;;  - agent invokes from experiments are skipped
+         ;;  - start from time for rule
+         ;;  - error handling:
+         ;;    - online eval throws exception
+         ;;      - online eval doesn't return map
+         ;;    - action doesn't return map
 
-       ;; TODO: <<<<>>>>
-       ;;  - ana/add-rule!
-       ;;  - ana/delete-rule!
-       ;;     - verify dependency checking
-       ;;  - ana/fetch-agent-rules
-       ;;     - use unerlying-objects to get it
-      ))))
+         ;; TODO: <<<<>>>>
+         ;;  - ana/add-rule!
+         ;;  - ana/delete-rule!
+         ;;     - verify dependency checking
+         ;;  - ana/fetch-agent-rules
+         ;;     - use unerlying-objects to get it
+        )))))

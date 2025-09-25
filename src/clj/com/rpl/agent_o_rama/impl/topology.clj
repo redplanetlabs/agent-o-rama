@@ -194,6 +194,11 @@
 
 (defn init-retry-num [] 0)
 
+;; factored out for redef in tests
+(defn gen-new-agent-id
+  [agent-name]
+  (h/random-uuid7))
+
 (deframaop intake-agent-initiate
   [*agent-name *data]
   (<<with-substitutions
@@ -209,7 +214,7 @@
      (local-select> [(keypath *forced-agent-id) nil?] $$root)
      (identity *forced-agent-id :> *agent-id)
     (else>)
-     (h/random-uuid7 :> *agent-id))
+     (gen-new-agent-id *agent-name :> *agent-id))
    (init-retry-num :> *retry-num)
    (init-root *agent-name *agent-id *retry-num *args *source :> *invoke-id)
    (local-transform> [(keypath *agent-id) (termval true)]
