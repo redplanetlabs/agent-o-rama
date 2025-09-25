@@ -63,15 +63,15 @@ test.describe('Invocation Trace Page Rendering', () => {
     // 3b. **This is the key assertion.** We wait for the "Final Result" panel to be visible.
     // This will directly test if the race condition is fixed. If the panel doesn't appear,
     // the test will fail here. We give it a generous timeout to allow for network and processing.
-    const finalResultPanel = page.locator('div').filter({ hasText: /^Final Result/ });
-    await expect(finalResultPanel).toBeVisible({ timeout: 30000 });
+    // Use getByText to target the specific header element with "Final Result"
+    const finalResultHeader = page.getByText('Final Result', { exact: true });
+    await expect(finalResultHeader).toBeVisible({ timeout: 30000 });
     console.log('Final Result panel is visible.');
 
     // 3c. Verify the content of the final result panel.
-    // We look for a `pre` tag within the panel that contains our expected output.
-    // Using a locator that chains from the panel ensures we're checking the right element.
-    const resultText = finalResultPanel.locator('pre');
-    await expect(resultText).toContainText(expectedResult);
+    // The result is displayed in the generic-data-viewer, which renders the content as text.
+    // We look for any element that contains our expected output text.
+    await expect(page.getByText(expectedResult)).toBeVisible();
     console.log('Final Result content is correct.');
 
     // 3d. Additionally, check for the "Success" badge to be sure.
