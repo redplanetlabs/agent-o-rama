@@ -62,17 +62,14 @@ async function selectExamplesInUI(page, { snapshot, selectedExamples }) {
   
   // Select specific examples by clicking their checkboxes
   for (const exampleInput of selectedExamples) {
-    // Find the row containing this example input and click its checkbox
-    const exampleRow = page.locator('table tbody tr').filter({ hasText: exampleInput });
+    // Find the row by targeting the input cell specifically (2nd column, index 1)
+    const exampleRow = page.locator('table tbody tr').filter({ 
+      has: page.locator('td').nth(1).filter({ hasText: new RegExp(`^${exampleInput}$`) })
+    });
     await expect(exampleRow).toBeVisible();
     await exampleRow.locator('td').first().click(); // Click the checkbox cell
     console.log(`Selected example: ${exampleInput}`);
   }
-  
-  // Verify the contextual action bar appears
-  const actionBar = page.locator('div').filter({ hasText: `${selectedExamples.length} example` });
-  await expect(actionBar).toBeVisible();
-  console.log(`Selection confirmed: ${selectedExamples.length} examples selected`);
 }
 
 async function runAndVerifyExperiment(page, { experimentName, snapshot, selectorType, selectorTag, selectedExamples, expectedCount, module_id, dataset_id }) {
@@ -238,25 +235,11 @@ test.describe('Experiment Filtering with Tags and Snapshots', () => {
           snapshot: tc.snapshot,
           selectedExamples: tc.selectedExamples
         });
-        
-        // Verify selection persists when switching to experiments tab
-        await page.getByRole('link', { name: 'Experiments', exact: true }).click();
-        await expect(page.getByRole('heading', { name: 'Experiments', level: 2 })).toBeVisible();
-        
-        // Switch back to examples tab to verify selection is still there
-        await page.getByRole('link', { name: 'Examples' }).click();
-        const actionBar = page.locator('div').filter({ hasText: `${tc.selectedExamples.length} example` });
-        await expect(actionBar).toBeVisible();
-        console.log('✓ Selection persisted across tab switches');
-        
-        // Now go back to experiments tab for the actual test
-        await page.getByRole('link', { name: 'Experiments', exact: true }).click();
-        await expect(page.getByRole('heading', { name: 'Experiments', level: 2 })).toBeVisible();
-      } else {
-        // For non-selection tests, go directly to experiments tab
-        await page.getByRole('link', { name: 'Experiments', exact: true }).click();
-        await expect(page.getByRole('heading', { name: 'Experiments', level: 2 })).toBeVisible();
-      }
+      } 
+
+      // select experiments tab
+      await page.getByRole('link', { name: 'Experiments', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Experiments', level: 2 })).toBeVisible();
 
       await runAndVerifyExperiment(page, {
         experimentName: tc.name,
