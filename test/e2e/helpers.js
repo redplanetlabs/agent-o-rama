@@ -91,32 +91,60 @@ export async function createEvaluator(page, { name, builderName, description, pa
  */
 export async function addExample(page, { input, output, tags }) {
   console.log('Adding example with input:', JSON.stringify(input), 'tags:', tags);
-  // Click the first enabled Add Example button
+  
+  // Step 1: Create the example
   await page.locator('button').filter({ hasText: 'Add Example' }).filter({ hasNot: page.locator('[disabled]') }).first().click();
 
-  const modal = page.locator('[role="dialog"]');
-  await expect(modal).toBeVisible();
-  await modal.getByLabel('Input (JSON)').fill(JSON.stringify(input, null, 2));
+  const createModal = page.locator('[role="dialog"]');
+  await expect(createModal).toBeVisible();
+  await createModal.getByLabel('Input (JSON)').fill(JSON.stringify(input, null, 2));
   
   if (output !== undefined) {
-    await modal.getByLabel('Output (JSON, Optional)').fill(JSON.stringify(output, null, 2));
-  }
-
-  if (tags && tags.length > 0) {
-    // Add tags one by one
-    for (const tag of tags) {
-      await modal.getByPlaceholder('Add tag...').fill(tag);
-      await modal.getByPlaceholder('Add tag...').press('Enter');
-    }
+    await createModal.getByLabel('Output (JSON, Optional)').fill(JSON.stringify(output, null, 2));
   }
   
-  await modal.getByRole('button', { name: 'Add Example' }).click();
+  await createModal.getByRole('button', { name: 'Add Example' }).click();
+  await expect(createModal).not.toBeVisible({ timeout: 15000 });
 
-  await expect(modal).not.toBeVisible({ timeout: 15000 });
-  // For examples with input as string, look for the string value in the table
-  const inputValue = typeof input === 'string' ? input : (input.id || JSON.stringify(input));
-  const rowWithInput = page.locator('table tbody tr').filter({ hasText: inputValue });
-  await expect(rowWithInput).toBeVisible({ timeout: 10000 });
+  // Step 2: If tags are provided, edit the example to add them
+  if (tags && tags.length > 0) {
+    // Find the newly created example row
+    const inputValue = typeof input === 'string' ? input : (input.id || JSON.stringify(input));
+    const rowWithInput = page.locator('table tbody tr').filter({ hasText: inputValue });
+    await expect(rowWithInput).toBeVisible({ timeout: 10000 });
+    
+    // Click edit button on the row
+    await rowWithInput.click();
+    
+
+    const editModal = page.locator('[role="dialog"]');
+    await expect(editModal).toBeVisible();
+    
+    // Add tags one by one
+    for (const tag of tags) {
+      await editModal.getByPlaceholder('Add a tag and press Enter...').fill(tag);
+      await editModal.getByPlaceholder('Add a tag and press Enter...').press('Enter');
+    }
+
+    const noTags = editModal.getByText('No tags', { exact: true })
+    await expect(noTags).not.toBeVisible();
+
+    for (const tag of tags) {
+      const tagRow = editModal.getByText(tag, { exact: true })
+      await expect(tagRow).toBeVisible();
+    }
+
+    const closeButton = editModal.getByRole('button', { name: '×' })
+    closeButton.click();
+    await expect(editModal).not.toBeVisible({ timeout: 15000 });
+    console.log('Successfully added tags to example.');
+  } else {
+    // Just verify the example was created
+    const inputValue = typeof input === 'string' ? input : (input.id || JSON.stringify(input));
+    const rowWithInput = page.locator('table tbody tr').filter({ hasText: inputValue });
+    await expect(rowWithInput).toBeVisible({ timeout: 10000 });
+  }
+  
   console.log('Successfully added example.');
 }
 
