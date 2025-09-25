@@ -108,9 +108,11 @@ export async function addExample(page, { input, output, tags }) {
 
   // Step 2: If tags are provided, edit the example to add them
   if (tags && tags.length > 0) {
-    // Find the newly created example row
+    // Find the newly created example row - target the input column (second td)
     const inputValue = typeof input === 'string' ? input : (input.id || JSON.stringify(input));
-    const rowWithInput = page.locator('table tbody tr').filter({ hasText: inputValue });
+    const rowWithInput = page.locator('table tbody tr').filter({ 
+      has: page.locator('td').nth(1).getByText(inputValue, { exact: true })
+    });
     await expect(rowWithInput).toBeVisible({ timeout: 10000 });
     
     // Click edit button on the row
@@ -139,9 +141,11 @@ export async function addExample(page, { input, output, tags }) {
     await expect(editModal).not.toBeVisible({ timeout: 15000 });
     console.log('Successfully added tags to example.');
   } else {
-    // Just verify the example was created
+    // Just verify the example was created - target the input column (second td)
     const inputValue = typeof input === 'string' ? input : (input.id || JSON.stringify(input));
-    const rowWithInput = page.locator('table tbody tr').filter({ hasText: inputValue });
+    const rowWithInput = page.locator('table tbody tr').filter({ 
+      has: page.locator('td').nth(1).getByText(inputValue, { exact: true })
+    });
     await expect(rowWithInput).toBeVisible({ timeout: 10000 });
   }
   
