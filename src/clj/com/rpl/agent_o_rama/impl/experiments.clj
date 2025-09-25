@@ -625,7 +625,7 @@
                                           (must example-id)
                                           :input]
                                          datasets))
-                   _ (when (empty? inputv)
+                   _ (when (and (some? inputv) (empty? inputv))
                        (throw (h/ex-info "Did not find example"
                                          {:dataset-id dataset-id
                                           :snapshot   snapshot

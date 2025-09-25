@@ -800,6 +800,8 @@
        (rtest/launch-module! ipc module {:tasks 2 :threads 2})
        (bind module-name (get-module-name module))
        (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind global-actions-depot
+         (:global-actions-depot (aor-types/underlying-objects agent-manager)))
        (bind foo (aor/agent-client agent-manager "foo"))
        (bind bar (aor/agent-client agent-manager "bar"))
 
@@ -811,6 +813,24 @@
          (foreign-pstate ipc
                          module-name
                          (po/agent-root-task-global-name "bar")))
+
+
+       ;; TODO: <<<<>>>>
+       ;;  - wrap generation of agent IDs / node IDs
+       ;;   - node ID generates random one based on current time
+       ;;   - agent ID generates based on current time and then advances by 10s or something
+       ;;   - then start-time-millis can work to select
+       ;; TODO: <<<<>>>>>
+       ;; - wrap sampling rate filter part to control what gets taken and what doesn't
+       ; (ana/add-rule! global-actions-depot
+       ;                "eval1"
+       ;                "foo"
+       ;                {:action-name       "aor/eval"
+       ;                 :action-params     {"name" "concise2"}
+       ;                 :filter            ... ;: TODO
+       ;                 :sampling-rate     0.5
+       ;                 :start-time-millis ... ;; TODO
+       ;                })
 
        ;; TODO: <<<<>>>>
        ;;  - need better logic to skip failed runs
