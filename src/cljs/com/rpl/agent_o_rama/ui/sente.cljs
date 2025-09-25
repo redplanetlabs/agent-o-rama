@@ -13,7 +13,7 @@
       (sente/make-channel-socket-client!
        "/chsk"
        nil ; No CSRF token for development
-       {:type :auto  ; :auto will prefer WebSockets with Ajax fallback
+       {:type :ajax ;; ajax because problems on firefox
         :packer transit-packer})]
 
   ;; 2. Define the vars for our Sente client
