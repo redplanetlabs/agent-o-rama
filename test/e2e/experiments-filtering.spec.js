@@ -88,7 +88,7 @@ async function runAndVerifyExperiment(page, { experimentName, snapshot, selector
 
   // The most important check: verify the number of examples it ran on.
   const summaryTable = page.locator('table').filter({ hasText: '# Examples' });
-  await expect(summaryTable.locator('td').first()).toHaveText(String(expectedCount));
+  await expect(summaryTable.locator('td').first().locator('div').nth(1)).toHaveText(String(expectedCount));
   
   const resultsTable = page.locator('table').filter({ hasText: 'Input' });
   await expect(resultsTable.locator('tbody tr')).toHaveCount(expectedCount);
