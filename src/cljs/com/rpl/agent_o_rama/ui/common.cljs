@@ -147,7 +147,7 @@
            :fill "currentColor"
            :d "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"}))))
 
-(defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content]}]
+(defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content data-testid]}]
   (let [row-classes (cn
                      "flex items-center justify-between w-full px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
                      {"bg-blue-50 text-blue-700" selected?
@@ -159,7 +159,8 @@
           {:onClick (fn [e]
                       (.stopPropagation e)
                       (when on-select (on-select)))
-           :className row-classes}
+           :className row-classes
+           :data-testid data-testid}
           ($ :div.flex.items-center.flex-1
              (when icon ($ :div.mr-3 icon))
              ($ :span.truncate label)

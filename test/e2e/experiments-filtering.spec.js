@@ -53,7 +53,12 @@ async function runAndVerifyExperiment(page, { experimentName, snapshot, selector
   
   // Select Snapshot
   await modal.getByRole('button', { name: /Latest/ }).click();
-  await page.getByText(snapshot, { exact: true }).click();
+  // Use data-testid to target the specific snapshot option
+  if (snapshot === 'Latest (Working Copy)') {
+    await page.getByTestId('snapshot-option-latest').click();
+  } else {
+    await page.getByTestId(`snapshot-option-${snapshot}`).click();
+  }
   console.log(`Selected snapshot: ${snapshot}`);
 
   // Select Examples

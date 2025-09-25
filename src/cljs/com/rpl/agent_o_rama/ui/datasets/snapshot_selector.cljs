@@ -77,18 +77,20 @@
          ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
             {:onClick #(.stopPropagation %)}
             ($ :div.py-1
-               ;; Latest option
+;; Latest option
                ($ common/DropdownRow {:label "Latest (Working Copy)"
                                       :selected? (str/blank? selected-snapshot)
                                       :on-select #(handle-select "")
-                                      :delete-button nil})
+                                      :delete-button nil
+                                      :data-testid "snapshot-option-latest"})
 
-               ;; Named snapshots
+;; Named snapshots
                (for [name snapshot-names]
                  ($ common/DropdownRow {:key name
                                         :label name
                                         :selected? (= selected-snapshot name)
                                         :on-select #(handle-select name)
+                                        :data-testid (str "snapshot-option-" name)
                                         :delete-button (when-not (or disabled? read-only?)
                                                          ($ :button.text-red-600.hover:text-red-800.p-1.rounded.hover:bg-red-100
                                                             {:type "button"

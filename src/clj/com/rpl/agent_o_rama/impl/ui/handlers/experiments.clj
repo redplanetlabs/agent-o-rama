@@ -32,8 +32,10 @@
 (defn- parse-selector [selector]
   (when selector
     (case (:type selector)
-      "tag" (aor-types/->TagSelector (:tag selector))
-      "example-ids" (aor-types/->ExampleIdsSelector (mapv #(UUID/fromString %) (:example-ids selector)))
+      :tag (aor-types/->TagSelector (:tag selector))
+      :example-ids (aor-types/->ExampleIdsSelector
+                    (mapv #(UUID/fromString %)
+                          (:example-ids selector)))
       nil)))
 
 (defn- parse-target [t]
