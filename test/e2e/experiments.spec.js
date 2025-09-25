@@ -135,8 +135,8 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     await writeSectionNode.click();
     
     // Wait for the node details panel to appear and the Add to Dataset button to be available
-    await expect(page.locator('.bg-indigo-50').getByRole('button', { name: 'Add to Dataset' })).toBeVisible({ timeout: 10000 });
-    await page.locator('.bg-indigo-50').getByRole('button', { name: 'Add to Dataset' }).click();
+    await expect(page.locator('.bg-indigo-50').getByRole('button', { name: 'Add node to Dataset' })).toBeVisible({ timeout: 10000 });
+    await page.locator('.bg-indigo-50').getByRole('button', { name: 'Add node to Dataset' }).click();
 
     // Now the modal should appear
     const addToDatasetModal = page.locator('[role="dialog"]');
@@ -249,9 +249,9 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     const passChip = outputCell.locator('a').filter({ hasText: new RegExp(`${evaluatorNamePass}/concise\\?`) }).first();
     const failChip = outputCell.locator('a').filter({ hasText: new RegExp(`${evaluatorNameFail}/concise\\?`) }).first();
     await expect(passChip).toBeVisible();
-    await expect(passChip).toContainText('?T');
+    await expect(passChip).toContainText('✓T');
     await expect(failChip).toBeVisible();
-    await expect(failChip).toContainText('?F');
+    await expect(failChip).toContainText('✗F');
     console.log('Evaluator scores for both pass and fail correctly displayed.');
 
     // ---
@@ -308,9 +308,9 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     const rerunPassChip = rerunOutputCell.locator('a').filter({ hasText: new RegExp(`${evaluatorNamePass}/concise\\?`) }).first();
     const rerunFailChip = rerunOutputCell.locator('a').filter({ hasText: new RegExp(`${evaluatorNameFail}/concise\\?`) }).first();
     await expect(rerunPassChip).toBeVisible();
-    await expect(rerunPassChip).toContainText('?T');
+    await expect(rerunPassChip).toContainText('✓T');
     await expect(rerunFailChip).toBeVisible();
-    await expect(rerunFailChip).toContainText('?F');
+    await expect(rerunFailChip).toContainText('✗F');
     console.log('Evaluator scores for the re-run experiment verified.');
 
 
