@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.analytics :as ana]
+   [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.stats :as stats]
@@ -755,11 +756,17 @@
   ))
 
 (def ACTIONS)
+(def TICKS)
 
 (deftest actions-test
-  (let [sample-rates (atom 0)
+  (let [sample-rates (atom [])
         sample-atom  (atom true)]
-    (with-redefs [ACTIONS           (atom [])
+    (with-redefs [ACTIONS (atom [])
+                  TICKS (atom 0)
+                  i/SUBSTITUTE-TICK-DEPOTS true
+
+                  i/hook:analytics-tick
+                  (fn [& args] (swap! TICKS inc))
 
                   ana/sample?
                   (fn [sampling-rate]
@@ -842,6 +849,9 @@
            (:global-actions-depot (aor-types/underlying-objects agent-manager)))
          (bind foo (aor/agent-client agent-manager "foo"))
          (bind bar (aor/agent-client agent-manager "bar"))
+         (bind ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
+
+         (TopologyUtils/advanceSimTime 1000)
 
          (bind foo-root
            (foreign-pstate ipc
@@ -852,21 +862,48 @@
                            module-name
                            (po/agent-root-task-global-name "bar")))
 
+         (bind cycle!
+           (fn []
+             (reset! TICKS 0)
+             (foreign-append! ana-depot nil)
+             (is (condition-attained? (> @TICKS 0)))
+             (rtest/pause-microbatch-topology! ipc
+                                               module-name
+                                               aor-types/AGENTS-MB-TOPOLOGY-NAME)
+             (rtest/resume-microbatch-topology! ipc
+                                                module-name
+                                                aor-types/AGENTS-MB-TOPOLOGY-NAME)))
 
-         ;; TODO: <<<<>>>>
-         ;;  - wrap generation of agent IDs / node IDs
-         ;;   - node ID generates random one based on current time
-         ;;   - agent ID generates based on current time and then advances by 10s or something
-         ;;   - then start-time-millis can work to select
+
+         (aor/create-evaluator! agent-manager
+                                "concise5"
+                                "aor/conciseness"
+                                {"threshold" "5"}
+                                "")
+
          (ana/add-rule! global-actions-depot
                         "eval1"
                         "foo"
                         {:action-name       "aor/eval"
-                         :action-params     {"name" "concise2"}
+                         :action-params     {"name" "concise5"}
                          :filter            (aor-types/->AndFilter [])
                          :sampling-rate     0.5
-                         :start-time-millis 25000
+                         :start-time-millis 0
                         })
+
+
+         (bind {:keys [agent-invoke-id task-id] :as inv} (aor/agent-initiate foo "ab"))
+         (is (= "ab!?" (aor/agent-result foo inv)))
+
+         (cycle!)
+
+         (println
+          "RES"
+          (foreign-select-one [(keypath agent-invoke-id) :feedback] foo-root {:pkey task-id}))
+
+
+
+
 
          ;; TODO: <<<<>>>>
          ;;  - need better logic to skip failed runs

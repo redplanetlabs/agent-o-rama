@@ -154,6 +154,10 @@
      mb-topology
      (symbol (po/pending-retries-task-global-name agent-name))
      po/PENDING-RETRIES-PSTATE-SCHEMA)
+    (declare-pstate*
+     mb-topology
+     (symbol (po/agent-rule-cursors-task-global-name agent-name))
+     po/AGENT-RULE-CURSORS-PSTATE-SCHEMA)
 
     (retries/declare-check-impl mb-topology agent-name)
     (queries/declare-tracing-query-topology topologies agent-name)
@@ -208,6 +212,8 @@
      (assoc m agent-name [nil agent-name]))
    mirror-agents
    agent-graphs))
+
+(defn hook:analytics-tick [])
 
 (defn define-agents!
   [setup topologies stream-topology mb-topology agent-graphs mirror-agents
@@ -282,6 +288,7 @@
     (<<sources mb-topology
      (source> analytics-tick-depot-sym :> %mb)
       (%mb)
+      (hook:analytics-tick)
       (ana/handle-analytics-tick))
     (<<sources stream-topology
      (source> pstate-write-depot-sym

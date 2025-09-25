@@ -97,7 +97,7 @@
                 (c/emit! agent-node
                          "agg-results"
                          (ToolExecutionResultMessage/from request error-ret))
-                (tl/warn :tool-exec-error t "Tool execution exception")
+                (tl/warn ::tool-exec-error t "Tool execution exception")
                 (anode/record-nested-op!-impl
                  agent-node
                  :tool-call

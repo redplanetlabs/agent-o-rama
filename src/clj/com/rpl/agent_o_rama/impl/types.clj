@@ -575,7 +575,7 @@
    builder-params :- {String Object}
    eval-type :- (s/enum :regular :comparative)
    eval-infos :- [EvalInfo]
-   source :- InfoSource
+   source :- (s/maybe InfoSource)
   ])
 
 ;; used in PState

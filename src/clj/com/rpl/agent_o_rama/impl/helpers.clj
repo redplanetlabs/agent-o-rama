@@ -215,9 +215,13 @@
   [^long millis]
   (UuidCreator/getTimeOrderedEpochMin (Instant/ofEpochMilli millis)))
 
+;; - this is max UUID for purposes of Clojure sorted maps, which compares the components as signed
+;; values
+;; - this is greater than any UUID7 whether compared in Clojure sorted maps or as RocksDB keys,
+;; which is all that matters
 (defn max-uuid
   []
-  (java.util.UUID. -1 -1))
+  (java.util.UUID. Long/MAX_VALUE Long/MAX_VALUE))
 
 (defn half-uuid
   [^UUID uuid]

@@ -14,6 +14,7 @@
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.throttled-logging :as tl]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops])
   (:import
@@ -39,6 +40,11 @@
 (defn declared-objects ^AgentDeclaredObjectsTaskGlobal [] (:declared-objects ACTION-HELPERS))
 (defn rama-clients ^RamaClientsTaskGlobal [] (:rama-clients ACTION-HELPERS))
 (defn random-task-id [] (rand-int (:num-tasks ACTION-HELPERS)))
+
+
+(defn get-num-tasks
+  []
+  (.getNumTasks ^com.rpl.rama.ModuleInstanceInfo (ops/module-instance-info)))
 
 (defn retrieve-pstate
   [pstate-name]
@@ -66,7 +72,7 @@
 (def BUILT-IN-ACTIONS
   {"aor/eval"
    {:builder-fn
-    (fn [{:keys [name]}]
+    (fn [{:strs [name]}]
       (let [evals-pstate (retrieve-pstate (po/evaluators-task-global-name))
             eval-info    (foreign-select-one (keypath name) evals-pstate)
             eval-client  (get-agent-client aor-types/EVALUATOR-AGENT-NAME)]
@@ -243,16 +249,6 @@
     (when (some? conflict)
       (format "Deletion failed because rule '%s' depends on it" conflict))))
 
-(defn mk-cursor-map
-  [start-time-millis]
-  (let [^com.rpl.rama.ModuleInstanceInfo module-instance-info (ops/module-instance-info)
-        num-tasks (.getNumTasks module-instance-info)
-        uuid      (h/min-uuid7-at-timestamp start-time-millis)]
-    (into {}
-          (for [i (range 0 num-tasks)]
-            [i uuid]
-          ))))
-
 (defn agent-names-set
   []
   (-> (po/agent-declared-objects-task-global)
@@ -264,7 +260,7 @@
   [{:keys [*agent-name] :as *data}]
   (agent-names-set :> *agent-names)
   (filter> (contains? *agent-names *agent-name))
-  (keys (all-action-builders) :> *action-names)
+  (set (keys (all-action-builders)) :> *action-names)
   (<<with-substitutions
    [$$rules (po/agent-rules-task-global *agent-name)]
    (<<subsource *data
@@ -273,14 +269,12 @@
      (<<cond
       (case> (and> (some? *curr-id) (not= *curr-id *id)))
        (ack-return> (format "Rule '%s' already exists" *name))
+
       (case> (not (contains? *action-names *action-name)))
        (ack-return> (format "Action '%s' doesn't exist" *action-name))
 
       (default>)
-       (mk-cursor-map *start-time-millis :> *cursor-map)
-       (local-transform> [(keypath *name)
-                          (multi-path [:definition (termval *data)]
-                                      [:cursors (termval *cursor-map)])]
+       (local-transform> [(keypath *name) :definition (termval *data)]
                          $$rules))
 
     (case> DeleteRule :> {:keys [*name]})
@@ -292,13 +286,35 @@
        (local-transform> [(keypath *name) NONE>] $$rules))
    )))
 
+(defn mk-cursor-map
+  [start-time-millis]
+  (let [^com.rpl.rama.ModuleInstanceInfo module-instance-info (ops/module-instance-info)
+        num-tasks (.getNumTasks module-instance-info)
+        uuid      (h/min-uuid7-at-timestamp start-time-millis)]
+    (into {}
+          (for [i (range 0 num-tasks)]
+            [i uuid]
+          ))))
+
 (deframafn read-rules
   []
   (<<batch
     (ops/explode (agent-names-set) :> *agent-name)
     (po/agent-rules-task-global *agent-name :> $$rules)
+    (po/agent-rule-cursors-task-global *agent-name :> $$rule-cursors)
     (local-select> STAY $$rules :> *rules)
-    (aggs/+map-agg *agent-name *rules :> *ret))
+    (local-select> STAY $$rule-cursors :> *all-rule-cursors)
+    (ops/explode-map *rules :> *rule-name *rule-info)
+    (get *all-rule-cursors *rule-name :> *curr-rule-cursors)
+    (get *rule-info :definition :> {:keys [*start-time-millis]})
+    (ifexpr (empty? *curr-rule-cursors)
+      (mk-cursor-map *start-time-millis :> *cursor-map)
+      *curr-rule-cursors
+      :> *rule-cursors)
+    (assoc *rule-info
+     :cursors *rule-cursors
+     :> *all-rule-info)
+    (+compound {*agent-name {*rule-name (aggs/+last *all-rule-info)}} :> *ret))
   (:> *ret))
 
 (defn safe-last-key
@@ -368,7 +384,7 @@
    (ops/explode-map *rule->info :> *rule-name *rule-info)
    (get *rule-info :definition :> {:keys [*filter *node-name *sampling-rate]})
    (aor-types/dependency-rule-names *filter :> *dependency-names)
-   (select> [:cursors ALL (collect-one FIRST LAST)]
+   (select> [:cursors ALL (collect-one FIRST) LAST]
      *rule-info
      :> [*task-id *offset])
    (<<batch
@@ -383,6 +399,7 @@
      (local-select> [(subselect FIRST) (view first) (view first)] $$active :> *max-scan-offset))
    (compute-end-offset *dep-end-offset *max-scan-offset :> *end-offset)
    (action-target-pstate *agent-name *node-name :> $$p)
+   (local-select> STAY $$p :> *tmp)
    (scan-amt :> *scan-amt)
    (po/agent-node-executor-task-global :> *node-exec)
    (local-select> [(sorted-map-range-from *offset *scan-amt)
@@ -434,27 +451,9 @@
 
 (def BUILD-ERROR ::builder-error)
 
-(defn build-action-fn
-  [builder-fn params]
-  (if (nil? builder-fn)
-    {BUILD-ERROR {"error" "Action builder does not exist"}}
-    (try
-      (builder-fn params)
-      (catch Throwable t
-        {BUILD-ERROR {"error"     "Action failed to build"
-                      "exception" (h/throwable->str t)}}
-
-      ))))
-
-(defn data->latency-millis
-  [{:keys [start-time-millis finish-time-millis]}]
-  (when (and start-time-millis finish-time-millis)
-    (- finish-time-millis start-time-millis)))
-
-(defn run-action!
-  [action-fn input output run-info]
-  (let [fetcher      (anode/mk-fetcher)
-        cf           (CompletableFuture.)
+(defn run-virtual-with-action-helpers!
+  [afn]
+  (let [cf           (CompletableFuture.)
         declared-objects-tg (po/agent-declared-objects-task-global)
         rama-clients (po/agents-clients-task-global)
         num-tasks    (.getNumTasks ^com.rpl.rama.ModuleInstanceInfo (ops/module-instance-info))]
@@ -466,14 +465,47 @@
                    {:num-tasks        num-tasks
                     :declared-objects declared-objects-tg
                     :rama-clients     rama-clients}]
-           (let [m (action-fn fetcher input output run-info)]
-             (when-not (and (instance? java.util.Map m) (every? string? (keys m)))
-               (throw (h/ex-info "Action return must be map with string keys" {:reeturn m})))
-             (.complete cf {:success? true :info-map m}))
-           (catch Throwable t
-             (.complete cf {:success? false :info-map {"exception" (h/throwable->str t)}}))
+           (afn cf)
          ))))
     cf))
+
+
+(defn build-action-fn
+  [builder-fn params]
+  (run-virtual-with-action-helpers!
+   (fn [^CompletableFuture cf]
+     (.complete
+      cf
+      (if (nil? builder-fn)
+        {BUILD-ERROR {"error" "Action builder does not exist"}}
+        (try
+          (builder-fn params)
+          (catch Throwable t
+            (tl/error ::build-action t "Action builder exception")
+            {BUILD-ERROR {"error"     "Action failed to build"
+                          "exception" (h/throwable->str t)}}
+
+          )))))))
+
+(defn run-action!
+  [action-fn input output run-info]
+  (let [fetcher (anode/mk-fetcher)]
+    (run-virtual-with-action-helpers!
+     (fn [^CompletableFuture cf]
+       (try
+         (let [m (action-fn fetcher input output run-info)]
+           (when-not (and (instance? java.util.Map m) (every? string? (keys m)))
+             (throw (h/ex-info "Action return must be map with string keys" {:reeturn m})))
+           (.complete cf {:success? true :info-map m}))
+         (catch Throwable t
+           (tl/error ::run-action t "Action exception")
+           (.complete cf {:success? false :info-map {"exception" (h/throwable->str t)}}))
+       )))))
+
+(defn data->latency-millis
+  [{:keys [start-time-millis finish-time-millis]}]
+  (when (and start-time-millis finish-time-millis)
+    (- finish-time-millis start-time-millis)))
 
 (deframaop run-actions!
   [*items *agent->rule->info *cache-pstate-name]
@@ -481,14 +513,13 @@
    [$$cache (this-module-pobject-task-global *cache-pstate-name)
     $$action-log (po/action-log-task-global)]
    (ops/explode *items :> {:keys [*task-id *agent-name *rule-name *offset]})
-
    (select> (keypath *agent-name *rule-name :definition)
      *agent->rule->info
      :> {:keys [*action-name *action-params *node-name]})
    (|direct *task-id)
    (all-action-builders :> *action-builders)
    (get *action-builders *action-name :> {:keys [*builder-fn]})
-   (build-action-fn *builder-fn *action-params :> *action-fn)
+   (completable-future> (build-action-fn *builder-fn *action-params) :> *action-fn)
    (h/current-time-millis :> *action-start-time-millis)
    (<<if (and> (map? *action-fn) (contains? *action-fn BUILD-ERROR))
      (get *action-fn BUILD-ERROR :> *info-map)
@@ -573,9 +604,8 @@
   (compute-new-cursors *match-info *rem-queue :> *agent->rule->cursors)
   (<<atomic
     (ops/explode-map *agent->rule->cursors :> *agent-name *rule->cursors)
-    (po/agent-rules-task-global *agent-name :> $$rules)
-    (ops/explode-map *rule->cursors :> *rule-name *cursors)
-    (local-transform> [(keypath *rule-name) :cursors (termval *cursors)] $$rules))
+    (po/agent-rule-cursors-task-global *agent-name :> $$rule-cursors)
+    (local-transform> (termval *rule->cursors) $$rule-cursors))
   (:>))
 
 (defbasicblocksegmacro handle-analytics-tick
@@ -610,7 +640,7 @@
        [<<if (seg# action-iter-complete? '*first-iter? '*queue '*actions-start-time-millis '*target-millis)
          [:> '*queue]
         [else>]
-         [split-at '*queue '*max-concurrency :> ['*items '*rest-queue]]
+         [split-at '*max-concurrency '*queue :> ['*items '*rest-queue]]
          [<<batch
            [run-actions! '*items '*agent->rule->info cache-pstate-name]]
          [continue> '*rest-queue false]

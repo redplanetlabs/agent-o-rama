@@ -337,11 +337,18 @@
 
 (defn agent-rules-task-global-name
   [agent-name]
-  (str "$$_agent-rules-" agent-name ""))
+  (str "$$_agent-rules-" agent-name))
 
-
-;; name -> {:definition AddRule :cursors {task-id -> UUID}}
+;; rule-name -> {:definition AddRule}
 (def AGENT-RULES-PSTATE-SCHEMA
+  java.util.Map)
+
+(defn agent-rule-cursors-task-global-name
+  [agent-name]
+  (str "$$_agent-rule-cursors-" agent-name))
+
+;; rule-name -> task-id -> UUID
+(def AGENT-RULE-CURSORS-PSTATE-SCHEMA
   java.util.Map)
 
 ;; Task global fetch helpers
@@ -420,6 +427,10 @@
 (defn agent-rules-task-global
   [name]
   (this-module-pobject-task-global (agent-rules-task-global-name name)))
+
+(defn agent-rule-cursors-task-global
+  [name]
+  (this-module-pobject-task-global (agent-rule-cursors-task-global-name name)))
 
 (defn agent-global-config-task-global
   []
