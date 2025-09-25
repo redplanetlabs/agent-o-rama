@@ -4,7 +4,12 @@
 Automatic retry logic for handling failed or stalled agent executions.
 
 ## Architecture Role
-Resilience layer for agent execution. Transparently handles transient failures and network issues.
+Resilience layer for agent execution. Transparently handles transient
+failures and network issues.
+
+Retries are not from the start of agent. Completed nodes do not get
+retried.  if there's a failure like exception in node fn or failed
+machine, it continues from the failed node.
 
 ## Operations
 - Automatic retry on failure

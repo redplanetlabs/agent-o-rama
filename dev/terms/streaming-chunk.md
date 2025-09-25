@@ -4,15 +4,15 @@
 Individual piece of streaming data emitted from agent nodes during execution.
 
 ## Architecture Role
-Enables real-time data flow from agents. Supports incremental output for long-running operations and progressive results.
+Enables real-time data flow from agents. Supports incremental output for
+long-running operations and progressive results.
 
 ## Operations
 - `stream-chunk!` - Emit chunk
-- Subscribe to receive
-- Filter by node
+- Subscribe to receive (Filter by node, invocation)
 
 ## Invariants
-- Order preserved per node
+- Order preserved per node and invocation
 - Non-blocking emission
 - Independent of result
 
@@ -24,7 +24,7 @@ Enables real-time data flow from agents. Supports incremental output for long-ru
 ## Key Java API
 - Primary functions: `streamChunk()`
 - Creation: `agentNode.streamChunk(data)`
-- Access: Via stream subscriptions
+- Access: Via streaming subscriptions
 
 ## Relationships
 - Uses: [Agent Node](agent-node.md)

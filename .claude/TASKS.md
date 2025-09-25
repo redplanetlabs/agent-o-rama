@@ -16,6 +16,8 @@ Include REFINE to refine the spec
         Find the next incomplete "Medium" item in the project task list
 
 
+- [ ] Use a canonical "Agent-o-rama" capitalisation.
+
 # Medium
 
 - [X] add a glossary in @doc/glossary.md with terms that have project

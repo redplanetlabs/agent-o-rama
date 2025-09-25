@@ -121,6 +121,10 @@ processing, and result combination across agent graph executions.
 
 An interface for managing and connecting to Rama clusters, providing access to deployed modules and their agents through connection management and factory methods.
 
+## Database Connections
+
+Database connections can be declared as agent objects.
+
 ## [Dataset](terms/dataset.md)
 
 A managed collection of input/output examples for agent testing and
@@ -220,6 +224,10 @@ A deployable unit containing depots, pstates and topologies.  It can be
 launched on a Rama cluster. Rama modules are identified by name and can
 reference partitioned objects from other Rama modules.
 
+## Recursive Agents
+
+Agents can be called recursively and be mutually recursive.
+
 ## [Red Planet Labs](terms/red-planet-labs.md)
 
 The company that created the Rama distributed computing platform and agent-o-rama framework, developing infrastructure for building real-time, scalable distributed applications.
@@ -280,3 +288,7 @@ A ClojureScript-based web interface for monitoring and visualizing
 agent execution in real-time. Provides debugging tools, state
 inspection, and execution flow visualization. Started via `start-ui`
 function and accessible through web browser when agents are running.
+
+## Vector Store
+
+Vector stores can be declared as agent objects.

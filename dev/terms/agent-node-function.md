@@ -4,7 +4,11 @@
 User-defined function implementing logic for a specific node in an agent graph.
 
 ## Architecture Role
-Executes business logic within agent nodes. Receives agent-node context and arguments, performs computation, and controls flow.
+Executes business logic within agent nodes. Receives agent-node context
+and arguments, performs computation, and controls flow.
+
+Runs on a virtual thread, so all code should be in simple blocking
+style.
 
 ## Operations
 - Access stores and objects via agent-node
@@ -13,7 +17,9 @@ Executes business logic within agent nodes. Receives agent-node context and argu
 - Request human input
 
 ## Invariants
-- First parameter always agent-node
+- First argument always agent-node
+- Other argument correspond to the arguments in the agent invoke (first
+  node) or the emitted values from other nodes.
 - Must emit or result (not both)
 - Synchronous execution model
 

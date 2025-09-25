@@ -37,6 +37,13 @@ Emits ordered streaming data for real-time consumption by client subscriptions.
 ```
 Synchronously requests human input, pausing execution until response received.
 
+### Sub Agent Access
+```clojure
+aor/agent-client agent-node "ToolsAgent")
+```
+Obtain an Agent Client for a sub-agent, so it can be invoked
+
+
 ## State Access
 
 ### Persistent Stores
@@ -106,4 +113,8 @@ Retrieve shared resources with automatic lifecycle management and connection poo
 
 ## Execution Model
 
-Nodes execute asynchronously on distributed tasks via virtual thread pools with automatic retry mechanisms, ordered emission processing, and comprehensive instrumentation for monitoring and debugging. State changes are transactional and resources are automatically managed throughout the execution lifecycle.
+Nodes execute asynchronously on distributed tasks via virtual thread
+pools with automatic retry mechanisms, ordered emission processing, and
+comprehensive instrumentation for monitoring and debugging. State
+changes are transactional and resources are automatically managed
+throughout the execution lifecycle.

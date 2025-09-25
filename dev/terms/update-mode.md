@@ -1,16 +1,17 @@
 # Update Mode
 
 ## Definition
-Configuration controlling agent graph behavior during definition updates.
+Configuration controlling agent graph behavior during module updates.
 
 ## Architecture Role
-Version control for agent graphs. Determines how running agents handle graph definition changes.
+Control of executing agent invocation behavior on module
+update. Determines how running agents handle graph definition changes.
 
 ## Operations
 - `set-update-mode` - Configure behavior
-- CONTINUE - Keep running with old graph
-- RESTART - Restart with new graph
-- DROP - Terminate execution
+- CONTINUE - Suspend invocation on old graph, and continue it on new graph
+- RESTART - Restart invocation with new graph
+- DROP - Terminate and drop invocation
 
 ## Invariants
 - Set per agent graph
