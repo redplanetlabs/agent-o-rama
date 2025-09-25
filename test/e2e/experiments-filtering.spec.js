@@ -35,13 +35,46 @@ const testCases = [
   { name: 'Latest - All Examples', snapshot: 'Latest (Working Copy)', selectorType: 'all', expectedCount: 5 },
   { name: 'Latest - Tag B', snapshot: 'Latest (Working Copy)', selectorType: 'tag', selectorTag: 'tag-b', expectedCount: 2 },
   { name: 'Latest - Tag C', snapshot: 'Latest (Working Copy)', selectorType: 'tag', selectorTag: 'tag-c', expectedCount: 2 },
+  { name: 'Latest - Selected Examples (A & D)', snapshot: 'Latest (Working Copy)', selectorType: 'selected', selectedExamples: ['A', 'D'], expectedCount: 2 },
 ];
 
 // =============================================================================
-// HELPER FUNCTION FOR RUNNING EXPERIMENTS
+// HELPER FUNCTIONS FOR EXPERIMENTS
 // =============================================================================
 
-async function runAndVerifyExperiment(page, { experimentName, snapshot, selectorType, selectorTag, expectedCount, module_id, dataset_id }) {
+async function selectExamplesInUI(page, { snapshot, selectedExamples }) {
+  console.log(`Selecting examples: ${selectedExamples.join(', ')} in snapshot: ${snapshot}`);
+  
+  // Navigate to examples tab
+  await page.getByRole('link', { name: 'Examples' }).click();
+  
+  // Select the correct snapshot
+  await page.getByRole('button', { name: /Latest|v1\.0/ }).click();
+  if (snapshot === 'Latest (Working Copy)') {
+    await page.getByText('Latest (Working Copy)', { exact: true }).click();
+  } else {
+    await page.getByText(snapshot, { exact: true }).click();
+  }
+  
+  // Wait for examples to load
+  await expect(page.locator('table tbody tr')).toHaveCount(selectedExamples.length >= 3 ? 5 : 3);
+  
+  // Select specific examples by clicking their checkboxes
+  for (const exampleInput of selectedExamples) {
+    // Find the row containing this example input and click its checkbox
+    const exampleRow = page.locator('table tbody tr').filter({ hasText: exampleInput });
+    await expect(exampleRow).toBeVisible();
+    await exampleRow.locator('td').first().click(); // Click the checkbox cell
+    console.log(`Selected example: ${exampleInput}`);
+  }
+  
+  // Verify the contextual action bar appears
+  const actionBar = page.locator('div').filter({ hasText: `${selectedExamples.length} example` });
+  await expect(actionBar).toBeVisible();
+  console.log(`Selection confirmed: ${selectedExamples.length} examples selected`);
+}
+
+async function runAndVerifyExperiment(page, { experimentName, snapshot, selectorType, selectorTag, selectedExamples, expectedCount, module_id, dataset_id }) {
   console.log(`--- Running Experiment: "${experimentName}" ---`);
   
   await page.getByRole('button', { name: 'Run New Experiment' }).click();
@@ -66,6 +99,10 @@ async function runAndVerifyExperiment(page, { experimentName, snapshot, selector
     await modal.getByLabel('Only examples with tag:').check();
     await modal.getByPlaceholder('e.g., hard-case').fill(selectorTag);
     console.log(`Selected tag: ${selectorTag}`);
+  } else if (selectorType === 'selected') {
+    // For selected examples, the radio button should already be enabled since examples are pre-selected
+    await modal.getByLabel(/Only the \d+ selected examples/).check();
+    console.log(`Selected examples option chosen (${selectedExamples.length} examples)`);
   } else {
     await modal.getByLabel('All examples in snapshot').check();
     console.log('Selected all examples.');
@@ -187,20 +224,45 @@ test.describe('Experiment Filtering with Tags and Snapshots', () => {
     console.log('--- PHASE 2: RUNNING ALL EXPERIMENTS ---');
     
     for (const tc of testCases) {
-      // Navigate to the correct experiments page before each experiment
+      // Navigate to the correct dataset page before each experiment
       await page.goto('/');
       const agentRow = await getBasicAgentRow(page);
       await agentRow.click();
       await page.getByText('Datasets & Experiments').click();
       await page.getByRole('link', { name: datasetName }).click();
-      await page.getByRole('link', { name: 'Experiments', exact: true }).click();
-      await expect(page.getByRole('heading', { name: 'Experiments', level: 2 })).toBeVisible();
+      
+      // If this is a "selected" test case, we need to select examples first
+      if (tc.selectorType === 'selected') {
+        await selectExamplesInUI(page, {
+          snapshot: tc.snapshot,
+          selectedExamples: tc.selectedExamples
+        });
+        
+        // Verify selection persists when switching to experiments tab
+        await page.getByRole('link', { name: 'Experiments', exact: true }).click();
+        await expect(page.getByRole('heading', { name: 'Experiments', level: 2 })).toBeVisible();
+        
+        // Switch back to examples tab to verify selection is still there
+        await page.getByRole('link', { name: 'Examples' }).click();
+        const actionBar = page.locator('div').filter({ hasText: `${tc.selectedExamples.length} example` });
+        await expect(actionBar).toBeVisible();
+        console.log('✓ Selection persisted across tab switches');
+        
+        // Now go back to experiments tab for the actual test
+        await page.getByRole('link', { name: 'Experiments', exact: true }).click();
+        await expect(page.getByRole('heading', { name: 'Experiments', level: 2 })).toBeVisible();
+      } else {
+        // For non-selection tests, go directly to experiments tab
+        await page.getByRole('link', { name: 'Experiments', exact: true }).click();
+        await expect(page.getByRole('heading', { name: 'Experiments', level: 2 })).toBeVisible();
+      }
 
       await runAndVerifyExperiment(page, {
         experimentName: tc.name,
         snapshot: tc.snapshot,
         selectorType: tc.selectorType,
         selectorTag: tc.selectorTag,
+        selectedExamples: tc.selectedExamples,
         expectedCount: tc.expectedCount,
         module_id: module_id,
         dataset_id: dataset_id,

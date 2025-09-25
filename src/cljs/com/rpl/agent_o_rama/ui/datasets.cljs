@@ -774,8 +774,6 @@
 
         examples (get data :examples)]
 
-;; Clear selections when navigating to a different dataset (not on every tab switch)
-
     ($ :div.h-full.flex.flex-col
        ;; Examples Tab Header with Controls
        ($ :div.bg-gray-50.border-b.border-gray-200.px-6.py-4
