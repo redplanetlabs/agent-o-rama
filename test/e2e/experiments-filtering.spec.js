@@ -68,7 +68,7 @@ async function runAndVerifyExperiment(page, { experimentName, snapshot, selector
 
   // Configure Target Agent
   await modal.getByRole('button', { name: /Select an agent/ }).click();
-  await page.getByText(agentToRun, { exact: true }).click();
+  await modal.getByText(agentToRun, { exact: true }).click();
   await modal.locator('div').filter({ hasText: /^Input Mappings/ }).getByRole('textbox').fill('$');
   
   // Select Evaluator
@@ -96,7 +96,7 @@ async function runAndVerifyExperiment(page, { experimentName, snapshot, selector
 
   // 4. Navigate back to the experiments list
   await page.getByText('Back').click();
-  await expect(page.getByRole('heading', { name: 'Experiments' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Experiments', level: 2 })).toBeVisible();
   console.log(`--- Finished Experiment: "${experimentName}" ---`);
 }
 
@@ -189,7 +189,7 @@ test.describe('Experiment Filtering with Tags and Snapshots', () => {
       await page.getByText('Datasets & Experiments').click();
       await page.getByRole('link', { name: datasetName }).click();
       await page.getByRole('link', { name: 'Experiments', exact: true }).click();
-      await expect(page.getByRole('heading', { name: 'Experiments' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Experiments', level: 2 })).toBeVisible();
 
       await runAndVerifyExperiment(page, {
         experimentName: tc.name,
