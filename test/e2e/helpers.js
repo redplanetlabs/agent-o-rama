@@ -20,6 +20,25 @@ export async function getResearchAgentRow(page) {
 }
 
 /**
+ * Gets the agent row for the BasicAgentModule.
+ * @param {import('@playwright/test').Page} page - The Playwright page object.
+ * @returns {Promise<import('@playwright/test').Locator>} The agent row locator.
+ */
+export async function getBasicAgentRow(page) {
+  const moduleNs = 'com.rpl.agent.basic.basic-agent';
+  const moduleName = 'BasicAgentModule';
+  const agentName = 'BasicAgent';
+
+  const agentRow = page.locator('table tbody tr').filter({ hasText: moduleNs }).filter({ hasText: moduleName }).filter({ hasText: agentName });
+
+  // Wait up to 30 seconds for agents to appear on first load.
+  await expect(agentRow).toBeVisible({ timeout: 30000 });
+  console.log(`Found agent: ${moduleNs}/${moduleName}:${agentName}`);
+
+  return agentRow;
+}
+
+/**
  * Creates an evaluator via the UI.
  * @param {import('@playwright/test').Page} page - The Playwright page object.
  * @param {Object} options - The evaluator creation options.
@@ -69,10 +88,10 @@ export async function createEvaluator(page, { name, builderName, description, pa
 /**
  * Adds an example to the currently viewed dataset.
  * @param {import('@playwright/test').Page} page - The Playwright page object.
- * @param {Object} example - An object with `input` and optional `output`.
+ * @param {Object} example - An object with `input`, optional `output`, and optional `tags` array.
  */
-export async function addExample(page, { input, output }) {
-  console.log('Adding example with input:', JSON.stringify(input));
+export async function addExample(page, { input, output, tags }) {
+  console.log('Adding example with input:', JSON.stringify(input), 'tags:', tags);
   // Click the first enabled Add Example button
   await page.locator('button').filter({ hasText: 'Add Example' }).filter({ hasNot: page.locator('[disabled]') }).first().click();
 
@@ -83,13 +102,22 @@ export async function addExample(page, { input, output }) {
   if (output !== undefined) {
     await modal.getByLabel('Output (JSON, Optional)').fill(JSON.stringify(output, null, 2));
   }
+
+  if (tags && tags.length > 0) {
+    // Add tags one by one
+    for (const tag of tags) {
+      await modal.getByPlaceholder('Add tag...').fill(tag);
+      await modal.getByPlaceholder('Add tag...').press('Enter');
+    }
+  }
   
   await modal.getByRole('button', { name: 'Add Example' }).click();
 
   await expect(modal).not.toBeVisible({ timeout: 15000 });
-  // Find the row that contains our input ID (JSON gets truncated in the table)
-  const rowWithId = page.locator('table tbody tr').filter({ hasText: input.id });
-  await expect(rowWithId).toBeVisible({ timeout: 10000 });
+  // For examples with input as string, look for the string value in the table
+  const inputValue = typeof input === 'string' ? input : (input.id || JSON.stringify(input));
+  const rowWithInput = page.locator('table tbody tr').filter({ hasText: inputValue });
+  await expect(rowWithInput).toBeVisible({ timeout: 10000 });
   console.log('Successfully added example.');
 }
 
