@@ -25,15 +25,14 @@ export async function getResearchAgentRow(page) {
  * @returns {Promise<import('@playwright/test').Locator>} The agent row locator.
  */
 export async function getBasicAgentRow(page) {
-  const moduleNs = 'com.rpl.agent.basic.basic-agent';
-  const moduleName = 'BasicAgentModule';
-  const agentName = 'BasicAgent';
-
-  const agentRow = page.locator('table tbody tr').filter({ hasText: moduleNs }).filter({ hasText: moduleName }).filter({ hasText: agentName });
+  // Target the specific row by its exact role name
+  const agentRow = page.getByRole('row', { 
+    name: 'com.rpl.agent.basic.basic-agent/BasicAgentModule BasicAgent' 
+  });
 
   // Wait up to 30 seconds for agents to appear on first load.
   await expect(agentRow).toBeVisible({ timeout: 30000 });
-  console.log(`Found agent: ${moduleNs}/${moduleName}:${agentName}`);
+  console.log('Found BasicAgent row');
 
   return agentRow;
 }
