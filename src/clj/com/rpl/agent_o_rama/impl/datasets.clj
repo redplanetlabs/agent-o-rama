@@ -47,6 +47,8 @@
     RemoveDatasetSnapshot
     UpdateDatasetExample
     UpdateDatasetProperty]
+   [java.io
+    Writer]
    [java.util
     Collections
     LinkedHashSet
@@ -559,7 +561,7 @@
 
    Lines written like:
      {\"input\": <json>, \"output\": <json optional>, \"tags\": [\"...\"] optional}"
-  [^AgentManager manager dataset-id snapshot-name writer failure-callback]
+  [^AgentManager manager dataset-id snapshot-name ^Writer writer failure-callback]
   (let [{:keys [search-examples-query multi-examples-query]}
         (aor-types/underlying-objects manager)
         mapper (j/object-mapper)]
