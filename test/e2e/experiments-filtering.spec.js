@@ -51,13 +51,14 @@ async function selectExamplesInUI(page, { snapshot, selectedExamples }) {
   // Select the correct snapshot
   await page.getByRole('button', { name: /Latest|v1\.0/ }).click();
   if (snapshot === 'Latest (Working Copy)') {
-    await page.getByText('Latest (Working Copy)', { exact: true }).click();
+    await page.getByTestId('snapshot-option-latest').click();
   } else {
-    await page.getByText(snapshot, { exact: true }).click();
+    await page.getByTestId(`snapshot-option-${snapshot}`).click();
   }
   
-  // Wait for examples to load
-  await expect(page.locator('table tbody tr')).toHaveCount(selectedExamples.length >= 3 ? 5 : 3);
+  // Wait for examples to load - number depends on which snapshot is selected
+  const expectedExampleCount = snapshot === 'Latest (Working Copy)' ? 5 : 3;
+  await expect(page.locator('table tbody tr')).toHaveCount(expectedExampleCount);
   
   // Select specific examples by clicking their checkboxes
   for (const exampleInput of selectedExamples) {
@@ -197,7 +198,7 @@ test.describe('Experiment Filtering with Tags and Snapshots', () => {
     
     // Switch back to "Latest" to add more examples
     await page.getByRole('button', { name: snapshotName }).click();
-    await page.getByText('Latest (Working Copy)', { exact: true }).click();
+    await page.getByTestId('snapshot-option-latest').click();
     await expect(page.getByRole('button', { name: /Latest/ })).toBeVisible();
 
     // Add last 2 examples
