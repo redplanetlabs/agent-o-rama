@@ -774,11 +774,7 @@
 
         examples (get data :examples)]
 
-    ;; Clear selections when dataset changes
-    (uix/use-effect
-     (fn []
-       #(state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}]))
-     [dataset-id])
+;; Clear selections when navigating to a different dataset (not on every tab switch)
 
     ($ :div.h-full.flex.flex-col
        ;; Examples Tab Header with Controls

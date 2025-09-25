@@ -275,6 +275,10 @@
         selector-type-field (forms/use-form-field form-id [:selector :type])
         selector-tag-field (forms/use-form-field form-id [:selector :tag])
 
+        ;; Get selected examples from global state
+        selected-example-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
+        selection-count (count selected-example-ids)
+
         ;; Target config fields
         form (forms/use-form form-id)
         spec-type (get-in form [:spec :type])
@@ -329,7 +333,21 @@
                         {:value (:value selector-tag-field)
                          :on-change (:on-change selector-tag-field)
                          :error (:error selector-tag-field)
-                         :placeholder "e.g., hard-case"}))))))
+                         :placeholder "e.g., hard-case"})))
+                ;; NEW: Add the "Selected examples" option
+                ($ :div.flex.items-center
+                   ($ :input.h-4.w-4.border-gray-300.text-indigo-600.focus:ring-indigo-500
+                      {:type "radio" :id "selected-examples" :name "selector-type"
+                       :checked (= (:value selector-type-field) :example-ids)
+                       :disabled (zero? selection-count) ;; Disable if nothing is selected
+                       :on-change #((:on-change selector-type-field) :example-ids)})
+                   ($ :label.ml-3.block.text-sm.text-gray-700
+                      {:htmlFor "selected-examples"
+                       :className (when (zero? selection-count) "text-gray-400 cursor-not-allowed")
+                       :title (when (zero? selection-count) "Select examples from the list to enable this option.")}
+                      (if (pos? selection-count)
+                        (str "Only the " selection-count " selected examples")
+                        "Only selected examples (none selected)"))))))
 
        ;; Target Configuration Section
        ($ :div.mb-8
@@ -423,8 +441,16 @@
     (println "form-state" form-state)
     (let [{:keys [form-id module-id dataset-id spec]} form-state
           spec-type (get spec :type)
-      ;; Convert input->args back to simple strings for the backend
-          cleaned-form-state (update-in form-state [:spec :targets]
+          ;; Get selected IDs from the DB at submission time
+          selected-ids (get-in db [:ui :datasets :selected-examples dataset-id])
+
+          ;; Add selected IDs to the selector if that option was chosen
+          form-with-selection (if (= (get-in form-state [:selector :type]) :example-ids)
+                                (assoc-in form-state [:selector :example-ids] (vec selected-ids))
+                                form-state)
+
+          ;; Convert input->args back to simple strings for the backend
+          cleaned-form-state (update-in form-with-selection [:spec :targets]
                                         (fn [targets]
                                           (mapv (fn [target]
                                                   (update target :input->args (fn [args] (mapv :value args))))
