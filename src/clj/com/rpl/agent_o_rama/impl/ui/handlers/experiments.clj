@@ -34,8 +34,7 @@
     (case (:type selector)
       :tag (aor-types/->TagSelector (:tag selector))
       :example-ids (aor-types/->ExampleIdsSelector
-                    (mapv #(UUID/fromString %)
-                          (:example-ids selector)))
+                    (:example-ids selector))
       nil)))
 
 (defn- parse-target [t]
