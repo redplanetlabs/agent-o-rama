@@ -4,7 +4,8 @@
 Client-side subscription receiving streaming data from agent nodes.
 
 ## Architecture Role
-Real-time data pipeline from agents to clients. Enables monitoring, progress tracking, and incremental results delivery.
+Real-time data pipeline from agents to clients. Enables monitoring,
+progress tracking, and incremental results delivery.
 
 ## Operations
 Subscribe to stream:
@@ -21,12 +22,18 @@ Subscribe to stream:
 ## Key Clojure API
 - Primary functions: `agent-stream`, `agent-stream-specific`, `agent-stream-all`
 - Creation: `(agent-stream client invoke callback)`
-- Access: Callback invocation
+- Access: Callback invocation - must handle `reset?` argument when
+  stream is reset because of a retry of the node.  Use
+  `agent-stream-reset-info` to get the reset count.
 
 ## Key Java API
 - Primary functions: `stream()`, `streamSpecific()`, `streamAll()`
-- Creation: `agentClient.stream(invoke, callback)`
-- Access: Via callback interface
+- Creation: `agentClient.stream(invoke, callback)` returns `AgentStream`.
+  `agentClient.streamAll(invoke, callback)` returns `AgentStreamByInvoke`.
+- Access: Via callback interface - must handle `isReset` argument of
+  `AgentClient$StreamCallback.onUpdate` when stream is reset because of
+  a retry of the node. Use `AgentStream.numResets` or
+  `AgentStreamByInvoke.numResetsByInvoke` to get the reset count.
 
 ## Relationships
 - Uses: [Agent Invoke](agent-invoke.md), [Streaming Chunk](streaming-chunk.md)
