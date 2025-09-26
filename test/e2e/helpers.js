@@ -144,7 +144,7 @@ export async function addExample(page, { input, output, tags }) {
     // Just verify the example was created - target the input column (second td)
     const inputValue = typeof input === 'string' ? input : (input.id || JSON.stringify(input));
     const rowWithInput = page.locator('table tbody tr').filter({ 
-      has: page.locator('td').nth(1).getByText(inputValue, { exact: true })
+      has: page.locator('td').nth(1).getByText(inputValue)
     });
     await expect(rowWithInput).toBeVisible({ timeout: 10000 });
   }
