@@ -318,7 +318,7 @@
              :onClick #(.stopPropagation %)
              :className (common/cn
                          "inline-flex items-center gap-1.5 px-2.5 py-1 "
-                         "bg-indigo-100 text-indigo-700 rounded-full "
+                         "bg-indigo-100 text-indigo-700 rounded-sm "
                          "text-xs font-medium "
                          "hover:bg-indigo-200 hover:text-indigo-800 transition-colors shadow-sm")}
          ($ ArrowTopRightOnSquareIcon {:className "h-3.5 w-3.5"})
