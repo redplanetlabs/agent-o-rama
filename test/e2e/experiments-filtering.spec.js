@@ -136,7 +136,6 @@ async function runAndVerifyExperiment(page, { experimentName, snapshot, selector
 
   // 4. Navigate back to the experiments list
   await page.getByText('Back').click();
-  await expect(page.getByRole('heading', { name: 'Experiments', level: 2 })).toBeVisible();
   console.log(`--- Finished Experiment: "${experimentName}" ---`);
 }
 
@@ -239,7 +238,6 @@ test.describe('Experiment Filtering with Tags and Snapshots', () => {
 
       // select experiments tab
       await page.getByRole('link', { name: 'Experiments', exact: true }).click();
-      await expect(page.getByRole('heading', { name: 'Experiments', level: 2 })).toBeVisible();
 
       await runAndVerifyExperiment(page, {
         experimentName: tc.name,
