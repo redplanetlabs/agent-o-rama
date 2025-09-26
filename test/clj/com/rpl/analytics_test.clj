@@ -991,8 +991,8 @@
                   {:action-name "action1" :agent-name "foo" :node-name nil :type :agent}
                   [{"concise?" true}]]]))
 
-
-         ;; time is 51000
+         ;; sanity check
+         (is (= 51000 (h/current-time-millis)))
 
          (ana/add-rule!
           global-actions-depot
@@ -1080,6 +1080,8 @@
          (is (= {0.1 4} (frequencies @sample-rates)))
          (is (= [] @ACTIONS))
          (cycle!)
+         ;; this is rule dependent on eval2 which is dependent on eval1, which is why it takes 3
+         ;; iters
          (is (= {0.7 2} (frequencies @sample-rates)))
          (is (= 2 (count @ACTIONS)))
          (is (= (set @ACTIONS)
