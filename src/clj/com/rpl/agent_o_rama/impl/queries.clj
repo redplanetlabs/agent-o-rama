@@ -923,18 +923,18 @@
 (defn declare-get-action-log-page-topology
   [topologies agent-name]
   (let [pstate-name (po/action-log-task-global-name)]
-  (<<query-topology topologies
-    (action-log-page-name agent-name)
-    [*rule-name *page-size *pagination-params :> *res]
-    (get-distributed-page* *page-size
-                           *pagination-params
-                           pstate-name
-                           *res
-                           action-log-info
-                           to-action-log-page-result
-                           h/max-uuid
-                           (seg# keypath agent-name *rule-name))
-  )))
+    (<<query-topology topologies
+      (action-log-page-name agent-name)
+      [*rule-name *page-size *pagination-params :> *res]
+      (get-distributed-page* *page-size
+                             *pagination-params
+                             pstate-name
+                             *res
+                             action-log-info
+                             to-action-log-page-result
+                             h/max-uuid
+                             (keypath agent-name *rule-name))
+    )))
 
 ;; direct queries on PStates
 

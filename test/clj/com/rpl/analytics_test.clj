@@ -1092,6 +1092,11 @@
 
 
 
+
+         ;; TODO: <<<<>>>> check action logs
+         (clojure.pprint/pprint
+          (foreign-invoke-query foo-action-log "foo-a3" 10 nil))
+
          ;; TODO: <<<<>>>>> do java ones
          ;;   - can only verify those through action logs
 
@@ -1101,9 +1106,6 @@
 
 
 
-
-         ;; TODO: <<<<>>>> check action logs
-         ;;   - foo-action-log
 
 
 
