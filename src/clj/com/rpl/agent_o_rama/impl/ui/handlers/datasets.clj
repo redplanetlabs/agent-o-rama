@@ -56,13 +56,13 @@
                           pagination)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-example
-  [{:keys [manager dataset-id snapshot-name input output]} uid]
-  ;; No parsing needed! The data is already in the correct format.
+  [{:keys [manager dataset-id snapshot-name input output tags]} uid]
   (aor/add-dataset-example! manager
                             dataset-id
                             input
                             {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)
-                             :reference-output output})
+                             :reference-output output
+                             :tags (set tags)})
   {:status :ok})
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-snapshot-names

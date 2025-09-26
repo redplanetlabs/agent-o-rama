@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.datasets
   (:require
    [uix.core :as uix :refer [defui defhook $]]
-   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon XMarkIcon LockClosedIcon InformationCircleIcon]]
+   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon XMarkIcon LockClosedIcon InformationCircleIcon DocumentDuplicateIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.sente :as sente]
@@ -555,6 +555,29 @@
                                                                                                                  :example example})}]))}
                                        ($ PlayIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                        "Try with evaluator")
+                                    ;; Duplicate button
+                                    ($ :button
+                                       {:className "group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
+                                        :onClick (fn [e]
+                                                   (.stopPropagation e)
+                                                   (set-open-dropdown nil) ; Close dropdown
+                                                   (sente/request!
+                                                    [:datasets/add-example
+                                                     {:module-id module-id
+                                                      :dataset-id dataset-id
+                                                      :snapshot-name snapshot-name
+                                                      ;; Pass the data from the current example
+                                                      :input (:input example)
+                                                      :output (:reference-output example)
+                                                      :tags (vec (:tags example))}] ;; Pass tags as well
+                                                    10000
+                                                    (fn [reply]
+                                                      (if (:success reply)
+                                                        ;; Invalidate query to refresh the list with the new example
+                                                        (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                                        (js/alert (str "Error duplicating example: " (:error reply)))))))}
+                                       ($ DocumentDuplicateIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
+                                       "Duplicate")
                                     ;; Delete button
                                     ($ :button
                                        {:className "group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-red-100 hover:text-red-800 cursor-pointer"
