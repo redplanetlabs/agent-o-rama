@@ -106,7 +106,7 @@ public class TestSnippets {
 
   public static void declareActionBuilders(AgentTopology topology) {
     topology.declareActionBuilder("action3", "a 3rd one", (Map<String, String> params) -> {
-      return (AgentObjectFetcher fetcher, String input, Object output, RunInfo info) -> {
+      return (AgentObjectFetcher fetcher, List<Object> input, Object output, RunInfo info) -> {
         Map ret = new HashMap();
         ret.put("input", input);
         ret.put("output", output);
@@ -114,7 +114,7 @@ public class TestSnippets {
       };
     });
     topology.declareActionBuilder("action4", "a 4th one", (Map<String, String> params) -> {
-      return (AgentObjectFetcher fetcher, Object input, String output, RunInfo info) -> {
+      return (AgentObjectFetcher fetcher, List<String> input, String output, RunInfo info) -> {
         Map ret = new HashMap();
         ret.put("input", input);
         ret.put("output", output);

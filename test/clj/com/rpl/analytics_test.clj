@@ -1017,7 +1017,7 @@
                                 (aor-types/->FeedbackFilter "eval2"
                                                             "concise?"
                                                             (aor-types/->ComparatorSpec := true))
-                                (aor-types/->InputMatchFilter "$" #"a")])
+                                (aor-types/->InputMatchFilter "$[0]" #"a")])
            :sampling-rate     0.7
            :start-time-millis 50000
            :include-failures? false
@@ -1060,6 +1060,25 @@
          (cycle!)
          (is (= {} (frequencies @sample-rates)))
          (is (= [] @ACTIONS))
+
+         (bind inv1 (aor/agent-initiate foo "dcba"))
+         (is (= "dcba!?" (aor/agent-result foo inv1)))
+         (bind inv2 (aor/agent-initiate foo "aaaaaaa"))
+         (is (= "aaaaaaa!?" (aor/agent-result foo inv2)))
+         (bind inv3 (aor/agent-initiate foo "...."))
+         (is (= "....!?" (aor/agent-result foo inv3)))
+         (bind inv4 (aor/agent-initiate foo "aaaa"))
+         (is (= "aaaa!?" (aor/agent-result foo inv4)))
+         (cycle!)
+         ;; TODO: <<<<>>>>
+         (is (= {0.1 1 0.5 1 0.8 1 0.9 1} (frequencies @sample-rates)))
+         (println "AAA" @ACTIONS)
+         (cycle!)
+         (println "SSS" (frequencies @sample-rates))
+         (println "BBB" @ACTIONS)
+         (cycle!)
+         (println "SSS" (frequencies @sample-rates))
+         (println "CCC" @ACTIONS)
 
 
 

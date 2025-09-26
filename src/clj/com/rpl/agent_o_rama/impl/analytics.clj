@@ -470,9 +470,13 @@
    (action-target-pstate *agent-name *node-name :> $$p)
    (scan-amt :> *scan-amt)
    (po/agent-node-executor-task-global :> *node-exec)
+   (<<ramafn %add-run-type
+     [*m]
+     (:> (assoc (into {} *m) :run-type (ifexpr (some? *node-name) :node :agent))))
    (local-select> [(sorted-map-range-from *offset *scan-amt)
                    (sorted-map-range *offset *end-offset)
-                   (view complete-node-map *node-name *node-exec)]
+                   (view complete-node-map *node-name *node-exec)
+                   (transformed MAP-VALS %add-run-type)]
                   $$p
                   :> *m)
    (local-transform> [(keypath *agent-name *rule-name)
@@ -525,6 +529,12 @@
   [{:keys [start-time-millis finish-time-millis]}]
   (when (and start-time-millis finish-time-millis)
     (- finish-time-millis start-time-millis)))
+
+(defn maybe-to-clojure-map
+  [o]
+  (cond (map? o) o
+        (instance? java.util.Map o) (into {} o)
+        :else o))
 
 (deframaop run-actions!
   [*items *agent->rule->info *cache-pstate-name]
@@ -580,7 +590,7 @@
    (aor-types/->valid-ActionLog *action-start-time-millis
                                 *action-finish-time-millis
                                 *success?
-                                *info-map
+                                (maybe-to-clojure-map *info-map)
                                 :> *action-log)
    (local-transform> [(keypath *agent-name *rule-name) AFTER-ELEM (termval *action-log)]
                      $$action-log)
