@@ -430,6 +430,15 @@
   [sampling-rate]
   (< (rand) sampling-rate))
 
+(def +min-uuid
+  (combiner
+   (fn [v1 v2]
+     (cond
+       (nil? v1) v2
+       (nil? v2) v1
+       (< (compare v1 v2) 0) v1
+       :else v2))))
+
 (deframaop find-qualified-offsets
   [*agent->rule->info *cache-pstate-name]
   (<<with-substitutions
@@ -447,7 +456,7 @@
    (<<batch
      (ops/explode *dependency-names :> *dname)
      (select> [(keypath *dname) :cursors (keypath *task-id)] *rule->info :> *other-offset)
-     (aggs/+min *other-offset :> *dep-end-offset))
+     (+min-uuid *other-offset :> *dep-end-offset))
    (|direct *task-id)
    (all-action-builders :> *action-builders)
    (get *action-builders *action-name :> {:keys [*builder-fn]})

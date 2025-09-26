@@ -875,6 +875,8 @@
          (bind cycle!
            (fn []
              (reset! TICKS 0)
+             (reset! sample-rates [])
+             (reset! ACTIONS [])
              (foreign-append! ana-depot nil)
              (is (condition-attained? (> @TICKS 0)))
              (rtest/pause-microbatch-topology! ipc
@@ -889,6 +891,11 @@
                                 "concise5"
                                 "aor/conciseness"
                                 {"threshold" "5"}
+                                "")
+         (aor/create-evaluator! agent-manager
+                                "concise7"
+                                "aor/conciseness"
+                                {"threshold" "7"}
                                 "")
 
          (ana/add-rule! global-actions-depot
@@ -940,8 +947,6 @@
                     :eval-name)))
 
          (is (= [0.5 0.5] @sample-rates))
-         (reset! sample-rates [])
-
 
          (ana/add-rule!
           global-actions-depot
@@ -979,14 +984,94 @@
                   {:action-name "action1" :agent-name "foo" :node-name nil :type :agent}
                   [{"concise?" true}]]]))
 
-         (reset! sample-rates [])
-         (reset! ACTIONS [])
          (cycle!)
          (is (= [1.0] @sample-rates))
          (is (= @ACTIONS
                 [[:action1 ["."] ".!?"
                   {:action-name "action1" :agent-name "foo" :node-name nil :type :agent}
                   [{"concise?" true}]]]))
+
+
+         ;; time is 51000
+
+         (ana/add-rule! global-actions-depot
+                        "eval2"
+                        "foo"
+                        {:action-name       "aor/eval"
+                         :action-params     {"name" "concise7"}
+                         :filter            (aor-types/->AndFilter [])
+                         :sampling-rate     0.1
+                         :start-time-millis 50000
+                         :include-failures? false
+                        })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a2"
+          "foo"
+          {:action-name       "action2"
+           :action-params     {"a2" "XYZ"}
+           :filter            (aor-types/->AndFilter
+                               [(aor-types/->FeedbackFilter "eval1"
+                                                            "concise?"
+                                                            (aor-types/->ComparatorSpec := false))
+                                (aor-types/->FeedbackFilter "eval2"
+                                                            "concise?"
+                                                            (aor-types/->ComparatorSpec := true))
+                                (aor-types/->InputMatchFilter "$" #"a")])
+           :sampling-rate     0.7
+           :start-time-millis 50000
+           :include-failures? false
+          })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a3"
+          "foo"
+          {:action-name       "action3"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.8
+           :start-time-millis 50000
+           :include-failures? false
+          })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a4"
+          "foo"
+          {:action-name       "action4"
+           :action-params     {"jparam1" "ZZZ"}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.9
+           :start-time-millis 50000
+           :include-failures? false
+          })
+
+
+         (bind inv (aor/agent-initiate foo "aaaa"))
+         (is (= "aaaa!?" (aor/agent-result foo inv)))
+
+         (reset! sample-atom false)
+         (cycle!)
+         (is (= {0.1 1 0.5 1 0.8 1 0.9 1} (frequencies @sample-rates)))
+         (is (= [] @ACTIONS))
+         (reset! sample-atom true)
+         (cycle!)
+         (is (= {} (frequencies @sample-rates)))
+         (is (= [] @ACTIONS))
+         (cycle!)
+         (is (= {} (frequencies @sample-rates)))
+         (is (= [] @ACTIONS))
+
+
+
+         ;; TODO: <<<<>>>>> do java ones
+         ;;   - can only verify those through action logs
+
+
+         ;; TODO: <<<<>>>> deleting a rule is not deleting its cursors
+         ;;   - can clean those up in microbatch
+
+
+
 
          ;; TODO: <<<<>>>> check action logs
          ;;   - need query topology first
