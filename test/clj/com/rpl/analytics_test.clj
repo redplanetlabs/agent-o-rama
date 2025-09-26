@@ -799,8 +799,11 @@
              (fn [params]
                (fn [fetcher input output run-info]
                  (swap! ACTIONS conj
-                   [:action1 input output
-                    (select-keys run-info [:action-name :agent-name :node-name :type])])
+                   [:action1
+                    input
+                    output
+                    (select-keys run-info [:action-name :agent-name :node-name :type])
+                    (select [:feedback ALL :scores] run-info)])
                  {"abc" "ccc"
                   "xyz" "..."}
                )))
@@ -862,6 +865,13 @@
                            module-name
                            (po/agent-root-task-global-name "bar")))
 
+         (bind foo-feedback
+           (fn [{:keys [task-id agent-invoke-id]}]
+             (foreign-select-one [(keypath agent-invoke-id) :feedback :results]
+                                 foo-root
+                                 {:pkey task-id})
+           ))
+
          (bind cycle!
            (fn []
              (reset! TICKS 0)
@@ -888,32 +898,114 @@
                          :action-params     {"name" "concise5"}
                          :filter            (aor-types/->AndFilter [])
                          :sampling-rate     0.5
-                         :start-time-millis 0
+                         :start-time-millis 15000
+                         :include-failures? false
                         })
 
 
-         (bind {:keys [agent-invoke-id task-id] :as inv} (aor/agent-initiate foo "ab"))
-         (is (= "ab!?" (aor/agent-result foo inv)))
+         (bind inv1 (aor/agent-initiate foo "ab"))
+         (bind inv2 (aor/agent-initiate foo ".."))
+         (bind inv3 (aor/agent-initiate foo "abcd"))
+         (bind inv4 (aor/agent-initiate foo ".."))
+         (is (= "ab!?" (aor/agent-result foo inv1)))
+         (is (= "..!?" (aor/agent-result foo inv2)))
+         (is (= "abcd!?" (aor/agent-result foo inv3)))
+         (is (= "..!?" (aor/agent-result foo inv4)))
 
          (cycle!)
 
-         (println
-          "RES"
-          (foreign-select-one [(keypath agent-invoke-id) :feedback] foo-root {:pkey task-id}))
+         (is (nil? (foo-feedback inv1)))
+         (is (nil? (foo-feedback inv2)))
+         (bind fb (foo-feedback inv3))
+         (is (= 1 (count fb)))
+         (is (= {"concise?" false}
+                (-> fb
+                    first
+                    :scores)))
+         (is (= "concise5"
+                (-> fb
+                    first
+                    :source
+                    :eval-name)))
+
+         (bind fb (foo-feedback inv4))
+         (is (= {"concise?" true}
+                (-> fb
+                    first
+                    :scores)))
+         (is (= "concise5"
+                (-> fb
+                    first
+                    :source
+                    :eval-name)))
+
+         (is (= [0.5 0.5] @sample-rates))
+         (reset! sample-rates [])
+
+
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a1"
+          "foo"
+          {:action-name       "action1"
+           :action-params     {}
+           :filter            (aor-types/->FeedbackFilter "eval1"
+                                                          "concise?"
+                                                          (aor-types/->ComparatorSpec := true))
+           :sampling-rate     1.0
+           :start-time-millis 0
+           :include-failures? false
+          })
+
+
+         (bind inv5 (aor/agent-initiate foo "."))
+         (is (= ".!?" (aor/agent-result foo inv5)))
+
+         (cycle!)
+
+         (bind fb (foo-feedback inv5))
+         (is (= {"concise?" true}
+                (-> fb
+                    first
+                    :scores)))
+         (is (= "concise5"
+                (-> fb
+                    first
+                    :source
+                    :eval-name)))
+         (is (= {0.5 1 1.0 1} (frequencies @sample-rates)))
+         (is (= @ACTIONS
+                [[:action1 [".."] "..!?"
+                  {:action-name "action1" :agent-name "foo" :node-name nil :type :agent}
+                  [{"concise?" true}]]]))
+
+         (reset! sample-rates [])
+         (reset! ACTIONS [])
+         (cycle!)
+         (is (= [1.0] @sample-rates))
+         (is (= @ACTIONS
+                [[:action1 ["."] ".!?"
+                  {:action-name "action1" :agent-name "foo" :node-name nil :type :agent}
+                  [{"concise?" true}]]]))
+
+         ;; TODO: <<<<>>>> check action logs
+         ;;   - need query topology first
 
 
 
 
 
-         ;; TODO: <<<<>>>>
-         ;;  - need better logic to skip failed runs
-         ;;   - default to not looking at incomplete agents/nodes
 
          ;; TODO: <<<<>>>>
          ;;  - TODO: use both clojure and both java action builders
          ;;  - test one agent with just online evals
          ;;     - verify feedback added to nodes/agents
          ;;  - another agent has dependent rules
+         ;;  - verify include-failures? behavior
+         ;;   - gives AgentFailedException for agent failure
+         ;;   - gives nil for node output in that case
+         ;;     - node latency is nil
+         ;;     - agent latency is not nil
          ;;  - verify filters work
          ;;  - verify sampling rate
          ;;  - verify respects max concurrency

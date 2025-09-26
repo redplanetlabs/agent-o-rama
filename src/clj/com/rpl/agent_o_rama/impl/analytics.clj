@@ -115,7 +115,7 @@
                                  (:builder-name eval-info)
                                  (:builder-params eval-info)
                                  [(aor-types/->valid-EvalInfo agent-name target)]
-                                 nil))
+                                 (aor-types/->valid-ActionSourceImpl (:rule-name run-info))))
             (let [{:keys [stats result]}
                   (.get
                    ^CompletableFuture
@@ -317,11 +317,12 @@
     (+compound {*agent-name {*rule-name (aggs/+last *all-rule-info)}} :> *ret))
   (:> *ret))
 
-(defn safe-last-key
-  [m alternate]
+(defn compute-end-scan-offset
+  [m start-offset]
   (if (empty? m)
-    alternate
-    (h/last-key m)))
+    start-offset
+    (h/uuid-inc (h/last-key m))
+  ))
 
 (defn action-target-pstate
   [agent-name node-name]
@@ -437,7 +438,8 @@
    (ops/explode-map *rule->info :> *rule-name *rule-info)
    (get *rule-info
         :definition
-        :> {:keys [*filter *node-name *sampling-rate *action-name *action-params]})
+        :> {:keys [*filter *node-name *sampling-rate *action-name *action-params
+                   *include-failures?]})
    (aor-types/dependency-rule-names *filter :> *dependency-names)
    (select> [:cursors ALL (collect-one FIRST) LAST]
      *rule-info
@@ -468,11 +470,12 @@
                       (multi-path [:data (termval *m)]
                                   [:action-fn (termval *action-fn)])]
                      $$cache)
-   (safe-last-key *m *end-offset :> *end-scan-offset)
+   (compute-end-scan-offset *m *offset :> *end-scan-offset)
    (<<ramafn %match?
      [*data]
      (:> (and> (not (experiment-source? *data))
                (not (contains? *data :invoked-agg-invoke-id))
+               (or> *include-failures? (contains? *data :finish-time-millis))
                (aor-types/rule-filter-matches? *filter *data)
                (sample? *sampling-rate))))
    (select> (subselect ALL
@@ -550,7 +553,8 @@
        (get *data :invoke-args :> *input)
        (h/result->output (get *data :result) :> *output))
      (select> [:feedback :results NIL->VECTOR] *data :> *feedback)
-     (aor-types/->valid-RunInfoImpl *action-name
+     (aor-types/->valid-RunInfoImpl *rule-name
+                                    *action-name
                                     *agent-name
                                     *node-name
                                     *agent-invoke
@@ -655,7 +659,8 @@
 
 (defn add-rule!
   [global-actions-depot name agent-name
-   {:keys [node-name action-name action-params filter sampling-rate start-time-millis]}]
+   {:keys [node-name action-name action-params filter sampling-rate start-time-millis
+           include-failures?]}]
   (let [{error aor-types/AGENT-TOPOLOGY-NAME}
         (foreign-append!
          global-actions-depot
@@ -668,7 +673,8 @@
           action-params
           filter
           sampling-rate
-          start-time-millis))]
+          start-time-millis
+          include-failures?))]
     (when error
       (throw (h/ex-info "Error adding rule" {:info error})))))
 

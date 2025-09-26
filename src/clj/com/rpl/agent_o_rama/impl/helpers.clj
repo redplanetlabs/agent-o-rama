@@ -223,6 +223,14 @@
   []
   (java.util.UUID. Long/MAX_VALUE Long/MAX_VALUE))
 
+(defn uuid-inc
+  [^UUID u]
+  (let [msb (.getMostSignificantBits u)
+        lsb (.getLeastSignificantBits u)]
+    (if (not= lsb -1)
+      (UUID. msb (inc lsb))
+      (UUID. (inc msb) 0))))
+
 (defn half-uuid
   [^UUID uuid]
   (.getLeastSignificantBits uuid))

@@ -5,6 +5,13 @@ import java.util.*;
 
 public interface RunInfo {
   /**
+   * Returns name of the rule for the action.
+   *
+   * @return rule name
+   */
+  String getRuleName();
+
+  /**
    * Returns name of the action.
    *
    * @return action name

@@ -642,7 +642,8 @@
   (getModifiedAt [this] modified-at))
 
 (defaorrecord RunInfoImpl
-  [action-name :- String
+  [rule-name :- String
+   action-name :- String
    agent-name :- String
    node-name :- (s/maybe String)
    agent-invoke :- AgentInvokeImpl
@@ -653,6 +654,7 @@
    agent-stats :- (s/maybe AgentInvokeStatsImpl)
    nested-ops :- (s/maybe [NestedOpInfoImpl])]
   RunInfo
+  (getRuleName [this] rule-name)
   (getActionName [this] action-name)
   (getAgentName [this] agent-name)
   (getNodeName [this] node-name)
@@ -750,7 +752,8 @@
    action-params :- {String String}
    filter :- (s/protocol RuleFilter)
    sampling-rate :- Double
-   start-time-millis :- Long]
+   start-time-millis :- Long
+   include-failures? :- Boolean]
   RuleEvent)
 
 (defaorrecord DeleteRule
