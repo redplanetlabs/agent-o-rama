@@ -73,16 +73,14 @@ Datasets are stored in distributed PState structures with:
 
 ```clojure
 ;; Add multiple examples
-(datasets/bulk-add-examples manager "dataset-name" examples)
+(doseq [example examples]
+  (aor/add-dataset-example! manager "dataset-name" example))
 
 ;; Query examples
-(datasets/get-examples manager "dataset-name"
-  {:filter {:tag "critical"}
+(aor/search-examples manager "dataset-name"
+  {:filters {:tag "critical"}
    :limit 100})
 
-;; Dataset statistics
-(datasets/get-stats manager "dataset-name")
-;; Returns: {:count 1500 :tags ["support" "billing"] :created "2024-01-15"}
-```
-
-Datasets provide the foundation for systematic agent evaluation, enabling data-driven development and continuous improvement of AI agent performance through structured testing and measurement.
+Datasets provide the foundation for systematic agent evaluation,
+enabling data-driven development and continuous improvement of AI agent
+performance through structured testing and measurement.

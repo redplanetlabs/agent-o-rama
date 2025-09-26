@@ -288,8 +288,9 @@ See the [glossary](glossary.md) for detailed explanations of agent-o-rama concep
               :category "authentication"
               :tags ["password" "reset"]}})
 
-;; Bulk add examples
-(aor/bulk-add-examples! manager "customer-support-v1" example-collection)
+;; Add multiple examples individually
+(doseq [example example-collection]
+  (aor/add-dataset-example! manager "customer-support-v1" example))
 
 ;; Search examples with filters
 (aor/search-examples manager "customer-support-v1"
@@ -298,9 +299,8 @@ See the [glossary](glossary.md) for detailed explanations of agent-o-rama concep
    :limit 50
    :offset 0})
 
-;; Get dataset statistics
-(aor/dataset-stats manager "customer-support-v1")
-;; Returns: {:count 1500 :categories ["auth" "billing"] :avg-difficulty 3.2}
+;; Search all examples to get count
+(count (aor/search-examples manager "customer-support-v1" {:limit 10000}))
 ```
 
 ## Evaluators

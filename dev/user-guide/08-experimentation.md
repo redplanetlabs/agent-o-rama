@@ -6,59 +6,368 @@ Test and improve your agents with systematic evaluation using [datasets](../term
 
 ## Dataset Management
 
-[Datasets](../terms/dataset.md) are managed collections of input/output examples for agent testing and evaluation. They provide structured test data with rich metadata.
+[Datasets](../terms/dataset.md) are managed collections of input/output examples for systematic agent testing and evaluation. They provide structured test data with rich metadata, versioning capabilities, and powerful organization features.
 
-### Creating Datasets
+Datasets solve critical challenges in AI agent development:
+- **Performance Measurement**: Systematic evaluation across test cases
+- **Regression Testing**: Detect performance degradation during development
+- **A/B Testing**: Compare different agent implementations
+- **Training Data Management**: Organize examples for agent improvement
 
-Create datasets with descriptive metadata:
+### Dataset Fundamentals
+
+#### Creating Datasets with Schema Validation
+
+Create datasets with JSON schemas for input and output validation:
 
 ```clojure
-;; Create new dataset
-(aor/create-dataset! manager "customer-support-v1"
-  {:description "Customer service scenarios"
-   :tags ["support" "qa" "troubleshooting"]
-   :version "1.0"
-   :created-by "dev-team"})
+;; Define input schema for structured validation
+(def customer-input-schema
+  (j/write-value-as-string
+   {"type" "object"
+    "properties" {"message" {"type" "string", "minLength" 1}
+                  "user-type" {"type" "string", "enum" ["basic" "premium" "enterprise"]}
+                  "context" {"type" "object"
+                            "properties" {"logged-in" {"type" "boolean"}
+                                         "previous-attempts" {"type" "number"}}}}
+    "required" ["message" "user-type"]}))
+
+;; Define output schema for response validation
+(def customer-output-schema
+  (j/write-value-as-string
+   {"type" "object"
+    "properties" {"action" {"type" "string"}
+                  "response" {"type" "string", "minLength" 10}
+                  "steps" {"type" "array", "items" {"type" "string"}}}
+    "required" ["action" "response"]}))
+
+;; Create dataset with comprehensive metadata
+(aor/create-dataset! manager "customer-support-v2"
+  {:description "Advanced customer service scenarios with validation"
+   :input-json-schema customer-input-schema
+   :output-json-schema customer-output-schema
+   :tags ["support" "qa" "production"]
+   :version "2.0"
+   :created-by "ai-team"
+   :domain "customer-service"})
 ```
 
-### Adding Examples
+#### Dataset Discovery and Management
 
-Add examples with input, expected output, and metadata:
+Find and organize your datasets:
 
 ```clojure
-;; Add single example
-(aor/add-dataset-example! manager "customer-support-v1"
-  {:input {:message "How do I reset my password?"
-           :user-type "premium"
-           :context {:logged-in false :previous-attempts 2}}
-   :reference-output {:action "password-reset"
-                      :response "I'll help you reset your password..."
-                      :steps ["verify-email" "send-reset-link"]}
-   :metadata {:difficulty "easy"
-              :category "authentication"
-              :tags ["password" "reset"]}})
+;; Search datasets by name or description
+(aor/search-datasets manager "customer" 10)
+;; => [{:name "customer-support-v1" :description "..."}
+;;     {:name "customer-onboarding" :description "..."}]
 
-;; Bulk add examples
-(aor/bulk-add-examples! manager "customer-support-v1"
-  [{:input {...} :reference-output {...} :metadata {...}}
-   {:input {...} :reference-output {...} :metadata {...}}])
+;; Update dataset metadata
+(aor/set-dataset-name! manager dataset-id "Customer Support Production")
+(aor/set-dataset-description! manager dataset-id
+  "Production-ready customer service evaluation scenarios")
 ```
 
-### Searching Examples
+### Dataset Lifecycle Management
 
-Find examples with filters and queries:
+#### Versioning with Snapshots
+
+[Dataset snapshots](../terms/dataset-snapshot.md) provide immutable versions for reproducible experiments:
 
 ```clojure
-;; Search with filters
-(aor/search-examples manager "customer-support-v1"
-  {:query "password"
-   :filters {:category "authentication" :difficulty "easy"}
-   :limit 50
-   :offset 0})
+;; Create snapshots at key milestones
+(aor/snapshot-dataset! manager dataset-id nil "baseline")
+(aor/snapshot-dataset! manager dataset-id nil "v1.0-release")
+(aor/snapshot-dataset! manager dataset-id nil "pre-model-update")
 
-;; Get dataset statistics
-(aor/dataset-stats manager "customer-support-v1")
-;; => {:count 1500 :categories ["auth" "billing"] :avg-difficulty 3.2}
+;; Create snapshot with metadata
+(aor/snapshot-dataset! manager dataset-id
+  {:notes "Snapshot before GPT-4 integration"
+   :commit-hash "abc123"
+   :timestamp (System/currentTimeMillis)}
+  "gpt4-baseline")
+
+;; Remove outdated snapshots
+(aor/remove-dataset-snapshot! manager dataset-id "experimental")
+```
+
+#### Dataset Destruction
+
+Clean up datasets when no longer needed:
+
+```clojure
+;; Remove entire dataset (use with caution)
+(aor/destroy-dataset! manager obsolete-dataset-id)
+```
+
+### Example Operations
+
+#### Adding Examples with Rich Metadata
+
+Add [dataset examples](../terms/dataset-example.md) with comprehensive metadata:
+
+```clojure
+;; Add single example with full metadata
+(let [example-id
+      (aor/add-dataset-example! manager "customer-support-v2"
+        ;; Input data
+        {:message "My account is locked and I can't log in"
+         :user-type "premium"
+         :context {:logged-in false
+                  :previous-attempts 3
+                  :account-age-days 365}}
+        ;; Configuration options
+        {:reference-output {:action "account-unlock"
+                           :response "I'll help unlock your premium account..."
+                           :steps ["verify-identity" "unlock-account" "send-confirmation"]}
+         :tags #{"account" "login" "premium" "security"}
+         :metadata {:difficulty "medium"
+                   :category "account-management"
+                   :priority "high"
+                   :created-by "qa-team"
+                   :source "user-support-ticket-12345"}})]
+  (println "Added example:" example-id))
+
+;; Add example to specific snapshot
+(aor/add-dataset-example! manager dataset-id
+  input-data
+  {:reference-output output-data
+   :tags #{"regression-test"}
+   :snapshot "v1.0-release"})
+```
+
+#### Batch Operations
+
+Process multiple examples with individual API calls:
+
+```clojure
+;; Add examples from CSV or external source
+(let [examples (load-examples-from-csv "support-tickets.csv")
+      processed-examples
+      (map (fn [raw-example]
+             {:input (transform-to-agent-input raw-example)
+              :reference-output (generate-expected-output raw-example)
+              :metadata {:source "csv-import"
+                        :batch-id "batch-001"
+                        :imported-at (System/currentTimeMillis)}})
+           examples)]
+  (doseq [example processed-examples]
+    (aor/add-dataset-example! manager "customer-support-v2"
+      (:input example)
+      {:reference-output (:reference-output example)
+       :metadata (:metadata example)})))
+
+;; Tag examples by category
+(let [auth-examples (filter-examples-by-category "authentication")]
+  (doseq [example-id auth-examples]
+    (aor/add-dataset-example-tag! manager dataset-id example-id "auth-workflow")))
+```
+
+#### Example Modification and Tagging
+
+Update examples and manage [dataset example tags](../terms/dataset-example-tag.md):
+
+```clojure
+;; Update example input after requirements change
+(aor/set-dataset-example-input! manager dataset-id example-id
+  {:message "My premium account is locked"
+   :user-type "premium"
+   :context {:logged-in false
+            :previous-attempts 3
+            :subscription-status "active"}})
+
+;; Update reference output for improved accuracy
+(aor/set-dataset-example-reference-output! manager dataset-id example-id
+  {:action "premium-account-unlock"
+   :response "I'll prioritize unlocking your premium account..."
+   :steps ["verify-premium-status" "immediate-unlock" "premium-support-follow-up"]})
+
+;; Add tags for organization
+(aor/add-dataset-example-tag! manager dataset-id example-id "premium-support")
+(aor/add-dataset-example-tag! manager dataset-id example-id "regression-critical")
+
+;; Remove outdated tags
+(aor/remove-dataset-example-tag! manager dataset-id example-id "draft")
+
+;; Snapshot-specific operations
+(aor/set-dataset-example-input! manager dataset-id example-id
+  updated-input {:snapshot "v2.0-dev"})
+```
+
+#### Example Removal
+
+Remove examples that are no longer relevant:
+
+```clojure
+;; Remove individual example
+(aor/remove-dataset-example! manager dataset-id obsolete-example-id)
+
+;; Batch remove examples by criteria
+(let [draft-examples (get-examples-by-tag dataset-id "draft")]
+  (doseq [example-id draft-examples]
+    (aor/remove-dataset-example! manager dataset-id example-id)))
+```
+
+### Organization and Search
+
+#### Advanced Dataset Querying
+
+Find examples using sophisticated filters:
+
+```clojure
+;; Search with text query and filters
+(aor/search-examples manager "customer-support-v2"
+  {:query "password reset"
+   :filters {:category "authentication"
+            :difficulty ["easy" "medium"]
+            :user-type "premium"}
+   :tags ["verified" "production"]
+   :limit 25
+   :offset 0
+   :sort-by "created-at"
+   :sort-order "desc"})
+
+;; Find examples by metadata patterns
+(aor/search-examples manager dataset-id
+  {:filters {:metadata.priority "high"
+            :metadata.source "user-ticket"}
+   :limit 100})
+
+;; Get examples for specific snapshot
+(aor/search-examples manager dataset-id
+  {:snapshot "v1.0-release"
+   :limit 1000})
+```
+
+#### Dataset Statistics and Analysis
+
+Get insights into your dataset composition:
+
+```clojure
+;; Get basic dataset information
+(let [examples (aor/search-examples manager "customer-support-v2" {:limit 10000})
+      total-count (count examples)
+      categories (frequencies (map #(get-in % [:metadata :category]) examples))
+      tags (frequencies (mapcat :tags examples))]
+  {:total-examples total-count
+   :categories categories
+   :tag-distribution tags})
+
+;; Example: {:total-examples 2543
+;;          :categories {"authentication" 892, "billing" 651, "technical" 1000}
+;;          :tag-distribution {"verified" 1200, "production" 800, "edge-case" 156}}
+```
+
+### Advanced Dataset Patterns
+
+#### Dynamic Dataset Building
+
+Build datasets from agent interactions:
+
+```clojure
+;; Capture production agent interactions
+(defn capture-interaction [agent-input agent-output user-feedback]
+  (when (= user-feedback "positive")
+    (aor/add-dataset-example! manager "production-captures"
+      agent-input
+      {:reference-output agent-output
+       :metadata {:captured-at (System/currentTimeMillis)
+                 :feedback-score user-feedback
+                 :source "production-capture"}
+       :tags #{"validated" "production"}})))
+
+;; Build dataset from historical logs
+(defn build-from-logs [log-entries]
+  (let [successful-interactions (filter #(= (:status %) "success") log-entries)]
+    (doseq [entry successful-interactions]
+      (aor/add-dataset-example! manager "historical-dataset"
+        (:input entry)
+        {:reference-output (:output entry)
+         :metadata {:log-timestamp (:timestamp entry)
+                   :confidence-score (:confidence entry)}
+         :tags #{"historical" "validated"}}))))
+```
+
+#### Dataset Validation and Quality Control
+
+Ensure dataset quality with validation patterns:
+
+```clojure
+;; Validate dataset examples against schema
+(defn validate-dataset-quality [dataset-id]
+  (let [examples (aor/search-examples manager dataset-id {:limit 10000})
+        validation-results
+        (map (fn [example]
+               {:example-id (:id example)
+                :input-valid? (validate-against-schema (:input example) input-schema)
+                :output-valid? (validate-against-schema (:reference-output example) output-schema)
+                :has-tags? (seq (:tags example))
+                :has-metadata? (seq (:metadata example))})
+             examples)]
+    {:total-examples (count examples)
+     :valid-inputs (count (filter :input-valid? validation-results))
+     :valid-outputs (count (filter :output-valid? validation-results))
+     :tagged-examples (count (filter :has-tags? validation-results))
+     :quality-score (calculate-quality-score validation-results)}))
+
+;; Clean up dataset based on quality metrics
+(defn cleanup-low-quality-examples [dataset-id quality-threshold]
+  (let [examples (aor/search-examples manager dataset-id {:limit 10000})
+        low-quality (filter #(< (example-quality-score %) quality-threshold) examples)]
+    (doseq [example low-quality]
+      (println "Removing low-quality example:" (:id example))
+      (aor/remove-dataset-example! manager dataset-id (:id example)))))
+```
+
+### Dataset Integration Workflows
+
+#### Production Dataset Pipeline
+
+Complete workflow for production dataset management:
+
+```clojure
+(defn production-dataset-pipeline []
+  ;; 1. Create dataset with versioning
+  (let [dataset-id (aor/create-dataset! manager "production-eval-2024-q1"
+                     {:description "Q1 2024 production evaluation dataset"
+                      :input-json-schema input-schema
+                      :output-json-schema output-schema
+                      :tags ["production" "q1-2024"]})
+
+        ;; 2. Import examples from multiple sources
+        user-feedback-examples (load-from-user-feedback)
+        qa-test-examples (load-from-qa-suite)
+        regression-examples (load-from-previous-datasets)]
+
+    ;; 3. Add examples with source tracking
+    (doseq [example user-feedback-examples]
+      (aor/add-dataset-example! manager dataset-id
+        (:input example)
+        {:reference-output (:reference-output example)
+         :metadata {:source "user-feedback"}}))
+    (doseq [example qa-test-examples]
+      (aor/add-dataset-example! manager dataset-id
+        (:input example)
+        {:reference-output (:reference-output example)
+         :metadata {:source "qa-suite"}}))
+    (doseq [example regression-examples]
+      (aor/add-dataset-example! manager dataset-id
+        (:input example)
+        {:reference-output (:reference-output example)
+         :metadata {:source "regression"}}))
+
+    ;; 4. Create baseline snapshot
+    (aor/snapshot-dataset! manager dataset-id nil "baseline-q1-2024")
+
+    ;; 5. Validate dataset quality
+    (let [examples (aor/search-examples manager dataset-id {:limit 10000})
+          example-count (count examples)]
+      (println "Dataset created with" example-count "examples"))
+
+    ;; 6. Create production snapshot
+    (aor/snapshot-dataset! manager dataset-id nil "production-ready")
+
+    dataset-id))
 ```
 
 ## Evaluators
