@@ -274,8 +274,11 @@
 
 (defui RunEvaluatorModal [{:keys [module-id dataset-id mode example selected-example-ids]}]
   (let [[selected-evaluator set-selected-evaluator] (uix/use-state nil)
-        ;; Separate input state from result state
-        [model-output-input set-model-output-input] (uix/use-state "") ; For :regular type user input
+        ;; NEW: State hooks for all three fields as editable textareas
+        [input-str set-input-str] (uix/use-state #(common/pp-json (:input example)))
+        [ref-output-str set-ref-output-str] (uix/use-state #(common/pp-json (:reference-output example)))
+        [output-str set-output-str] (uix/use-state "") ; For :regular type
+
         [model-outputs-input set-model-outputs-input] (uix/use-state [{:id (random-uuid) :value ""}]) ; For :comparative type user input
         [evaluation-result set-evaluation-result] (uix/use-state nil) ; For evaluator results
         [error set-error] (uix/use-state nil)
@@ -283,7 +286,7 @@
         [dropdown-open? set-dropdown-open] (uix/use-state false)
 
         ;; Fetch all evaluator instances
-        {:keys [data evaluators-loading? evaluators-error]}
+        {:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:evaluator-instances module-id]
           :sente-event [:evaluators/get-all-instances {:module-id module-id}]
@@ -304,13 +307,18 @@
                        (set-error nil)
 
                        (try
-                         (let [run-data (case evaluator-type
-                                          :regular {:input (:input example) ; Already cljs data
-                                                    :referenceOutput (:reference-output example) ; Already cljs data
-                                                    :output (-> model-output-input js/JSON.parse js->clj)} ; <--- PARSE HERE
-                                          :comparative {:input (:input example)
-                                                        :referenceOutput (:reference-output example)
-                                                        :outputs (mapv #(-> % :value js/JSON.parse js->clj) model-outputs-input)} ; <--- PARSE HERE
+                         (let [parsed-input (-> input-str js/JSON.parse js->clj)
+                               parsed-ref-output (when-not (str/blank? ref-output-str)
+                                                   (-> ref-output-str js/JSON.parse js->clj))
+
+                               run-data (case evaluator-type
+                                          :regular {:input parsed-input
+                                                    :referenceOutput parsed-ref-output
+                                                    :output (when-not (str/blank? output-str)
+                                                              (-> output-str js/JSON.parse js->clj))}
+                                          :comparative {:input parsed-input
+                                                        :referenceOutput parsed-ref-output
+                                                        :outputs (mapv #(-> % :value js/JSON.parse js->clj) model-outputs-input)}
                                           :summary {:dataset-id dataset-id
                                                     :example-ids selected-example-ids})]
                            (sente/request!
@@ -326,7 +334,7 @@
                                 (set-error (:error reply))))))
                          (catch js/Error e
                            (set-loading false)
-                           (set-error (str "Invalid JSON in one of the output fields: " (.-message e)))))))]
+                           (set-error (str "Invalid JSON in one of the fields: " (.-message e)))))))]
 
     ;; Clear evaluation result when evaluator changes
     (uix/use-effect
@@ -349,8 +357,8 @@
        ($ :div
           ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Select Evaluator")
           (cond
-            evaluators-loading? ($ :div.text-sm.text-gray-500 "Loading evaluators...")
-            evaluators-error ($ :div.text-sm.text-red-600 "Error loading evaluators")
+            loading? ($ :div.text-sm.text-gray-500 "Loading evaluators...")
+            error ($ :div.text-sm.text-red-600 "Error loading evaluators")
             (empty? evaluators) ($ :div.text-sm.text-gray-500 (if (= mode :single) "No regular or comparative evaluators available." "No summary evaluators available."))
             :else
             ($ :div.relative
@@ -371,30 +379,35 @@
                                                                      {:className (get-evaluator-type-badge-style (:type evaluator))}
                                                                      (get-evaluator-type-display (:type evaluator))))}))))))))
 
-       ;; 2. Example Input (read-only) - only for single mode
+       ;; 2. Example Input (now editable) - only for single mode
        (when (= mode :single)
-         ($ :div
-            ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Input")
-            ($ :div.bg-gray-50.rounded-md.p-4.border
-               ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
-                  (js/JSON.stringify (clj->js (:input example)) nil 2)))))
+         ($ forms/form-field
+            {:label "Input (JSON)"
+             :type :textarea
+             :rows 4
+             :value input-str
+             :on-change set-input-str}))
 
-       ;; 3. Reference Output (read-only) - only for single mode
-       (when (and (= mode :single) (:reference-output example))
-         ($ :div
-            ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Reference Output")
-            ($ :div.bg-gray-50.rounded-md.p-4.border
-               ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono
-                  (js/JSON.stringify (clj->js (:reference-output example)) nil 2)))))
+       ;; 3. Reference Output (now editable) - only for single mode
+       (when (= mode :single)
+         ($ forms/form-field
+            {:label "Reference Output (JSON)"
+             :type :textarea
+             :rows 4
+             :value ref-output-str
+             :on-change set-ref-output-str}))
 
        ;; 4. Dynamic UI based on selection and mode
        (when selected-evaluator
          (case evaluator-type
            :regular
-           ($ :div
-              ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Model Output (JSON)")
-              ($ :textarea.w-full.p-3.border.border-gray-300.rounded-md.font-mono.text-sm
-                 {:rows 3, :placeholder "{\"result\": \"...\"}", :value model-output-input, :onChange #(set-model-output-input (.. % -target -value))}))
+           ($ forms/form-field
+              {:label "Model Output (JSON)"
+               :type :textarea
+               :rows 4
+               :value output-str
+               :on-change set-output-str
+               :placeholder "{\"result\": \"...\"}"})
 
            :comparative
            ($ :div
