@@ -210,7 +210,7 @@
   {String ; agent-name
    (map-schema
     String ; rule-name
-    (vector-schema ActionLog {:subindex? true})
+    (map-schema UUID ActionLog {:subindex? true})
     {:subindex? true})})
 
 

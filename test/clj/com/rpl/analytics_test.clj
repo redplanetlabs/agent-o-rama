@@ -872,6 +872,8 @@
                                  {:pkey task-id})
            ))
 
+         (bind foo-action-log (:action-log-query (aor-types/underlying-objects foo)))
+
          (bind cycle!
            (fn []
              (reset! TICKS 0)
@@ -1101,7 +1103,7 @@
 
 
          ;; TODO: <<<<>>>> check action logs
-         ;;   - need query topology first
+         ;;   - foo-action-log
 
 
 

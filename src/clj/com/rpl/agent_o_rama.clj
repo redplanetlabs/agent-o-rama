@@ -590,7 +590,10 @@
              current-graph-query  (foreign-query
                                    cluster
                                    module-name
-                                   (queries/agent-get-current-graph-name agentName))]
+                                   (queries/agent-get-current-graph-name agentName))
+             action-log-query     (foreign-query cluster
+                                                 module-name
+                                                 (queries/action-log-page-name agentName))]
          (reify
           AgentClient
           (invoke [this args]
@@ -803,6 +806,7 @@
              :tracing-query        tracing-query
              :invokes-page-query   invokes-page-query
              :current-graph-query  current-graph-query
+             :action-log-query     action-log-query
             })
          )))
      (createDataset [this name description inputJsonSchema outputJsonSchema]

@@ -592,7 +592,8 @@
                                 *success?
                                 (maybe-to-clojure-map *info-map)
                                 :> *action-log)
-   (local-transform> [(keypath *agent-name *rule-name) AFTER-ELEM (termval *action-log)]
+   (h/random-uuid7 :> *action-log-id)
+   (local-transform> [(keypath *agent-name *rule-name *action-log-id) (termval *action-log)]
                      $$action-log)
   ))
 
@@ -647,6 +648,9 @@
      [<<batch
       [filter> false]
       [materialize> :> cache-pstate]]
+      ;; TODO: <<<<>>> change this:
+      ;;  - return # of qualified offsets from each task
+      ;;  - in the loop while processing in the inner batch block, return highest offset processed per task/rule
      [<<batch
       [find-qualified-offsets '*agent->rule->info cache-pstate-name
         :> '*agent-name '*rule-name '*task-id '*offsets '*end-scan-offset]
