@@ -94,6 +94,14 @@ within agent nodes, retrieved via `agent-result` on client side.
 
 An individual execution unit returned by agent processing, can be result, human input request, or continuation.
 
+## Agent Throttling
+
+Rate-limiting mechanism for log messages to prevent overwhelming output in distributed execution.
+
+## Agent Topology
+
+Interface representing the configuration context for defining agents, stores, and objects. Provides methods for declaring system components within an agent module.
+
 ## [Agent Trace](terms/agent-trace.md)
 
 Execution monitoring system that captures agent node transitions and data flow for debugging.
@@ -130,6 +138,24 @@ Database connections can be declared as agent objects.
 A managed collection of input/output examples for agent testing and
 evaluation. Created and managed via agent manager dataset functions for
 tracking agent performance and behavior.
+
+## [Dataset Example](terms/dataset-example.md)
+
+A single input-output pair within a dataset used for testing and
+evaluation. Contains inputs provided to an agent, expected output,
+actual output, and optional metadata like tags and descriptions.
+
+## [Dataset Example Tag](terms/dataset-example-tag.md)
+
+Labels attached to dataset examples for categorization, filtering, and
+organization. Enable grouping examples by type, complexity, domain, or
+other characteristics for targeted evaluation.
+
+## [Dataset Snapshot](terms/dataset-snapshot.md)
+
+A versioned state of a dataset at a specific point in time, capturing
+the exact examples and metadata. Used to ensure reproducible
+experiments and track dataset evolution.
 
 ## [Document Store](terms/document-store.md)
 
@@ -180,6 +206,10 @@ execution flows.
 
 Rate-limiting mechanism for log messages to prevent overwhelming output
 in distributed execution.
+
+## Mirror Agent
+
+Local proxy for an agent defined in another module, enabling cross-module agent interactions. Declared via `declare-cluster-agent` to reference remote agents.
 
 ## [Multi-Agg](terms/multi-agg.md)
 
@@ -267,6 +297,10 @@ A specialized agent type that executes tool functions, created via
 `newToolsAgent`. Built with tool specifications and automatically
 handles tool execution with aggregation patterns for AI tool calling
 workflows.
+
+## UI
+
+Web-based monitoring and visualization interface for agent execution. Started via `start-ui` function, provides real-time agent state inspection and debugging capabilities.
 
 ## [Update Mode](terms/update-mode.md)
 
