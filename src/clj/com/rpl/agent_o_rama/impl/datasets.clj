@@ -176,7 +176,7 @@
 (defn wrap-pojos
   [x]
   (cond
-    (and (map? x) (not (record? x)))
+    (and (instance? Map x) (not (record? x)))
     (let [obj (.createObjectNode MAPPER)]
       (doseq [[k v] x]
         (.set obj (name k) (wrap-pojos v)))
@@ -265,13 +265,19 @@
           ^JsonSchema schema (.getSchema ^JsonSchemaFactory FACTORY schema-node)
           errs (.validate schema (wrap-pojos value))]
       (when (seq errs)
-        (str/join
-         "\n"
-         (mapv #(.getMessage ^ValidationMessage %) errs))))
+        (str
+         (str/join
+          "\n"
+          (mapv #(.getMessage ^ValidationMessage %) errs))
+         ", schema: " (print-str json-schema)
+         ", value: " (pr-str value))))
     (catch com.fasterxml.jackson.core.JsonProcessingException e
-      (str "Invalid JSON schema: " (h/throwable->str e)))
+      (str "Invalid JSON schema: " (h/throwable->str e)
+           ", schema: " (print-str json-schema)))
     (catch Exception e
-      (str "Failed to compile or apply schema: " (h/throwable->str e)))))
+      (str "Failed to compile or apply schema: " (h/throwable->str e)
+           ", schema: " (print-str json-schema)
+           ", value: " (pr-str value)))))
 
 (deframaop validate-with-schema>
   [*json-schema *value]

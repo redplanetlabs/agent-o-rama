@@ -101,6 +101,36 @@
     (is (= ["x-javaType: $.xs — expected java.util.List"]
            (msgs (datasets/validate S {"m" {} "xs" "not-a-list"}))))))
 
+(deftest x-javaType-basic-Map
+  ;; Test Map validation with x-javaType
+  (testing "java.util.Map validation"
+    (let [S (datasets/build-schema
+             {"$schema"    datasets/META
+              "type"       "object"
+              "properties" {"data" {"x-javaType" "java.util.Map"}}
+              "required"   ["data"]})]
+
+      (testing "accepts various Map types"
+        (is (empty? (datasets/validate S {"data" {}})))
+        (is (empty? (datasets/validate S {"data" {"key" "val"}})))
+        (is (empty? (datasets/validate S {"data" {:a 1 :b 2}})))
+        (is (empty?
+             (datasets/validate S {"data" (java.util.HashMap. {"x" "y"})})))
+        (is (empty?
+             (datasets/validate S {"data" (java.util.TreeMap. {"m" "n"})})))
+        (is (empty?
+             (datasets/validate S {"data" (java.util.Map/of "m" "n")}))))
+
+      (testing "rejects non-Map values"
+        (is (= ["x-javaType: $.data — expected java.util.Map"]
+               (msgs (datasets/validate S {"data" "string"}))))
+        (is (= ["x-javaType: $.data — expected java.util.Map"]
+               (msgs (datasets/validate S {"data" 42}))))
+        (is (= ["x-javaType: $.data — expected java.util.Map"]
+               (msgs (datasets/validate S {"data" ["list"]}))))
+        (is (= ["x-javaType: $.data — expected java.util.Map"]
+               (msgs (datasets/validate S {"data" nil}))))))))
+
 (deftest x-javaType-nested-and-items
   (let [S (datasets/build-schema
            {"$schema"    datasets/META
@@ -431,8 +461,8 @@
                  "},"
                  "\"required\":[\"id\",\"name\",\"owner\"]"
                  "}"))
-        ; normalize returns a JSON string; ensure it is so
-        _ (is (string? schema))
+                                        ; normalize returns a JSON string; ensure it is so
+        _      (is (string? schema))
         result (datasets/validate-with-schema*
                 schema
                 {"id"    (h/random-uuid7)
