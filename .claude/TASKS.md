@@ -162,6 +162,28 @@ Include REFINE to refine the spec
       should show how to use the builders in
       com.rpl.agent-o-rama.impl.evaluators
 
+- [x] update the dataset examples and @examples/clj/README.md files:
+
+	  Update @examples/clj/src/com/rpl/agent/basic/dataset_agent.clj
+	  remove usage:
+        - aor/add-dataset-example!
+	  add usage:
+		- aor/set-dataset-name!
+		- aor/set-dataset-description!
+		- aor/destroy-dataset!
+		- aor/search-datasets
+		- aor/remove-dataset-snapshot!
+		- aor/snapshot-dataset!
+
+	  create @examples/clj/src/com/rpl/agent/basic/dataset_example_agent.clj
+	  add usage (with and without a snapshot):
+        - aor/add-dataset-example!
+        - aor/add-dataset-example-tag!
+		- aor/remove-dataset-example-tag!
+		- aor/remove-dataset-example!
+		- aor/set-dataset-example-input!
+		- aor/set-dataset-example-reference-output!
+
 - [ ] update the aggregation-agent example to show the return value of
       agg-start node being passed as last arg to agg-node
 

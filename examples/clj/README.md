@@ -47,9 +47,10 @@ progressing from basic concepts to advanced patterns.
 
 #### System Features
 17. **`forking_agent`** - Agent execution branching
-18. **`dataset_agent`** - Dataset creation and management
-19. **`evaluator_agent`** - Evaluator creation and execution
-20. **`provided_evaluator_builders_agent`** - Built-in evaluator builders (aor/llm-judge, aor/conciseness, aor/f1-score)
+18. **`dataset_agent`** - Dataset lifecycle management (create, update, snapshots, destroy)
+19. **`dataset_example_agent`** - Dataset example management (add, update, tag, remove examples)
+20. **`evaluator_agent`** - Evaluator creation and execution
+21. **`provided_evaluator_builders_agent`** - Built-in evaluator builders (aor/llm-judge, aor/conciseness, aor/f1-score)
 
 ## Running Examples
 
@@ -93,6 +94,7 @@ lein run -m com.rpl.agent.basic.streaming-langchain4j-agent
 lein run -m com.rpl.agent.basic.tools-agent
 lein run -m com.rpl.agent.basic.forking-agent
 lein run -m com.rpl.agent.basic.dataset-agent
+lein run -m com.rpl.agent.basic.dataset-example-agent
 lein run -m com.rpl.agent.basic.evaluator-agent
 lein run -m com.rpl.agent.basic.provided-evaluator-builders-agent
 lein run -m com.rpl.agent.basic.langchain4j-agent
@@ -115,7 +117,7 @@ Basic examples are ordered to build understanding progressively:
 - **State Management** (7-9): Independent storage and resource patterns
 - **Communication** (10-11): Real-time interaction patterns
 - **Advanced Patterns** (12-16): Complex execution and integration patterns
-- **System Features** (17-19): Full-system capabilities
+- **System Features** (17-20): Full-system capabilities
 
 Each example includes detailed comments explaining the demonstrated
 features and their usage patterns.

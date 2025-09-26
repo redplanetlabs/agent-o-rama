@@ -1,12 +1,14 @@
 (ns com.rpl.agent.basic.dataset-agent
-  "Demonstrates dataset creation and management for agent testing and evaluation.
+  "Demonstrates dataset creation and lifecycle management for agent testing and evaluation.
 
   Features demonstrated:
   - create-dataset!: Create datasets with input/output schemas
-  - add-dataset-example!: Add examples to datasets
+  - set-dataset-name!: Update dataset names
+  - set-dataset-description!: Update dataset descriptions
   - search-datasets: Find datasets by name/description
-  - Dataset snapshots and example management
-  - JSON schema validation for inputs and outputs"
+  - snapshot-dataset!: Create dataset snapshots
+  - remove-dataset-snapshot!: Remove snapshots
+  - destroy-dataset!: Delete entire datasets"
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.rama :as rama]
@@ -52,87 +54,61 @@
     "required"   ["result"]}))
 
 (defn -main
-  "Demonstrates proper client-side dataset management"
+  "Demonstrates dataset lifecycle management"
   [& _args]
   (with-open [ipc (rtest/create-ipc)]
     (rtest/launch-module! ipc DatasetExampleModule {:tasks 1 :threads 1})
 
-    (let [manager    (aor/agent-manager
-                      ipc
-                      (rama/get-module-name DatasetExampleModule))
-          calc-agent (aor/agent-client manager "SimpleCalculatorAgent")]
+    (let [manager (aor/agent-manager
+                   ipc
+                   (rama/get-module-name DatasetExampleModule))]
 
-      (println
-       "Dataset Agent Example: Testing calculator agent with datasets\n")
-
-      ;; Create dataset with JSON schema for our calculator agent
-      (let [math-dataset-id
+      ;; Create initial dataset
+      (let [dataset-id
             (aor/create-dataset!
              manager
-             "Math Operations Dataset"
-             {:description
-              "Dataset for testing calculator agent"
+             "Initial Calculator Dataset"
+             {:description        "Basic calculator operations dataset"
               :input-json-schema  math-input-schema
               :output-json-schema math-output-schema})]
 
-        (println "Created dataset:" math-dataset-id)
+        (aor/set-dataset-name! manager dataset-id "Advanced Math Dataset")
 
-        ;; Add examples with different tags and sources
-        (aor/add-dataset-example!
+        (aor/set-dataset-description!
          manager
-         math-dataset-id
-         {:operation "add" :a 5 :b 3}
-         {:reference-output {:result 8}
-          :tags   #{"basic" "addition"}
-          :source "manual"})
+         dataset-id
+         "Comprehensive mathematical operations with edge case handling")
 
-        (aor/add-dataset-example!
-         manager
-         math-dataset-id
-         {:operation "multiply" :a 4 :b 7}
-         {:reference-output {:result 28}
-          :tags   #{"basic" "multiplication"}
-          :source "manual"})
+        (aor/snapshot-dataset! manager dataset-id nil "baseline")
+        (aor/snapshot-dataset! manager dataset-id nil "v1.0")
+        (aor/snapshot-dataset! manager dataset-id nil "experimental")
 
-        (aor/add-dataset-example!
-         manager
-         math-dataset-id
-         {:operation "divide" :a 10 :b 0}
-         {:reference-output {:result
-                             "Error: Division by zero"}
-          :tags   #{"edge-case" "error"}
-          :source "manual"})
+        (aor/remove-dataset-snapshot! manager dataset-id "experimental")
 
-        (aor/add-dataset-example!
-         manager
-         math-dataset-id
-         {:operation "subtract" :a 10 :b 3}
-         {:reference-output {:result 7}
-          :tags   #{"basic" "subtraction"}
-          :source "generated"})
+        (let [math-results (aor/search-datasets manager "Math" 5)
+              calc-results (aor/search-datasets manager "Calculator" 5)]
+          (println (str "'Math' search: " (count math-results) " results"))
+          (println (str "'Calculator' search: " (count calc-results) " results")))
 
-        ;; Create snapshot to preserve current state
-        (aor/snapshot-dataset! manager math-dataset-id nil "v1.0")
-        (println "Created snapshot 'v1.0'")
+        ;; Create another dataset to demonstrate multiple datasets
+        (let [geometry-dataset-id
+              (aor/create-dataset!
+               manager
+               "Geometry Dataset"
+               {:description        "Geometric calculations and formulas"
+                :input-json-schema  math-input-schema
+                :output-json-schema math-output-schema})]
 
-        ;; Test agent against dataset examples
-        (println "\nTesting calculator agent with dataset examples:")
-        (doseq [[input expected] [[{:operation "add" :a 5 :b 3} {:result 8}]
-                                  [{:operation "divide" :a 10 :b 0}
-                                   {:result "Error: Division by zero"}]]]
-          (let [result (aor/agent-invoke calc-agent input)]
-            (println "  Input:" input "→ Agent:" result "Expected:" expected)))
+          ;; Search again to show multiple results
+          (let [all-results (aor/search-datasets manager "" 10)]
+            (println (str "Total datasets: " (count all-results))))
 
-        ;; Demonstrate search functionality
-        (println "\nSearching datasets:")
-        (let [search-results
-              {"Math"       (aor/search-datasets manager "Math" 10)
-               "Operations" (aor/search-datasets manager "Operations" 10)}]
-          (doseq [[term results] search-results]
-            (println (str "  " term " datasets found: " (count results)))))
+          ;; Demonstrate dataset destruction
+          (aor/destroy-dataset! manager geometry-dataset-id)
 
-        (println
-         "\nDemonstrated: JSON schemas, examples with tags/sources, snapshots, search")))))
+          ;; Final search to confirm deletion
+          (let [final-results (aor/search-datasets manager "" 10)]
+            (println (str "Datasets remaining: " (count final-results)))))))))
 
 (comment
   (-main))
