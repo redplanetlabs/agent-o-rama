@@ -66,6 +66,9 @@ experiments
     └── evaluator-builder
         ├── evaluator
         │   └── dataset
+		│       ├── dataset-snapshot
+		│       ├── dataset-example
+		│       ├── dataset-example-tag
         │       └── experiment
         │           └── experiment-run
         └-- provided-evaluator-builders
@@ -147,6 +150,9 @@ log-throttling
 - **evaluator-builder**: Metric construction
 - **evaluator**: Performance measurement
 - **dataset**: Input/output collections
+- **dataset-snapshot**: Input/output collections
+- **dataset-example**: An example in a dataset
+- **dataset-example-tag**: Tags on dataset examples
 - **experiment**: Test execution
 - **experiment-run**: Individual test runs
 - **provided-evaluator-builders**: Provided evaluator builders
