@@ -994,22 +994,26 @@
 
          ;; time is 51000
 
-         (ana/add-rule! global-actions-depot
-                        "eval2"
-                        "foo"
-                        {:action-name       "aor/eval"
-                         :action-params     {"name" "concise7"}
-                         :filter            (aor-types/->AndFilter [])
-                         :sampling-rate     0.1
-                         :start-time-millis 50000
-                         :include-failures? false
-                        })
+         (ana/add-rule!
+          global-actions-depot
+          "eval2"
+          "foo"
+          {:action-name       "aor/eval"
+           :action-params     {"name" "concise7"}
+           :filter            (aor-types/->FeedbackFilter "eval1"
+                                                          "concise?"
+                                                          (aor-types/->ComparatorSpec :not= ""))
+           :sampling-rate     0.1
+           :start-time-millis 50000
+           :include-failures? false
+          })
          (ana/add-rule!
           global-actions-depot
           "foo-a2"
           "foo"
           {:action-name       "action2"
-           :action-params     {"a2" "XYZ"}
+           :action-params     {"a1" "1a"
+                               "a2" "XYZ"}
            :filter            (aor-types/->AndFilter
                                [(aor-types/->FeedbackFilter "eval1"
                                                             "concise?"
@@ -1051,7 +1055,7 @@
 
          (reset! sample-atom false)
          (cycle!)
-         (is (= {0.1 1 0.5 1 0.8 1 0.9 1} (frequencies @sample-rates)))
+         (is (= {0.5 1 0.8 1 0.9 1} (frequencies @sample-rates)))
          (is (= [] @ACTIONS))
          (reset! sample-atom true)
          (cycle!)
@@ -1070,15 +1074,17 @@
          (bind inv4 (aor/agent-initiate foo "aaaa"))
          (is (= "aaaa!?" (aor/agent-result foo inv4)))
          (cycle!)
-         ;; TODO: <<<<>>>>
-         (is (= {0.1 1 0.5 1 0.8 1 0.9 1} (frequencies @sample-rates)))
-         (println "AAA" @ACTIONS)
+         (is (= {0.5 4 0.8 4 0.9 4} (frequencies @sample-rates)))
+         (is (= @ACTIONS []))
          (cycle!)
-         (println "SSS" (frequencies @sample-rates))
-         (println "BBB" @ACTIONS)
+         (is (= {0.1 4} (frequencies @sample-rates)))
+         (is (= [] @ACTIONS))
          (cycle!)
-         (println "SSS" (frequencies @sample-rates))
-         (println "CCC" @ACTIONS)
+         (is (= {0.7 2} (frequencies @sample-rates)))
+         (is (= 2 (count @ACTIONS)))
+         (is (= (set @ACTIONS)
+                #{[:action2 ["dcba"] "dcba!?" {"a1" "1a" "a2" "XYZ"}]
+                  [:action2 ["aaaa"] "aaaa!?" {"a1" "1a" "a2" "XYZ"}]}))
 
 
 
@@ -1101,10 +1107,7 @@
 
 
          ;; TODO: <<<<>>>>
-         ;;  - TODO: use both clojure and both java action builders
-         ;;  - test one agent with just online evals
-         ;;     - verify feedback added to nodes/agents
-         ;;  - another agent has dependent rules
+         ;;  - multiple agents with different rules (some with same name) at same time
          ;;  - verify include-failures? behavior
          ;;   - gives AgentFailedException for agent failure
          ;;   - gives nil for node output in that case

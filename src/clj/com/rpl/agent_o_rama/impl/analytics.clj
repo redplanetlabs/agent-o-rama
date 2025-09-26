@@ -78,7 +78,7 @@
             eval-client  (get-agent-client aor-types/EVALUATOR-AGENT-NAME)]
         (when (nil? eval-info)
           (throw (h/ex-info "Evaluator doesn't exist" {:name name})))
-        (fn [fetcher input output {:keys [action-name agent-name] :as run-info}]
+        (fn [fetcher input output {:keys [rule-name agent-name] :as run-info}]
           (let [target-pstate-name (if (= :agent (:type run-info))
                                      (po/agent-root-task-global-name agent-name)
                                      (po/agent-node-task-global-name agent-name))
@@ -91,7 +91,7 @@
                     (:agent-invoke-id target)
                     (:node-invoke-id target))
                 curr-eval-agent-invoke (foreign-select-one [(keypath k)
-                                                            (fb/action-state-path action-name)]
+                                                            (fb/action-state-path rule-name)]
                                                            target-pstate
                                                            {:pkey target-task-id})
                 eval-agent-invoke (or curr-eval-agent-invoke
@@ -100,8 +100,8 @@
             (when (nil? curr-eval-agent-invoke)
               (pstate-write! target-pstate-name
                              (path (keypath k)
-                                   (fb/set-action-state-path action-name eval-agent-invoke))
-                             (:task-id target)))
+                                   (fb/set-action-state-path rule-name eval-agent-invoke))
+                             (aor-types/->DirectTaskId target-task-id)))
             (binding [aor-types/FORCED-AGENT-INVOKE-ID (:agent-invoke-id eval-agent-invoke)
                       aor-types/FORCED-AGENT-TASK-ID   (:task-id eval-agent-invoke)]
               ;; this is a no-op if it was already initiated

@@ -14,9 +14,9 @@
     (path :feedback :results NIL->VECTOR AFTER-ELEM (termval v))))
 
 (defn action-state-path
-  ^:direct-nav [action-name]
-  (path :feedback :actions (keypath action-name)))
+  ^:direct-nav [rule-name]
+  (path :feedback :actions (keypath rule-name)))
 
 (defn set-action-state-path
-  ^:direct-nav [action-name val]
-  (path (action-state-path action-name) (termval val)))
+  ^:direct-nav [rule-name val]
+  (path (action-state-path rule-name) (termval val)))
