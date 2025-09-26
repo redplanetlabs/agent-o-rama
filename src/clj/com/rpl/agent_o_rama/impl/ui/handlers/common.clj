@@ -97,6 +97,8 @@
           ;; --- Parse String Identifiers into Rich Types ---
           parsed-dataset-id (when-let [did (:dataset-id thawed-data)]
                               (if (string? did) (UUID/fromString did) did))
+          parsed-experiment-id (when-let [eid (:experiment-id thawed-data)]
+                                 (if (string? eid) (UUID/fromString eid) eid))
           parsed-invoke-pair (when-let [iid (:invoke-id thawed-data)]
                                (if (string? iid) (parse-url-pair iid) iid))
 
@@ -110,6 +112,7 @@
                           decoded-module-id (assoc :decoded-module-id decoded-module-id)
                           decoded-agent-name (assoc :decoded-agent-name decoded-agent-name)
                           parsed-dataset-id (assoc :dataset-id parsed-dataset-id)
+                          parsed-experiment-id (assoc :experiment-id parsed-experiment-id)
                           parsed-invoke-pair (assoc :invoke-pair parsed-invoke-pair) ; Store as a new key
                           manager (assoc :manager manager)
                           client (assoc :client client))]

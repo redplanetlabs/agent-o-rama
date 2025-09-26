@@ -1,10 +1,11 @@
 (ns com.rpl.agent-o-rama.ui.experiments.index
   (:require
    [uix.core :as uix :refer [defui $]]
-   ["@heroicons/react/24/outline" :refer [BeakerIcon PlusIcon]]
+   ["@heroicons/react/24/outline" :refer [BeakerIcon PlusIcon TrashIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.experiments.evaluators :as evaluators]
    [clojure.string :as str]
    [reitit.frontend.easy :as rfe]))
@@ -63,10 +64,9 @@
                      ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "P99 Latency (ms)")
                      ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Avg Total Tokens")
                      (for [{:keys [column-key label]} columns]
-                       ($ :th {:key column-key
-                               :className (common/cn (:th common/table-classes) "text-right")}
-                          ($ :div.truncate {:title label}
-                             label)))))
+                       ($ :th {:key column-key, :className (common/cn (:th common/table-classes) "text-right")}
+                          ($ :div.truncate {:title label} label)))
+                     ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Actions")))
                ($ :tbody
                   (for [exp experiments
                         :let [info (:experiment-info exp)
@@ -117,7 +117,23 @@
                                tooltip (if ambiguous?
                                          (str "Avg. " metric-label " (" eval-name ")")
                                          (str "Avg. " metric-label))]
-                           ($ StatCell {:key column-key
-                                        :value display-value
-                                        :tooltip tooltip}))))))))))))
+                           ($ StatCell {:key column-key, :value display-value, :tooltip tooltip})))
+
+                       ($ :td {:className (:td-right common/table-classes)}
+                          ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
+                             {:onClick (fn [e]
+                                         (.stopPropagation e)
+                                         (when (js/confirm (str "Are you sure you want to delete experiment '" (:name info) "'?"))
+                                           (sente/request!
+                                            [:experiments/delete {:module-id module-id
+                                                                  :dataset-id dataset-id
+                                                                  :experiment-id (:id info)}]
+                                            10000
+                                            (fn [reply]
+                                              (if (:success reply)
+                                                ;; Invalidate both regular and comparative queries just in case
+                                                (state/dispatch [:query/invalidate {:query-key-pattern [:experiments module-id dataset-id]}])
+                                                (js/alert (str "Failed to delete experiment: " (:error reply))))))))}
+                             ($ TrashIcon {:className "h-4 w-4 mr-1"})
+                             "Delete")))))))))))
 

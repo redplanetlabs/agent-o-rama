@@ -56,7 +56,7 @@
   (let [global-actions-depot (:global-actions-depot (aor-types/underlying-objects manager))
         {:keys [name snapshot selector evaluators spec num-repetitions concurrency]} form-data
         experiment-id (h/random-uuid7)]
-    (let [{:keys [agent-invoke]} 
+    (let [{:keys [agent-invoke]}
           (foreign-append! global-actions-depot
                            (aor-types/->StartExperiment
                             experiment-id
@@ -97,3 +97,10 @@
             base-results)))
       ;; If there are no invoke coordinates, it's too early, return base results.
       base-results)))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/delete
+  [{:keys [manager dataset-id experiment-id]} uid]
+  (let [global-actions-depot (:global-actions-depot (aor-types/underlying-objects manager))]
+    (foreign-append! global-actions-depot
+                     (aor-types/->DeleteExperiment experiment-id dataset-id))
+    {:status :ok}))

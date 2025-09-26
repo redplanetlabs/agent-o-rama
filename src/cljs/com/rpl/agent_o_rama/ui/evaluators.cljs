@@ -527,8 +527,9 @@
                                      {:className (get-evaluator-type-badge-style type)}
                                      (get-evaluator-type-display type)))
                                ($ :td {:className (:td-right common/table-classes)}
-                                  ($ :button.text-sm.text-red-600.hover:text-red-800.cursor-pointer
+                                  ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
                                      {:onClick (fn [e]
                                                  (.stopPropagation e) ; Prevent row click
                                                  (handle-delete evaluator-name))}
+                                     ($ TrashIcon {:className "h-4 w-4 mr-1"})
                                      "Delete")))))))))))))
