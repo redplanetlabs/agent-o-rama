@@ -1,7 +1,8 @@
 (ns com.rpl.agent-o-rama.ui.experiments.index
   (:require
    [uix.core :as uix :refer [defui $]]
-   ["@heroicons/react/24/outline" :refer [BeakerIcon PlusIcon TrashIcon]]
+   ["@heroicons/react/24/outline" :refer [BeakerIcon PlusIcon TrashIcon MagnifyingGlassIcon]]
+   ["use-debounce" :refer [useDebounce]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
@@ -17,13 +18,21 @@
      (if (some? value) (str value) "N/A"))) ;; Require events to register handlers
 
 (defui index [{:keys [module-id dataset-id]}]
-  (let [{:keys [data loading? error]}
+  (let [;; Add state for search term and debounce it
+        [search-term set-search-term] (uix/use-state "")
+        [debounced-search-term] (useDebounce search-term 300)
+
+        ;; Update the query hook to use the debounced search term
+        {:keys [data loading? error]}
         (queries/use-sente-query
-         {:query-key [:experiments module-id dataset-id :regular]
+         {:query-key [:experiments module-id dataset-id :regular debounced-search-term] ; Add search term to query key
           :sente-event [:experiments/get-all-for-dataset
                         {:module-id module-id
                          :dataset-id dataset-id
-                         :filters {:type :regular}}]
+                         :filters {:type :regular
+                                   ;; Add search-string to filters if it's not blank
+                                   :search-string (when-not (str/blank? debounced-search-term)
+                                                    debounced-search-term)}}]
           :enabled? (boolean (and module-id dataset-id))
           :refresh-interval-ms 1000})
 
@@ -35,7 +44,16 @@
 
     ($ :div.p-6
        ($ :div.flex.justify-between.items-center.mb-6
-          ($ :h2.text-2xl.font-bold "Experiments")
+          ;; Add the search input field to the UI
+          ($ :div.flex-1
+             ($ :div.relative.mt-2.rounded-md.shadow-sm.max-w-md
+                ($ :input
+                   {:type "text"
+                    :value search-term
+                    :onChange #(set-search-term (.. % -target -value))
+                    :className "block w-full rounded-md border-0 py-1.5 pl-2 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    :placeholder "Search by name or ID..."})))
+
           ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
              {:onClick #(state/dispatch [:modal/show-form :create-experiment
                                          {:module-id module-id
