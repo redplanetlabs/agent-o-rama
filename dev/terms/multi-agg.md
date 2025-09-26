@@ -23,7 +23,7 @@ Enables sophisticated result aggregation patterns. Supports custom initializatio
 - Access: In aggregation nodes
 
 ## Key Java API
-- Primary functions: `MultiAgg.builder()`, `init()`, `on()`
+- Primary functions: `MultiAgg.create()`, `MultiAgg.init()`, `MultiAgg.on()`
 - Creation: Builder pattern
 - Access: `MultiAgg` interface
 

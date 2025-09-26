@@ -18,7 +18,9 @@ Enables human-in-the-loop workflows. Pauses execution pending user response, mai
 - One response per request
 
 ## Key Clojure API
-- Primary functions: `get-human-input`, `provide-human-input`, `pending-human-inputs`
+- Primary functions: `get-human-input`, `provide-human-input`,
+  `pending-human-inputs`, `pending-human-inputs-async`,
+  `provide-human-input-async`
 - Creation: `(get-human-input agent-node "prompt")`
 - Access: Via client operations
 

@@ -161,9 +161,13 @@ experiments and track dataset evolution.
 
 A schema-flexible store for complex nested data structures in agents.
 
-## [Evaluators](terms/evaluators.md)
+## [Evaluator](terms/evaluator.md)
 
 Functions for measuring agent performance against datasets.
+
+## [Evaluator Builder](terms/evaluator-builder.md)
+
+In topology provider with code for building evaluators from a client.
 
 ## [Example Run](terms/example-run.md)
 
@@ -291,7 +295,7 @@ Agents that run within other agents, but with limited functionality (no
 async API or streaming). Referenced in error messages indicating
 restricted capabilities for sub-agent contexts.
 
-## [Tools Sub Agent](terms/tools-sub-agent.md)
+## [Tools Agent](terms/tools-sub-agent.md)
 
 A specialized agent type that executes tool functions, created via
 `newToolsAgent`. Built with tool specifications and automatically

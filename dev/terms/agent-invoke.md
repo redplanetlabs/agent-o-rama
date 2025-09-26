@@ -18,7 +18,8 @@ Tracks and controls individual agent executions. Provides access to results, str
 - Valid until result retrieved
 
 ## Key Clojure API
-- Primary functions: `agent-invoke`, `agent-invoke-async`, `agent-initiate`
+- Primary functions: `agent-invoke`, `agent-invoke-async`,
+  `agent-initiate`, `agent-initiate-async`
 - Creation: Via client invoke operations
 - Access: Returned from invoke calls
 

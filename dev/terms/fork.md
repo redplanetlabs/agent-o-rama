@@ -18,7 +18,8 @@ Enables parallel execution variants with modified parameters. Supports explorato
 - Separate result streams
 
 ## Key Clojure API
-- Primary functions: `agent-fork`, `agent-fork-async`, `agent-initiate-fork`
+- Primary functions: `agent-fork`, `agent-fork-async`,
+  `agent-initiate-fork`, `agent-initiate-fork-async`
 - Creation: `(agent-fork client invoke new-args)`
 - Access: Returns new invoke handle
 

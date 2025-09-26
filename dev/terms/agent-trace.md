@@ -25,6 +25,14 @@ invocations, and data transformations.
 - Read-only observation
 - Complete execution history
 
+## Key Clojure API
+- Primary functions: `record-nested-op!`, using keyword for op type
+
+## Key Java API
+- Primary functions: `AgentNode.recordNestedOp()` using `NestedOpType`.
+- Contains `AgentRef` with `AgentRef.getAgentName()` and
+  `AgentRef.getModuleName`
+
 ## Relationships
 - Used by: [User Interface](user-interface.md)
 

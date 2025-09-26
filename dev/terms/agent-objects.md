@@ -1,143 +1,54 @@
 # Agent Objects
 
-Shared resources that agents access during execution, including AI models, databases, APIs, and other external services with managed lifecycles.
+## Definition
+Shared resources that agents access during execution, including AI
+models, databases, APIs, and other external services with managed
+lifecycles.
 
-## Purpose
+## Architecture Role
+Provides centralized resource management within the agent topology,
+enabling resource sharing across multiple agent instances while handling
+initialization, connection pooling, and cleanup.
 
-Agent objects solve resource management challenges in distributed agent systems:
+## Operations
+Declaration and configuration of shared resources, runtime access by
+agent nodes, lifecycle management including initialization and cleanup.
 
-- **Resource Sharing**: Enable multiple agents to share expensive resources like AI models
-- **Lifecycle Management**: Automatic initialization, connection pooling, and cleanup
-- **Configuration Management**: Centralized setup and configuration of external services
-- **Performance Optimization**: Connection reuse and caching across agent executions
+With the object builder, instances of returned objects are guaranteed to
+only be made available to one consumer at a time (assumed to be
+non-thread-safe). The objects are pooled for efficiency, and re-used.
 
-## Declaration and Setup
+## Invariants
+Objects are created once per topology deployment and remain immutable
+during execution. Resources are automatically cleaned up when topology
+shuts down.
 
-### Static Objects
-```clojure
-(aor/declare-agent-object topology "config-data"
-  {:api-key "secret-key"
-   :model-name "gpt-4o-mini"})
-```
+ObjectBuilders are instantiated on demand, and pooled.
 
-### Dynamic Builder Objects
-```clojure
-(aor/declare-agent-object-builder topology "openai-model"
-  (fn [setup]
-    (-> (OpenAiChatModel/builder)
-        (.apiKey (get-env "OPENAI_API_KEY"))
-        (.modelName "gpt-4o-mini")
-        (.timeout (Duration/ofSeconds 60))
-        .build)))
-```
+## Key Clojure API
+- Primary functions: `declare-agent-object`, `declare-agent-object-builder`, `get-agent-object`
+- Creation: `declare-agent-object` for static values, `declare-agent-object-builder` for constructed resources
+- Access: `get-agent-object` within agent node functions
 
-### Builder with Options
-```clojure
-(aor/declare-agent-object-builder topology "database"
-  (fn [setup]
-    (create-connection (:database-url setup)))
-  {:database-url "jdbc:postgresql://localhost/agents"
-   :pool-size 10})
-```
+## Key Java API
+- Primary functions: `declareAgentObject`, `declareAgentObjectBuilder`,
+  `getAgentObject`, `setup-object-name`
+- Creation: `AgentObjectOptions` interface with `disableAutoTracing()`,
+  `threadSafe()` and `workerObjectLimit()` options.
+- Access: Via AgentNode interface methods
 
-## Access Patterns
+## Relationships
+- Uses: [agent-topology], [agent-node], [configuration]
+- Used by: [langchain4j-integration], [database-connection], [external-api]
 
-### Within Agent Nodes
-```clojure
-(aor/node "chat" "process"
-  (fn [agent-node messages]
-    (let [model (aor/get-agent-object agent-node "openai-model")
-          db (aor/get-agent-object agent-node "database")]
-      ;; Use shared resources
-      (process-with-ai model db messages))))
-```
+## Dependency graph edges:
+    agent-topology -> agent-objects
+    agent-node -> agent-objects
+    configuration -> agent-objects
+    agent-objects -> langchain4j-integration
+    agent-objects -> database-connection
+    agent-objects -> external-api
 
-### Resource Validation
-```clojure
-(let [model (aor/get-agent-object agent-node "openai-model")]
-  (when-not model
-    (throw (ex-info "Model not available" {:object-name "openai-model"}))))
-```
-
-## Common Object Types
-
-### AI Models
-```clojure
-;; OpenAI ChatModel
-(declare-agent-object-builder topology "gpt4"
-  (fn [_] (OpenAiChatModel/builder)...))
-
-;; LangChain4j StreamingChatModel
-(declare-agent-object-builder topology "streaming-model"
-  (fn [_] (OpenAiStreamingChatModel/builder)...))
-```
-
-### Database Connections
-```clojure
-(declare-agent-object-builder topology "postgres"
-  (fn [{:keys [url user password]}]
-    (-> (HikariConfig.)
-        (.setJdbcUrl url)
-        (.setUsername user)
-        (.setPassword password)
-        (HikariDataSource.))))
-```
-
-### External APIs
-```clojure
-(declare-agent-object-builder topology "weather-api"
-  (fn [{:keys [api-key base-url]}]
-    {:client (http/create-client)
-     :api-key api-key
-     :base-url base-url}))
-```
-
-## Lifecycle Management
-
-### Initialization
-Objects are created once per topology deployment and shared across all agent executions.
-
-### Connection Pooling
-Database and API connections automatically pool connections for optimal performance.
-
-### Cleanup
-Resources are automatically closed when topology shuts down.
-
-### Error Handling
-Failed object creation is logged and can trigger topology deployment failures.
-
-## Configuration Integration
-
-Objects integrate with agent configuration system:
-```clojure
-(declare-agent-object-builder topology "configurable-model"
-  (fn [config]
-    (-> (OpenAiChatModel/builder)
-        (.modelName (:model-name config "gpt-4o-mini"))
-        (.temperature (:temperature config 0.7))
-        .build)))
-```
-
-## Monitoring and Observability
-
-Agent objects provide instrumentation:
-- **Usage Metrics**: Track object access frequency and patterns
-- **Performance Monitoring**: Measure response times and error rates
-- **Resource Utilization**: Monitor connection pool health and capacity
-- **Error Tracking**: Log and alert on object access failures
-
-## Best Practices
-
-### Immutable Configuration
-Use immutable configuration objects to prevent runtime state corruption.
-
-### Graceful Degradation
-Handle missing or failed objects gracefully with fallback mechanisms.
-
-### Resource Limits
-Configure appropriate timeouts, connection limits, and retry policies.
-
-### Security
-Secure credential management through environment variables or secret management systems.
-
-Agent objects enable robust, scalable agent systems by providing managed access to external resources with automatic lifecycle management, performance optimization, and comprehensive monitoring capabilities.
+## Examples
+- Clojure: `examples/clj/src/com/rpl/agent/basic/langchain4j_agent.clj`
+- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/LangChain4jAgent.java`

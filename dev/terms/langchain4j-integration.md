@@ -9,7 +9,8 @@ tool execution. Bridges agents with various LLM providers.
 
 Provides a consistent blocking interface (as a langchain4j `ChatModel`
 instance) for both provider specific `ChatModel` and
-`StreamingChatModel` instances.
+`StreamingChatModel` instances. The langchain model object can be
+accessed using `IUnderlying.getUnderlying` on the returned chat model.
 
 Provides automatic streaming (via `aor/stream-chunk!`) for
 `StreamingChatModel` instances.

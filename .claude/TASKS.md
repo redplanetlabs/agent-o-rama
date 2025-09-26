@@ -194,6 +194,8 @@ Include REFINE to refine the spec
 
 	  add similar tests
 
+- [ ] create java basic example for every clojure example
+
 - [ ] update the aggregation-agent example to show the return value of
       agg-start node being passed as last arg to agg-node
 
