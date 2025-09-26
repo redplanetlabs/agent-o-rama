@@ -184,6 +184,16 @@ Include REFINE to refine the spec
 		- aor/set-dataset-example-input!
 		- aor/set-dataset-example-reference-output!
 
+- [x] Create java dataset examples in
+      examples/java/basic/src/main/java/com/rpl/agent/basic/
+
+	  mirror the clojure examples in:
+
+	  @examples/java/src/com/rpl/agent/basic/dataset_agent.clj
+	  @examples/clj/src/com/rpl/agent/basic/dataset_example_agent.clj
+
+	  add similar tests
+
 - [ ] update the aggregation-agent example to show the return value of
       agg-start node being passed as last arg to agg-node
 
