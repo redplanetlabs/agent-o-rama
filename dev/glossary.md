@@ -94,11 +94,11 @@ within agent nodes, retrieved via `agent-result` on client side.
 
 An individual execution unit returned by agent processing, can be result, human input request, or continuation.
 
-## Agent Throttling
+## [Agent Throttling](terms/agent-throttling.md)
 
 Rate-limiting mechanism for log messages to prevent overwhelming output in distributed execution.
 
-## Agent Topology
+## [Agent Topology](terms/agent-topology.md)
 
 Interface representing the configuration context for defining agents, stores, and objects. Provides methods for declaring system components within an agent module.
 
@@ -129,7 +129,7 @@ processing, and result combination across agent graph executions.
 
 An interface for managing and connecting to Rama clusters, providing access to deployed modules and their agents through connection management and factory methods.
 
-## Database Connections
+## [Database Connections](terms/database-connections.md)
 
 Database connections can be declared as agent objects.
 
@@ -207,7 +207,7 @@ execution flows.
 Rate-limiting mechanism for log messages to prevent overwhelming output
 in distributed execution.
 
-## Mirror Agent
+## [Mirror Agent](terms/mirror-agent.md)
 
 Local proxy for an agent defined in another module, enabling cross-module agent interactions. Declared via `declare-cluster-agent` to reference remote agents.
 
@@ -254,7 +254,7 @@ A deployable unit containing depots, pstates and topologies.  It can be
 launched on a Rama cluster. Rama modules are identified by name and can
 reference partitioned objects from other Rama modules.
 
-## Recursive Agents
+## [Recursive Agents](terms/recursive-agents.md)
 
 Agents can be called recursively and be mutually recursive.
 
@@ -298,7 +298,7 @@ A specialized agent type that executes tool functions, created via
 handles tool execution with aggregation patterns for AI tool calling
 workflows.
 
-## UI
+## [UI](terms/ui.md)
 
 Web-based monitoring and visualization interface for agent execution. Started via `start-ui` function, provides real-time agent state inspection and debugging capabilities.
 
@@ -323,6 +323,6 @@ agent execution in real-time. Provides debugging tools, state
 inspection, and execution flow visualization. Started via `start-ui`
 function and accessible through web browser when agents are running.
 
-## Vector Store
+## [Vector Store](terms/vector-store.md)
 
 Vector stores can be declared as agent objects.
