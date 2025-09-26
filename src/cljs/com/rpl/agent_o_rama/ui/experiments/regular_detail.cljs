@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.experiments.regular-detail
   (:require
    [uix.core :as uix :refer [defui $]]
-   ["@heroicons/react/24/outline" :refer [ArrowLeftIcon PlayIcon ChevronDownIcon ChevronUpIcon]]
+   ["@heroicons/react/24/outline" :refer [ArrowLeftIcon PlayIcon ChevronDownIcon ChevronUpIcon ArrowTopRightOnSquareIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
@@ -294,6 +294,36 @@
             {:onClick #(on-expand content-str)}
             "↗")))))
 
+(defui TraceLinkCapsule [{:keys [module-id target-initiate]}]
+  (let [target-agent-name (:agent-name target-initiate)
+        target-invoke (:agent-invoke target-initiate)
+        task-id (or (:task-id target-invoke)
+                    (:taskId target-invoke)
+                    (when target-invoke (.-taskId target-invoke)))
+        invoke-id (or (:agent-invoke-id target-invoke)
+                      (:agentInvokeId target-invoke)
+                      (when target-invoke (.-agentInvokeId target-invoke)))
+        invoke-fragment (when (and task-id invoke-id)
+                          (str task-id "-" invoke-id))
+        trace-url (when invoke-fragment
+                    (rfe/href :agent/invocation-detail
+                              {:module-id module-id
+                               :agent-name (common/url-encode target-agent-name)
+                               :invoke-id invoke-fragment}))]
+    (when trace-url
+      ($ :a {:href trace-url
+             :target "_blank"
+             :rel "noopener noreferrer"
+             :title "View execution trace for this run (opens in new tab)"
+             :onClick #(.stopPropagation %)
+             :className (common/cn
+                         "inline-flex items-center gap-1.5 px-2.5 py-1 "
+                         "bg-indigo-100 text-indigo-700 rounded-full "
+                         "text-xs font-medium "
+                         "hover:bg-indigo-200 hover:text-indigo-800 transition-colors shadow-sm")}
+         ($ ArrowTopRightOnSquareIcon {:className "h-3.5 w-3.5"})
+         "View Trace"))))
+
 (defui ContentModal [{:keys [content title]}]
   ($ :div.p-6.space-y-4
      ($ :h4.text-lg.font-medium.text-gray-900.mb-4 (or title "Content"))
@@ -363,15 +393,20 @@
                      ($ :th {:className (common/cn (:th common/table-classes) "w-1/3")} "Output & Evaluations")))
                ($ :tbody
                   (for [[idx run] (map-indexed vector filtered-results)
-                        :let [evaluator-metadata (evaluators/collect-column-metadata (:evals run))]]
+                        :let [evaluator-metadata (evaluators/collect-column-metadata (:evals run))
+                              target-initiate (-> run :agent-initiates vals first)]]
                     ($ :tr.border-b {:key (str (:example-id run) "-" idx)}
                        ;; Input Cell
                        ($ :td {:className (:td common/table-classes)}
-                          ($ CellContent {:content (:input run)
-                                          :truncated? (not show-full-text?)
-                                          :on-expand #(state/dispatch [:modal/show :content-detail
-                                                                       {:title "Input"
-                                                                        :component ($ ContentModal {:content % :title "Input"})}])}))
+                          ($ :div.flex.flex-col.items-start.gap-2
+                             ($ CellContent {:content (:input run)
+                                             :truncated? (not show-full-text?)
+                                             :on-expand #(state/dispatch [:modal/show :content-detail
+                                                                          {:title "Input"
+                                                                           :component ($ ContentModal {:content % :title "Input"})}])})
+                             (when target-initiate
+                               ($ TraceLinkCapsule {:module-id module-id
+                                                    :target-initiate target-initiate}))))
                        ;; Reference Output Cell
                        ($ :td {:className (:td common/table-classes)}
                           ($ CellContent {:content (:reference-output run)
@@ -407,10 +442,10 @@
                                                  {:onClick #(state/dispatch [:modal/show :content-detail
                                                                              {:title "Output"
                                                                               :component ($ ContentModal {:content output-content :title "Output"})}])}
-                                                 "↗")))))))
-                               ($ EvaluatorCapsulesContainer {:run run
-                                                              :module-id module-id
-                                                              :columns-metadata evaluator-metadata})))))))))))))
+                                                 "↗")))))
+                                     ($ EvaluatorCapsulesContainer {:run run
+                                                                    :module-id module-id
+                                                                    :columns-metadata evaluator-metadata})))))))))))))))
                        ;; Trace Column placeholder (if needed later)
 
 (defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
