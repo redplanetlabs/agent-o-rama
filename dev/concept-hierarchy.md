@@ -145,7 +145,10 @@ log-throttling
 - **tool-calling**: External function execution
 - **tools-sub-agent**: Tool execution agents
 
-### Experimentation (Chapter 8)
+### Advanced (Chapter 8)
+- **update-mode**: Update Mode
+
+### Experimentation (Chapter 9)
 - **experiments**: Evaluation framework
 - **evaluator-builder**: Metric construction
 - **evaluator**: Performance measurement
