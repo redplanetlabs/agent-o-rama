@@ -5,6 +5,8 @@
   - get-human-input: Request input from human users
   - agent-next-step: Handle human input requests in execution flow
   - provide-human-input: Supply responses to human input requests
+  - pending-human-inputs: List all pending human input requests
+  - human-input-request?: Check if a step is a human input request
   - Human-in-the-loop agent execution patterns"
   (:require
    [com.rpl.agent-o-rama :as aor]
@@ -12,8 +14,6 @@
    [com.rpl.rama :as rama]
    [com.rpl.rama.test :as rtest])
   (:import
-   [com.rpl.agentorama
-    HumanInputRequest]
    [dev.langchain4j.data.message
     UserMessage]
    [dev.langchain4j.model.openai
@@ -47,40 +47,43 @@
          (.modelName "gpt-4o-mini")
          .build)))
   (->
-    topology
-    (aor/new-agent "HumanInputAgent")
-    (aor/node
-     "chat"
-     nil
-     (fn [agent-node ^String user-message]
-       (let [openai   (aor/get-agent-object agent-node "openai")
-             response (-> (lc4j/chat openai [(UserMessage. user-message)])
-                          .aiMessage
-                          .text)
-             helpful? (human-helpful? agent-node response)]
-         (aor/result! agent-node
-                      {:response response
-                       :helpful  helpful?}))))))
+   topology
+   (aor/new-agent "HumanInputAgent")
+   (aor/node
+    "chat"
+    nil
+    (fn [agent-node ^String user-message]
+      (let [openai (aor/get-agent-object agent-node "openai")
+            response (-> (lc4j/chat openai [(UserMessage. user-message)])
+                         .aiMessage
+                         .text)
+            helpful? (human-helpful? agent-node response)]
+        (aor/result! agent-node
+                     {:response response
+                      :helpful helpful?}))))))
 
 (defn -main
   "Run the human input agent example"
   [& _args]
   (if (System/getenv "OPENAI_API_KEY")
     (with-open [ipc (rtest/create-ipc)
-                ui  (aor/start-ui ipc)]
+                ui (aor/start-ui ipc)]
       (rtest/launch-module! ipc HumanInputAgentModule {:tasks 4 :threads 2})
-      (let [module-name   (rama/get-module-name HumanInputAgentModule)
+      (let [module-name (rama/get-module-name HumanInputAgentModule)
             agent-manager (aor/agent-manager ipc module-name)
-            chat-agent    (aor/agent-client agent-manager "HumanInputAgent")
+            chat-agent (aor/agent-client agent-manager "HumanInputAgent")
             _ (print "Enter your message: ")
             _ (flush)
-            user-message  (read-line)
-            inv           (aor/agent-initiate chat-agent user-message)]
+            user-message (read-line)
+            inv (aor/agent-initiate chat-agent user-message)]
         (println)
         (println user-message)
         (loop [step (aor/agent-next-step chat-agent inv)]
-          (if (instance? HumanInputRequest step)
+          (if (aor/human-input-request? step)
             (do
+              (let [pending (aor/pending-human-inputs chat-agent inv)]
+                (when (> (count pending) 1)
+                  (println (format "\n[%d pending human input requests]" (count pending)))))
               (println (:prompt step))
               (print ">> ")
               (flush)
@@ -93,6 +96,8 @@
 
         (println "\nNotice how:")
         (println "- Agents can request human input during execution")
+        (println "- human-input-request? checks if a step is a human input request")
+        (println "- pending-human-inputs lists all pending requests")
         (println "- Input validation and defaults are handled gracefully")
         (println "- Human responses influence the final result")))
 

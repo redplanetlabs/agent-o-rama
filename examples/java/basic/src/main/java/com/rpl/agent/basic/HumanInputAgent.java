@@ -5,16 +5,16 @@ import com.rpl.agentorama.AgentInvoke;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentStep;
-import com.rpl.agentorama.AgentsModule;
 import com.rpl.agentorama.AgentTopology;
+import com.rpl.agentorama.AgentsModule;
 import com.rpl.agentorama.HumanInputRequest;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import dev.langchain4j.model.chat.ChatModel;
-
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
@@ -27,6 +27,7 @@ import java.util.Scanner;
  *   <li>getHumanInput: Request input from human users
  *   <li>agent.nextStep: Handle human input requests in execution flow
  *   <li>provideHumanInput: Supply responses to human input requests
+ *   <li>pendingHumanInputs: List all pending human input requests
  *   <li>Human-in-the-loop agent execution patterns
  * </ul>
  *
@@ -132,6 +133,13 @@ public class HumanInputAgent {
       AgentStep step = agent.nextStep(invoke);
       while (step instanceof HumanInputRequest) {
         HumanInputRequest humanInput = (HumanInputRequest) step;
+
+        // Check for multiple pending human inputs
+        List<HumanInputRequest> pending = agent.pendingHumanInputs(invoke);
+        if (pending.size() > 1) {
+          System.out.println(String.format("\n[%d pending human input requests]", pending.size()));
+        }
+
         System.out.println(humanInput.getPrompt());
         System.out.print(">> ");
         String response = scanner.nextLine();
@@ -151,6 +159,9 @@ public class HumanInputAgent {
 
       System.out.println("\nNotice how:");
       System.out.println("- Agents can request human input during execution");
+      System.out.println(
+          "- instanceof HumanInputRequest checks if a step is a human input request");
+      System.out.println("- pendingHumanInputs lists all pending requests");
       System.out.println("- Input validation and defaults are handled gracefully");
       System.out.println("- Human responses influence the final result");
     }

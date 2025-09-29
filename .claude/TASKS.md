@@ -218,7 +218,7 @@ Include REFINE to refine the spec
           - examples/clj/src/com/rpl/agent/basic/evaluator_agent.clj
 		  - examples/java/basic/src/main/java/com/rpl/agent/basic/EvaluatorAgent.java
 
-- [ ] add demonstration of - `human-input-request?` and
+- [x] add demonstration of - `human-input-request?` and
       `pending-human-inputs` calls to the clojure and java basic
       examples.  The former should replace the current explicit instance? check:
 
