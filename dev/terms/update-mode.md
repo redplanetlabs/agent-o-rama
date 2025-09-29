@@ -33,5 +33,5 @@ update. Determines how running agents handle graph definition changes.
 - Used by: Graph deployment
 
 ## Examples
-- Clojure: Used in development for hot reloading
-- Java: Used in development for hot reloading
+- Clojure: `examples/clj/src/com/rpl/agent/basic/module_update_agent.clj`
+- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/ModuleUpdateAgent.java`
