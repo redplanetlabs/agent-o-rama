@@ -194,6 +194,12 @@ Include REFINE to refine the spec
 
 	  add similar tests
 
+- [x] add a module update example in @examples/clj/README.md and an
+      implementation:
+	  - include aor/set-update-mode
+	  - IPC with module deploy and update
+
+
 - [ ] create java basic example for every clojure example
 
 - [ ] update the aggregation-agent example to show the return value of

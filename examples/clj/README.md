@@ -51,6 +51,7 @@ progressing from basic concepts to advanced patterns.
 19. **`dataset_example_agent`** - Dataset example management (add, update, tag, remove examples)
 20. **`evaluator_agent`** - Evaluator creation and execution
 21. **`provided_evaluator_builders_agent`** - Built-in evaluator builders (aor/llm-judge, aor/conciseness, aor/f1-score)
+22. **`module_update_agent`** - Module updates with aor/set-update-mode, IPC deployment and update
 
 ## Running Examples
 
@@ -98,6 +99,7 @@ lein run -m com.rpl.agent.basic.dataset-example-agent
 lein run -m com.rpl.agent.basic.evaluator-agent
 lein run -m com.rpl.agent.basic.provided-evaluator-builders-agent
 lein run -m com.rpl.agent.basic.langchain4j-agent
+lein run -m com.rpl.agent.basic.module-update-agent
 ```
 
 Or from REPL:
