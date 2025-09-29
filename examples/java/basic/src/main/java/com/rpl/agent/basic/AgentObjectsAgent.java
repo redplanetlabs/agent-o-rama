@@ -4,8 +4,8 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentInvoke;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
-import com.rpl.agentorama.AgentsModule;
 import com.rpl.agentorama.AgentTopology;
+import com.rpl.agentorama.AgentsModule;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -67,11 +67,13 @@ public class AgentObjectsAgent {
       topology.declareAgentObject("app-version", "1.2.3");
       topology.declareAgentObject("send-to", "alerts");
 
-      // Dynamic agent object builder - service that uses version
+      // Dynamic agent object builder - service that uses version and object name
       topology.declareAgentObjectBuilder(
           "message-service",
           setup -> {
             String version = (String) setup.getAgentObject("app-version");
+            String objectName = setup.getObjectName();
+            System.out.println("Building object: " + objectName + " with version: " + version);
             return new MessageService(version);
           });
 

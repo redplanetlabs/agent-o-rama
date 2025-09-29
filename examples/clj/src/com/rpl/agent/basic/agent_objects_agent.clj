@@ -34,7 +34,7 @@
   "Use the message service - NOT thread-safe"
   [service input send-to]
   (let [new-count (vswap! (:counter-vol service) inc)
-        version   (:version service)]
+        version (:version service)]
     {:message (str "v" version ": " input " (#" new-count " -> " send-to ")")}))
 
 ;;; Agent module demonstrating agent objects
@@ -45,12 +45,14 @@
   (aor/declare-agent-object topology "app-version" "1.2.3")
   (aor/declare-agent-object topology "send-to" "alerts")
 
-  ;; Dynamic agent object builder - service that uses version
+  ;; Dynamic agent object builder - service that uses version and object name
   (aor/declare-agent-object-builder
    topology
    "message-service"
    (fn [setup]
-     (let [version (aor/get-agent-object setup "app-version")]
+     (let [version (aor/get-agent-object setup "app-version")
+           object-name (aor/setup-object-name setup)]
+       (println (str "Building object: " object-name " with version: " version))
        (create-message-service version))))
 
   (-> (aor/new-agent topology "AgentObjectsAgent")
@@ -73,7 +75,7 @@
 
     (let [manager (aor/agent-manager ipc
                                      (rama/get-module-name AgentObjectsModule))
-          agent   (aor/agent-client manager "AgentObjectsAgent")]
+          agent (aor/agent-client manager "AgentObjectsAgent")]
 
       (println "Agent Objects Example:")
 

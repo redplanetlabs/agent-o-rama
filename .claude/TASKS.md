@@ -225,7 +225,7 @@ Include REFINE to refine the spec
           - examples/clj/src/com/rpl/agent/basic/human_input_agent.clj
 		  - examples/java/basic/src/main/java/com/rpl/agent/basic/HumanInputAgent.java
 
-- [ ] add demonstration of - `setup-object-name` calls to the clojure
+- [x] add demonstration of - `setup-object-name` calls to the clojure
       and java basic examples.
 
           - examples/clj/src/com/rpl/agent/basic/agent_objects_agent.clj
