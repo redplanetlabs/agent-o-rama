@@ -3,8 +3,8 @@ package com.rpl.agent.basic;
 import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
-import com.rpl.agentorama.AgentsModule;
 import com.rpl.agentorama.AgentTopology;
+import com.rpl.agentorama.AgentsModule;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -18,6 +18,7 @@ import com.rpl.rama.test.LaunchConfig;
  *   <li>Agent module definition as nested class extending AgentsModule
  *   <li>Node function implementation as nested class
  *   <li>Single-node agent topology
+ *   <li>Querying available agent names
  *   <li>Agent invocation and result handling
  * </ul>
  *
@@ -67,13 +68,18 @@ public class BasicAgent {
       BasicModule module = new BasicModule();
       ipc.launchModule(module, new LaunchConfig(1, 1));
 
-      // Get agent manager and client
+      // Get agent manager
       String moduleName = module.getModuleName();
       AgentManager manager = AgentManager.create(ipc, moduleName);
+
+      // List all available agents in this module
+      System.out.println("Available agents: " + manager.getAgentNames());
+
+      // Get client for our specific agent
       AgentClient agent = manager.getAgentClient("BasicAgent");
 
       // Invoke agent synchronously with sample user names
-      System.out.println("Basic Agent Results:");
+      System.out.println("\nBasic Agent Results:");
       System.out.println("User: \"Alice\" -> Result: " + agent.invoke("Alice"));
       System.out.println("User: \"Bob\" -> Result: " + agent.invoke("Bob"));
     }

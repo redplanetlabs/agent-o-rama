@@ -9,6 +9,7 @@
   - agent-node: Use agent-node argument
   - result!: Return final result from a node
   - agent-manager: Create client manager
+  - agent-names: Query available agent names
   - agent-client: Get client for specific agent
   - agent-invoke: Synchronously invoke agent"
   (:require
@@ -43,10 +44,15 @@
     ;; Get agent manager and client
     (let [manager (aor/agent-manager
                    ipc
-                   (rama/get-module-name BasicAgentModule))
-          agent   (aor/agent-client manager "BasicAgent")]
+                   (rama/get-module-name BasicAgentModule))]
 
-      ;; Invoke agent synchronously with sample user names
-      (println "Basic Agent Results:")
-      (println "User: \"Alice\" -> Result:" (aor/agent-invoke agent "Alice"))
-      (println "User: \"Bob\" -> Result:" (aor/agent-invoke agent "Bob")))))
+      ;; List all available agents in this module
+      (println "Available agents:" (aor/agent-names manager))
+
+      ;; Get client for our specific agent
+      (let [agent (aor/agent-client manager "BasicAgent")]
+
+        ;; Invoke agent synchronously with sample user names
+        (println "\nBasic Agent Results:")
+        (println "User: \"Alice\" -> Result:" (aor/agent-invoke agent "Alice"))
+        (println "User: \"Bob\" -> Result:" (aor/agent-invoke agent "Bob"))))))

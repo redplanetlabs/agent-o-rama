@@ -208,6 +208,11 @@ Include REFINE to refine the spec
 
 	  add similar tests
 
+- [x] add demonstration of agent-names call to the clojure and java
+      basic examples:
+          - examples/clj/src/com/rpl/agent/basic/basic_agent.clj
+		  - examples/java/basic/src/main/java/com/rpl/agent/basic/BasicAgent.java
+
 - [ ] create java basic example for every clojure example
 
 - [ ] update the aggregation-agent example to show the return value of
