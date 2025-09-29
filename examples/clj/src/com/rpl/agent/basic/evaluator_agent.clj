@@ -28,7 +28,7 @@
          (let [output-length (count (str output))]
            {"within-limit?" (<= output-length max-length)
             "actual-length" output-length
-            "max-length"    max-length}))))
+            "max-length" max-length}))))
    {:params {"maxLength" {:description "Maximum allowed length"}}})
 
   (aor/declare-comparative-evaluator-builder
@@ -40,20 +40,20 @@
        ;; Simple quality metric based on length and content
        (let [scored-outputs (map-indexed
                              (fn [idx output]
-                               {:index  idx
+                               {:index idx
                                 :output output
-                                :score  (+ (count (str output))
-                                           (if (str/includes? (str output) "good")
-                                             10
-                                             0)
-                                           (if (str/includes? (str output) "bad")
-                                             -10
-                                             0))})
+                                :score (+ (count (str output))
+                                          (if (str/includes? (str output) "good")
+                                            10
+                                            0)
+                                          (if (str/includes? (str output) "bad")
+                                            -10
+                                            0))})
                              outputs)
-             best-output    (apply max-key :score scored-outputs)]
-         {"best-index"  (:index best-output)
+             best-output (apply max-key :score scored-outputs)]
+         {"best-index" (:index best-output)
           "best-output" (:output best-output)
-          "best-score"  (:score best-output)}))))
+          "best-score" (:score best-output)}))))
 
   (aor/declare-summary-evaluator-builder
    topology
@@ -61,34 +61,34 @@
    "Calculates accuracy across multiple examples"
    (fn [params]
      (fn [fetcher example-runs]
-       (let [total    (count example-runs)
-             correct  (count (filter #(= (:reference-output %) (:output %))
-                              example-runs))
+       (let [total (count example-runs)
+             correct (count (filter #(= (:reference-output %) (:output %))
+                                    example-runs))
              accuracy (if (pos? total) (/ (double correct) total) 0.0)]
          {"total-examples" total
           "correct-predictions" correct
-          "accuracy"       accuracy}))))
+          "accuracy" accuracy}))))
 
   ;; Simple agent that processes text
   (->
-    (aor/new-agent topology "TextProcessor")
+   (aor/new-agent topology "TextProcessor")
 
-    (aor/node
-     "process-text"
-     nil
-     (fn [agent-node input]
-       (let [response (cond
-                        (< (count input) 10)
-                        "short"
+   (aor/node
+    "process-text"
+    nil
+    (fn [agent-node input]
+      (let [response (cond
+                       (< (count input) 10)
+                       "short"
 
-                        (< (count input) 30)
-                        "good medium length"
+                       (< (count input) 30)
+                       "good medium length"
 
-                        :else
-                        "too long")]
-         (println "Processing input:" input)
-         (println "Generated response:" response)
-         (aor/result! agent-node response))))))
+                       :else
+                       "too long")]
+        (println "Processing input:" input)
+        (println "Generated response:" response)
+        (aor/result! agent-node response))))))
 
 (defn -main
   "Run the evaluator example"
@@ -99,7 +99,7 @@
     (let [manager (aor/agent-manager
                    ipc
                    (rama/get-module-name EvaluatorAgentModule))
-          agent   (aor/agent-client manager "TextProcessor")]
+          agent (aor/agent-client manager "TextProcessor")]
 
       (println "Evaluator Example:")
       (println "====================")
@@ -152,12 +152,12 @@
       ;; Run the agent to generate some outputs
       (println "\n2. Running agent to generate outputs...")
       (let
-        [output1 (aor/agent-invoke agent "Hi")
-         output2 (aor/agent-invoke agent "This is a test input")
-         output3
-         (aor/agent-invoke
-          agent
-          "This is a much longer test input that should trigger different behavior")]
+       [output1 (aor/agent-invoke agent "Hi")
+        output2 (aor/agent-invoke agent "This is a test input")
+        output3
+        (aor/agent-invoke
+         agent
+         "This is a much longer test input that should trigger different behavior")]
 
         (println "  Output 1:" output1)
         (println "  Output 2:" output2)
@@ -167,11 +167,11 @@
         (println "\n3. Testing evaluators with agent outputs...")
 
         ;; Test regular evaluators
-        (let [length-result  (aor/try-evaluator manager
-                                                "length-50"
-                                                "Hi"
-                                                "short"
-                                                output1)
+        (let [length-result (aor/try-evaluator manager
+                                               "length-50"
+                                               "Hi"
+                                               "short"
+                                               output1)
               concise-result (aor/try-evaluator
                               manager
                               "concise-30"
@@ -194,22 +194,22 @@
 
         ;; Test summary evaluator with multiple examples
         (println "\n5. Testing summary evaluator...")
-        (let [examples        [(aor/mk-example-run "input1"
-                                                   "positive"
-                                                   "positive")
-                               (aor/mk-example-run "input2"
-                                                   "negative"
-                                                   "negative")
-                               (aor/mk-example-run "input3"
-                                                   "positive"
-                                                   "negative")
-                               (aor/mk-example-run "input4"
-                                                   "positive"
-                                                   "positive")]
+        (let [examples [(aor/mk-example-run "input1"
+                                            "positive"
+                                            "positive")
+                        (aor/mk-example-run "input2"
+                                            "negative"
+                                            "negative")
+                        (aor/mk-example-run "input3"
+                                            "positive"
+                                            "negative")
+                        (aor/mk-example-run "input4"
+                                            "positive"
+                                            "positive")]
 
-              f1-result       (aor/try-summary-evaluator manager
-                                                         "f1-positive"
-                                                         examples)
+              f1-result (aor/try-summary-evaluator manager
+                                                   "f1-positive"
+                                                   examples)
               accuracy-result (aor/try-summary-evaluator manager
                                                          "accuracy-calc"
                                                          examples)]
@@ -220,7 +220,24 @@
         ;; Search for evaluators
         (println "\n6. Searching for evaluators...")
         (let [search-results (aor/search-evaluators manager "length")]
-          (println "Evaluators matching 'length':" search-results)))
+          (println "Evaluators matching 'length':" search-results))
+
+        ;; Demonstrate removing evaluators
+        (println "\n7. Removing evaluators...")
+        (println "  Before removal, all evaluators:")
+        (println "    " (aor/search-evaluators manager ""))
+
+        ;; Remove a couple of evaluators
+        (aor/remove-evaluator! manager "length-50")
+        (aor/remove-evaluator! manager "quality-compare")
+        (println "  Removed 'length-50' and 'quality-compare'")
+
+        (println "  After removal, remaining evaluators:")
+        (println "    " (aor/search-evaluators manager ""))
+
+        ;; Demonstrate that removing non-existent evaluator doesn't error
+        (aor/remove-evaluator! manager "non-existent")
+        (println "  Removing non-existent evaluator causes no error"))
 
       (println "\nKey takeaways:")
       (println
@@ -229,7 +246,8 @@
        "- Agents focus on their core logic, evaluators assess their outputs")
       (println "- Different evaluator types serve different assessment needs")
       (println "- Custom evaluators can implement domain-specific logic")
-      (println "- Built-in evaluators provide common metrics like F1-score"))))
+      (println "- Built-in evaluators provide common metrics like F1-score")
+      (println "- Evaluators can be removed when no longer needed"))))
 
 (comment
   (-main))
