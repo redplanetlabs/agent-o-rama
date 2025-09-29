@@ -199,6 +199,14 @@ Include REFINE to refine the spec
 	  - include aor/set-update-mode
 	  - IPC with module deploy and update
 
+- [x] Create a java example in
+      examples/java/basic/src/main/java/com/rpl/agent/basic/
+
+	  mirror the clojure example in:
+
+	  @examples/clj/src/com/rpl/agent/basic/module_update_agent.clj
+
+	  add similar tests
 
 - [ ] create java basic example for every clojure example
 
