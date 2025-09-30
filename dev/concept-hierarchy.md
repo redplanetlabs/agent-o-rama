@@ -147,6 +147,8 @@ log-throttling
 
 ### Advanced (Chapter 8)
 - **update-mode**: Update Mode
+- **define-agents**: define agents in a rama module
+- **underlying-stream-topology**: extend the agent streaming topology
 
 ### Experimentation (Chapter 9)
 - **experiments**: Evaluation framework

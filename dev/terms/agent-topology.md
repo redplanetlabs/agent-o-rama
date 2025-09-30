@@ -1,7 +1,9 @@
 # Agent Topology
 
 ## Definition
-Interface representing the configuration context for defining agents, stores, and objects within an agent module. Provides the foundational structure for declaring system components and their relationships.
+Interface representing the configuration context for defining agents,
+stores, and objects within an agent module. Provides the foundational
+structure for declaring system components and their relationships.
 
 ## Architecture Role
 Agent Topology serves as the configuration interface passed to agent
@@ -17,10 +19,14 @@ before deployment.
 
 An agent-topology can be declared in an ordinary Rama module, using the
 low level API, should you need to create your own depots, and topologies
-along side the agent.
+along side the agent.  This, for example could allow you to use a
+tick-depot to trigger cleanup of agent stores.
 
 ## Invariants
-Each topology maintains a consistent view of declared components. Component names must be unique within their type scope. Topology configuration is immutable once the module is defined and deployed.
+Each topology maintains a consistent view of declared
+components. Component names must be unique within their type
+scope. Topology configuration is immutable once the module is defined
+and deployed.
 
 ## Key Clojure API
 - Primary functions: `agents-topology`, `new-agent`, `declare-key-value-store`, `declare-agent-object`
