@@ -20,43 +20,43 @@
    topology
    (aor/new-agent "MultiAggAgent")
 
-    ;; Start by distributing different types of data
+   ;; Start by distributing different types of data
    (aor/agg-start-node
     "distribute-data"
     ["process-numbers" "process-text"]
     (fn [agent-node {:keys [numbers text]}]
       (println "Distributing data for parallel processing")
 
-       ;; Send numbers for mathematical analysis
+      ;; Send numbers for mathematical analysis
       (doseq [num numbers]
         (aor/emit! agent-node "process-numbers" num))
 
-       ;; Send text for linguistic analysis
+      ;; Send text for linguistic analysis
       (doseq [txt text]
         (aor/emit! agent-node "process-text" txt))))
 
-    ;; Process numbers - compute statistics
+   ;; Process numbers - compute statistics
    (aor/node
     "process-numbers"
     "combine-results"
     (fn [agent-node number]
-      (let [analysis {:value number
+      (let [analysis {:value  number
                       :square (* number number)
-                      :even? (even? number)}]
+                      :even?  (even? number)}]
         (aor/emit! agent-node "combine-results" "number" analysis))))
 
-    ;; Process text - analyze content
+   ;; Process text - analyze content
    (aor/node
     "process-text"
     "combine-results"
     (fn [agent-node text]
-      (let [analysis {:value text
-                      :length (count text)
+      (let [analysis {:value     text
+                      :length    (count text)
                       :uppercase (str/upper-case text)
-                      :words (count (str/split text #"\s+"))}]
+                      :words     (count (str/split text #"\s+"))}]
         (aor/emit! agent-node "combine-results" "text" analysis))))
 
-    ;; Combine all analysis using multi-agg with tagged inputs
+   ;; Combine all analysis using multi-agg with tagged inputs
    (aor/agg-node
     "combine-results"
     nil
@@ -69,15 +69,15 @@
          [state analysis]
          (update state :text conj analysis)))
     (fn [agent-node aggregated-state _]
-      (let [numbers (:numbers aggregated-state)
+      (let [numbers      (:numbers aggregated-state)
             text-entries (:text aggregated-state)
 
-             ;; Calculate statistics from numbers
+            ;; Calculate statistics from numbers
             number-sum (reduce + (map :value numbers))
             square-sum (reduce + (map :square numbers))
             even-count (count (filter :even? numbers))
 
-             ;; Calculate statistics from text
+            ;; Calculate statistics from text
             total-words (reduce + (map :words text-entries))
             total-chars (reduce + (map :length text-entries))]
 
@@ -88,12 +88,12 @@
 
         (aor/result! agent-node
                      {:summary {:numbers-processed (count numbers)
-                                :text-processed (count text-entries)
-                                :number-sum number-sum
-                                :square-sum square-sum
-                                :even-count even-count
-                                :total-words total-words
-                                :total-characters total-chars}
+                                :text-processed    (count text-entries)
+                                :number-sum        number-sum
+                                :square-sum        square-sum
+                                :even-count        even-count
+                                :total-words       total-words
+                                :total-characters  total-chars}
                       :details aggregated-state}))))))
 
 (defn -main
@@ -104,16 +104,16 @@
 
     (let [manager (aor/agent-manager ipc
                                      (rama/get-module-name MultiAggAgentModule))
-          agent (aor/agent-client manager "MultiAggAgent")]
+          agent   (aor/agent-client manager "MultiAggAgent")]
 
       (println "Multi-Agg Agent Example:")
       (println "Processing mixed data types with custom aggregation logic")
 
       (let [result (aor/agent-invoke agent
                                      {:numbers [1 2 3 4 5 6 7 8 9 10]
-                                      :text ["Hello world"
-                                             "Multi-agg is powerful"
-                                             "Parallel processing rocks"]})]
+                                      :text    ["Hello world"
+                                                "Multi-agg is powerful"
+                                                "Parallel processing rocks"]})]
 
         (println "\nResults:")
 
@@ -138,3 +138,6 @@
       (println "- Each 'on' clause processes specific data types")
       (println "- State accumulation works across multiple input streams")
       (println "- Parallel processing with custom aggregation logic"))))
+
+(comment
+  (-main))
