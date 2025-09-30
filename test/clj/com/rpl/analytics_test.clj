@@ -853,6 +853,12 @@
          (bind foo (aor/agent-client agent-manager "foo"))
          (bind bar (aor/agent-client agent-manager "bar"))
          (bind ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
+         (bind foo-cursors
+           (foreign-pstate ipc module-name (po/agent-rule-cursors-task-global-name "foo")))
+
+         (bind foo-rules
+           (:agent-rules-pstate (aor-types/underlying-objects
+                                 foo)))
 
          (TopologyUtils/advanceSimTime 1000)
 
@@ -1091,22 +1097,55 @@
                   [:action2 ["aaaa"] "aaaa!?" {"a1" "1a" "a2" "XYZ"}]}))
 
 
+         (bind {:keys [actions pagination-params]}
+           (foreign-invoke-query foo-action-log "foo-a3" 2 nil))
+         (bind all-actions actions)
+         (bind {:keys [actions pagination-params]}
+           (foreign-invoke-query foo-action-log "foo-a3" 2 pagination-params))
+         (bind all-actions (mapv :action (concat all-actions actions)))
+         (is (= {0 nil 1 nil} pagination-params))
+         (is (= 4 (count all-actions)))
+         (is (every? :success? all-actions))
+         ;; actions aren't done in strict order across tasks
+         (is (= #{{"output" "aaaa!?" "input" ["aaaa"]}
+                  {"output" "....!?" "input" ["...."]}
+                  {"output" "aaaaaaa!?" "input" ["aaaaaaa"]}
+                  {"output" "dcba!?" "input" ["dcba"]}}
+                (set (mapv :info-map all-actions))))
 
 
-         ;; TODO: <<<<>>>> check action logs
-         (clojure.pprint/pprint
-          (foreign-invoke-query foo-action-log "foo-a3" 10 nil))
 
-         ;; TODO: <<<<>>>>> do java ones
-         ;;   - can only verify those through action logs
-
-
-         ;; TODO: <<<<>>>> deleting a rule is not deleting its cursors
-         ;;   - can clean those up in microbatch
-
-
+         (bind {:keys [actions pagination-params]}
+           (foreign-invoke-query foo-action-log "foo-a4" 10 nil))
+         (bind all-actions (mapv :action actions))
+         (is (every? :success? all-actions))
+         (is (= #{{"output" "aaaa!?" "input" ["aaaa"] "params" {"jparam1" "ZZZ"}}
+                  {"output" "....!?" "input" ["...."] "params" {"jparam1" "ZZZ"}}
+                  {"output" "aaaaaaa!?" "input" ["aaaaaaa"] "params" {"jparam1" "ZZZ"}}
+                  {"output" "dcba!?" "input" ["dcba"] "params" {"jparam1" "ZZZ"}}}
+                (set (mapv :info-map all-actions))))
 
 
+         (is (= #{"foo-a1" "foo-a2" "foo-a3" "foo-a4" "eval1" "eval2"}
+                (set (keys (foreign-select-one STAY foo-cursors)))))
+         (is (= #{"foo-a1" "foo-a2" "foo-a3" "foo-a4" "eval1" "eval2"}
+                (set (keys (ana/fetch-agent-rules foo-rules)))))
+
+
+         (is (thrown? Exception (ana/delete-rule! global-actions-depot "foo" "eval1")))
+         (cycle!)
+         (is (= #{"foo-a1" "foo-a2" "foo-a3" "foo-a4" "eval1" "eval2"}
+                (set (keys (foreign-select-one STAY foo-cursors)))))
+         (is (= #{"foo-a1" "foo-a2" "foo-a3" "foo-a4" "eval1" "eval2"}
+                (set (keys (ana/fetch-agent-rules foo-rules)))))
+
+         ;; verify cursors get deleted for deleted rule on next microbatch
+         (ana/delete-rule! global-actions-depot "foo" "foo-a3")
+         (cycle!)
+         (is (= #{"foo-a1" "foo-a2" "foo-a4" "eval1" "eval2"}
+                (set (keys (foreign-select-one STAY foo-cursors)))))
+         (is (= #{"foo-a1" "foo-a2" "foo-a4" "eval1" "eval2"}
+                (set (keys (ana/fetch-agent-rules foo-rules)))))
 
 
 
@@ -1119,21 +1158,12 @@
          ;;   - gives nil for node output in that case
          ;;     - node latency is nil
          ;;     - agent latency is not nil
-         ;;  - verify filters work
-         ;;  - verify sampling rate
          ;;  - verify respects max concurrency
          ;;  - verify how much it does in one iteration
          ;;  - agent invokes from experiments are skipped
-         ;;  - start from time for rule
          ;;  - error handling:
          ;;    - online eval throws exception
          ;;      - online eval doesn't return map
          ;;    - action doesn't return map
-
-         ;; TODO: <<<<>>>>
-         ;;  - ana/add-rule!
-         ;;  - ana/delete-rule!
-         ;;     - verify dependency checking
-         ;;  - ana/fetch-agent-rules
-         ;;     - use unerlying-objects to get it
+         ;;    - error during action and its associated action log
         )))))

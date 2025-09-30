@@ -278,7 +278,7 @@
                          $$rules))
 
     (case> DeleteRule :> {:keys [*name]})
-     (local-select> (subselect MAP-VALS) $$rules :> *rules)
+     (local-select> (subselect MAP-VALS :definition) $$rules :> *rules)
      (check-rule-dependency-conflict *rules *name :> *error-str)
      (<<if (some? *error-str)
        (ack-return> *error-str)

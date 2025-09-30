@@ -157,7 +157,8 @@
     (declare-pstate*
      mb-topology
      (symbol (po/agent-rule-cursors-task-global-name agent-name))
-     po/AGENT-RULE-CURSORS-PSTATE-SCHEMA)
+     po/AGENT-RULE-CURSORS-PSTATE-SCHEMA
+     {:global? true})
 
     (retries/declare-check-impl mb-topology agent-name)
     (queries/declare-tracing-query-topology topologies agent-name)
