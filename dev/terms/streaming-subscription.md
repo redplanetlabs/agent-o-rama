@@ -10,8 +10,7 @@ progress tracking, and incremental results delivery.
 ## Operations
 Subscribe to stream:
 - `agent-stream` -  from first invoke of an agent node
-- `agent-stream-specific` - from a specific invoke of an agent node
-- `agent-stream-all` - from all invocations of a node (chunks are grouped by invocation-id, as a map from invocation-id to sequence of chunks)
+- `agent-stream-all` - from all invocations of a node (chunks are grouped by invocation-id, as a map from invocation-id to sequence of chunks) for a given agent invoke
 - Process chunks asynchronously
 
 ## Invariants
@@ -20,7 +19,7 @@ Subscribe to stream:
 - Non-blocking reception
 
 ## Key Clojure API
-- Primary functions: `agent-stream`, `agent-stream-specific`, `agent-stream-all`
+- Primary functions: `agent-stream`, `agent-stream-all`
 - Creation: `(agent-stream client invoke callback)`
 - Access: Callback invocation - must handle `reset?` argument when
   stream is reset because of a retry of the node.  Use
