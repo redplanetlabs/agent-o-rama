@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.experiments.evaluators :as evaluators]
+   [com.rpl.agent-o-rama.ui.chart :as chart]
    [clojure.string :as str]
    [reitit.frontend.easy :as rfe]))
 
@@ -15,7 +16,60 @@
 (defui StatCell [{:keys [value tooltip]}]
   ($ :td.px-4.py-3.text-sm.text-gray-700.text-right.font-mono.whitespace-nowrap
      {:title tooltip}
-     (if (some? value) (str value) "N/A"))) ;; Require events to register handlers
+     (if (some? value) (str value) "N/A")))
+
+(defn prepare-chart-data
+  "Transform experiment data into uPlot time-series format.
+  
+  Returns a map with:
+  - :data - [[timestamps] [series1] [series2] ...] in uPlot format
+  - :series - [{:label :stroke :width} ...] for each data series
+  - :selected-metrics - set of metric keys that are being displayed"
+  [experiments columns]
+  (when (seq experiments)
+    (let [;; Sort experiments by start time for chronological order
+          sorted-experiments (sort-by :start-time-millis experiments)
+
+          ;; Extract timestamps in UNIX seconds (uPlot expects seconds, not millis)
+          timestamps (mapv (fn [exp]
+                             (/ (:start-time-millis exp) 1000.0))
+                           sorted-experiments)
+
+          ;; Build series data for each evaluator metric
+          series-data (atom [])
+          series-config (atom [])
+
+          ;; Color palette for different series
+          colors ["#3b82f6" "#ef4444" "#10b981" "#f59e0b" "#8b5cf6"
+                  "#ec4899" "#14b8a6" "#f97316" "#06b6d4" "#84cc16"]]
+
+      ;; Process each column/metric
+      (doseq [[idx {:keys [column-key label eval-name metric-key]}] (map-indexed vector columns)]
+        (let [;; Extract values for this metric across all experiments
+              values (mapv (fn [exp]
+                             (let [eval-stats (:eval-number-stats exp)
+                                   metric-data (get-in eval-stats [eval-name metric-key])
+                                   num-examples (get-in exp [:latency-number-stats :count] 0)]
+                               ;; Calculate average: total / count
+                               (when (and metric-data
+                                          (pos? num-examples)
+                                          (some? (:total metric-data))
+                                          (pos? (:count metric-data)))
+                                 (/ (:total metric-data) (:count metric-data)))))
+                           sorted-experiments)
+              color (get colors (mod idx (count colors)))]
+
+          ;; Only add series if it has at least some non-nil values
+          (when (some some? values)
+            (swap! series-data conj values)
+            (swap! series-config conj {:label label
+                                       :stroke color
+                                       :width 2
+                                       :points {:show false}}))))
+
+      {:data (into [timestamps] @series-data)
+       :series @series-config
+       :selected-metrics (set (map :column-key columns))})))
 
 (defui index [{:keys [module-id dataset-id]}]
   (let [;; Add state for search term and debounce it
@@ -25,26 +79,24 @@
         ;; Update the query hook to use the debounced search term
         {:keys [data loading? error]}
         (queries/use-sente-query
-         {:query-key [:experiments module-id dataset-id :regular debounced-search-term] ; Add search term to query key
+         {:query-key [:experiments module-id dataset-id :regular debounced-search-term]
           :sente-event [:experiments/get-all-for-dataset
                         {:module-id module-id
                          :dataset-id dataset-id
                          :filters {:type :regular
-                                   ;; Add search-string to filters if it's not blank
                                    :search-string (when-not (str/blank? debounced-search-term)
                                                     debounced-search-term)}}]
           :enabled? (boolean (and module-id dataset-id))
           :refresh-interval-ms 1000})
 
-        experiments
-        (get data :items)
+        experiments (get data :items)
         {:keys [columns ambiguous-metrics] :as evaluator-metadata}
         (evaluators/collect-column-metadata
          (map :eval-number-stats experiments))]
 
     ($ :div.p-6
+       ;; Header with search and create button
        ($ :div.flex.justify-between.items-center.mb-6
-          ;; Add the search input field to the UI
           ($ :div.flex-1
              ($ :div.relative.mt-2.rounded-md.shadow-sm.max-w-md
                 ($ :input
@@ -62,6 +114,7 @@
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Run New Experiment"))
 
+       ;; Main content
        (cond
          loading? ($ :div.text-center.py-12 ($ common/spinner {:size :large}))
          error ($ :div.text-red-500.text-center.py-8 "Error loading experiments: " error)
@@ -70,88 +123,104 @@
             ($ BeakerIcon {:className "mx-auto h-12 w-12 text-gray-400"})
             ($ :h3.mt-2.text-sm.font-medium.text-gray-900 "No experiments run yet")
             ($ :p.mt-1.text-sm.text-gray-500 "Run your first experiment to evaluate agent performance."))
+
+         ;; When we have experiments, show chart and table
          :else
-         ($ :div {:className (common/cn (:container common/table-classes) "overflow-x-auto")}
-            ($ :table {:className (:table common/table-classes)}
-               ($ :thead {:className (:thead common/table-classes)}
-                  ($ :tr
-                     ($ :th {:className (:th common/table-classes)} "Experiment Name")
-                     ($ :th {:className (:th common/table-classes)} "Status")
-                     ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "# Examples")
-                     ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Avg Latency (ms)")
-                     ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "P99 Latency (ms)")
-                     ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Avg Total Tokens")
-                     (for [{:keys [column-key label]} columns]
-                       ($ :th {:key column-key, :className (common/cn (:th common/table-classes) "text-right")}
-                          ($ :div.truncate {:title label} label)))
-                     ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Actions")))
-               ($ :tbody
-                  (for [exp experiments
-                        :let [info (:experiment-info exp)
-                              latency-stats (:latency-number-stats exp)
-                              token-stats (:total-token-number-stats exp)
-                              eval-stats (:eval-number-stats exp)
-                              num-examples (or (:count latency-stats) 0)]]
-                    ($ :tr {:key (:id info)
-                            :className "hover:bg-gray-50 cursor-pointer"
-                            :onClick (fn [_]
-                                       (rfe/push-state :module/dataset-detail.experiment-detail
-                                                       {:module-id module-id
-                                                        :dataset-id dataset-id
-                                                        :experiment-id (:id info)}))}
-                       ;; Experiment Name
-                       ($ :td {:className (:td common/table-classes)}
-                          ($ :div.font-medium.text-gray-900.truncate {:title (:name info)} (:name info)))
+         ($ :<>
+            ;; Performance chart (only show if we have 2+ experiments)
+            (when (and (seq experiments) (>= (count experiments) 2))
+              (let [chart-data (prepare-chart-data experiments columns)]
+                (when (and chart-data (> (count (:data chart-data)) 1))
+                  ($ :div.bg-white.rounded-lg.shadow-sm.p-6.mb-6
+                     ($ :h3.text-lg.font-semibold.text-gray-800.mb-4
+                        "Evaluator Performance Over Time")
+                     ($ chart/time-series-chart
+                        {:data (:data chart-data)
+                         :series (:series chart-data)
+                         :width 1000
+                         :height 400})))))
 
-                       ;; Status
-                       ($ :td {:className (:td common/table-classes)}
-                          (if (:finish-time-millis exp)
-                            ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs.font-medium "Completed")
-                            ($ :span.px-2.py-1.bg-blue-100.text-blue-800.rounded-full.text-xs.font-medium "Running")))
+            ;; Experiments table
+            ($ :div {:className (common/cn (:container common/table-classes) "overflow-x-auto")}
+               ($ :table {:className (:table common/table-classes)}
+                  ($ :thead {:className (:thead common/table-classes)}
+                     ($ :tr
+                        ($ :th {:className (:th common/table-classes)} "Experiment Name")
+                        ($ :th {:className (:th common/table-classes)} "Status")
+                        ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "# Examples")
+                        ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Avg Latency (ms)")
+                        ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "P99 Latency (ms)")
+                        ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Avg Total Tokens")
+                        (for [{:keys [column-key label]} columns]
+                          ($ :th {:key column-key, :className (common/cn (:th common/table-classes) "text-right")}
+                             ($ :div.truncate {:title label} label)))
+                        ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Actions")))
+                  ($ :tbody
+                     (for [exp experiments
+                           :let [info (:experiment-info exp)
+                                 latency-stats (:latency-number-stats exp)
+                                 token-stats (:total-token-number-stats exp)
+                                 eval-stats (:eval-number-stats exp)
+                                 num-examples (or (:count latency-stats) 0)]]
+                       ($ :tr {:key (:id info)
+                               :className "hover:bg-gray-50 cursor-pointer"
+                               :onClick (fn [_]
+                                          (rfe/push-state :module/dataset-detail.experiment-detail
+                                                          {:module-id module-id
+                                                           :dataset-id dataset-id
+                                                           :experiment-id (:id info)}))}
+                          ;; Experiment Name
+                          ($ :td {:className (:td common/table-classes)}
+                             ($ :div.font-medium.text-gray-900.truncate {:title (:name info)} (:name info)))
 
-                       ;; # Examples
-                       ($ StatCell {:value num-examples})
+                          ;; Status
+                          ($ :td {:className (:td common/table-classes)}
+                             (if (:finish-time-millis exp)
+                               ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs.font-medium "Completed")
+                               ($ :span.px-2.py-1.bg-blue-100.text-blue-800.rounded-full.text-xs.font-medium "Running")))
 
-                       ;; Avg Latency
-                       ($ StatCell {:value (when (and latency-stats (pos? num-examples))
-                                             (int (/ (:total latency-stats) num-examples)))})
+                          ;; # Examples
+                          ($ StatCell {:value num-examples})
 
-                       ;; P99 Latency
-                       ($ StatCell {:value (get-in latency-stats [:percentiles 0.99])})
+                          ;; Avg Latency
+                          ($ StatCell {:value (when (and latency-stats (pos? num-examples))
+                                                (int (/ (:total latency-stats) num-examples)))})
 
-                       ;; Avg Total Tokens
-                       ($ StatCell {:value (when (and token-stats (pos? num-examples))
-                                             (int (/ (:total token-stats) num-examples)))})
+                          ;; P99 Latency
+                          ($ StatCell {:value (get-in latency-stats [:percentiles 0.99])})
 
-                       ;; Dynamic columns for each evaluator
-                       (for [{:keys [column-key eval-name metric-key ambiguous? metric-label]} columns]
-                         (let [metric-data (get-in eval-stats [eval-name metric-key])
-                               count (:count metric-data)
-                               total (:total metric-data)
-                               display-value (when (and metric-data
-                                                        (pos? (or count 0))
-                                                        (some? total))
-                                               (.toFixed (/ total count) 2))
-                               tooltip (if ambiguous?
-                                         (str "Avg. " metric-label " (" eval-name ")")
-                                         (str "Avg. " metric-label))]
-                           ($ StatCell {:key column-key, :value display-value, :tooltip tooltip})))
+                          ;; Avg Total Tokens
+                          ($ StatCell {:value (when (and token-stats (pos? num-examples))
+                                                (int (/ (:total token-stats) num-examples)))})
 
-                       ($ :td {:className (:td-right common/table-classes)}
-                          ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
-                             {:onClick (fn [e]
-                                         (.stopPropagation e)
-                                         (when (js/confirm (str "Are you sure you want to delete experiment '" (:name info) "'?"))
-                                           (sente/request!
-                                            [:experiments/delete {:module-id module-id
-                                                                  :dataset-id dataset-id
-                                                                  :experiment-id (:id info)}]
-                                            10000
-                                            (fn [reply]
-                                              (if (:success reply)
-                                                ;; Invalidate both regular and comparative queries just in case
-                                                (state/dispatch [:query/invalidate {:query-key-pattern [:experiments module-id dataset-id]}])
-                                                (js/alert (str "Failed to delete experiment: " (:error reply))))))))}
-                             ($ TrashIcon {:className "h-4 w-4 mr-1"})
-                             "Delete")))))))))))
+                          ;; Dynamic columns for each evaluator
+                          (for [{:keys [column-key eval-name metric-key ambiguous? metric-label]} columns]
+                            (let [metric-data (get-in eval-stats [eval-name metric-key])
+                                  count (:count metric-data)
+                                  total (:total metric-data)
+                                  display-value (when (and metric-data
+                                                           (pos? (or count 0))
+                                                           (some? total))
+                                                  (.toFixed (/ total count) 2))
+                                  tooltip (if ambiguous?
+                                            (str "Avg. " metric-label " (" eval-name ")")
+                                            (str "Avg. " metric-label))]
+                              ($ StatCell {:key column-key, :value display-value, :tooltip tooltip})))
 
+                          ;; Delete action
+                          ($ :td {:className (:td-right common/table-classes)}
+                             ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
+                                {:onClick (fn [e]
+                                            (.stopPropagation e)
+                                            (when (js/confirm (str "Are you sure you want to delete experiment '" (:name info) "'?"))
+                                              (sente/request!
+                                               [:experiments/delete {:module-id module-id
+                                                                     :dataset-id dataset-id
+                                                                     :experiment-id (:id info)}]
+                                               10000
+                                               (fn [reply]
+                                                 (if (:success reply)
+                                                   (state/dispatch [:query/invalidate {:query-key-pattern [:experiments module-id dataset-id]}])
+                                                   (js/alert (str "Failed to delete experiment: " (:error reply))))))))}
+                                ($ TrashIcon {:className "h-4 w-4 mr-1"})
+                                "Delete"))))))))))))
