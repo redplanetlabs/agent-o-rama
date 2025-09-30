@@ -22,7 +22,6 @@
                                           RectangleStackIcon ChartBarIcon BeakerIcon Cog6ToothIcon]]
 
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.stats :as stats]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.forms :refer [global-modal-component]]
@@ -54,8 +53,7 @@
       ["/invocations"
        ["" {:name :agent/invocations, :views [agents/invocations]}]
        ["/:invoke-id" {:name :agent/invocation-detail, :views [agents/invoke]}]]
-      ["/config" {:name :agent/config, :views [config-page/config-page]}]
-      ["/stats" {:name :agent/stats, :views [stats/stats]}]]]]])
+      ["/config" {:name :agent/config, :views [config-page/config-page]}]]]]])
 
 (defui ViewStack []
   (let [match (state/use-sub [:route])
