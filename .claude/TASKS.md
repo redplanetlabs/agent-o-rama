@@ -237,6 +237,22 @@ Include REFINE to refine the spec
           - examples/clj/src/com/rpl/agent/basic/human_input_agent.clj
 		  - examples/java/basic/src/main/java/com/rpl/agent/basic/HumanInputAgent.java
 
+
+- [x] add mirror-agent basic example.  Uses two modules and
+      `declare-cluster-agent` and `agent-client` to invoke an agent from
+      the first module
+
+          - examples/clj/src/com/rpl/agent/basic/mirror_agent.clj
+		  - examples/java/basic/src/main/java/com/rpl/agent/basic/MirrorAgent.java
+
+- [ ] add stream-all-agent basic example.  Similiar to the
+      streaming-agent example, but Use stream-all to subscribe to
+      streaming from a node, then invoke the graph multiple times, and
+      show the streaming callback has multiple invoke ids
+
+          - examples/clj/src/com/rpl/agent/basic/mirror_agent.clj
+		  - examples/java/basic/src/main/java/com/rpl/agent/basic/MirrorAgent.java
+
 - [ ] create java basic example for every clojure example
 
 - [ ] update the aggregation-agent example to show the return value of

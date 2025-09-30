@@ -52,6 +52,7 @@ progressing from basic concepts to advanced patterns.
 20. **`evaluator_agent`** - Evaluator creation and execution
 21. **`provided_evaluator_builders_agent`** - Built-in evaluator builders (aor/llm-judge, aor/conciseness, aor/f1-score)
 22. **`module_update_agent`** - Module updates with aor/set-update-mode, IPC deployment and update
+23. **`mirror_agent`** - Cross-module agent invocation using declare-cluster-agent
 
 ## Running Examples
 
@@ -100,6 +101,7 @@ lein run -m com.rpl.agent.basic.evaluator-agent
 lein run -m com.rpl.agent.basic.provided-evaluator-builders-agent
 lein run -m com.rpl.agent.basic.langchain4j-agent
 lein run -m com.rpl.agent.basic.module-update-agent
+lein run -m com.rpl.agent.basic.mirror-agent
 ```
 
 Or from REPL:
