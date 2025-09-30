@@ -28,6 +28,7 @@ import java.util.Scanner;
  *   <li>agent.nextStep: Handle human input requests in execution flow
  *   <li>provideHumanInput: Supply responses to human input requests
  *   <li>pendingHumanInputs: List all pending human input requests
+ *   <li>isAgentInvokeComplete: Check if an agent invocation has completed
  *   <li>Human-in-the-loop agent execution patterns
  * </ul>
  *
@@ -129,6 +130,9 @@ public class HumanInputAgent {
 
       AgentInvoke invoke = agent.initiate(userMessage);
 
+      System.out.println(
+          String.format("\nAgent invoke complete? %s", agent.isAgentInvokeComplete(invoke)));
+
       // Handle execution steps including human input requests
       AgentStep step = agent.nextStep(invoke);
       while (step instanceof HumanInputRequest) {
@@ -157,10 +161,14 @@ public class HumanInputAgent {
       System.out.println("Response: " + result.get("response"));
       System.out.println("Helpful: " + result.get("helpful"));
 
+      System.out.println(
+          String.format("\nAgent invoke complete? %s", agent.isAgentInvokeComplete(invoke)));
+
       System.out.println("\nNotice how:");
       System.out.println("- Agents can request human input during execution");
       System.out.println(
           "- instanceof HumanInputRequest checks if a step is a human input request");
+      System.out.println("- isAgentInvokeComplete checks if an agent invocation has completed");
       System.out.println("- pendingHumanInputs lists all pending requests");
       System.out.println("- Input validation and defaults are handled gracefully");
       System.out.println("- Human responses influence the final result");

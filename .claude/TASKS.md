@@ -231,6 +231,12 @@ Include REFINE to refine the spec
           - examples/clj/src/com/rpl/agent/basic/agent_objects_agent.clj
 		  - examples/java/basic/src/main/java/com/rpl/agent/basic/AgentObjectsAgent.java
 
+- [x] add demonstration of an `agent-invoke-complete?` call to the clojure
+      and java basic examples.
+
+          - examples/clj/src/com/rpl/agent/basic/human_input_agent.clj
+		  - examples/java/basic/src/main/java/com/rpl/agent/basic/HumanInputAgent.java
+
 - [ ] create java basic example for every clojure example
 
 - [ ] update the aggregation-agent example to show the return value of

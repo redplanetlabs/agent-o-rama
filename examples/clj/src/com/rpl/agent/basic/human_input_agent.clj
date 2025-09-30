@@ -7,6 +7,7 @@
   - provide-human-input: Supply responses to human input requests
   - pending-human-inputs: List all pending human input requests
   - human-input-request?: Check if a step is a human input request
+  - agent-invoke-complete?: Check if an agent invocation has completed
   - Human-in-the-loop agent execution patterns"
   (:require
    [com.rpl.agent-o-rama :as aor]
@@ -78,6 +79,7 @@
             inv (aor/agent-initiate chat-agent user-message)]
         (println)
         (println user-message)
+        (println (format "\nAgent invoke complete? %s" (aor/agent-invoke-complete? chat-agent inv)))
         (loop [step (aor/agent-next-step chat-agent inv)]
           (if (aor/human-input-request? step)
             (do
@@ -92,11 +94,13 @@
               (recur (aor/agent-next-step chat-agent inv)))
             (do
               (println "Final result:")
-              (println (:result step)))))
+              (println (:result step))
+              (println (format "\nAgent invoke complete? %s" (aor/agent-invoke-complete? chat-agent inv))))))
 
         (println "\nNotice how:")
         (println "- Agents can request human input during execution")
         (println "- human-input-request? checks if a step is a human input request")
+        (println "- agent-invoke-complete? checks if an agent invocation has completed")
         (println "- pending-human-inputs lists all pending requests")
         (println "- Input validation and defaults are handled gracefully")
         (println "- Human responses influence the final result")))
