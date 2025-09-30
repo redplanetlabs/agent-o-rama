@@ -12,8 +12,6 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.ops :as ops])
   (:import
-   [com.rpl.agent_o_rama.impl.types
-    Node]
    [com.rpl.agentorama
     AgentClient
     AgentFailedException
@@ -26,11 +24,15 @@
     AgentDeclaredObjectsTaskGlobal
     AgentNodeExecutorTaskGlobal
     RamaClientsTaskGlobal]
-   [dev.langchain4j.data.embedding
-    Embedding]
+   [com.rpl.agent_o_rama.impl.types
+    Node]
    [dev.langchain4j.model.chat
     ChatModel
     StreamingChatModel]
+   [dev.langchain4j.data.embedding
+    Embedding]
+   [dev.langchain4j.data.message
+    ChatMessage]
    [dev.langchain4j.model.chat.request
     ChatRequest]
    [dev.langchain4j.model.chat.response
@@ -44,7 +46,7 @@
    [java.io
     Closeable]
    [java.util
-    Map]
+    UUID]
    [java.util.concurrent
     CompletableFuture]))
 
@@ -422,7 +424,7 @@
          (throw (h/ex-info "Finish time cannot be before start time"
                            {:start-time-millis  start-time-millis
                             :finish-time-millis finish-time-millis})))
-       (when-not (every? string? (.keySet ^Map info))
+       (when-not (every? string? (keys info))
          (throw (h/ex-info "Info map must contain string keys" {:info info})))
        (vswap! nested-ops-vol
                conj
