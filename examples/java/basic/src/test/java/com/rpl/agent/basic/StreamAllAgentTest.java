@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
@@ -63,8 +64,8 @@ public class StreamAllAgentTest {
           invoke1,
           "process-task",
           (allChunks, newChunks, resetInvokeIds, complete) -> {
-            for (Map.Entry<Object, List<Object>> entry : newChunks.entrySet()) {
-              Object invokeId = entry.getKey();
+            for (Map.Entry<UUID, List<Object>> entry : newChunks.entrySet()) {
+              UUID invokeId = entry.getKey();
               List<Object> chunks = entry.getValue();
 
               for (Object chunkObj : chunks) {

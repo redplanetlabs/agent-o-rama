@@ -266,7 +266,7 @@ Include REFINE to refine the spec
 		  as node-invoke-id, but streaming callback not triggering. Needs
 		  clarification on correct usage of node-invoke-id parameter.
 
-- [ ] add stream-reset basic example.  Similar to the streaming-agent
+- [x] add stream-reset basic example.  Similar to the streaming-agent
       example, but calls stream-chunk, and the throws an error the first
       time it is called. Subsequent invokes should not error. Call the
       agent, and show that the `agent-stream-reset-info` shows a reset
@@ -283,6 +283,30 @@ Include REFINE to refine the spec
 
           - examples/clj/src/com/rpl/agent/basic/record_op_agent.clj
 		  - examples/java/basic/src/main/java/com/rpl/agent/basic/ReecordOpAgent.java
+
+- [ ] add a rama-module basic example.  Similar to the basic-agent example,
+      but doesn't use defagentmodule.
+
+(rama/module
+   {:module-name "ChatRamaModule"}
+   [setup topologies]
+   (declare-depot setup *depot (hash-by identity))
+   (let [topology (aor/agents-topology setup topologies)
+         s-topology (aor/underlying-stream-topology topology)]
+	 (<<sources
+		 s-topo
+		 (source> **depot  :> !v)
+		 (println "Process" !v))
+
+    (-> (aor/new-agent topology "feedback-agent")
+     (aor/node
+      "update-feedback"
+      []
+      (fn update-feedback [agent-node] (aor/result! agent-node {:success true}))))
+       (aor/define-agents! topology)))
+
+          - examples/clj/src/com/rpl/agent/basic/rama_module_agent.clj
+		  - examples/java/basic/src/main/java/com/rpl/agent/basic/RamaModuleAgent.java
 
 - [ ] create java basic example for every clojure example
 

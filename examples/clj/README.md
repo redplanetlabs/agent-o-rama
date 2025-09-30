@@ -37,23 +37,24 @@ progressing from basic concepts to advanced patterns.
 #### Communication Examples
 10. **`streaming_agent`** - Stream chunks from nodes
 11. **`stream_all_agent`** - Subscribe to streaming from multiple invocations
-12. **`human_input_agent`** - Request and handle human input
+12. **`stream_reset_agent`** - Stream reset behavior on node retry after failure
+13. **`human_input_agent`** - Request and handle human input
 
 #### Advanced Patterns
-13. **`aggregation_agent`** - Fan-out/fan-in with agg-start-node and agg-node
-14. **`multi_agg_agent`** - Custom aggregation logic with multi-agg
-15. **`structured_langchain4j_agent`** - JSON structured output with LangChain4j
-16. **`streaming_langchain4j_agent`** - Real-time streaming with LangChain4j models
-17. **`tools_agent`** - LangChain4j tools integration
+14. **`aggregation_agent`** - Fan-out/fan-in with agg-start-node and agg-node
+15. **`multi_agg_agent`** - Custom aggregation logic with multi-agg
+16. **`structured_langchain4j_agent`** - JSON structured output with LangChain4j
+17. **`streaming_langchain4j_agent`** - Real-time streaming with LangChain4j models
+18. **`tools_agent`** - LangChain4j tools integration
 
 #### System Features
-18. **`forking_agent`** - Agent execution branching
-19. **`dataset_agent`** - Dataset lifecycle management (create, update, snapshots, destroy)
-20. **`dataset_example_agent`** - Dataset example management (add, update, tag, remove examples)
-21. **`evaluator_agent`** - Evaluator creation and execution
-22. **`provided_evaluator_builders_agent`** - Built-in evaluator builders (aor/llm-judge, aor/conciseness, aor/f1-score)
-23. **`module_update_agent`** - Module updates with aor/set-update-mode, IPC deployment and update
-24. **`mirror_agent`** - Cross-module agent invocation using declare-cluster-agent
+19. **`forking_agent`** - Agent execution branching
+20. **`dataset_agent`** - Dataset lifecycle management (create, update, snapshots, destroy)
+21. **`dataset_example_agent`** - Dataset example management (add, update, tag, remove examples)
+22. **`evaluator_agent`** - Evaluator creation and execution
+23. **`provided_evaluator_builders_agent`** - Built-in evaluator builders (aor/llm-judge, aor/conciseness, aor/f1-score)
+24. **`module_update_agent`** - Module updates with aor/set-update-mode, IPC deployment and update
+25. **`mirror_agent`** - Cross-module agent invocation using declare-cluster-agent
 
 ## Running Examples
 
@@ -90,6 +91,7 @@ lein run -m com.rpl.agent.basic.document-store-agent
 lein run -m com.rpl.agent.basic.pstate-store-agent
 lein run -m com.rpl.agent.basic.streaming-agent
 lein run -m com.rpl.agent.basic.stream-all-agent
+lein run -m com.rpl.agent.basic.stream-reset-agent
 lein run -m com.rpl.agent.basic.human-input-agent
 lein run -m com.rpl.agent.basic.aggregation-agent
 lein run -m com.rpl.agent.basic.multi-agg-agent
