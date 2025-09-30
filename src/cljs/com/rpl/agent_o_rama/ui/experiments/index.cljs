@@ -22,7 +22,7 @@
   "Transform experiment data into uPlot time-series format.
   
   Returns a map with:
-  - :data - [[timestamps] [series1] [series2] ...] in uPlot format
+  - :data - [[experiment-numbers] [series1] [series2] ...] in uPlot format
   - :series - [{:label :stroke :width} ...] for each data series
   - :selected-metrics - set of metric keys that are being displayed"
   [experiments columns]
@@ -30,10 +30,8 @@
     (let [;; Sort experiments by start time for chronological order
           sorted-experiments (sort-by :start-time-millis experiments)
 
-          ;; Extract timestamps in UNIX seconds (uPlot expects seconds, not millis)
-          timestamps (mapv (fn [exp]
-                             (/ (:start-time-millis exp) 1000.0))
-                           sorted-experiments)
+          ;; Generate experiment numbers: 1, 2, 3, ...
+          experiment-numbers (mapv inc (range (count sorted-experiments)))
 
           ;; Build series data for each evaluator metric
           series-data (atom [])
@@ -67,7 +65,7 @@
                                        :width 2
                                        :points {:show false}}))))
 
-      {:data (into [timestamps] @series-data)
+      {:data (into [experiment-numbers] @series-data)
        :series @series-config
        :selected-metrics (set (map :column-key columns))})))
 
@@ -92,7 +90,14 @@
         experiments (get data :items)
         {:keys [columns ambiguous-metrics] :as evaluator-metadata}
         (evaluators/collect-column-metadata
-         (map :eval-number-stats experiments))]
+         (map :eval-number-stats experiments))
+
+        ;; Create a map from experiment ID to experiment number (based on chronological order)
+        experiment-number-map (into {}
+                                    (map-indexed
+                                     (fn [idx exp]
+                                       [(:id (:experiment-info exp)) (inc idx)])
+                                     (sort-by :start-time-millis experiments)))]
 
     ($ :div.p-6
        ;; Header with search and create button
@@ -145,6 +150,7 @@
                ($ :table {:className (:table common/table-classes)}
                   ($ :thead {:className (:thead common/table-classes)}
                      ($ :tr
+                        ($ :th {:className (:th common/table-classes)} "#")
                         ($ :th {:className (:th common/table-classes)} "Experiment Name")
                         ($ :th {:className (:th common/table-classes)} "Status")
                         ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "# Examples")
@@ -169,6 +175,11 @@
                                                           {:module-id module-id
                                                            :dataset-id dataset-id
                                                            :experiment-id (:id info)}))}
+                          ;; Experiment Number
+                          ($ :td {:className (:td common/table-classes)}
+                             ($ :div.font-mono.text-gray-600
+                                (str "#" (get experiment-number-map (:id info)))))
+
                           ;; Experiment Name
                           ($ :td {:className (:td common/table-classes)}
                              ($ :div.font-medium.text-gray-900.truncate {:title (:name info)} (:name info)))

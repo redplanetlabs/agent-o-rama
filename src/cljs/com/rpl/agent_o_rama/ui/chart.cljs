@@ -63,16 +63,20 @@
         ;; Build uPlot options
         options {:width width
                  :height height
-                 :series (into [{:label "Time"}] series)
+                 :series (into [{:label "Experiment #"}] series)
                  :axes (or axes
-                           ;; Default axes configuration
+                           ;; Default axes configuration with custom value formatting
                            [{:stroke "#64748b"
                              :grid {:show true :stroke "#e2e8f0" :width 1}
-                             :ticks {:show true :stroke "#cbd5e1"}}
+                             :ticks {:show true :stroke "#cbd5e1"}
+                             ;; Custom value formatter for x-axis: show as "#1", "#2", etc.
+                             :values (fn [self splits-array axis-index]
+                                       ;; splits-array contains the tick values, use JS .map directly
+                                       (.map splits-array (fn [v] (str "#" (int v)))))}
                             {:stroke "#64748b"
                              :grid {:show true :stroke "#e2e8f0" :width 1}
                              :ticks {:show true :stroke "#cbd5e1"}}])
-                 :scales {:x {:time true}
+                 :scales {:x {:auto true} ; Numeric scale, not time
                           :y {:auto true}}
                  :legend {:show true
                           :live true}}
