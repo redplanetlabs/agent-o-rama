@@ -419,7 +419,7 @@
          (throw (h/ex-info "Finish time cannot be before start time"
                            {:start-time-millis  start-time-millis
                             :finish-time-millis finish-time-millis})))
-       (when-not (every? string? (keys info))
+       (when-not (every? string? (.keySet info))
          (throw (h/ex-info "Info map must contain string keys" {:info info})))
        (vswap! nested-ops-vol
                conj
@@ -427,7 +427,7 @@
                 start-time-millis
                 finish-time-millis
                 (aor-types/nested-op-type->clj type)
-                info)))
+                (into {} info))))
      (getHumanInput
        [this prompt]
        (let [start-time-millis (h/current-time-millis)
