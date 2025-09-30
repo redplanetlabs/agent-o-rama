@@ -55,10 +55,12 @@
   - :width - Chart width in pixels (optional, defaults to 800)
   - :height - Chart height in pixels (optional, defaults to 400)
   - :title - Chart title (optional)
-  - :axes - Custom axes configuration (optional)"
-  [{:keys [data series width height title axes]}]
+  - :axes - Custom axes configuration (optional)
+  - :show-legend - Whether to show the legend (optional, defaults to true)"
+  [{:keys [data series width height title axes show-legend]}]
   (let [width (or width 800)
         height (or height 400)
+        show-legend (if (nil? show-legend) true show-legend)
 
         ;; Build uPlot options
         options {:width width
@@ -93,7 +95,7 @@
                                        ;; Force integer range based on actual data
                                        #js [(js/Math.floor min) (js/Math.ceil max)])}
                           :y {:auto true}}
-                 :legend {:show true
+                 :legend {:show show-legend
                           :live true}}
 
         ;; Get the ref from our hook
@@ -101,7 +103,5 @@
 
     ($ :div.w-full
        (when title
-         ($ :h3.text-lg.font-semibold.text-gray-800.mb-3 title))
-       ($ :div.w-full.overflow-x-auto
-          ($ :div {:ref chart-ref
-                   :className "min-w-full"})))))
+         ($ :h4.text-base.font-medium.text-gray-700.mb-2.text-center title))
+       ($ :div {:ref chart-ref}))))

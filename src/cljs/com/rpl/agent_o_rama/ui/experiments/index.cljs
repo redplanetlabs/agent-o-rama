@@ -139,18 +139,23 @@
          ($ :<>
             ;; Performance charts (one per evaluator, only show if we have 2+ experiments)
             (when (and (seq experiments) (>= (count experiments) 2))
-              (let [charts (prepare-charts-by-evaluator experiments columns)]
-                (for [{:keys [evaluator-name data series]} charts
-                      :when (and (seq series) (> (count data) 1))]
+              (let [charts (prepare-charts-by-evaluator experiments columns)
+                    valid-charts (filter #(and (seq (:series %)) (> (count (:data %)) 1)) charts)]
+                (when (seq valid-charts)
                   ($ :div.bg-white.rounded-lg.shadow-sm.p-6.mb-6
-                     {:key evaluator-name}
-                     ($ :h3.text-lg.font-semibold.text-gray-800.mb-4
-                        (str evaluator-name " Performance"))
-                     ($ chart/time-series-chart
-                        {:data data
-                         :series series
-                         :width 600
-                         :height 300})))))
+                     ($ :h3.text-lg.font-semibold.text-gray-800.mb-4 "Evaluator Performance")
+                     ;; Horizontal flex container for charts
+                     ($ :div.flex.flex-wrap.gap-6
+                        (for [{:keys [evaluator-name data series]} valid-charts]
+                          ($ :div.flex-1.min-w-0
+                             {:key evaluator-name}
+                             ($ chart/time-series-chart
+                                {:data data
+                                 :series series
+                                 :width 600
+                                 :height 300
+                                 :title evaluator-name
+                                 :show-legend false}))))))))
 
             ;; Experiments table
             ($ :div {:className (common/cn (:container common/table-classes) "overflow-x-auto")}
