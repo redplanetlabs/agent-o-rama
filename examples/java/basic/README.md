@@ -13,6 +13,9 @@ An agent with multiple connected nodes demonstrating inter-node emissions and da
 ### ProvidedEvaluatorBuildersExample
 Demonstrates the three built-in evaluator builders (aor/llm-judge, aor/conciseness, aor/f1-score) for evaluating agent performance.
 
+### RamaModuleAgent
+Shows how to implement a Rama module directly (not extending AgentsModule) to access full Rama features like depots and stream processing alongside agents.
+
 ## Overview
 
 These examples show how to:
@@ -61,6 +64,9 @@ mvn exec:java -Dexec.mainClass="com.rpl.agent.basic.MultiNodeAgent"
 
 # Run the provided evaluator builders example
 mvn exec:java -Dexec.mainClass="com.rpl.agent.basic.ProvidedEvaluatorBuildersExample"
+
+# Run the Rama module agent example
+mvn exec:java -Dexec.mainClass="com.rpl.agent.basic.RamaModuleAgent"
 
 # Run tests
 mvn test
