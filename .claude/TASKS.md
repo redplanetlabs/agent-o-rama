@@ -276,16 +276,18 @@ Include REFINE to refine the spec
           - examples/clj/src/com/rpl/agent/basic/stream_reset_agent.clj
 		  - examples/java/basic/src/main/java/com/rpl/agent/basic/StreamResetAgent.java
 
-- [ ] add record-op basic example.  Similar to the basic-agent example,
+- [x] add record-op basic example.  Similar to the basic-agent example,
       but calls `record-nested-op` to add info to the agent trace.
       Should start the UI, and direct the reader to view the trace in
       the UI.
 
           - examples/clj/src/com/rpl/agent/basic/record_op_agent.clj
-		  - examples/java/basic/src/main/java/com/rpl/agent/basic/ReecordOpAgent.java
+		  - examples/java/basic/src/main/java/com/rpl/agent/basic/RecordOpAgent.java
 
 - [ ] add a rama-module basic example.  Similar to the basic-agent example,
       but doesn't use defagentmodule.
+
+      Demonstrate the use of a depot. Should look something like:
 
 (rama/module
    {:module-name "ChatRamaModule"}
