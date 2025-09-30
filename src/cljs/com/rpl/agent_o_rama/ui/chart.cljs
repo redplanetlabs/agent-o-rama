@@ -3,7 +3,7 @@
   (:require
    [uix.core :as uix :refer [defui defhook $]]
    ["react" :refer [useRef useLayoutEffect useEffect]]
-   ["uplot" :default uPlot]))
+   ["uplot" :as uPlot]))
 
 (defhook use-uplot
   "React hook to manage a uPlot chart instance lifecycle.
@@ -27,7 +27,8 @@
              ;; If chart exists, update its data
              (.setData current-chart (clj->js data))
              ;; Otherwise, create a new chart instance
-             (let [new-chart (new uPlot (clj->js options) (clj->js data) (.-current target-ref))]
+             ;; uPlot is the constructor function itself when imported with :as
+             (let [new-chart (uPlot. (clj->js options) (clj->js data) (.-current target-ref))]
                (set! (.-current chart-ref) new-chart)))))
        ;; No cleanup needed here since we handle it in the separate effect below
        js/undefined)
