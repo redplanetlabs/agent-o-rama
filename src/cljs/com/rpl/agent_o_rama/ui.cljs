@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.ui.config-page :as config-page]
    [com.rpl.agent-o-rama.ui.datasets :as datasets]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
+   [com.rpl.agent-o-rama.ui.module-page :as module-page]
    [com.rpl.agent-o-rama.ui.experiments.index :as experiments]
    [com.rpl.agent-o-rama.ui.experiments.comparative :as comparative-experiments]
    [com.rpl.agent-o-rama.ui.experiments.regular-detail :as experiments-detail]
@@ -36,6 +37,7 @@
    ["/agents"
     ["" {:name :agents/index, :views [agents/index]}]
     ["/:module-id"
+     ["" {:name :module/detail, :views [module-page/index]}]
      ["/datasets"
       ["" {:name :module/datasets, :views [datasets/index]}]
       ["/:dataset-id"
@@ -241,8 +243,10 @@
                               (cond
                                 ;; Agent invocation detail
                                 (and module-id agent-name invoke-id)
-                                [{:label (str (common/url-decode module-id) ":" (common/url-decode agent-name))
-                                  :path (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name))}
+                                [{:label (common/url-decode module-id)
+                                  :path (rfe/href :module/detail {:module-id module-id})}
+                                 {:label (common/url-decode agent-name)
+                                  :path (rfe/href :agent/detail {:module-id module-id :agent-name agent-name})}
                                  {:label "Invocations"
                                   :path (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations")}
                                  {:label (common/url-decode invoke-id)
@@ -250,8 +254,10 @@
 
                                 ;; Agent detail pages
                                 (and module-id agent-name)
-                                [{:label (str (common/url-decode module-id) ":" (common/url-decode agent-name))
-                                  :path (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name))}
+                                [{:label (common/url-decode module-id)
+                                  :path (rfe/href :module/detail {:module-id module-id})}
+                                 {:label (common/url-decode agent-name)
+                                  :path (rfe/href :agent/detail {:module-id module-id :agent-name agent-name})}
                                  {:label (case route-name
                                            :agent/invocations "Invocations"
                                            :agent/config "Config"
@@ -262,7 +268,7 @@
                                 ;; Dataset detail
                                 (and module-id dataset-id)
                                 [{:label (common/url-decode module-id)
-                                  :path (str "/agents/" (common/url-encode module-id))}
+                                  :path (rfe/href :module/detail {:module-id module-id})}
                                  {:label "Datasets"
                                   :path (str "/agents/" (common/url-encode module-id) "/datasets")}
                                  {:label (common/url-decode dataset-id)
@@ -271,10 +277,11 @@
                                 ;; Module level pages
                                 (and module-id)
                                 [{:label (common/url-decode module-id)
-                                  :path (str "/agents/" (common/url-encode module-id))}
+                                  :path (rfe/href :module/detail {:module-id module-id})}
                                  {:label (case route-name
                                            :module/datasets "Datasets"
                                            :module/evaluations "Evaluations"
+                                           :module/detail "Dashboard"
                                            "Module")
                                   :path nil}] ; Current page
 
