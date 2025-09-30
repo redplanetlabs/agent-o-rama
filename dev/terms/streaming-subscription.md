@@ -40,5 +40,9 @@ Subscribe to stream:
 - Used by: [Agent Client](agent-client.md)
 
 ## Examples
-- Clojure: `examples/clj/src/com/rpl/agent/basic/streaming_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/StreamingAgent.java`
+- Clojure:
+  - `examples/clj/src/com/rpl/agent/basic/streaming_agent.clj` - Basic streaming from first invocation
+  - `examples/clj/src/com/rpl/agent/basic/stream_all_agent.clj` - Streaming from multiple invocations
+- Java:
+  - `examples/java/basic/src/main/java/com/rpl/agent/basic/StreamingAgent.java` - Basic streaming from first invocation
+  - `examples/java/basic/src/main/java/com/rpl/agent/basic/StreamAllAgent.java` - Streaming from multiple invocations

@@ -1,0 +1,143 @@
+- defining agents:
+  - node
+  - agg start node
+  - agg node
+- AgentNode argument
+  - emit
+  - result
+  - stream-chunk
+  - get-agent-object
+  - agent-client for subagents
+- agent objects
+  - declaring chat models
+  - declaring database connections
+    - postgres
+  - vector stores
+- defining custom aggregators
+  - accumulators
+  - combiners
+  - multi-agg (AOR-specific)
+- declaring and using the tools agent
+- declaring and using stores
+  - k/v
+  - document
+  - PState
+- recursive / mutually recursive agents
+- paths
+  - https://redplanetlabs.com/docs/~/paths.html#gsc.tab=0 for Java API
+  - Javadoc and Clojuredoc for all navs
+- defining an agent module
+- updating agents
+  - update mode to specify what if should do with in-flight agent executions at the time of update
+    - continue where it left off, restart from the root, or drop
+
+- how retries work
+- configs
+  - max-retries
+- streaming
+  - difference between stream and stream-all
+- langchain4j integration
+  - special JSON format when displaying lc4j types which can be edited
+  - auto-wired streaming for StreamingChatModel
+  - declared StreamingChatModel is fetched as regular ChatModel and used in blocking fashion
+- forking and how it works
+- runs on virtual threads so all code should be in simple blocking style
+- human input
+  - agent-next-step
+  - can see and provide input via UI or via API
+  - integration with subagents
+    - calling result on a subagent will auto proxy the human input requests to the parent agent in a loop
+======= HERE ======
+- invoke traces
+  - available information:
+    - latencies of nodes / overall invoke
+    - nested ops
+    - token counts
+    - exceptions
+    - feedback on overall agent run or individual nodes
+    - trace analytics
+      - AgentInvokeStatsImpl
+
+- operational:
+  - deploying a rama cluster
+    - https://redplanetlabs.com/docs/~/operating-rama.html#gsc.tab=0
+  - running single node clusters
+  - deploying a module
+  - updating a module
+  - scaling a module
+  - tasks vs. threads vs. workers vs. nodes
+- datasets
+  - input/output JSON schemas
+  - adding/deleting examples
+  - tags
+  - snapshots
+  - Clojure/Java APIs for all of this
+- evaluators
+  - built-in evaluator builders
+  - declaring evaluator builders
+    - defined in topology
+    - higher order function that takes in map of string -> string params
+    - options:
+      - params, which are specified with description and optional default
+      - whether input/ref-output/output are used
+   - creating evaluators via UI or Java/Clojure API
+      - name, builder-name, builder-params, description
+      - input/ref-output/output JSON paths
+  - regular, comparative, and summary evaluators
+    - ExampleRun type for summary evals
+  - try evaluator
+- experiments
+  - running experiments via the UI
+    - providing "JSON path template" to map input -> list of input args
+      - e.g.:
+        - arg 1: $.a
+        - arg 2: {"a" "$.b"}]
+    - explanation of JSON path templates
+  - specifying which examples to use
+    - tag/snapshot/explicit example IDs
+  - agent target or node target
+    - for each target provide input mappings
+  - num repetitions / concurrency
+  - specifying comparative experiment (same but multiple targets)
+
+  - experiment result format
+- viewing experiment results:
+  - evals shown inline with outputs
+  - evals link to traces for that eval run
+  - overall stats at top as well as summary evals
+  - link on agent output to agent trace
+  - on pagination page:
+    - eval number summaries and latency summaries
+    - auto-generated charts to show trends of what experiments are currently shown on the page
+      - can filter with search
+- feedback
+  - map of string key -> value
+  - attached to agent invoke root or to specific nodes
+  - has a source and timestamp
+- automations
+  - on agent page can create rules with actions
+  - rules are specified with start time, and they will auto backfill
+  - rules can filter by:
+    - agent or node
+    - latency
+    - eval scores from another rule
+    - regex on input/output or part of it
+    - token counts
+    - combination with and/or/not
+  - rules can depend on each other and AOR orchestrates them properly
+  - actions are defined with declare-action-builder similar to evaluators, in the topology
+    - actions return map of string -> object that gets displayed in action logs (purely informational)
+  - built-in actions
+    - run evaluator, which gets added as feedback on the agent or node and can then trigger other rules
+    - will have other ones later, probably "add to dataset" and "post to URL"
+  - action logs to see what runs of an action have been doing and whether they've been succeeding or failing
+    - linked when viewing rules
+- analytics
+  - time-series charts
+- async foreign API
+
+
+Examples need:
+ - recursive agent calls (fibbonaci numbers?)
+ - update-mode
+ - retries (there is a fail-agent, but needs work + java version)

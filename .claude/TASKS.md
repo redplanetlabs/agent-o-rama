@@ -245,13 +245,40 @@ Include REFINE to refine the spec
           - examples/clj/src/com/rpl/agent/basic/mirror_agent.clj
 		  - examples/java/basic/src/main/java/com/rpl/agent/basic/MirrorAgent.java
 
-- [ ] add stream-all-agent basic example.  Similiar to the
+- [x] add stream-all-agent basic example.  Similar to the
       streaming-agent example, but Use stream-all to subscribe to
       streaming from a node, then invoke the graph multiple times, and
       show the streaming callback has multiple invoke ids
 
-          - examples/clj/src/com/rpl/agent/basic/mirror_agent.clj
-		  - examples/java/basic/src/main/java/com/rpl/agent/basic/MirrorAgent.java
+          - examples/clj/src/com/rpl/agent/basic/stream_all_agent.clj
+		  - examples/java/basic/src/main/java/com/rpl/agent/basic/StreamAllAgent.java
+
+- [ ] add stream-specific basic example.  Similar to the streaming-agent
+      example, but Use stream-specific to subscribe to streaming from
+      one invoke of a node. uses agent-initiate to start an invoke, get
+      the invoke-id from the returned value, then call stream-specific
+      with that invoke-id, call next-step to actual run the agent.
+
+          - examples/clj/src/com/rpl/agent/basic/stream_specific_agent.clj
+		  - examples/java/basic/src/main/java/com/rpl/agent/basic/StreamSpecificAgent.java
+
+- [ ] add stream-reset basic example.  Similar to the streaming-agent
+      example, but calls stream-chunk, and the throws an error the first
+      time it is called. Subsequent invokes should not error. Call the
+      agent, and show that the `agent-stream-reset-info` shows a reset
+      count of one.  The callback should also show a "reset?` value of
+      true being passed.
+
+          - examples/clj/src/com/rpl/agent/basic/stream_reset_agent.clj
+		  - examples/java/basic/src/main/java/com/rpl/agent/basic/StreamResetAgent.java
+
+- [ ] add record-op basic example.  Similar to the basic-agent example,
+      but calls `record-nested-op` to add info to the agent trace.
+      Should start the UI, and direct the reader to view the trace in
+      the UI.
+
+          - examples/clj/src/com/rpl/agent/basic/record_op_agent.clj
+		  - examples/java/basic/src/main/java/com/rpl/agent/basic/ReecordOpAgent.java
 
 - [ ] create java basic example for every clojure example
 
