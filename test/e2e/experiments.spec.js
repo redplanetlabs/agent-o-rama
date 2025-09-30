@@ -6,6 +6,7 @@ import {
   deleteDataset,
   createEvaluator,
   deleteEvaluator,
+  addExample,
 } from './helpers.js';
 
 // =============================================================================
@@ -15,6 +16,7 @@ const uniqueId = randomUUID().substring(0, 8);
 const datasetName = `e2e-exp-dataset-${uniqueId}`;
 const evaluatorNamePass = `e2e-exp-evaluator-pass-${uniqueId}`;
 const evaluatorNameFail = `e2e-exp-evaluator-fail-${uniqueId}`;
+const summaryEvaluatorName = `e2e-exp-summary-eval-${uniqueId}`;
 const experimentName = `e2e-full-flow-experiment-${uniqueId}`;
 const rerunExperimentName = `e2e-rerun-experiment-${uniqueId}`; // New constant for the re-run
 const agentToRun = 'researcher'; // As defined in the research_agent.clj example
@@ -80,7 +82,14 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
       params: { threshold: '10' },
       outputJsonPath: '$[0].args[0]'
     });
-    console.log('Evaluators created successfully.');
+    // Summary evaluator (F1 score)
+    await createEvaluator(page, {
+      name: summaryEvaluatorName,
+      builderName: 'aor/f1-score',
+      description: 'Summary evaluator for F1 score.',
+      params: { positiveValue: 'pass' }
+    });
+    console.log('All evaluators created successfully.');
 
 
     // ---
@@ -183,6 +192,14 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     await expect(page.locator('table tbody tr').first()).toBeVisible();
     console.log('Verified example in dataset.');
 
+    // Add a second example manually for the summary evaluator
+    await addExample(page, { input: ["persona2", [], "context2"], output: "some-output" });
+    console.log('Second example added manually.');
+    
+    // Verify we have 2 examples now
+    await expect(page.locator('table tbody tr')).toHaveCount(2);
+    console.log('Verified dataset has 2 examples.');
+
 
     // ---
     // PHASE 5: CREATE AND RUN EXPERIMENT
@@ -214,13 +231,17 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     await mappingsSection.locator('input').nth(1).fill('$[1]'); // messages
     await mappingsSection.locator('input').nth(2).fill('$[2]'); // context
 
-    // Select both evaluators (via portal)
+    // Select all three evaluators (via portal)
     await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
     await expect(page.getByText(evaluatorNamePass, { exact: true })).toBeVisible();
     await page.getByText(evaluatorNamePass, { exact: true }).click();
     await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
     await expect(page.getByText(evaluatorNameFail, { exact: true })).toBeVisible();
     await page.getByText(evaluatorNameFail, { exact: true }).click();
+    await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
+    await expect(page.getByText(summaryEvaluatorName, { exact: true })).toBeVisible();
+    await page.getByText(summaryEvaluatorName, { exact: true }).click();
+    console.log('All three evaluators selected.');
 
     // 5b. Start the experiment
     await expModal.getByRole('button', { name: 'Run Experiment' }).click();
@@ -252,7 +273,16 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     await expect(passChip).toContainText('✓T');
     await expect(failChip).toBeVisible();
     await expect(failChip).toContainText('✗F');
-    console.log('Evaluator scores for both pass and fail correctly displayed.');
+    console.log('Regular evaluator scores for both pass and fail correctly displayed.');
+
+    // Verify summary evaluator results in the summary table
+    const summaryTable = page.locator('table').filter({ hasText: '# Examples' });
+    const summaryCell = summaryTable.locator('td').filter({ hasText: summaryEvaluatorName });
+    await expect(summaryCell).toBeVisible();
+    await expect(summaryCell.getByText('score')).toBeVisible();
+    await expect(summaryCell.getByText('precision')).toBeVisible();
+    await expect(summaryCell.getByText('recall')).toBeVisible();
+    console.log('Summary evaluator scores verified.');
 
     // ---
     // NEW PHASE 7: RE-RUN EXPERIMENT
@@ -279,7 +309,8 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     
     await expect(rerunModal.getByText(evaluatorNamePass, { exact: true })).toBeVisible();
     await expect(rerunModal.getByText(evaluatorNameFail, { exact: true })).toBeVisible();
-    console.log('Verified that the re-run form is correctly pre-filled.');
+    await expect(rerunModal.getByText(summaryEvaluatorName, { exact: true })).toBeVisible();
+    console.log('Verified that the re-run form is correctly pre-filled with all three evaluators.');
 
     // 7c. Modify the name and run the new experiment
     await rerunModal.getByLabel('Experiment Name').fill(rerunExperimentName);
@@ -311,7 +342,14 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     await expect(rerunPassChip).toContainText('✓T');
     await expect(rerunFailChip).toBeVisible();
     await expect(rerunFailChip).toContainText('✗F');
-    console.log('Evaluator scores for the re-run experiment verified.');
+    console.log('Regular evaluator scores for the re-run experiment verified.');
+
+    // Verify summary evaluator results for re-run
+    const rerunSummaryTable = page.locator('table').filter({ hasText: '# Examples' });
+    const rerunSummaryCell = rerunSummaryTable.locator('td').filter({ hasText: summaryEvaluatorName });
+    await expect(rerunSummaryCell).toBeVisible();
+    await expect(rerunSummaryCell.getByText('score')).toBeVisible();
+    console.log('Summary evaluator scores for re-run experiment verified.');
 
 
     // ---
@@ -335,10 +373,11 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     await page.getByText('Datasets & Experiments').click();
     await deleteDataset(page, datasetName);
     
-    // Delete the evaluators
+    // Delete all evaluators
     await page.getByText('Evaluators').click();
     await deleteEvaluator(page, evaluatorNamePass);
     await deleteEvaluator(page, evaluatorNameFail);
+    await deleteEvaluator(page, summaryEvaluatorName);
     
     console.log('--- Test successfully completed and cleaned up all resources. ---');
   });

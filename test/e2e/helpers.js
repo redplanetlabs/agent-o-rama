@@ -92,7 +92,11 @@ export async function createEvaluator(page, { name, builderName, description, pa
 export async function addExample(page, { input, output, tags }) {
   console.log('Adding example with input:', JSON.stringify(input), 'tags:', tags);
   
-  // Step 1: Create the example
+  // Step 1: Count existing rows before adding
+  const rowsBefore = await page.locator('table tbody tr').count();
+  console.log(`Rows before adding example: ${rowsBefore}`);
+  
+  // Step 2: Create the example
   await page.locator('button').filter({ hasText: 'Add Example' }).filter({ hasNot: page.locator('[disabled]') }).first().click();
 
   const createModal = page.locator('[role="dialog"]');
@@ -106,18 +110,23 @@ export async function addExample(page, { input, output, tags }) {
   await createModal.getByRole('button', { name: 'Add Example' }).click();
   await expect(createModal).not.toBeVisible({ timeout: 15000 });
 
-  // Step 2: If tags are provided, edit the example to add them
+  // Step 3: Wait for the new row to appear
+  await expect(async () => {
+    const rowsAfter = await page.locator('table tbody tr').count();
+    expect(rowsAfter).toBe(rowsBefore + 1);
+  }).toPass({ timeout: 10000 });
+  
+  const rowsAfter = await page.locator('table tbody tr').count();
+  console.log(`Rows after adding example: ${rowsAfter}`);
+
+  // Step 4: Target the newly added row (last row)
+  const newRow = page.locator('table tbody tr').nth(rowsAfter - 1);
+  await expect(newRow).toBeVisible();
+
+  // Step 5: If tags are provided, edit the example to add them
   if (tags && tags.length > 0) {
-    // Find the newly created example row - target the input column (second td)
-    const inputValue = typeof input === 'string' ? input : (input.id || JSON.stringify(input));
-    const rowWithInput = page.locator('table tbody tr').filter({ 
-      has: page.locator('td').nth(1).getByText(inputValue, { exact: true })
-    });
-    await expect(rowWithInput).toBeVisible({ timeout: 10000 });
-    
-    // Click edit button on the row
-    await rowWithInput.click();
-    
+    // Click the newly added row
+    await newRow.click();
 
     const editModal = page.locator('[role="dialog"]');
     await expect(editModal).toBeVisible();
@@ -140,13 +149,6 @@ export async function addExample(page, { input, output, tags }) {
     closeButton.click();
     await expect(editModal).not.toBeVisible({ timeout: 15000 });
     console.log('Successfully added tags to example.');
-  } else {
-    // Just verify the example was created - target the input column (second td)
-    const inputValue = typeof input === 'string' ? input : (input.id || JSON.stringify(input));
-    const rowWithInput = page.locator('table tbody tr').filter({ 
-      has: page.locator('td').nth(1).getByText(inputValue)
-    });
-    await expect(rowWithInput).toBeVisible({ timeout: 10000 });
   }
   
   console.log('Successfully added example.');
