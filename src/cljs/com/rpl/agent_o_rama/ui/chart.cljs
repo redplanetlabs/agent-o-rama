@@ -69,6 +69,17 @@
                            [{:stroke "#64748b"
                              :grid {:show true :stroke "#e2e8f0" :width 1}
                              :ticks {:show true :stroke "#cbd5e1"}
+                             ;; Custom splits function to only show integer experiment numbers
+                             :splits (fn [self axis-idx scale-min scale-max inc-space]
+                                       ;; Generate integer splits from min to max
+                                       (let [min (js/Math.ceil scale-min)
+                                             max (js/Math.floor scale-max)
+                                             result #js []]
+                                         (loop [i min]
+                                           (when (<= i max)
+                                             (.push result i)
+                                             (recur (inc i))))
+                                         result))
                              ;; Custom value formatter for x-axis: show as "#1", "#2", etc.
                              :values (fn [self splits-array axis-index]
                                        ;; splits-array contains the tick values, use JS .map directly
@@ -76,7 +87,11 @@
                             {:stroke "#64748b"
                              :grid {:show true :stroke "#e2e8f0" :width 1}
                              :ticks {:show true :stroke "#cbd5e1"}}])
-                 :scales {:x {:auto true} ; Numeric scale, not time
+                 :scales {:x {:time false ; Explicitly NOT a time scale
+                              :auto false ; Don't auto-detect
+                              :range (fn [self min max]
+                                       ;; Force integer range based on actual data
+                                       #js [(js/Math.floor min) (js/Math.ceil max)])}
                           :y {:auto true}}
                  :legend {:show true
                           :live true}}
