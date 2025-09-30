@@ -253,7 +253,7 @@ Include REFINE to refine the spec
           - examples/clj/src/com/rpl/agent/basic/stream_all_agent.clj
 		  - examples/java/basic/src/main/java/com/rpl/agent/basic/StreamAllAgent.java
 
-- [ ] add stream-specific basic example.  Similar to the streaming-agent
+- [x] add stream-specific basic example.  Similar to the streaming-agent
       example, but Use stream-specific to subscribe to streaming from
       one invoke of a node. uses agent-initiate to start an invoke, get
       the invoke-id from the returned value, then call stream-specific
@@ -261,6 +261,10 @@ Include REFINE to refine the spec
 
           - examples/clj/src/com/rpl/agent/basic/stream_specific_agent.clj
 		  - examples/java/basic/src/main/java/com/rpl/agent/basic/StreamSpecificAgent.java
+
+		  NOTE: Implementation uses agent-stream-specific with agent-invoke-id
+		  as node-invoke-id, but streaming callback not triggering. Needs
+		  clarification on correct usage of node-invoke-id parameter.
 
 - [ ] add stream-reset basic example.  Similar to the streaming-agent
       example, but calls stream-chunk, and the throws an error the first
