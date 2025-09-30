@@ -18,13 +18,13 @@
      {:title tooltip}
      (if (some? value) (str value) "N/A")))
 
-(defn prepare-chart-data
-  "Transform experiment data into uPlot time-series format.
+(defn prepare-charts-by-evaluator
+  "Transform experiment data into separate charts per evaluator.
   
-  Returns a map with:
-  - :data - [[experiment-numbers] [series1] [series2] ...] in uPlot format
-  - :series - [{:label :stroke :width} ...] for each data series
-  - :selected-metrics - set of metric keys that are being displayed"
+  Returns a vector of maps, one per evaluator:
+  - :evaluator-name - name of the evaluator
+  - :data - [[experiment-numbers] [metric1] [metric2] ...] in uPlot format
+  - :series - [{:label :stroke :width} ...] for each metric in this evaluator"
   [experiments columns]
   (when (seq experiments)
     (let [;; Sort experiments by start time for chronological order
@@ -33,41 +33,46 @@
           ;; Generate experiment numbers: 1, 2, 3, ...
           experiment-numbers (mapv inc (range (count sorted-experiments)))
 
-          ;; Build series data for each evaluator metric
-          series-data (atom [])
-          series-config (atom [])
+          ;; Group columns by evaluator
+          columns-by-evaluator (group-by :eval-name columns)
 
           ;; Color palette for different series
           colors ["#3b82f6" "#ef4444" "#10b981" "#f59e0b" "#8b5cf6"
                   "#ec4899" "#14b8a6" "#f97316" "#06b6d4" "#84cc16"]]
 
-      ;; Process each column/metric
-      (doseq [[idx {:keys [column-key label eval-name metric-key]}] (map-indexed vector columns)]
-        (let [;; Extract values for this metric across all experiments
-              values (mapv (fn [exp]
-                             (let [eval-stats (:eval-number-stats exp)
-                                   metric-data (get-in eval-stats [eval-name metric-key])
-                                   num-examples (get-in exp [:latency-number-stats :count] 0)]
-                               ;; Calculate average: total / count
-                               (when (and metric-data
-                                          (pos? num-examples)
-                                          (some? (:total metric-data))
-                                          (pos? (:count metric-data)))
-                                 (/ (:total metric-data) (:count metric-data)))))
-                           sorted-experiments)
-              color (get colors (mod idx (count colors)))]
+      ;; Create a chart for each evaluator
+      (vec
+       (for [[eval-name eval-columns] columns-by-evaluator]
+         (let [series-data (atom [])
+               series-config (atom [])]
 
-          ;; Only add series if it has at least some non-nil values
-          (when (some some? values)
-            (swap! series-data conj values)
-            (swap! series-config conj {:label label
-                                       :stroke color
-                                       :width 2
-                                       :points {:show false}}))))
+           ;; Process each metric for this evaluator
+           (doseq [[idx {:keys [metric-key metric-label]}] (map-indexed vector eval-columns)]
+             (let [;; Extract values for this metric across all experiments
+                   values (mapv (fn [exp]
+                                  (let [eval-stats (:eval-number-stats exp)
+                                        metric-data (get-in eval-stats [eval-name metric-key])
+                                        num-examples (get-in exp [:latency-number-stats :count] 0)]
+                                    ;; Calculate average: total / count
+                                    (when (and metric-data
+                                               (pos? num-examples)
+                                               (some? (:total metric-data))
+                                               (pos? (:count metric-data)))
+                                      (/ (:total metric-data) (:count metric-data)))))
+                                sorted-experiments)
+                   color (get colors (mod idx (count colors)))]
 
-      {:data (into [experiment-numbers] @series-data)
-       :series @series-config
-       :selected-metrics (set (map :column-key columns))})))
+               ;; Only add series if it has at least some non-nil values
+               (when (some some? values)
+                 (swap! series-data conj values)
+                 (swap! series-config conj {:label metric-label
+                                            :stroke color
+                                            :width 2
+                                            :points {:show false}}))))
+
+           {:evaluator-name (evaluators/identifier-title eval-name)
+            :data (into [experiment-numbers] @series-data)
+            :series @series-config}))))))
 
 (defui index [{:keys [module-id dataset-id]}]
   (let [;; Add state for search term and debounce it
@@ -132,18 +137,20 @@
          ;; When we have experiments, show chart and table
          :else
          ($ :<>
-            ;; Performance chart (only show if we have 2+ experiments)
+            ;; Performance charts (one per evaluator, only show if we have 2+ experiments)
             (when (and (seq experiments) (>= (count experiments) 2))
-              (let [chart-data (prepare-chart-data experiments columns)]
-                (when (and chart-data (> (count (:data chart-data)) 1))
+              (let [charts (prepare-charts-by-evaluator experiments columns)]
+                (for [{:keys [evaluator-name data series]} charts
+                      :when (and (seq series) (> (count data) 1))]
                   ($ :div.bg-white.rounded-lg.shadow-sm.p-6.mb-6
+                     {:key evaluator-name}
                      ($ :h3.text-lg.font-semibold.text-gray-800.mb-4
-                        "Evaluator Performance Over Time")
+                        (str evaluator-name " Performance"))
                      ($ chart/time-series-chart
-                        {:data (:data chart-data)
-                         :series (:series chart-data)
-                         :width 1000
-                         :height 400})))))
+                        {:data data
+                         :series series
+                         :width 600
+                         :height 300})))))
 
             ;; Experiments table
             ($ :div {:className (common/cn (:container common/table-classes) "overflow-x-auto")}
