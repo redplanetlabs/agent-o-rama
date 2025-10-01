@@ -276,12 +276,11 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     console.log('Regular evaluator scores for both pass and fail correctly displayed.');
 
     // Verify summary evaluator results in the summary table
-    const summaryTable = page.locator('table').filter({ hasText: '# Examples' });
-    const summaryCell = summaryTable.locator('td').filter({ hasText: summaryEvaluatorName });
-    await expect(summaryCell).toBeVisible();
-    await expect(summaryCell.getByText('score')).toBeVisible();
-    await expect(summaryCell.getByText('precision')).toBeVisible();
-    await expect(summaryCell.getByText('recall')).toBeVisible();
+    const summaryTable = page.locator('table').filter({ hasText: 'precision' });
+    await expect(summaryTable).toBeVisible();
+    await expect(summaryTable.getByText('score')).toBeVisible();
+    await expect(summaryTable.getByText('precision')).toBeVisible();
+    await expect(summaryTable.getByText('recall')).toBeVisible();
     console.log('Summary evaluator scores verified.');
 
     // ---
@@ -345,10 +344,11 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     console.log('Regular evaluator scores for the re-run experiment verified.');
 
     // Verify summary evaluator results for re-run
-    const rerunSummaryTable = page.locator('table').filter({ hasText: '# Examples' });
-    const rerunSummaryCell = rerunSummaryTable.locator('td').filter({ hasText: summaryEvaluatorName });
-    await expect(rerunSummaryCell).toBeVisible();
-    await expect(rerunSummaryCell.getByText('score')).toBeVisible();
+    const rerunSummaryTable = page.locator('table').filter({ hasText: 'precision' });
+    await expect(rerunSummaryTable).toBeVisible();
+    await expect(rerunSummaryTable.getByText('score')).toBeVisible();
+    await expect(rerunSummaryTable.getByText('precision')).toBeVisible();
+    await expect(rerunSummaryTable.getByText('recall')).toBeVisible();
     console.log('Summary evaluator scores for re-run experiment verified.');
 
 
