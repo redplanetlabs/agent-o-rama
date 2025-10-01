@@ -152,6 +152,7 @@
                         ($ :th {:className (:th common/table-classes)} "#")
                         ($ :th {:className (:th common/table-classes)} "Experiment Name")
                         ($ :th {:className (:th common/table-classes)} "Status")
+                        ($ :th {:className (:th common/table-classes)} "Started")
                         ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "# Examples")
                         ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "Avg Latency (ms)")
                         ($ :th {:className (common/cn (:th common/table-classes) "text-right")} "P99 Latency (ms)")
@@ -188,6 +189,9 @@
                              (if (:finish-time-millis exp)
                                ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs.font-medium "Completed")
                                ($ :span.px-2.py-1.bg-blue-100.text-blue-800.rounded-full.text-xs.font-medium "Running")))
+
+                          ;; Started
+                          ($ StatCell {:value (common/format-relative-time (:start-time-millis exp))})
 
                           ;; # Examples
                           ($ StatCell {:value num-examples})
