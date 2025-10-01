@@ -1213,9 +1213,31 @@
          (bind invb (aor/agent-initiate bar "mmmm"))
          (is (= "mmmm+-" (aor/agent-result bar invb)))
          (cycle!)
-         ;; TODO: <<<<>>>> asserts
-         (clojure.pprint/pprint @sample-rates)
-         (clojure.pprint/pprint @ACTIONS)
+         (is (= {0.5 1 0.55 1 0.6 1 0.65 1} (frequencies @sample-rates)))
+         (is (= 4 (count @ACTIONS)))
+         (is (= (frequencies @ACTIONS)
+                {[:action1
+                  ["lmno"]
+                  "lmno!?"
+                  {:action-name "action1"
+                   :agent-name  "foo"
+                   :node-name   nil
+                   :type        :agent}
+                  []]
+                 1
+
+                 [:action2 ["lmno"] "lmno!?" {"a1" "!" "a2" "?"}]
+                 1
+
+                 [:action1
+                  ["mmmm"]
+                  "mmmm+-"
+                  {:action-name "action1"
+                   :agent-name  "bar"
+                   :node-name   nil
+                   :type        :agent}
+                  []]
+                 2}))
 
          ;; TODO: <<<<>>>>
          ;;  - actions against nodes
@@ -1225,8 +1247,10 @@
          ;;     - node latency is nil
          ;;     - agent latency is not nil
          ;;  - verify respects max concurrency
+         ;;  - verify limited vs. unlimited actions behavior
          ;;  - verify how much it does in one iteration
          ;;  - agent invokes from experiments are skipped
+         ;;     - do binding of source when initiating
          ;;  - error handling:
          ;;    - online eval throws exception
          ;;      - online eval doesn't return map
