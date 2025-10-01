@@ -1654,7 +1654,15 @@
        (is (h/contains-string? (get (:info-map action) "failure")
                                "Invalid map of results"))
 
-       ;; TODO: <<<<>>>> eval exception
+
+       (bind inv (aor/agent-initiate foo "eval-exception"))
+       (is (= "eval-exception!?" (aor/agent-result foo inv)))
+       (cycle!)
+       (bind action (last-action "eval-action"))
+       (is (= #{"failure" "invoke" "success?"} (set (keys (:info-map action)))))
+       (is (= false (get (:info-map action) "success?")))
+       (is (h/contains-string? (get (:info-map action) "failure")
+                               "clojure.lang.ExceptionInfo: fail"))
 
        ;; TODO: <<<<>>>>
        ;;  - verify include-failures? behavior
