@@ -75,6 +75,10 @@
         declared-objects-vol   (volatile! {})
         evaluator-builders-vol (volatile! {})
         action-builders-vol    (volatile! {})]
+    (set-launch-topology-dynamic-option! setup
+                                         aor-types/AGENTS-MB-TOPOLOGY-NAME
+                                         "topology.microbatch.phase.timeout.seconds"
+                                         60)
     (reify
      AgentTopology
      (newAgent [this name]

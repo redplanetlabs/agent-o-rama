@@ -909,4 +909,4 @@
  ACTIONS-PROCESSING-ITERATION-TIME-MILLIS
  positive-long?
  "Maximum amount of time to spend processing actions per iteration"
- 5000)
+ 20000)

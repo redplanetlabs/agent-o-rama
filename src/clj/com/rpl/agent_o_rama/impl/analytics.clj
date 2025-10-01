@@ -680,14 +680,12 @@
               (seg# aggs/+last '*match-count)}}}
         :> match-info-pstate]]
      [ops/vget match-info-pstate :> '*match-info]
-
      [to-action-queue '*match-info :> '*queue]
      [loop<-
        ['*queue '*queue
-        '*first-iter? true
-        :> '*rem-queue]
+        '*first-iter? true]
        [<<if (seg# action-iter-complete? '*first-iter? '*queue '*actions-start-time-millis '*target-millis)
-         [:> '*queue]
+         [:>]
         [else>]
          [split-at '*max-concurrency '*queue :> ['*items '*rest-queue]]
          [agg-items '*items :> '*plan]
