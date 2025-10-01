@@ -2,7 +2,8 @@
   (:require
    [cljs.test :refer-macros [deftest testing is]]
    [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.specter :as s]))
+   [com.rpl.specter :as s]
+   [com.rpl.agent-o-rama.ui.dom])); Load DOM setup before tests
 
 (deftest test-initial-db
   ;; Tests the initial-db structure to ensure critical keys exist and have expected shapes
@@ -51,17 +52,7 @@
   (testing ":db/set-value"
     (testing "sets a value at a simple path"
       ;; Remove and re-add the console-logger watch to avoid window reference issues
-      (remove-watch state/app-db :console-logger)
       (state/reset-db!)
-      (add-watch state/app-db
-                 :console-logger
-                 (fn [key atom old-state new-state]
-                   (when (exists? js/window)
-                     (aset js/window
-                           "db"
-                           (clj->js new-state
-                                    {:keyword-fn (fn [k]
-                                                   (clojure.string/replace (name k) "-" "_"))})))))
       (state/dispatch [:db/set-value [:ui :selected-node-id] "test-node-123"])
       (is (= "test-node-123" (s/select-one [:ui :selected-node-id] (state/get-db)))))
 
