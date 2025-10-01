@@ -44,52 +44,53 @@
   :global-vars {*warn-on-reflection* true}
   :repositories
   [["releases"
-    {:id  "maven-releases"
+    {:id "maven-releases"
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
-  :profiles {:dev      {:resource-paths    ["test/resources/"]
-                        :source-paths      ["src/clj"
-                                            "src/cljs"
-                                            "resource"
-                                            "examples/clj/src"]
-                        :test-paths        ["test/clj"
-                                            "examples/clj/test"]
-                        :java-source-paths ["src/java" "test/java"]
-                        :dependencies
-                        [[org.clojure/clojure "1.12.0"]
-                         [meander/epsilon "0.0.650"]
-                         [dev.langchain4j/langchain4j-open-ai "1.4.0"]
-                         [dev.langchain4j/langchain4j-web-search-engine-tavily
-                          "1.3.0-beta9"]
-                         [thheller/shadow-cljs "3.1.7"]]}
+  :profiles {:dev {:resource-paths ["test/resources/"]
+                   :source-paths ["src/clj"
+                                  "src/cljs"
+                                  "resource"
+                                  "examples/clj/src"]
+                   :test-paths ["test/clj"
+                                "examples/clj/test"]
+                   :java-source-paths ["src/java" "test/java"]
+                   :dependencies
+                   [[org.clojure/clojure "1.12.0"]
+                    [meander/epsilon "0.0.650"]
+                    [dev.langchain4j/langchain4j-open-ai "1.4.0"]
+                    [dev.langchain4j/langchain4j-web-search-engine-tavily
+                     "1.3.0-beta9"]
+                    [thheller/shadow-cljs "3.1.7"]]}
              :provided {:dependencies
                         ;; TODO: fix Rama version
                         [[com.rpl/rama "0.0.6-SNAPSHOT"]
                          [org.apache.logging.log4j/log4j-slf4j18-impl
                           "2.16.0"]]}
-             :gen      {:prep-tasks   []
-                        :source-paths ["scripts"]
-                        :dependencies [[comb "0.1.1"]
-                                       [org.clojure/clojure "1.12.0"]]}
-             :ui       {:source-paths ["test/cljs"]
-                        :dependencies [[com.rpl/specter "1.1.4"] ;; only cljs
-                                       [com.pitch/uix.core "1.4.3"]
-                                       [com.pitch/uix.dom "1.4.3"]
-                                       [thheller/shadow-cljs "3.1.7"]
-                                       [metosin/reitit-frontend "0.7.2"]
-                                       [metosin/reitit-malli "0.7.2"]
-                                       [net.java.dev.jna/jna "5.17.0"] ;; to fix
+             :gen {:prep-tasks []
+                   :source-paths ["scripts"]
+                   :dependencies [[comb "0.1.1"]
+                                  [org.clojure/clojure "1.12.0"]]}
+             :ui {:source-paths ["test/cljs"]
+                  :dependencies [[prismatic/schema "1.4.1"]
+                                 [com.rpl/specter "1.1.4"] ;; only cljs
+                                 [com.pitch/uix.core "1.4.3"]
+                                 [com.pitch/uix.dom "1.4.3"]
+                                 [thheller/shadow-cljs "3.1.7"]
+                                 [metosin/reitit-frontend "0.7.2"]
+                                 [metosin/reitit-malli "0.7.2"]
+                                 [net.java.dev.jna/jna "5.17.0"] ;; to fix
                                        ;; dynlink
                                        ;; error
                                        ;; on arm
                                        ;; macs
-                                       [org.clojure/clojure "1.12.0"]]}}
+                                 [org.clojure/clojure "1.12.0"]]}}
   :codox {:source-paths ["src/clj"]
-          :metadata     {:doc/format :markdown}
-          :output-path  "target/doc"
-          :namespaces   [com.rpl.agent-o-rama
-                         com.rpl.agent-o-rama.langchain4j
-                         com.rpl.agent-o-rama.store
-                         com.rpl.agent-o-rama.tools]}
+          :metadata {:doc/format :markdown}
+          :output-path "target/doc"
+          :namespaces [com.rpl.agent-o-rama
+                       com.rpl.agent-o-rama.langchain4j
+                       com.rpl.agent-o-rama.store
+                       com.rpl.agent-o-rama.tools]}
   :plugins [[lein-exec "0.3.7"]
             [lein-codox "0.10.8"]
             [lein-doo "0.1.11"]])

@@ -3,7 +3,9 @@
    [com.rpl.specter :as s]
    [uix.core :as uix]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [com.rpl.agent-o-rama.ui.schemas :as schemas]
+   [schema.core :as s-core :include-macros true]))
 
 ;; =============================================================================
 ;; APP-DB: The Single Source of Truth
@@ -86,7 +88,8 @@
 
 (defn dispatch
   "Dispatch an event to update app-db. Event is a vector [event-id & args].
-   The handler must return a Specter path navigator suitable for s/multi-transform."
+   The handler must return a Specter path navigator suitable for s/multi-transform.
+   Includes centralized schema validation for development builds."
   [event]
   (let [event-id (first event)
         event-args (rest event)
@@ -95,13 +98,32 @@
       (try
         (let [current-db @app-db
               specter-path (apply handler current-db event-args)]
-          ;; Allow handlers to return nil to indicate they handled the update themselves
+          ;; Allow handlers to return nil to indicate no state change is needed
           (when specter-path
-            (swap! app-db #(s/multi-transform specter-path %))))
+            ;; Perform the state transformation
+            (let [new-db (s/multi-transform specter-path current-db)]
+
+              ;; <<< START: CENTRALIZED VALIDATION HOOK >>>
+              ;; This validation runs only in dev builds (thanks to goog.DEBUG)
+              ;; It checks the entire state tree after every single change.
+              (when ^boolean js/goog.DEBUG
+                (try
+                  (s-core/validate schemas/AppDbSchema new-db)
+                  (catch :default e
+                    (js/console.error "🔥🔥 SCHEMA VALIDATION FAILED 🔥🔥")
+                    (js/console.error "Event that caused failure:" (clj->js event))
+                    (js/console.error "Validation error details:" (clj->js (ex-data e)))
+                    ;; For aggressive debugging, you can throw the error to halt execution
+                    ;; (throw e)
+                    )))
+              ;; <<< END: CENTRALIZED VALIDATION HOOK >>>
+
+              ;; Atomically update the database
+              (reset! app-db new-db))))
         (catch :default e
-          (println "💥 Error in event handler" event-id ":" e)
+          (js/console.error "💥 Error in event handler" event-id ":" e)
           (throw e)))
-      (println "⚠️ No handler registered for event:" event-id))))
+      (js/console.warn "⚠️ No handler registered for event:" event-id))))
 
 ;; =============================================================================
 ;; SUBSCRIPTIONS (REACTIVE STATE ACCESS)
