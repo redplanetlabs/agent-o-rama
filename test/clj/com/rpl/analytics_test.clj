@@ -1166,9 +1166,10 @@
          (is (= #{}
                 (set (keys (ana/fetch-agent-rules foo-rules)))))
          (cycle!)
-         (is (= #{"foo-a1" "foo-a2" "foo-a4" "eval1" "eval2"}
+         (is (= #{}
                 (set (keys (foreign-select-one STAY foo-cursors)))))
 
+         (TopologyUtils/advanceSimTime 1000)
 
          (ana/add-rule!
           global-actions-depot
@@ -1178,7 +1179,7 @@
            :action-params     {}
            :filter            (aor-types/->AndFilter [])
            :sampling-rate     0.5
-           :start-time-millis 0
+           :start-time-millis (h/current-time-millis)
            :include-failures? false
           })
          (ana/add-rule!
@@ -1190,7 +1191,7 @@
                                "a2" "?"}
            :filter            (aor-types/->AndFilter [])
            :sampling-rate     0.6
-           :start-time-millis 0
+           :start-time-millis (h/current-time-millis)
            :include-failures? false
           })
          (ana/add-rule!
@@ -1201,7 +1202,7 @@
            :action-params     {}
            :filter            (aor-types/->AndFilter [])
            :sampling-rate     0.55
-           :start-time-millis 0
+           :start-time-millis (h/current-time-millis)
            :include-failures? false
           })
          (ana/add-rule!
@@ -1212,9 +1213,12 @@
            :action-params     {}
            :filter            (aor-types/->AndFilter [])
            :sampling-rate     0.65
-           :start-time-millis 0
+           :start-time-millis (h/current-time-millis)
            :include-failures? false
           })
+
+         (TopologyUtils/advanceSimTime 1000)
+
 
          (bind invf (aor/agent-initiate foo "lmno"))
          (is (= "lmno!?" (aor/agent-result foo invf)))
@@ -1254,6 +1258,7 @@
 
          ;; still have foo/foo-a1 at 0.5 sampling rate
 
+         (TopologyUtils/advanceSimTime 1000)
          (ana/add-rule!
           global-actions-depot
           "foo-start"
@@ -1263,7 +1268,7 @@
            :action-params     {}
            :filter            (aor-types/->AndFilter [])
            :sampling-rate     0.51
-           :start-time-millis 0
+           :start-time-millis (h/current-time-millis)
            :include-failures? false
           })
 
@@ -1276,7 +1281,7 @@
                          :action-params     {"name" "mconcise5"}
                          :filter            (aor-types/->AndFilter [])
                          :sampling-rate     0.52
-                         :start-time-millis 20000
+                         :start-time-millis (h/current-time-millis)
                          :include-failures? false
                         })
 
@@ -1291,9 +1296,11 @@
                                                           "concise?"
                                                           (aor-types/->ComparatorSpec :not= "a"))
            :sampling-rate     0.53
-           :start-time-millis 0
+           :start-time-millis (h/current-time-millis)
            :include-failures? false
           })
+
+         (TopologyUtils/advanceSimTime 1000)
 
          (bind invf (aor/agent-initiate foo "aaaa"))
          (is (= "aaaa!?" (aor/agent-result foo invf)))
@@ -1301,27 +1308,29 @@
          (is (= {"abc" "nnmm+-"} (aor/agent-result bar invb)))
 
          (cycle!)
-         (println "CYCLE 1")
-         (println @sample-rates)
-         (println @ACTIONS)
-         (cycle!)
-         (println "CYCLE 2")
-         (println @sample-rates)
-         (println @ACTIONS)
+         (is (= {0.5 1 0.51 1 0.52 1} (frequencies @sample-rates)))
+         (is (= 2 (count @ACTIONS)))
+         (is (= (set @ACTIONS)
+                #{[:action1 ["aaaa"] "aaaa!?"
+                   {:action-name "action1" :agent-name "foo" :node-name nil :type :agent} []]
+                  [:action1 ["aaaa"] [{"node" "node1" "args" ["aaaa!"]}]
+                   {:action-name "action1" :agent-name "foo" :node-name "start" :type :node} []]}))
 
-         ;; TODO: <<<<>>>
-         ;;  - first cycle is foo-a1, meval, foo-start
-         ;;  - second cycle is bar-n1, and it should have feedback
+         (cycle!)
+         (is (= {0.53 1} (frequencies @sample-rates)))
+         (is (= @ACTIONS
+                [[:action1 [{"abc" "nnmm+"}] {"abc" "nnmm+-"}
+                  {:action-name "action1" :agent-name "bar" :node-name "n1" :type :node}
+                  [{"concise?" false}]]]))
+
+
 
 
          ;; TODO: <<<<>>>>
-         ;;  - actions against nodes
-         ;;     - do against:
-         ;;       - also want eval on it
-         ;;         - also want evals to utilize paths..
-         ;;       - foo/start
-         ;;       - bar/n1
-         ;;       - and an agent
+         ;;  - verify in run info:
+         ;;     - latency-millis
+         ;;     - agent-stats
+         ;;     - nested-ops
          ;;  - verify include-failures? behavior
          ;;   - gives AgentFailedException for agent failure
          ;;   - gives nil for node output in that case

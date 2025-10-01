@@ -364,11 +364,14 @@
   [m node-name node-exec]
   (if (nil? node-name)
     m
-    (let [invalid-offset?
+    (let [max-time        (max-node-scan-time)
+          invalid-offset?
           (fn [[k data]]
-            (not (or (contains? data :finish-time-millis)
-                     (contains? data :invoked-agg-invoke-id)
-                     (not (retries/invoke-id-executing? node-exec k)))))
+            (and (not (contains? data :finish-time-millis))
+                 (not (contains? data :invoked-agg-invoke-id))
+                 (or (not (retries/invoke-id-executing? node-exec k))
+                     (and (contains? data :start-time-millis) ; not strictly necessary
+                          (> (:start-time-millis data) max-time)))))
           first-invalid-offset (select-first [ALL invalid-offset? FIRST] m)]
       (if (nil? first-invalid-offset)
         m
@@ -535,7 +538,7 @@
    (get *options :limit-concurrency? false :> *limit-concurrency?)
    (completable-future> (build-action-fn *builder-fn *action-params) :> *action-fn)
    (<<if (some? *node-name)
-     (h/min-uuid7-at-timestamp (max-node-scan-time) :> *max-scan-offset)
+     (identity nil :> *max-scan-offset)
     (else>)
      (po/agent-active-invokes-task-global *agent-name :> $$active)
      (local-select> [(subselect FIRST) (view first) (view first)] $$active :> *max-scan-offset))
@@ -558,6 +561,7 @@
      (:> (and> (not (experiment-source? *data))
                (not (contains? *data :invoked-agg-invoke-id))
                (or> *include-failures? (contains? *data :finish-time-millis))
+               (or> (nil? *node-name) (= *node-name (get *data :node)))
                (aor-types/rule-filter-matches? *filter *data)
                (sample? *sampling-rate))))
    (select> (subselect ALL
@@ -648,7 +652,8 @@
 (deframafn update-rule-offsets!
   [*agent->rule->cursors]
   (<<atomic
-    (ops/explode-map *agent->rule->cursors :> *agent-name *rule->cursors)
+    (ops/explode (agent-names-set) :> *agent-name)
+    (get *agent->rule->cursors *agent-name :> *rule->cursors)
     (po/agent-rule-cursors-task-global *agent-name :> $$rule-cursors)
     (local-transform> (termval *rule->cursors) $$rule-cursors))
   (:>))

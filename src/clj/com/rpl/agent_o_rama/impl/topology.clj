@@ -173,7 +173,7 @@
    [$$root (po/agent-root-task-global *agent-name)
     $$root-count (po/agent-root-count-task-global *agent-name)]
    (fetch-graph-version *agent-name :> *version)
-   (h/random-uuid7 :> *invoke-id)
+   (anode/gen-node-id :> *invoke-id)
    (h/current-time-millis :> *current-time-millis)
    (local-select> [(keypath *agent-id) (view some?)] $$root :> *exists?)
    (<<if (not *exists?)
@@ -879,7 +879,7 @@
       *fork-context)
 
     (case> NodeAggStart :> {:keys [*node-fn *agg-node-name]})
-     (h/random-uuid7 :> *new-agg-invoke-id)
+     (anode/gen-node-id :> *new-agg-invoke-id)
      (local-transform>
       [(keypath *invoke-id) :started-agg? (termval true)]
       $$nodes)
@@ -972,7 +972,7 @@
     (:>
      (assoc *emit
       :fork-invoke-id *emit-invoke-id
-      :invoke-id (h/random-uuid7))))
+      :invoke-id (anode/gen-node-id))))
   (:> (mapv %update-emit *emits)))
 
 (deframafn copy-unforked-agg-state
@@ -1049,7 +1049,7 @@
                                   :agg-invoke-id *agg-invoke-id))]
                        $$nodes)
      (<<if (aor-types/NodeAggStart? *node-obj)
-       (h/random-uuid7 :> *new-agg-invoke-id)
+       (anode/gen-node-id :> *new-agg-invoke-id)
        (local-select> (keypath *fork-agg-invoke-id)
                       $$nodes
                       :> {*agg-node      :node

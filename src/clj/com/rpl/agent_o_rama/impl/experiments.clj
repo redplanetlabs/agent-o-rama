@@ -490,7 +490,7 @@
 
           (aor-types/NodeInvokeImpl? target)
           (store/pstate-transform!
-           [(keypath (:agent-invoke-id target)) (fb/add-feedback-path res source)]
+           [(keypath (:node-invoke-id target)) (fb/add-feedback-path res source)]
            (.getStore agent-node (po/agent-node-task-global-name agent-name))
            (aor-types/->DirectTaskId (:task-id target)))
 
