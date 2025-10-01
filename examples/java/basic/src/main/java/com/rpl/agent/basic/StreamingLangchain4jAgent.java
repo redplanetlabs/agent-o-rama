@@ -11,13 +11,11 @@ import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.StreamingResponseHandler;
 import dev.langchain4j.model.chat.ChatModel;
-import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
-import dev.langchain4j.model.output.Response;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Java example demonstrating LangChain4j streaming chat model integration.
@@ -65,31 +63,18 @@ public class StreamingLangchain4jAgent {
 
     @Override
     public void invoke(AgentNode agentNode, String userMessage) {
-      ChatModel model =
-          (ChatModel) agentNode.getAgentObject("openai-streaming-model");
+      // Agent objects wrapping StreamingChatModel are returned as ChatModel
+      ChatModel model = (ChatModel) agentNode.getAgentObject("openai-streaming-model");
 
-      AtomicReference<String> responseRef = new AtomicReference<>("");
+      // Build chat request
+      ChatRequest request =
+          ChatRequest.builder().messages(List.<ChatMessage>of(new UserMessage(userMessage))).build();
 
-      // Send chat request to streaming OpenAI model
-      model.chat(
-        List.<ChatMessage>of(new UserMessage(userMessage)) //,
-        // new StreamingChatResponseHandler() {
-        //     @Override
-        //     public void onNext(String token) {
-        //       responseRef.set(responseRef.get() + token);
-        //     }
+      // Send chat request - streaming happens automatically with agent-o-rama
+      ChatResponse response = model.chat(request);
+      String responseText = response.aiMessage().text();
 
-        //     @Override
-        //     public void onComplete(Response<String> response) {
-        //       agentNode.result(responseRef.get());
-        //     }
-
-        //     @Override
-        //     public void onError(Throwable error) {
-        //       agentNode.result("Error: " + error.getMessage());
-        //     }
-        //   }
-                 );
+      agentNode.result(responseText);
     }
   }
 
@@ -102,8 +87,6 @@ public class StreamingLangchain4jAgent {
       System.out.println("  export OPENAI_API_KEY=your-api-key-here");
       return;
     }
-
-    AtomicReference<String> responseRef = new AtomicReference<>("");
 
     try (InProcessCluster ipc = InProcessCluster.create()) {
       StreamingLangChain4jModule module = new StreamingLangChain4jModule();
@@ -118,27 +101,13 @@ public class StreamingLangchain4jAgent {
 
       System.out.println("User: Explain what machine learning is in simple terms");
 
-      AgentInvoke invoke = agent.initiate("Explain what machine learning is in simple terms");
+      String result = (String) agent.invoke("Explain what machine learning is in simple terms");
 
-      agent.stream(invoke, "streaming-chat", new AgentClient.StreamCallback<String>() {
-         public void onUpdate(List<String> allChunks,
-                       List<String> newChunks,
-                       boolean isReset,
-                       boolean isComplete) {
-           for (String chunk : newChunks) {
-             responseRef.set(responseRef.get() + chunk);
-           }
-
-         }
-        });
-
-      agent.result(invoke);
-
-      System.out.println("\nAssistant: " + responseRef.get());
+      System.out.println("\nAssistant: " + result);
 
       System.out.println("\nNotice how:");
-      System.out.println("- OpenAI streaming model processes tokens in real-time");
-      System.out.println("- StreamingResponseHandler manages the response flow");
+      System.out.println("- OpenAI streaming model is automatically wrapped by agent-o-rama");
+      System.out.println("- Streaming chunks are emitted automatically during execution");
       System.out.println("- Final result contains the complete response");
     }
   }

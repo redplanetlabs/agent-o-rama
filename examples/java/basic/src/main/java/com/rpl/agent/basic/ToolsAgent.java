@@ -30,7 +30,9 @@ import dev.langchain4j.service.AiServices;
 public class ToolsAgent {
 
   /** Calculator tool for basic arithmetic operations. */
-  public static class Calculator {
+  public static class Calculator implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
+
     @Tool("Adds two numbers together")
     public double add(double a, double b) {
       return a + b;

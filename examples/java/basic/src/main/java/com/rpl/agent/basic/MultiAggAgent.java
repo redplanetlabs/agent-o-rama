@@ -56,24 +56,23 @@ public class MultiAggAgent {
           .node("process-text", "combine-results", new ProcessTextFunction())
           // Combine all analysis using multi-agg with tagged inputs
           .aggNode(
-            "combine-results",
-            null,
-            MultiAgg.create()
-	    .init(CustomMultiAggregator::init)
-            .on(
-              "number",
-              (AggregationState state, Map<String, Object> analysis) -> {
-                state.numbers.add(analysis);
-                return state;
-              })
-            // Handle text analysis results
-            .on(
-              "text",
-              (AggregationState state, Map<String, Object> analysis) -> {
-                state.text.add(analysis);
-                return state;
-              }),
-            new CombineResultsFunction());
+              "combine-results",
+              null,
+              MultiAgg
+                  .init(() -> new AggregationState())
+                  .on(
+                      "number",
+                      (AggregationState state, Map<String, Object> analysis) -> {
+                        state.numbers.add(analysis);
+                        return state;
+                      })
+                  .on(
+                      "text",
+                      (AggregationState state, Map<String, Object> analysis) -> {
+                        state.text.add(analysis);
+                        return state;
+                      }),
+              new CombineResultsFunction());
     }
   }
 
@@ -81,34 +80,6 @@ public class MultiAggAgent {
   public static class AggregationState {
     public List<Map<String, Object>> numbers = new ArrayList<>();
     public List<Map<String, Object>> text = new ArrayList<>();
-  }
-
-  /** Custom multi-aggregator for handling different tagged inputs. */
-  public static class CustomMultiAggregator // implements MultiAgg
-  {
-
-    public static RamaFunction0<AggregationState> init() {
-      return () -> new AggregationState();
-    }
-
-    // @Override
-    // public void declareOn() {
-    //   // Handle number analysis results
-    //   on(
-    //       "number",
-    //       (AggregationState state, Map<String, Object> analysis) -> {
-    //         state.numbers.add(analysis);
-    //         return state;
-    //       });
-
-    //   // Handle text analysis results
-    //   on(
-    //       "text",
-    //       (AggregationState state, Map<String, Object> analysis) -> {
-    //         state.text.add(analysis);
-    //         return state;
-    //       });
-    // }
   }
 
   /** Aggregation start function that distributes different types of data. */
