@@ -44,7 +44,7 @@
 (defn hook:building-plain-agent-object [name o])
 
 (defn- define-agent!
-  [agent-name setup topologies stream-topology mb-topology agent-graph]
+  [agent-name setup topologies stream-topology mb-topology analytics-mb-topology agent-graph]
   (let [agent-depot-sym           (symbol (po/agent-depot-name agent-name))
         agent-streaming-depot-sym (symbol (po/agent-streaming-depot-name
                                            agent-name))
@@ -155,7 +155,7 @@
      (symbol (po/pending-retries-task-global-name agent-name))
      po/PENDING-RETRIES-PSTATE-SCHEMA)
     (declare-pstate*
-     mb-topology
+     analytics-mb-topology
      (symbol (po/agent-rule-cursors-task-global-name agent-name))
      po/AGENT-RULE-CURSORS-PSTATE-SCHEMA
      {:global? true})
@@ -218,7 +218,7 @@
 (defn hook:analytics-tick [])
 
 (defn define-agents!
-  [setup topologies stream-topology mb-topology agent-graphs mirror-agents
+  [setup topologies stream-topology mb-topology analytics-mb-topology agent-graphs mirror-agents
    store-info declared-objects evaluator-builders action-builders]
   (declare-object* setup
                    (symbol (po/agents-store-info-name))
@@ -276,7 +276,7 @@
      {:key-partitioner apart/task-id-key-partitioner})
 
     (declare-pstate*
-     mb-topology
+     analytics-mb-topology
      (symbol (po/action-log-task-global-name))
      po/ACTION-LOG-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
@@ -287,7 +287,7 @@
                                          depot-sym
                                          "depot.max.entries.per.partition"
                                          500))
-    (<<sources mb-topology
+    (<<sources analytics-mb-topology
      (source> analytics-tick-depot-sym :> %mb)
       (%mb)
       (hook:analytics-tick)
@@ -351,6 +351,7 @@
                    topologies
                    stream-topology
                    mb-topology
+                   analytics-mb-topology
                    agent-graph)))
 
 (defn convert-agent-object-options

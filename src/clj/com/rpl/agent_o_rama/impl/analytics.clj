@@ -34,7 +34,8 @@
     OutputMatchFilter
     TokenCountFilter]
    [java.util.concurrent
-    CompletableFuture]))
+    CompletableFuture
+    TimeUnit]))
 
 (def ^:dynamic ACTION-HELPERS)
 (defn declared-objects ^AgentDeclaredObjectsTaskGlobal [] (:declared-objects ACTION-HELPERS))
@@ -116,11 +117,14 @@
                                  (:builder-params eval-info)
                                  [(aor-types/->valid-EvalInfo agent-name target)]
                                  (aor-types/->valid-ActionSourceImpl (:rule-name run-info))))
+            ;; should be guaranteed to be delivered, so the timeout is just in case
             (let [{:keys [stats result]}
                   (.get
                    ^CompletableFuture
                    (aor-types/subagent-next-step-async eval-client
-                                                       eval-agent-invoke))]
+                                                       eval-agent-invoke)
+                   180
+                   TimeUnit/SECONDS)]
               (merge {"invoke" eval-agent-invoke}
                      (if (instance? Throwable result)
                        {"success?" false "failure" (h/throwable->str result)}

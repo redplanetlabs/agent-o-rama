@@ -916,10 +916,10 @@
              (is (condition-attained? (> @TICKS 0)))
              (rtest/pause-microbatch-topology! ipc
                                                module-name
-                                               aor-types/AGENTS-MB-TOPOLOGY-NAME)
+                                               aor-types/AGENTS-ANALYTICS-MB-TOPOLOGY-NAME)
              (rtest/resume-microbatch-topology! ipc
                                                 module-name
-                                                aor-types/AGENTS-MB-TOPOLOGY-NAME)))
+                                                aor-types/AGENTS-ANALYTICS-MB-TOPOLOGY-NAME)))
 
 
          (aor/create-evaluator! agent-manager
@@ -1555,10 +1555,10 @@
            (is (condition-attained? (> @TICKS 0)))
            (rtest/pause-microbatch-topology! ipc
                                              module-name
-                                             aor-types/AGENTS-MB-TOPOLOGY-NAME)
+                                             aor-types/AGENTS-ANALYTICS-MB-TOPOLOGY-NAME)
            (rtest/resume-microbatch-topology! ipc
                                               module-name
-                                              aor-types/AGENTS-MB-TOPOLOGY-NAME)))
+                                              aor-types/AGENTS-ANALYTICS-MB-TOPOLOGY-NAME)))
 
        (aor/create-evaluator! agent-manager
                               "eval1"
@@ -1643,8 +1643,12 @@
 
 
 
+       (bind inv (aor/agent-initiate foo "bad-eval-return"))
+       (is (= "bad-eval-return!?" (aor/agent-result foo inv)))
+       (cycle!)
+       (bind action (last-action "eval-action"))
 
-       ;       (clojure.pprint/pprint action)
+       (clojure.pprint/pprint action)
 
        ;; TODO: <<<<>>>>
        ;;  - verify include-failures? behavior

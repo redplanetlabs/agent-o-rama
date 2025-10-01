@@ -59,6 +59,7 @@
 
 (def AGENT-TOPOLOGY-NAME "_agent-topology")
 (def AGENTS-MB-TOPOLOGY-NAME "_agents-mb-topology")
+(def AGENTS-ANALYTICS-MB-TOPOLOGY-NAME "_agents-analytics-topology")
 (def EVALUATOR-AGENT-NAME "_aor-evaluator")
 
 (def NODE-KW :node)

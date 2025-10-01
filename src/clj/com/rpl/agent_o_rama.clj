@@ -68,6 +68,9 @@
         mb-topology            (microbatch-topology
                                 topologies
                                 aor-types/AGENTS-MB-TOPOLOGY-NAME)
+        analytics-mb-topology  (microbatch-topology
+                                topologies
+                                aor-types/AGENTS-ANALYTICS-MB-TOPOLOGY-NAME)
         defined?-vol           (volatile! false)
         agents-vol             (volatile! {})
         mirror-agents-vol      (volatile! {})
@@ -77,6 +80,10 @@
         action-builders-vol    (volatile! {})]
     (set-launch-topology-dynamic-option! setup
                                          aor-types/AGENTS-MB-TOPOLOGY-NAME
+                                         "topology.microbatch.phase.timeout.seconds"
+                                         60)
+    (set-launch-topology-dynamic-option! setup
+                                         aor-types/AGENTS-ANALYTICS-MB-TOPOLOGY-NAME
                                          "topology.microbatch.phase.timeout.seconds"
                                          60)
     (reify
@@ -203,6 +210,7 @@
         topologies
         stream-topology
         mb-topology
+        analytics-mb-topology
         @agents-vol
         @mirror-agents-vol
         @store-info-vol
