@@ -27,9 +27,9 @@ import java.util.stream.Collectors;
  * <ul>
  *   <li>declarePStateStore: Create a PState store with schema
  *   <li>getStore: Access PState stores from agent nodes
- *   <li>Store.pstateSelect: Query data using path expressions
- *   <li>Store.pstateSelectOne: Query single values using path expressions
- *   <li>Store.pstateTransform: Update data using path-based transformations
+ *   <li>PStateStore.select: Query data using path expressions
+ *   <li>PStateStore.selectOne: Query single values using path expressions
+ *   <li>PStateStore.transform: Update data using path-based transformations
  *   <li>Complex nested data structures and path-based operations
  *   <li>Schema-based storage with Rama's native persistent state
  * </ul>
@@ -103,24 +103,27 @@ public class PstateStoreAgent {
       // Initialize company if it doesn't exist
       if (companyName != null) {
         orgStore.transform(
-            Path.key(companyId, "name").term(existing -> existing != null ? existing : companyName),
-            Path.key(companyId));
+          companyId,
+          Path
+          .key(companyId, "name")
+          .term(existing -> existing != null ? existing : companyName));
       }
 
       // Initialize department if it doesn't exist
       if (deptName != null) {
         orgStore.transform(
-            Path.key(companyId, "departments", deptId, "name")
-                .term(existing -> existing != null ? existing : deptName),
-            Path.key(companyId));
+          companyId,
+          Path.key(companyId, "departments", deptId, "name")
+          .term(existing -> existing != null ? existing : deptName));
       }
 
       // Add or update employee
       if (employee != null) {
         String empId = (String) employee.get("id");
         orgStore.transform(
-            Path.key(companyId, "departments", deptId, "employees", empId).termVal(employee),
-            Path.key(companyId));
+          companyId,
+          Path.key(companyId, "departments", deptId, "employees", empId)
+          .termVal(employee));
       }
 
       Map<String, Object> emitData = new HashMap<>();
@@ -146,28 +149,33 @@ public class PstateStoreAgent {
 
       // Query various data paths
       String companyName =
-	(String) orgStore.selectOne(Path.key(companyId, "name"), Path.key(companyId));
+          (String) orgStore.selectOne(companyId, Path.key(companyId, "name"));
 
       String deptName =
           (String)
-              orgStore.selectOne(Path.key(companyId, "departments", deptId, "name"),
-				 Path.key(companyId));
+          orgStore.selectOne(
+            companyId,
+            Path.key(companyId, "departments", deptId, "name"));
 
       Map<String, Object> allEmployees =
-          (Map<String, Object>) orgStore.selectOne(Path.key(companyId, "departments", deptId, "employees"),
-						   Path.key(companyId));
+          (Map<String, Object>) orgStore.selectOne(
+            companyId,
+            Path.key(companyId, "departments", deptId, "employees"));
 
       Map<String, Object> specificEmployee = null;
       if (employeeId != null) {
         specificEmployee =
             (Map<String, Object>)
                 orgStore.selectOne(
-                    Path.key(companyId, "departments", deptId, "employees", employeeId), Path.key(companyId));
+                companyId,
+                Path.key(companyId, "departments", deptId, "employees", employeeId));
       }
 
       Map<String, Object> allDepartments =
           (Map<String, Object>)
-	orgStore.selectOne(Path.key(companyId, "departments"), Path.key(companyId));
+          orgStore.selectOne(
+            companyId,
+            Path.key(companyId, "departments"));
 
       Map<String, Object> emitData = new HashMap<>();
       emitData.put("companyId", companyId);
@@ -225,15 +233,15 @@ public class PstateStoreAgent {
 
       // Demonstrate complex path querying - get all employee names across all departments
       List<String> allCompanyEmployeeNames =
-              orgStore.select(
-                  Path.key(companyId, "departments")
-                      .mapVals()
-                      .key("employees")
-                      .mapVals()
-                      .key("name"),
-                  Path.key(companyId)).stream()
-	.map(obj -> (String) obj)
-	.collect(Collectors.toList());
+          orgStore.select(
+            companyId,
+            Path.key(companyId, "departments")
+            .mapVals()
+            .key("employees")
+            .mapVals()
+            .key("name")).stream()
+        .map(obj -> (String) obj)
+        .collect(Collectors.toList());
 
       Map<String, Object> result = new HashMap<>();
       result.put("action", "pstate-query");
