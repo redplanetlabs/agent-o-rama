@@ -1466,20 +1466,197 @@
          (is (= (repeat 4 "foo-a1") (first iters)))
          (is (every? #(= 2 (count %)) (rest iters)))
          (is (= #{"foo-a2" "eval1"} (set (apply concat (rest iters)))))
-
-
-
-         ;; TODO: <<<<>>>>
-         ;;  - verify include-failures? behavior
-         ;;   - gives AgentFailedException for agent failure
-         ;;   - gives nil for node output in that case
-         ;;     - node latency is nil
-         ;;     - agent latency is not nil
-         ;;  - doesn't scan past incomplete nodes that haven't stalled
-         ;;  - doesn't scan past incomplete agents
-         ;;  - error handling:
-         ;;    - online eval throws exception
-         ;;    - online eval doesn't return map
-         ;;    - action doesn't return map
-         ;;    - error during action and its associated action log
         )))))
+
+(deftest action-failures-test
+  (with-redefs [TICKS (atom 0)
+                i/SUBSTITUTE-TICK-DEPOTS true
+
+                aor-types/get-config (max-retries-override 0)
+
+                ana/enable-action-error-logs? (constantly false)
+
+                i/hook:analytics-tick
+                (fn [& args] (swap! TICKS inc))]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (aor/declare-evaluator-builder
+           topology
+           "my-eval"
+           ""
+           (fn [params]
+             (fn [fetcher input ref-output output]
+               (cond
+                 (= input ["bad-eval-return"])
+                 "invalid"
+
+                 (= input ["eval-exception"])
+                 (throw (ex-info "fail" {}))
+
+                 :else
+                 {"len" (count output)}))))
+          (aor/declare-action-builder
+           topology
+           "action1"
+           ""
+           (fn [params]
+             (fn [fetcher input output run-info]
+               (cond
+                 (= input ["bad-action-return"])
+                 "invalid"
+
+                 (= input ["action-exception"])
+                 (throw (ex-info "fail" {}))
+
+                 :else
+                 {"input"  input
+                  "output" output})
+             )))
+          (-> topology
+              (aor/new-agent "foo")
+              (aor/node
+               "start"
+               "node1"
+               (fn [agent-node input]
+                 (if (= input "fail-agent")
+                   (throw (ex-info "fail-agent" {}))
+                   (aor/emit! agent-node "node1" (str input "!")))))
+              (aor/node
+               "node1"
+               nil
+               (fn [agent-node input]
+                 (aor/result! agent-node (str input "?")))))
+         ))
+       (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind global-actions-depot
+         (:global-actions-depot (aor-types/underlying-objects agent-manager)))
+       (bind foo (aor/agent-client agent-manager "foo"))
+       (bind ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
+       (bind foo-action-log (:action-log-query (aor-types/underlying-objects foo)))
+
+       (bind last-action
+         (fn [action-name]
+           (-> foo-action-log
+               (foreign-invoke-query action-name 1 nil)
+               :actions
+               first
+               :action)))
+
+
+       (bind cycle!
+         (fn []
+           (reset! TICKS 0)
+           (foreign-append! ana-depot nil)
+           (is (condition-attained? (> @TICKS 0)))
+           (rtest/pause-microbatch-topology! ipc
+                                             module-name
+                                             aor-types/AGENTS-MB-TOPOLOGY-NAME)
+           (rtest/resume-microbatch-topology! ipc
+                                              module-name
+                                              aor-types/AGENTS-MB-TOPOLOGY-NAME)))
+
+       (aor/create-evaluator! agent-manager
+                              "eval1"
+                              "my-eval"
+                              {}
+                              "")
+
+       (ana/add-rule! global-actions-depot
+                      "eval-action"
+                      "foo"
+                      {:node-name         nil
+                       :action-name       "aor/eval"
+                       :action-params     {"name" "eval1"}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? false
+                      })
+       (ana/add-rule! global-actions-depot
+                      "foo-agent-fail"
+                      "foo"
+                      {:node-name         nil
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? true
+                      })
+       (ana/add-rule! global-actions-depot
+                      "foo-agent"
+                      "foo"
+                      {:node-name         nil
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? false
+                      })
+       (ana/add-rule! global-actions-depot
+                      "foo-start-fail"
+                      "foo"
+                      {:node-name         "start"
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? true
+                      })
+       (ana/add-rule! global-actions-depot
+                      "foo-start"
+                      "foo"
+                      {:node-name         "start"
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? false
+                      })
+
+
+       (bind inv (aor/agent-initiate foo "bad-action-return"))
+       (is (= "bad-action-return!?" (aor/agent-result foo inv)))
+
+       (cycle!)
+       (bind action (last-action "foo-agent"))
+       (is (not (:success? action)))
+       (is (= ["exception"] (keys (:info-map action))))
+       (is (h/contains-string? (get (:info-map action) "exception") "Action return must be map"))
+
+       (bind inv (aor/agent-initiate foo "action-exception"))
+       (is (= "action-exception!?" (aor/agent-result foo inv)))
+       (cycle!)
+       (bind action (last-action "foo-agent"))
+       (is (not (:success? action)))
+       (is (= ["exception"] (keys (:info-map action))))
+       (is (h/contains-string? (get (:info-map action) "exception")
+                               "clojure.lang.ExceptionInfo: fail"))
+
+
+
+
+       ;       (clojure.pprint/pprint action)
+
+       ;; TODO: <<<<>>>>
+       ;;  - verify include-failures? behavior
+       ;;   - gives AgentFailedException for agent failure
+       ;;   - gives nil for node output in that case
+       ;;     - node latency is nil
+       ;;     - agent latency is not nil
+       ;;  - doesn't scan past incomplete nodes that haven't stalled
+       ;;  - doesn't scan past incomplete agents
+       ;;  - error handling:
+       ;;    - online eval throws exception
+       ;;    - online eval doesn't return map
+       ;;    - action doesn't return map
+       ;;    - error during action and its associated action log
+      ))))

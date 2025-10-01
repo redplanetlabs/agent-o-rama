@@ -416,6 +416,7 @@
           )))))))
 
 (defn hook:run-action [run-info])
+(defn enable-action-error-logs? [] true)
 
 (defn run-action!
   [action-fn input output run-info]
@@ -426,10 +427,11 @@
        (try
          (let [m (action-fn fetcher input output run-info)]
            (when-not (and (instance? java.util.Map m) (every? string? (keys m)))
-             (throw (h/ex-info "Action return must be map with string keys" {:reeturn m})))
+             (throw (h/ex-info "Action return must be map with string keys" {:return m})))
            (.complete cf {:success? true :info-map m}))
          (catch Throwable t
-           (tl/error ::run-action t "Action exception")
+           (when (enable-action-error-logs?)
+             (tl/error ::run-action t "Action exception"))
            (.complete cf {:success? false :info-map {"exception" (h/throwable->str t)}}))
        )))))
 
