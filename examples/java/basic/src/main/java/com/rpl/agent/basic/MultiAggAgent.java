@@ -8,7 +8,6 @@ import com.rpl.agentorama.AgentsModule;
 import com.rpl.agentorama.MultiAgg;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.agentorama.ops.RamaVoidFunction3;
-import com.rpl.rama.ops.RamaFunction0;
 import com.rpl.rama.ops.RamaFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -58,8 +57,7 @@ public class MultiAggAgent {
           .aggNode(
               "combine-results",
               null,
-              MultiAgg
-                  .init(() -> new AggregationState())
+              MultiAgg.init(() -> new AggregationState())
                   .on(
                       "number",
                       (AggregationState state, Map<String, Object> analysis) -> {
@@ -77,14 +75,43 @@ public class MultiAggAgent {
   }
 
   /** Custom aggregator state for combining multiple data types. */
-  public static class AggregationState {
+  public static class AggregationState implements com.rpl.rama.RamaSerializable {
     public List<Map<String, Object>> numbers = new ArrayList<>();
     public List<Map<String, Object>> text = new ArrayList<>();
+
+    private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
+      byte[] ser = com.rpl.agentorama.impl.AORHelpers.freeze(this.toMap());
+      out.writeInt(ser.length);
+      out.write(ser);
+    }
+
+    private void readObject(java.io.ObjectInputStream in)
+        throws java.io.IOException, ClassNotFoundException {
+      int size = in.readInt();
+      byte[] ser = new byte[size];
+      in.readFully(ser);
+      @SuppressWarnings("unchecked")
+      Map<String, Object> data = (Map<String, Object>) com.rpl.agentorama.impl.AORHelpers.thaw(ser);
+      this.fromMap(data);
+    }
+
+    private Map<String, Object> toMap() {
+      Map<String, Object> map = new HashMap<>();
+      map.put("numbers", numbers);
+      map.put("text", text);
+      return map;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void fromMap(Map<String, Object> map) {
+      this.numbers = (List<Map<String, Object>>) map.get("numbers");
+      this.text = (List<Map<String, Object>>) map.get("text");
+    }
   }
 
   /** Aggregation start function that distributes different types of data. */
   public static class DistributeDataFunction
-    implements RamaFunction2<AgentNode, Map<String, Object>, Object> {
+      implements RamaFunction2<AgentNode, Map<String, Object>, Object> {
 
     @Override
     @SuppressWarnings("unchecked")
@@ -209,9 +236,11 @@ public class MultiAggAgent {
       System.out.println("Processing mixed data types with custom aggregation logic");
 
       Map<String, Object> request = new HashMap<>();
-      request.put("numbers", List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10));
+      request.put("numbers", new ArrayList(List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)));
       request.put(
-          "text", List.of("Hello world", "Multi-agg is powerful", "Parallel processing rocks"));
+          "text",
+          new ArrayList(
+              List.of("Hello world", "Multi-agg is powerful", "Parallel processing rocks")));
 
       @SuppressWarnings("unchecked")
       Map<String, Object> result = (Map<String, Object>) agent.invoke(request);
