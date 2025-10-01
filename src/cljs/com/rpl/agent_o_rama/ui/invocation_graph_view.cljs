@@ -283,7 +283,8 @@
                                      [:ui :hitl :submitting :placeholder]))]
 
     (when selected-node
-      ($ :div {:className (common/cn "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl")}
+      ($ :div {:className (common/cn "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl")
+               :data-id "node-invoke-details-panel"}
          ($ :div {:className "p-6"}
             ;; Human input section
             (when hr
@@ -323,7 +324,6 @@
                   ($ :span {:className "text-sm font-medium text-indigo-700"} "ID")
                   ($ :span {:className "text-xs text-indigo-500 font-mono"} (str node-id)))
                ;; Add to Dataset button for individual node
-                              ;; Add to Dataset button for individual node
                ($ :div {:className "mt-3"}
                   ($ :button
                      {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
@@ -573,7 +573,8 @@
                           sorted-forks
                           (take 5 sorted-forks))]
     (when has-lineage?
-      ($ :div {:className "bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4"}
+      ($ :div {:className "bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4"
+               :data-id "lineage-panel"}
          ($ :h4 {:className "text-md font-semibold text-gray-700 mb-2"} "Lineage")
          ($ :div {:className "space-y-2"}
 
@@ -611,7 +612,8 @@
 (defui exceptions-panel [{:keys [summary-data graph-data on-select-node]}]
   (let [exceptions (get-in summary-data [:exception-summaries])]
     (when (seq exceptions)
-      ($ :div {:className (common/cn "bg-red-50 p-3 rounded-lg border border-red-200")}
+      ($ :div {:className (common/cn "bg-red-50 p-3 rounded-lg border border-red-200")
+               :data-id "exceptions-panel"}
          ($ :div {:className "text-sm font-medium text-red-700 mb-2 flex items-center gap-2"}
             ($ ExclamationTriangleIcon {:className "w-5 h-5"})
             (str "Exceptions (" (count exceptions) ")"))
@@ -666,7 +668,8 @@
                          :fork-of fork-of})
 
        (when result
-         ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"}
+         ($ :div {:className "bg-gray-50 p-3 rounded-lg border border-gray-200"
+                  :data-id "final-result-section"}
             ($ :div {:className "flex justify-between items-center mb-2"}
                ($ :div {:className "text-sm font-medium text-gray-700"} "Final Result")
                (if failure?
@@ -694,7 +697,9 @@
                             :graph-data graph-data
                             :on-select-node on-select-node})
 
-       ($ :div {:className "text-sm font-medium text-gray-700 pt-2 border-t border-gray-200"} "Overall Stats")
+       ($ :div {:className "text-sm font-medium text-gray-700 pt-2 border-t border-gray-200"
+                :data-id "overall-stats-section"}
+          "Overall Stats")
 
        ;; Metrics grid
        (let [total-nodes (count graph-data)
@@ -773,13 +778,15 @@
          (state/dispatch [:db/set-value [:ui :active-tab] :info])))
      [is-live changed-nodes])
 
-    ($ :div {:className (common/cn "fixed right-0 top-32 h-[calc(100vh-8rem)] w-80 bg-white shadow-lg border-l border-gray-200 overflow-hidden z-40")}
+    ($ :div {:className (common/cn "fixed right-0 top-32 h-[calc(100vh-8rem)] w-80 bg-white shadow-lg border-l border-gray-200 overflow-hidden z-40")
+             :data-id "agent-info-panel"}
        ;; Tab header
        ($ :div {:className (common/cn "border-b border-gray-200 p-4")}
           ($ :div {:className (common/cn "flex space-x-1 bg-gray-100 rounded-lg p-1")}
              ($ :button {:className (common/cn "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors"
                                                {"bg-white text-gray-900 shadow-sm" (= active-tab :info)
                                                 "text-gray-600 hover:text-gray-900" (not= active-tab :info)})
+                         :data-id "info-tab"
                          :onClick #(state/dispatch [:db/set-value [:ui :active-tab] :info])}
                 "Info")
              ;; Only show Fork tab when not in live mode
@@ -787,6 +794,7 @@
                ($ :button {:className (common/cn "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors"
                                                  {"bg-white text-gray-900 shadow-sm" (= active-tab :fork)
                                                   "text-gray-600 hover:text-gray-900" (not= active-tab :fork)})
+                           :data-id "fork-tab"
                            :onClick #(state/dispatch [:db/set-value [:ui :active-tab] :fork])}
                   (str "Fork" (when (> (count changed-nodes) 0) (str " (" (count changed-nodes) ")")))))))
 
@@ -803,58 +811,64 @@
                                  :fork-of fork-of})
 
             :fork (if (empty? changed-nodes)
-                    ($ :div {:className "text-gray-500 text-center py-8"}
+                    ($ :div {:className "text-gray-500 text-center py-8"
+                             :data-id "fork-empty-state"}
                        "No changes yet. Select a node to edit its input.")
 
-                    ($ :div {:className "space-y-3"}
+                    ($ :div {:className "space-y-3"
+                             :data-id "fork-content"}
                        ;; Changed nodes list
-                       (for [[node-id new-input] changed-nodes]
-                         (let [node-data (get graph-data node-id)
-                               node-name (:node node-data)
-                               is-overridden (contains? affected-nodes node-id)
-                               handle-select-node (fn [e]
-                                                    (.stopPropagation e)
-                                                    ;; Find the corresponding flow node and select it
-                                                    (let [nodes (js->clj flow-nodes :keywordize-keys true)
-                                                          target-node (->> nodes
-                                                                           (filter #(= (-> % :data :node-id) node-id))
-                                                                           first)]
-                                                      (when (and target-node on-select-node)
-                                                        (on-select-node node-id))))]
+                       ($ :div {:data-id "changed-nodes-list"}
+                          (for [[node-id new-input] changed-nodes]
+                            (let [node-data (get graph-data node-id)
+                                  node-name (:node node-data)
+                                  is-overridden (contains? affected-nodes node-id)
+                                  handle-select-node (fn [e]
+                                                       (.stopPropagation e)
+                                                       ;; Find the corresponding flow node and select it
+                                                       (let [nodes (js->clj flow-nodes :keywordize-keys true)
+                                                             target-node (->> nodes
+                                                                              (filter #(= (-> % :data :node-id) node-id))
+                                                                              first)]
+                                                         (when (and target-node on-select-node)
+                                                           (on-select-node node-id))))]
 
-                           ($ :div {:key node-id
-                                    :className (common/cn "border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow"
-                                                          {"bg-yellow-50 border-yellow-300 hover:bg-yellow-100" is-overridden
-                                                           "bg-gray-50 border-gray-200 hover:bg-gray-100" (not is-overridden)})
-                                    :onClick handle-select-node}
-                              ($ :div {:className "flex justify-between items-start mb-2"}
-                                 ($ :div
-                                    ($ :div {:className "font-medium text-gray-800 text-sm flex items-center gap-2"}
-                                       node-name)
-                                    ($ :div {:className "text-xs text-gray-500 font-mono"} (str "ID: " node-id))
-                                    (when is-overridden
-                                      ($ :div {:className "bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded mt-1 font-medium"}
-                                         "⚠️ This change will not be reached")))
-                                 ($ :button {:className "cursor-pointer text-red-500 hover:text-red-700 text-sm"
-                                             :onClick (fn [e]
-                                                        (.stopPropagation e)
-                                                        (when on-remove-node-change
-                                                          (on-remove-node-change node-id)))}
-                                    "Remove"))
+                              ($ :div {:key node-id
+                                       :className (common/cn "border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow"
+                                                             {"bg-yellow-50 border-yellow-300 hover:bg-yellow-100" is-overridden
+                                                              "bg-gray-50 border-gray-200 hover:bg-gray-100" (not is-overridden)})
+                                       :onClick handle-select-node}
+                                 ($ :div {:className "flex justify-between items-start mb-2"}
+                                    ($ :div
+                                       ($ :div {:className "font-medium text-gray-800 text-sm flex items-center gap-2"}
+                                          node-name)
+                                       ($ :div {:className "text-xs text-gray-500 font-mono"} (str "ID: " node-id))
+                                       (when is-overridden
+                                         ($ :div {:className "bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded mt-1 font-medium"}
+                                            "⚠️ This change will not be reached")))
+                                    ($ :button {:className "cursor-pointer text-red-500 hover:text-red-700 text-sm"
+                                                :onClick (fn [e]
+                                                           (.stopPropagation e)
+                                                           (when on-remove-node-change
+                                                             (on-remove-node-change node-id)))}
+                                       "Remove"))
 
-                              ($ :div {:className "text-xs"}
-                                 ($ :div {:className "text-gray-600 mb-1"} "New input:")
-                                 ($ :div {:className "bg-white p-2 rounded border font-mono text-gray-800 break-all"}
-                                    (if (> (count new-input) 100)
-                                      (str (subs new-input 0 100) "...")
-                                      new-input))))))
+                                 ($ :div {:className "text-xs"}
+                                    ($ :div {:className "text-gray-600 mb-1"} "New input:")
+                                    ($ :div {:className "bg-white p-2 rounded border font-mono text-gray-800 break-all"}
+                                       (if (> (count new-input) 100)
+                                         (str (subs new-input 0 100) "...")
+                                         new-input)))))))
 
                        ;; Action buttons
-                       ($ :div {:className "pt-4 border-t border-gray-200 space-y-2"}
+                       ($ :div {:className "pt-4 border-t border-gray-200 space-y-2"
+                                :data-id "fork-action-buttons"}
                           ($ :button {:className "w-full font-medium py-2 px-4 rounded-md transition-colors bg-blue-600 hover:bg-blue-700 text-white"
+                                      :data-id "execute-fork-button"
                                       :onClick on-execute-fork}
                              (str "Execute Fork (" (count changed-nodes) " changes)"))
                           ($ :button {:className "w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors"
+                                      :data-id "clear-fork-button"
                                       :onClick on-clear-fork}
                              "Clear All Changes")))))))))
 
@@ -975,7 +989,8 @@
          ($ :div.text-gray-500 "No graph data available"))
       ($ :<>
          ;; Main content area with right margin for the stats panel
-         ($ :div {:className "mr-80"}
+         ($ :div {:className "mr-80"
+                  :data-id "agent-graph-panel"}
             ($ :div {:style {:width "100%" :height "500px"}}
                ($ ReactFlow {:nodes flow-nodes
                              :edges flow-edges
