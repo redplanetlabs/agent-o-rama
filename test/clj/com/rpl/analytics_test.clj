@@ -838,12 +838,16 @@
                  "begin"
                  "n1"
                  (fn [agent-node input]
-                   (aor/emit! agent-node "n1" (str input "+"))))
+                   (if (map? input)
+                     (aor/emit! agent-node "n1" (setval [MAP-VALS END] "+" input))
+                     (aor/emit! agent-node "n1" (str input "+")))))
                 (aor/node
                  "n1"
                  nil
                  (fn [agent-node input]
-                   (aor/result! agent-node (str input "-")))))
+                   (if (map? input)
+                     (aor/result! agent-node (setval [MAP-VALS END] "-" input))
+                     (aor/result! agent-node (str input "-"))))))
            ))
          (rtest/launch-module! ipc module {:tasks 2 :threads 2})
          (bind module-name (get-module-name module))
@@ -905,6 +909,12 @@
                                 "aor/conciseness"
                                 {"threshold" "7"}
                                 "")
+         (aor/create-evaluator! agent-manager
+                                "mconcise5"
+                                "aor/conciseness"
+                                {"threshold" "5"}
+                                ""
+                                {:output-json-path "$.abc"})
 
          (ana/add-rule! global-actions-depot
                         "eval1"
@@ -1206,8 +1216,6 @@
            :include-failures? false
           })
 
-
-
          (bind invf (aor/agent-initiate foo "lmno"))
          (is (= "lmno!?" (aor/agent-result foo invf)))
          (bind invb (aor/agent-initiate bar "mmmm"))
@@ -1239,18 +1247,98 @@
                   []]
                  2}))
 
+         (ana/delete-rule! global-actions-depot "foo" "foo-a2")
+         (ana/delete-rule! global-actions-depot "bar" "foo-a1")
+         (ana/delete-rule! global-actions-depot "bar" "bar-a1")
+         (cycle!)
+
+         ;; still have foo/foo-a1 at 0.5 sampling rate
+
+         (ana/add-rule!
+          global-actions-depot
+          "foo-start"
+          "foo"
+          {:action-name       "action1"
+           :node-name         "start"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.51
+           :start-time-millis 0
+           :include-failures? false
+          })
+
+
+         (ana/add-rule! global-actions-depot
+                        "meval"
+                        "bar"
+                        {:node-name         "n1"
+                         :action-name       "aor/eval"
+                         :action-params     {"name" "mconcise5"}
+                         :filter            (aor-types/->AndFilter [])
+                         :sampling-rate     0.52
+                         :start-time-millis 20000
+                         :include-failures? false
+                        })
+
+         (ana/add-rule!
+          global-actions-depot
+          "bar-n1"
+          "bar"
+          {:node-name         "n1"
+           :action-name       "action1"
+           :action-params     {}
+           :filter            (aor-types/->FeedbackFilter "meval"
+                                                          "concise?"
+                                                          (aor-types/->ComparatorSpec :not= "a"))
+           :sampling-rate     0.53
+           :start-time-millis 0
+           :include-failures? false
+          })
+
+         (bind invf (aor/agent-initiate foo "aaaa"))
+         (is (= "aaaa!?" (aor/agent-result foo invf)))
+         (bind invb (aor/agent-initiate bar {"abc" "nnmm"}))
+         (is (= {"abc" "nnmm+-"} (aor/agent-result bar invb)))
+
+         (cycle!)
+         (println "CYCLE 1")
+         (println @sample-rates)
+         (println @ACTIONS)
+         (cycle!)
+         (println "CYCLE 2")
+         (println @sample-rates)
+         (println @ACTIONS)
+
+         ;; TODO: <<<<>>>
+         ;;  - first cycle is foo-a1, meval, foo-start
+         ;;  - second cycle is bar-n1, and it should have feedback
+
+
          ;; TODO: <<<<>>>>
          ;;  - actions against nodes
+         ;;     - do against:
+         ;;       - also want eval on it
+         ;;         - also want evals to utilize paths..
+         ;;       - foo/start
+         ;;       - bar/n1
+         ;;       - and an agent
          ;;  - verify include-failures? behavior
          ;;   - gives AgentFailedException for agent failure
          ;;   - gives nil for node output in that case
          ;;     - node latency is nil
          ;;     - agent latency is not nil
          ;;  - verify respects max concurrency
+         ;;     - set max concurrency setting
+         ;;     - make an action limited concurrency
+         ;;       - verify how many execute per cycle along with an eval rule
+         ;;         - can verify evals with a hook? or just by checking which agents have feedback
+         ;;         on them
          ;;  - verify limited vs. unlimited actions behavior
          ;;  - verify how much it does in one iteration
          ;;  - agent invokes from experiments are skipped
          ;;     - do binding of source when initiating
+         ;;  - doesn't scan past incomplete nodes that haven't stalled
+         ;;  - doesn't scan past incomplete agents
          ;;  - error handling:
          ;;    - online eval throws exception
          ;;      - online eval doesn't return map

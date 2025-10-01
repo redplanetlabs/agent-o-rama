@@ -471,7 +471,7 @@
        (aor-types/->AgentInvokeImpl (get *data :agent-task-id)
                                     (get *data :agent-id)
                                     :> *agent-invoke)
-       (identity *offset :> *node-invoke)
+       (aor-types/->NodeInvokeImpl *task-id *offset :> *node-invoke)
        (get *data :input :> *input)
        (h/node->output (get *data :result) (get *data :emits) :> *output)
       (else>)
