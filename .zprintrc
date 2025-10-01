@@ -166,12 +166,12 @@
   [:arg1-body
    {:list       {:indent-arg 2}
     :next-inner {:list {:indent-arg 1}}}]
-  "transform>"
-  :arg1-body
-  "with-retriever"
-  :arg1-body
-  "while"
-  :arg1-body
+  "transform>"      :arg1-body
+  "while"           :arg1-body
+  "with-agent-env"  :arg1-body
+  "with-postmortem" :arg2
+  "with-retriever"  :arg1-body
+  "with-webdriver"  :arg1-body
  }
  :factor-output-streams? true
  ;; see https://github.com/kkinnear/zprint/issues/187

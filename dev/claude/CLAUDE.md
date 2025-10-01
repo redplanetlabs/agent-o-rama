@@ -70,9 +70,20 @@ lein with-profile +ui run -m shadow.cljs.devtools.cli compile :test
 
 # Watch and auto-run ClojureScript tests
 lein with-profile +ui run -m shadow.cljs.devtools.cli watch :test
+
+# Run Etaoin E2E tests (requires Chrome/Chromium)
+lein test :only com.rpl.agent-o-rama.ui.trace-analytics-e2e-test
+
+# Run E2E tests with model calls (requires OPENAI_API_KEY)
+OPENAI_API_KEY=your-key lein test :only com.rpl.agent-o-rama.ui.trace-analytics-e2e-test/trace-analytics-with-model-calls-test
+
+# Run Playwright E2E tests (requires agent-o-rama backend running)
+npx playwright test
 ```
 - running an ipc test can take several minutes
 - ClojureScript tests use Node.js with jsdom for DOM support
+- Etaoin tests use headless Chrome and deploy agents programmatically
+- Playwright tests assume backend is already running with agents deployed
 
 ## Key Dependencies
 

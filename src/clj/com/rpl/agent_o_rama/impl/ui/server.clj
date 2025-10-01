@@ -14,9 +14,11 @@
    [ring.middleware.resource :as resource]
    [ring.middleware.file :as ring-file]
    [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
-   [ring.middleware.multipart-params :refer [wrap-multipart-params]]))
+   [ring.middleware.multipart-params :refer [wrap-multipart-params]]
+   [ring.middleware.cors :refer [wrap-cors]]))
 
-(defn spa-index-handler [_request]
+(defn spa-index-handler
+  [_request]
   (-> (resp/resource-response "index.html")
       (resp/content-type "text/html")))
 
@@ -27,15 +29,17 @@
       ;; First, try to serve from "public" for compiled JS and other assets.
       (resource/wrap-resource "public")))
 
-(defn routes [request]
-  (let [uri (:uri request)
+(defn routes
+  [request]
+  (let [uri    (:uri request)
         method (:request-method request)]
     (cond
       ;; Sente routes are the only specific routes we need
       (= uri "/chsk")
-      (case method
-        :get (sente/ring-ajax-get-or-ws-handshake request)
-        :post (sente/ring-ajax-post request))
+      (->
+        (case method
+          :get (sente/ring-ajax-get-or-ws-handshake request)
+          :post (sente/ring-ajax-post request)))
 
       ;; Dataset export
       (and (= method :get)
@@ -50,7 +54,8 @@
       ;; For any other route, return nil to let the next handler take over.
       :else nil)))
 
-(defn app-handler [request]
+(defn app-handler
+  [request]
   (or
    ;; 1. Try to serve a static file from "public" or "resources/public".
    (file-handler request)
@@ -67,4 +72,10 @@
       wrap-multipart-params
       (wrap-defaults (-> site-defaults
                          (assoc-in [:security :anti-forgery] false)
-                         (assoc-in [:security :ssl-redirect] false)))))
+                         (assoc-in [:security :ssl-redirect] false)))
+      (wrap-cors :access-control-allow-origin [#".*"]
+                 :access-control-allow-methods #{:get :post :put :delete :options}
+                 :access-control-allow-headers #{"Content-Type"
+                                                 "Authorization"
+                                                 "X-CSRF-Token"
+                                                 "x-requested-with"})))

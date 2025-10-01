@@ -107,7 +107,7 @@
     (aor/node
      "chat-with-tools"
      nil
-     (fn [agent-node prompts]
+     (fn chat-with-tools-fn [agent-node prompts]
        (let [model       (aor/get-agent-object agent-node "openai-model")
              tools-agent (aor/agent-client agent-node "ToolsAgent")
              results     (atom [])]
@@ -119,7 +119,7 @@
                                         [(UserMessage. prompt)]
                                         {:tools [CALCULATOR-TOOL STRING-TOOL]}))
                  ai-message (.aiMessage response)
-                 tool-calls (.toolExecutionRequests ai-message)]
+                 tool-calls (vec (.toolExecutionRequests ai-message))]
 
              (if (seq tool-calls)
                ;; Execute tools and get results

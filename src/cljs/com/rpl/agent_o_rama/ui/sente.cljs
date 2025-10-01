@@ -1,8 +1,9 @@
 (ns com.rpl.agent-o-rama.ui.sente
-  (:require [taoensso.sente :as sente]
-            [taoensso.sente.packers.transit :as sente-transit]
-            [uix.core :as uix]
-            [com.rpl.agent-o-rama.ui.state :as state]))
+  (:require
+   [taoensso.sente :as sente]
+   [taoensso.sente.packers.transit :as sente-transit]
+   [uix.core :as uix]
+   [com.rpl.agent-o-rama.ui.state :as state]))
 
 ;; Create Transit packer for serialization (must match server)
 (def transit-packer
@@ -17,33 +18,41 @@
    {:handlers
     {"u" (fn [v] (uuid v))}}))
 
+(defn firefox?
+  []
+  (when-let [user-agent (.-userAgent js/navigator)]
+    (re-find #"Firefox" user-agent)))
+
 ;; 1. Instantiate the Sente channel socket client
 (let [{:keys [chsk ch-recv send-fn state]}
       (sente/make-channel-socket-client!
        "/chsk"
        nil ; No CSRF token for development
-       {:type :ajax ;; ajax because problems on firefox
-        :packer transit-packer})]
+       {:type   (if (firefox?) :ajax :auto)
+        :packer transit-packer
+        :port   1974})]
 
   ;; 2. Define the vars for our Sente client
   (def chsk chsk) ; The channel socket itself
   (def ch-chsk ch-recv) ; ChannelSocket's receive channel
   (def chsk-send! send-fn) ; ChannelSocket's send API function
-  (def chsk-state state)) ; Watchable atom of connection state
+  (def chsk-state state)); Watchable atom of connection state
 
 ;; 3. Define the Sente event router for the client
 (defmulti -event-msg-handler :id)
 
 (defn event-msg-handler [ev-msg] (-event-msg-handler ev-msg))
 
-(defmethod -event-msg-handler :default [{:as ev-msg :keys [id ?data]}]
+(defmethod -event-msg-handler :default
+  [{:as ev-msg :keys [id ?data]}]
   (.log js/console (str "Unhandled Sente event: " id) ?data))
 
 (defmethod -event-msg-handler :chsk/ws-ping [ev-msg])
 (defmethod -event-msg-handler :chsk/ws-pong [ev-msg])
 
 ;; Handler to log connection state changes
-(defmethod -event-msg-handler :chsk/state [{:as ev-msg :keys [?data]}]
+(defmethod -event-msg-handler :chsk/state
+  [{:as ev-msg :keys [?data]}]
   (let [[old-state new-state] ?data
         connected? (boolean (:open? new-state))]
     ;; Update app-db with connection state
@@ -51,20 +60,23 @@
     (state/dispatch [:db/set-value [:sente :connected?] connected?])))
 
 ;; Handler for successful handshake
-(defmethod -event-msg-handler :chsk/handshake [{:as ev-msg :keys [?data]}]
+(defmethod -event-msg-handler :chsk/handshake
+  [{:as ev-msg :keys [?data]}]
   (state/dispatch [:db/set-value [:sente :connected?] true]))
 
 ;; 4. Router lifecycle functions
 (defonce router_ (atom nil))
 
-(defn stop-router! []
+(defn stop-router!
+  []
   (when-let [stop-fn @router_]
     (stop-fn)))
 
-(defn start-router! []
+(defn start-router!
+  []
   (stop-router!)
   (reset! router_
-          (sente/start-client-chsk-router! ch-chsk event-msg-handler)))
+    (sente/start-client-chsk-router! ch-chsk event-msg-handler)))
 
 ;; =============================================================================
 ;; REQUEST HELPERS
@@ -79,7 +91,8 @@
    (request! event-vec timeout-ms nil))
   ([event-vec timeout-ms callback]
    #_(println "SENDING SENTE EVENT:" event-vec timeout-ms callback)
-   (chsk-send! event-vec timeout-ms
+   (chsk-send! event-vec
+               timeout-ms
                (fn [reply]
                  #_(println "SENTE EVENT REPLY:" reply)
                  (callback reply)))))
@@ -89,6 +102,6 @@
   [event-vec]
   (chsk-send! event-vec))
 
-(defn init! []
+(defn init!
+  []
   (start-router!))
-

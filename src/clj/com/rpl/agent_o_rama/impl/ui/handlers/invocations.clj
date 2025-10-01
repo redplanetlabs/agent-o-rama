@@ -2,6 +2,7 @@
   (:use [com.rpl.rama] [com.rpl.rama.path])
   (:require
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.analytics :as analytics]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
    [jsonista.core :as j])
@@ -34,13 +35,20 @@
         is-initial-load? (boolean initial?)
 
         ;; This query is now safe because root-pstate is correctly sourced
+        summary-info-raw (foreign-select-one
+                          [(keypath agent-id)
+                           (submap [:result :start-time-millis :finish-time-millis :graph-version :retry-num :fork-of :exception-summaries :invoke-args :stats :feedback])]
+                          root-pstate
+                          {:pkey agent-task-id})
+
+        ;; Add aggregated stats to the stats object
         summary-info (merge
                       {:forks (foreign-select-one [(keypath agent-id) :forks (sorted-set-range-to-end 100)]
                                                   root-pstate
                                                   {:pkey agent-task-id})}
-                      (foreign-select-one [(keypath agent-id) (submap [:result :start-time-millis :finish-time-millis :graph-version :retry-num :fork-of :exception-summaries :invoke-args])]
-                                          root-pstate
-                                          {:pkey agent-task-id}))
+                      summary-info-raw
+                      (when-let [stats (:stats summary-info-raw)]
+                        {:stats (merge {:aggregated-stats (analytics/aggregated-basic-stats stats)} stats)}))
 
         root-invoke-id (when is-initial-load?
                          (foreign-select-one [(keypath agent-id) :root-invoke-id] root-pstate {:pkey agent-task-id}))
@@ -63,11 +71,9 @@
 
         next-leaves (:next-task-invoke-pairs dynamic-trace)
 
-        root-status (foreign-select-one [(keypath agent-id) (submap [:result :finish-time-millis])]
-                                        root-pstate
-                                        {:pkey agent-task-id})
-
-        agent-is-complete? (boolean (or (:finish-time-millis root-status) (:result root-status)))]
+        ;; Determine completion from the summary data we already fetched
+        ;; to avoid race condition between two separate queries
+        agent-is-complete? (boolean (or (:finish-time-millis summary-info) (:result summary-info)))]
 
     (cond-> {:is-complete agent-is-complete?}
       (seq cleaned-nodes) (assoc :nodes cleaned-nodes)

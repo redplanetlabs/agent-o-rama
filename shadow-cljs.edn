@@ -1,9 +1,24 @@
 {:lein   {:profile "+ui"}
  :builds
- {:frontend
-  {:target     :browser
-   :modules    {:main {:init-fn com.rpl.agent-o-rama.ui/init}}
-   :output-dir "resource/public/"}
+ {:dev
+  {:target           :browser
+   :output-dir       "target/public"
+   :asset-path       "/js"
+   :modules          {:main
+                      {:init-fn com.rpl.agent-o-rama.ui/init}}
+   :compiler-options {:optimizations :none
+                      :source-map    true}
+   :devtools         {:http-root "target/public"
+                      :http-port 3001
+                      ;; :before-load chat-rama.frontend.core/stop
+                      ;; :after-load  chat-rama.frontend.core/start
+                     }}
+  :frontend
+  {:target           :browser
+   :modules          {:main {:init-fn com.rpl.agent-o-rama.ui/init}}
+   :output-dir       "resource/public/"
+   :compiler-options
+   {:optimizations :advanced :infer-externs :auto :source-map true}}
 
   :test
   {:target    :node-test
@@ -11,4 +26,6 @@
    :autorun   true
    :ns-regexp "-test$"
    :dev-tools {:preloads [com.rpl.agent-o-rama.ui.dom]}
-   :esm       true}}}
+   :esm       true}}
+ :nrepl  {:middleware [cider.nrepl/cider-middleware]
+          :port       61000}}

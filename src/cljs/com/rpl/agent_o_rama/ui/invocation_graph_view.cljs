@@ -258,6 +258,45 @@
   [invoke-args result-val]
   {"node" "agent" "args" [result-val]})
 
+(defui feedback-panel [{:keys [feedback]}]
+  (when (and feedback (seq (:scores feedback)))
+    (let [scores (:scores feedback)
+          source (:source feedback)
+          created-at (:created-at feedback)
+          modified-at (:modified-at feedback)
+          source-str (when source
+                       (cond
+                         (:human? source) "Human"
+                         (:ai? source) "AI"
+                         (:api? source) "API"
+                         (:bulk-upload? source) "Bulk Upload"
+                         (:experiment? source) (str "Experiment: " (:experiment-name source))
+                         (:agent-run? source) (str "Agent: " (:agent-name source))
+                         :else "Unknown"))]
+      ($ :div {:className "bg-purple-50 p-3 rounded-lg border border-purple-200"
+               :data-id "feedback-panel"}
+         ($ :div {:className "text-sm font-medium text-purple-700 mb-2 flex items-center justify-between"}
+            ($ :span "Feedback")
+            (when source-str
+              ($ :span {:className "text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded-full"}
+                 source-str)))
+         ($ :div {:className "space-y-2"}
+            ;; Display scores
+            (for [[score-name score-value] (sort-by key scores)]
+              ($ :div {:key score-name
+                       :className "bg-white p-2 rounded border border-purple-100"}
+                 ($ :div {:className "flex justify-between items-center"}
+                    ($ :span {:className "text-xs font-medium text-purple-600"}
+                       score-name)
+                    ($ :span {:className "text-sm font-semibold text-purple-800"}
+                       (if (number? score-value)
+                         (.toFixed score-value 2)
+                         (str score-value))))))
+            ;; Display timestamp if available
+            (when created-at
+              ($ :div {:className "text-xs text-purple-500 mt-2 pt-2 border-t border-purple-200"}
+                 (str "Created: " (format-ms created-at)))))))))
+
 (defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes module-id agent-name invoke-id]}]
   (let [data (when selected-node
                (js->clj (.-data selected-node) :keywordize-keys true))
@@ -272,6 +311,7 @@
                    (str (- finish-time start-time)))
         emits (:emits data)
         has-paginated (:has-paginated-children data)
+        feedback (:feedback data)
 
         hr (:human-request data)
 
@@ -484,7 +524,9 @@
                                                         :truncate-length 60
                                                         :depth 0}))
                               ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
-                                 (str "ID: " emit-id))))))))))))))
+                                 (str "ID: " emit-id)))))))))
+
+            ($ feedback-panel {:feedback feedback}))))))
 
 (defui forking-input-component [{:keys [selected-node changed-nodes on-change-node-input affected-nodes]}]
   (let [data (when selected-node
@@ -655,10 +697,11 @@
                                               "Node not loaded (pagination)")}
                             "Go to Node")))))))))))
 
-(defui info-panel [{:keys [graph-data summary-data on-select-node module-id agent-name task-id forks fork-of]}]
+(defui info-panel [{:keys [graph-data summary-data on-select-node module-id agent-name task-id forks fork-of invoke-id]}]
   (let [result (:result summary-data)
         failure? (:failure? result)
-        result-val (:val result)]
+        result-val (:val result)
+        feedback (:feedback summary-data)]
 
     ($ :div {:className "space-y-4"}
 
@@ -698,15 +741,12 @@
                             :graph-data graph-data
                             :on-select-node on-select-node})
 
-       ($ :div {:className "text-sm font-medium text-gray-700 pt-2 border-t border-gray-200"
-                :data-id "overall-stats-section"}
-          "Overall Stats")
+       ($ feedback-panel {:feedback feedback})
 
-       ($ trace-analytics/info {:graph-data graph-data
-                                :summary-data summary-data}))))
+       ($ trace-analytics/info {:invoke-id invoke-id}))))
 
 (defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live
-                            module-id agent-name task-id forks fork-of]}]
+                            module-id agent-name task-id forks fork-of invoke-id]}]
   (let [active-tab (state/use-sub [:ui :active-tab])]
 
     ;; Update forking mode when tab changes
@@ -726,10 +766,10 @@
          (state/dispatch [:db/set-value [:ui :active-tab] :info])))
      [is-live changed-nodes])
 
-    ($ :div {:className (common/cn "fixed right-0 top-32 h-[calc(100vh-8rem)] w-80 bg-white shadow-lg border-l border-gray-200 overflow-hidden z-40")
+    ($ :div {:className (common/cn "fixed right-0 top-32 h-[calc(100vh-8rem)] w-80 bg-white shadow-lg border-l border-gray-200 flex flex-col z-40")
              :data-id "agent-info-panel"}
        ;; Tab header
-       ($ :div {:className (common/cn "border-b border-gray-200 p-4")}
+       ($ :div {:className (common/cn "border-b border-gray-200 p-4 flex-shrink-0")}
           ($ :div {:className (common/cn "flex space-x-1 bg-gray-100 rounded-lg p-1")}
              ($ :button {:className (common/cn "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors"
                                                {"bg-white text-gray-900 shadow-sm" (= active-tab :info)
@@ -747,7 +787,7 @@
                   (str "Fork" (when (> (count changed-nodes) 0) (str " (" (count changed-nodes) ")")))))))
 
        ;; Tab content
-       ($ :div {:className "p-4 h-full overflow-y-auto"}
+       ($ :div {:className "p-4 flex-1 overflow-y-auto"}
           (case active-tab
             :info ($ info-panel {:graph-data graph-data
                                  :summary-data summary-data
@@ -756,7 +796,8 @@
                                  :agent-name agent-name
                                  :task-id task-id
                                  :forks forks
-                                 :fork-of fork-of})
+                                 :fork-of fork-of
+                                 :invoke-id invoke-id})
 
             :fork (if (empty? changed-nodes)
                     ($ :div {:className "text-gray-500 text-center py-8"
@@ -1048,4 +1089,5 @@
                          :agent-name agent-name
                          :task-id task-id
                          :forks forks
-                         :fork-of fork-of})))))
+                         :fork-of fork-of
+                         :invoke-id invoke-id})))))
