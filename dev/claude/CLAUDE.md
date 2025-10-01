@@ -64,8 +64,15 @@ lein test
 
 # Test specific namespace
 lein test com.rpl.agent-o-rama.test-namespace
+
+# Run ClojureScript tests
+lein with-profile +ui run -m shadow.cljs.devtools.cli --npm compile :test
+
+# Watch and auto-run ClojureScript tests
+lein with-profile +ui run -m shadow.cljs.devtools.cli --npm watch :test
 ```
 - running an ipc test can take several minutes
+- ClojureScript tests use Node.js with jsdom for DOM support
 
 ## Key Dependencies
 

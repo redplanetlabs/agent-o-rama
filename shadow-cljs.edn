@@ -3,4 +3,11 @@
  {:frontend
   {:target :browser
    :modules {:main {:init-fn com.rpl.agent-o-rama.ui/init}}
-   :output-dir "resource/public/"}}}
+   :output-dir "resource/public/"}
+
+  :test
+  {:target :node-test
+   :output-to "target/test/test.js"
+   :autorun true
+   :ns-regexp "-test$"
+   :preloads [com.rpl.agent-o-rama.ui.dom]}}}

@@ -4,6 +4,7 @@
   "private": true,
   "devDependencies": {
     "@playwright/test": "^1.55.0",
+    "jsdom": "^25.0.1",
     "shadow-cljs": "3.0.5"
   },
   "dependencies": {
