@@ -802,8 +802,12 @@
                    [:action1
                     input
                     output
-                    (select-keys run-info [:action-name :agent-name :node-name :type])
-                    (select [:feedback ALL :scores] run-info)])
+                    (select-keys run-info
+                                 [:action-name :agent-name :node-name :type :latency-millis])
+                    (select [:feedback ALL :scores] run-info)
+                    (mapv aor-types/NestedOpInfoImpl? (:nested-ops run-info))
+                    (aor-types/AgentInvokeStatsImpl? (:agent-stats run-info))
+                   ])
                  {"abc" "ccc"
                   "xyz" "..."}
                )))
@@ -846,7 +850,10 @@
                  nil
                  (fn [agent-node input]
                    (if (map? input)
-                     (aor/result! agent-node (setval [MAP-VALS END] "-" input))
+                     (do
+                       (aor/record-nested-op! agent-node :other 1 2 {})
+                       (TopologyUtils/advanceSimTime 1)
+                       (aor/result! agent-node (setval [MAP-VALS END] "-" input)))
                      (aor/result! agent-node (str input "-"))))))
            ))
          (rtest/launch-module! ipc module {:tasks 2 :threads 2})
@@ -999,15 +1006,27 @@
          (is (= {0.5 1 1.0 1} (frequencies @sample-rates)))
          (is (= @ACTIONS
                 [[:action1 [".."] "..!?"
-                  {:action-name "action1" :agent-name "foo" :node-name nil :type :agent}
-                  [{"concise?" true}]]]))
+                  {:action-name    "action1"
+                   :agent-name     "foo"
+                   :node-name      nil
+                   :type           :agent
+                   :latency-millis 0}
+                  [{"concise?" true}]
+                  []
+                  true]]))
 
          (cycle!)
          (is (= [1.0] @sample-rates))
          (is (= @ACTIONS
                 [[:action1 ["."] ".!?"
-                  {:action-name "action1" :agent-name "foo" :node-name nil :type :agent}
-                  [{"concise?" true}]]]))
+                  {:action-name    "action1"
+                   :agent-name     "foo"
+                   :node-name      nil
+                   :type           :agent
+                   :latency-millis 0}
+                  [{"concise?" true}]
+                  []
+                  true]]))
 
          ;; sanity check
          (is (= 51000 (h/current-time-millis)))
@@ -1231,11 +1250,14 @@
                 {[:action1
                   ["lmno"]
                   "lmno!?"
-                  {:action-name "action1"
-                   :agent-name  "foo"
-                   :node-name   nil
-                   :type        :agent}
-                  []]
+                  {:action-name    "action1"
+                   :agent-name     "foo"
+                   :node-name      nil
+                   :type           :agent
+                   :latency-millis 0}
+                  []
+                  []
+                  true]
                  1
 
                  [:action2 ["lmno"] "lmno!?" {"a1" "!" "a2" "?"}]
@@ -1244,11 +1266,14 @@
                  [:action1
                   ["mmmm"]
                   "mmmm+-"
-                  {:action-name "action1"
-                   :agent-name  "bar"
-                   :node-name   nil
-                   :type        :agent}
-                  []]
+                  {:action-name    "action1"
+                   :agent-name     "bar"
+                   :node-name      nil
+                   :type           :agent
+                   :latency-millis 0}
+                  []
+                  []
+                  true]
                  2}))
 
          (ana/delete-rule! global-actions-depot "foo" "foo-a2")
@@ -1312,25 +1337,41 @@
          (is (= 2 (count @ACTIONS)))
          (is (= (set @ACTIONS)
                 #{[:action1 ["aaaa"] "aaaa!?"
-                   {:action-name "action1" :agent-name "foo" :node-name nil :type :agent} []]
+                   {:action-name    "action1"
+                    :agent-name     "foo"
+                    :node-name      nil
+                    :type           :agent
+                    :latency-millis 0}
+                   []
+                   []
+                   true]
                   [:action1 ["aaaa"] [{"node" "node1" "args" ["aaaa!"]}]
-                   {:action-name "action1" :agent-name "foo" :node-name "start" :type :node} []]}))
+                   {:action-name    "action1"
+                    :agent-name     "foo"
+                    :node-name      "start"
+                    :type           :node
+                    :latency-millis 0}
+                   []
+                   []
+                   false]}))
 
          (cycle!)
          (is (= {0.53 1} (frequencies @sample-rates)))
          (is (= @ACTIONS
                 [[:action1 [{"abc" "nnmm+"}] {"abc" "nnmm+-"}
-                  {:action-name "action1" :agent-name "bar" :node-name "n1" :type :node}
-                  [{"concise?" false}]]]))
+                  {:action-name    "action1"
+                   :agent-name     "bar"
+                   :node-name      "n1"
+                   :type           :node
+                   :latency-millis 1}
+                  [{"concise?" false}]
+                  [true]
+                  false]]))
 
 
 
 
          ;; TODO: <<<<>>>>
-         ;;  - verify in run info:
-         ;;     - latency-millis
-         ;;     - agent-stats
-         ;;     - nested-ops
          ;;  - verify include-failures? behavior
          ;;   - gives AgentFailedException for agent failure
          ;;   - gives nil for node output in that case
