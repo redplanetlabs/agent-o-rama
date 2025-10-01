@@ -142,6 +142,8 @@ lein with-profile +ui run -m shadow.cljs.devtools.cli --npm watch :frontend
 
 The UI will be available at `http://localhost:8080` when running agents with `(aor/start-ui ipc)`.
 
+@dev/ui.md
+
 ## Working with Examples
 
 The `examples/clj/` directory contains fully functional agent implementations:
