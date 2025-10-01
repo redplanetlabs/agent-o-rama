@@ -19,6 +19,7 @@
   [& body]
   `(reify
     ~'MultiAgg$Impl
+    (~'init [this# f#] (internal-add-init! this# (h/convert-jfn f#)))
     ~@(for [i (range 0 (- h/MAX-ARITY 1))]
         (let [name-sym (h/type-hinted String 'name#)
               jfn-sym  (h/type-hinted (h/rama-function-class (+ i 1)) 'jfn#)
