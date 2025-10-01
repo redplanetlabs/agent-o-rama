@@ -415,9 +415,12 @@
 
           )))))))
 
+(defn hook:run-action [run-info])
+
 (defn run-action!
   [action-fn input output run-info]
   (let [fetcher (anode/mk-fetcher)]
+    (hook:run-action run-info)
     (run-virtual-with-action-helpers!
      (fn [^CompletableFuture cf]
        (try
@@ -658,6 +661,11 @@
     (local-transform> (termval *rule->cursors) $$rule-cursors))
   (:>))
 
+(defn hook:analytics-loop-iter* [])
+(defn hook:analytics-loop-iter
+  []
+  (hook:analytics-loop-iter*))
+
 (defbasicblocksegmacro handle-analytics-tick
   []
   (let [match-info-pstate (gen-pstatevar "match-info")
@@ -689,6 +697,7 @@
      [loop<-
        ['*queue '*queue
         '*first-iter? true]
+       [hook:analytics-loop-iter]
        [<<if (seg# action-iter-complete? '*first-iter? '*queue '*actions-start-time-millis '*target-millis)
          [:>]
         [else>]

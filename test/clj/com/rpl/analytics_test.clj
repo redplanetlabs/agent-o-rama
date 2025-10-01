@@ -755,12 +755,18 @@
    (is (< 2000 @counter 3000))
   ))
 
+(defn split-on
+  [delim coll]
+  (remove #(= [delim] %)
+   (partition-by #(= % delim) coll)))
+
 (def ACTIONS)
 (def TICKS)
 
 (deftest actions-test
   (let [sample-rates (atom [])
-        sample-atom  (atom true)]
+        sample-atom  (atom true)
+        event-log    (atom [])]
     (with-redefs [ACTIONS (atom [])
                   TICKS (atom 0)
                   i/SUBSTITUTE-TICK-DEPOTS true
@@ -772,6 +778,14 @@
                   (fn [sampling-rate]
                     (swap! sample-rates conj sampling-rate)
                     @sample-atom)
+
+                  ana/hook:run-action
+                  (fn [run-info]
+                    (swap! event-log conj (:rule-name run-info)))
+
+                  ana/hook:analytics-loop-iter*
+                  (fn [& args]
+                    (swap! event-log conj :loop))
 
                   anode/gen-node-id
                   (fn [& args]
@@ -822,7 +836,8 @@
                  {"abc" (str input "-" output)
                   "xyz" "zyx"}))
              {:params {"a1" {:description "param1" :default "1"}
-                       "a2" {:description "param2"}}})
+                       "a2" {:description "param2"}}
+              :limit-concurrency? true})
             (TestSnippets/declareActionBuilders topology)
             (-> topology
                 (aor/new-agent "foo")
@@ -896,6 +911,7 @@
              (reset! TICKS 0)
              (reset! sample-rates [])
              (reset! ACTIONS [])
+             (reset! event-log [])
              (foreign-append! ana-depot nil)
              (is (condition-attained? (> @TICKS 0)))
              (rtest/pause-microbatch-topology! ipc
@@ -1369,6 +1385,84 @@
                   false]]))
 
 
+         (bind {:keys [actions pagination-params]}
+           (foreign-invoke-query foo-action-log "foo-start" 10 nil))
+         (is (= 1 (count actions)))
+         (is (= {"abc" "ccc" "xyz" "..."}
+                (-> actions
+                    first
+                    :action
+                    :info-map)))
+         (is (-> actions
+                 first
+                 :action
+                 :success?))
+         (is (= {0 nil 1 nil} pagination-params))
+
+
+         (foreign-append! global-actions-depot (aor-types/change-max-limited-actions-concurrency 2))
+
+
+         ;; now verify concurrency control and limited vs. unlimited actions processing
+
+         (ana/delete-rule! global-actions-depot "foo" "foo-start")
+         (ana/delete-rule! global-actions-depot "bar" "foo-a1")
+         (ana/delete-rule! global-actions-depot "bar" "bar-n1")
+         (ana/delete-rule! global-actions-depot "bar" "meval")
+         (cycle!)
+
+
+         (ana/add-rule! global-actions-depot
+                        "eval1"
+                        "foo"
+                        {:action-name       "aor/eval"
+                         :action-params     {"name" "concise5"}
+                         :filter            (aor-types/->AndFilter [])
+                         :sampling-rate     0.6
+                         :start-time-millis (h/current-time-millis)
+                         :include-failures? false
+                        })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a1"
+          "foo"
+          {:action-name       "action1"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.61
+           :start-time-millis (h/current-time-millis)
+           :include-failures? false
+          })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a2"
+          "foo"
+          {:action-name       "action2"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.62
+           :start-time-millis (h/current-time-millis)
+           :include-failures? false
+          })
+
+
+         (bind inv1 (aor/agent-initiate foo "a"))
+         (bind inv2 (aor/agent-initiate foo "bbbb"))
+         (bind inv3 (aor/agent-initiate foo "c"))
+         (bind inv4 (aor/agent-initiate foo "d"))
+         (bind inv5 (aor/agent-initiate foo "e"))
+         (is (= "a!?" (aor/agent-result foo inv1)))
+         (is (= "bbbb!?" (aor/agent-result foo inv2)))
+         (is (= "c!?" (aor/agent-result foo inv3)))
+         (is (= "d!?" (aor/agent-result foo inv4)))
+         (is (= "e!?" (aor/agent-result foo inv5)))
+         (cycle!)
+
+         (bind iters (split-on :loop @event-log))
+         (is (= (repeat 5 "foo-a1") (first iters)))
+         (is (every? #(= 2 (count %)) (rest iters)))
+         (is (= #{"foo-a2" "eval1"} (set (apply concat (rest iters)))))
+
 
 
          ;; TODO: <<<<>>>>
@@ -1377,21 +1471,13 @@
          ;;   - gives nil for node output in that case
          ;;     - node latency is nil
          ;;     - agent latency is not nil
-         ;;  - verify respects max concurrency
-         ;;     - set max concurrency setting
-         ;;     - make an action limited concurrency
-         ;;       - verify how many execute per cycle along with an eval rule
-         ;;         - can verify evals with a hook? or just by checking which agents have feedback
-         ;;         on them
-         ;;  - verify limited vs. unlimited actions behavior
-         ;;  - verify how much it does in one iteration
          ;;  - agent invokes from experiments are skipped
          ;;     - do binding of source when initiating
          ;;  - doesn't scan past incomplete nodes that haven't stalled
          ;;  - doesn't scan past incomplete agents
          ;;  - error handling:
          ;;    - online eval throws exception
-         ;;      - online eval doesn't return map
+         ;;    - online eval doesn't return map
          ;;    - action doesn't return map
          ;;    - error during action and its associated action log
         )))))
