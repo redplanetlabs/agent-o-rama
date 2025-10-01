@@ -1449,7 +1449,11 @@
          (bind inv1 (aor/agent-initiate foo "a"))
          (bind inv2 (aor/agent-initiate foo "bbbb"))
          (bind inv3 (aor/agent-initiate foo "c"))
-         (bind inv4 (aor/agent-initiate foo "d"))
+         ;; verifies agent runs from experiments are ignored
+         (bind inv4
+           (binding [aor-types/OPERATION-SOURCE
+                     (aor-types/->valid-ExperimentSourceImpl (h/random-uuid7) (h/random-uuid7))]
+             (aor/agent-initiate foo "d")))
          (bind inv5 (aor/agent-initiate foo "e"))
          (is (= "a!?" (aor/agent-result foo inv1)))
          (is (= "bbbb!?" (aor/agent-result foo inv2)))
@@ -1459,7 +1463,7 @@
          (cycle!)
 
          (bind iters (split-on :loop @event-log))
-         (is (= (repeat 5 "foo-a1") (first iters)))
+         (is (= (repeat 4 "foo-a1") (first iters)))
          (is (every? #(= 2 (count %)) (rest iters)))
          (is (= #{"foo-a2" "eval1"} (set (apply concat (rest iters)))))
 
@@ -1471,8 +1475,6 @@
          ;;   - gives nil for node output in that case
          ;;     - node latency is nil
          ;;     - agent latency is not nil
-         ;;  - agent invokes from experiments are skipped
-         ;;     - do binding of source when initiating
          ;;  - doesn't scan past incomplete nodes that haven't stalled
          ;;  - doesn't scan past incomplete agents
          ;;  - error handling:
