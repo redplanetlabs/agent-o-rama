@@ -130,6 +130,26 @@
      ($ :div.text-xs.font-medium.text-gray-500.uppercase.tracking-wider label)
      ($ :div.text-xl.font-semibold.text-gray-900.mt-1 value)))
 
+(defui SummaryEvaluatorsMetricsTable [{:keys [summary-evals]}]
+  (let [summary-metadata (evaluators/collect-column-metadata summary-evals)]
+    (when (seq (:columns summary-metadata))
+      ($ :div.overflow-x-auto.bg-white.rounded-lg.border.border-gray-200.shadow-sm
+         ($ :table.min-w-full
+            ($ :thead.bg-gray-50
+               ($ :tr
+                  (for [{:keys [column-key label]} (:columns summary-metadata)]
+                    ($ :th.px-4.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider.border-b.border-gray-200
+                       {:key column-key
+                        :title label}
+                       ($ :div.truncate label)))))
+            ($ :tbody
+               ($ :tr.hover:bg-gray-50
+                  (for [{:keys [column-key eval-name metric-key]} (:columns summary-metadata)]
+                    ($ :td.px-4.py-3.text-sm.text-gray-900.border-b.border-gray-200.text-center.font-mono
+                       {:key column-key}
+                       (let [value (get-in summary-evals [eval-name metric-key])]
+                         (format-metric-value value)))))))))))
+
 ;; SummaryEvaluatorCell component removed - summary evaluators now displayed in their own table
 
 (defui SummaryStatsTable [{:keys [data]}]
@@ -138,7 +158,6 @@
         latency-stats (:latency-number-stats data)
         token-stats (:total-token-number-stats data)
         summary-evals (:summary-evals data)
-        summary-metadata (evaluators/collect-column-metadata summary-evals)
 
         ;; --- Perform calculations for each required metric ---
         num-examples (or (:count latency-stats) 0)
@@ -181,33 +200,7 @@
                                 :tooltip "Average total tokens (input + output) per example."})))))
 
        ;; Summary Evaluators Table
-       (when (seq summary-evals)
-         ($ :div.overflow-x-auto.bg-white.rounded-lg.border.border-gray-200.shadow-sm
-            ($ :table.min-w-full
-               ($ :thead.bg-gray-50
-                  ($ :tr
-                     ($ :th.px-4.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider.border-b.border-gray-200
-                        "Summary Evaluator")
-                     ;; Collect all unique metrics across all evaluators for column headers
-                     (let [all-metrics (into #{} (mapcat (fn [[_ metrics]] (keys metrics)) summary-evals))
-                           sorted-metrics (sort all-metrics)]
-                       (for [metric-key sorted-metrics]
-                         ($ :th.px-4.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider.border-b.border-gray-200
-                            {:key (str metric-key)}
-                            (evaluators/metric-title metric-key))))))
-               ($ :tbody
-                  (let [all-metrics (into #{} (mapcat (fn [[_ metrics]] (keys metrics)) summary-evals))
-                        sorted-metrics (sort all-metrics)]
-                    (for [[eval-name metrics] summary-evals]
-                      ($ :tr.hover:bg-gray-50 {:key (str eval-name)}
-                         ;; First column: evaluator name
-                         ($ :td.px-4.py-3.text-sm.font-medium.text-gray-900.border-b.border-gray-200.whitespace-nowrap
-                            (evaluators/identifier-title eval-name))
-                         ;; Subsequent columns: metrics
-                         (for [metric-key sorted-metrics]
-                           ($ :td.px-4.py-3.text-sm.text-gray-900.border-b.border-gray-200.text-center
-                              {:key (str eval-name "-" metric-key)}
-                              (format-metric-value (get metrics metric-key))))))))))))))
+       ($ SummaryEvaluatorsMetricsTable {:summary-evals summary-evals}))))
 
 (defn format-metric-value [value]
   (cond
