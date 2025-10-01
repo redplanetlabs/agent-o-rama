@@ -838,7 +838,7 @@
                  "begin"
                  "n1"
                  (fn [agent-node input]
-                   (aor/emit! agent-node "node1" (str input "+"))))
+                   (aor/emit! agent-node "n1" (str input "+"))))
                 (aor/node
                  "n1"
                  nil
@@ -1148,11 +1148,77 @@
                 (set (keys (ana/fetch-agent-rules foo-rules)))))
 
 
+         (ana/delete-rule! global-actions-depot "foo" "foo-a4")
+         (ana/delete-rule! global-actions-depot "foo" "foo-a2")
+         (ana/delete-rule! global-actions-depot "foo" "foo-a1")
+         (ana/delete-rule! global-actions-depot "foo" "eval2")
+         (ana/delete-rule! global-actions-depot "foo" "eval1")
+         (is (= #{}
+                (set (keys (ana/fetch-agent-rules foo-rules)))))
+         (cycle!)
+         (is (= #{"foo-a1" "foo-a2" "foo-a4" "eval1" "eval2"}
+                (set (keys (foreign-select-one STAY foo-cursors)))))
 
 
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a1"
+          "foo"
+          {:action-name       "action1"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.5
+           :start-time-millis 0
+           :include-failures? false
+          })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a2"
+          "foo"
+          {:action-name       "action2"
+           :action-params     {"a1" "!"
+                               "a2" "?"}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.6
+           :start-time-millis 0
+           :include-failures? false
+          })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a1" ; give it same name to verify they're independent
+          "bar"
+          {:action-name       "action1"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.55
+           :start-time-millis 0
+           :include-failures? false
+          })
+         (ana/add-rule!
+          global-actions-depot
+          "bar-a1"
+          "bar"
+          {:action-name       "action1"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.65
+           :start-time-millis 0
+           :include-failures? false
+          })
+
+
+
+         (bind invf (aor/agent-initiate foo "lmno"))
+         (is (= "lmno!?" (aor/agent-result foo invf)))
+         (bind invb (aor/agent-initiate bar "mmmm"))
+         (is (= "mmmm+-" (aor/agent-result bar invb)))
+         (cycle!)
+         ;; TODO: <<<<>>>> asserts
+         (clojure.pprint/pprint @sample-rates)
+         (clojure.pprint/pprint @ACTIONS)
 
          ;; TODO: <<<<>>>>
-         ;;  - multiple agents with different rules (some with same name) at same time
+         ;;  - actions against nodes
          ;;  - verify include-failures? behavior
          ;;   - gives AgentFailedException for agent failure
          ;;   - gives nil for node output in that case

@@ -899,12 +899,10 @@
   5000)
 
 
-;; TODO: <<<<>>>> consider parameter for action builders that should be limited by this
-;;  - and rename to MAX-LIMITED-ACTIONS-CONCURRENCY
 (defglobalconfig
- MAX-ACTIONS-CONCURRENCY
+ MAX-LIMITED-ACTIONS-CONCURRENCY
  positive-long?
- "Maximum number of actions (e.g. online evaluations) that can be executing at once across all agents and all tasks"
+ "Maximum number of limited actions (e.g. online evaluations) that can be executing at once across all agents and all tasks"
  10)
 
 (defglobalconfig

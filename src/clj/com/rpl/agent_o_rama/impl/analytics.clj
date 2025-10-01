@@ -133,7 +133,8 @@
      {"name"
       {:description
        "Evaluator to use"
-      }}}
+      }}
+     :limit-concurrency? true}
    }})
 
 
@@ -439,92 +440,6 @@
        (< (compare v1 v2) 0) v1
        :else v2))))
 
-(deframaop find-qualified-offsets
-  [*agent->rule->info *cache-pstate-name]
-  (<<with-substitutions
-   [$$cache (this-module-pobject-task-global *cache-pstate-name)]
-   (ops/explode-map *agent->rule->info :> *agent-name *rule->info)
-   (ops/explode-map *rule->info :> *rule-name *rule-info)
-   (get *rule-info
-        :definition
-        :> {:keys [*filter *node-name *sampling-rate *action-name *action-params
-                   *include-failures?]})
-   (aor-types/dependency-rule-names *filter :> *dependency-names)
-   (select> [:cursors ALL (collect-one FIRST) LAST]
-     *rule-info
-     :> [*task-id *offset])
-   (<<batch
-     (ops/explode *dependency-names :> *dname)
-     (select> [(keypath *dname) :cursors (keypath *task-id)] *rule->info :> *other-offset)
-     (+min-uuid *other-offset :> *dep-end-offset))
-   (|direct *task-id)
-   (all-action-builders :> *action-builders)
-   (get *action-builders *action-name :> {:keys [*builder-fn]})
-   (completable-future> (build-action-fn *builder-fn *action-params) :> *action-fn)
-   (<<if (some? *node-name)
-     (h/min-uuid7-at-timestamp (max-node-scan-time) :> *max-scan-offset)
-    (else>)
-     (po/agent-active-invokes-task-global *agent-name :> $$active)
-     (local-select> [(subselect FIRST) (view first) (view first)] $$active :> *max-scan-offset))
-   (compute-end-offset *dep-end-offset *max-scan-offset :> *end-offset)
-   (action-target-pstate *agent-name *node-name :> $$p)
-   (scan-amt :> *scan-amt)
-   (po/agent-node-executor-task-global :> *node-exec)
-   (<<ramafn %add-run-type
-     [*m]
-     (:> (assoc (into {} *m) :run-type (ifexpr (some? *node-name) :node :agent))))
-   (local-select> [(sorted-map-range-from *offset *scan-amt)
-                   (sorted-map-range *offset *end-offset)
-                   (view complete-node-map *node-name *node-exec)
-                   (transformed MAP-VALS %add-run-type)]
-                  $$p
-                  :> *m)
-   (local-transform> [(keypath *agent-name *rule-name)
-                      (multi-path [:data (termval *m)]
-                                  [:action-fn (termval *action-fn)])]
-                     $$cache)
-   (compute-end-scan-offset *m *offset :> *end-scan-offset)
-   (<<ramafn %match?
-     [*data]
-     (:> (and> (not (experiment-source? *data))
-               (not (contains? *data :invoked-agg-invoke-id))
-               (or> *include-failures? (contains? *data :finish-time-millis))
-               (aor-types/rule-filter-matches? *filter *data)
-               (sample? *sampling-rate))))
-   (select> (subselect ALL
-                       (selected? LAST (pred %match?))
-                       FIRST)
-     *m
-     :> *matching-offsets)
-   (:> *agent-name *rule-name *task-id *matching-offsets *end-scan-offset)))
-
-
-(defn to-action-queue
-  [task->agent->rule->info]
-  (letfn [(rr [colls]
-              (lazy-seq
-               (let [active (seq (filter seq colls))]
-                 (when active
-                   (concat (map first active)
-                           (rr (map rest active)))))))]
-    (let [tasks     (shuffle (or (keys task->agent->rule->info) []))
-          task-seqs (for [t tasks]
-                      (rr
-                       (for [a (shuffle (keys (get task->agent->rule->info t)))]
-                         (rr
-                          (for [r (shuffle (keys (select-any (keypath t a)
-                                                             task->agent->rule->info)))]
-                            (let [offs (select-any (keypath t a r :offsets)
-                                                   task->agent->rule->info)]
-                              (when (seq offs)
-                                (map (fn [off]
-                                       {:task-id    t
-                                        :agent-name a
-                                        :rule-name  r
-                                        :offset     off})
-                                     offs))))))))]
-      (rr task-seqs))))
-
 (defn data->latency-millis
   [{:keys [start-time-millis finish-time-millis]}]
   (when (and start-time-millis finish-time-millis)
@@ -536,16 +451,12 @@
         (instance? java.util.Map o) (into {} o)
         :else o))
 
-(deframaop run-actions!
-  [*items *agent->rule->info *cache-pstate-name]
+(deframaop run-one-action!
+  [*cache-pstate-name *agent-name *rule-name *offset *action-name *node-name]
   (<<with-substitutions
    [$$cache (this-module-pobject-task-global *cache-pstate-name)
     $$action-log (po/action-log-task-global)]
-   (ops/explode *items :> {:keys [*task-id *agent-name *rule-name *offset]})
-   (select> (keypath *agent-name *rule-name :definition)
-     *agent->rule->info
-     :> {:keys [*action-name *action-params *node-name]})
-   (|direct *task-id)
+   (ops/current-task-id :> *task-id)
    (local-select> [(keypath *agent-name *rule-name) :action-fn] $$cache :> *action-fn)
    (h/current-time-millis :> *action-start-time-millis)
    (<<if (and> (map? *action-fn) (contains? *action-fn BUILD-ERROR))
@@ -595,6 +506,134 @@
    (h/random-uuid7 :> *action-log-id)
    (local-transform> [(keypath *agent-name *rule-name *action-log-id) (termval *action-log)]
                      $$action-log)
+   (:>)
+  ))
+
+
+(deframaop find-qualified-offsets-and-run-unlimited
+  [*agent->rule->info *cache-pstate-name *processed-pstate-name]
+  (<<with-substitutions
+   [$$cache (this-module-pobject-task-global *cache-pstate-name)
+    $$processed (this-module-pobject-task-global *processed-pstate-name)]
+   (ops/explode-map *agent->rule->info :> *agent-name *rule->info)
+   (ops/explode-map *rule->info :> *rule-name *rule-info)
+   (get *rule-info
+        :definition
+        :> {:keys [*filter *node-name *sampling-rate *action-name *action-params
+                   *include-failures?]})
+   (aor-types/dependency-rule-names *filter :> *dependency-names)
+   (select> [:cursors ALL (collect-one FIRST) LAST]
+     *rule-info
+     :> [*task-id *offset])
+   (<<batch
+     (ops/explode *dependency-names :> *dname)
+     (select> [(keypath *dname) :cursors (keypath *task-id)] *rule->info :> *other-offset)
+     (+min-uuid *other-offset :> *dep-end-offset))
+   (|direct *task-id)
+   (all-action-builders :> *action-builders)
+   (get *action-builders *action-name :> {:keys [*builder-fn *options]})
+   (get *options :limit-concurrency? false :> *limit-concurrency?)
+   (completable-future> (build-action-fn *builder-fn *action-params) :> *action-fn)
+   (<<if (some? *node-name)
+     (h/min-uuid7-at-timestamp (max-node-scan-time) :> *max-scan-offset)
+    (else>)
+     (po/agent-active-invokes-task-global *agent-name :> $$active)
+     (local-select> [(subselect FIRST) (view first) (view first)] $$active :> *max-scan-offset))
+   (compute-end-offset *dep-end-offset *max-scan-offset :> *end-offset)
+   (action-target-pstate *agent-name *node-name :> $$p)
+   (scan-amt :> *scan-amt)
+   (po/agent-node-executor-task-global :> *node-exec)
+   (<<ramafn %add-run-type
+     [*m]
+     (:> (assoc (into {} *m) :run-type (ifexpr (some? *node-name) :node :agent))))
+   (local-select> [(sorted-map-range-from *offset *scan-amt)
+                   (sorted-map-range *offset *end-offset)
+                   (view complete-node-map *node-name *node-exec)
+                   (transformed MAP-VALS %add-run-type)]
+                  $$p
+                  :> *m)
+   (compute-end-scan-offset *m *offset :> *end-scan-offset)
+   (<<ramafn %match?
+     [*data]
+     (:> (and> (not (experiment-source? *data))
+               (not (contains? *data :invoked-agg-invoke-id))
+               (or> *include-failures? (contains? *data :finish-time-millis))
+               (aor-types/rule-filter-matches? *filter *data)
+               (sample? *sampling-rate))))
+   (select> (subselect ALL
+                       (selected? LAST (pred %match?))
+                       FIRST)
+     *m
+     :> *matching-offsets)
+   (local-transform> [(keypath *agent-name *rule-name)
+                      (multi-path [:data (termval *m)]
+                                  [:action-fn (termval *action-fn)]
+                                  [:end-scan-offset (termval *end-scan-offset)]
+                                  [:matching-offsets (termval *matching-offsets)])]
+                     $$cache)
+   (<<if *limit-concurrency?
+     (or> (first *matching-offsets) *end-scan-offset :> *next-offset)
+     (local-transform> [(keypath *agent-name *rule-name) (termval *next-offset)] $$processed)
+     (:> *agent-name *rule-name *task-id (count *matching-offsets))
+    (else>)
+     (local-transform> [(keypath *agent-name *rule-name) (termval *end-scan-offset)] $$processed)
+     (ops/explode *matching-offsets :> *offset)
+     (run-one-action! *cache-pstate-name *agent-name *rule-name *offset *action-name *node-name)
+   )))
+
+
+(defn to-action-queue
+  [task->agent->rule->info]
+  (letfn [(rr [colls]
+              (lazy-seq
+               (let [active (seq (filter seq colls))]
+                 (when active
+                   (concat (map first active)
+                           (rr (map rest active)))))))]
+    (let [tasks     (shuffle (or (keys task->agent->rule->info) []))
+          task-seqs (for [t tasks]
+                      (rr
+                       (for [a (shuffle (keys (get task->agent->rule->info t)))]
+                         (rr
+                          (for [r (shuffle (keys (select-any (keypath t a)
+                                                             task->agent->rule->info)))]
+                            (let [match-count (select-any (keypath t a r) task->agent->rule->info)]
+                              (repeat match-count
+                                      {:task-id    t
+                                       :agent-name a
+                                       :rule-name  r})))))))]
+      (rr task-seqs))))
+
+(deframafn agg-items
+  [*items]
+  (<<batch
+    (ops/explode *items :> {:keys [*task-id *agent-name *rule-name]})
+    (+compound {*task-id {*agent-name {*rule-name (aggs/+count)}}} :> *res))
+  (:> *res))
+
+(deframaop run-limited-concurrency-actions!
+  [*plan *agent->rule->info *cache-pstate-name *processed-pstate-name]
+  (<<with-substitutions
+   [$$cache (this-module-pobject-task-global *cache-pstate-name)
+    $$processed (this-module-pobject-task-global *processed-pstate-name)]
+   (ops/explode-map *plan :> *task-id *agent->rule->count)
+   (ops/explode-map *agent->rule->count :> *agent-name *rule->count)
+   (ops/explode-map *rule->count :> *rule-name *count)
+   (select> (keypath *agent-name *rule-name :definition)
+     *agent->rule->info
+     :> {:keys [*action-name *node-name]})
+   (|direct *task-id)
+   (local-select> (keypath *agent-name *rule-name :matching-offsets) $$cache :> *matching-offsets)
+   (local-select> (keypath *agent-name *rule-name :end-scan-offset) $$cache :> *end-scan-offset)
+   (split-at *count *matching-offsets :> [*offsets *next-matching-offsets])
+   (local-transform> [(keypath *agent-name *rule-name :matching-offsets)
+                      (termval *next-matching-offsets)]
+                     $$cache)
+
+   (or> (first *next-matching-offsets) *end-scan-offset :> *next-offset)
+   (local-transform> [(keypath *agent-name *rule-name) (termval *next-offset)] $$processed)
+   (ops/explode *offsets :> *offset)
+   (run-one-action! *cache-pstate-name *agent-name *rule-name *offset *action-name *node-name)
   ))
 
 (defn action-iter-complete?
@@ -604,33 +643,10 @@
         (and (not first-iter?)
              (> time-delta target-millis)))))
 
-(defn compute-new-cursors
-  [match-info rem-queue]
-  (let [set-offset
-        (fn [m agent-name rule-name task-id offset]
-          (setval [(keypath agent-name rule-name task-id) nil?]
-                  offset
-                  m))
-        agent->rule->cursors
-        (reduce
-         (fn [m {:keys [agent-name task-id rule-name offset]}]
-           (set-offset m agent-name rule-name task-id offset))
-         {}
-         rem-queue)]
-    (reduce
-     (fn [m [task-id agent-name rule-name end-scanned-offset]]
-       (set-offset m agent-name rule-name task-id end-scanned-offset))
-     agent->rule->cursors
-     (select [ALL (collect-one FIRST) LAST
-              ALL (collect-one FIRST) LAST
-              ALL (collect-one FIRST) LAST
-              :end-scan-offset]
-             match-info)
-    )))
+
 
 (deframafn update-rule-offsets!
-  [*match-info *rem-queue]
-  (compute-new-cursors *match-info *rem-queue :> *agent->rule->cursors)
+  [*agent->rule->cursors]
   (<<atomic
     (ops/explode-map *agent->rule->cursors :> *agent-name *rule->cursors)
     (po/agent-rule-cursors-task-global *agent-name :> $$rule-cursors)
@@ -641,30 +657,31 @@
   []
   (let [match-info-pstate (gen-pstatevar "match-info")
         cache-pstate (gen-pstatevar "cache")
-        cache-pstate-name (str cache-pstate)]
-    [[anode/read-global-config aor-types/MAX-ACTIONS-CONCURRENCY-CONFIG :> '*max-concurrency]
+        cache-pstate-name (str cache-pstate)
+        processed-pstate (gen-pstatevar "processed-offsets")
+        processed-pstate-name (str processed-pstate)
+        processed-agg-pstate (gen-pstatevar "processed-agg")]
+    [[anode/read-global-config aor-types/MAX-LIMITED-ACTIONS-CONCURRENCY-CONFIG :> '*max-concurrency]
      [anode/read-global-config aor-types/ACTIONS-PROCESSING-ITERATION-TIME-MILLIS-CONFIG :> '*target-millis]
+     [h/current-time-millis :> '*actions-start-time-millis]
      [read-rules :> '*agent->rule->info]
      [<<batch
       [filter> false]
-      [materialize> :> cache-pstate]]
-      ;; TODO: <<<<>>> change this:
-      ;;  - return # of qualified offsets from each task
-      ;;  - in the loop while processing in the inner batch block, return highest offset processed per task/rule
+      [materialize> :> cache-pstate]
+      [materialize> :> processed-pstate]]
      [<<batch
-      [find-qualified-offsets '*agent->rule->info cache-pstate-name
-        :> '*agent-name '*rule-name '*task-id '*offsets '*end-scan-offset]
+      [find-qualified-offsets-and-run-unlimited '*agent->rule->info cache-pstate-name processed-pstate-name
+        :> '*agent-name '*rule-name '*task-id '*match-count]
       [|global]
       [+compound
         {'*task-id
           {'*agent-name
             {'*rule-name
-              {:offsets (seg# aggs/+last '*offsets)
-               :end-scan-offset (seg# aggs/+last '*end-scan-offset)}}}}
+              (seg# aggs/+last '*match-count)}}}
         :> match-info-pstate]]
      [ops/vget match-info-pstate :> '*match-info]
+
      [to-action-queue '*match-info :> '*queue]
-     [h/current-time-millis :> '*actions-start-time-millis]
      [loop<-
        ['*queue '*queue
         '*first-iter? true
@@ -673,11 +690,21 @@
          [:> '*queue]
         [else>]
          [split-at '*max-concurrency '*queue :> ['*items '*rest-queue]]
+         [agg-items '*items :> '*plan]
          [<<batch
-           [run-actions! '*items '*agent->rule->info cache-pstate-name]]
+           [run-limited-concurrency-actions! '*plan '*agent->rule->info cache-pstate-name processed-pstate-name]]
          [continue> '*rest-queue false]
          ]]
-     [update-rule-offsets! '*match-info '*rem-queue]
+     [<<batch
+       [|all]
+       [ops/current-task-id :> '*task-id]
+       [local-select> STAY processed-pstate :> '*agent->rule->offset]
+       [ops/explode-map '*agent->rule->offset :> '*agent-name '*rule->offset]
+       [ops/explode-map '*rule->offset :> '*rule-name '*offset]
+       [|global]
+       [+compound {'*agent-name {'*rule-name {'*task-id (seg# aggs/+last '*offset)}}} :> processed-agg-pstate]]
+     [local-select> STAY processed-agg-pstate :> '*new-cursors]
+     [update-rule-offsets! '*new-cursors]
     ]))
 
 (defn add-rule!

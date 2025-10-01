@@ -271,18 +271,19 @@
        (when-not (ifn? builder-fn)
          (throw (h/ex-info "Builder must be a function"
                            {:type (class builder-fn)})))
-       (let [full-options (merge {:params {}}
+       (let [full-options (merge {:params {}
+                                  :limit-concurrency? false}
                                  options)]
          (h/validate-options! name
                               full-options
-                              {:params h/map-spec})
+                              {:params h/map-spec
+                               :limit-concurrency? h/boolean-spec})
          ;; params have exact same specification as evals
          (evals/validate-params! (:params full-options))
          (vswap! action-builders-vol
                  assoc
                  name
                  {:builder-fn  builder-fn
-                  :type        type
                   :description description
                   :options     options
                  })

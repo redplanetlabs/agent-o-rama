@@ -104,6 +104,9 @@
                {:description description :default defaultValue}
                options)
        this)
+     (limitConcurrency [this]
+       (setval [h/VOLATILE :limit-concurrency?] true options)
+       this)
      clojure.lang.IDeref
      (deref [this]
        @options

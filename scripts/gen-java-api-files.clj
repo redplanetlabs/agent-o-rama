@@ -128,6 +128,7 @@
     [["String" "name"] ["String" "description"]]]
    ["param" "ActionBuilderOptions.Impl"
     [["String" "name"] ["String" "description"] ["String" "defaultValue"]]]
+   ["limitConcurrency" "ActionBuilderOptions.Impl" []]
   ])
 
 (def UI-OPTIONS-METHODS

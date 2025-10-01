@@ -11,6 +11,8 @@ public interface ActionBuilderOptions {
     
     ActionBuilderOptions.Impl param(String name, String description, String defaultValue);
     
+    ActionBuilderOptions.Impl limitConcurrency();
+    
   }
 
   /**
@@ -26,6 +28,10 @@ public interface ActionBuilderOptions {
   
   static ActionBuilderOptions.Impl param(String name, String description, String defaultValue) {
     return create().param(name, description, defaultValue);
+  }
+  
+  static ActionBuilderOptions.Impl limitConcurrency() {
+    return create().limitConcurrency();
   }
   
 }
