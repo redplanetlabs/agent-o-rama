@@ -1,13 +1,14 @@
-{:lein true
+{:lein   {:profile "+ui"}
  :builds
  {:frontend
-  {:target :browser
-   :modules {:main {:init-fn com.rpl.agent-o-rama.ui/init}}
+  {:target     :browser
+   :modules    {:main {:init-fn com.rpl.agent-o-rama.ui/init}}
    :output-dir "resource/public/"}
 
   :test
-  {:target :node-test
+  {:target    :node-test
    :output-to "target/test/test.js"
-   :autorun true
+   :autorun   true
    :ns-regexp "-test$"
-   :preloads [com.rpl.agent-o-rama.ui.dom]}}}
+   :dev-tools {:preloads [com.rpl.agent-o-rama.ui.dom]}
+   :esm       true}}}
