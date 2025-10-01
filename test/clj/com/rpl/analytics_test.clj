@@ -1476,6 +1476,8 @@
 
                 ana/enable-action-error-logs? (constantly false)
 
+                anode/log-node-error (fn [& args])
+
                 i/hook:analytics-tick
                 (fn [& args] (swap! TICKS inc))]
     (with-open [ipc (rtest/create-ipc)]
@@ -1647,8 +1649,12 @@
        (is (= "bad-eval-return!?" (aor/agent-result foo inv)))
        (cycle!)
        (bind action (last-action "eval-action"))
+       (is (= #{"failure" "invoke" "success?"} (set (keys (:info-map action)))))
+       (is (= false (get (:info-map action) "success?")))
+       (is (h/contains-string? (get (:info-map action) "failure")
+                               "Invalid map of results"))
 
-       (clojure.pprint/pprint action)
+       ;; TODO: <<<<>>>> eval exception
 
        ;; TODO: <<<<>>>>
        ;;  - verify include-failures? behavior
@@ -1658,9 +1664,5 @@
        ;;     - agent latency is not nil
        ;;  - doesn't scan past incomplete nodes that haven't stalled
        ;;  - doesn't scan past incomplete agents
-       ;;  - error handling:
-       ;;    - online eval throws exception
-       ;;    - online eval doesn't return map
-       ;;    - action doesn't return map
-       ;;    - error during action and its associated action log
+
       ))))
