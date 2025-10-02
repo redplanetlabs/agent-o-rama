@@ -337,6 +337,6 @@
                       (if (:success reply)
                         (do
                           (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
-                          (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}]))
+                          (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id) snapshot-name]}]))
                         (js/alert (str "Failed to delete examples: " (:error reply))))))
                    nil))
