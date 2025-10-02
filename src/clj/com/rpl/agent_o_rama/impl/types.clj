@@ -58,8 +58,8 @@
 (def ^:dynamic FORCED-AGENT-TASK-ID nil)
 
 (def AGENT-TOPOLOGY-NAME "_agent-topology")
-(def AGENTS-MB-TOPOLOGY-NAME "_agents-mb-topology")
-(def AGENTS-ANALYTICS-MB-TOPOLOGY-NAME "_agents-analytics-topology")
+(def AGENT-MB-TOPOLOGY-NAME "_agent-mb-topology")
+(def AGENT-ANALYTICS-MB-TOPOLOGY-NAME "_agent-analytics-topology")
 (def EVALUATOR-AGENT-NAME "_aor-evaluator")
 
 (def NODE-KW :node)

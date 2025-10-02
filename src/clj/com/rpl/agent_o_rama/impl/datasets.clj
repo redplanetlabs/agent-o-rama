@@ -647,7 +647,7 @@
 
 (defn create-remote-dataset!
   [datasets-depot dataset-id cluster-conductor-host cluster-conductor-port module-name]
-  (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
+  (let [{error aor-types/AGENT-TOPOLOGY-NAME}
         (foreign-append!
          datasets-depot
          (aor-types/->valid-AddRemoteDataset dataset-id
