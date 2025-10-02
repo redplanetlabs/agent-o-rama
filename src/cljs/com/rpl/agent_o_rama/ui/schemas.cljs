@@ -62,7 +62,7 @@
 (def QueriesCacheSchema
   "A schema for the nested query cache. It's a recursive map where
    leaf nodes must match QueryStateSchema."
-  {s/Any ;; arbitrary data from use-sente-query api user
+  {(s/cond-pre s/Keyword s/Str) ;; Keys can be keywords or strings (module-ids, dataset-ids, etc.)
    (s/conditional
     ;; Predicate: if the value is a map containing :status, treat it as a leaf (QueryStateSchema)
     #(and (map? %) (contains? % :status))
@@ -75,15 +75,33 @@
 (s/defschema RouteMatchSchema s/Any) ;; don't want to schematize all of reitit
 
 (s/defschema FormStateSchema
-  {s/Keyword (spy "form-state-value")})
+  "Schema for form state. Each form has common metadata fields plus form-specific fields."
+  {;; Common form metadata fields
+   (s/optional-key :field-errors) {s/Keyword s/Str} ;; Map of field -> error message
+   (s/optional-key :valid?) s/Bool
+   (s/optional-key :submitting?) s/Bool
+   (s/optional-key :error) (s/maybe s/Str)
+   (s/optional-key :current-step) s/Keyword
+   (s/optional-key :steps) [s/Keyword]
+
+   ;; Form-specific fields - can be anything
+   s/Keyword s/Any})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; UI State Schemas
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (s/defschema ModalStateSchema
+  "Schema for modal state. Modal data can contain form metadata or a React component."
   {:active (s/maybe s/Keyword)
-   :data {s/Keyword (spy "modal-data-value")}
+   :data {;; Common modal data fields
+          (s/optional-key :title) s/Str
+          (s/optional-key :submit-text) s/Str
+          (s/optional-key :form-id) s/Keyword
+          (s/optional-key :component) s/Any ;; React component
+
+          ;; Other modal-specific data
+          s/Keyword (spy "modal-data-value")}
    :form {:submitting? s/Bool
           :error (s/maybe (spy "modal-form-error"))}})
 
