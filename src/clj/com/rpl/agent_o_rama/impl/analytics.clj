@@ -365,7 +365,7 @@
     )))
 
 (defn complete-node-map
-  [m node-name node-exec]
+  [m node-name]
   (if (nil? node-name)
     m
     (let [max-time        (max-node-scan-time)
@@ -373,9 +373,8 @@
           (fn [[k data]]
             (and (not (contains? data :finish-time-millis))
                  (not (contains? data :invoked-agg-invoke-id))
-                 (or (not (retries/invoke-id-executing? node-exec k))
-                     (and (contains? data :start-time-millis) ; not strictly necessary
-                          (> (:start-time-millis data) max-time)))))
+                 (contains? data :start-time-millis); not strictly necessary
+                 (> (:start-time-millis data) max-time)))
           first-invalid-offset (select-first [ALL invalid-offset? FIRST] m)]
       (if (nil? first-invalid-offset)
         m
@@ -524,6 +523,14 @@
   ))
 
 
+(defn include-result-from-status?
+  [include-failures? {:keys [run-type result finish-time-millis]}]
+  (or include-failures?
+      (if (= :agent run-type)
+        (not (:failure? result))
+        (some? finish-time-millis)
+      )))
+
 (deframaop find-qualified-offsets-and-run-unlimited
   [*agent->rule->info *cache-pstate-name *processed-pstate-name]
   (<<with-substitutions
@@ -556,13 +563,12 @@
    (compute-end-offset *dep-end-offset *max-scan-offset :> *end-offset)
    (action-target-pstate *agent-name *node-name :> $$p)
    (scan-amt :> *scan-amt)
-   (po/agent-node-executor-task-global :> *node-exec)
    (<<ramafn %add-run-type
      [*m]
      (:> (assoc (into {} *m) :run-type (ifexpr (some? *node-name) :node :agent))))
    (local-select> [(sorted-map-range-from *offset *scan-amt)
                    (sorted-map-range *offset *end-offset)
-                   (view complete-node-map *node-name *node-exec)
+                   (view complete-node-map *node-name)
                    (transformed MAP-VALS %add-run-type)]
                   $$p
                   :> *m)
@@ -571,7 +577,8 @@
      [*data]
      (:> (and> (not (experiment-source? *data))
                (not (contains? *data :invoked-agg-invoke-id))
-               (or> *include-failures? (contains? *data :finish-time-millis))
+               (contains? *data :start-time-millis) ; not stricly necessary
+               (include-result-from-status? *include-failures? *data)
                (or> (nil? *node-name) (= *node-name (get *data :node)))
                (aor-types/rule-filter-matches? *filter *data)
                (sample? *sampling-rate))))

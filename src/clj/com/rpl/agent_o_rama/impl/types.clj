@@ -768,7 +768,7 @@
    agent-invoke :- AgentInvokeImpl
    node-invoke :- (s/maybe NodeInvokeImpl)
    success? :- Boolean
-   info-map :- {String Object}])
+   info-map :- {String (s/maybe Object)}])
 
 ;; Misc
 

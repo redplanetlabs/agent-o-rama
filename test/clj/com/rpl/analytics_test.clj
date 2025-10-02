@@ -21,6 +21,8 @@
    [com.rpl.test-common :as tc]
    [meander.epsilon :as m])
   (:import
+   [com.rpl.agentorama
+    AgentFailedException]
    [com.rpl.aortest
     TestSnippets]
    [com.rpl.rama.helpers
@@ -1474,7 +1476,10 @@
                 anode/log-node-error (fn [& args])
 
                 i/hook:analytics-tick
-                (fn [& args] (swap! TICKS inc))]
+                (fn [& args] (swap! TICKS inc))
+
+                ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
+               ]
     (with-open [ipc (rtest/create-ipc)]
       (letlocals
        (bind module
@@ -1509,8 +1514,9 @@
                  (throw (ex-info "fail" {}))
 
                  :else
-                 {"input"  input
-                  "output" output})
+                 {"input"   input
+                  "output"  output
+                  "latency" (:latency-millis run-info)})
              )))
           (-> topology
               (aor/new-agent "foo")
@@ -1543,6 +1549,18 @@
                :actions
                first
                :action)))
+
+       (bind fixed-node-invoke (aor-types/->valid-NodeInvokeImpl 0 (h/max-uuid)))
+
+       (bind last-action-normed
+         (fn [action-name]
+           (multi-transform
+            (multi-path
+             [:start-time-millis (termval 0)]
+             [:finish-time-millis (termval 0)]
+             [:node-invoke aor-types/NodeInvokeImpl? (termval fixed-node-invoke)]
+             [:info-map (keypath "latency") NONE>])
+            (last-action action-name))))
 
 
        (bind cycle!
@@ -1647,7 +1665,6 @@
        (is (h/contains-string? (get (:info-map action) "failure")
                                "Invalid map of results"))
 
-
        (bind inv (aor/agent-initiate foo "eval-exception"))
        (is (= "eval-exception!?" (aor/agent-result foo inv)))
        (cycle!)
@@ -1657,13 +1674,56 @@
        (is (h/contains-string? (get (:info-map action) "failure")
                                "clojure.lang.ExceptionInfo: fail"))
 
+
+       (bind inv (aor/agent-initiate foo "a"))
+       (is (= "a!?" (aor/agent-result foo inv)))
+       (cycle!)
+       (bind ares
+         (aor-types/->valid-ActionLog
+          0
+          0
+          inv
+          nil
+          true
+          {"input" ["a"] "output" "a!?"}))
+       (is (= ares (last-action-normed "foo-agent") (last-action-normed "foo-agent-fail")))
+
+       (bind nres
+         (aor-types/->valid-ActionLog
+          0
+          0
+          inv
+          fixed-node-invoke
+          true
+          {"input" ["a"] "output" [{"node" "node1" "args" ["a!"]}]}))
+       (is (= nres (last-action-normed "foo-start") (last-action-normed "foo-start-fail")))
+
+       (bind inv (aor/agent-initiate foo "fail-agent"))
+       (is (thrown? Exception (aor/agent-result foo inv)))
+       (cycle!)
+       (is (= ares (last-action-normed "foo-agent")))
+       (is (= nres (last-action-normed "foo-start")))
+
+       (bind action (last-action "foo-agent-fail"))
+       (is (= inv (:agent-invoke action)))
+       (is (nil? (:node-invoke action)))
+       (is (:success? action))
+       (bind im (:info-map action))
+       (is (= ["fail-agent"] (get im "input")))
+       (is (instance? AgentFailedException (get im "output")))
+       (is (some? (get im "latency")))
+       (println "AAA" im)
+
+       (bind action (last-action "foo-start-fail"))
+       (is (= inv (:agent-invoke action)))
+       (is (some? (:node-invoke action)))
+       (is (:success? action))
+       (bind im (:info-map action))
+       (is (= ["fail-agent"] (get im "input")))
+       (is (= [] (get im "output")))
+       (is (nil? (get im "latency")))
+
        ;; TODO: <<<<>>>>
-       ;;  - verify include-failures? behavior for both agent and node actions
-       ;;   - gives AgentFailedException for agent failure
-       ;;   - gives nil for node output in that case
-       ;;     - node latency is nil
-       ;;     - agent latency is not nil
        ;;  - doesn't scan past incomplete nodes that haven't stalled
        ;;  - doesn't scan past incomplete agents
-
       ))))
