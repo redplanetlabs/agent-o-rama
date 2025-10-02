@@ -291,7 +291,8 @@
 
 (reg-event :query/fetch-start
            (fn [db {:keys [query-key]}]
-             (into (into [:queries] query-key)
+             ;; Convert query-key with raw UUIDs to Specter path
+             (into (path->specter-path (into [:queries] query-key))
                    [(s/terminal (fn [current-state]
                                   (let [has-data? (some? (:data current-state))]
                                     (-> current-state
@@ -302,7 +303,8 @@
 
 (reg-event :query/fetch-success
            (fn [db {:keys [query-key data]}]
-             (into (into [:queries] query-key)
+             ;; Convert query-key with raw UUIDs to Specter path
+             (into (path->specter-path (into [:queries] query-key))
                    [(s/terminal (fn [_]
                                   {:status :success
                                    :data data
@@ -311,7 +313,8 @@
 
 (reg-event :query/fetch-error
            (fn [db {:keys [query-key error]}]
-             (into (into [:queries] query-key)
+             ;; Convert query-key with raw UUIDs to Specter path
+             (into (path->specter-path (into [:queries] query-key))
                    [(s/terminal (fn [current-state]
                                   (-> current-state
                                       (assoc :error error
