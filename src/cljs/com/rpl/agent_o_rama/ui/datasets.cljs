@@ -785,7 +785,7 @@
         ;; Fetch examples
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
-         {:query-key [:dataset-examples module-id (str dataset-id) selected-snapshot-name search-string]
+         {:query-key [:dataset-examples module-id dataset-id selected-snapshot-name search-string]
           :sente-event [:datasets/search-examples {:module-id module-id
                                                    :dataset-id dataset-id
                                                    :snapshot-name selected-snapshot-name
