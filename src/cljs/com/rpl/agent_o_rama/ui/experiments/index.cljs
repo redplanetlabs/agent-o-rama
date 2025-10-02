@@ -180,6 +180,7 @@
                              ($ :div.font-mono.text-gray-600
                                 (str "#" (get experiment-number-map (:id info)))))
 
+
                           ;; Experiment Name
                           ($ :td {:className (:td common/table-classes)}
                              ($ :div.font-medium.text-gray-900.truncate {:title (:name info)} (:name info)))

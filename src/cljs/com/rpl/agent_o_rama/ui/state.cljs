@@ -110,9 +110,9 @@
                 (try
                   (s-core/validate schemas/AppDbSchema new-db)
                   (catch :default e
-                    (js/console.error "🔥🔥 SCHEMA VALIDATION FAILED 🔥🔥")
-                    (js/console.error "Event that caused failure:" (clj->js event))
-                    (js/console.error "Validation error details:" (clj->js (ex-data e)))
+                    (println "🔥🔥 SCHEMA VALIDATION FAILED 🔥🔥")
+                    (println "Event that caused failure:" event)
+                    (println "Validation error details:" (ex-data e))
                     ;; For aggressive debugging, you can throw the error to halt execution
                     ;; (throw e)
                     )))
@@ -121,9 +121,9 @@
               ;; Atomically update the database
               (reset! app-db new-db))))
         (catch :default e
-          (js/console.error "💥 Error in event handler" event-id ":" e)
+          (println "💥 Error in event handler" event-id ":" e)
           (throw e)))
-      (js/console.warn "⚠️ No handler registered for event:" event-id))))
+      (println "⚠️ No handler registered for event:" event-id))))
 
 ;; =============================================================================
 ;; SUBSCRIPTIONS (REACTIVE STATE ACCESS)

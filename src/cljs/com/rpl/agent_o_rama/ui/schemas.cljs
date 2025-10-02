@@ -53,8 +53,7 @@
    :fetching? s/Bool
    (s/optional-key :should-refetch?) s/Bool})
 
-(s/defschema RouteMatchSchema
-  (s/maybe {s/Keyword Spy}))
+(s/defschema RouteMatchSchema s/Any)
 
 (s/defschema FormStateSchema
   {s/Keyword Spy})
@@ -65,7 +64,8 @@
 
 (s/defschema ModalStateSchema
   {:active (s/maybe s/Keyword)
-   :data {s/Keyword Spy}})
+   :data {s/Keyword Spy}
+   :form {s/Keyword Spy}})
 
 (s/defschema HitlStateSchema
   {:responses {s/Uuid s/Str}
@@ -102,7 +102,7 @@
   {:current-invocation CurrentInvocationSchema
    :invocations-data {s/Str InvocationDataSchema}
    :invocations InvocationsSchema
-   :queries {s/Any QueryStateSchema}
+   :queries {s/Any {s/Any Spy}} ; Nested query structure: {query-type {param-key query-state}}
    :route RouteMatchSchema
    :forms {s/Keyword FormStateSchema}
    :ui UiSchema
