@@ -27,16 +27,20 @@
 
 (s/defschema InvocationDataSchema
   {:status (s/enum :loading :success :error)
-   :graph (spy :invocation/graph)
-   :implicit-edges [(spy :invocation/implicit-edge)]
-   :summary (spy :invocation/summary)
+   :graph {:raw-nodes {s/Uuid s/Any}
+           :nodes {s/Uuid s/Any}
+           :edges [s/Any]}
+   :implicit-edges [s/Any]
+   :summary (s/maybe {:forks [s/Uuid]
+                      :fork-of (s/maybe s/Uuid)
+                      s/Keyword s/Any})
    :root-invoke-id (s/maybe s/Uuid)
    :task-id (s/maybe s/Int)
    :is-complete s/Bool
-   (s/optional-key :historical-graph) (spy :invocation/historical-graph)
+   (s/optional-key :historical-graph) s/Any
    (s/optional-key :forks) [s/Uuid]
-   (s/optional-key :fork-of) (spy :invocation/fork-of)
-   (s/optional-key :error) (spy :invocation/error)})
+   (s/optional-key :fork-of) s/Any
+   (s/optional-key :error) s/Any})
 
 (s/defschema InvocationsSchema
   {:all-invokes [s/Any] ; Keep s/Any for now, or use Spy if you want to inspect invokes
@@ -71,7 +75,7 @@
 (s/defschema RouteMatchSchema s/Any)
 
 (s/defschema FormStateSchema
-  {s/Keyword (spy :forms/field-value)})
+  {s/Keyword s/Any})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; UI State Schemas
@@ -79,8 +83,9 @@
 
 (s/defschema ModalStateSchema
   {:active (s/maybe s/Keyword)
-   :data {s/Keyword (spy :modal/data)}
-   :form {s/Keyword (spy :modal/form)}})
+   :data {s/Keyword s/Any}
+   :form {:submitting? s/Bool
+          :error (s/maybe s/Any)}})
 
 (s/defschema HitlStateSchema
   {:responses {s/Uuid s/Str}
@@ -107,7 +112,7 @@
 
 (s/defschema SessionSchema
   {:user-id (s/maybe s/Str)
-   :preferences {s/Keyword (spy :session/preference)}})
+   :preferences {s/Keyword s/Any}})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Top-Level App DB Schema
