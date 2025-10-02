@@ -47,7 +47,7 @@
    :ui {:selected-node-id nil
         :forking-mode? false
         :changed-nodes {}
-        :active-tab :graph
+        :active-tab :info
         :current-route "/"
         :modal {:active nil
                 :data {}
