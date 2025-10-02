@@ -5,13 +5,14 @@
 ;;; Spy Schema for Discovery
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(s/defschema Spy
-  "A custom schema that accepts any value but logs its structure to the console.
-   Useful for discovering the shape of data during development."
+(defn spy
+  "Creates a spy schema that logs values with a label to identify which field it came from.
+   Usage: (spy \"field-name\") or (spy :invocation/graph)"
+  [label]
   (s/pred
    (fn [value]
      (when (some? value)
-       (println "SPY | value:" value))
+       (println "SPY |" label "|" (type value) "|" value))
      true)
    'spy-schema))
 
@@ -26,16 +27,16 @@
 
 (s/defschema InvocationDataSchema
   {:status (s/enum :loading :success :error)
-   :graph Spy
-   :implicit-edges [Spy]
-   :summary Spy
+   :graph (spy :invocation/graph)
+   :implicit-edges [(spy :invocation/implicit-edge)]
+   :summary (spy :invocation/summary)
    :root-invoke-id (s/maybe s/Uuid)
    :task-id (s/maybe s/Int)
    :is-complete s/Bool
-   (s/optional-key :historical-graph) Spy
+   (s/optional-key :historical-graph) (spy :invocation/historical-graph)
    (s/optional-key :forks) [s/Uuid]
-   (s/optional-key :fork-of) Spy
-   (s/optional-key :error) Spy})
+   (s/optional-key :fork-of) (spy :invocation/fork-of)
+   (s/optional-key :error) (spy :invocation/error)})
 
 (s/defschema InvocationsSchema
   {:all-invokes [s/Any] ; Keep s/Any for now, or use Spy if you want to inspect invokes
@@ -45,15 +46,15 @@
 
 (s/defschema QueryStateSchema
   {:status (s/maybe (s/enum :loading :success :error))
-   :data Spy
-   :error Spy
+   :data (spy :query/data)
+   :error (spy :query/error)
    :fetching? s/Bool
    (s/optional-key :should-refetch?) s/Bool})
 
 (s/defschema RouteMatchSchema s/Any)
 
 (s/defschema FormStateSchema
-  {s/Keyword Spy})
+  {s/Keyword (spy :forms/field-value)})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; UI State Schemas
@@ -61,8 +62,8 @@
 
 (s/defschema ModalStateSchema
   {:active (s/maybe s/Keyword)
-   :data {s/Keyword Spy}
-   :form {s/Keyword Spy}})
+   :data {s/Keyword (spy :modal/data)}
+   :form {s/Keyword (spy :modal/form)}})
 
 (s/defschema HitlStateSchema
   {:responses {s/Uuid s/Str}
@@ -89,7 +90,7 @@
 
 (s/defschema SessionSchema
   {:user-id (s/maybe s/Str)
-   :preferences {s/Keyword Spy}})
+   :preferences {s/Keyword (spy :session/preference)}})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Top-Level App DB Schema
@@ -99,7 +100,7 @@
   {:current-invocation CurrentInvocationSchema
    :invocations-data {s/Str InvocationDataSchema}
    :invocations InvocationsSchema
-   :queries {s/Any {s/Any Spy}} ; Nested query structure: {query-type {param-key query-state}}
+   :queries {s/Any {s/Any (spy :queries/nested-value)}} ; Nested query structure: {query-type {param-key query-state}}
    :route RouteMatchSchema
    :forms {s/Keyword FormStateSchema}
    :ui UiSchema
