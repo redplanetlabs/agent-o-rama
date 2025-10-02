@@ -282,36 +282,33 @@
 
 (reg-event :query/fetch-start
            (fn [db {:keys [query-key]}]
-             (let [path (normalize-path (into [:queries] query-key))]
-               (into path
-                     [(s/terminal (fn [current-state]
-                                    (let [has-data? (some? (:data current-state))]
-                                      (-> current-state
-                                          (assoc :error nil
-                                                 :fetching? true)
-                                          (cond-> (not has-data?)
-                                            (assoc :status :loading))))))]))))
+             (into (into [:queries] query-key)
+                   [(s/terminal (fn [current-state]
+                                  (let [has-data? (some? (:data current-state))]
+                                    (-> current-state
+                                        (assoc :error nil
+                                               :fetching? true)
+                                        (cond-> (not has-data?)
+                                          (assoc :status :loading))))))])))
 
 (reg-event :query/fetch-success
            (fn [db {:keys [query-key data]}]
-             (let [path (normalize-path (into [:queries] query-key))]
-               (into path
-                     [(s/terminal (fn [_]
-                                    {:status :success
-                                     :data data
-                                     :error nil
-                                     :fetching? false}))]))))
+             (into (into [:queries] query-key)
+                   [(s/terminal (fn [_]
+                                  {:status :success
+                                   :data data
+                                   :error nil
+                                   :fetching? false}))])))
 
 (reg-event :query/fetch-error
            (fn [db {:keys [query-key error]}]
-             (let [path (normalize-path (into [:queries] query-key))]
-               (into path
-                     [(s/terminal (fn [current-state]
-                                    (-> current-state
-                                        (assoc :error error
-                                               :fetching? false)
-                                        (cond-> (nil? (:data current-state))
-                                          (assoc :status :error)))))]))))
+             (into (into [:queries] query-key)
+                   [(s/terminal (fn [current-state]
+                                  (-> current-state
+                                      (assoc :error error
+                                             :fetching? false)
+                                      (cond-> (nil? (:data current-state))
+                                        (assoc :status :error)))))])))
 
 (reg-event :query/invalidate
            (fn [db {:keys [query-key-pattern]}]
@@ -356,8 +353,8 @@
                (when (seq matching-keys)
                  (apply s/multi-path
                         (map (fn [query-key]
-                               (let [path (normalize-path (into queries-path query-key))]
-                                 (into path [:should-refetch? (s/terminal-val true)])))
+                               (into (into queries-path query-key)
+                                     [:should-refetch? (s/terminal-val true)]))
                              matching-keys))))))
 
 ;; =============================================================================
