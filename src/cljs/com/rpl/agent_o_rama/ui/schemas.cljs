@@ -45,9 +45,10 @@
    :loading? s/Bool})
 
 (s/defschema QueryStateSchema
-  {:status (s/maybe (s/enum :loading :success :error))
-   :data s/Any ;; any server data
-   :error s/Any ;; any server data
+  {:status (s/enum :loading :success :error)
+
+   (s/optional-key :data) s/Any ;; any server data
+   (s/optional-key :error) s/Any ;; any server data
    :fetching? s/Bool
    (s/optional-key :should-refetch?) s/Bool})
 
@@ -62,7 +63,7 @@
     ;; Predicate: if the value is a map containing :status, treat it as a leaf (QueryStateSchema)
     #(and (map? %) (contains? % :status))
     QueryStateSchema
-    
+
     ;; Otherwise, expect another nested map conforming to the same structure
     (constantly true)
     (s/recursive #'QueriesCacheSchema))})
