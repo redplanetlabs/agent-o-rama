@@ -453,7 +453,9 @@
 
              ;; 2. Construct the full state for the modal
              modal-state {:active form-id
-                          :data (assoc modal-data :form-id form-id)}]
+                          :data (assoc modal-data :form-id form-id)
+                          :form {:submitting? false
+                                 :error nil}}]
 
          ;; 3. Return a single Specter path to update both parts of the DB atomically
          (s/multi-path
@@ -463,11 +465,15 @@
 (state/reg-event :modal/show
                  (fn [db modal-type modal-data]
                    [:ui :modal (s/terminal-val {:active modal-type
-                                                :data modal-data})]))
+                                                :data modal-data
+                                                :form {:submitting? false
+                                                       :error nil}})]))
 
 (state/reg-event :modal/hide
                  (fn [db]
                    [:ui :modal (s/terminal-val {:active nil
-                                                :data {}})]))
+                                                :data {}
+                                                :form {:submitting? false
+                                                       :error nil}})]))
 
 
