@@ -112,7 +112,7 @@
 
 (s/defschema DatasetsUiSchema
   {:selected-examples {s/Uuid #{s/Uuid}}
-   :selected-snapshot-per-dataset {s/Uuid s/Uuid}})
+   :selected-snapshot-per-dataset {s/Uuid (s/maybe s/Str)}})
 
 (s/defschema UiSchema
   {:selected-node-id (s/maybe s/Uuid)
