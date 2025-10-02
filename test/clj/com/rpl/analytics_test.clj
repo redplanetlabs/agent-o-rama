@@ -1712,7 +1712,6 @@
        (is (= ["fail-agent"] (get im "input")))
        (is (instance? AgentFailedException (get im "output")))
        (is (some? (get im "latency")))
-       (println "AAA" im)
 
        (bind action (last-action "foo-start-fail"))
        (is (= inv (:agent-invoke action)))
@@ -1724,6 +1723,7 @@
        (is (nil? (get im "latency")))
 
        ;; TODO: <<<<>>>>
-       ;;  - doesn't scan past incomplete nodes that haven't stalled
+       ;;  - doesn't scan past incomplete nodes until time limit is reached (and then skips them for
+       ;;  actions unless include-failures? is true) – in this case, would output be nil or []?
        ;;  - doesn't scan past incomplete agents
       ))))
