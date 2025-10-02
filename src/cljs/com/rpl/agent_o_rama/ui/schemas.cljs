@@ -46,10 +46,26 @@
 
 (s/defschema QueryStateSchema
   {:status (s/maybe (s/enum :loading :success :error))
-   :data (spy :query/data)
-   :error (spy :query/error)
+   :data s/Any ;; any server data
+   :error s/Any ;; any server data
    :fetching? s/Bool
    (s/optional-key :should-refetch?) s/Bool})
+
+;; Forward declaration for recursive reference
+(declare QueriesCacheSchema)
+
+(def QueriesCacheSchema
+  "A schema for the nested query cache. It's a recursive map where
+   leaf nodes must match QueryStateSchema."
+  {s/Any
+   (s/conditional
+    ;; Predicate: if the value is a map containing :status, treat it as a leaf (QueryStateSchema)
+    #(and (map? %) (contains? % :status))
+    QueryStateSchema
+    
+    ;; Otherwise, expect another nested map conforming to the same structure
+    (constantly true)
+    (s/recursive #'QueriesCacheSchema))})
 
 (s/defschema RouteMatchSchema s/Any)
 
@@ -100,7 +116,7 @@
   {:current-invocation CurrentInvocationSchema
    :invocations-data {s/Str InvocationDataSchema}
    :invocations InvocationsSchema
-   :queries {s/Any {s/Any (spy :queries/nested-value)}} ; Nested query structure: {query-type {param-key query-state}}
+   :queries QueriesCacheSchema ; Recursive schema for nested query cache with arbitrary depth
    :route RouteMatchSchema
    :forms {s/Keyword FormStateSchema}
    :ui UiSchema
