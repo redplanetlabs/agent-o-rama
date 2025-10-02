@@ -110,8 +110,8 @@
    :submitting {s/Uuid s/Bool}})
 
 (s/defschema DatasetsUiSchema
-  {:selected-examples {s/Str #{s/Str}}
-   :selected-snapshot-per-dataset {s/Str s/Str}})
+  {:selected-examples {s/Uuid #{s/Uuid}}
+   :selected-snapshot-per-dataset {s/Uuid s/Uuid}})
 
 (s/defschema UiSchema
   {:selected-node-id (s/maybe s/Uuid)
