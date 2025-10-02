@@ -27,23 +27,23 @@
 
 (s/defschema InvocationDataSchema
   {:status (s/enum :loading :success :error)
-   :graph {:raw-nodes {s/Uuid s/Any}
-           :nodes {s/Uuid s/Any}
-           :edges [s/Any]}
-   :implicit-edges [s/Any]
+   :graph {:raw-nodes {s/Uuid (spy "raw-nodes")}
+           :nodes {s/Uuid (spy "nodes")}
+           :edges [(spy "edges")]}
+   :implicit-edges [(spy "implicit-edges")]
    :summary (s/maybe {:forks [s/Uuid]
                       :fork-of (s/maybe s/Uuid)
-                      s/Keyword s/Any})
+                      s/Keyword (spy "summary-extra")})
    :root-invoke-id (s/maybe s/Uuid)
    :task-id (s/maybe s/Int)
    :is-complete s/Bool
-   (s/optional-key :historical-graph) s/Any
+   (s/optional-key :historical-graph) (spy "historical-graph")
    (s/optional-key :forks) [s/Uuid]
-   (s/optional-key :fork-of) s/Any
-   (s/optional-key :error) s/Any})
+   (s/optional-key :fork-of) (spy "fork-of")
+   (s/optional-key :error) (spy "invocation-error")})
 
 (s/defschema InvocationsSchema
-  {:all-invokes [s/Any] ; Keep s/Any for now, or use Spy if you want to inspect invokes
+  {:all-invokes [(spy "all-invokes")]
    :pagination-params (s/maybe {s/Int (s/maybe s/Int)})
    :has-more? s/Bool
    :loading? s/Bool})
@@ -62,7 +62,7 @@
 (def QueriesCacheSchema
   "A schema for the nested query cache. It's a recursive map where
    leaf nodes must match QueryStateSchema."
-  {s/Any
+  {(spy "queries-cache-key")
    (s/conditional
     ;; Predicate: if the value is a map containing :status, treat it as a leaf (QueryStateSchema)
     #(and (map? %) (contains? % :status))
@@ -72,10 +72,10 @@
     (constantly true)
     (s/recursive #'QueriesCacheSchema))})
 
-(s/defschema RouteMatchSchema s/Any)
+(s/defschema RouteMatchSchema (spy "route-match"))
 
 (s/defschema FormStateSchema
-  {s/Keyword s/Any})
+  {s/Keyword (spy "form-state-value")})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; UI State Schemas
@@ -83,9 +83,9 @@
 
 (s/defschema ModalStateSchema
   {:active (s/maybe s/Keyword)
-   :data {s/Keyword s/Any}
+   :data {s/Keyword (spy "modal-data-value")}
    :form {:submitting? s/Bool
-          :error (s/maybe s/Any)}})
+          :error (s/maybe (spy "modal-form-error"))}})
 
 (s/defschema HitlStateSchema
   {:responses {s/Uuid s/Str}
@@ -101,18 +101,18 @@
    :changed-nodes {s/Uuid s/Str}
    :active-tab s/Keyword
    :current-route s/Str
-   :breadcrumbs [s/Any]
+   :breadcrumbs [(spy "breadcrumb")]
    :modal ModalStateSchema
    :hitl HitlStateSchema
    :datasets DatasetsUiSchema})
 
 (s/defschema SenteSchema
   {:connected? s/Bool
-   :connection-state s/Any})
+   :connection-state (spy "connection-state")})
 
 (s/defschema SessionSchema
   {:user-id (s/maybe s/Str)
-   :preferences {s/Keyword s/Any}})
+   :preferences {s/Keyword (spy "session-preference-value")}})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Top-Level App DB Schema
@@ -122,7 +122,7 @@
   {:current-invocation CurrentInvocationSchema
    :invocations-data {s/Str InvocationDataSchema}
    :invocations InvocationsSchema
-   :queries QueriesCacheSchema ; Recursive schema for nested query cache with arbitrary depth
+   :queries QueriesCacheSchema
    :route RouteMatchSchema
    :forms {s/Keyword FormStateSchema}
    :ui UiSchema
