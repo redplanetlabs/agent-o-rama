@@ -153,7 +153,7 @@
                      (state/dispatch [:modal/hide])
                      (let [decoded-module-id (when module-id (common/url-decode module-id))]
                        (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}])
-                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-props decoded-module-id (str dataset-id)]}]))
+                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-props decoded-module-id dataset-id]}]))
                      (state/dispatch [:form/clear form-id])))
             (.catch (fn [error]
                       (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
