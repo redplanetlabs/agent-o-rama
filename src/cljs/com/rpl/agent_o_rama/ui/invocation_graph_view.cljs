@@ -277,10 +277,10 @@
 
         hr-invoke-id (when hr (:invoke-id hr))
         hitl-response (state/use-sub (if hr-invoke-id
-                                       [:ui :hitl :responses (s/keypath hr-invoke-id)]
+                                       [:ui :hitl :responses hr-invoke-id]
                                        [:ui :hitl :responses :placeholder]))
         submitting? (state/use-sub (if hr-invoke-id
-                                     [:ui :hitl :submitting (s/keypath hr-invoke-id)]
+                                     [:ui :hitl :submitting hr-invoke-id]
                                      [:ui :hitl :submitting :placeholder]))]
 
     (when selected-node
@@ -299,7 +299,7 @@
                                   :value (or hitl-response "")
                                   :disabled submitting?
                                   :onChange #(state/dispatch [:db/set-value
-                                                              [:ui :hitl :responses (s/keypath hr-invoke-id)]
+                                                              [:ui :hitl :responses hr-invoke-id]
                                                               (.. % -target -value)])})
                     ($ :button {:className (common/cn "mt-2 px-3 py-2 rounded text-sm font-medium transition-colors"
                                                       {"bg-gray-400 text-gray-600 cursor-not-allowed" submitting?
@@ -314,7 +314,7 @@
                                                               :request hr
                                                               :response (str/trim hitl-response)}])
                                             ;; Clear the response after submission
-                                            (state/dispatch [:db/set-value [:ui :hitl :responses (s/keypath hr-invoke-id)] ""]))}
+                                            (state/dispatch [:db/set-value [:ui :hitl :responses hr-invoke-id] ""]))}
                        (if submitting? "Submitting..." "Submit Response")))))
 
             ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}

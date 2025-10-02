@@ -34,7 +34,7 @@
                          (fn [reply]
                            (if (:success reply)
                              (do
-                               (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}])
+                               (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                (when on-delete-success (on-delete-success)))
                              (js/alert (str "Error deleting example: " (:error reply))))))))}
           ($ TrashIcon {:className delete-icon-classes})
@@ -84,8 +84,8 @@
                                        (set-editing! false)
                                        (set-edit-value! "")
                                        ;; Invalidate both the single example query and the main examples list
-                                       (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id (s/keypath dataset-id) snapshot-name (str example-id)]}])
-                                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}])
+                                       (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
+                                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                        (when on-save (on-save)))
                                      (set-error! (str "Error saving: " (:error reply)))))))
                               (catch js/Error e
@@ -138,7 +138,7 @@
   (let [;; Fetch the specific example data
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
-         {:query-key [:single-example module-id (s/keypath dataset-id) snapshot-name (str example-id)]
+         {:query-key [:single-example module-id dataset-id snapshot-name (str example-id)]
           :sente-event [:datasets/get-example {:module-id module-id
                                                :dataset-id dataset-id
                                                :snapshot-name snapshot-name
@@ -169,7 +169,7 @@
                                 (fn [reply]
                                   (if (:success reply)
                                     (do
-                                      (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}])
+                                      (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                       (when on-delete-success (on-delete-success)))
                                     (js/alert (str "Error deleting example: " (:error reply))))))))}
                  ($ TrashIcon {:className "mr-2 h-4 w-4"})
@@ -233,8 +233,8 @@
                                 (do
                                   (set-input-value "")
                                   ;; Invalidate both the single example query and the main examples list
-                                  (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id (s/keypath dataset-id) snapshot-name (str example-id)]}])
-                                  (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}])
+                                  (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
+                                  (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                   (when on-tags-change (on-tags-change)))
                                 (js/alert (str "Error adding tag: " (:error reply))))))))
 
@@ -250,8 +250,8 @@
                                (if (:success reply)
                                  (do
                                    ;; Invalidate both the single example query and the main examples list
-                                   (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id (s/keypath dataset-id) snapshot-name (str example-id)]}])
-                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}])
+                                   (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
+                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                    (when on-tags-change (on-tags-change)))
                                  (js/alert (str "Error removing tag: " (:error reply)))))))
 
@@ -425,7 +425,7 @@
 
 (defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success is-read-only?]}] ;; Add is-read-only?
   (let [[open-dropdown set-open-dropdown] (uix/use-state nil)
-        selected-ids (or (state/use-sub [:ui :datasets :selected-examples (s/keypath dataset-id)]) #{})
+        selected-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
         all-on-page-ids (set (map :id examples))
         all-selected? (and (seq all-on-page-ids)
                            (clojure.set/subset? all-on-page-ids selected-ids))]
@@ -574,7 +574,7 @@
                                                     (fn [reply]
                                                       (if (:success reply)
                                                         ;; Invalidate query to refresh the list with the new example
-                                                        (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}])
+                                                        (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                                         (js/alert (str "Error duplicating example: " (:error reply)))))))}
                                        ($ DocumentDuplicateIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                        "Duplicate")
@@ -595,7 +595,7 @@
                                                       (fn [reply]
                                                         (if (:success reply)
                                                           (do
-                                                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}])
+                                                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                                             (when on-delete-success (on-delete-success)))
                                                           (js/alert (str "Error deleting example: " (:error reply))))))))}
                                        ($ TrashIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-red-500"})
@@ -769,11 +769,11 @@
 
 (defui detail-examples [{:keys [module-id dataset-id]}]
   (let [;; Get selected examples for this dataset
-        selected-example-ids (or (state/use-sub [:ui :datasets :selected-examples (s/keypath dataset-id)]) #{})
+        selected-example-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
 
         ;; --- REFACTORED ---
         ;; State for selected snapshot now comes from app-db and is updated via dispatch
-        selected-snapshot-name (or (state/use-sub [:ui :datasets :selected-snapshot-per-dataset (s/keypath dataset-id)]) "")
+        selected-snapshot-name (or (state/use-sub [:ui :datasets :selected-snapshot-per-dataset dataset-id]) "")
         set-selected-snapshot-name (fn [new-name]
                                      (state/dispatch [:datasets/set-selected-snapshot
                                                       {:dataset-id dataset-id :snapshot-name new-name}]))
@@ -785,7 +785,7 @@
         ;; Fetch examples
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
-         {:query-key [:dataset-examples module-id (s/keypath dataset-id) selected-snapshot-name search-string]
+         {:query-key [:dataset-examples module-id (str dataset-id) selected-snapshot-name search-string]
           :sente-event [:datasets/search-examples {:module-id module-id
                                                    :dataset-id dataset-id
                                                    :snapshot-name selected-snapshot-name
@@ -955,11 +955,11 @@
         [show-info? set-show-info] (uix/use-state false)
         {:keys [loading? error]}
         (queries/use-sente-query
-         {:query-key [:dataset-props module-id (s/keypath dataset-id)]
+         {:query-key [:dataset-props module-id dataset-id]
           :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
         ;; not sure about doing it this way, why not. maybe we can eventually decouple fetching from views?
-        dataset (state/use-sub [:queries :dataset-props module-id (s/keypath dataset-id) :data])]
+        dataset (state/use-sub [:queries :dataset-props module-id dataset-id :data])]
     ($ :div.h-full.flex.flex-col
        (cond
          loading? ($ :div.p-6 "Loading dataset details...")

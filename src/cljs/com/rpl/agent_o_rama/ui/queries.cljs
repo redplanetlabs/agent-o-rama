@@ -2,7 +2,23 @@
   (:require [uix.core :as uix :refer [defhook]]
             [com.rpl.agent-o-rama.ui.state :as state]
             [com.rpl.agent-o-rama.ui.sente :as sente]
-            [com.rpl.agent-o-rama.ui.common :as common]))
+            [com.rpl.agent-o-rama.ui.common :as common]
+            [com.rpl.specter :as s]))
+
+(defn query-key->specter-path
+  "Converts a query-key vector (which may contain UUID objects) into a Specter path.
+   UUIDs are wrapped with s/keypath since Specter can't use them directly as navigators.
+   Other values (keywords, strings) are left as-is.
+   
+   Example:
+     (query-key->specter-path [:dataset-examples \"module-1\" #uuid \"...\" \"snapshot\" \"search\"])
+     => [:dataset-examples \"module-1\" (s/keypath #uuid \"...\") \"snapshot\" \"search\"]"
+  [query-key]
+  (mapv (fn [segment]
+          (if (uuid? segment)
+            (s/keypath segment)
+            segment))
+        query-key))
 
 (defhook use-sente-query
   "A hook for making Sente-based queries with automatic connection handling.
@@ -25,6 +41,7 @@
     :or {timeout-ms 10000 enabled? true refetch-on-mount true}}]
   (let [state-path (into [:queries] query-key)
         query-state (state/use-sub state-path)
+        should-refetch? (:should-refetch? query-state)
         connected? (state/use-sub [:sente :connected?])
         query-key-str (str (vec query-key))
         sente-event-str (str sente-event)
@@ -66,12 +83,15 @@
     ;; Effect to watch for invalidation flag and auto-refetch
     (uix/use-effect
      (fn []
-       (when (and (:should-refetch? query-state) connected? enabled? page-is-visible?)
+       (when (and should-refetch? connected? enabled? page-is-visible?)
          ;; Clear the flag first to prevent infinite loops
          (state/dispatch [:db/set-value (into state-path [:should-refetch?]) false])
          ;; Then refetch the data
          (fetch-data)))
-     [state-path query-state (:should-refetch? query-state) connected? enabled? page-is-visible? fetch-data])
+     ;; CRITICAL: Only watch the boolean value itself, not state-path or query-state
+     ;; state-path is not needed because it's derived from query-key which is in fetch-data deps
+     ;; Including state-path or query-state causes infinite loops
+     [should-refetch? connected? enabled? page-is-visible? fetch-data])
 
     ;; Return the result map including the refetch function
     (let [default-state {:data nil :status nil :error nil :fetching? false}

@@ -153,7 +153,7 @@
                      (state/dispatch [:modal/hide])
                      (let [decoded-module-id (when module-id (common/url-decode module-id))]
                        (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}])
-                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-props decoded-module-id dataset-id]}]))
+                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-props decoded-module-id (str dataset-id)]}]))
                      (state/dispatch [:form/clear form-id])))
             (.catch (fn [error]
                       (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
@@ -236,7 +236,7 @@
   {:event (fn [db form-state]
             [:datasets/create-snapshot form-state])
    :on-success-invalidate (fn [db {:keys [module-id dataset-id]} _reply]
-                            {:query-key-pattern [:snapshot-names module-id dataset-id]})
+                            {:query-key-pattern [:snapshot-names module-id (str dataset-id)]})
    :on-success (fn [db {:keys [dataset-id]} reply]
                  ;; On success, directly dispatch an event to select the new snapshot
                  (state/dispatch [:datasets/set-selected-snapshot
@@ -278,9 +278,9 @@
             ;; 1. Get stable IDs from the route.
             (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
                   ;; 2. Get the CURRENTLY selected snapshot name from its state path.
-                  snapshot-name (s/select-one [:ui :datasets :selected-snapshot-per-dataset (s/keypath dataset-id)] db)
+                  snapshot-name (s/select-one (state/path->specter-path [:ui :datasets :selected-snapshot-per-dataset dataset-id]) db)
                   ;; 3. Get the CURRENTLY selected example IDs from their state path.
-                  example-ids (s/select-one [:ui :datasets :selected-examples (s/keypath dataset-id)] db)
+                  example-ids (s/select-one (state/path->specter-path [:ui :datasets :selected-examples dataset-id]) db)
                   ;; 4. Get the tag name from the form state.
                   {:keys [tag-name]} form-state]
               [:datasets/add-tag-to-examples
@@ -293,7 +293,7 @@
                 :tag tag-name}]))
    :on-success-invalidate (fn [db _form-state _reply]
                             (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
-                              {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}))
+                              {:query-key-pattern [:dataset-examples module-id dataset-id]}))
    :on-success (fn [db _form-state _reply]
                  (let [{:keys [dataset-id]} (s/select-one [:route :path-params] db)]
                    (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])))}})
@@ -318,9 +318,9 @@
             ;; 1. Get stable IDs from the route.
             (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
                   ;; 2. Get the CURRENTLY selected snapshot name from its state path.
-                  snapshot-name (s/select-one [:ui :datasets :selected-snapshot-per-dataset (s/keypath dataset-id)] db)
+                  snapshot-name (s/select-one (state/path->specter-path [:ui :datasets :selected-snapshot-per-dataset dataset-id]) db)
                   ;; 3. Get the CURRENTLY selected example IDs from their state path.
-                  example-ids (s/select-one [:ui :datasets :selected-examples (s/keypath dataset-id)] db)
+                  example-ids (s/select-one (state/path->specter-path [:ui :datasets :selected-examples dataset-id]) db)
                   ;; 4. Get the tag name from the form state.
                   {:keys [tag-name]} form-state]
               [:datasets/remove-tag-from-examples
@@ -333,7 +333,7 @@
                 :tag tag-name}]))
    :on-success-invalidate (fn [db _form-state _reply]
                             (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
-                              {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}))
+                              {:query-key-pattern [:dataset-examples module-id dataset-id]}))
    :on-success (fn [db _form-state _reply]
                  (let [{:keys [dataset-id]} (s/select-one [:route :path-params] db)]
                    (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])))}})

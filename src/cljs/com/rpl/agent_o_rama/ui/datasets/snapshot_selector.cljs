@@ -14,7 +14,7 @@
 
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
-         {:query-key [:snapshot-names module-id (s/keypath dataset-id)]
+         {:query-key [:snapshot-names module-id dataset-id]
           :sente-event [:datasets/get-snapshot-names {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
 

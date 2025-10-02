@@ -129,11 +129,32 @@
 ;; SUBSCRIPTIONS (REACTIVE STATE ACCESS)
 ;; =============================================================================
 
+(defn path->specter-path
+  "Converts a path vector (which may contain UUID objects) into a Specter path.
+   UUIDs are wrapped with s/keypath since Specter can't use them directly as navigators.
+   Other values (keywords, strings) are left as-is."
+  [path]
+  (mapv (fn [segment]
+          (if (uuid? segment)
+            (s/keypath segment)
+            segment))
+        path))
+
 (defn use-sub
-  "Subscribe to a value at the given Specter path in app-db.
-   Component will re-render only when the value at that path changes."
-  [specter-path]
-  (let [;; Memoize the extractor function to have stable reference
+  "Subscribe to a value at the given path in app-db.
+   The path may contain raw UUIDs - they will be converted to Specter navigators internally.
+   Component will re-render only when the value at that path changes.
+   
+   Example:
+     (use-sub [:ui :datasets :selected-examples dataset-id])
+   where dataset-id is a raw UUID object."
+  [path]
+  (let [;; Convert the path once, outside the callback
+        ;; This ensures we have a stable specter-path for the dependency array
+        specter-path (uix/use-memo
+                      (fn [] (path->specter-path path))
+                      [path])
+        ;; Memoize the extractor function to have stable reference
         extract-value (uix/use-callback
                        (fn [db] (s/select-one specter-path db))
                        [specter-path])
@@ -225,8 +246,9 @@
 ;; Usage: (dispatch [:db/set-value [:some :path] value])
 (reg-event :db/set-value
            (fn [db path value]
-    ;; Build a Specter navigator that sets the value at the given path
-             (into path [(s/terminal-val value)])))
+             ;; Build a Specter navigator that sets the value at the given path
+             ;; Convert any UUIDs in the path to keypath navigators
+             (into (path->specter-path path) [(s/terminal-val value)])))
 
 ;; Usage: (dispatch [:db/update-value [:some :path] update-fn])
 (reg-event :db/update-value
@@ -238,7 +260,7 @@
            (fn [db & path-value-pairs]
              (apply s/multi-path
                     (map (fn [[path value]]
-                           (into path [(s/terminal-val value)]))
+                           (into (path->specter-path path) [(s/terminal-val value)]))
                          path-value-pairs))))
 
 ;; Specific complex events that do more than just setting a value
@@ -383,17 +405,17 @@
  ;; Dataset selection event handlers
 (reg-event :datasets/toggle-selection
            (fn [db {:keys [dataset-id example-id]}]
-             [:ui :datasets :selected-examples (s/keypath dataset-id)
-              (s/terminal #(if (contains? % example-id)
-                             (disj % example-id)
-                             (conj (or % #{}) example-id)))]))
+             (into (path->specter-path [:ui :datasets :selected-examples dataset-id])
+                   [(s/terminal #(if (contains? % example-id)
+                                   (disj % example-id)
+                                   (conj (or % #{}) example-id)))])))
 
 (reg-event :datasets/toggle-all-selection
            (fn [db {:keys [dataset-id example-ids-on-page select-all?]}]
-             [:ui :datasets :selected-examples (s/keypath dataset-id)
-              (s/terminal #(if select-all?
-                             (into (or % #{}) example-ids-on-page)
-                             (apply disj (or % #{}) example-ids-on-page)))]))
+             (into (path->specter-path [:ui :datasets :selected-examples dataset-id])
+                   [(s/terminal #(if select-all?
+                                   (into (or % #{}) example-ids-on-page)
+                                   (apply disj (or % #{}) example-ids-on-page)))])))
 
 (reg-event :datasets/clear-selection
            (fn [db {:keys [dataset-id]}]
@@ -401,4 +423,6 @@
 
 (reg-event :datasets/set-selected-snapshot
            (fn [db {:keys [dataset-id snapshot-name]}]
-             [:ui :datasets :selected-snapshot-per-dataset (s/keypath dataset-id) (s/terminal-val snapshot-name)]))
+             ;; Convert path with raw UUID to Specter path
+             (into (path->specter-path [:ui :datasets :selected-snapshot-per-dataset dataset-id])
+                   [(s/terminal-val snapshot-name)])))

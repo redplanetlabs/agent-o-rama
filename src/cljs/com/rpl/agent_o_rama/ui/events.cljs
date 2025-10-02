@@ -246,7 +246,7 @@
 
 (state/reg-event :hitl/submit
                  (fn [db {:keys [module-id agent-name invoke-id request response]}]
-                   (state/dispatch [:db/set-value [:ui :hitl :submitting (s/keypath (:invoke-id request))] true])
+                   (state/dispatch [:db/set-value [:ui :hitl :submitting (:invoke-id request)] true])
 
                    (sente/request!
                     [:invocations/provide-human-input
@@ -257,7 +257,7 @@
                       :response response}]
                     5000
                     (fn [reply]
-                      (state/dispatch [:db/set-value [:ui :hitl :submitting (s/keypath (:invoke-id request))] false])
+                      (state/dispatch [:db/set-value [:ui :hitl :submitting (:invoke-id request)] false])
                       (if (:success reply)
                         (println "HITL response submitted successfully. Polling loop will automatically pick up new nodes.")
                         (js/console.error "HITL submit failed" (:error reply)))))
@@ -314,7 +314,7 @@
                           (if (:success reply)
                             (do
                               (state/dispatch [:modal/hide])
-                              (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id) snapshot-name]}])
+                              (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
                               (state/dispatch [:form/clear form-id]))
                             (state/dispatch [:form/set-error form-id (or (:error reply) "An unknown server error occurred.")]))))
                        (catch js/Error e
@@ -337,6 +337,6 @@
                       (if (:success reply)
                         (do
                           (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
-                          (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id) snapshot-name]}]))
+                          (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}]))
                         (js/alert (str "Failed to delete examples: " (:error reply))))))
                    nil))

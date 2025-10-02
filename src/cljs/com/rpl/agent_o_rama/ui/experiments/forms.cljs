@@ -465,7 +465,7 @@
          (if (:success reply)
            (do
              (state/dispatch [:modal/hide])
-             (state/dispatch [:query/invalidate {:query-key-pattern [:experiments module-id (s/keypath dataset-id)]}])
+             (state/dispatch [:query/invalidate {:query-key-pattern [:experiments module-id dataset-id]}])
              (let [eid (get-in reply [:data :experiment-id])]
                (if (and eid (not= spec-type :comparative))
                  (rfe/push-state :module/dataset-detail.experiment-detail
