@@ -343,31 +343,24 @@
                                              acc
                                              m))]
                                     (collect-keys current-queries [] []))
-                   _ (println "🔍 Invalidation Debug:")
-                   _ (println "  Pattern:" query-key-pattern)
-                   _ (println "  All query keys:" (mapv (fn [k] (mapv #(str (type %) " = " %) k)) all-query-keys))
                    matching-keys (filter
                                   (fn [query-key]
-                                    (let [matches? (cond
-                                                     ;; Case 1: Pattern is a keyword: match first segment
-                                                     (keyword? query-key-pattern)
-                                                     (= (first query-key) query-key-pattern)
+                                    (cond
+                                      ;; Case 1: Pattern is a keyword: match first segment
+                                      (keyword? query-key-pattern)
+                                      (= (first query-key) query-key-pattern)
 
-                                                     ;; Case 2: Pattern is a vector: prefix match
-                                                     (vector? query-key-pattern)
-                                                     (and (>= (count query-key) (count query-key-pattern))
-                                                          (= query-key-pattern (subvec query-key 0 (count query-key-pattern))))
+                                      ;; Case 2: Pattern is a vector: prefix match
+                                      (vector? query-key-pattern)
+                                      (and (>= (count query-key) (count query-key-pattern))
+                                           (= query-key-pattern (subvec query-key 0 (count query-key-pattern))))
 
-                                                     ;; Case 3: Pattern is a function (for complex logic)
-                                                     (fn? query-key-pattern)
-                                                     (query-key-pattern query-key)
+                                      ;; Case 3: Pattern is a function (for complex logic)
+                                      (fn? query-key-pattern)
+                                      (query-key-pattern query-key)
 
-                                                     :else false)]
-                                      (when matches?
-                                        (println "  ✓ Matched:" query-key))
-                                      matches?))
-                                  all-query-keys)
-                   _ (println "  Total matches:" (count matching-keys))]
+                                      :else false))
+                                  all-query-keys)]
                ;; Mark matching queries as stale by setting a flag (:should-refetch?)
                ;; Convert query-key paths to Specter paths before navigation
                (when (seq matching-keys)
