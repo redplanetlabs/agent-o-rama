@@ -62,7 +62,7 @@
 (def QueriesCacheSchema
   "A schema for the nested query cache. It's a recursive map where
    leaf nodes must match QueryStateSchema."
-  {(spy "queries-cache-key")
+  {s/Any ;; arbitrary data from use-sente-query api user
    (s/conditional
     ;; Predicate: if the value is a map containing :status, treat it as a leaf (QueryStateSchema)
     #(and (map? %) (contains? % :status))
@@ -106,10 +106,6 @@
    :hitl HitlStateSchema
    :datasets DatasetsUiSchema})
 
-(s/defschema SenteSchema
-  {:connected? s/Bool
-   :connection-state (spy "connection-state")})
-
 (s/defschema SessionSchema
   {:user-id (s/maybe s/Str)
    :preferences {s/Keyword (spy "session-preference-value")}})
@@ -126,5 +122,5 @@
    :route RouteMatchSchema
    :forms {s/Keyword FormStateSchema}
    :ui UiSchema
-   :sente SenteSchema
+   :sente s/Any ;; don't want to schematize all of sente
    :session SessionSchema})
