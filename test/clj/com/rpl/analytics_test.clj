@@ -1760,7 +1760,7 @@
            ""
            (fn [params]
              (fn [fetcher input output run-info]
-               (swap! ACTIONS conj input)
+               (swap! ACTIONS conj [(:rule-name run-info) (:node-name run-info) input output])
                {}
              )))
           (-> topology
@@ -1800,6 +1800,10 @@
                                               module-name
                                               aor-types/AGENTS-ANALYTICS-MB-TOPOLOGY-NAME)))
 
+       (bind wait-acquired!
+         (fn [^java.util.concurrent.Semaphore sem]
+           (is (condition-attained? (> (.getQueueLength sem) 0)))
+         ))
 
        (ana/add-rule! global-actions-depot
                       "foo-agent"
@@ -1821,16 +1825,60 @@
                        :filter            (aor-types/->AndFilter [])
                        :sampling-rate     1.0
                        :start-time-millis 0
+                       :include-failures? false
+                      })
+       (ana/add-rule! global-actions-depot
+                      "foo-start-fail"
+                      "foo"
+                      {:node-name         "start"
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
                        :include-failures? true
                       })
-       ;; TODO: <<<<>>>>
-       ;;  - doesn't scan past incomplete nodes until time limit is reached (and then skips them
-       ;;  for
-       ;;  actions unless include-failures? is true) – in this case, would output be nil or []?
-       ;;  - doesn't scan past incomplete agents
-       ;;  - PLAN:
-       ;;     - single task module
-       ;;     - initiate a bunch of agents
 
-       ;; ana/NODE-ACTION-STALL-TIME-MILLIS
+
+
+       (bind inv (aor/agent-initiate foo "a"))
+       (is (= "a!?" (aor/agent-result foo inv)))
+       (bind inv (aor/agent-initiate foo "b"))
+       (is (= "b!?" (aor/agent-result foo inv)))
+       (bind sem1 (h/mk-semaphore 0))
+       (reset! SEM-ATOM sem1)
+       (bind invc (aor/agent-initiate foo "c"))
+       (wait-acquired! sem1)
+       (reset! SEM-ATOM nil)
+       (bind inv (aor/agent-initiate foo "d"))
+       (is (= "d!?" (aor/agent-result foo inv)))
+       (bind inv (aor/agent-initiate foo "e"))
+       (is (= "e!?" (aor/agent-result foo inv)))
+       (cycle!)
+       (is (= (frequencies @ACTIONS)
+              {["foo-agent" nil ["a"] "a!?"] 1
+               ["foo-agent" nil ["b"] "b!?"] 1
+               ["foo-start" "start" ["a"] [{"node" "node1" "args" ["a!"]}]] 1
+               ["foo-start" "start" ["b"] [{"node" "node1" "args" ["b!"]}]] 1
+               ["foo-start-fail" "start" ["a"] [{"node" "node1" "args" ["a!"]}]] 1
+               ["foo-start-fail" "start" ["b"] [{"node" "node1" "args" ["b!"]}]] 1}))
+       (cycle!)
+       (is (= [] @ACTIONS))
+       (TopologyUtils/advanceSimTime (+ ana/NODE-ACTION-STALL-TIME-MILLIS 1000))
+       (cycle!)
+       (is (= (frequencies @ACTIONS)
+              {["foo-start-fail" "start" ["c"] []] 1
+               ["foo-start-fail" "start" ["d"] [{"node" "node1" "args" ["d!"]}]] 1
+               ["foo-start-fail" "start" ["e"] [{"node" "node1" "args" ["e!"]}]] 1
+               ["foo-start" "start" ["d"] [{"node" "node1" "args" ["d!"]}]] 1
+               ["foo-start" "start" ["e"] [{"node" "node1" "args" ["e!"]}]] 1}))
+       (cycle!)
+       (is (= [] @ACTIONS))
+       (h/release-semaphore sem1 1)
+       (is (= "c!?" (aor/agent-result foo invc)))
+       (cycle!)
+       (is (= (frequencies @ACTIONS)
+              {["foo-agent" nil ["c"] "c!?"] 1
+               ["foo-agent" nil ["d"] "d!?"] 1
+               ["foo-agent" nil ["e"] "e!?"] 1}))
       ))))
