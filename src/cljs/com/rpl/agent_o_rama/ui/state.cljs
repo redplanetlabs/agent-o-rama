@@ -125,30 +125,18 @@
           (throw e)))
       (println "⚠️ No handler registered for event:" event-id))))
 
-(defn normalize-path
-  "Normalizes a Specter path by wrapping UUID values in keypath.
-   This allows UUIDs to be used directly in paths without explicit keypath wrapping."
-  [path]
-  (mapv (fn [segment]
-          (if (uuid? segment)
-            (s/keypath segment)
-            segment))
-        path))
-
 ;; =============================================================================
 ;; SUBSCRIPTIONS (REACTIVE STATE ACCESS)
 ;; =============================================================================
 
 (defn use-sub
   "Subscribe to a value at the given Specter path in app-db.
-   Component will re-render only when the value at that path changes.
-   UUID values in the path are automatically wrapped in keypath."
+   Component will re-render only when the value at that path changes."
   [specter-path]
-  (let [normalized-path (normalize-path specter-path)
-        ;; Memoize the extractor function to have stable reference
+  (let [;; Memoize the extractor function to have stable reference
         extract-value (uix/use-callback
-                       (fn [db] (s/select-one normalized-path db))
-                       [normalized-path])
+                       (fn [db] (s/select-one specter-path db))
+                       [specter-path])
         [value set-value] (uix/use-state (fn [] (extract-value @app-db)))]
 
     (uix/use-effect
@@ -175,8 +163,7 @@
   "Find all unfinished leaf nodes for a given invoke-id.
    Returns a vector of unique [task-id node-id] pairs that can be used for pagination."
   [db invoke-id]
-  (let [path (normalize-path [:invocations-data invoke-id :graph :nodes])
-        nodes-map (s/select-one path db)]
+  (let [nodes-map (s/select-one [:invocations-data invoke-id :graph :nodes] db)]
     (->> (s/select [s/ALL ;; Use ALL to get [key value] pairs
                     (s/selected? s/LAST ;; Check the value (node-data)
                                  (s/must :node-task-id)
@@ -396,14 +383,14 @@
  ;; Dataset selection event handlers
 (reg-event :datasets/toggle-selection
            (fn [db {:keys [dataset-id example-id]}]
-             [:ui :datasets :selected-examples (s/keypath dataset-id)
+             [:ui :datasets :selected-examples dataset-id
               (s/terminal #(if (contains? % example-id)
                              (disj % example-id)
                              (conj (or % #{}) example-id)))]))
 
 (reg-event :datasets/toggle-all-selection
            (fn [db {:keys [dataset-id example-ids-on-page select-all?]}]
-             [:ui :datasets :selected-examples (s/keypath dataset-id)
+             [:ui :datasets :selected-examples dataset-id
               (s/terminal #(if select-all?
                              (into (or % #{}) example-ids-on-page)
                              (apply disj (or % #{}) example-ids-on-page)))]))
@@ -414,4 +401,4 @@
 
 (reg-event :datasets/set-selected-snapshot
            (fn [db {:keys [dataset-id snapshot-name]}]
-             [:ui :datasets :selected-snapshot-per-dataset (s/keypath dataset-id) (s/terminal-val snapshot-name)]))
+             [:ui :datasets :selected-snapshot-per-dataset dataset-id (s/terminal-val snapshot-name)]))
