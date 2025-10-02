@@ -32,7 +32,32 @@
           (str "Invalid JSON: " (.-message e)))))))
 
 ;; schema defined in schemas.cljs
-(def initial-db {})
+(def initial-db
+  {:current-invocation {:invoke-id nil
+                        :module-id nil
+                        :agent-name nil}
+   :invocations-data {}
+   :invocations {:all-invokes []
+                 :pagination-params nil
+                 :has-more? true
+                 :loading? false}
+   :queries {}
+   :route nil
+   :forms {}
+   :ui {:selected-node-id nil
+        :forking-mode? false
+        :changed-nodes {}
+        :active-tab :graph
+        :current-route "/"
+        :modal {:active nil
+                :data {}
+                :form {:submitting? false
+                       :error nil}}
+        :hitl {:responses {}
+               :submitting {}}
+        :datasets {:selected-examples {}
+                   :selected-snapshot-per-dataset {}}}
+   :sente nil})
 
 (defonce app-db (atom initial-db))
 
