@@ -76,8 +76,7 @@
         ;; 1. Fetch the base experiment data as before.
         base-results (foreign-invoke-query results-query
                                            dataset-id
-                                           ;; TODO move this uuid parse to client
-                                           (java.util.UUID/fromString experiment-id))]
+                                           experiment-id)]
 
     ;; 2. NEW LOGIC STARTS HERE: Check for early failure.
     (if-let [invoke (:experiment-invoke base-results)]
