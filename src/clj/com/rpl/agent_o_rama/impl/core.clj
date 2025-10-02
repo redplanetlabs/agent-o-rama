@@ -341,6 +341,7 @@
   (queries/declare-search-examples-query-topology topologies)
   (queries/declare-multi-examples-query-topology topologies)
   (queries/declare-all-evaluator-builders-query-topology topologies)
+  (ana/declare-all-action-builders-query-topology topologies)
   (queries/declare-try-evaluator-query-topology topologies)
   (queries/declare-search-evaluators-query-topology topologies)
   (queries/declare-search-experiments-query-topology topologies)

@@ -4,7 +4,6 @@
   (:require
    [clojure.set :as set]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
-   [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.feedback :as fb]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -12,7 +11,6 @@
    [com.rpl.agent-o-rama.impl.retries :as retries]
    [com.rpl.agent-o-rama.impl.stats :as stats]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
-   [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.throttled-logging :as tl]
    [com.rpl.rama.aggs :as aggs]
@@ -147,6 +145,25 @@
   (let [declared-objects (po/agent-declared-objects-task-global)]
     (merge BUILT-IN-ACTIONS
            (.getActionBuilders declared-objects))))
+
+(defn all-action-builders-name
+  []
+  "_aor-all-action-builders")
+
+(defn all-action-builders-without-builder-fns
+  []
+  (setval [MAP-VALS :builder-fn]
+          NONE
+          (all-action-builders)))
+
+;; can't go in queries.clj because that creates a circular dependency
+(defn declare-all-action-builders-query-topology
+  [topologies]
+  (<<query-topology topologies
+    (all-action-builders-name)
+    [:> *res]
+    (|origin)
+    (all-action-builders-without-builder-fns :> *res)))
 
 (defn- agent-run-type?
   [info]

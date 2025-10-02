@@ -3,6 +3,7 @@
         [com.rpl.rama.path])
   (:require
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
+   [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.core :as i]
@@ -202,7 +203,7 @@
        (vswap! mirror-agents-vol assoc localName [moduleName agentName]))
      (define [this]
        (when @defined?-vol
-         (throw (h/ex-info "Agents topology already defined" {})))
+         (throw (h/ex-info "Agent topology already defined" {})))
        (vreset! defined?-vol true)
        (exp/define-evaluator-agent! this)
        (i/define-agents!
@@ -544,6 +545,11 @@
                                    cluster
                                    module-name
                                    (queries/all-evaluator-builders-name))
+
+        all-action-builders-query (foreign-query
+                                   cluster
+                                   module-name
+                                   (ana/all-action-builders-name))
 
         search-evals-query        (foreign-query
                                    cluster
@@ -1015,6 +1021,7 @@
         :search-examples-query     search-examples-query
         :multi-examples-query      multi-examples-query
         :all-eval-builders-query   all-eval-builders-query
+        :all-action-builders-query all-action-builders-query
         :search-evals-query        search-evals-query
         :search-experiments-query  search-experiments-query
         :experiments-results-query experiments-results-query

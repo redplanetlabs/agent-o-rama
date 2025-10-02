@@ -880,6 +880,12 @@
            (:agent-rules-pstate (aor-types/underlying-objects
                                  foo)))
 
+         (bind all-action-builders-query
+           (:all-action-builders-query (aor-types/underlying-objects agent-manager)))
+
+         (bind all-builders (foreign-invoke-query all-action-builders-query))
+         (clojure.pprint/pprint all-builders)
+
          (TopologyUtils/advanceSimTime 1000)
 
          (bind foo-root
