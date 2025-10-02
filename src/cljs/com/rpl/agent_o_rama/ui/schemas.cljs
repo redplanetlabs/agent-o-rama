@@ -35,7 +35,7 @@
    (s/optional-key :summary) (s/maybe {:forks #{s/Uuid}
                                        :fork-of (s/maybe s/Uuid)
                                        s/Keyword (spy "summary-extra")})
-   (s/optional-key :root-invoke-id) (s/maybe s/Uuid)
+   (s/optional-key :root-invoke-id) (s/maybe (spy "root-invoke-id"))
    (s/optional-key :task-id) (s/maybe s/Int)
    (s/optional-key :is-complete) s/Bool
    (s/optional-key :historical-graph) (spy "historical-graph")

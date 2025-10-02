@@ -6,7 +6,16 @@
 
 ;; Create Transit packer for serialization (must match server)
 (def transit-packer
-  (sente-transit/get-transit-packer :json))
+  (sente-transit/get-transit-packer
+   :json
+   ;; because theres a difference between cljs.core/UUID and Transit$UUID
+   {:handlers
+    {"u" (reify Object
+           (tag [_ _] "u")
+           (rep [_ v] (str v))
+           (stringRep [_ v] (str v)))}}
+   {:handlers
+    {"u" (fn [v] (uuid v))}}))
 
 ;; 1. Instantiate the Sente channel socket client
 (let [{:keys [chsk ch-recv send-fn state]}
@@ -71,9 +80,9 @@
   ([event-vec timeout-ms callback]
    #_(println "SENDING SENTE EVENT:" event-vec timeout-ms callback)
    (chsk-send! event-vec timeout-ms
-    (fn [reply]
-      #_(println "SENTE EVENT REPLY:" reply)
-      (callback reply)))))
+               (fn [reply]
+                 #_(println "SENTE EVENT REPLY:" reply)
+                 (callback reply)))))
 
 (defn push!
   "Send a one-way message to the server (no response expected)."
