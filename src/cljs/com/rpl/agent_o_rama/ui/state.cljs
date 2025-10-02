@@ -358,7 +358,7 @@
               (s/terminal-val
                (s/transform
                 [:path-params s/MAP-VALS]
-                common/url-decode
+                (comp common/coerce-uuid common/url-decode)
                 new-match))]))
 
  ;; =============================================================================

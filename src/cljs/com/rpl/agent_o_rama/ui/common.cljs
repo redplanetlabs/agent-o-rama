@@ -12,7 +12,15 @@
       s)))
 
 (defn url-encode [s]
-  (js/encodeURIComponent s)) ; Fallback to original string on error
+  (js/encodeURIComponent s))
+
+(defn coerce-uuid
+  "Converts a string to a UUID if it matches UUID format, otherwise returns the original value."
+  [s]
+  (if (and (string? s)
+           (re-matches #"^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$" s))
+    (uuid s)
+    s)) ; Fallback to original string on error
 
 (def reader (t/reader :json))
 (def writer (t/writer :json))
