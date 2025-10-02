@@ -69,10 +69,10 @@
   ([event-vec timeout-ms]
    (request! event-vec timeout-ms nil))
   ([event-vec timeout-ms callback]
-   (println "SENDING SENTE EVENT:" event-vec timeout-ms callback)
+   #_(println "SENDING SENTE EVENT:" event-vec timeout-ms callback)
    (chsk-send! event-vec timeout-ms
     (fn [reply]
-      (println "SENTE EVENT REPLY:" reply)
+      #_(println "SENTE EVENT REPLY:" reply)
       (callback reply)))))
 
 (defn push!
