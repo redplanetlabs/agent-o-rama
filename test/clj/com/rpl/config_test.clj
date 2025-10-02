@@ -78,9 +78,9 @@
 
      (global-confirm! nil)
      (foreign-append! global-actions-depot (aor-types/change-max-limited-actions-concurrency 100))
-     (global-confirm! {"max.actions.concurrency" 100})
+     (global-confirm! {"max.limited.actions.concurrency" 100})
      (foreign-append! global-actions-depot (aor-types/change-max-limited-actions-concurrency 50))
-     (global-confirm! {"max.actions.concurrency" 50})
+     (global-confirm! {"max.limited.actions.concurrency" 50})
      (is (thrown? Exception
                   (aor-types/change-max-limited-actions-concurrency -1)))
      (is (thrown? Exception
