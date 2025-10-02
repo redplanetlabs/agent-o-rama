@@ -10,12 +10,9 @@
    Useful for discovering the shape of data during development."
   (s/pred
    (fn [value]
-     ;; Only log if the value is not nil or empty to reduce console noise
-     (when (and (some? value) (if (coll? value) (seq value) true))
-       (println
-        "SPY @ path:" (or (.-path s/*explain-out*) "unknown")
-        "| value:" value))
-     true) ; Always return true to pass validation
+     (when (some? value)
+       (println "SPY | value:" value))
+     true)
    'spy-schema))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
