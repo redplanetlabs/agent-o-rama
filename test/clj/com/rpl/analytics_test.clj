@@ -1151,6 +1151,8 @@
          (is (= {0 nil 1 nil} pagination-params))
          (is (= 4 (count all-actions)))
          (is (every? :success? all-actions))
+         (is (every? #(aor-types/AgentInvokeImpl? (:agent-invoke %)) all-actions))
+         (is (every? #(nil? (:node-invoke %)) all-actions))
          ;; actions aren't done in strict order across tasks
          (is (= #{{"output" "aaaa!?" "input" ["aaaa"]}
                   {"output" "....!?" "input" ["...."]}
@@ -1388,15 +1390,16 @@
          (bind {:keys [actions pagination-params]}
            (foreign-invoke-query foo-action-log "foo-start" 10 nil))
          (is (= 1 (count actions)))
+         (bind a
+           (-> actions
+               first
+               :action))
          (is (= {"abc" "ccc" "xyz" "..."}
-                (-> actions
-                    first
-                    :action
-                    :info-map)))
-         (is (-> actions
-                 first
-                 :action
-                 :success?))
+                (:info-map a)))
+         (is (:success? a))
+         (is (aor-types/AgentInvokeImpl? (:agent-invoke a)))
+         (is (aor-types/NodeInvokeImpl? (:node-invoke a)))
+
          (is (= {0 nil 1 nil} pagination-params))
 
 
@@ -1643,8 +1646,6 @@
        (is (h/contains-string? (get (:info-map action) "exception")
                                "clojure.lang.ExceptionInfo: fail"))
 
-
-
        (bind inv (aor/agent-initiate foo "bad-eval-return"))
        (is (= "bad-eval-return!?" (aor/agent-result foo inv)))
        (cycle!)
@@ -1665,7 +1666,7 @@
                                "clojure.lang.ExceptionInfo: fail"))
 
        ;; TODO: <<<<>>>>
-       ;;  - verify include-failures? behavior
+       ;;  - verify include-failures? behavior for both agent and node actions
        ;;   - gives AgentFailedException for agent failure
        ;;   - gives nil for node output in that case
        ;;     - node latency is nil

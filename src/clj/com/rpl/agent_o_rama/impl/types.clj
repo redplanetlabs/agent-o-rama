@@ -765,6 +765,8 @@
 (defaorrecord ActionLog
   [start-time-millis :- Long
    finish-time-millis :- Long
+   agent-invoke :- AgentInvokeImpl
+   node-invoke :- (s/maybe NodeInvokeImpl)
    success? :- Boolean
    info-map :- {String Object}])
 
