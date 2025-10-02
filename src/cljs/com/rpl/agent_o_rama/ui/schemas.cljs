@@ -63,7 +63,7 @@
 (def QueriesCacheSchema
   "A schema for the nested query cache. It's a recursive map where
    leaf nodes must match QueryStateSchema."
-  {(s/cond-pre s/Keyword s/Str) ;; Keys can be keywords or strings (module-ids, dataset-ids, etc.)
+  {(s/cond-pre s/Keyword s/Str s/Uuid) ;; Keys can be keywords, strings, or UUIDs (module-ids, dataset-ids, etc.)
    (s/conditional
     ;; Predicate: if the value is a map containing :status, treat it as a leaf (QueryStateSchema)
     #(and (map? %) (contains? % :status))
