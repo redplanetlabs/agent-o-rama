@@ -72,7 +72,7 @@
     (constantly true)
     (s/recursive #'QueriesCacheSchema))})
 
-(s/defschema RouteMatchSchema (spy "route-match"))
+(s/defschema RouteMatchSchema s/Any) ;; don't want to schematize all of reitit
 
 (s/defschema FormStateSchema
   {s/Keyword (spy "form-state-value")})
