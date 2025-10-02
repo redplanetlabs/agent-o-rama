@@ -450,7 +450,7 @@
 (defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
   (let [{:keys [data loading? error]}
         (queries/use-sente-query
-         {:query-key [:experiment-results module-id dataset-id experiment-id]
+         {:query-key [:experiment-results module-id (s/keypath dataset-id) experiment-id]
           :sente-event [:experiments/get-results {:module-id module-id
                                                   :dataset-id dataset-id
                                                   :experiment-id experiment-id}]

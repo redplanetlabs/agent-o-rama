@@ -241,4 +241,4 @@
            :input parsed-input
            :output parsed-output}])))
    :on-success-invalidate (fn [_db {:keys [module-id dataset-id]} _reply]
-                            {:query-key-pattern [:dataset-examples module-id dataset-id]})}})
+                            {:query-key-pattern [:dataset-examples module-id (s/kepyath dataset-id)]})}})

@@ -10,7 +10,7 @@
 (defui index [{:keys [module-id dataset-id]}]
   (let [{:keys [data loading? error]}
         (queries/use-sente-query
-         {:query-key [:experiments module-id dataset-id :comparative]
+         {:query-key [:experiments module-id (s/keypath dataset-id) :comparative]
           :sente-event [:experiments/get-all-for-dataset
                         {:module-id module-id
                          :dataset-id dataset-id

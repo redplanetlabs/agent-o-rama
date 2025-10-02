@@ -84,8 +84,8 @@
                                        (set-editing! false)
                                        (set-edit-value! "")
                                        ;; Invalidate both the single example query and the main examples list
-                                       (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
-                                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                       (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id (s/keypath dataset-id) snapshot-name (str example-id)]}])
+                                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}])
                                        (when on-save (on-save)))
                                      (set-error! (str "Error saving: " (:error reply)))))))
                               (catch js/Error e
@@ -169,7 +169,7 @@
                                 (fn [reply]
                                   (if (:success reply)
                                     (do
-                                      (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                      (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}])
                                       (when on-delete-success (on-delete-success)))
                                     (js/alert (str "Error deleting example: " (:error reply))))))))}
                  ($ TrashIcon {:className "mr-2 h-4 w-4"})
@@ -233,8 +233,8 @@
                                 (do
                                   (set-input-value "")
                                   ;; Invalidate both the single example query and the main examples list
-                                  (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
-                                  (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                  (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id (s/keypath dataset-id) snapshot-name (str example-id)]}])
+                                  (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}])
                                   (when on-tags-change (on-tags-change)))
                                 (js/alert (str "Error adding tag: " (:error reply))))))))
 
@@ -250,8 +250,8 @@
                                (if (:success reply)
                                  (do
                                    ;; Invalidate both the single example query and the main examples list
-                                   (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
-                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                   (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id (s/keypath dataset-id) snapshot-name (str example-id)]}])
+                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}])
                                    (when on-tags-change (on-tags-change)))
                                  (js/alert (str "Error removing tag: " (:error reply)))))))
 
@@ -574,7 +574,7 @@
                                                     (fn [reply]
                                                       (if (:success reply)
                                                         ;; Invalidate query to refresh the list with the new example
-                                                        (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                                        (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}])
                                                         (js/alert (str "Error duplicating example: " (:error reply)))))))}
                                        ($ DocumentDuplicateIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                        "Duplicate")
@@ -595,7 +595,7 @@
                                                       (fn [reply]
                                                         (if (:success reply)
                                                           (do
-                                                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}])
                                                             (when on-delete-success (on-delete-success)))
                                                           (js/alert (str "Error deleting example: " (:error reply))))))))}
                                        ($ TrashIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-red-500"})

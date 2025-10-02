@@ -314,7 +314,7 @@
                           (if (:success reply)
                             (do
                               (state/dispatch [:modal/hide])
-                              (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                              (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id) snapshot-name]}])
                               (state/dispatch [:form/clear form-id]))
                             (state/dispatch [:form/set-error form-id (or (:error reply) "An unknown server error occurred.")]))))
                        (catch js/Error e

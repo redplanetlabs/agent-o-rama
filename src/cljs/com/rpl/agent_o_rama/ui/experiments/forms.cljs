@@ -438,7 +438,6 @@
 
   :on-submit
   (fn [db form-state]
-    (println "form-state" form-state)
     (let [{:keys [form-id module-id dataset-id spec]} form-state
           spec-type (get spec :type)
           ;; Get selected IDs from the DB at submission time
@@ -466,7 +465,7 @@
          (if (:success reply)
            (do
              (state/dispatch [:modal/hide])
-             (state/dispatch [:query/invalidate {:query-key-pattern [:experiments module-id dataset-id]}])
+             (state/dispatch [:query/invalidate {:query-key-pattern [:experiments module-id (s/keypath dataset-id)]}])
              (let [eid (get-in reply [:data :experiment-id])]
                (if (and eid (not= spec-type :comparative))
                  (rfe/push-state :module/dataset-detail.experiment-detail
