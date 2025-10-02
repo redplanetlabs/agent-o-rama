@@ -293,7 +293,7 @@
                 :tag tag-name}]))
    :on-success-invalidate (fn [db _form-state _reply]
                             (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
-                              {:query-key-pattern [:dataset-examples module-id dataset-id]}))
+                              {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}))
    :on-success (fn [db _form-state _reply]
                  (let [{:keys [dataset-id]} (s/select-one [:route :path-params] db)]
                    (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])))}})
@@ -333,7 +333,7 @@
                 :tag tag-name}]))
    :on-success-invalidate (fn [db _form-state _reply]
                             (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
-                              {:query-key-pattern [:dataset-examples module-id dataset-id]}))
+                              {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}))
    :on-success (fn [db _form-state _reply]
                  (let [{:keys [dataset-id]} (s/select-one [:route :path-params] db)]
                    (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])))}})
