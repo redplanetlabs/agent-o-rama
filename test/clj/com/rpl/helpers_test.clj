@@ -2,7 +2,11 @@
   (:use [clojure.test]
         [com.rpl.test-helpers])
   (:require
-   [com.rpl.agent-o-rama.impl.helpers :as h]))
+   [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.types :as aor-types])
+  (:import
+   [com.rpl.agentorama
+    AgentFailedException]))
 
 (deftest invoke-test
   (loop [args         []
@@ -36,3 +40,17 @@
          clojure.lang.ExceptionInfo
          (h/validate-options! "context" {:ab -1 :bb 23} spec)))
   ))
+
+(deftest node->output-test
+  (is (= 123 (h/node->output (aor-types/->AgentResult 123 false) 12345)))
+  (is (instance? AgentFailedException
+                 (h/node->output (aor-types/->AgentResult "failed..." true) [])))
+  (is (instance? AgentFailedException (h/result->output nil)))
+  (is (= [{"node" "abc" "args" [1 2 3]}
+          {"node" "defg" "args" ["a" 3]}
+          {"node" "abc" "args" ["aa" "bb"]}]
+         (h/node->output nil
+                         [(aor-types/->AgentNodeEmit (h/random-uuid7) nil 2 "abc" [1 2 3])
+                          (aor-types/->AgentNodeEmit (h/random-uuid7) nil 2 "defg" ["a" 3])
+                          (aor-types/->AgentNodeEmit (h/random-uuid7) nil 2 "abc" ["aa" "bb"])])))
+)

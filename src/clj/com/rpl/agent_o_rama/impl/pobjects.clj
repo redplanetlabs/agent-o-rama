@@ -12,6 +12,7 @@
    [com.rpl.agentorama.source
     InfoSource]
    [com.rpl.agent_o_rama.impl.types
+    ActionLog
     AgentInvokeStatsImpl
     AgentNodeEmit
     AgentResult
@@ -96,8 +97,14 @@
   [agent-name]
   (str "$$_agent-root-" agent-name))
 
+(defn agent-analytics-tick-depot-name
+  []
+  (str "*_agent-analytics-tick-depot"))
+
 (def FEEDBACK-SCHEMA
-  [FeedbackImpl])
+  (fixed-keys-schema
+   {:actions {String Object}
+    :results [FeedbackImpl]}))
 
 (def AGENT-ROOT-PSTATE-SCHEMA
   {UUID
@@ -195,6 +202,18 @@
      :agg-finished?       Boolean
     })})
 
+(defn action-log-task-global-name
+  []
+  (str "$$_agent-action-log"))
+
+(def ACTION-LOG-PSTATE-SCHEMA
+  {String ; agent-name
+   (map-schema
+    String ; rule-name
+    (map-schema UUID ActionLog {:subindex? true})
+    {:subindex? true})})
+
+
 (defn graph-history-task-global-name
   [agent-name]
   (str "$$_agent-graph-history-" agent-name))
@@ -213,6 +232,10 @@
 (defn agent-config-task-global-name
   [agent-name]
   (str "$$_agent-config-" agent-name))
+
+(defn agent-global-config-task-global-name
+  []
+  (str "$$_agent-global-config"))
 
 (def AGENT-CONFIG-PSTATE-SCHEMA
   java.util.Map)
@@ -312,6 +335,22 @@
             :reference-output-json-path String
            })})
 
+(defn agent-rules-task-global-name
+  [agent-name]
+  (str "$$_agent-rules-" agent-name))
+
+;; rule-name -> {:definition AddRule}
+(def AGENT-RULES-PSTATE-SCHEMA
+  java.util.Map)
+
+(defn agent-rule-cursors-task-global-name
+  [agent-name]
+  (str "$$_agent-rule-cursors-" agent-name))
+
+;; rule-name -> task-id -> UUID
+(def AGENT-RULE-CURSORS-PSTATE-SCHEMA
+  java.util.Map)
+
 ;; Task global fetch helpers
 
 (defn agent-node-executor-task-global
@@ -385,6 +424,18 @@
   [name]
   (this-module-pobject-task-global (agent-config-task-global-name name)))
 
+(defn agent-rules-task-global
+  [name]
+  (this-module-pobject-task-global (agent-rules-task-global-name name)))
+
+(defn agent-rule-cursors-task-global
+  [name]
+  (this-module-pobject-task-global (agent-rule-cursors-task-global-name name)))
+
+(defn agent-global-config-task-global
+  []
+  (this-module-pobject-task-global (agent-global-config-task-global-name)))
+
 (defn datasets-task-global
   []
   (this-module-pobject-task-global (datasets-task-global-name)))
@@ -392,6 +443,10 @@
 (defn evaluators-task-global
   []
   (this-module-pobject-task-global (evaluators-task-global-name)))
+
+(defn action-log-task-global
+  []
+  (this-module-pobject-task-global (action-log-task-global-name)))
 
 (defn log-throttler
   []

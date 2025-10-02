@@ -3,12 +3,12 @@
         [com.rpl.rama path])
   (:require
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
-   [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.graph :as graph]
    [com.rpl.agent-o-rama.impl.partitioner :as apart]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.stats :as stats]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.ops :as ops])
@@ -110,7 +110,7 @@
      (local-transform>
       [(keypath *agent-id)
        (multi-path [:last-progress-time-millis (termval (h/current-time-millis))]
-                   [:stats (term (ana/agent-stats-merger *stats))])]
+                   [:stats (term (stats/agent-stats-merger *stats))])]
       $$root))
 
    (<<if (some? *result)
@@ -173,7 +173,7 @@
    [$$root (po/agent-root-task-global *agent-name)
     $$root-count (po/agent-root-count-task-global *agent-name)]
    (fetch-graph-version *agent-name :> *version)
-   (h/random-uuid7 :> *invoke-id)
+   (anode/gen-node-id :> *invoke-id)
    (h/current-time-millis :> *current-time-millis)
    (local-select> [(keypath *agent-id) (view some?)] $$root :> *exists?)
    (<<if (not *exists?)
@@ -186,7 +186,7 @@
                :ack-val           (h/half-uuid *invoke-id)
                :last-progress-time-millis *current-time-millis
                :retry-num         *retry-num
-               :stats             ana/EMPTY-AGENT-STATS
+               :stats             stats/EMPTY-AGENT-STATS
                :source            *source
                :start-time-millis *current-time-millis})]
     $$root)
@@ -194,19 +194,27 @@
 
 (defn init-retry-num [] 0)
 
+;; factored out for redef in tests
+(defn gen-new-agent-id
+  [agent-name]
+  (h/random-uuid7))
+
 (deframaop intake-agent-initiate
   [*agent-name *data]
   (<<with-substitutions
-   [$$active (po/agent-active-invokes-task-global *agent-name)
+   [$$root (po/agent-root-task-global *agent-name)
+    $$active (po/agent-active-invokes-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
    (get *data :args :> *args)
    (ops/current-task-id :> *agent-task-id)
    (get *data :forced-agent-invoke-id :> *forced-agent-id)
    (get *data :source :> *source)
    (<<if (some? *forced-agent-id)
+     ;; stop if already exists for idempotency
+     (local-select> [(keypath *forced-agent-id) nil?] $$root)
      (identity *forced-agent-id :> *agent-id)
     (else>)
-     (h/random-uuid7 :> *agent-id))
+     (gen-new-agent-id *agent-name :> *agent-id))
    (init-retry-num :> *retry-num)
    (init-root *agent-name *agent-id *retry-num *args *source :> *invoke-id)
    (local-transform> [(keypath *agent-id) (termval true)]
@@ -503,7 +511,7 @@
                        $$nodes))
 
 
-   (ana/mk-node-stats *node *start-time-millis *finish-time-millis *nested-ops :> *stats)
+   (stats/mk-node-stats *node *start-time-millis *finish-time-millis *nested-ops :> *stats)
    (handle-node-complete-emits
     *agent-name
     *agent-task-id
@@ -813,6 +821,13 @@
    (|all)
    (local-transform> [(keypath *key) (termval *val)] $$config)))
 
+(deframaop handle-global-config
+  [{:keys [*key *val]}]
+  (<<with-substitutions
+   [$$global-config (po/agent-global-config-task-global)]
+   (|all)
+   (local-transform> [(keypath *key) (termval *val)] $$global-config)))
+
 (deframafn node-complete?
   [*agent-name *next-node *invoke-id]
   (<<with-substitutions
@@ -864,7 +879,7 @@
       *fork-context)
 
     (case> NodeAggStart :> {:keys [*node-fn *agg-node-name]})
-     (h/random-uuid7 :> *new-agg-invoke-id)
+     (anode/gen-node-id :> *new-agg-invoke-id)
      (local-transform>
       [(keypath *invoke-id) :started-agg? (termval true)]
       $$nodes)
@@ -957,7 +972,7 @@
     (:>
      (assoc *emit
       :fork-invoke-id *emit-invoke-id
-      :invoke-id (h/random-uuid7))))
+      :invoke-id (anode/gen-node-id))))
   (:> (mapv %update-emit *emits)))
 
 (deframafn copy-unforked-agg-state
@@ -1034,7 +1049,7 @@
                                   :agg-invoke-id *agg-invoke-id))]
                        $$nodes)
      (<<if (aor-types/NodeAggStart? *node-obj)
-       (h/random-uuid7 :> *new-agg-invoke-id)
+       (anode/gen-node-id :> *new-agg-invoke-id)
        (local-select> (keypath *fork-agg-invoke-id)
                       $$nodes
                       :> {*agg-node      :node

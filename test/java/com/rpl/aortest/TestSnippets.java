@@ -103,4 +103,25 @@ public class TestSnippets {
     },
     EvaluatorBuilderOptions.param("extra", "more input"));
   }
+
+  public static void declareActionBuilders(AgentTopology topology) {
+    topology.declareActionBuilder("action3", "a 3rd one", (Map<String, String> params) -> {
+      return (AgentObjectFetcher fetcher, List<Object> input, Object output, RunInfo info) -> {
+        Map ret = new HashMap();
+        ret.put("input", input);
+        ret.put("output", output);
+        return ret;
+      };
+    });
+    topology.declareActionBuilder("action4", "a 4th one", (Map<String, String> params) -> {
+      return (AgentObjectFetcher fetcher, List<String> input, String output, RunInfo info) -> {
+        Map ret = new HashMap();
+        ret.put("input", input);
+        ret.put("output", output);
+        ret.put("params", params);
+        return ret;
+      };
+    },
+    ActionBuilderOptions.param("jparam1", "jp jp", "aaa").param("jparam2", "jp2"));
+  }
 }

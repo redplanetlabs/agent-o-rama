@@ -52,7 +52,8 @@
   [all-feedback all-score-sets]
   (doseq [[fb score-sets] (mapv vector all-feedback all-score-sets)]
     (doseq [{:keys [source created-at modified-at]} fb]
-      (when-not (aor-types/ExperimentSourceImpl? source)
+      (when-not (and (aor-types/EvalSourceImpl? source)
+                     (aor-types/ExperimentSourceImpl? (:source source)))
         (throw (ex-info "Expected ExperimentSource"
                         {:feedback fb})))
       (when-not (and created-at modified-at (= created-at modified-at))
@@ -181,7 +182,7 @@
          (bind ds-module-name (get-module-name ds-module))
          (bind manager (aor/agent-manager ipc module-name))
          (bind ds-manager (aor/agent-manager ipc ds-module-name))
-         (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
+         (bind exp-client (aor/agent-client manager aor-types/EVALUATOR-AGENT-NAME))
          (bind foo-root
            (foreign-pstate ipc
                            module-name
@@ -189,7 +190,7 @@
          (bind exp-root
            (foreign-pstate ipc
                            module-name
-                           (po/agent-root-task-global-name exp/EVALUATOR-AGENT-NAME)))
+                           (po/agent-root-task-global-name aor-types/EVALUATOR-AGENT-NAME)))
 
          (bind global-actions-depot
            (foreign-depot ipc module-name (po/global-actions-depot-name)))
@@ -199,10 +200,14 @@
 
          (bind root-feedback
            (fn [{:keys [task-id agent-invoke-id]}]
-             (foreign-select-one [(keypath agent-invoke-id) :feedback] foo-root {:pkey task-id})))
+             (foreign-select-one [(keypath agent-invoke-id) :feedback :results]
+                                 foo-root
+                                 {:pkey task-id})))
          (bind exp-root-feedback
            (fn [{:keys [task-id agent-invoke-id]}]
-             (foreign-select-one [(keypath agent-invoke-id) :feedback] exp-root {:pkey task-id})))
+             (foreign-select-one [(keypath agent-invoke-id) :feedback :results]
+                                 exp-root
+                                 {:pkey task-id})))
 
          (aor/create-evaluator! manager
                                 "concise2"
@@ -295,7 +300,7 @@
           {:reference-output ["abcdefg" "hijklmnop"]})
 
          (bind exp-id (h/random-uuid7))
-         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
            (foreign-append!
             global-actions-depot
             (aor-types/->valid-StartExperiment
@@ -535,7 +540,7 @@
          ;;   - JSON paths for regular evaluators
          (reset! example-id-chunks-atom [])
          (bind exp-id (h/random-uuid7))
-         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
            (foreign-append!
             global-actions-depot
             (aor-types/->valid-StartExperiment
@@ -648,7 +653,7 @@
          ;;   - remote evaluator
          ;;   - summary eval with custom json paths
          (bind exp-id (h/random-uuid7))
-         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
            (foreign-append!
             global-actions-depot
             (aor-types/->valid-StartExperiment
@@ -716,7 +721,7 @@
 
          ;; test selecting specific tag
          (bind exp-id (h/random-uuid7))
-         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
            (foreign-append!
             global-actions-depot
             (aor-types/->valid-StartExperiment
@@ -769,7 +774,7 @@
 
          ;; test selecting specific examples
          (bind exp-id (h/random-uuid7))
-         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
            (foreign-append!
             global-actions-depot
             (aor-types/->valid-StartExperiment
@@ -814,7 +819,7 @@
 
          ;; test specific snapshot
          (bind exp-id (h/random-uuid7))
-         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
            (foreign-append!
             global-actions-depot
             (aor-types/->valid-StartExperiment
@@ -852,7 +857,7 @@
 
          ;; test error running experiment with non-existent node
          (bind exp-id (h/random-uuid7))
-         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
            (foreign-append!
             global-actions-depot
             (aor-types/->valid-StartExperiment
@@ -898,7 +903,7 @@
 
          ;; test with non-existent dataset
          (bind exp-id (h/random-uuid7))
-         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
            (foreign-append!
             global-actions-depot
             (aor-types/->valid-StartExperiment
@@ -924,7 +929,7 @@
 
          ;; test with non-existent snapshot
          (bind exp-id (h/random-uuid7))
-         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
            (foreign-append!
             global-actions-depot
             (aor-types/->valid-StartExperiment
@@ -951,7 +956,7 @@
 
          ;; test error running regular experiment with comparative evaluator
          (bind exp-id (h/random-uuid7))
-         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
            (foreign-append!
             global-actions-depot
             (aor-types/->valid-StartExperiment
@@ -984,7 +989,7 @@
 
          ;; test error running comparative experiment with regular evaluator
          (bind exp-id (h/random-uuid7))
-         (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+         (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
            (foreign-append!
             global-actions-depot
             (aor-types/->valid-StartExperiment
@@ -1095,7 +1100,7 @@
        (rtest/launch-module! ipc module {:tasks 2 :threads 2})
        (bind module-name (get-module-name module))
        (bind manager (aor/agent-manager ipc module-name))
-       (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
+       (bind exp-client (aor/agent-client manager aor-types/EVALUATOR-AGENT-NAME))
        (bind global-actions-depot
          (foreign-depot ipc module-name (po/global-actions-depot-name)))
        (bind results
@@ -1119,7 +1124,7 @@
        (aor/create-evaluator! manager "ccount" "ccount" {} "")
 
        (bind exp-id (h/random-uuid7))
-       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+       (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
          (foreign-append!
           global-actions-depot
           (aor-types/->valid-StartExperiment
@@ -1181,7 +1186,7 @@
          (is (>= finish-time-millis start-time-millis)))
 
        (bind exp-id (h/random-uuid7))
-       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+       (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
          (foreign-append!
           global-actions-depot
           (aor-types/->valid-StartExperiment
@@ -1243,7 +1248,7 @@
 
        (add-example-and-wait! manager ds-id1 "b" {:tags #{"t"}})
        (bind exp-id (h/random-uuid7))
-       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+       (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
          (foreign-append!
           global-actions-depot
           (aor-types/->valid-StartExperiment
@@ -1296,7 +1301,7 @@
 
 
        (bind exp-id (h/random-uuid7))
-       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+       (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
          (foreign-append!
           global-actions-depot
           (aor-types/->valid-StartExperiment
@@ -1464,7 +1469,7 @@
        (rtest/launch-module! ipc module {:tasks 2 :threads 2})
        (bind module-name (get-module-name module))
        (bind manager (aor/agent-manager ipc module-name))
-       (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
+       (bind exp-client (aor/agent-client manager aor-types/EVALUATOR-AGENT-NAME))
        (bind global-actions-depot
          (foreign-depot ipc module-name (po/global-actions-depot-name)))
        (bind results
@@ -1518,7 +1523,7 @@
        (fail-on-n! :initiate 2)
        (fail-on-n! :result 2)
        (bind exp-id (h/random-uuid7))
-       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+       (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
          (foreign-append!
           global-actions-depot
           (aor-types/->valid-StartExperiment
@@ -1584,7 +1589,7 @@
        (fail-on-n-arg! :eval "reg2" 2)
        (fail-on-n-arg! :summary "count2" 1)
        (bind exp-id (h/random-uuid7))
-       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+       (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
          (foreign-append!
           global-actions-depot
           (aor-types/->valid-StartExperiment
@@ -1650,7 +1655,7 @@
        (fail-on-n-arg! :initiate 1 2)
        (fail-on-n-arg! :eval "ccount2" 2)
        (bind exp-id (h/random-uuid7))
-       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+       (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
          (foreign-append!
           global-actions-depot
           (aor-types/->valid-StartExperiment
@@ -1728,7 +1733,7 @@
        (reset! RUNS [])
        (fail-on-n! :initiate-eval 2)
        (bind exp-id (h/random-uuid7))
-       (bind {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+       (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
          (foreign-append!
           global-actions-depot
           (aor-types/->valid-StartExperiment
@@ -1833,7 +1838,7 @@
      (rtest/launch-module! ipc module {:tasks 2 :threads 2})
      (bind module-name (get-module-name module))
      (bind manager (aor/agent-manager ipc module-name))
-     (bind exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME))
+     (bind exp-client (aor/agent-client manager aor-types/EVALUATOR-AGENT-NAME))
      (bind global-actions-depot
        (foreign-depot ipc module-name (po/global-actions-depot-name)))
      (bind search
@@ -1852,7 +1857,7 @@
      (bind run-experiment!
        (fn [exp]
          (let [exp-id (h/random-uuid7)
-               {exp-invoke aor-types/AGENTS-TOPOLOGY-NAME}
+               {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
                (foreign-append! global-actions-depot (assoc exp :id exp-id))]
            (wait-experiment-finished! exp-client exp-invoke)
            (TopologyUtils/advanceSimTime 1000)

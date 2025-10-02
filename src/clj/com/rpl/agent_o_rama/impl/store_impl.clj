@@ -47,6 +47,19 @@
 
 (defn hook:initiating-pstate-write [])
 
+(defn do-pstate-write!
+  [write-depot source pstate-name path k]
+  (let [{ret aor-types/AGENT-TOPOLOGY-NAME}
+        (foreign-append!
+         write-depot
+         (aor-types/->PStateWrite
+          source
+          pstate-name
+          path
+          k))]
+    (if (= (:type ret) :failure)
+      (throw (:exception ret)))))
+
 (defn- pstate-write!*
   [store-params path k op params]
   (when (:mirror? store-params)
@@ -54,20 +67,17 @@
                       {:pstate-name (:pstate-name store-params)})))
   (let [start-time  (h/current-time-millis)
         _ (hook:initiating-pstate-write)
-        {ret aor-types/AGENTS-TOPOLOGY-NAME}
-        (foreign-append!
-         (:write-depot store-params)
-         (aor-types/->PStateWrite
-          (:agent-name store-params)
-          (:agent-task-id store-params)
-          (:agent-id store-params)
-          (:retry-num store-params)
-          (:pstate-name store-params)
-          path
-          k))
+        _ (do-pstate-write!
+           (:write-depot store-params)
+           (aor-types/->PStateWriteAgentSource
+            (:agent-name store-params)
+            (:agent-task-id store-params)
+            (:agent-id store-params)
+            (:retry-num store-params))
+           (:pstate-name store-params)
+           path
+           k)
         finish-time (h/current-time-millis)]
-    (if (= (:type ret) :failure)
-      (throw (:exception ret)))
     (vswap! (:nested-ops-vol store-params)
             conj
             (aor-types/->NestedOpInfoImpl

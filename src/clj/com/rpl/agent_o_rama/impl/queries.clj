@@ -49,6 +49,10 @@
   [agent-name]
   (str "_agent-get-current-graph-" agent-name))
 
+(defn action-log-page-name
+  [agent-name]
+  (str "_agent-get-action-log-page-" agent-name))
+
 (defn get-datasets-page-query-name
   []
   "_aor-get-datasets")
@@ -85,6 +89,7 @@
 (defn experiment-results-name
   []
   "_aor-experiment-results")
+
 
 (defn- to-pqueue
   [coll]
@@ -313,6 +318,34 @@
          empty?
          not))))
 
+(defbasicblocksegmacro get-distributed-page*
+  [page-size pagination-params pstate-name res info-transformer page-result-fn max-key-fn initial-path]
+  (let [task-id-sym (gen-anyvar "task-id")
+        end-id-sym (gen-anyvar "end-id")
+        task-page-sym (gen-anyvar "task-page")
+        pages-map-sym (gen-anyvar "pages-map")
+        pstate-sym (symbol pstate-name)]
+    [[|all]
+     [ops/current-task-id :> task-id-sym]
+     [get pagination-params task-id-sym (seg# max-key-fn) :> end-id-sym]
+     [<<if (seg# nil? end-id-sym)
+       [identity [] :> task-page-sym]
+      [else>]
+       [local-select>
+        [initial-path
+         (seg# sorted-map-range-to end-id-sym
+                                   {:inclusive? true
+                                    :max-amt    (seg# adjust-page-size page-size)})
+         (seg# transformed MAP-VALS info-transformer)]
+        pstate-sym
+        :> task-page-sym]]
+     [|origin]
+     [aggs/+map-agg task-id-sym task-page-sym :> pages-map-sym]
+     [page-result-fn pages-map-sym
+                     (seg# adjust-page-size page-size)
+                     :> res]
+     ]))
+
 ;; returns map of form:
 ;; {:agent-invokes
 ;;   [{:task-id ... :agent-id ... :start-time-millis ...
@@ -322,33 +355,18 @@
 ;;  :pagination-params {task-id end-id}}
 (defn declare-get-distributed-page-topology
   [topologies query-name pstate-name info-transformer page-result-fn max-key-fn]
-  (let [pstate-sym (symbol pstate-name)]
-    (<<query-topology topologies
-      query-name
-      [*page-size *pagination-params :> *res]
-      (|all)
-      (ops/current-task-id :> *task-id)
-      (get *pagination-params *task-id (max-key-fn) :> *end-id)
-      (<<if (nil? *end-id)
-        (identity [] :> *task-page)
-       (else>)
-        (local-select>
-         [(sorted-map-range-to *end-id
-                               {:inclusive? true
-                                :max-amt    (adjust-page-size *page-size)})
-          (transformed MAP-VALS info-transformer)]
-         pstate-sym
-         :> *task-page))
-      (|origin)
-      (aggs/+map-agg *task-id *task-page :> *pages-map)
-      (page-result-fn *pages-map
-                      (adjust-page-size *page-size)
-                      :> *res)
-    )))
-
-(defn max-uuid
-  []
-  (java.util.UUID. -1 -1))
+  (<<query-topology topologies
+    query-name
+    [*page-size *pagination-params :> *res]
+    (get-distributed-page* *page-size
+                           *pagination-params
+                           pstate-name
+                           *res
+                           info-transformer
+                           page-result-fn
+                           max-key-fn
+                           STAY)
+  ))
 
 (defn declare-get-invokes-page-topology
   [topologies agent-name]
@@ -358,7 +376,7 @@
    (po/agent-root-task-global-name agent-name)
    relevant-invoke-submap
    to-invokes-page-result
-   max-uuid))
+   h/max-uuid))
 
 (defn declare-agent-get-names-query-topology
   [topologies agent-names]
@@ -404,7 +422,7 @@
    (po/datasets-task-global-name)
    dataset-info
    to-dataset-page-result
-   max-uuid))
+   h/max-uuid))
 
 (defn search-pagination-size
   []
@@ -883,6 +901,40 @@
        :> *res)
       (|origin))))
 
+(defn action-log-info
+  [action-log]
+  {:action action-log})
+
+(defn to-action-log-page-result
+  [pages-map page-size]
+  (to-page-result pages-map
+                  page-size
+                  :action-id
+                  :actions
+                  :action-id))
+
+
+;; returns map of form:
+;; {:actions
+;;   [{:action-id ...
+;      :action ...}
+;;    ...]
+;;  :pagination-params {task-id end-id}}
+(defn declare-get-action-log-page-topology
+  [topologies agent-name]
+  (let [pstate-name (po/action-log-task-global-name)]
+    (<<query-topology topologies
+      (action-log-page-name agent-name)
+      [*rule-name *page-size *pagination-params :> *res]
+      (get-distributed-page* *page-size
+                             *pagination-params
+                             pstate-name
+                             *res
+                             action-log-info
+                             to-action-log-page-result
+                             h/max-uuid
+                             (keypath agent-name *rule-name))
+    )))
 
 ;; direct queries on PStates
 

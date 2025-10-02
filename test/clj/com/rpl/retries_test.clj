@@ -111,7 +111,7 @@
            (module
              [setup topologies]
              (declare-depot setup *reset-depot :random {:global? true})
-             (let [topology  (aor/agents-topology setup topologies)
+             (let [topology  (aor/agent-topology setup topologies)
                    s         (aor/underlying-stream-topology topology)
                    node-exec (symbol (po/agent-node-executor-name))
                    root-sym  (symbol (po/agent-root-task-global-name "foo"))
@@ -354,7 +354,7 @@
            (module
              [setup topologies]
              (declare-depot setup *reset-depot :random {:global? true})
-             (let [topology  (aor/agents-topology setup topologies)
+             (let [topology  (aor/agent-topology setup topologies)
                    s         (aor/underlying-stream-topology topology)
                    node-exec (symbol (po/agent-node-executor-name))
                    root-sym  (symbol (po/agent-root-task-global-name "foo"))
@@ -443,7 +443,7 @@
          (reset-test!)
          (rtest/pause-microbatch-topology! ipc
                                            module-name
-                                           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+                                           aor-types/AGENT-MB-TOPOLOGY-NAME)
          (bind inv (aor/agent-initiate bar))
          (is (condition-attained? (= 1 @failure-appends-atom)))
 
@@ -455,7 +455,7 @@
                              0)))
          (rtest/resume-microbatch-topology! ipc
                                             module-name
-                                            aor-types/AGENTS-MB-TOPOLOGY-NAME)
+                                            aor-types/AGENT-MB-TOPOLOGY-NAME)
 
          (is (condition-attained? (= 1 (count @received-atom))))
          (is (= {[(.getTaskId inv)
@@ -468,7 +468,7 @@
          (reset-test!)
          (rtest/pause-microbatch-topology! ipc
                                            module-name
-                                           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+                                           aor-types/AGENT-MB-TOPOLOGY-NAME)
          (reset! init-retry-num-atom 2)
          (bind inv2 (aor/agent-initiate bar))
          (is (condition-attained? (= 1 @failure-appends-atom)))
@@ -479,7 +479,7 @@
                            1))
          (rtest/resume-microbatch-topology! ipc
                                             module-name
-                                            aor-types/AGENTS-MB-TOPOLOGY-NAME)
+                                            aor-types/AGENT-MB-TOPOLOGY-NAME)
          (is (condition-attained? (= 1 (count @received-atom))))
          (is (= {[(.getTaskId inv2)
                   (.getAgentInvokeId inv2)
@@ -518,7 +518,7 @@
          (bind module
            (module
              [setup topologies]
-             (let [topology (aor/agents-topology setup topologies)]
+             (let [topology (aor/agent-topology setup topologies)]
                (aor/declare-key-value-store
                 topology
                 "$$kv"
@@ -593,7 +593,7 @@
      (bind module
        (module
          [setup topologies]
-         (let [topology (aor/agents-topology setup topologies)]
+         (let [topology (aor/agent-topology setup topologies)]
            (->
              topology
              (aor/new-agent "foo")
@@ -879,14 +879,14 @@
                (rtest/pause-microbatch-topology!
                 ipc
                 module-name
-                aor-types/AGENTS-MB-TOPOLOGY-NAME)
+                aor-types/AGENT-MB-TOPOLOGY-NAME)
                (bind inv (aor/agent-initiate foo 1))
                (when-not (condition-attained? (= (count nodes) @failures-atom))
                  (throw (ex-info "Didn't reach initial failures" {})))
                (rtest/resume-microbatch-topology!
                 ipc
                 module-name
-                aor-types/AGENTS-MB-TOPOLOGY-NAME)
+                aor-types/AGENT-MB-TOPOLOGY-NAME)
                (dotimes [i (min (dec num-fails) 3)]
                  (check-active! 1)
                  (reset! failures-atom 0)
@@ -895,7 +895,7 @@
                  (rtest/pause-microbatch-topology!
                   ipc
                   module-name
-                  aor-types/AGENTS-MB-TOPOLOGY-NAME)
+                  aor-types/AGENT-MB-TOPOLOGY-NAME)
                  (tc/complete-cf! @CF-ATOM true)
                  (when-not (condition-attained? (= (count nodes)
                                                    @failures-atom))
@@ -904,7 +904,7 @@
                  (rtest/resume-microbatch-topology!
                   ipc
                   module-name
-                  aor-types/AGENTS-MB-TOPOLOGY-NAME)
+                  aor-types/AGENT-MB-TOPOLOGY-NAME)
                )
                (reset! tc/FAIL-NODES-ATOM #{})
                (when-not (condition-attained? (some? @CF-ATOM))
@@ -1100,7 +1100,7 @@
           (rtest/pause-microbatch-topology!
            ipc
            module-name
-           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+           aor-types/AGENT-MB-TOPOLOGY-NAME)
           (bind inv (aor/agent-initiate foo))
           (is (condition-attained? (= 1 @failures-atom)))
           (check-active! 1)
@@ -1109,7 +1109,7 @@
           (rtest/resume-microbatch-topology!
            ipc
            module-name
-           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+           aor-types/AGENT-MB-TOPOLOGY-NAME)
           (is (= "node2" (aor/agent-result foo inv)))
           (is (= {"begin" 1 "node1" 2 "node2" 1} @tc/RAN-NODES-ATOM))
           (check-active! 0)
@@ -1123,7 +1123,7 @@
           (rtest/pause-microbatch-topology!
            ipc
            module-name
-           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+           aor-types/AGENT-MB-TOPOLOGY-NAME)
           (bind inv (aor/agent-initiate bar))
           (is (condition-attained? (= 1 @failures-atom)))
           (check-active! 1)
@@ -1132,7 +1132,7 @@
           (rtest/resume-microbatch-topology!
            ipc
            module-name
-           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+           aor-types/AGENT-MB-TOPOLOGY-NAME)
           (is (= "node2" (aor/agent-result bar inv)))
           (is (= {"begin" 2 "node1" 2 "node2" 1} @tc/RAN-NODES-ATOM))
           (check-active! 0)
@@ -1146,7 +1146,7 @@
           (rtest/pause-microbatch-topology!
            ipc
            module-name
-           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+           aor-types/AGENT-MB-TOPOLOGY-NAME)
           (bind inv (aor/agent-initiate car))
           (is (condition-attained? (= 1 @failures-atom)))
           (check-active! 1)
@@ -1155,7 +1155,7 @@
           (rtest/resume-microbatch-topology!
            ipc
            module-name
-           aor-types/AGENTS-MB-TOPOLOGY-NAME)
+           aor-types/AGENT-MB-TOPOLOGY-NAME)
           (try
             (aor/agent-result car inv)
             (is false)

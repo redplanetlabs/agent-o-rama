@@ -7,7 +7,7 @@ import java.util.*;
 
 public class AORHelpers {
   public static final IFn CREATE_AGENTS_TOPOLOGY =
-      Util.getIFn("com.rpl.agent-o-rama", "agents-topology");
+      Util.getIFn("com.rpl.agent-o-rama", "agent-topology");
   public static final IFn CREATE_MULTI_AGG =
       Util.getIFn("com.rpl.agent-o-rama.impl.multi-agg", "mk-multi-agg");
   public static final IFn CREATE_AGENT_MANAGER =
@@ -20,6 +20,8 @@ public class AORHelpers {
       Util.getIFn("com.rpl.agent-o-rama.impl.java", "mk-tools-agent-options");
   public static IFn MAKE_EVALUATOR_BUILDER_OPTIONS =
       Util.getIFn("com.rpl.agent-o-rama.impl.java", "mk-evaluator-builder-options");
+  public static IFn MAKE_ACTION_BUILDER_OPTIONS =
+      Util.getIFn("com.rpl.agent-o-rama.impl.java", "mk-action-builder-options");
   public static IFn CREATE_TOOL_INFO =
       Util.getIFn("com.rpl.agent-o-rama.impl.java", "create-tool-info");
   public static IFn CREATE_TOOL_INFO_WITH_CONTEXT =

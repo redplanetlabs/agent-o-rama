@@ -3,6 +3,7 @@
         [com.rpl.rama.path])
   (:require
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
+   [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.core :as i]
@@ -60,20 +61,32 @@
             (contains? @mirror-agents-vol name))
     (throw (h/ex-info "Agent already exists" {:name name}))))
 
-(defn agents-topology
+(defn agent-topology
   [setup topologies]
   (let [^StreamTopology stream-topology (stream-topology
                                          topologies
-                                         aor-types/AGENTS-TOPOLOGY-NAME)
+                                         aor-types/AGENT-TOPOLOGY-NAME)
         mb-topology            (microbatch-topology
                                 topologies
-                                aor-types/AGENTS-MB-TOPOLOGY-NAME)
+                                aor-types/AGENT-MB-TOPOLOGY-NAME)
+        analytics-mb-topology  (microbatch-topology
+                                topologies
+                                aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
         defined?-vol           (volatile! false)
         agents-vol             (volatile! {})
         mirror-agents-vol      (volatile! {})
         store-info-vol         (volatile! {})
         declared-objects-vol   (volatile! {})
-        evaluator-builders-vol (volatile! {})]
+        evaluator-builders-vol (volatile! {})
+        action-builders-vol    (volatile! {})]
+    (set-launch-topology-dynamic-option! setup
+                                         aor-types/AGENT-MB-TOPOLOGY-NAME
+                                         "topology.microbatch.phase.timeout.seconds"
+                                         60)
+    (set-launch-topology-dynamic-option! setup
+                                         aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME
+                                         "topology.microbatch.phase.timeout.seconds"
+                                         60)
     (reify
      AgentTopology
      (newAgent [this name]
@@ -139,7 +152,7 @@
      (declareEvaluatorBuilder [this name description builder-jfn]
        (.declareEvaluatorBuilder this name description builder-jfn nil))
      (declareEvaluatorBuilder [this name description builder-jfn options]
-       (aor-types/declare-java-evaluator-builer
+       (aor-types/declare-java-evaluator-builder
         this
         :regular
         name
@@ -154,7 +167,7 @@
                                             nil))
      (declareComparativeEvaluatorBuilder [this name description builder-jfn
                                           options]
-       (aor-types/declare-java-evaluator-builer
+       (aor-types/declare-java-evaluator-builder
         this
         :comparative
         name
@@ -164,13 +177,21 @@
      (declareSummaryEvaluatorBuilder [this name description builder-jfn]
        (.declareSummaryEvaluatorBuilder this name description builder-jfn nil))
      (declareSummaryEvaluatorBuilder [this name description builder-jfn options]
-       (aor-types/declare-java-evaluator-builer
+       (aor-types/declare-java-evaluator-builder
         this
         :summary
         name
         description
         builder-jfn
         options))
+     (declareActionBuilder [this name description builder-jfn]
+       (.declareActionBuilder this name description builder-jfn nil))
+     (declareActionBuilder [this name description builder-jfn options]
+       (aor-types/declare-action-builder-internal this
+                                                  name
+                                                  description
+                                                  (aor-types/convert-java-builder-fn builder-jfn)
+                                                  (if options @options)))
      (declareClusterAgent [this localName moduleName agentName]
        (check-unique-agent-name! agents-vol mirror-agents-vol localName)
        ;; this connects the modules so a module update removing an agent needed
@@ -182,7 +203,7 @@
        (vswap! mirror-agents-vol assoc localName [moduleName agentName]))
      (define [this]
        (when @defined?-vol
-         (throw (h/ex-info "Agents topology already defined" {})))
+         (throw (h/ex-info "Agent topology already defined" {})))
        (vreset! defined?-vol true)
        (exp/define-evaluator-agent! this)
        (i/define-agents!
@@ -190,11 +211,13 @@
         topologies
         stream-topology
         mb-topology
+        analytics-mb-topology
         @agents-vol
         @mirror-agents-vol
         @store-info-vol
         @declared-objects-vol
-        @evaluator-builders-vol))
+        @evaluator-builders-vol
+        @action-builders-vol))
      aor-types/AgentTopologyInternal
      (declare-agent-object-builder-internal [this name afn options]
        (when-not (ifn? afn)
@@ -252,6 +275,32 @@
                   :options     options
                  })
        ))
+     (declare-action-builder-internal [this name description builder-fn options]
+       (when (contains? @action-builders-vol name)
+         (throw (h/ex-info "Action builder already declared" {:name name})))
+       (when (h/contains-string? name "/")
+         (throw (h/ex-info "Action builder name may not include '/'"
+                           {:name name})))
+       (when-not (ifn? builder-fn)
+         (throw (h/ex-info "Builder must be a function"
+                           {:type (class builder-fn)})))
+       (let [full-options (merge {:params {}
+                                  :limit-concurrency? false}
+                                 options)]
+         (h/validate-options! name
+                              full-options
+                              {:params h/map-spec
+                               :limit-concurrency? h/boolean-spec})
+         ;; params have exact same specification as evals
+         (evals/validate-params! (:params full-options))
+         (vswap! action-builders-vol
+                 assoc
+                 name
+                 {:builder-fn  builder-fn
+                  :description description
+                  :options     options
+                 })
+       ))
     )))
 
 (defn underlying-stream-topology
@@ -263,39 +312,39 @@
   (.define at))
 
 (defn declare-key-value-store
-  [^AgentTopology agents-topology name key-class val-class]
-  (.declareKeyValueStore agents-topology name key-class val-class))
+  [^AgentTopology agent-topology name key-class val-class]
+  (.declareKeyValueStore agent-topology name key-class val-class))
 
 (defn declare-document-store
-  [^AgentTopology agents-topology name key-class & key-val-classes]
-  (.declareDocumentStore agents-topology
+  [^AgentTopology agent-topology name key-class & key-val-classes]
+  (.declareDocumentStore agent-topology
                          name
                          key-class
                          (into-array Object key-val-classes)))
 
 (defn declare-pstate-store
-  [^AgentTopology agents-topology name schema]
-  (declare-pstate* (.getStreamTopology agents-topology) (symbol name) schema))
+  [^AgentTopology agent-topology name schema]
+  (declare-pstate* (.getStreamTopology agent-topology) (symbol name) schema))
 
 (defn declare-agent-object
-  [^AgentTopology agents-topology name val]
-  (.declareAgentObject agents-topology name val))
+  [^AgentTopology agent-topology name val]
+  (.declareAgentObject agent-topology name val))
 
 (defn declare-agent-object-builder
-  ([agents-topology name afn]
-   (declare-agent-object-builder agents-topology name afn nil))
-  ([agents-topology name afn options]
-   (aor-types/declare-agent-object-builder-internal agents-topology
+  ([agent-topology name afn]
+   (declare-agent-object-builder agent-topology name afn nil))
+  ([agent-topology name afn options]
+   (aor-types/declare-agent-object-builder-internal agent-topology
                                                     name
                                                     afn
                                                     options)))
 
 
 (defn declare-evaluator-builder
-  ([agents-topology name description builder-fn]
-   (declare-evaluator-builder agents-topology name description builder-fn nil))
-  ([agents-topology name description builder-fn options]
-   (aor-types/declare-evaluator-builder-internal agents-topology
+  ([agent-topology name description builder-fn]
+   (declare-evaluator-builder agent-topology name description builder-fn nil))
+  ([agent-topology name description builder-fn options]
+   (aor-types/declare-evaluator-builder-internal agent-topology
                                                  :regular
                                                  name
                                                  description
@@ -303,14 +352,14 @@
                                                  options)))
 
 (defn declare-comparative-evaluator-builder
-  ([agents-topology name description builder-fn]
-   (declare-comparative-evaluator-builder agents-topology
+  ([agent-topology name description builder-fn]
+   (declare-comparative-evaluator-builder agent-topology
                                           name
                                           description
                                           builder-fn
                                           nil))
-  ([agents-topology name description builder-fn options]
-   (aor-types/declare-evaluator-builder-internal agents-topology
+  ([agent-topology name description builder-fn options]
+   (aor-types/declare-evaluator-builder-internal agent-topology
                                                  :comparative
                                                  name
                                                  description
@@ -318,31 +367,37 @@
                                                  options)))
 
 (defn declare-summary-evaluator-builder
-  ([agents-topology name description builder-fn]
-   (declare-summary-evaluator-builder agents-topology
+  ([agent-topology name description builder-fn]
+   (declare-summary-evaluator-builder agent-topology
                                       name
                                       description
                                       builder-fn
                                       nil))
-  ([agents-topology name description builder-fn options]
-   (aor-types/declare-evaluator-builder-internal agents-topology
+  ([agent-topology name description builder-fn options]
+   (aor-types/declare-evaluator-builder-internal agent-topology
                                                  :summary
                                                  name
                                                  description
                                                  builder-fn
                                                  options)))
 
+(defn declare-action-builder
+  ([agent-topology name description builder-fn]
+   (declare-action-builder agent-topology name description builder-fn nil))
+  ([agent-topology name description builder-fn options]
+   (aor-types/declare-action-builder-internal agent-topology name description builder-fn options)))
+
 (defn declare-cluster-agent
-  [^AgentTopology agents-topology local-name module-name agent-name]
-  (.declareClusterAgent agents-topology local-name module-name agent-name))
+  [^AgentTopology agent-topology local-name module-name agent-name]
+  (.declareClusterAgent agent-topology local-name module-name agent-name))
 
 (defn setup-object-name
   [^AgentObjectSetup setup]
   (.getObjectName setup))
 
 (defn new-agent
-  [agents-topology name]
-  (c/new-agent agents-topology name))
+  [agent-topology name]
+  (c/new-agent agent-topology name))
 
 (defn node
   [agent-graph name output-nodes-spec node-fn]
@@ -425,7 +480,7 @@
   (let [[options [[agent-topology-sym] & body]] (parse-map-options args)]
     `(module ~options
        [setup# topologies#]
-       (let [~agent-topology-sym (agents-topology setup# topologies#)]
+       (let [~agent-topology-sym (agent-topology setup# topologies#)]
          ~@body
          (define-agents! ~agent-topology-sym)
        ))))
@@ -491,6 +546,11 @@
                                    module-name
                                    (queries/all-evaluator-builders-name))
 
+        all-action-builders-query (foreign-query
+                                   cluster
+                                   module-name
+                                   (ana/all-action-builders-name))
+
         search-evals-query        (foreign-query
                                    cluster
                                    module-name
@@ -515,21 +575,17 @@
                                     :agent-name agentName})))
              agent-depot          (foreign-depot cluster
                                                  module-name
-                                                 (po/agent-depot-name
-                                                  agentName))
+                                                 (po/agent-depot-name agentName))
              human-depot          (foreign-depot cluster
                                                  module-name
-                                                 (po/agent-human-depot-name
-                                                  agentName))
+                                                 (po/agent-human-depot-name agentName))
              agent-config-depot   (foreign-depot cluster
                                                  module-name
-                                                 (po/agent-config-depot-name
-                                                  agentName))
+                                                 (po/agent-config-depot-name agentName))
              config-pstate        (foreign-pstate
                                    cluster
                                    module-name
-                                   (po/agent-config-task-global-name
-                                    agentName))
+                                   (po/agent-config-task-global-name agentName))
              root-pstate          (foreign-pstate
                                    cluster
                                    module-name
@@ -537,24 +593,26 @@
              graph-history-pstate (foreign-pstate
                                    cluster
                                    module-name
-                                   (po/graph-history-task-global-name
-                                    agentName))
+                                   (po/graph-history-task-global-name agentName))
+             agent-rules-pstate   (foreign-pstate
+                                   cluster
+                                   module-name
+                                   (po/agent-rules-task-global-name agentName))
              tracing-query        (foreign-query
                                    cluster
                                    module-name
-                                   (queries/tracing-query-name
-                                    agentName))
+                                   (queries/tracing-query-name agentName))
              invokes-page-query   (foreign-query
                                    cluster
                                    module-name
-                                   (queries/agent-get-invokes-page-query-name
-                                    agentName))
-
+                                   (queries/agent-get-invokes-page-query-name agentName))
              current-graph-query  (foreign-query
                                    cluster
                                    module-name
-                                   (queries/agent-get-current-graph-name
-                                    agentName))]
+                                   (queries/agent-get-current-graph-name agentName))
+             action-log-query     (foreign-query cluster
+                                                 module-name
+                                                 (queries/action-log-page-name agentName))]
          (reify
           AgentClient
           (invoke [this args]
@@ -572,10 +630,11 @@
               agent-depot
               (aor-types/->AgentInitiate
                (vec args)
-               nil
+               aor-types/FORCED-AGENT-TASK-ID
+               aor-types/FORCED-AGENT-INVOKE-ID
                aor-types/OPERATION-SOURCE))
              (h/cf-function [{[agent-task-id agent-id]
-                              aor-types/AGENTS-TOPOLOGY-NAME}]
+                              aor-types/AGENT-TOPOLOGY-NAME}]
                (aor-types/->AgentInvokeImpl agent-task-id agent-id)
              )))
 
@@ -597,7 +656,7 @@
                (.getAgentInvokeId invoke)
                invokeIdToNewArgs))
              (h/cf-function [{[agent-task-id agent-id]
-                              aor-types/AGENTS-TOPOLOGY-NAME}]
+                              aor-types/AGENT-TOPOLOGY-NAME}]
                (aor-types/->AgentInvokeImpl agent-task-id agent-id)
              )))
 
@@ -762,15 +821,17 @@
              :config-pstate        config-pstate
              :root-pstate          root-pstate
              :graph-history-pstate graph-history-pstate
+             :agent-rules-pstate   agent-rules-pstate
              :tracing-query        tracing-query
              :invokes-page-query   invokes-page-query
              :current-graph-query  current-graph-query
+             :action-log-query     action-log-query
             })
          )))
      (createDataset [this name description inputJsonSchema outputJsonSchema]
        (let [uuid (h/random-uuid7)
 
-             {error aor-types/AGENTS-TOPOLOGY-NAME}
+             {error aor-types/AGENT-TOPOLOGY-NAME}
              (foreign-append!
               datasets-depot
               (aor-types/->valid-CreateDataset uuid
@@ -811,7 +872,7 @@
                (or aor-types/OPERATION-SOURCE (aor-types/->ApiSourceImpl))
               ))
              (.thenApply
-              (h/cf-function [{error aor-types/AGENTS-TOPOLOGY-NAME}]
+              (h/cf-function [{error aor-types/AGENT-TOPOLOGY-NAME}]
                 (when error
                   (throw (h/ex-info "Error adding example" {:info error})))
                 uuid
@@ -822,7 +883,7 @@
                                       input
                                       options)))
      (setDatasetExampleInput [this datasetId snapshotName exampleId input]
-       (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
+       (let [{error aor-types/AGENT-TOPOLOGY-NAME}
              (foreign-append!
               datasets-depot
               (aor-types/->valid-UpdateDatasetExample datasetId
@@ -835,7 +896,7 @@
        ))
      (setDatasetExampleReferenceOutput
        [this datasetId snapshotName exampleId referenceOutput]
-       (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
+       (let [{error aor-types/AGENT-TOPOLOGY-NAME}
              (foreign-append!
               datasets-depot
               (aor-types/->valid-UpdateDatasetExample datasetId
@@ -881,7 +942,7 @@
        (foreign-invoke-query datasets-search-query searchString limit))
 
      (createEvaluator [this name builderName params description options]
-       (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
+       (let [{error aor-types/AGENT-TOPOLOGY-NAME}
              (foreign-append!
               global-actions-depot
               (aor-types/->valid-AddEvaluator
@@ -941,7 +1002,7 @@
      aor-types/AgentManagerInternal
      (add-remote-dataset-internal
        [this dataset-id cluster-conductor-host cluster-conductor-port module-name]
-       (let [{error aor-types/AGENTS-TOPOLOGY-NAME}
+       (let [{error aor-types/AGENT-TOPOLOGY-NAME}
              (foreign-append!
               datasets-depot
               (aor-types/->valid-AddRemoteDataset dataset-id
@@ -960,6 +1021,7 @@
         :search-examples-query     search-examples-query
         :multi-examples-query      multi-examples-query
         :all-eval-builders-query   all-eval-builders-query
+        :all-action-builders-query all-action-builders-query
         :search-evals-query        search-evals-query
         :search-experiments-query  search-experiments-query
         :experiments-results-query experiments-results-query

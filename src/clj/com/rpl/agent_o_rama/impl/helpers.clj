@@ -12,6 +12,8 @@
    [com.jayway.jsonpath
     JsonPath
     Predicate]
+   [com.rpl.agentorama
+    AgentFailedException]
    [com.rpl.agentorama.impl
     AORExceptionInfo]
    [com.rpl.rama.helpers
@@ -19,6 +21,8 @@
    [java.io
     PrintWriter
     StringWriter]
+   [java.time
+    Instant]
    [java.util
     UUID]
    [java.util.concurrent
@@ -203,6 +207,30 @@
   []
   (str (random-uuid7)))
 
+(defn random-uuid7-at-timestamp
+  [^long millis]
+  (UuidCreator/getTimeOrderedEpoch (Instant/ofEpochMilli millis)))
+
+(defn min-uuid7-at-timestamp
+  [^long millis]
+  (UuidCreator/getTimeOrderedEpochMin (Instant/ofEpochMilli millis)))
+
+;; - this is max UUID for purposes of Clojure sorted maps, which compares the components as signed
+;; values
+;; - this is greater than any UUID7 whether compared in Clojure sorted maps or as RocksDB keys,
+;; which is all that matters
+(defn max-uuid
+  []
+  (java.util.UUID. Long/MAX_VALUE Long/MAX_VALUE))
+
+(defn uuid-inc
+  [^UUID u]
+  (let [msb (.getMostSignificantBits u)
+        lsb (.getLeastSignificantBits u)]
+    (if (not= lsb -1)
+      (UUID. msb (inc lsb))
+      (UUID. (inc msb) 0))))
+
 (defn half-uuid
   [^UUID uuid]
   (.getLeastSignificantBits uuid))
@@ -267,7 +295,7 @@
 
 (defn map-spec
   [v]
-  (when-not (map? v)
+  (when-not (instance? java.util.Map v)
     "value must be a map"))
 
 (defn string-spec
@@ -324,3 +352,25 @@
     (if port
       (assoc m "conductor.port" port)
       m)))
+
+(defn result->output
+  [{:keys [failure? val] :as result}]
+  (cond
+    (nil? result)
+    (AgentFailedException. "No result")
+
+    failure?
+    (AgentFailedException. (str val))
+
+    :else
+    val))
+
+(defn node->output
+  [result emits]
+  (if (some? result)
+    (result->output result)
+    (mapv
+     (fn [{:keys [node-name args]}]
+       {"node" node-name
+        "args" args})
+     emits)))

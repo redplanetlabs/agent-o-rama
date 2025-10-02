@@ -123,6 +123,14 @@
    ["withoutReferenceOutputPath" "EvaluatorBuilderOptions.Impl" []]
   ])
 
+(def ACTION-BUILDER-OPTIONS-METHODS
+  [["param" "ActionBuilderOptions.Impl"
+    [["String" "name"] ["String" "description"]]]
+   ["param" "ActionBuilderOptions.Impl"
+    [["String" "name"] ["String" "description"] ["String" "defaultValue"]]]
+   ["limitConcurrency" "ActionBuilderOptions.Impl" []]
+  ])
+
 (def UI-OPTIONS-METHODS
   [["port" "UIOptions" [["int" "portNumber"]]]
    ["noInputBeforeClose" "UIOptions" []]

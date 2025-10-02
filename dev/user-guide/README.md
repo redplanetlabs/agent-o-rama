@@ -66,7 +66,7 @@ String result = client.invoke("World");
 // => "Hello, World!"
 ```
 
-That's it. You've defined an [agent](../terms/agent.md), deployed it to a distributed system using an [agents topology](../glossary.md#agents-topology), and invoked it through an [agent client](../glossary.md#agent-client). The framework handles everything else.
+That's it. You've defined an [agent](../terms/agent.md), deployed it to a distributed system using an [agent topology](../glossary.md#agent-topology), and invoked it through an [agent client](../glossary.md#agent-client). The framework handles everything else.
 
 ## Next Step
 

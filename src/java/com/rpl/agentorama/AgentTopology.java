@@ -62,6 +62,20 @@ public interface AgentTopology {
                     RamaFunction2<AgentObjectFetcher, List<ExampleRun>, Map>> builder,
       EvaluatorBuilderOptions options);
 
+   <Input, Output> void declareActionBuilder(
+      String name,
+      String description,
+      RamaFunction1<Map<String, String>,
+                    RamaFunction4<AgentObjectFetcher, List<Input>, Output, RunInfo, Map>> builder);
+
+   <Input, Output> void declareActionBuilder(
+      String name,
+      String description,
+      RamaFunction1<Map<String, String>,
+                    RamaFunction4<AgentObjectFetcher, List<Input>, Output, RunInfo, Map>> builder,
+      ActionBuilderOptions options);
+
+
   void declareClusterAgent(String localName, String moduleName, String agentName);
 
   StreamTopology getStreamTopology();

@@ -6,9 +6,13 @@
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.analytics :as ana]
+   [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.stats :as stats]
+   [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
@@ -17,6 +21,12 @@
    [com.rpl.test-common :as tc]
    [meander.epsilon :as m])
   (:import
+   [com.rpl.agentorama
+    AgentFailedException]
+   [com.rpl.aortest
+    TestSnippets]
+   [com.rpl.rama.helpers
+    TopologyUtils]
    [dev.langchain4j.data.message
     AiMessage
     UserMessage]
@@ -36,11 +46,11 @@
 (defn sa-stats [& args] (apply aor-types/->SubagentInvokeStatsImpl args))
 
 (deftest mk-node-stats-test
-  (is (= (ana/mk-node-stats "a" 3 5 [])
+  (is (= (stats/mk-node-stats "a" 3 5 [])
          (ai-stats {} (bai-stats {} 0 0 0 {"a" (op-stats 1 2)}))))
   (is
    (=
-    (ana/mk-node-stats
+    (stats/mk-node-stats
      "bb"
      3
      6
@@ -93,7 +103,7 @@
       0
       0
       {"abc" (op-stats 1 3)}))
-    (ana/mk-node-stats
+    (stats/mk-node-stats
      "abc"
      3
      6
@@ -188,7 +198,7 @@
         215
         {"abc" (op-stats 1031 1063)
          "q"   (op-stats 3 6)})
-       (ana/aggregated-basic-stats
+       (stats/aggregated-basic-stats
         (ai-stats
          {(sa-ref "M1" "A1")
           (sa-stats 4
@@ -374,3 +384,1507 @@
         (= !module-name module-name))
       ))
     )))
+
+
+(deftest comparator-spec-test
+  (letlocals
+   (bind spec (aor-types/->valid-ComparatorSpec := 6))
+   (is (aor-types/comparator-spec-matches? spec 6))
+   (is (not (aor-types/comparator-spec-matches? spec 7)))
+   (is (not (aor-types/comparator-spec-matches? spec "6")))
+   (bind spec (aor-types/->valid-ComparatorSpec := "aaa"))
+   (is (aor-types/comparator-spec-matches? spec "aaa"))
+   (is (not (aor-types/comparator-spec-matches? spec "abc")))
+
+   (bind spec (aor-types/->valid-ComparatorSpec :not= 6))
+   (is (not (aor-types/comparator-spec-matches? spec 6)))
+   (is (aor-types/comparator-spec-matches? spec 7))
+   (is (aor-types/comparator-spec-matches? spec "6"))
+
+   (bind spec (aor-types/->valid-ComparatorSpec :< 10))
+   (is (not (aor-types/comparator-spec-matches? spec 10)))
+   (is (not (aor-types/comparator-spec-matches? spec 11)))
+   (is (aor-types/comparator-spec-matches? spec 9))
+
+   (bind spec (aor-types/->valid-ComparatorSpec :> 10))
+   (is (not (aor-types/comparator-spec-matches? spec 10)))
+   (is (not (aor-types/comparator-spec-matches? spec 9)))
+   (is (aor-types/comparator-spec-matches? spec 11))
+
+   (bind spec (aor-types/->valid-ComparatorSpec :<= 10))
+   (is (aor-types/comparator-spec-matches? spec 10))
+   (is (not (aor-types/comparator-spec-matches? spec 11)))
+   (is (aor-types/comparator-spec-matches? spec 9))
+
+   (bind spec (aor-types/->valid-ComparatorSpec :>= 10))
+   (is (aor-types/comparator-spec-matches? spec 10))
+   (is (not (aor-types/comparator-spec-matches? spec 9)))
+   (is (aor-types/comparator-spec-matches? spec 11))
+  ))
+
+(deftest rule-filters-test
+  ;; use actual PState schemas to ensure data matches what it would in full application
+  (with-open [root  (rtest/create-test-pstate po/AGENT-ROOT-PSTATE-SCHEMA)
+              nodes (rtest/create-test-pstate po/AGENT-NODE-PSTATE-SCHEMA)]
+    (letlocals
+
+     (bind id (h/random-uuid7))
+     (bind tp-rule-filter-matches?
+       (fn [pstate filter data]
+         (rtest/test-pstate-transform [(keypath id) (termval data)] pstate)
+         (aor-types/rule-filter-matches? filter
+                                         (assoc (into {}
+                                                      (rtest/test-pstate-select-one (keypath id)
+                                                                                    pstate))
+                                          :run-type (if (identical? pstate root) :agent :node)))
+       ))
+
+
+     (bind ai (aor-types/->valid-AgentInvokeImpl 0 (h/random-uuid7)))
+     (bind filter
+       (aor-types/->valid-FeedbackFilter "xyz" "abc" (aor-types/->valid-ComparatorSpec := 6)))
+
+     (bind matching-source
+       (aor-types/->valid-EvalSourceImpl
+        "blah"
+        ai
+        (aor-types/->valid-ActionSourceImpl "xyz")))
+
+     (is (= #{"xyz"} (aor-types/dependency-rule-names filter)))
+
+     (is (not
+          (tp-rule-filter-matches?
+           root
+           filter
+           {:feedback {:results [(aor-types/->FeedbackImpl {"abc" 6}
+                                                           (aor-types/->AiSourceImpl)
+                                                           0
+                                                           0)]}})))
+     (is (tp-rule-filter-matches?
+          root
+          filter
+          {:feedback {:results [(aor-types/->valid-FeedbackImpl
+                                 {"abc" 6}
+                                 matching-source
+                                 0
+                                 0)]}}))
+     (is (not
+          (tp-rule-filter-matches?
+           nodes
+           filter
+           {:feedback {:results [(aor-types/->FeedbackImpl {"def" 6}
+                                                           matching-source
+                                                           0
+                                                           0)]}})))
+     (is (not (tp-rule-filter-matches?
+               nodes
+               filter
+               {:feedback {:results [(aor-types/->valid-FeedbackImpl
+                                      {"abc" "6"}
+                                      matching-source
+                                      0
+                                      0)]}})))
+
+     (bind filter
+       (aor-types/->valid-LatencyFilter (aor-types/->valid-ComparatorSpec :> 10)))
+     (is (= #{} (aor-types/dependency-rule-names filter)))
+     (is (not (tp-rule-filter-matches?
+               root
+               filter
+               {:start-time-millis  10
+                :finish-time-millis 20})))
+     (is (tp-rule-filter-matches?
+          root
+          filter
+          {:start-time-millis  10
+           :finish-time-millis 21}))
+     (is (tp-rule-filter-matches?
+          nodes
+          filter
+          {:start-time-millis  10
+           :finish-time-millis 21}))
+
+     (bind filter (aor-types/->valid-ErrorFilter))
+     (is (= #{} (aor-types/dependency-rule-names filter)))
+     (is (not (tp-rule-filter-matches? root filter {})))
+     (is (not (tp-rule-filter-matches? nodes filter {})))
+     (is (not (tp-rule-filter-matches? root filter {:exception-summaries []})))
+     (is
+      (tp-rule-filter-matches?
+       root
+       filter
+       {:exception-summaries [(aor-types/->ExceptionSummary "aaa" "bbb" (h/random-uuid7))]}))
+     (is
+      (not
+       (tp-rule-filter-matches?
+        nodes
+        filter
+        {:exceptions []})))
+     (is
+      (tp-rule-filter-matches?
+       nodes
+       filter
+       {:exceptions ["abc"]}))
+
+
+     (bind filter
+       (aor-types/->valid-InputMatchFilter "$[0].a" #"abc"))
+     (is (= #{} (aor-types/dependency-rule-names filter)))
+     (is (not (tp-rule-filter-matches? root filter {:invoke-args [{"a" "aaa"} {"b" "abc"}]})))
+     (is (tp-rule-filter-matches? root filter {:invoke-args [{"a" "qqqabcqqq"}]}))
+     (is (not (tp-rule-filter-matches? nodes filter {:input [{"a" "aaa"}]})))
+     (is (tp-rule-filter-matches? nodes filter {:input [{"a" "qqqabcqqq"}]}))
+
+     (bind filter
+       (aor-types/->valid-OutputMatchFilter "$[0].args[1]" #"abc"))
+     (is (= #{} (aor-types/dependency-rule-names filter)))
+     (is (not
+          (tp-rule-filter-matches? root
+                                   filter
+                                   {:result (aor-types/->AgentResult [{"args" [1 "aaa"]}] false)})))
+     (is (tp-rule-filter-matches? root
+                                  filter
+                                  {:result (aor-types/->AgentResult [{"args" [1 "1abc2"]}] false)}))
+     (is (not
+          (tp-rule-filter-matches? nodes
+                                   filter
+                                   {:result (aor-types/->AgentResult [{"args" [1 "aaa"]}] false)})))
+     (is (tp-rule-filter-matches? nodes
+                                  filter
+                                  {:result (aor-types/->AgentResult [{"args" [1 "1abc2"]}] false)}))
+     (is
+      (not (tp-rule-filter-matches? nodes
+                                    filter
+                                    {:emits [(aor-types/->AgentNodeEmit id nil 0 "a" [0 "aaa"])]})))
+     (is (tp-rule-filter-matches? nodes
+                                  filter
+                                  {:emits [(aor-types/->AgentNodeEmit id nil 0 "a" [0 "1abc2"])]}))
+
+
+
+     (bind token-filter
+       (fn [k v]
+         (aor-types/->valid-TokenCountFilter k (aor-types/->valid-ComparatorSpec :> v))))
+     (is (= #{} (aor-types/dependency-rule-names (token-filter :input 1))))
+
+     (bind root-stats
+       (ai-stats
+        {(sa-ref "M1" "A1")
+         (sa-stats 4
+                   (bai-stats {:other    (op-stats 5 10)
+                               :db-write (op-stats 3 7)}
+                              1
+                              2
+                              3
+                              {"abc" (op-stats 1020 1040)
+                               "q"   (op-stats 1 2)}))
+
+        }
+        (bai-stats
+         {:agent-call (op-stats 6 25)}
+         10
+         11
+         12
+         {"abc" (op-stats 1 3)})))
+
+     (is (not (tp-rule-filter-matches? root
+                                       (token-filter :input 11)
+                                       {:stats root-stats})))
+     (is (tp-rule-filter-matches? root
+                                  (token-filter :input 10)
+                                  {:stats root-stats}))
+     (is (not (tp-rule-filter-matches? root
+                                       (token-filter :output 13)
+                                       {:stats root-stats})))
+     (is (tp-rule-filter-matches? root
+                                  (token-filter :output 12)
+                                  {:stats root-stats}))
+     (is (not (tp-rule-filter-matches? root
+                                       (token-filter :total 15)
+                                       {:stats root-stats})))
+     (is (tp-rule-filter-matches? root
+                                  (token-filter :total 14)
+                                  {:stats root-stats}))
+
+
+     (bind nested-ops
+       [(aor-types/->NestedOpInfoImpl
+         0
+         0
+         :other
+         {"inputTokenCount"  1000
+          "outputTokenCount" 1000
+          "totalTokenCount"  1000})
+        (aor-types/->NestedOpInfoImpl
+         0
+         0
+         :model-call
+         {"inputTokenCount" 1
+          "totalTokenCount" 3})
+        (aor-types/->NestedOpInfoImpl
+         0
+         0
+         :model-call
+         {"inputTokenCount"  10
+          "outputTokenCount" 11
+          "totalTokenCount"  12})
+        (aor-types/->NestedOpInfoImpl
+         0
+         0
+         :model-call
+         {"outputTokenCount" 101})])
+
+     (is (not (tp-rule-filter-matches? nodes
+                                       (token-filter :input 11)
+                                       {:nested-ops nested-ops})))
+     (is (tp-rule-filter-matches? nodes
+                                  (token-filter :input 10)
+                                  {:nested-ops nested-ops}))
+     (is (not (tp-rule-filter-matches? nodes
+                                       (token-filter :output 112)
+                                       {:nested-ops nested-ops})))
+     (is (tp-rule-filter-matches? nodes
+                                  (token-filter :output 111)
+                                  {:nested-ops nested-ops}))
+     (is (not (tp-rule-filter-matches? nodes
+                                       (token-filter :total 15)
+                                       {:nested-ops nested-ops})))
+     (is (tp-rule-filter-matches? nodes
+                                  (token-filter :total 14)
+                                  {:nested-ops nested-ops}))
+
+     (bind filter (aor-types/->valid-AndFilter []))
+     (is (tp-rule-filter-matches? root filter {}))
+     (bind filter
+       (aor-types/->valid-AndFilter
+        [(aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :> 10))
+         (aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :< 20))]))
+     (is (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 111}))
+     (is (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 118}))
+     (is (not
+          (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 110})))
+     (is (not
+          (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 120})))
+
+     (bind filter
+       (aor-types/->valid-AndFilter
+        [(aor-types/->valid-FeedbackFilter "xyz" "a" (aor-types/->ComparatorSpec :> 10))
+         (aor-types/->valid-FeedbackFilter "xyz" "b" (aor-types/->ComparatorSpec :> 10))
+         (aor-types/->valid-FeedbackFilter "cba" "a" (aor-types/->ComparatorSpec :> 10))]))
+     (is (= #{"xyz" "cba"} (aor-types/dependency-rule-names filter)))
+
+     (bind filter (aor-types/->valid-OrFilter []))
+     (is (not (tp-rule-filter-matches? root filter {})))
+     (bind filter
+       (aor-types/->valid-OrFilter
+        [(aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :< 10))
+         (aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :> 20))]))
+     (is (not
+          (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 111})))
+     (is (not
+          (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 118})))
+     (is (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 101}))
+     (is (tp-rule-filter-matches? root filter {:start-time-millis 100 :finish-time-millis 125}))
+     (bind filter
+       (aor-types/->valid-OrFilter
+        [(aor-types/->valid-FeedbackFilter "xyz" "a" (aor-types/->ComparatorSpec :> 10))
+         (aor-types/->valid-FeedbackFilter "xyz" "b" (aor-types/->ComparatorSpec :> 10))
+         (aor-types/->valid-FeedbackFilter "cba" "a" (aor-types/->ComparatorSpec :> 10))]))
+     (is (= #{"xyz" "cba"} (aor-types/dependency-rule-names filter)))
+
+
+     (bind filter
+       (aor-types/->valid-NotFilter
+        (aor-types/->valid-LatencyFilter (aor-types/->ComparatorSpec :> 10))))
+     (is (tp-rule-filter-matches? root filter {:start-time-millis 10 :finish-time-millis 18}))
+     (is (not
+          (tp-rule-filter-matches? root filter {:start-time-millis 10 :finish-time-millis 100})))
+     (bind filter
+       (aor-types/->valid-NotFilter
+        (aor-types/->valid-FeedbackFilter "xyz" "a" (aor-types/->ComparatorSpec :> 10))))
+     (is (= #{"xyz"} (aor-types/dependency-rule-names filter)))
+    )))
+
+(defn expected-counts
+  [m]
+  (->> (for [[task-id agents]   m
+             [agent-name rules] agents
+             [rule-name count]  rules]
+         [{:task-id    task-id
+           :agent-name agent-name
+           :rule-name  rule-name}
+          count])
+       (into {})))
+
+(deftest to-action-queue-test
+  (let [data   {0 {"A" {"A-R1" 1
+                        "A-R2" 3}
+                   "B" {"B-R1" 0
+                        "B-R2" 1
+                        "B-R3" 4}}
+                1 {"A" {"A-R1" 2
+                        "A-R2" 1}
+                   "B" {"B-R1" 1
+                        "B-R2" 2
+                        "B-R3" 3}}
+                2 {"A" {"A-R1" 3}
+                   "B" {"B-R1" 3
+                        "B-R2" 1
+                        "B-R3" 9}}}
+        out    (vec (ana/to-action-queue data))
+        freqs  (frequencies out)
+        expect (expected-counts data)]
+    (is (= (into {} (remove (comp zero? val) expect))
+           freqs))))
+
+(deftest sample?-test
+  (letlocals
+   (bind counter (volatile! 0))
+   (dotimes [_ 10000]
+     (if (ana/sample? 0.5) (vswap! counter inc)))
+   (is (< 4500 @counter 5500))
+   (bind counter (volatile! 0))
+   (dotimes [_ 10000]
+     (if (ana/sample? 0.25) (vswap! counter inc)))
+   (is (< 2000 @counter 3000))
+  ))
+
+(defn split-on
+  [delim coll]
+  (remove #(= [delim] %)
+   (partition-by #(= % delim) coll)))
+
+(def ACTIONS)
+(def TICKS)
+
+(deftest actions-test
+  (let [sample-rates (atom [])
+        sample-atom  (atom true)
+        event-log    (atom [])]
+    (with-redefs [ACTIONS (atom [])
+                  TICKS (atom 0)
+                  i/SUBSTITUTE-TICK-DEPOTS true
+
+                  i/hook:analytics-tick
+                  (fn [& args] (swap! TICKS inc))
+
+                  ana/sample?
+                  (fn [sampling-rate]
+                    (swap! sample-rates conj sampling-rate)
+                    @sample-atom)
+
+                  ana/hook:run-action
+                  (fn [run-info]
+                    (swap! event-log conj (:rule-name run-info)))
+
+                  ana/hook:analytics-loop-iter*
+                  (fn [& args]
+                    (swap! event-log conj :loop))
+
+                  anode/gen-node-id
+                  (fn [& args]
+                    (h/random-uuid7-at-timestamp (h/current-time-millis)))
+
+                  at/gen-new-agent-id
+                  (fn [agent-name]
+                    (if (#{"foo" "bar"} agent-name)
+                      (do
+                        (let [ret (h/random-uuid7-at-timestamp (h/current-time-millis))]
+                          (TopologyUtils/advanceSimTime 10000)
+                          ret
+                        ))
+                      (h/random-uuid7)))]
+      (with-open [ipc (rtest/create-ipc)
+                  _ (TopologyUtils/startSimTime)]
+        (letlocals
+         (bind module
+           (aor/agentmodule
+            [topology]
+            (aor/declare-action-builder
+             topology
+             "action1"
+             "does a thing"
+             (fn [params]
+               (fn [fetcher input output run-info]
+                 (swap! ACTIONS conj
+                   [:action1
+                    input
+                    output
+                    (select-keys run-info
+                                 [:action-name :agent-name :node-name :type :latency-millis])
+                    (select [:feedback ALL :scores] run-info)
+                    (mapv aor-types/NestedOpInfoImpl? (:nested-ops run-info))
+                    (aor-types/AgentInvokeStatsImpl? (:agent-stats run-info))
+                   ])
+                 {"abc" "ccc"
+                  "xyz" "..."}
+               )))
+            (aor/declare-action-builder
+             topology
+             "action2"
+             "does a thing 2"
+             (fn [params]
+               (fn [fetcher input output run-info]
+                 (swap! ACTIONS conj
+                   [:action2 input output params])
+                 {"abc" (str input "-" output)
+                  "xyz" "zyx"}))
+             {:params {"a1" {:description "param1" :default "1"}
+                       "a2" {:description "param2"}}
+              :limit-concurrency? true})
+            (TestSnippets/declareActionBuilders topology)
+            (-> topology
+                (aor/new-agent "foo")
+                (aor/node
+                 "start"
+                 "node1"
+                 (fn [agent-node input]
+                   (aor/emit! agent-node "node1" (str input "!"))))
+                (aor/node
+                 "node1"
+                 nil
+                 (fn [agent-node input]
+                   (aor/result! agent-node (str input "?")))))
+            (-> topology
+                (aor/new-agent "bar")
+                (aor/node
+                 "begin"
+                 "n1"
+                 (fn [agent-node input]
+                   (if (map? input)
+                     (aor/emit! agent-node "n1" (setval [MAP-VALS END] "+" input))
+                     (aor/emit! agent-node "n1" (str input "+")))))
+                (aor/node
+                 "n1"
+                 nil
+                 (fn [agent-node input]
+                   (if (map? input)
+                     (do
+                       (aor/record-nested-op! agent-node :other 1 2 {})
+                       (TopologyUtils/advanceSimTime 1)
+                       (aor/result! agent-node (setval [MAP-VALS END] "-" input)))
+                     (aor/result! agent-node (str input "-"))))))
+           ))
+         (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+         (bind module-name (get-module-name module))
+         (bind agent-manager (aor/agent-manager ipc module-name))
+         (bind global-actions-depot
+           (:global-actions-depot (aor-types/underlying-objects agent-manager)))
+         (bind foo (aor/agent-client agent-manager "foo"))
+         (bind bar (aor/agent-client agent-manager "bar"))
+         (bind ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
+         (bind foo-cursors
+           (foreign-pstate ipc module-name (po/agent-rule-cursors-task-global-name "foo")))
+
+         (bind foo-rules
+           (:agent-rules-pstate (aor-types/underlying-objects
+                                 foo)))
+
+         (bind all-action-builders-query
+           (:all-action-builders-query (aor-types/underlying-objects agent-manager)))
+
+         (bind all-builders (foreign-invoke-query all-action-builders-query))
+         (is (= #{"aor/eval" "action1" "action2" "action3" "action4"} (set (keys all-builders))))
+
+         (TopologyUtils/advanceSimTime 1000)
+
+         (bind foo-root
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name "foo")))
+         (bind bar-root
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name "bar")))
+
+         (bind foo-feedback
+           (fn [{:keys [task-id agent-invoke-id]}]
+             (foreign-select-one [(keypath agent-invoke-id) :feedback :results]
+                                 foo-root
+                                 {:pkey task-id})
+           ))
+
+         (bind foo-action-log (:action-log-query (aor-types/underlying-objects foo)))
+
+         (bind cycle!
+           (fn []
+             (reset! TICKS 0)
+             (reset! sample-rates [])
+             (reset! ACTIONS [])
+             (reset! event-log [])
+             (foreign-append! ana-depot nil)
+             (is (condition-attained? (> @TICKS 0)))
+             (rtest/pause-microbatch-topology! ipc
+                                               module-name
+                                               aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
+             (rtest/resume-microbatch-topology! ipc
+                                                module-name
+                                                aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)))
+
+
+         (aor/create-evaluator! agent-manager
+                                "concise5"
+                                "aor/conciseness"
+                                {"threshold" "5"}
+                                "")
+         (aor/create-evaluator! agent-manager
+                                "concise7"
+                                "aor/conciseness"
+                                {"threshold" "7"}
+                                "")
+         (aor/create-evaluator! agent-manager
+                                "mconcise5"
+                                "aor/conciseness"
+                                {"threshold" "5"}
+                                ""
+                                {:output-json-path "$.abc"})
+
+         (ana/add-rule! global-actions-depot
+                        "eval1"
+                        "foo"
+                        {:action-name       "aor/eval"
+                         :action-params     {"name" "concise5"}
+                         :filter            (aor-types/->AndFilter [])
+                         :sampling-rate     0.5
+                         :start-time-millis 15000
+                         :include-failures? false
+                        })
+
+
+         (bind inv1 (aor/agent-initiate foo "ab"))
+         (bind inv2 (aor/agent-initiate foo ".."))
+         (bind inv3 (aor/agent-initiate foo "abcd"))
+         (bind inv4 (aor/agent-initiate foo ".."))
+         (is (= "ab!?" (aor/agent-result foo inv1)))
+         (is (= "..!?" (aor/agent-result foo inv2)))
+         (is (= "abcd!?" (aor/agent-result foo inv3)))
+         (is (= "..!?" (aor/agent-result foo inv4)))
+
+         (cycle!)
+
+         (is (nil? (foo-feedback inv1)))
+         (is (nil? (foo-feedback inv2)))
+         (bind fb (foo-feedback inv3))
+         (is (= 1 (count fb)))
+         (is (= {"concise?" false}
+                (-> fb
+                    first
+                    :scores)))
+         (is (= "concise5"
+                (-> fb
+                    first
+                    :source
+                    :eval-name)))
+
+         (bind fb (foo-feedback inv4))
+         (is (= {"concise?" true}
+                (-> fb
+                    first
+                    :scores)))
+         (is (= "concise5"
+                (-> fb
+                    first
+                    :source
+                    :eval-name)))
+
+         (is (= [0.5 0.5] @sample-rates))
+
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a1"
+          "foo"
+          {:action-name       "action1"
+           :action-params     {}
+           :filter            (aor-types/->FeedbackFilter "eval1"
+                                                          "concise?"
+                                                          (aor-types/->ComparatorSpec := true))
+           :sampling-rate     1.0
+           :start-time-millis 0
+           :include-failures? false
+          })
+
+
+         (bind inv5 (aor/agent-initiate foo "."))
+         (is (= ".!?" (aor/agent-result foo inv5)))
+
+         (cycle!)
+
+         (bind fb (foo-feedback inv5))
+         (is (= {"concise?" true}
+                (-> fb
+                    first
+                    :scores)))
+         (is (= "concise5"
+                (-> fb
+                    first
+                    :source
+                    :eval-name)))
+         (is (= {0.5 1 1.0 1} (frequencies @sample-rates)))
+         (is (= @ACTIONS
+                [[:action1 [".."] "..!?"
+                  {:action-name    "action1"
+                   :agent-name     "foo"
+                   :node-name      nil
+                   :type           :agent
+                   :latency-millis 0}
+                  [{"concise?" true}]
+                  []
+                  true]]))
+
+         (cycle!)
+         (is (= [1.0] @sample-rates))
+         (is (= @ACTIONS
+                [[:action1 ["."] ".!?"
+                  {:action-name    "action1"
+                   :agent-name     "foo"
+                   :node-name      nil
+                   :type           :agent
+                   :latency-millis 0}
+                  [{"concise?" true}]
+                  []
+                  true]]))
+
+         ;; sanity check
+         (is (= 51000 (h/current-time-millis)))
+
+         (ana/add-rule!
+          global-actions-depot
+          "eval2"
+          "foo"
+          {:action-name       "aor/eval"
+           :action-params     {"name" "concise7"}
+           :filter            (aor-types/->FeedbackFilter "eval1"
+                                                          "concise?"
+                                                          (aor-types/->ComparatorSpec :not= ""))
+           :sampling-rate     0.1
+           :start-time-millis 50000
+           :include-failures? false
+          })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a2"
+          "foo"
+          {:action-name       "action2"
+           :action-params     {"a1" "1a"
+                               "a2" "XYZ"}
+           :filter            (aor-types/->AndFilter
+                               [(aor-types/->FeedbackFilter "eval1"
+                                                            "concise?"
+                                                            (aor-types/->ComparatorSpec := false))
+                                (aor-types/->FeedbackFilter "eval2"
+                                                            "concise?"
+                                                            (aor-types/->ComparatorSpec := true))
+                                (aor-types/->InputMatchFilter "$[0]" #"a")])
+           :sampling-rate     0.7
+           :start-time-millis 50000
+           :include-failures? false
+          })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a3"
+          "foo"
+          {:action-name       "action3"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.8
+           :start-time-millis 50000
+           :include-failures? false
+          })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a4"
+          "foo"
+          {:action-name       "action4"
+           :action-params     {"jparam1" "ZZZ"}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.9
+           :start-time-millis 50000
+           :include-failures? false
+          })
+
+
+         (bind inv (aor/agent-initiate foo "aaaa"))
+         (is (= "aaaa!?" (aor/agent-result foo inv)))
+
+         (reset! sample-atom false)
+         (cycle!)
+         (is (= {0.5 1 0.8 1 0.9 1} (frequencies @sample-rates)))
+         (is (= [] @ACTIONS))
+         (reset! sample-atom true)
+         (cycle!)
+         (is (= {} (frequencies @sample-rates)))
+         (is (= [] @ACTIONS))
+         (cycle!)
+         (is (= {} (frequencies @sample-rates)))
+         (is (= [] @ACTIONS))
+
+         (bind inv1 (aor/agent-initiate foo "dcba"))
+         (is (= "dcba!?" (aor/agent-result foo inv1)))
+         (bind inv2 (aor/agent-initiate foo "aaaaaaa"))
+         (is (= "aaaaaaa!?" (aor/agent-result foo inv2)))
+         (bind inv3 (aor/agent-initiate foo "...."))
+         (is (= "....!?" (aor/agent-result foo inv3)))
+         (bind inv4 (aor/agent-initiate foo "aaaa"))
+         (is (= "aaaa!?" (aor/agent-result foo inv4)))
+         (cycle!)
+         (is (= {0.5 4 0.8 4 0.9 4} (frequencies @sample-rates)))
+         (is (= @ACTIONS []))
+         (cycle!)
+         (is (= {0.1 4} (frequencies @sample-rates)))
+         (is (= [] @ACTIONS))
+         (cycle!)
+         ;; this is rule dependent on eval2 which is dependent on eval1, which is why it takes 3
+         ;; iters
+         (is (= {0.7 2} (frequencies @sample-rates)))
+         (is (= 2 (count @ACTIONS)))
+         (is (= (set @ACTIONS)
+                #{[:action2 ["dcba"] "dcba!?" {"a1" "1a" "a2" "XYZ"}]
+                  [:action2 ["aaaa"] "aaaa!?" {"a1" "1a" "a2" "XYZ"}]}))
+
+
+         (bind {:keys [actions pagination-params]}
+           (foreign-invoke-query foo-action-log "foo-a3" 2 nil))
+         (bind all-actions actions)
+         (bind {:keys [actions pagination-params]}
+           (foreign-invoke-query foo-action-log "foo-a3" 2 pagination-params))
+         (bind all-actions (mapv :action (concat all-actions actions)))
+         (is (= {0 nil 1 nil} pagination-params))
+         (is (= 4 (count all-actions)))
+         (is (every? :success? all-actions))
+         (is (every? #(aor-types/AgentInvokeImpl? (:agent-invoke %)) all-actions))
+         (is (every? #(nil? (:node-invoke %)) all-actions))
+         ;; actions aren't done in strict order across tasks
+         (is (= #{{"output" "aaaa!?" "input" ["aaaa"]}
+                  {"output" "....!?" "input" ["...."]}
+                  {"output" "aaaaaaa!?" "input" ["aaaaaaa"]}
+                  {"output" "dcba!?" "input" ["dcba"]}}
+                (set (mapv :info-map all-actions))))
+
+
+
+         (bind {:keys [actions pagination-params]}
+           (foreign-invoke-query foo-action-log "foo-a4" 10 nil))
+         (bind all-actions (mapv :action actions))
+         (is (every? :success? all-actions))
+         (is (= #{{"output" "aaaa!?" "input" ["aaaa"] "params" {"jparam1" "ZZZ"}}
+                  {"output" "....!?" "input" ["...."] "params" {"jparam1" "ZZZ"}}
+                  {"output" "aaaaaaa!?" "input" ["aaaaaaa"] "params" {"jparam1" "ZZZ"}}
+                  {"output" "dcba!?" "input" ["dcba"] "params" {"jparam1" "ZZZ"}}}
+                (set (mapv :info-map all-actions))))
+
+
+         (is (= #{"foo-a1" "foo-a2" "foo-a3" "foo-a4" "eval1" "eval2"}
+                (set (keys (foreign-select-one STAY foo-cursors)))))
+         (is (= #{"foo-a1" "foo-a2" "foo-a3" "foo-a4" "eval1" "eval2"}
+                (set (keys (ana/fetch-agent-rules foo-rules)))))
+
+
+         (is (thrown? Exception (ana/delete-rule! global-actions-depot "foo" "eval1")))
+         (cycle!)
+         (is (= #{"foo-a1" "foo-a2" "foo-a3" "foo-a4" "eval1" "eval2"}
+                (set (keys (foreign-select-one STAY foo-cursors)))))
+         (is (= #{"foo-a1" "foo-a2" "foo-a3" "foo-a4" "eval1" "eval2"}
+                (set (keys (ana/fetch-agent-rules foo-rules)))))
+
+         ;; verify cursors get deleted for deleted rule on next microbatch
+         (ana/delete-rule! global-actions-depot "foo" "foo-a3")
+         (cycle!)
+         (is (= #{"foo-a1" "foo-a2" "foo-a4" "eval1" "eval2"}
+                (set (keys (foreign-select-one STAY foo-cursors)))))
+         (is (= #{"foo-a1" "foo-a2" "foo-a4" "eval1" "eval2"}
+                (set (keys (ana/fetch-agent-rules foo-rules)))))
+
+
+         (ana/delete-rule! global-actions-depot "foo" "foo-a4")
+         (ana/delete-rule! global-actions-depot "foo" "foo-a2")
+         (ana/delete-rule! global-actions-depot "foo" "foo-a1")
+         (ana/delete-rule! global-actions-depot "foo" "eval2")
+         (ana/delete-rule! global-actions-depot "foo" "eval1")
+         (is (= #{}
+                (set (keys (ana/fetch-agent-rules foo-rules)))))
+         (cycle!)
+         (is (= #{}
+                (set (keys (foreign-select-one STAY foo-cursors)))))
+
+         (TopologyUtils/advanceSimTime 1000)
+
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a1"
+          "foo"
+          {:action-name       "action1"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.5
+           :start-time-millis (h/current-time-millis)
+           :include-failures? false
+          })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a2"
+          "foo"
+          {:action-name       "action2"
+           :action-params     {"a1" "!"
+                               "a2" "?"}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.6
+           :start-time-millis (h/current-time-millis)
+           :include-failures? false
+          })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a1" ; give it same name to verify they're independent
+          "bar"
+          {:action-name       "action1"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.55
+           :start-time-millis (h/current-time-millis)
+           :include-failures? false
+          })
+         (ana/add-rule!
+          global-actions-depot
+          "bar-a1"
+          "bar"
+          {:action-name       "action1"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.65
+           :start-time-millis (h/current-time-millis)
+           :include-failures? false
+          })
+
+         (TopologyUtils/advanceSimTime 1000)
+
+
+         (bind invf (aor/agent-initiate foo "lmno"))
+         (is (= "lmno!?" (aor/agent-result foo invf)))
+         (bind invb (aor/agent-initiate bar "mmmm"))
+         (is (= "mmmm+-" (aor/agent-result bar invb)))
+         (cycle!)
+         (is (= {0.5 1 0.55 1 0.6 1 0.65 1} (frequencies @sample-rates)))
+         (is (= 4 (count @ACTIONS)))
+         (is (= (frequencies @ACTIONS)
+                {[:action1
+                  ["lmno"]
+                  "lmno!?"
+                  {:action-name    "action1"
+                   :agent-name     "foo"
+                   :node-name      nil
+                   :type           :agent
+                   :latency-millis 0}
+                  []
+                  []
+                  true]
+                 1
+
+                 [:action2 ["lmno"] "lmno!?" {"a1" "!" "a2" "?"}]
+                 1
+
+                 [:action1
+                  ["mmmm"]
+                  "mmmm+-"
+                  {:action-name    "action1"
+                   :agent-name     "bar"
+                   :node-name      nil
+                   :type           :agent
+                   :latency-millis 0}
+                  []
+                  []
+                  true]
+                 2}))
+
+         (ana/delete-rule! global-actions-depot "foo" "foo-a2")
+         (ana/delete-rule! global-actions-depot "bar" "foo-a1")
+         (ana/delete-rule! global-actions-depot "bar" "bar-a1")
+         (cycle!)
+
+         ;; still have foo/foo-a1 at 0.5 sampling rate
+
+         (TopologyUtils/advanceSimTime 1000)
+         (ana/add-rule!
+          global-actions-depot
+          "foo-start"
+          "foo"
+          {:action-name       "action1"
+           :node-name         "start"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.51
+           :start-time-millis (h/current-time-millis)
+           :include-failures? false
+          })
+
+
+         (ana/add-rule! global-actions-depot
+                        "meval"
+                        "bar"
+                        {:node-name         "n1"
+                         :action-name       "aor/eval"
+                         :action-params     {"name" "mconcise5"}
+                         :filter            (aor-types/->AndFilter [])
+                         :sampling-rate     0.52
+                         :start-time-millis (h/current-time-millis)
+                         :include-failures? false
+                        })
+
+         (ana/add-rule!
+          global-actions-depot
+          "bar-n1"
+          "bar"
+          {:node-name         "n1"
+           :action-name       "action1"
+           :action-params     {}
+           :filter            (aor-types/->FeedbackFilter "meval"
+                                                          "concise?"
+                                                          (aor-types/->ComparatorSpec :not= "a"))
+           :sampling-rate     0.53
+           :start-time-millis (h/current-time-millis)
+           :include-failures? false
+          })
+
+         (TopologyUtils/advanceSimTime 1000)
+
+         (bind invf (aor/agent-initiate foo "aaaa"))
+         (is (= "aaaa!?" (aor/agent-result foo invf)))
+         (bind invb (aor/agent-initiate bar {"abc" "nnmm"}))
+         (is (= {"abc" "nnmm+-"} (aor/agent-result bar invb)))
+
+         (cycle!)
+         (is (= {0.5 1 0.51 1 0.52 1} (frequencies @sample-rates)))
+         (is (= 2 (count @ACTIONS)))
+         (is (= (set @ACTIONS)
+                #{[:action1 ["aaaa"] "aaaa!?"
+                   {:action-name    "action1"
+                    :agent-name     "foo"
+                    :node-name      nil
+                    :type           :agent
+                    :latency-millis 0}
+                   []
+                   []
+                   true]
+                  [:action1 ["aaaa"] [{"node" "node1" "args" ["aaaa!"]}]
+                   {:action-name    "action1"
+                    :agent-name     "foo"
+                    :node-name      "start"
+                    :type           :node
+                    :latency-millis 0}
+                   []
+                   []
+                   false]}))
+
+         (cycle!)
+         (is (= {0.53 1} (frequencies @sample-rates)))
+         (is (= @ACTIONS
+                [[:action1 [{"abc" "nnmm+"}] {"abc" "nnmm+-"}
+                  {:action-name    "action1"
+                   :agent-name     "bar"
+                   :node-name      "n1"
+                   :type           :node
+                   :latency-millis 1}
+                  [{"concise?" false}]
+                  [true]
+                  false]]))
+
+
+         (bind {:keys [actions pagination-params]}
+           (foreign-invoke-query foo-action-log "foo-start" 10 nil))
+         (is (= 1 (count actions)))
+         (bind a
+           (-> actions
+               first
+               :action))
+         (is (= {"abc" "ccc" "xyz" "..."}
+                (:info-map a)))
+         (is (:success? a))
+         (is (aor-types/AgentInvokeImpl? (:agent-invoke a)))
+         (is (aor-types/NodeInvokeImpl? (:node-invoke a)))
+
+         (is (= {0 nil 1 nil} pagination-params))
+
+
+         (foreign-append! global-actions-depot (aor-types/change-max-limited-actions-concurrency 2))
+
+
+         ;; now verify concurrency control and limited vs. unlimited actions processing
+
+         (ana/delete-rule! global-actions-depot "foo" "foo-start")
+         (ana/delete-rule! global-actions-depot "bar" "foo-a1")
+         (ana/delete-rule! global-actions-depot "bar" "bar-n1")
+         (ana/delete-rule! global-actions-depot "bar" "meval")
+         (cycle!)
+
+
+         (ana/add-rule! global-actions-depot
+                        "eval1"
+                        "foo"
+                        {:action-name       "aor/eval"
+                         :action-params     {"name" "concise5"}
+                         :filter            (aor-types/->AndFilter [])
+                         :sampling-rate     0.6
+                         :start-time-millis (h/current-time-millis)
+                         :include-failures? false
+                        })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a1"
+          "foo"
+          {:action-name       "action1"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.61
+           :start-time-millis (h/current-time-millis)
+           :include-failures? false
+          })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-a2"
+          "foo"
+          {:action-name       "action2"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.62
+           :start-time-millis (h/current-time-millis)
+           :include-failures? false
+          })
+
+
+         (bind inv1 (aor/agent-initiate foo "a"))
+         (bind inv2 (aor/agent-initiate foo "bbbb"))
+         (bind inv3 (aor/agent-initiate foo "c"))
+         ;; verifies agent runs from experiments are ignored
+         (bind inv4
+           (binding [aor-types/OPERATION-SOURCE
+                     (aor-types/->valid-ExperimentSourceImpl (h/random-uuid7) (h/random-uuid7))]
+             (aor/agent-initiate foo "d")))
+         (bind inv5 (aor/agent-initiate foo "e"))
+         (is (= "a!?" (aor/agent-result foo inv1)))
+         (is (= "bbbb!?" (aor/agent-result foo inv2)))
+         (is (= "c!?" (aor/agent-result foo inv3)))
+         (is (= "d!?" (aor/agent-result foo inv4)))
+         (is (= "e!?" (aor/agent-result foo inv5)))
+         (cycle!)
+
+         (bind iters (split-on :loop @event-log))
+         (is (= (repeat 4 "foo-a1") (first iters)))
+         (is (every? #(= 2 (count %)) (rest iters)))
+         (is (= #{"foo-a2" "eval1"} (set (apply concat (rest iters)))))
+        )))))
+
+(deftest action-failures-test
+  (with-redefs [TICKS (atom 0)
+                i/SUBSTITUTE-TICK-DEPOTS true
+
+                aor-types/get-config (max-retries-override 0)
+
+                ana/enable-action-error-logs? (constantly false)
+
+                anode/log-node-error (fn [& args])
+
+                i/hook:analytics-tick
+                (fn [& args] (swap! TICKS inc))
+
+                ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
+               ]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (aor/declare-evaluator-builder
+           topology
+           "my-eval"
+           ""
+           (fn [params]
+             (fn [fetcher input ref-output output]
+               (cond
+                 (= input ["bad-eval-return"])
+                 "invalid"
+
+                 (= input ["eval-exception"])
+                 (throw (ex-info "fail" {}))
+
+                 :else
+                 {"len" (count output)}))))
+          (aor/declare-action-builder
+           topology
+           "action1"
+           ""
+           (fn [params]
+             (fn [fetcher input output run-info]
+               (cond
+                 (= input ["bad-action-return"])
+                 "invalid"
+
+                 (= input ["action-exception"])
+                 (throw (ex-info "fail" {}))
+
+                 :else
+                 {"input"   input
+                  "output"  output
+                  "latency" (:latency-millis run-info)})
+             )))
+          (-> topology
+              (aor/new-agent "foo")
+              (aor/node
+               "start"
+               "node1"
+               (fn [agent-node input]
+                 (if (= input "fail-agent")
+                   (throw (ex-info "fail-agent" {}))
+                   (aor/emit! agent-node "node1" (str input "!")))))
+              (aor/node
+               "node1"
+               nil
+               (fn [agent-node input]
+                 (aor/result! agent-node (str input "?")))))
+         ))
+       (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind global-actions-depot
+         (:global-actions-depot (aor-types/underlying-objects agent-manager)))
+       (bind foo (aor/agent-client agent-manager "foo"))
+       (bind ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
+       (bind foo-action-log (:action-log-query (aor-types/underlying-objects foo)))
+
+       (bind last-action
+         (fn [action-name]
+           (-> foo-action-log
+               (foreign-invoke-query action-name 1 nil)
+               :actions
+               first
+               :action)))
+
+       (bind fixed-node-invoke (aor-types/->valid-NodeInvokeImpl 0 (h/max-uuid)))
+
+       (bind last-action-normed
+         (fn [action-name]
+           (multi-transform
+            (multi-path
+             [:start-time-millis (termval 0)]
+             [:finish-time-millis (termval 0)]
+             [:node-invoke aor-types/NodeInvokeImpl? (termval fixed-node-invoke)]
+             [:info-map (keypath "latency") NONE>])
+            (last-action action-name))))
+
+
+       (bind cycle!
+         (fn []
+           (reset! TICKS 0)
+           (foreign-append! ana-depot nil)
+           (is (condition-attained? (> @TICKS 0)))
+           (rtest/pause-microbatch-topology! ipc
+                                             module-name
+                                             aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
+           (rtest/resume-microbatch-topology! ipc
+                                              module-name
+                                              aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)))
+
+       (aor/create-evaluator! agent-manager
+                              "eval1"
+                              "my-eval"
+                              {}
+                              "")
+
+       (ana/add-rule! global-actions-depot
+                      "eval-action"
+                      "foo"
+                      {:node-name         nil
+                       :action-name       "aor/eval"
+                       :action-params     {"name" "eval1"}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? false
+                      })
+       (ana/add-rule! global-actions-depot
+                      "foo-agent-fail"
+                      "foo"
+                      {:node-name         nil
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? true
+                      })
+       (ana/add-rule! global-actions-depot
+                      "foo-agent"
+                      "foo"
+                      {:node-name         nil
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? false
+                      })
+       (ana/add-rule! global-actions-depot
+                      "foo-start-fail"
+                      "foo"
+                      {:node-name         "start"
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? true
+                      })
+       (ana/add-rule! global-actions-depot
+                      "foo-start"
+                      "foo"
+                      {:node-name         "start"
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? false
+                      })
+
+
+       (bind inv (aor/agent-initiate foo "bad-action-return"))
+       (is (= "bad-action-return!?" (aor/agent-result foo inv)))
+
+       (cycle!)
+       (bind action (last-action "foo-agent"))
+       (is (not (:success? action)))
+       (is (= ["exception"] (keys (:info-map action))))
+       (is (h/contains-string? (get (:info-map action) "exception") "Action return must be map"))
+
+       (bind inv (aor/agent-initiate foo "action-exception"))
+       (is (= "action-exception!?" (aor/agent-result foo inv)))
+       (cycle!)
+       (bind action (last-action "foo-agent"))
+       (is (not (:success? action)))
+       (is (= ["exception"] (keys (:info-map action))))
+       (is (h/contains-string? (get (:info-map action) "exception")
+                               "clojure.lang.ExceptionInfo: fail"))
+
+       (bind inv (aor/agent-initiate foo "bad-eval-return"))
+       (is (= "bad-eval-return!?" (aor/agent-result foo inv)))
+       (cycle!)
+       (bind action (last-action "eval-action"))
+       (is (= #{"failure" "invoke" "success?"} (set (keys (:info-map action)))))
+       (is (= false (get (:info-map action) "success?")))
+       (is (h/contains-string? (get (:info-map action) "failure")
+                               "Invalid map of results"))
+
+       (bind inv (aor/agent-initiate foo "eval-exception"))
+       (is (= "eval-exception!?" (aor/agent-result foo inv)))
+       (cycle!)
+       (bind action (last-action "eval-action"))
+       (is (= #{"failure" "invoke" "success?"} (set (keys (:info-map action)))))
+       (is (= false (get (:info-map action) "success?")))
+       (is (h/contains-string? (get (:info-map action) "failure")
+                               "clojure.lang.ExceptionInfo: fail"))
+
+
+       (bind inv (aor/agent-initiate foo "a"))
+       (is (= "a!?" (aor/agent-result foo inv)))
+       (cycle!)
+       (bind ares
+         (aor-types/->valid-ActionLog
+          0
+          0
+          inv
+          nil
+          true
+          {"input" ["a"] "output" "a!?"}))
+       (is (= ares (last-action-normed "foo-agent") (last-action-normed "foo-agent-fail")))
+
+       (bind nres
+         (aor-types/->valid-ActionLog
+          0
+          0
+          inv
+          fixed-node-invoke
+          true
+          {"input" ["a"] "output" [{"node" "node1" "args" ["a!"]}]}))
+       (is (= nres (last-action-normed "foo-start") (last-action-normed "foo-start-fail")))
+
+       (bind inv (aor/agent-initiate foo "fail-agent"))
+       (is (thrown? Exception (aor/agent-result foo inv)))
+       (cycle!)
+       (is (= ares (last-action-normed "foo-agent")))
+       (is (= nres (last-action-normed "foo-start")))
+
+       (bind action (last-action "foo-agent-fail"))
+       (is (= inv (:agent-invoke action)))
+       (is (nil? (:node-invoke action)))
+       (is (:success? action))
+       (bind im (:info-map action))
+       (is (= ["fail-agent"] (get im "input")))
+       (is (instance? AgentFailedException (get im "output")))
+       (is (some? (get im "latency")))
+
+       (bind action (last-action "foo-start-fail"))
+       (is (= inv (:agent-invoke action)))
+       (is (some? (:node-invoke action)))
+       (is (:success? action))
+       (bind im (:info-map action))
+       (is (= ["fail-agent"] (get im "input")))
+       (is (= [] (get im "output")))
+       (is (nil? (get im "latency")))
+      ))))
+
+
+(def SEM-ATOM)
+
+(deftest actions-scanning-test
+  (with-redefs [TICKS (atom 0)
+                ACTIONS (atom [])
+                SEM-ATOM (atom nil)
+                i/SUBSTITUTE-TICK-DEPOTS true
+
+                i/hook:analytics-tick
+                (fn [& args] (swap! TICKS inc))
+
+                anode/gen-node-id
+                (fn [& args]
+                  (h/random-uuid7-at-timestamp (h/current-time-millis)))
+
+                at/gen-new-agent-id
+                (fn [agent-name]
+                  (if (#{"foo"} agent-name)
+                    (do
+                      (let [ret (h/random-uuid7-at-timestamp (h/current-time-millis))]
+                        (TopologyUtils/advanceSimTime 1000)
+                        ret
+                      ))
+                    (h/random-uuid7)))]
+    (with-open [ipc (rtest/create-ipc)
+                _ (TopologyUtils/startSimTime)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (aor/declare-action-builder
+           topology
+           "action1"
+           ""
+           (fn [params]
+             (fn [fetcher input output run-info]
+               (swap! ACTIONS conj [(:rule-name run-info) (:node-name run-info) input output])
+               {}
+             )))
+          (-> topology
+              (aor/new-agent "foo")
+              (aor/node
+               "start"
+               "node1"
+               (fn [agent-node input]
+                 (if-let [sem @SEM-ATOM]
+                   (h/acquire-semaphore sem))
+                 (aor/emit! agent-node "node1" (str input "!"))))
+              (aor/node
+               "node1"
+               nil
+               (fn [agent-node input]
+                 (aor/result! agent-node (str input "?")))))
+         ))
+       (rtest/launch-module! ipc module {:tasks 1 :threads 1})
+       (bind module-name (get-module-name module))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind global-actions-depot
+         (:global-actions-depot (aor-types/underlying-objects agent-manager)))
+       (bind foo (aor/agent-client agent-manager "foo"))
+       (bind ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
+
+
+       (bind cycle!
+         (fn []
+           (reset! TICKS 0)
+           (reset! ACTIONS [])
+           (foreign-append! ana-depot nil)
+           (is (condition-attained? (> @TICKS 0)))
+           (rtest/pause-microbatch-topology! ipc
+                                             module-name
+                                             aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
+           (rtest/resume-microbatch-topology! ipc
+                                              module-name
+                                              aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)))
+
+       (bind wait-acquired!
+         (fn [^java.util.concurrent.Semaphore sem]
+           (is (condition-attained? (> (.getQueueLength sem) 0)))
+         ))
+
+       (ana/add-rule! global-actions-depot
+                      "foo-agent"
+                      "foo"
+                      {:node-name         nil
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? true
+                      })
+       (ana/add-rule! global-actions-depot
+                      "foo-start"
+                      "foo"
+                      {:node-name         "start"
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? false
+                      })
+       (ana/add-rule! global-actions-depot
+                      "foo-start-fail"
+                      "foo"
+                      {:node-name         "start"
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? true
+                      })
+
+
+
+       (bind inv (aor/agent-initiate foo "a"))
+       (is (= "a!?" (aor/agent-result foo inv)))
+       (bind inv (aor/agent-initiate foo "b"))
+       (is (= "b!?" (aor/agent-result foo inv)))
+       (bind sem1 (h/mk-semaphore 0))
+       (reset! SEM-ATOM sem1)
+       (bind invc (aor/agent-initiate foo "c"))
+       (wait-acquired! sem1)
+       (reset! SEM-ATOM nil)
+       (bind inv (aor/agent-initiate foo "d"))
+       (is (= "d!?" (aor/agent-result foo inv)))
+       (bind inv (aor/agent-initiate foo "e"))
+       (is (= "e!?" (aor/agent-result foo inv)))
+       (cycle!)
+       (is (= (frequencies @ACTIONS)
+              {["foo-agent" nil ["a"] "a!?"] 1
+               ["foo-agent" nil ["b"] "b!?"] 1
+               ["foo-start" "start" ["a"] [{"node" "node1" "args" ["a!"]}]] 1
+               ["foo-start" "start" ["b"] [{"node" "node1" "args" ["b!"]}]] 1
+               ["foo-start-fail" "start" ["a"] [{"node" "node1" "args" ["a!"]}]] 1
+               ["foo-start-fail" "start" ["b"] [{"node" "node1" "args" ["b!"]}]] 1}))
+       (cycle!)
+       (is (= [] @ACTIONS))
+       (TopologyUtils/advanceSimTime (+ ana/NODE-ACTION-STALL-TIME-MILLIS 1000))
+       (cycle!)
+       (is (= (frequencies @ACTIONS)
+              {["foo-start-fail" "start" ["c"] []] 1
+               ["foo-start-fail" "start" ["d"] [{"node" "node1" "args" ["d!"]}]] 1
+               ["foo-start-fail" "start" ["e"] [{"node" "node1" "args" ["e!"]}]] 1
+               ["foo-start" "start" ["d"] [{"node" "node1" "args" ["d!"]}]] 1
+               ["foo-start" "start" ["e"] [{"node" "node1" "args" ["e!"]}]] 1}))
+       (cycle!)
+       (is (= [] @ACTIONS))
+       (h/release-semaphore sem1 1)
+       (is (= "c!?" (aor/agent-result foo invc)))
+       (cycle!)
+       (is (= (frequencies @ACTIONS)
+              {["foo-agent" nil ["c"] "c!?"] 1
+               ["foo-agent" nil ["d"] "d!?"] 1
+               ["foo-agent" nil ["e"] "e!?"] 1}))
+      ))))

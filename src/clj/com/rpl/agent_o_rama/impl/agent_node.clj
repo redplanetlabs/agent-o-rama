@@ -66,7 +66,8 @@
   (agent-node-state [this])
   (release-acquired-objects! [this])
   (get-streaming-recorder [this])
-  (get-declared-objects [this]))
+  (get-declared-objects [this])
+  (get-agent-invoke [this]))
 
 (defprotocol StreamingRecorderInternal
   (waitFinish [this]))
@@ -185,6 +186,10 @@
          (.releaseAgentObject declared-objects-tg name o)))
     )))
 
+(defn gen-node-id
+  []
+  (h/random-uuid7))
+
 (defn mk-agent-node
   [agent-name agent-graph agent-task-id agent-id curr-node invoke-id retry-num
    store-info ^RamaClientsTaskGlobal rama-clients]
@@ -233,7 +238,7 @@
           emits-vol
           conj
           (aor-types/->valid-AgentNodeEmit
-           (h/random-uuid7)
+           (gen-node-id)
            nil
            (if (selected-any? [:node-map (keypath node) :node
                                #(instance? Node %)]
@@ -459,6 +464,7 @@
      (get-streaming-recorder [this] streaming-recorder)
      (release-acquired-objects! [this]
        (release-acquired-objects! fetcher))
+     (get-agent-invoke [this] (aor-types/->AgentInvokeImpl agent-task-id agent-id))
      (agent-node-state [this]
        {:emits      @emits-vol
         :result     @result-vol
@@ -791,6 +797,13 @@
   (<<with-substitutions
    [$$config (po/agent-config-task-global *agent-name)]
    (local-select> STAY $$config :> *config-map)
+   (:> (aor-types/get-config *config-map *config))))
+
+(deframafn read-global-config
+  [*config]
+  (<<with-substitutions
+   [$$global-config (po/agent-global-config-task-global)]
+   (local-select> STAY $$global-config :> *config-map)
    (:> (aor-types/get-config *config-map *config))))
 
 (deframaop handle-node-invoke

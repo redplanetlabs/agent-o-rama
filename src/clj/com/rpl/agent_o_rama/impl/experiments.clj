@@ -4,12 +4,12 @@
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
-   [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.feedback :as fb]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.stats :as stats]
    [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.store :as store]
@@ -31,8 +31,6 @@
    [java.util.concurrent
     CompletableFuture]
   ))
-
-(def EVALUATOR-AGENT-NAME "_aor-evaluator")
 
 (defn get-cluster-retriever
   [agent-node]
@@ -331,11 +329,8 @@
 
 (defn validate-results!
   [o]
-  (when-not (and (map? o) (every? string? (keys o)))
-    (throw
-     (h/ex-info
-      "Invalid map of results (must be map with string keys)"
-      {:return o}))))
+  (when-not (and (instance? java.util.Map o) (every? string? (keys o)))
+    (throw (h/ex-info "Invalid map of results (must be map with string keys)" {:return o}))))
 
 (defn non-summary-evaluate!
   [agent-node eval-type eval-fn input reference-output outputs]
@@ -478,7 +473,10 @@
                  eval-fn
                  input
                  reference-output
-                 outputs)]
+                 outputs)
+        source  (aor-types/->valid-EvalSourceImpl eval-name
+                                                  (anode/get-agent-invoke agent-node)
+                                                  source)]
     (validate-results! res)
     (when (and (= :regular eval-type) (not (empty? eval-infos)))
       (assert (= 1 (count eval-infos)))
@@ -490,9 +488,9 @@
            (.getStore agent-node (po/agent-root-task-global-name agent-name))
            (aor-types/->DirectTaskId (:task-id target)))
 
-          (aor-types/EvalNodeTarget? target)
+          (aor-types/NodeInvokeImpl? target)
           (store/pstate-transform!
-           [(keypath (:agent-invoke-id target)) (fb/add-feedback-path res source)]
+           [(keypath (:node-invoke-id target)) (fb/add-feedback-path res source)]
            (.getStore agent-node (po/agent-node-task-global-name agent-name))
            (aor-types/->DirectTaskId (:task-id target)))
 
@@ -501,6 +499,31 @@
         )))
     (c/result! agent-node res)
   ))
+
+(defn initiate-eval
+  [eval-client
+   {:keys [input-json-path reference-output-json-path output-json-path]}
+   eval-type
+   input
+   reference-output
+   outputs
+   eval-name
+   builder-name
+   builder-params
+   eval-infos
+   source]
+  (c/agent-initiate
+   eval-client
+   (aor-types/->valid-EvalInvoke
+    (maybe-get-json-path input-json-path input)
+    (maybe-get-json-path reference-output-json-path reference-output)
+    (mapv #(maybe-get-json-path output-json-path %) outputs)
+    eval-name
+    builder-name
+    builder-params
+    eval-type
+    eval-infos
+    source)))
 
 (defn hook:running-invoke-node [result+example-ids])
 (defn hook:initiate-target [i])
@@ -512,7 +535,7 @@
   [topology]
   (->
     topology
-    (c/new-agent EVALUATOR-AGENT-NAME)
+    (c/new-agent aor-types/EVALUATOR-AGENT-NAME)
     (c/node
      "start"
      "root"
@@ -568,7 +591,7 @@
                              (fn [{:keys [target-spec]}]
                                (if (aor-types/AgentTarget? target-spec)
                                  (.getAgentClient agent-node (:agent-name target-spec))
-                                 (.getAgentClient agent-node EVALUATOR-AGENT-NAME)))
+                                 (.getAgentClient agent-node aor-types/EVALUATOR-AGENT-NAME)))
                              targets)
                source       (aor-types/->valid-ExperimentSourceImpl dataset-id id)
                initiate-fns
@@ -582,7 +605,7 @@
                           (if (aor-types/AgentTarget? target-spec)
                             {:agent-name   agent-name
                              :agent-invoke (apply c/agent-initiate client args)}
-                            {:agent-name   EVALUATOR-AGENT-NAME
+                            {:agent-name   aor-types/EVALUATOR-AGENT-NAME
                              :agent-invoke (c/agent-initiate client
                                                              (aor-types/->valid-ExperimentNodeInvoke
                                                               agent-name
@@ -596,11 +619,18 @@
                    (store/pstate-select-one
                     [(keypath dataset-id :experiments id :results result-id)]
                     local-ds)
-                   input         (when (< (count agent-initiates) (count targets))
-                                   (foreign-select-one
-                                    [(keypath dataset-id :snapshots snapshot example-id :input)]
-                                    datasets))
-                   initiates-vol (volatile! [])]
+                   [input :as inputv] (when (< (count agent-initiates) (count targets))
+                                        (foreign-select
+                                         [(keypath dataset-id :snapshots snapshot)
+                                          (must example-id)
+                                          :input]
+                                         datasets))
+                   _ (when (and (some? inputv) (empty? inputv))
+                       (throw (h/ex-info "Did not find example"
+                                         {:dataset-id dataset-id
+                                          :snapshot   snapshot
+                                          :example-id example-id})))
+                   initiates-vol      (volatile! [])]
                (when-not (some? (:example-id currm))
                  (store/pstate-transform!
                   [(keypath dataset-id :experiments id :results result-id :example-id)
@@ -639,7 +669,7 @@
                            (submap [:start-time-millis :finish-time-millis :stats])]
                           root
                           {:pkey task-id})
-                         basic-stats (ana/aggregated-basic-stats stats)]
+                         basic-stats (stats/aggregated-basic-stats stats)]
                      (store/pstate-transform!
                       [(keypath dataset-id :experiments id :results result-id :agent-results)
                        (nil->val (sorted-map))
@@ -668,7 +698,7 @@
          [retriever]
          (let [eval-info     (all-evaluator-info retriever experiment)
                eval-info-map (relevant-eval-info agent-node eval-info #{:regular :comparative})
-               eval-client   (.getAgentClient agent-node EVALUATOR-AGENT-NAME)
+               eval-client   (.getAgentClient agent-node aor-types/EVALUATOR-AGENT-NAME)
                local-ds      (local-datasets-store retriever)
                datasets      (datasets-pstate retriever)
                local-ds      (local-datasets-store retriever)]
@@ -691,8 +721,7 @@
                    eval-counter (volatile! -1)]
                (when-not (selected-any? [MAP-VALS :result :failure? identity] agent-results)
                  (doseq [[eval-name
-                          {:keys [input-json-path reference-output-json-path output-json-path
-                                  builder-name builder-params]}]
+                          {:keys [builder-name builder-params] :as em}]
                          eval-info-map
 
                          :when (and (not (contains? curr-evals eval-name))
@@ -701,22 +730,17 @@
                    (hook:initiate-eval (vswap! eval-counter inc))
                    (when-not (contains? @eval-initiates eval-name)
                      (let [inv
-                           (c/agent-initiate
-                            eval-client
-                            (aor-types/->valid-EvalInvoke
-                             (maybe-get-json-path input-json-path input)
-                             (maybe-get-json-path reference-output-json-path reference-output)
-                             (select [MAP-VALS
-                                      :result
-                                      :val
-                                      (view (fn [v] (maybe-get-json-path output-json-path v)))]
-                                     agent-results)
-                             eval-name
-                             builder-name
-                             builder-params
-                             (experiment-type->kw (class spec))
-                             (to-eval-infos agent-initiates)
-                             (aor-types/->valid-ExperimentSourceImpl dataset-id id)))]
+                           (initiate-eval eval-client
+                                          em
+                                          (experiment-type->kw (class spec))
+                                          input
+                                          reference-output
+                                          (select [MAP-VALS :result :val] agent-results)
+                                          eval-name
+                                          builder-name
+                                          builder-params
+                                          (to-eval-infos agent-initiates)
+                                          (aor-types/->valid-ExperimentSourceImpl dataset-id id))]
                        (store/pstate-transform!
                         [(keypath dataset-id :experiments id :results result-id)
                          (keypath :eval-initiates eval-name)
@@ -854,7 +878,7 @@
   [*data]
   (<<with-substitutions
    [$$datasets (po/datasets-task-global)
-    *agent-depot (po/agent-depot-task-global EVALUATOR-AGENT-NAME)]
+    *agent-depot (po/agent-depot-task-global aor-types/EVALUATOR-AGENT-NAME)]
    (<<subsource *data
     (case> StartExperiment :> {:keys [*id *dataset-id]})
      (|hash *dataset-id)
@@ -869,7 +893,7 @@
      ;; have to do it this way since cannot do :ack on the depot append since it's running as part
      ;; of the same stream topology
      (h/random-uuid7 :> *agent-invoke-id)
-     (aor-types/->valid-AgentInitiate [*data] *agent-invoke-id nil :> *initiate)
+     (aor-types/->valid-AgentInitiate [*data] nil *agent-invoke-id nil :> *initiate)
      (depot-partition-append!
       *agent-depot
       *initiate

@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.impl.types
   (:use [com.rpl.rama.path])
   (:require
+   [clojure.set :as set]
    [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.serialize]
@@ -14,6 +15,9 @@
     ExampleRun
     HumanInputRequest
     NestedOpType
+    NodeInvoke
+    RunInfo
+    RunType
     ToolInfo]
    [com.rpl.agentorama.analytics
     AgentInvokeStats
@@ -23,10 +27,12 @@
     SubagentInvokeStats
     OpStats]
    [com.rpl.agentorama.source
+    ActionSource
     AgentRunSource
     AiSource
     ApiSource
     BulkUploadSource
+    EvalSource
     ExperimentSource
     HumanSource
     InfoSource]
@@ -48,9 +54,13 @@
     `(drp/defrecord+ ~s ~@args)))
 
 (def ^:dynamic OPERATION-SOURCE nil)
+(def ^:dynamic FORCED-AGENT-INVOKE-ID nil)
+(def ^:dynamic FORCED-AGENT-TASK-ID nil)
 
-(def AGENTS-TOPOLOGY-NAME "_agents-topology")
-(def AGENTS-MB-TOPOLOGY-NAME "_agents-mb-topology")
+(def AGENT-TOPOLOGY-NAME "_agent-topology")
+(def AGENT-MB-TOPOLOGY-NAME "_agent-mb-topology")
+(def AGENT-ANALYTICS-MB-TOPOLOGY-NAME "_agent-analytics-topology")
+(def EVALUATOR-AGENT-NAME "_aor-evaluator")
 
 (def NODE-KW :node)
 (def AGG-START-NODE-KW :agg-start-node)
@@ -107,9 +117,12 @@
   (getAgentInvokeId [this] agent-invoke-id)
   EvalTarget)
 
-(defaorrecord EvalNodeTarget
+(defaorrecord NodeInvokeImpl
   [task-id :- Long
-   invoke-id :- UUID]
+   node-invoke-id :- UUID]
+  NodeInvoke
+  (getTaskId [this] task-id)
+  (getNodeInvokeId [this] node-invoke-id)
   EvalTarget)
 
 ;; Sources
@@ -157,10 +170,25 @@
   (getAgentInvoke [this] agent-invoke)
   (getSourceString [this] (str "agent[" module-name "/" agent-name "]")))
 
+(defaorrecord EvalSourceImpl
+  [eval-name :- String
+   agent-invoke :- AgentInvokeImpl
+   source :- (s/maybe InfoSource)]
+  EvalSource
+  (getEvalName [this] eval-name)
+  (getSourceString [this] (str "eval[" eval-name "]")))
+
+(defaorrecord ActionSourceImpl
+  [rule-name :- String]
+  ActionSource
+  (getRuleName [this] rule-name)
+  (getSourceString [this] (str "action[" rule-name "]")))
+
 ;; Core types
 
 (defaorrecord AgentInitiate
   [args :- [s/Any]
+   forced-agent-task-id :- (s/maybe Long)
    forced-agent-invoke-id :- (s/maybe UUID)
    source :- (s/maybe InfoSource)
   ])
@@ -336,11 +364,14 @@
   [agg-invoke-id :- UUID
    ack-val :- Long])
 
-(defaorrecord PStateWrite
+(defaorrecord PStateWriteAgentSource
   [agent-name :- String
    agent-task-id :- Long
    agent-id :- UUID
-   retry-num :- Long
+   retry-num :- Long])
+
+(defaorrecord PStateWrite
+  [agent-source :- (s/maybe PStateWriteAgentSource)
    pstate-name :- String
    path :- s/Any
    key :- s/Any])
@@ -500,7 +531,7 @@
 
 
 ;; since this is stored in a PState
-(defaorrecord ^{:features {:nippy-8-byte-hash false}} StartExperiment
+(defaorrecord StartExperiment
   [id :- UUID
    name :- String
 
@@ -545,7 +576,7 @@
    builder-params :- {String Object}
    eval-type :- (s/enum :regular :comparative)
    eval-infos :- [EvalInfo]
-   source :- InfoSource
+   source :- (s/maybe InfoSource)
   ])
 
 ;; used in PState
@@ -600,7 +631,7 @@
   (getSubagentStats [this] subagent-stats)
   (getBasicStats [this] basic-stats))
 
-(defaorrecord ^{:features {:nippy-8-byte-hash false}} FeedbackImpl
+(defaorrecord FeedbackImpl
   [scores :- {String Object}
    source :- InfoSource
    created-at :- Long
@@ -610,6 +641,134 @@
   (getSource [this] source)
   (getCreatedAt [this] created-at)
   (getModifiedAt [this] modified-at))
+
+(defaorrecord RunInfoImpl
+  [rule-name :- String
+   action-name :- String
+   agent-name :- String
+   node-name :- (s/maybe String)
+   agent-invoke :- AgentInvokeImpl
+   node-invoke :- (s/maybe NodeInvokeImpl)
+   type :- (s/enum :agent :node)
+   latency-millis :- (s/maybe Long)
+   feedback :- [FeedbackImpl]
+   agent-stats :- (s/maybe AgentInvokeStatsImpl)
+   nested-ops :- (s/maybe [NestedOpInfoImpl])]
+  RunInfo
+  (getRuleName [this] rule-name)
+  (getActionName [this] action-name)
+  (getAgentName [this] agent-name)
+  (getNodeName [this] node-name)
+  (getAgentInvoke [this] agent-invoke)
+  (getNodeInvoke [this] node-invoke)
+  (getRunType [this]
+    (cond
+      (= type :agent)
+      RunType/AGENT
+
+      (= type :node)
+      RunType/NODE
+
+      :else
+      (throw (h/ex-info "Unexpected run type" {:type type}))))
+  (getLatencyMillis [this] latency-millis)
+  (getFeedback [this] feedback)
+  (getAgentStats [this] agent-stats)
+  (getNodeNestedOps [this] nested-ops))
+
+;; Rules
+
+(defprotocol RuleFilter
+  (dependency-rule-names [this])
+  (rule-filter-matches? [this info]))
+
+(defaorrecord ComparatorSpec
+  [comparator :- (s/enum := :not= :< :> :<= :>=)
+   value :- Object])
+
+(defn comparator-spec-matches?
+  [{:keys [comparator value]} v]
+  (condp = comparator
+    :=
+    (= v value)
+
+    :not=
+    (not= v value)
+
+    :<
+    (< v value)
+
+    :>
+    (> v value)
+
+    :<=
+    (<= v value)
+
+    :>=
+    (>= v value)
+
+    (throw (h/ex-info "Unknown comparator" {:comparator comparator}))))
+
+(defaorrecord FeedbackFilter
+  [rule-name :- String
+   feedback-key :- String
+   comparator-spec :- ComparatorSpec])
+
+(defaorrecord LatencyFilter
+  [comparator-spec :- ComparatorSpec])
+
+;; if there were any exceptions, even if it succeeded
+(defaorrecord ErrorFilter
+  [])
+
+(defaorrecord InputMatchFilter
+  [json-path :- String
+   regex :- java.util.regex.Pattern])
+
+(defaorrecord OutputMatchFilter
+  [json-path :- String
+   regex :- java.util.regex.Pattern])
+
+(defaorrecord TokenCountFilter
+  [type :- (s/enum :input :output :total)
+   comparator-spec :- ComparatorSpec])
+
+(defaorrecord AndFilter
+  [filters :- [(s/protocol RuleFilter)]])
+
+(defaorrecord OrFilter
+  [filters :- [(s/protocol RuleFilter)]])
+
+(defaorrecord NotFilter
+  [filter :- (s/protocol RuleFilter)])
+
+(definterface RuleEvent)
+
+(defaorrecord AddRule
+  [name :- String
+   id :- UUID
+   agent-name :- String
+   node-name :- (s/maybe String)
+   action-name :- String
+   action-params :- {String String}
+   filter :- (s/protocol RuleFilter)
+   sampling-rate :- Double
+   start-time-millis :- Long
+   include-failures? :- Boolean]
+  RuleEvent)
+
+(defaorrecord DeleteRule
+  [agent-name :- String
+   name :- String]
+  RuleEvent)
+
+(defaorrecord ActionLog
+  [start-time-millis :- Long
+   finish-time-millis :- Long
+   agent-invoke :- AgentInvokeImpl
+   node-invoke :- (s/maybe NodeInvokeImpl)
+   success? :- Boolean
+   info-map :- {String (s/maybe Object)}])
 
 ;; Misc
 
@@ -625,20 +784,25 @@
 (defprotocol AgentTopologyInternal
   (declare-agent-object-builder-internal [this name afn options])
   (declare-evaluator-builder-internal [this type name description builder-fn
-                                       options]))
+                                       options])
+  (declare-action-builder-internal [this name description builder-fn options]))
 
 
-(defn declare-java-evaluator-builer
-  [this type name description builder-fn options]
-  (let [builder-fn (h/convert-jfn builder-fn)]
-    (declare-evaluator-builder-internal this
-                                        type
-                                        name
-                                        description
-                                        (fn [params]
-                                          (h/convert-jfn
-                                           (builder-fn params)))
-                                        (if options @options))))
+(defn convert-java-builder-fn
+  [builder-jfn]
+  (let [builder-fn (h/convert-jfn builder-jfn)]
+    (fn [params]
+      (h/convert-jfn
+       (builder-fn params)))))
+
+(defn declare-java-evaluator-builder
+  [this type name description builder-jfn options]
+  (declare-evaluator-builder-internal this
+                                      type
+                                      name
+                                      description
+                                      (convert-java-builder-fn builder-jfn)
+                                      (if options @options)))
 
 (defprotocol AgentClientInternal
   (stream-internal [this agent-invoke node callback-fn])
@@ -656,10 +820,13 @@
   [key :- String
    val :- Object])
 
+;; agent configs
 (def ALL-CONFIGS {})
+;; global configs
+(def ALL-GLOBAL-CONFIGS {})
 
-(defmacro defconfig
-  [name schema-fn doc config-default]
+(defmacro defconfig*
+  [global name schema-fn doc config-default]
   (let [cname      (-> name
                        str
                        str/lower-case
@@ -687,8 +854,16 @@
           :doc       ~doc
           :default   ~config-default
           :change-fn ~change-sym})
-       (alter-var-root (var ALL-CONFIGS) assoc ~cname ~csym)
+       (alter-var-root (var ~global) assoc ~cname ~csym)
      )))
+
+(defmacro defconfig
+  [name schema-fn doc config-default]
+  `(defconfig* ALL-CONFIGS ~name ~schema-fn ~doc ~config-default))
+
+(defmacro defglobalconfig
+  [name schema-fn doc config-default]
+  `(defconfig* ALL-GLOBAL-CONFIGS ~name ~schema-fn ~doc ~config-default))
 
 (defn get-config
   [m config]
@@ -725,3 +900,16 @@
   positive-long?
   "Maximum number of agent traces to keep per task"
   5000)
+
+
+(defglobalconfig
+ MAX-LIMITED-ACTIONS-CONCURRENCY
+ positive-long?
+ "Maximum number of limited actions (e.g. online evaluations) that can be executing at once across all agents and all tasks"
+ 10)
+
+(defglobalconfig
+ ACTIONS-PROCESSING-ITERATION-TIME-MILLIS
+ positive-long?
+ "Maximum amount of time to spend processing actions per iteration"
+ 20000)

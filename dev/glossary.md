@@ -83,10 +83,10 @@ Rate-limiting mechanism for log messages to prevent overwhelming output in distr
 
 Execution monitoring system that captures agent node transitions and data flow for debugging.
 
-## Agents Topology
+## Agent Topology
 
 The top-level container for defining agents, stores, and objects within
-a module. Created via `agents-topology` function, provides methods for
+a module. Created via `agent-topology` function, provides methods for
 declaring agents and resources.
 
 ## [Aggregation](terms/aggregation.md)

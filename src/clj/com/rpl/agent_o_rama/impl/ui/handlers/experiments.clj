@@ -5,12 +5,16 @@
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
-   [com.rpl.agent-o-rama.impl.helpers :as h]
-   [com.rpl.agent-o-rama.impl.experiments :as exp])
+   [com.rpl.agent-o-rama.impl.helpers :as h])
   (:use [com.rpl.rama])
-  (:import [java.util UUID]
-           [com.rpl.agentorama AgentFailedException]
-           [com.rpl.agent_o_rama.impl.types RegularExperiment ComparativeExperiment]))
+  (:import
+   [java.util
+    UUID]
+   [com.rpl.agentorama
+    AgentFailedException]
+   [com.rpl.agent_o_rama.impl.types
+    RegularExperiment
+    ComparativeExperiment]))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/get-all-for-dataset
   [{:keys [manager dataset-id pagination filters]} uid]
@@ -78,11 +82,12 @@
                                            dataset-id
                                            experiment-id)]
 
+
     ;; 2. NEW LOGIC STARTS HERE: Check for early failure.
     (if-let [invoke (:experiment-invoke base-results)]
       ;; If we have the invoke coordinates for the experimenter agent...
       (do
-        (with-open [exp-client (aor/agent-client manager exp/EVALUATOR-AGENT-NAME)]
+        (with-open [exp-client (aor/agent-client manager aor-types/EVALUATOR-AGENT-NAME)]
           (if (aor/agent-invoke-complete? exp-client invoke)
             ;; If the agent is complete, fetch its result.
             (let [result (try (aor/agent-result exp-client invoke)

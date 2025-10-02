@@ -3,6 +3,7 @@
         [com.rpl.rama path])
   (:require
    [clojure.set :as set]
+   [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.datasets :as datasets]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.experiments :as exp]
@@ -27,20 +28,23 @@
     AgentNodeExecutorTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     AggAckOp
+    ChangeConfig
     EvaluatorEvent
     ExperimentEvent
-    NodeOp]
+    NodeOp
+    RuleEvent]
    [java.util.concurrent
     CompletableFuture]))
 
 (def SUBSTITUTE-TICK-DEPOTS false)
 (def DEFAULT-GC-TICK-MILLIS 10000)
+(def DEFAULT-ANALYTICS-TICK-MILLIS 10000)
 
 ;; for agent-o-rama namespace
 (defn hook:building-plain-agent-object [name o])
 
 (defn- define-agent!
-  [agent-name setup topologies stream-topology mb-topology agent-graph]
+  [agent-name setup topologies stream-topology mb-topology analytics-mb-topology agent-graph]
   (let [agent-depot-sym           (symbol (po/agent-depot-name agent-name))
         agent-streaming-depot-sym (symbol (po/agent-streaming-depot-name
                                            agent-name))
@@ -97,6 +101,13 @@
      (symbol (po/agent-config-task-global-name agent-name))
      po/AGENT-CONFIG-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
+    (declare-pstate*
+     stream-topology
+     (symbol (po/agent-rules-task-global-name agent-name))
+     po/AGENT-RULES-PSTATE-SCHEMA
+     {:global?       true
+      :initial-value (sorted-map)})
+
 
     (if SUBSTITUTE-TICK-DEPOTS
       (do
@@ -143,12 +154,18 @@
      mb-topology
      (symbol (po/pending-retries-task-global-name agent-name))
      po/PENDING-RETRIES-PSTATE-SCHEMA)
+    (declare-pstate*
+     analytics-mb-topology
+     (symbol (po/agent-rule-cursors-task-global-name agent-name))
+     po/AGENT-RULE-CURSORS-PSTATE-SCHEMA
+     {:global? true})
 
     (retries/declare-check-impl mb-topology agent-name)
     (queries/declare-tracing-query-topology topologies agent-name)
     (queries/declare-fork-affected-aggs-query-topology topologies agent-name)
     (queries/declare-get-invokes-page-topology topologies agent-name)
     (queries/declare-get-current-graph topologies agent-name)
+    (queries/declare-get-action-log-page-topology topologies agent-name)
 
     (<<sources stream-topology
      (source> agent-config-depot-sym {:retry-mode :all-after} :> *data)
@@ -198,9 +215,11 @@
    mirror-agents
    agent-graphs))
 
+(defn hook:analytics-tick [])
+
 (defn define-agents!
-  [setup topologies stream-topology mb-topology agent-graphs mirror-agents
-   store-info declared-objects evaluator-builders]
+  [setup topologies stream-topology mb-topology analytics-mb-topology agent-graphs mirror-agents
+   store-info declared-objects evaluator-builders action-builders]
   (declare-object* setup
                    (symbol (po/agents-store-info-name))
                    (aor-types/->valid-StoreInfo store-info {}))
@@ -220,18 +239,27 @@
                    (AgentDeclaredObjectsTaskGlobal.
                     declared-objects
                     evaluator-builders
+                    action-builders
                     (mk-agents-info agent-graphs mirror-agents)
                     (transform MAP-VALS
                                graph/resolve-agent-graph
                                agent-graphs)
                    ))
-
   (let [pstate-write-depot-sym   (symbol (po/agent-pstate-write-depot-name))
         datasets-depot-sym       (symbol (po/datasets-depot-name))
-        global-actions-depot-sym (symbol (po/global-actions-depot-name))]
+        global-actions-depot-sym (symbol (po/global-actions-depot-name))
+        analytics-tick-depot-sym (symbol (po/agent-analytics-tick-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
     (declare-depot* setup datasets-depot-sym (hash-by :dataset-id))
     (declare-depot* setup global-actions-depot-sym :random {:global? true})
+    (if SUBSTITUTE-TICK-DEPOTS
+      (declare-depot* setup
+                      analytics-tick-depot-sym
+                      :random
+                      {:global? true})
+      (declare-tick-depot* setup
+                           analytics-tick-depot-sym
+                           DEFAULT-ANALYTICS-TICK-MILLIS))
     (declare-pstate*
      stream-topology
      (symbol (po/datasets-task-global-name))
@@ -241,6 +269,17 @@
      (symbol (po/evaluators-task-global-name))
      po/EVALUATORS-PSTATE-SCHEMA
      {:global? true})
+    (declare-pstate*
+     stream-topology
+     (symbol (po/agent-global-config-task-global-name))
+     po/AGENT-CONFIG-PSTATE-SCHEMA
+     {:key-partitioner apart/task-id-key-partitioner})
+
+    (declare-pstate*
+     analytics-mb-topology
+     (symbol (po/action-log-task-global-name))
+     po/ACTION-LOG-PSTATE-SCHEMA
+     {:key-partitioner apart/task-id-key-partitioner})
 
     (doseq [depot-sym [pstate-write-depot-sym datasets-depot-sym
                        global-actions-depot-sym]]
@@ -248,15 +287,21 @@
                                          depot-sym
                                          "depot.max.entries.per.partition"
                                          500))
+    (<<sources analytics-mb-topology
+     (source> analytics-tick-depot-sym :> %mb)
+      (%mb)
+      (hook:analytics-tick)
+      (ana/handle-analytics-tick))
     (<<sources stream-topology
      (source> pstate-write-depot-sym
                {:retry-mode :none}
-              :> {:keys [*pstate-name *path *agent-name *agent-task-id
-                          *agent-id *retry-num *key]})
-      (<<if (apart/valid-retry-num? *agent-name
-                                    *agent-task-id
-                                    *agent-id
-                                    *retry-num)
+              :> {:keys [*agent-source *pstate-name *path *key]})
+      (identity *agent-source :> {:keys [*agent-name *agent-task-id *agent-id *retry-num]})
+      (<<if (or> (nil? *agent-source)
+                 (apart/valid-retry-num? *agent-name
+                                         *agent-task-id
+                                         *agent-id
+                                         *retry-num))
         (<<if (aor-types/DirectTaskId? *key)
           (|direct (get *key :task-id)))
         (this-module-pobject-task-global *pstate-name :> $$p)
@@ -278,6 +323,12 @@
        (case> (instance? ExperimentEvent *data))
         (exp/handle-experiments-op *data)
 
+       (case> (instance? RuleEvent *data))
+        (ana/handle-rule-event *data)
+
+       (case> (instance? ChangeConfig *data))
+        (at/handle-global-config *data)
+
        (default>)
         (throw! (h/ex-info "Unexpected global action type" {:type (class *data)})))
     ))
@@ -290,6 +341,7 @@
   (queries/declare-search-examples-query-topology topologies)
   (queries/declare-multi-examples-query-topology topologies)
   (queries/declare-all-evaluator-builders-query-topology topologies)
+  (ana/declare-all-action-builders-query-topology topologies)
   (queries/declare-try-evaluator-query-topology topologies)
   (queries/declare-search-evaluators-query-topology topologies)
   (queries/declare-search-experiments-query-topology topologies)
@@ -300,6 +352,7 @@
                    topologies
                    stream-topology
                    mb-topology
+                   analytics-mb-topology
                    agent-graph)))
 
 (defn convert-agent-object-options

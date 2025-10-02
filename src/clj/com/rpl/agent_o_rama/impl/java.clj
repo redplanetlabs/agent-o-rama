@@ -6,6 +6,7 @@
    [com.rpl.agent-o-rama.impl.helpers :as h])
   (:import
    [com.rpl.agentorama
+    ActionBuilderOptions$Impl
     EvaluatorBuilderOptions$Impl
     ToolsAgentOptions$Impl
     ToolsAgentOptions$FunctionHandler
@@ -83,6 +84,28 @@
        this)
      (withoutReferenceOutputPath [this]
        (vswap! options assoc :reference-output-path? false)
+       this)
+     clojure.lang.IDeref
+     (deref [this]
+       @options
+     ))))
+
+(defn mk-action-builder-options
+  []
+  (let [options (volatile! {})]
+    (reify
+     ActionBuilderOptions$Impl
+     (param [this name description]
+       (.param this name description ""))
+     (param [this name description defaultValue]
+       (when (contains? (:params @options) name)
+         (throw (h/ex-info "Param already declared" {:name name})))
+       (setval [h/VOLATILE :params (keypath name)]
+               {:description description :default defaultValue}
+               options)
+       this)
+     (limitConcurrency [this]
+       (setval [h/VOLATILE :limit-concurrency?] true options)
        this)
      clojure.lang.IDeref
      (deref [this]

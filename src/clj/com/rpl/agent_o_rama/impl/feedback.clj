@@ -11,4 +11,12 @@
   ^:direct-nav [scores source]
   (let [t (h/current-time-millis)
         v (aor-types/->valid-FeedbackImpl scores source t t)]
-    (path :feedback NIL->VECTOR AFTER-ELEM (termval v))))
+    (path :feedback :results NIL->VECTOR AFTER-ELEM (termval v))))
+
+(defn action-state-path
+  ^:direct-nav [rule-name]
+  (path :feedback :actions (keypath rule-name)))
+
+(defn set-action-state-path
+  ^:direct-nav [rule-name val]
+  (path (action-state-path rule-name) (termval val)))

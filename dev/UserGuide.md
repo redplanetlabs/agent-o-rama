@@ -14,7 +14,7 @@ See the [glossary](glossary.md) for detailed explanations of agent-o-rama concep
 
 **[Agent Node](glossary.md#agent-node)**: Individual execution unit performing computation. Can emit to other nodes, return results, stream data, or request human input.
 
-**[Agents Topology](glossary.md#agents-topology)**: Top-level container for defining agents, stores, and objects within a module.
+**[Agent Topology](glossary.md#agent-topology)**: Top-level container for defining agents, stores, and objects within a module.
 
 **[Agent Objects](glossary.md#agent-objects)**: Shared resources (AI models, APIs, tools) with managed lifecycles accessible across all agent nodes.
 
