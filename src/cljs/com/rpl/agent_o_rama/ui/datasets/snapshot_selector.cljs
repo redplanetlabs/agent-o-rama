@@ -6,6 +6,7 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.sente :as sente]
+   [com.rpl.specter :as s]
    [clojure.string :as str]))
 
 (defui SnapshotManager [{:keys [module-id dataset-id selected-snapshot on-select-snapshot disabled? read-only?]}]
@@ -13,7 +14,7 @@
 
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
-         {:query-key [:snapshot-names module-id dataset-id]
+         {:query-key [:snapshot-names module-id (s/keypath dataset-id)]
           :sente-event [:datasets/get-snapshot-names {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
 

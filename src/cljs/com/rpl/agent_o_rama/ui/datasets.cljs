@@ -34,7 +34,7 @@
                          (fn [reply]
                            (if (:success reply)
                              (do
-                               (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                               (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]}])
                                (when on-delete-success (on-delete-success)))
                              (js/alert (str "Error deleting example: " (:error reply))))))))}
           ($ TrashIcon {:className delete-icon-classes})
@@ -769,7 +769,7 @@
 
 (defui detail-examples [{:keys [module-id dataset-id]}]
   (let [;; Get selected examples for this dataset
-        selected-example-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
+        selected-example-ids (or (state/use-sub [:ui :datasets :selected-examples (s/keypath dataset-id)]) #{})
 
         ;; --- REFACTORED ---
         ;; State for selected snapshot now comes from app-db and is updated via dispatch
@@ -785,7 +785,7 @@
         ;; Fetch examples
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
-         {:query-key [:dataset-examples module-id dataset-id selected-snapshot-name search-string]
+         {:query-key [:dataset-examples module-id (s/keypath dataset-id) selected-snapshot-name search-string]
           :sente-event [:datasets/search-examples {:module-id module-id
                                                    :dataset-id dataset-id
                                                    :snapshot-name selected-snapshot-name
@@ -955,11 +955,11 @@
         [show-info? set-show-info] (uix/use-state false)
         {:keys [loading? error]}
         (queries/use-sente-query
-         {:query-key [:dataset-props module-id dataset-id]
+         {:query-key [:dataset-props module-id (s/keypath dataset-id)]
           :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
         ;; not sure about doing it this way, why not. maybe we can eventually decouple fetching from views?
-        dataset (state/use-sub [:queries :dataset-props module-id dataset-id :data])]
+        dataset (state/use-sub [:queries :dataset-props module-id (s/keypath dataset-id) :data])]
     ($ :div.h-full.flex.flex-col
        (cond
          loading? ($ :div.p-6 "Loading dataset details...")
