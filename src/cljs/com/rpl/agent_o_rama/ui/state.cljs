@@ -383,14 +383,14 @@
  ;; Dataset selection event handlers
 (reg-event :datasets/toggle-selection
            (fn [db {:keys [dataset-id example-id]}]
-             [:ui :datasets :selected-examples dataset-id
+             [:ui :datasets :selected-examples (s/keypath dataset-id)
               (s/terminal #(if (contains? % example-id)
                              (disj % example-id)
                              (conj (or % #{}) example-id)))]))
 
 (reg-event :datasets/toggle-all-selection
            (fn [db {:keys [dataset-id example-ids-on-page select-all?]}]
-             [:ui :datasets :selected-examples dataset-id
+             [:ui :datasets :selected-examples (s/keypath dataset-id)
               (s/terminal #(if select-all?
                              (into (or % #{}) example-ids-on-page)
                              (apply disj (or % #{}) example-ids-on-page)))]))
@@ -401,4 +401,4 @@
 
 (reg-event :datasets/set-selected-snapshot
            (fn [db {:keys [dataset-id snapshot-name]}]
-             [:ui :datasets :selected-snapshot-per-dataset dataset-id (s/terminal-val snapshot-name)]))
+             [:ui :datasets :selected-snapshot-per-dataset (s/keypath dataset-id) (s/terminal-val snapshot-name)]))

@@ -425,7 +425,7 @@
 
 (defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success is-read-only?]}] ;; Add is-read-only?
   (let [[open-dropdown set-open-dropdown] (uix/use-state nil)
-        selected-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
+        selected-ids (or (state/use-sub [:ui :datasets :selected-examples (s/keypath dataset-id)]) #{})
         all-on-page-ids (set (map :id examples))
         all-selected? (and (seq all-on-page-ids)
                            (clojure.set/subset? all-on-page-ids selected-ids))]
@@ -773,7 +773,7 @@
 
         ;; --- REFACTORED ---
         ;; State for selected snapshot now comes from app-db and is updated via dispatch
-        selected-snapshot-name (or (state/use-sub [:ui :datasets :selected-snapshot-per-dataset dataset-id]) "")
+        selected-snapshot-name (or (state/use-sub [:ui :datasets :selected-snapshot-per-dataset (s/keypath dataset-id)]) "")
         set-selected-snapshot-name (fn [new-name]
                                      (state/dispatch [:datasets/set-selected-snapshot
                                                       {:dataset-id dataset-id :snapshot-name new-name}]))
