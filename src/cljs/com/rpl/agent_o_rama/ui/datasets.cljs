@@ -138,7 +138,7 @@
   (let [;; Fetch the specific example data
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
-         {:query-key [:single-example module-id dataset-id snapshot-name (str example-id)]
+         {:query-key [:single-example module-id (s/keypath dataset-id) snapshot-name (str example-id)]
           :sente-event [:datasets/get-example {:module-id module-id
                                                :dataset-id dataset-id
                                                :snapshot-name snapshot-name
