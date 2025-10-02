@@ -1721,9 +1721,116 @@
        (is (= ["fail-agent"] (get im "input")))
        (is (= [] (get im "output")))
        (is (nil? (get im "latency")))
+      ))))
 
+
+(def SEM-ATOM)
+
+(deftest actions-scanning-test
+  (with-redefs [TICKS (atom 0)
+                ACTIONS (atom [])
+                SEM-ATOM (atom nil)
+                i/SUBSTITUTE-TICK-DEPOTS true
+
+                i/hook:analytics-tick
+                (fn [& args] (swap! TICKS inc))
+
+                anode/gen-node-id
+                (fn [& args]
+                  (h/random-uuid7-at-timestamp (h/current-time-millis)))
+
+                at/gen-new-agent-id
+                (fn [agent-name]
+                  (if (#{"foo"} agent-name)
+                    (do
+                      (let [ret (h/random-uuid7-at-timestamp (h/current-time-millis))]
+                        (TopologyUtils/advanceSimTime 1000)
+                        ret
+                      ))
+                    (h/random-uuid7)))]
+    (with-open [ipc (rtest/create-ipc)
+                _ (TopologyUtils/startSimTime)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (aor/declare-action-builder
+           topology
+           "action1"
+           ""
+           (fn [params]
+             (fn [fetcher input output run-info]
+               (swap! ACTIONS conj input)
+               {}
+             )))
+          (-> topology
+              (aor/new-agent "foo")
+              (aor/node
+               "start"
+               "node1"
+               (fn [agent-node input]
+                 (if-let [sem @SEM-ATOM]
+                   (h/acquire-semaphore sem))
+                 (aor/emit! agent-node "node1" (str input "!"))))
+              (aor/node
+               "node1"
+               nil
+               (fn [agent-node input]
+                 (aor/result! agent-node (str input "?")))))
+         ))
+       (rtest/launch-module! ipc module {:tasks 1 :threads 1})
+       (bind module-name (get-module-name module))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind global-actions-depot
+         (:global-actions-depot (aor-types/underlying-objects agent-manager)))
+       (bind foo (aor/agent-client agent-manager "foo"))
+       (bind ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
+
+
+       (bind cycle!
+         (fn []
+           (reset! TICKS 0)
+           (reset! ACTIONS [])
+           (foreign-append! ana-depot nil)
+           (is (condition-attained? (> @TICKS 0)))
+           (rtest/pause-microbatch-topology! ipc
+                                             module-name
+                                             aor-types/AGENTS-ANALYTICS-MB-TOPOLOGY-NAME)
+           (rtest/resume-microbatch-topology! ipc
+                                              module-name
+                                              aor-types/AGENTS-ANALYTICS-MB-TOPOLOGY-NAME)))
+
+
+       (ana/add-rule! global-actions-depot
+                      "foo-agent"
+                      "foo"
+                      {:node-name         nil
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? true
+                      })
+       (ana/add-rule! global-actions-depot
+                      "foo-start"
+                      "foo"
+                      {:node-name         "start"
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? true
+                      })
        ;; TODO: <<<<>>>>
-       ;;  - doesn't scan past incomplete nodes until time limit is reached (and then skips them for
+       ;;  - doesn't scan past incomplete nodes until time limit is reached (and then skips them
+       ;;  for
        ;;  actions unless include-failures? is true) – in this case, would output be nil or []?
        ;;  - doesn't scan past incomplete agents
+       ;;  - PLAN:
+       ;;     - single task module
+       ;;     - initiate a bunch of agents
+
+       ;; ana/NODE-ACTION-STALL-TIME-MILLIS
       ))))

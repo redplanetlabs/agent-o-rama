@@ -342,9 +342,11 @@
   (and (contains? data :source)
        (aor-types/ExperimentSourceImpl? (:source data))))
 
+(def NODE-ACTION-STALL-TIME-MILLIS (* 1000 60 2))
+
 (defn max-node-scan-time
   []
-  (- (h/current-time-millis) (* 1000 60 2)))
+  (- (h/current-time-millis) NODE-ACTION-STALL-TIME-MILLIS))
 
 (defn compute-end-offset
   [dep-offset max-scan-offset]
