@@ -32,14 +32,14 @@
                             :nodes {s/Uuid (spy "nodes")}
                             :edges [(spy "edges")]}
    (s/optional-key :implicit-edges) [(spy "implicit-edges")]
-   (s/optional-key :summary) (s/maybe {:forks [s/Uuid]
+   (s/optional-key :summary) (s/maybe {:forks #{s/Uuid}
                                        :fork-of (s/maybe s/Uuid)
                                        s/Keyword (spy "summary-extra")})
    (s/optional-key :root-invoke-id) (s/maybe s/Uuid)
    (s/optional-key :task-id) (s/maybe s/Int)
    (s/optional-key :is-complete) s/Bool
    (s/optional-key :historical-graph) (spy "historical-graph")
-   (s/optional-key :forks) [s/Uuid]
+   (s/optional-key :forks) #{s/Uuid}
    (s/optional-key :fork-of) (spy "fork-of")
    (s/optional-key :error) (spy "invocation-error")})
 
