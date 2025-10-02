@@ -27,16 +27,17 @@
 
 (s/defschema InvocationDataSchema
   {:status (s/enum :loading :success :error)
-   :graph {:raw-nodes {s/Uuid (spy "raw-nodes")}
-           :nodes {s/Uuid (spy "nodes")}
-           :edges [(spy "edges")]}
-   :implicit-edges [(spy "implicit-edges")]
-   :summary (s/maybe {:forks [s/Uuid]
-                      :fork-of (s/maybe s/Uuid)
-                      s/Keyword (spy "summary-extra")})
-   :root-invoke-id (s/maybe s/Uuid)
-   :task-id (s/maybe s/Int)
-   :is-complete s/Bool
+   ;; all optional because it starts with just {:status :loading}
+   (s/optional-key :graph) {:raw-nodes {s/Uuid (spy "raw-nodes")}
+                            :nodes {s/Uuid (spy "nodes")}
+                            :edges [(spy "edges")]}
+   (s/optional-key :implicit-edges) [(spy "implicit-edges")]
+   (s/optional-key :summary) (s/maybe {:forks [s/Uuid]
+                                       :fork-of (s/maybe s/Uuid)
+                                       s/Keyword (spy "summary-extra")})
+   (s/optional-key :root-invoke-id) (s/maybe s/Uuid)
+   (s/optional-key :task-id) (s/maybe s/Int)
+   (s/optional-key :is-complete) s/Bool
    (s/optional-key :historical-graph) (spy "historical-graph")
    (s/optional-key :forks) [s/Uuid]
    (s/optional-key :fork-of) (spy "fork-of")
