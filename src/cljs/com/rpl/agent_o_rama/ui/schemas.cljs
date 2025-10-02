@@ -100,11 +100,9 @@
           (s/optional-key :submit-text) s/Str
           (s/optional-key :form-id) s/Keyword
           (s/optional-key :component) s/Any ;; React component
-
-          ;; Other modal-specific data
-          s/Keyword (spy "modal-data-value")}
+          }
    :form {:submitting? s/Bool
-          :error (s/maybe (spy "modal-form-error"))}})
+          :error (s/maybe s/Str)}})
 
 (s/defschema HitlStateSchema
   {:responses {s/Uuid s/Str}
@@ -120,14 +118,9 @@
    :changed-nodes {s/Uuid s/Str}
    :active-tab s/Keyword
    :current-route s/Str
-   :breadcrumbs [(spy "breadcrumb")]
    :modal ModalStateSchema
    :hitl HitlStateSchema
    :datasets DatasetsUiSchema})
-
-(s/defschema SessionSchema
-  {:user-id (s/maybe s/Str)
-   :preferences {s/Keyword (spy "session-preference-value")}})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Top-Level App DB Schema
@@ -142,4 +135,4 @@
    :forms {s/Keyword FormStateSchema}
    :ui UiSchema
    :sente s/Any ;; don't want to schematize all of sente
-   :session SessionSchema})
+   })

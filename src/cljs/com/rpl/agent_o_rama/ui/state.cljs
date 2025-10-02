@@ -31,36 +31,8 @@
         (catch js/Error e
           (str "Invalid JSON: " (.-message e)))))))
 
-(def initial-db
-  {:current-invocation {:invoke-id nil
-                        :module-id nil
-                        :agent-name nil}
-   :invocations-data {} ;; Keyed by invoke-id -> {:graph {:raw-nodes {} :nodes {} :edges []} :implicit-edges [] :summary ... :root-invoke-id ... :task-id ... :is-complete false}
-   :invocations {:all-invokes []
-                 :pagination-params nil ;; Next pagination params from server
-                 :has-more? true
-                 :loading? false}
-   :queries {} ; New map to store all query states
-   :route nil ; Current route match from reitit
-   :forms {} ; Form states keyed by form-id -> {:fields {} :valid? false :submitting? false :error nil :submit-event [...]}
-   :ui {:selected-node-id nil
-        :forking-mode? false
-        :changed-nodes {}
-        :active-tab :info
-        :current-route "/"
-        :breadcrumbs []
-        :modal {:active nil ;; nil or modal type keyword
-                :data {} ;; modal-specific data
-                :form {:submitting? false
-                       :error nil}}
-        :hitl {:responses {} ;; Keyed by invoke-id -> response text
-               :submitting {}}
-        :datasets {:selected-examples {} ;; Keyed by dataset-id -> set of example-ids
-                   :selected-snapshot-per-dataset {}}} ;; Keyed by dataset-id -> snapshot-name 
-   :sente {:connected? false
-           :connection-state {}}
-   :session {:user-id nil
-             :preferences {}}})
+;; schema defined in schemas.cljs
+(def initial-db {})
 
 (defonce app-db (atom initial-db))
 
