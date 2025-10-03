@@ -1907,7 +1907,7 @@
        (TopologyUtils/advanceSimTime (+ ana/NODE-ACTION-STALL-TIME-MILLIS 1000))
        (cycle!)
        (is (= (frequencies @ACTIONS)
-              {["foo-start-fail" "start" ["c"] []] 1}))
+              {["foo-start-fail" "start" ["f"] []] 1}))
       ))))
 
 (deftest add-to-dataset-action-test
