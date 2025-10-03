@@ -1891,5 +1891,107 @@
       ))))
 
 (deftest add-to-dataset-action-test
-         ;; TODO: <<<<>>>>
-)
+  (with-redefs [TICKS (atom 0)
+                i/SUBSTITUTE-TICK-DEPOTS true
+
+                i/hook:analytics-tick
+                (fn [& args] (swap! TICKS inc))]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (-> topology
+              (aor/new-agent "foo")
+              (aor/node
+               "start"
+               nil
+               (fn [agent-node input]
+                 (aor/result! agent-node ["." (assoc input "q" 3) ".."]))))
+         ))
+       (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind global-actions-depot
+         (:global-actions-depot (aor-types/underlying-objects agent-manager)))
+       (bind foo (aor/agent-client agent-manager "foo"))
+       (bind ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
+       (bind search-examples-query
+         (:search-examples-query (aor-types/underlying-objects agent-manager)))
+       (bind foo-action-log (:action-log-query (aor-types/underlying-objects foo)))
+
+       (bind cycle!
+         (fn []
+           (reset! TICKS 0)
+           (foreign-append! ana-depot nil)
+           (is (condition-attained? (> @TICKS 0)))
+           (rtest/pause-microbatch-topology! ipc
+                                             module-name
+                                             aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
+           (rtest/resume-microbatch-topology! ipc
+                                              module-name
+                                              aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)))
+
+
+       (bind ds-id
+         (aor/create-dataset! agent-manager
+                              "Dataset 1 is a dataset"
+                              {:description "this is a dataset"}))
+
+       (bind all-examples
+         (fn []
+           (foreign-invoke-query search-examples-query
+                                 ds-id
+                                 nil
+                                 nil
+                                 1000
+                                 nil)))
+
+       (ana/add-rule! global-actions-depot
+                      "my-add"
+                      "foo"
+                      {:node-name         nil
+                       :action-name       "aor/add-to-dataset"
+                       :action-params     {"datasetId" (str ds-id)
+                                           "inputJsonPathTemplate" "$[0].a"
+                                           "outputJsonPathTemplate" "{\"b\": \"$[1]\"}"
+                                          }
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :include-failures? false
+                      })
+
+
+       (aor/agent-invoke foo {"a" "ccb"})
+       (cycle!)
+       (bind {:keys [examples]} (all-examples))
+       (is (= 1 (count examples)))
+       (bind e (first examples))
+       (is (= "ccb" (:input e)))
+       (is (= {"b" {"a" "ccb" "q" 3}} (:reference-output e)))
+       (is (aor-types/ActionSourceImpl? (:source e)))
+       (is (= "foo" (:agent-name (:source e))))
+       (is (= "my-add" (:rule-name (:source e))))
+       (bind {:keys [actions]} (foreign-invoke-query foo-action-log "my-add" 100 nil))
+       (is (contains? (-> actions
+                          first
+                          :action
+                          :info-map)
+                      "exampleId"))
+
+       (aor/agent-invoke foo {"a" "x"})
+       (aor/agent-invoke foo {"a" "y"})
+       (aor/agent-invoke foo {"a" "z"})
+       (cycle!)
+       (bind {:keys [examples]} (all-examples))
+       (is (= 4 (count examples)))
+       (bind s
+         (set (for [{:keys [input reference-output]} examples] {:i input :o reference-output})))
+       (is (= s
+              #{{:i "ccb" :o {"b" {"a" "ccb" "q" 3}}}
+                {:i "x" :o {"b" {"a" "x" "q" 3}}}
+                {:i "y" :o {"b" {"a" "y" "q" 3}}}
+                {:i "z" :o {"b" {"a" "z" "q" 3}}}
+               }))
+      ))))

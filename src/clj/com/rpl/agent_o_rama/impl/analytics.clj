@@ -140,11 +140,16 @@
         dataset-id      (java.util.UUID/fromString datasetId)
         manager         (get-agent-manager)]
     (fn [fetcher input output run-info]
-      (let [input  (h/resolve-json-path-template input-template input)
-            output (h/resolve-json-path-template output-template output)]
-        (binding [aor-types/OPERATION-SOURCE
-                  (aor-types/->valid-ActionSourceImpl (:agent-name run-info) (:rule-name run-info))]
-          (c/add-dataset-example! manager dataset-id input {:reference-output output}))
+      (let [input      (h/resolve-json-path-template input-template input)
+            output     (h/resolve-json-path-template output-template output)
+            example-id (binding [aor-types/OPERATION-SOURCE
+                                 (aor-types/->valid-ActionSourceImpl (:agent-name run-info)
+                                                                     (:rule-name run-info))]
+                         (c/add-dataset-example! manager
+                                                 dataset-id
+                                                 input
+                                                 {:reference-output output}))]
+        {"exampleId" (str example-id)}
       ))))
 
 (def BUILT-IN-ACTIONS
