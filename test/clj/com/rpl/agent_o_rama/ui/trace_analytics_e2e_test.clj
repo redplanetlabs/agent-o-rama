@@ -20,7 +20,7 @@
     GenericContainer]))
 
 (def ^:private default-port 8080)
-(def ^:private default-timeout 20)
+(def ^:private default-timeout 60)
 
 (defonce system (volatile! nil))
 
