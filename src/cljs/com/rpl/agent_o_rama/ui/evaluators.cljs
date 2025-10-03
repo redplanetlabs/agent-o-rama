@@ -34,11 +34,14 @@
 
           (when (seq builder-params)
             ($ DetailItem {:label "Parameters"}
-               ($ :div.bg-gray-100.rounded-md.p-3.space-y-1
+               ($ :div.bg-gray-100.rounded-md.p-3.space-y-3
                   (for [[k v] (sort-by key builder-params)]
-                    ($ :div.flex.gap-4.font-mono.text-xs.items-center {:key (str k)}
-                       ($ :span.text-gray-600.font-medium (clojure.core/name k))
-                       ($ :span.text-gray-800.bg-white.px-2.py-1.rounded (str v)))))))
+                    (let [v-str (str v)
+                          has-newlines? (str/includes? v-str "\n")]
+                      ($ :div {:key (str k)
+                               :className (if has-newlines? "flex flex-col gap-1" "flex gap-4 items-center")}
+                         ($ :span.text-gray-600.font-medium.font-mono.text-xs (clojure.core/name k))
+                         ($ :pre.text-gray-800.bg-white.px-2.py-1.rounded.font-mono.text-xs.whitespace-pre-wrap v-str)))))))
 
           ($ DetailItem {:label ($ :div.flex.items-center.gap-2 "Input JSONPath" ($ JsonPathTooltip))}
              (if (str/blank? input-json-path)
