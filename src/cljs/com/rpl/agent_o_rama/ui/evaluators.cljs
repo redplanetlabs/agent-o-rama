@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.evaluators
   (:require
    [uix.core :as uix :refer [defui $]]
-   ["@heroicons/react/24/outline" :refer [PlusIcon BeakerIcon TrashIcon EllipsisVerticalIcon ChevronDownIcon XMarkIcon InformationCircleIcon MagnifyingGlassIcon]]
+   ["@heroicons/react/24/outline" :refer [PlusIcon BeakerIcon TrashIcon EllipsisVerticalIcon ChevronDownIcon XMarkIcon InformationCircleIcon MagnifyingGlassIcon PlayIcon]]
    ["react" :refer [useState]]
    ["use-debounce" :refer [useDebounce]]
    [com.rpl.agent-o-rama.ui.common :as common]
@@ -23,8 +23,22 @@
 
 (defui EvaluatorDetailsModal [{:keys [spec]}]
   (let [{:keys [name type description builder-name builder-params
-                input-json-path output-json-path reference-output-json-path]} spec]
+                input-json-path output-json-path reference-output-json-path]} spec
+        ;; Get module-id from the route params to pass to the new event
+        module-id (state/use-sub [:route :path-params :module-id])]
     ($ :div.p-6.text-sm
+       ;; NEW: Try Evaluator button at the top
+       ($ :div.flex.justify-end.mb-4
+          ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
+             {:onClick (fn []
+                         ;; Close the details modal first, then show try modal
+                         (state/dispatch [:modal/hide])
+                         (js/setTimeout
+                          #(state/dispatch [:evaluators/show-try-modal {:evaluator spec :module-id module-id}])
+                          100))}
+             ($ PlayIcon {:className "h-5 w-5 mr-2"})
+             "Try Evaluator"))
+
        ($ :dl.divide-y.divide-gray-100
           ($ DetailItem {:label "Name"} ($ :span.font-mono name))
           ($ DetailItem {:label "Description"} (if (str/blank? description) ($ :span.italic.text-gray-500 "No description") description))
@@ -291,11 +305,12 @@
              (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
              (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)])))))))})
 
-(defui RunEvaluatorModal [{:keys [module-id dataset-id mode example selected-example-ids]}]
-  (let [[selected-evaluator set-selected-evaluator] (uix/use-state nil)
-        ;; NEW: State hooks for all three fields as editable textareas
-        [input-str set-input-str] (uix/use-state #(common/pp-json (:input example)))
-        [ref-output-str set-ref-output-str] (uix/use-state #(common/pp-json (:reference-output example)))
+(defui RunEvaluatorModal [{:keys [module-id dataset-id mode example selected-example-ids pre-selected-evaluator]}]
+  (let [;; NEW: If pre-selected, use it. Otherwise, state is nil.
+        [selected-evaluator set-selected-evaluator] (uix/use-state pre-selected-evaluator)
+        ;; NEW: Initialize textareas from the example if it exists, otherwise empty strings.
+        [input-str set-input-str] (uix/use-state #(common/pp-json (or (:input example) "")))
+        [ref-output-str set-ref-output-str] (uix/use-state #(common/pp-json (or (:reference-output example) "")))
         [output-str set-output-str] (uix/use-state "") ; For :regular type
 
         [model-outputs-input set-model-outputs-input] (uix/use-state [{:id (random-uuid) :value ""}]) ; For :comparative type user input
@@ -372,10 +387,18 @@
      [dropdown-open?])
 
     ($ :div.p-6.space-y-6
-       ;; 1. Evaluator Selection Dropdown
+       ;; 1. Evaluator Selection Dropdown (or display if pre-selected)
        ($ :div
           ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Select Evaluator")
           (cond
+            ;; NEW: If pre-selected, just display the name
+            pre-selected-evaluator
+            ($ :div.p-3.bg-gray-100.rounded-md.border.border-gray-300
+               ($ :span.font-medium (:name pre-selected-evaluator))
+               ($ :span.ml-2.inline-flex.items-center.px-2.py-0.5.rounded-full.text-xs.font-medium
+                  {:className (get-evaluator-type-badge-style (:type pre-selected-evaluator))}
+                  (get-evaluator-type-display (:type pre-selected-evaluator))))
+
             loading? ($ :div.text-sm.text-gray-500 "Loading evaluators...")
             error ($ :div.text-sm.text-red-600 "Error loading evaluators")
             (empty? evaluators) ($ :div.text-sm.text-gray-500 (if (= mode :single) "No regular or comparative evaluators available." "No summary evaluators available."))
@@ -468,6 +491,22 @@
             ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Evaluator Result")
             ($ :div.bg-green-50.rounded-md.p-4.border.border-green-200
                ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono (js/JSON.stringify (clj->js evaluation-result) nil 2))))))))
+
+;; Event handler to show the Try Evaluator modal with a pre-selected evaluator
+(state/reg-event
+ :evaluators/show-try-modal
+ (fn [_db {:keys [evaluator module-id]}]
+   ;; Dispatch the generic :modal/show event with RunEvaluatorModal
+   ;; In :single mode with a nil example, which signals empty textareas
+   (state/dispatch [:modal/show :run-evaluator
+                    {:title (str "Try Evaluator: " (:name evaluator))
+                     :component ($ RunEvaluatorModal
+                                   {:module-id module-id
+                                    :mode :single ;; Testing a single run
+                                    :pre-selected-evaluator evaluator ;; Pre-select the evaluator
+                                    :example nil ;; nil example means "start from scratch"
+                                    :dataset-id nil
+                                    :selected-example-ids nil})}])))
 
  ;; =============================================================================
 ;; MAIN PAGE COMPONENT
