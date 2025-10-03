@@ -214,6 +214,22 @@
         {:keys [active data]} modal-state
         form-id (when active (:form-id data))
 
+        ;; Get current form state to determine current step
+        form-state (state/use-sub [:forms form-id])
+        current-step (:current-step form-state)
+
+        ;; Get dynamic title based on current step
+        form-spec (when form-id (get @form-specs form-id))
+        current-step-spec (when current-step (get form-spec current-step))
+        modal-props (:modal-props current-step-spec)
+        dynamic-title (when modal-props
+                        (if (fn? modal-props)
+                          (:title (modal-props form-state))
+                          (:title modal-props)))
+
+        ;; Use dynamic title if available, otherwise fall back to data title
+        title (or dynamic-title (:title data))
+
         handle-cancel (fn []
                         (when form-id (state/dispatch [:form/clear form-id]))
                         (state/dispatch [:modal/hide]))
@@ -226,9 +242,9 @@
       (createPortal
        ($ :div {:className "fixed inset-0 flex items-center justify-center z-50", :style {:backgroundColor "rgba(0, 0, 0, 0.5)"}, :onClick handle-cancel}
           ($ :div {:className "bg-white rounded-lg shadow-xl w-full max-w-5xl overflow-hidden mx-4 my-8 flex flex-col max-h-screen", :role "dialog", :aria-modal "true", :onClick #(.stopPropagation %)}
-             ;; Header remains the same
+             ;; Header with dynamic title
              ($ :div {:className "flex-shrink-0 p-4 border-b border-gray-200 flex justify-between items-center bg-white"}
-                ($ :h3 {:className "text-lg font-medium text-gray-800"} (:title data))
+                ($ :h3 {:className "text-lg font-medium text-gray-800"} title)
                 ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer", :onClick handle-cancel} "×"))
 
              ;; Conditionally render the new content component

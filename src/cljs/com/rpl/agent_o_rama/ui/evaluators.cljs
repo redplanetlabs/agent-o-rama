@@ -254,7 +254,8 @@
                               current-form-state)))
    :validators {:name [forms/required]}
    :ui (fn [{:keys [form-id]}] ($ CreateEvaluatorForm {:form-id form-id}))
-   :modal-props {:title "Create Evaluator"}}
+   :modal-props (fn [form-state]
+                  {:title (str "Create Evaluator: " (get-in form-state [:selected-builder :name]))})}
 
   :on-submit
   (fn [db form-state] ; Updated to use the new flattened signature!
