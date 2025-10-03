@@ -65,12 +65,13 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-example
   [{:keys [manager dataset-id snapshot-name input output tags]} uid]
-  (aor/add-dataset-example! manager
-                            dataset-id
-                            input
-                            {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)
-                             :reference-output output
-                             :tags (set tags)})
+  (binding [aor-types/OPERATION-SOURCE (aor-types/->HumanSourceImpl "user")]
+    (aor/add-dataset-example! manager
+                              dataset-id
+                              input
+                              {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)
+                               :reference-output output
+                               :tags (set tags)}))
   {:status :ok})
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-snapshot-names
@@ -229,6 +230,7 @@
           input-validation (throw (ex-info (str "Input schema validation failed: " input-validation) {}))
           output-validation (throw (ex-info (str "Output schema validation failed: " output-validation) {}))
           :else (do
-                  (aor/add-dataset-example! manager dataset-id input
-                                            {:reference-output output})
+                  (binding [aor-types/OPERATION-SOURCE (aor-types/->HumanSourceImpl "user")]
+                    (aor/add-dataset-example! manager dataset-id input
+                                              {:reference-output output}))
                   {:status :ok}))))))
