@@ -62,7 +62,7 @@
 ;; JSONPATH TOOLTIP COMPONENT
 ;; =============================================================================
 
-(defui JsonPathTooltip []
+(defui InfoTooltip [{:keys [content]}]
   (let [[open? set-open!] (uix/use-state false)
         [timeout-id set-timeout-id!] (uix/use-state nil)
         hovering-ref (uix/use-ref false)
@@ -73,7 +73,6 @@
                          (set-timeout-id! nil)))
 
         schedule-close (fn schedule-close []
-                         (println "schedule close")
                          (clear-close!)
                          (let [new-timeout (js/setTimeout (fn []
                                                             (if (.-current hovering-ref)
@@ -87,26 +86,30 @@
        ($ InformationCircleIcon {:className "h-4 w-4 text-gray-400 hover:text-blue-500 cursor-help"
                                  :onClick (fn [] (set-open! (not open?)))
                                  :tabIndex 0
-                                 :onMouseEnter (fn [] (println "onMouseEnter1")
+                                 :onMouseEnter (fn []
                                                  (set! (.-current hovering-ref) true)
                                                  (clear-close!)
                                                  (set-open! true))
-                                 :onMouseLeave (fn [] (println "onMouseLeave1")
+                                 :onMouseLeave (fn []
                                                  (set! (.-current hovering-ref) false)
                                                  (schedule-close))})
        (when open?
          ($ :div.absolute.bottom-full.mb-2.w-64.bg-gray-800.text-white.text-xs.rounded.py-2.px-3.shadow-lg.z-50
-            {:onMouseEnter (fn [] (println "onMouseEnter2")
+            {:onMouseEnter (fn []
                              (set! (.-current hovering-ref) true)
                              (clear-close!))
-             :onMouseLeave (fn [] (println "onMouseLeave2")
+             :onMouseLeave (fn []
                              (set! (.-current hovering-ref) false)
                              (schedule-close))}
-            "A JSONPath expression to extract a value from the JSON object."
-            ($ :br)
-            ($ :a.text-blue-300.hover:underline.cursor-pointer
-               {:onClick #(js/window.open "https://en.wikipedia.org/wiki/JSONPath" "_blank")}
-               "Learn more on Wikipedia."))))))
+            content)))))
+
+(defui JsonPathTooltip []
+  ($ InfoTooltip {:content ($ :div
+                              "A JSONPath expression to extract a value from the JSON object."
+                              ($ :br)
+                              ($ :a.text-blue-300.hover:underline.cursor-pointer
+                                 {:onClick #(js/window.open "https://en.wikipedia.org/wiki/JSONPath" "_blank")}
+                                 "Learn more on Wikipedia."))}))
 
 ;; =============================================================================
 
@@ -187,13 +190,26 @@
          ($ :div.mt-6.pt-4.border-t
             ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "Builder Parameters")
             (for [[param-key param-spec] builder-params]
-              ($ forms/form-field
-                 {:key (str param-key)
-                  :label (str (name param-key))
-                  :value (get-in params [param-key]),
-                  :on-change #(set-field! [:params param-key] %)
-                  :error (get-in field-errors [:params param-key])
-                  :placeholder (:description param-spec)}))))
+              (let [param-description (:description param-spec)
+                    param-value (get params param-key)
+                    ;; Convert value to string for display
+                    value-str (cond
+                                (string? param-value) param-value
+                                (nil? param-value) ""
+                                :else (str param-value))
+                    ;; Check if value contains newlines to determine field type
+                    has-newlines? (str/includes? value-str "\n")]
+                ($ forms/form-field
+                   {:key (str param-key)
+                    :label ($ :div.flex.items-center.gap-2
+                              (str (name param-key))
+                              (when param-description
+                                ($ InfoTooltip {:content param-description})))
+                    :type (if has-newlines? :textarea :text)
+                    :rows (when has-newlines? 6)
+                    :value value-str
+                    :on-change #(set-field! [:params param-key] %)
+                    :error (get-in field-errors [:params param-key])})))))
        (when (or show-input-path? show-output-path? show-ref-output-path?)
          ($ :div.mt-6.pt-4.border-t
             ($ :button.flex.items-center.text-sm.font-medium.text-gray-700.hover:text-gray-900
@@ -205,17 +221,17 @@
             (when show-advanced?
               ($ :div.mt-4.space-y-4
                  (when show-input-path?
-                   ($ forms/form-field {:label "Input JSON Path"
+                   ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Input JSON Path" ($ JsonPathTooltip))
                                         :value input-json-path
                                         :on-change #(set-field! [:input-json-path] %)
                                         :error (:input-json-path field-errors)}))
                  (when show-output-path?
-                   ($ forms/form-field {:label "Output JSON Path"
+                   ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Output JSON Path" ($ JsonPathTooltip))
                                         :value output-json-path
                                         :on-change #(set-field! [:output-json-path] %)
                                         :error (:output-json-path field-errors)}))
                  (when show-ref-output-path?
-                   ($ forms/form-field {:label "Reference Output JSON Path"
+                   ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Reference Output JSON Path" ($ JsonPathTooltip))
                                         :value reference-output-json-path
                                         :on-change #(set-field! [:reference-output-json-path] %)
                                         :error (:reference-output-json-path field-errors)})))))))))
@@ -232,15 +248,17 @@
 
   :configure
   {:initial-fields (fn [current-form-state]
-                     ;; In multi-step forms, we receive the current form state
-                     ;; and only add new fields that don't exist yet
-                     (merge {:name ""
-                             :description ""
-                             :input-json-path ""
-                             :output-json-path ""
-                             :reference-output-json-path ""
-                             :params {}}
-                            current-form-state))
+                     ;; Extract defaults from selected builder params
+                     (let [builder-params (get-in current-form-state [:selected-builder :spec :options :params] {})
+                           default-params (into {} (for [[k v] builder-params]
+                                                     [k (:default v)]))]
+                       (merge {:name ""
+                               :description ""
+                               :input-json-path ""
+                               :output-json-path ""
+                               :reference-output-json-path ""
+                               :params default-params}
+                              current-form-state)))
    :validators {:name [forms/required]}
    :ui (fn [{:keys [form-id]}] ($ CreateEvaluatorForm {:form-id form-id}))
    :modal-props {:title "Create Evaluator"}}
