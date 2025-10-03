@@ -156,9 +156,9 @@
       ))))
 
 (def DEFAULT-WEBHOOK-PAYLOAD
-  "{\"input\": %input
-    \"output\": %output
-    \"runInfo\": %runInfo}")
+  "{\"input\": %input,
+  \"output\": %output,
+  \"runInfo\": %runInfo}")
 
 (def STR-MAPPER (j/object-mapper {:decode-key-fn str}))
 
@@ -181,6 +181,7 @@
   [{:keys [rule-name action-name agent-name node-name type start-time-millis latency-millis
            feedback]}]
   (setval [MAP-VALS nil?]
+          NONE
           {"ruleName"        rule-name
            "actionName"      action-name
            "agentName"       agent-name
@@ -191,8 +192,7 @@
            "feedback"        (mapv (fn [{:keys [scores source]}]
                                      {"scores" (transform MAP-VALS json-compatible-value scores)
                                       "source" (aor-types/source-string source)})
-                                   feedback)}
-          NONE))
+                                   feedback)}))
 
 (defn webhook-action-builder-fn
   [{:strs [url payloadTemplate headers timeoutMillis]}]

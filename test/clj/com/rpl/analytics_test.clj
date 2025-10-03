@@ -19,7 +19,9 @@
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
    [com.rpl.test-common :as tc]
-   [meander.epsilon :as m])
+   [jsonista.core :as j]
+   [meander.epsilon :as m]
+   [org.httpkit.server :as server])
   (:import
    [com.rpl.agentorama
     AgentFailedException]
@@ -2017,7 +2019,162 @@
       ))))
 
 (deftest webhook-action-test
-         ;; TODO: <<<<>>>>
-         ;;  - make one action to leave feedback
-         ;;  - run one on node and one on agent to verify what's in run-info
-)
+  (let [received-atom (atom [])
+        stop-server
+        (server/run-server
+         (fn [req]
+           (swap! received-atom conj req)
+           {:status  200
+            :headers {"Content-Type" "application/json"}
+            :body    (j/write-value-as-string {:ok true})})
+         {:port 0})]
+    (try
+      (with-redefs [TICKS (atom 0)
+                    i/SUBSTITUTE-TICK-DEPOTS true
+
+                    i/hook:analytics-tick
+                    (fn [& args] (swap! TICKS inc))]
+        (with-open [ipc (rtest/create-ipc)]
+          (letlocals
+           (bind port
+             (-> stop-server
+                 meta
+                 :local-port))
+           (bind url (str "http://127.0.0.1:" port "/test"))
+
+           (bind module
+             (aor/agentmodule
+              [topology]
+              (-> topology
+                  (aor/new-agent "foo")
+                  (aor/node
+                   "start"
+                   nil
+                   (fn [agent-node input]
+                     (aor/result! agent-node (str input "!")))))
+             ))
+           (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+           (bind module-name (get-module-name module))
+           (bind agent-manager (aor/agent-manager ipc module-name))
+           (bind global-actions-depot
+             (:global-actions-depot (aor-types/underlying-objects agent-manager)))
+           (bind foo (aor/agent-client agent-manager "foo"))
+           (bind ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
+           (bind foo-action-log (:action-log-query (aor-types/underlying-objects foo)))
+
+           (bind cycle!
+             (fn []
+               (reset! TICKS 0)
+               (reset! received-atom [])
+               (foreign-append! ana-depot nil)
+               (is (condition-attained? (> @TICKS 0)))
+               (rtest/pause-microbatch-topology! ipc
+                                                 module-name
+                                                 aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
+               (rtest/resume-microbatch-topology! ipc
+                                                  module-name
+                                                  aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)))
+
+
+           (aor/create-evaluator! agent-manager
+                                  "concise5"
+                                  "aor/conciseness"
+                                  {"threshold" "5"}
+                                  "")
+
+           (ana/add-rule! global-actions-depot
+                          "eval1"
+                          "foo"
+                          {:action-name       "aor/eval"
+                           :action-params     {"name" "concise5"}
+                           :filter            (aor-types/->AndFilter [])
+                           :sampling-rate     1.0
+                           :start-time-millis 0
+                           :include-failures? false
+                          })
+           (ana/add-rule! global-actions-depot
+                          "eval2"
+                          "foo"
+                          {:node-name         "start"
+                           :action-name       "aor/eval"
+                           :action-params     {"name" "concise5"}
+                           :filter            (aor-types/->AndFilter [])
+                           :sampling-rate     1.0
+                           :start-time-millis 0
+                           :include-failures? false
+                          })
+
+
+
+
+           (ana/add-rule!
+            global-actions-depot
+            "my-webhook"
+            "foo"
+            {:node-name         nil
+             :action-name       "aor/webhook"
+             :action-params     {"url"           url
+                                 "headers"       "{\"a\": \"abcdefg\"}"
+                                 "timeoutMillis" "30000"
+                                 "payloadTemplate" ana/DEFAULT-WEBHOOK-PAYLOAD}
+             :filter            (aor-types/->FeedbackFilter "eval1"
+                                                            "concise?"
+                                                            (aor-types/->ComparatorSpec :not= "a"))
+             :sampling-rate     1.0
+             :start-time-millis 0
+             :include-failures? false
+            })
+
+
+           (is (= "ccz!" (aor/agent-invoke foo "ccz")))
+           (cycle!)
+           (cycle!)
+           (is (= 1 (count @received-atom)))
+           (bind r (first @received-atom))
+           (is (= "abcdefg" (get (:headers r) "a")))
+           (bind m (j/read-value (slurp (:body r)) ana/STR-MAPPER))
+           (is (= #{"input" "output" "runInfo"} (set (keys m))))
+           (is (= ["ccz"] (get m "input")))
+           (is (= "ccz!" (get m "output")))
+           (bind ri (get m "runInfo"))
+           (is (= "my-webhook" (get ri "ruleName")))
+           (is (= "foo" (get ri "agentName")))
+           (is (>= (get ri "latencyMillis") 0))
+           (is (= "aor/webhook" (get ri "actionName")))
+           (is (= "agent" (get ri "type")))
+           (is (> (get ri "startTimeMillis") 0))
+           (is (= [{"source" "eval[concise5]" "scores" {"concise?" true}}] (get ri "feedback")))
+
+
+           (ana/delete-rule! global-actions-depot "foo" "my-webhook")
+           (cycle!)
+           (ana/add-rule!
+            global-actions-depot
+            "my-webhook-start"
+            "foo"
+            {:node-name         "start"
+             :action-name       "aor/webhook"
+             :action-params
+             {"url"           url
+              "headers"       "{\"a\": \"abcdefg\"}"
+              "timeoutMillis" "30000"
+              "payloadTemplate"
+              "{\"i\": %input, \"r\":
+                                               %runInfo}"}
+             :filter            (aor-types/->FeedbackFilter "eval2"
+                                                            "concise?"
+                                                            (aor-types/->ComparatorSpec :not= "a"))
+             :sampling-rate     1.0
+             :start-time-millis 0
+             :include-failures? false
+            })
+
+
+           ;; TODO: <<<><>>>
+           ;;   - add non-json serializable values in eval scores and input/output
+           ;;   - test on node
+
+
+          )))
+      (finally
+        (stop-server)))))
