@@ -72,6 +72,14 @@
                 (.format formatter date))))
     ""))
 
+(defn format-duration-ms
+  "Format a duration in milliseconds to a human-readable string."
+  [duration-ms]
+  (cond
+    (< duration-ms 1000) (str duration-ms "ms")
+    (< duration-ms 60000) (str (.toFixed (/ duration-ms 1000) 2) "s")
+    :else (str (.toFixed (/ duration-ms 60000) 2) "m")))
+
 (defn use-local-storage
   "Hook for localStorage functionality
   
