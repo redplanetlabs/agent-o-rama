@@ -1024,8 +1024,9 @@
         :all-action-builders-query all-action-builders-query
         :search-evals-query        search-evals-query
         :search-experiments-query  search-experiments-query
+        :search-datasets-query     datasets-search-query
         :experiments-results-query experiments-results-query
-       }))))
+        }))))
 
 (defn agent-client
   ^AgentClient [^IFetchAgentClient agent-client-fetcher agent-name]

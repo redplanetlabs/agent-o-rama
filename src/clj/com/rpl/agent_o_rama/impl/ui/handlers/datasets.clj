@@ -11,10 +11,18 @@
   (:use [com.rpl.rama]))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-all
-  [{:keys [manager pagination]} uid]
-  ;; TODO search will use different query
-  (let [datasets-page-query (:datasets-page-query (aor-types/underlying-objects manager))]
-    (foreign-invoke-query datasets-page-query 1000 pagination)))
+  [{:keys [manager pagination filters]} uid]
+  (let [underlying-objects (aor-types/underlying-objects manager)
+        search-string (get filters :search-string)]
+    (if-not (str/blank? search-string)
+      ;; Use the search query when a search string is provided
+      (let [search-query (:search-datasets-query underlying-objects)]
+        (->> (foreign-invoke-query search-query search-string 500)
+             (mapv (fn [[id name]] {:dataset-id id, :name name}))
+             (hash-map :datasets)))
+      ;; Otherwise, use the existing page query
+      (let [datasets-page-query (:datasets-page-query underlying-objects)]
+        (foreign-invoke-query datasets-page-query 1000 pagination)))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-props
   [{:keys [manager dataset-id]} uid]
