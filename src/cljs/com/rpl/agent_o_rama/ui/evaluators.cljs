@@ -169,7 +169,6 @@
         description-field (forms/use-form-field form-id :description)
         builder-params (get-in selected-builder [:spec :options :params] {})
         builder-options (get-in selected-builder [:spec :options] {})
-        [show-advanced? set-show-advanced!] (uix/use-state false)
         show-input-path? (get builder-options :input-path? true)
         show-output-path? (get builder-options :output-path? true)
         show-ref-output-path? (get builder-options :reference-output-path? true)]
@@ -212,29 +211,23 @@
                     :error (get-in field-errors [:params param-key])})))))
        (when (or show-input-path? show-output-path? show-ref-output-path?)
          ($ :div.mt-6.pt-4.border-t
-            ($ :button.flex.items-center.text-sm.font-medium.text-gray-700.hover:text-gray-900
-               {:type "button", :onClick #(set-show-advanced! (not show-advanced?))}
-               "Advanced Options"
-               ($ :svg {:className (common/cn "ml-2 h-4 w-4 transform transition-transform" {"rotate-180" show-advanced?})
-                        :fill "none", :viewBox "0 0 24 24", :stroke "currentColor"}
-                  ($ :path {:strokeLinecap "round", :strokeLinejoin "round", :strokeWidth 2, :d "M19 9l-7 7-7-7"})))
-            (when show-advanced?
-              ($ :div.mt-4.space-y-4
-                 (when show-input-path?
-                   ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Input JSON Path" ($ JsonPathTooltip))
-                                        :value input-json-path
-                                        :on-change #(set-field! [:input-json-path] %)
-                                        :error (:input-json-path field-errors)}))
-                 (when show-output-path?
-                   ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Output JSON Path" ($ JsonPathTooltip))
-                                        :value output-json-path
-                                        :on-change #(set-field! [:output-json-path] %)
-                                        :error (:output-json-path field-errors)}))
-                 (when show-ref-output-path?
-                   ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Reference Output JSON Path" ($ JsonPathTooltip))
-                                        :value reference-output-json-path
-                                        :on-change #(set-field! [:reference-output-json-path] %)
-                                        :error (:reference-output-json-path field-errors)})))))))))
+            ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "JSONPath Configuration")
+            ($ :div.space-y-4
+               (when show-input-path?
+                 ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Input JSON Path" ($ JsonPathTooltip))
+                                      :value input-json-path
+                                      :on-change #(set-field! [:input-json-path] %)
+                                      :error (:input-json-path field-errors)}))
+               (when show-output-path?
+                 ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Output JSON Path" ($ JsonPathTooltip))
+                                      :value output-json-path
+                                      :on-change #(set-field! [:output-json-path] %)
+                                      :error (:output-json-path field-errors)}))
+               (when show-ref-output-path?
+                 ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Reference Output JSON Path" ($ JsonPathTooltip))
+                                      :value reference-output-json-path
+                                      :on-change #(set-field! [:reference-output-json-path] %)
+                                      :error (:reference-output-json-path field-errors)}))))))))
 
 (forms/reg-form
  :create-evaluator
