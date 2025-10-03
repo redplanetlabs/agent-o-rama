@@ -179,10 +179,11 @@
   (getSourceString [this] (str "eval[" eval-name "]")))
 
 (defaorrecord ActionSourceImpl
-  [rule-name :- String]
+  [agent-name :- String
+   rule-name :- String]
   ActionSource
   (getRuleName [this] rule-name)
-  (getSourceString [this] (str "action[" rule-name "]")))
+  (getSourceString [this] (str "action[" agent-name "/" rule-name "]")))
 
 ;; Core types
 

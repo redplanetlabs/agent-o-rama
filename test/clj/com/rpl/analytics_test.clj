@@ -448,7 +448,7 @@
        (aor-types/->valid-EvalSourceImpl
         "blah"
         ai
-        (aor-types/->valid-ActionSourceImpl "xyz")))
+        (aor-types/->valid-ActionSourceImpl "aaa" "xyz")))
 
      (is (= #{"xyz"} (aor-types/dependency-rule-names filter)))
 

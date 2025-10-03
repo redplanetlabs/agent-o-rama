@@ -117,7 +117,8 @@
                              (:builder-name eval-info)
                              (:builder-params eval-info)
                              [(aor-types/->valid-EvalInfo agent-name target)]
-                             (aor-types/->valid-ActionSourceImpl (:rule-name run-info))))
+                             (aor-types/->valid-ActionSourceImpl (:agent-name run-info)
+                                                                 (:rule-name run-info))))
         ;; should be guaranteed to be delivered, so the timeout is just in case
         (let [{:keys [stats result]}
               (.get
@@ -141,7 +142,9 @@
     (fn [fetcher input output run-info]
       (let [input  (h/resolve-json-path-template input-template input)
             output (h/resolve-json-path-template output-template output)]
-        (c/add-dataset-example! manager dataset-id input {:reference-output output})
+        (binding [aor-types/OPERATION-SOURCE
+                  (aor-types/->valid-ActionSourceImpl (:agent-name run-info) (:rule-name run-info))]
+          (c/add-dataset-example! manager dataset-id input {:reference-output output}))
       ))))
 
 (def BUILT-IN-ACTIONS
