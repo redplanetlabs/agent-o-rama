@@ -188,8 +188,9 @@
            "type"            (if (= type :agent) "agent" "node")
            "startTimeMillis" start-time-millis
            "latencyMillis"   latency-millis
-           "feedback"        (mapv (fn [{:keys [scores]}]
-                                     (transform MAP-VALS json-compatible-value scores))
+           "feedback"        (mapv (fn [{:keys [scores source]}]
+                                     {"scores" (transform MAP-VALS json-compatible-value scores)
+                                      "source" (aor-types/source-string source)})
                                    feedback)}
           NONE))
 
