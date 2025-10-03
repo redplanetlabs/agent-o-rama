@@ -552,7 +552,7 @@
                                     *agent-invoke
                                     *node-invoke
                                     *type
-                                    (:start-time-millis *data)
+                                    (get *data :start-time-millis)
                                     (data->latency-millis *data)
                                     *feedback
                                     *agent-stats
