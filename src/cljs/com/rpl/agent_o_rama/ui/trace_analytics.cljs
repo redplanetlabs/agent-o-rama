@@ -14,14 +14,18 @@
 
 (defn has-operations?
   "Check if aggregated operations contain any of the specified operation types."
-  [aggregated-ops op-keys]
-  (some #(pos? (:count (get-in aggregated-ops [:nested-op-stats %]) 0))
+  [basic-stats op-keys]
+  (some #(pos? (get-in basic-stats [:nested-op-stats % :count] 0))
         op-keys))
 
 (defn get-op-stats
-  "Get operation stats for a specific operation key, returning default empty stats if not present."
-  [aggregated-ops op-key]
-  (get aggregated-ops op-key {:count 0 :total-time-millis 0}))
+  "Get operation stats for a specific operation key.
+  Returns default empty stats if not present."
+  [basic-stats op-key]
+  (get-in
+   basic-stats
+   [:nested-op-stats op-key]
+   {:count 0 :total-time-millis 0}))
 
 (defn format-op-stats
   "Format operation stats as 'Nx  ·  Nms'"
@@ -167,9 +171,11 @@
                   :value (str (.toLocaleString total-tokens))}]})))
 
        ;; Other operations (expandable)
+       (.log js/console "STATS" (pr-str basic-stats))
        (when (has-operations?
               basic-stats
               [:tool-call :agent-call :human-input :other])
+         (.log js/console "IN OTHER")
          ($ stat-card
             {:data-id "other-operations"}
             ($ :div

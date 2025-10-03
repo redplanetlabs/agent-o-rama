@@ -26,6 +26,7 @@
   [ipc]
   (shadow.cljs.devtools.server/start!)
   (shadow/watch :dev)
+  (shadow/nrepl-select :dev)
   (aor/start-ui ipc))
 
 (comment
@@ -41,6 +42,17 @@
 
   (shadow.cljs.devtools.server/stop!)
   (shadow.cljs.devtools.server/reload!)
+
+  (require 'com.rpl.agent-o-rama.ui.trace-analytics-test-agent)
+
+  (rtest/launch-module!
+   ipc
+   com.rpl.agent-o-rama.ui.trace-analytics-test-agent/TraceAnalyticsTestAgentModule
+   {:tasks 1 :threads 1})
+  (rtest/update-module!
+   ipc
+   com.rpl.agent-o-rama.ui.trace-analytics-test-agent/TraceAnalyticsTestAgentModule
+   {:tasks 1 :threads 1})
 
   (require 'com.rpl.agent.basic.basic-agent)
 

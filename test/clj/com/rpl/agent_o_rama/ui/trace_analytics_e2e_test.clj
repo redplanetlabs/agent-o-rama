@@ -180,7 +180,7 @@
       (let [env     @system
             manager (aor/agent-manager (:ipc env) (:module-name env))
             agent   (aor/agent-client manager "TraceTestAgent")
-            invoke  (aor/agent-initiate agent {:mode :basic})]
+            invoke  (aor/agent-initiate agent {"mode" "basic"})]
 
         @(aor/agent-result-async agent invoke)
 
@@ -204,7 +204,7 @@
       (let [env     @system
             manager (aor/agent-manager (:ipc env) (:module-name env))
             agent   (aor/agent-client manager "TraceTestAgent")
-            invoke  (aor/agent-initiate agent {:mode :db})]
+            invoke  (aor/agent-initiate agent {"mode" "db"})]
 
         @(aor/agent-result-async agent invoke)
 
@@ -228,7 +228,7 @@
       (let [env     @system
             manager (aor/agent-manager (:ipc env) (:module-name env))
             agent   (aor/agent-client manager "TraceTestAgent")
-            invoke  (aor/agent-initiate agent {:mode :store})]
+            invoke  (aor/agent-initiate agent {"mode" "store"})]
 
         @(aor/agent-result-async agent invoke)
 
@@ -256,7 +256,7 @@
       (let [env     @system
             manager (aor/agent-manager (:ipc env) (:module-name env))
             agent   (aor/agent-client manager "TraceTestAgent")
-            invoke  (aor/agent-initiate agent {:mode :other})]
+            invoke  (aor/agent-initiate agent {"mode" "other"})]
 
         @(aor/agent-result-async agent invoke)
 
@@ -282,7 +282,7 @@
       (let [env     @system
             manager (aor/agent-manager (:ipc env) (:module-name env))
             agent   (aor/agent-client manager "TraceTestAgent")
-            invoke  (aor/agent-initiate agent {:mode :other})]
+            invoke  (aor/agent-initiate agent {"mode" "other"})]
 
         @(aor/agent-result-async agent invoke)
 
@@ -319,7 +319,7 @@
       (let [env     @system
             manager (aor/agent-manager (:ipc env) (:module-name env))
             agent   (aor/agent-client manager "TraceTestAgent")
-            invoke  (aor/agent-initiate agent {:mode :sub-agent})]
+            invoke  (aor/agent-initiate agent {"mode" "sub-agent"})]
 
         @(aor/agent-result-async agent invoke)
 
@@ -384,8 +384,8 @@
                 manager (aor/agent-manager (:ipc env) (:module-name env))
                 agent   (aor/agent-client manager "TraceTestAgent")
                 invoke  (aor/agent-initiate agent
-                                            {:mode  :chat
-                                             :input "Say hello"})]
+                                            {"mode"  "chat"
+                                             "input" "Say hello"})]
 
             @(aor/agent-result-async agent invoke)
 

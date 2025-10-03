@@ -70,14 +70,14 @@
 (deftest get-op-stats-test
   (testing "get-op-stats"
     (testing "returns stats for existing operation"
-      (let [ops    {:db-read {:count 5 :total-time-millis 100}}
-            result (ta/get-op-stats ops :db-read)]
+      (let [basic-stats {:nested-op-stats {:db-read {:count 5 :total-time-millis 100}}}
+            result      (ta/get-op-stats basic-stats :db-read)]
         (is (= 5 (:count result)))
         (is (= 100 (:total-time-millis result)))))
 
     (testing "returns default empty stats for missing operation"
-      (let [ops    {:db-read {:count 5 :total-time-millis 100}}
-            result (ta/get-op-stats ops :missing)]
+      (let [basic-stats {:nested-op-stats {:db-read {:count 5 :total-time-millis 100}}}
+            result      (ta/get-op-stats basic-stats :missing)]
         (is (= 0 (:count result)))
         (is (= 0 (:total-time-millis result)))))
 
@@ -121,7 +121,7 @@
       (is (ta/has-operations? basic-stats [:tool-call :agent-call]))
 
       ;; Verify get-op-stats works with aggregated stats
-      (let [get-op (partial ta/get-op-stats (:nested-op-stats basic-stats))]
+      (let [get-op (partial ta/get-op-stats basic-stats)]
         (is (= 7 (:count (get-op :db-read))))
         (is (= 140 (:total-time-millis (get-op :db-read))))
         (is (= 5 (:count (get-op :model-call))))
