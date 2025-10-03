@@ -15,9 +15,7 @@
    [java.lang
     AutoCloseable]
    [org.testcontainers
-    Testcontainers]
-   [org.testcontainers.containers
-    GenericContainer]))
+    Testcontainers]))
 
 (def ^:private default-port 8080)
 (def ^:private default-timeout 60)
@@ -40,9 +38,6 @@
         container      (-> (tc/create
                             {:image-name    "selenium/standalone-chromium:latest"
                              :exposed-ports [webdriver-port]})
-                           #_(update
-                              :container
-                              #(.withReuse ^GenericContainer % true))
                            (tc/start!))]
     (vswap! system assoc :container container)
     container))
