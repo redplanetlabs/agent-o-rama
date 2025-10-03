@@ -193,7 +193,7 @@
                                    feedback)}
           NONE))
 
-(defn webook-action-builder-fn
+(defn webhook-action-builder-fn
   [{:strs [url payloadTemplate headers timeoutMillis]}]
   (let [timeout-millis (Long/parseLong timeoutMillis)
         headers        (j/read-value headers STR-MAPPER)]
@@ -211,10 +211,10 @@
                      ::timeout)]
         (when (= res ::timeout)
           (throw (h/ex-info "Timeout on HTTP request" {:url url :payload payload})))
-        (let [{:keys [status error]} res]
+        (let [{:keys [status body error]} res]
           (when (or (not= status 200) error)
-            (throw (h/ex-info "Error on HTTP request" {:status status :error error})))
-          {}
+            (throw (h/ex-info "Error on HTTP request" {:status status :error error :body body})))
+          {"response" body}
         )))))
 
 (def BUILT-IN-ACTIONS
@@ -239,7 +239,7 @@
                 :default     "$"}}
              }}
    "aor/webhook"
-   {:builder-fn  webook-action-builder-fn
+   {:builder-fn  webhook-action-builder-fn
     :description "Post a JSON payload to a URL"
     :options
     {:params
