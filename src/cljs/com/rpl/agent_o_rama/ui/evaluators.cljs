@@ -250,13 +250,15 @@
                      (let [builder-params (get-in current-form-state [:selected-builder :spec :options :params] {})
                            default-params (into {} (for [[k v] builder-params]
                                                      [k (:default v)]))]
-                       (merge {:name ""
+;; Merge current-form-state FIRST to preserve step 1 data,
+;; then override with new defaults to reset step 2 fields
+                       (merge current-form-state
+                              {:name ""
                                :description ""
                                :input-json-path "$"
                                :output-json-path "$"
                                :reference-output-json-path "$"
-                               :params default-params}
-                              current-form-state)))
+                               :params default-params})))
    :validators {:name [forms/required]}
    :ui (fn [{:keys [form-id]}] ($ CreateEvaluatorForm {:form-id form-id}))
    :modal-props (fn [form-state]
