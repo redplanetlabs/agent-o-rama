@@ -1731,16 +1731,20 @@
       ))))
 
 
-(def SEM-ATOM)
+(def NODE-ACTION-ATOM)
 
 (deftest actions-scanning-test
   (with-redefs [TICKS (atom 0)
                 ACTIONS (atom [])
-                SEM-ATOM (atom nil)
+                NODE-ACTION-ATOM (atom nil)
                 i/SUBSTITUTE-TICK-DEPOTS true
 
                 i/hook:analytics-tick
                 (fn [& args] (swap! TICKS inc))
+
+                aor-types/get-config (max-retries-override 0)
+
+                anode/log-node-error (fn [& args])
 
                 anode/gen-node-id
                 (fn [& args]
@@ -1776,8 +1780,10 @@
                "start"
                "node1"
                (fn [agent-node input]
-                 (if-let [sem @SEM-ATOM]
-                   (h/acquire-semaphore sem))
+                 (if-let [action @NODE-ACTION-ATOM]
+                   (if (instance? java.util.concurrent.Semaphore action)
+                     (h/acquire-semaphore action)
+                     (throw (h/ex-info "fail" {}))))
                  (aor/emit! agent-node "node1" (str input "!"))))
               (aor/node
                "node1"
@@ -1853,10 +1859,10 @@
        (bind inv (aor/agent-initiate foo "b"))
        (is (= "b!?" (aor/agent-result foo inv)))
        (bind sem1 (h/mk-semaphore 0))
-       (reset! SEM-ATOM sem1)
+       (reset! NODE-ACTION-ATOM sem1)
        (bind invc (aor/agent-initiate foo "c"))
        (wait-acquired! sem1)
-       (reset! SEM-ATOM nil)
+       (reset! NODE-ACTION-ATOM nil)
        (bind inv (aor/agent-initiate foo "d"))
        (is (= "d!?" (aor/agent-result foo inv)))
        (bind inv (aor/agent-initiate foo "e"))
@@ -1873,21 +1879,35 @@
        (is (= [] @ACTIONS))
        (TopologyUtils/advanceSimTime (+ ana/NODE-ACTION-STALL-TIME-MILLIS 1000))
        (cycle!)
-       (is (= (frequencies @ACTIONS)
-              {["foo-start-fail" "start" ["c"] []] 1
-               ["foo-start-fail" "start" ["d"] [{"node" "node1" "args" ["d!"]}]] 1
-               ["foo-start-fail" "start" ["e"] [{"node" "node1" "args" ["e!"]}]] 1
-               ["foo-start" "start" ["d"] [{"node" "node1" "args" ["d!"]}]] 1
-               ["foo-start" "start" ["e"] [{"node" "node1" "args" ["e!"]}]] 1}))
-       (cycle!)
        (is (= [] @ACTIONS))
        (h/release-semaphore sem1 1)
        (is (= "c!?" (aor/agent-result foo invc)))
        (cycle!)
        (is (= (frequencies @ACTIONS)
-              {["foo-agent" nil ["c"] "c!?"] 1
+              {["foo-start-fail" "start" ["c"] [{"node" "node1" "args" ["c!"]}]] 1
+               ["foo-start-fail" "start" ["d"] [{"node" "node1" "args" ["d!"]}]] 1
+               ["foo-start-fail" "start" ["e"] [{"node" "node1" "args" ["e!"]}]] 1
+               ["foo-start" "start" ["c"] [{"node" "node1" "args" ["c!"]}]] 1
+               ["foo-start" "start" ["d"] [{"node" "node1" "args" ["d!"]}]] 1
+               ["foo-start" "start" ["e"] [{"node" "node1" "args" ["e!"]}]] 1
+               ["foo-agent" nil ["c"] "c!?"] 1
                ["foo-agent" nil ["d"] "d!?"] 1
                ["foo-agent" nil ["e"] "e!?"] 1}))
+
+
+       (reset! NODE-ACTION-ATOM :fail)
+       (bind inv (aor/agent-initiate foo "f"))
+       (is (thrown? Exception (aor/agent-result foo inv)))
+       (cycle!)
+       (is (= 1 (count @ACTIONS)))
+       (bind a (first @ACTIONS))
+       (is (= (subvec a 0 3) ["foo-agent" nil ["f"]]))
+       (is (instance? Exception (nth a 3)))
+
+       (TopologyUtils/advanceSimTime (+ ana/NODE-ACTION-STALL-TIME-MILLIS 1000))
+       (cycle!)
+       (is (= (frequencies @ACTIONS)
+              {["foo-start-fail" "start" ["c"] []] 1}))
       ))))
 
 (deftest add-to-dataset-action-test

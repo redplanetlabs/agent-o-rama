@@ -505,7 +505,7 @@
     )))
 
 (defn complete-node-map
-  [m node-name]
+  [m node-name node-exec]
   (if (nil? node-name)
     m
     (let [max-time        (max-node-scan-time)
@@ -513,8 +513,9 @@
           (fn [[k data]]
             (and (not (contains? data :finish-time-millis))
                  (not (contains? data :invoked-agg-invoke-id))
-                 (contains? data :start-time-millis); not strictly necessary
-                 (> (:start-time-millis data) max-time)))
+                 (or (retries/invoke-id-executing? node-exec k)
+                     (and (contains? data :start-time-millis); not strictly necessary
+                          (> (:start-time-millis data) max-time)))))
           first-invalid-offset (select-first [ALL invalid-offset? FIRST] m)]
       (if (nil? first-invalid-offset)
         m
@@ -707,9 +708,10 @@
    (<<ramafn %add-run-type
      [*m]
      (:> (assoc (into {} *m) :run-type (ifexpr (some? *node-name) :node :agent))))
+   (po/agent-node-executor-task-global :> *node-exec)
    (local-select> [(sorted-map-range-from *offset *scan-amt)
                    (sorted-map-range *offset *end-offset)
-                   (view complete-node-map *node-name)
+                   (view complete-node-map *node-name *node-exec)
                    (transformed MAP-VALS %add-run-type)]
                   $$p
                   :> *m)
