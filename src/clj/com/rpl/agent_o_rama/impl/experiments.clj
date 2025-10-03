@@ -14,8 +14,7 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.store :as store]
    [com.rpl.rama.aggs :as aggs]
-   [com.rpl.rama.ops :as ops]
-   [jsonista.core :as j])
+   [com.rpl.rama.ops :as ops])
   (:import
    [com.rpl.agentorama
     AgentClient
@@ -287,34 +286,9 @@
               true))))
       ))))
 
-(defn parse-input-spec
-  [s]
-  (j/read-value
-   (if (and (str/starts-with? s "$") (not (str/starts-with? s "$$")))
-     (str "\"" s "\"")
-     s)))
-
-(defn resolve-input-spec
-  [spec input]
-  (cond
-    (string? spec)
-    (if (str/starts-with? spec "$")
-      (if (str/starts-with? spec "$$")
-        (subs spec 1)               ; "$$..." → "$..."
-        (h/read-json-path input spec))
-      spec)
-
-    (vector? spec)
-    (mapv #(resolve-input-spec % input) spec)
-
-    (map? spec)
-    (transform MAP-VALS #(resolve-input-spec % input) spec)
-
-    :else spec))
-
 (defn convert-input->args
-  [input parsed-input->args]
-  (mapv #(resolve-input-spec % input) parsed-input->args))
+  [input parsed-input-templates]
+  (mapv #(h/resolve-json-path-template % input) parsed-input-templates))
 
 (defn agent-result-obj
   [client agent-invoke]
@@ -597,11 +571,11 @@
                initiate-fns
                (mapv
                 (fn [{:keys [target-spec input->args]} client]
-                  (let [agent-name         (:agent-name target-spec)
-                        parsed-input->args (mapv parse-input-spec input->args)]
+                  (let [agent-name       (:agent-name target-spec)
+                        parsed-templates (mapv h/parse-json-path-template input->args)]
                     (fn [input]
                       (binding [aor-types/OPERATION-SOURCE source]
-                        (let [args (convert-input->args input parsed-input->args)]
+                        (let [args (convert-input->args input parsed-templates)]
                           (if (aor-types/AgentTarget? target-spec)
                             {:agent-name   agent-name
                              :agent-invoke (apply c/agent-initiate client args)}

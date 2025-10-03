@@ -5,7 +5,8 @@
   (:require
    [clojure.set :as set]
    [clojure.string :as str]
-   [com.rpl.rama.ops :as ops])
+   [com.rpl.rama.ops :as ops]
+   [jsonista.core :as j])
   (:import
    [com.github.f4b6a3.uuid
     UuidCreator]
@@ -323,6 +324,31 @@
 (defn compile-json-path
   [^String json-path]
   (JsonPath/compile json-path (into-array Predicate [])))
+
+(defn parse-json-path-template
+  [s]
+  (j/read-value
+   (if (and (str/starts-with? s "$") (not (str/starts-with? s "$$")))
+     (str "\"" s "\"")
+     s)))
+
+(defn resolve-json-path-template
+  [template data]
+  (cond
+    (string? template)
+    (if (str/starts-with? template "$")
+      (if (str/starts-with? template "$$")
+        (subs template 1) ; "$$..." → "$..."
+        (read-json-path data template))
+      template)
+
+    (vector? template)
+    (mapv #(resolve-json-path-template % data) template)
+
+    (map? template)
+    (transform MAP-VALS #(resolve-json-path-template % data) template)
+
+    :else template))
 
 (defn mk-completable-future
   ^CompletableFuture []

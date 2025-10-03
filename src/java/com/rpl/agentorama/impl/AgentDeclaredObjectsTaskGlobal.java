@@ -23,6 +23,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   String _thisModuleName;
   WorkerManagedResource<Map<String, AgentClient>> _agents;
   ClusterManagerBase _clusterRetriever;
+  WorkerManagedResource<AgentManager> _thisManager;
 
 
   // agents is localName -> [moduleName, agentName] (nil for local module)
@@ -41,6 +42,10 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
 
   public String getThisModuleName() {
     return _thisModuleName;
+  }
+
+  public AgentManager getThisModuleAgentManager() {
+    return _thisManager.getResource();
   }
 
   public Map getEvaluatorBuilders() {
@@ -122,6 +127,9 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   @Override
   public void prepareForTask(int taskId, TaskGlobalContext context) {
     _thisModuleName = context.getModuleInstanceInfo().getModuleName();
+    _thisManager = new WorkerManagedResource("_aor-this-agent-manager", context, () -> {
+      return AgentManager.create(context.getClusterRetriever(), _thisModuleName);
+    });
     _evaluators = new ConcurrentHashMap();
     _clusterRetriever = context.getClusterRetriever();
 
@@ -173,6 +181,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
 
   @Override
   public void close() throws IOException {
+    _thisManager.close();
     for(WorkerManagedResource resource: _objects.values()) {
       resource.close();
     }

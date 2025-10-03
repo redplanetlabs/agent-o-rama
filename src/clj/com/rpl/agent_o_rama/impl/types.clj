@@ -514,6 +514,7 @@
 
 (defaorrecord ExperimentTarget
   [target-spec :- (s/protocol TargetSpec)
+   ;; these are list of JSON path templates
    input->args :- [String]])
 
 (defprotocol ExperimentSpec

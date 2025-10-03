@@ -68,76 +68,93 @@
   [name]
   (.getAgentClient (declared-objects) name))
 
+(defn eval-action-builder-fn
+  [{:strs [name]}]
+  (let [evals-pstate (retrieve-pstate (po/evaluators-task-global-name))
+        eval-info    (foreign-select-one (keypath name) evals-pstate)
+        eval-client  (get-agent-client aor-types/EVALUATOR-AGENT-NAME)]
+    (when (nil? eval-info)
+      (throw (h/ex-info "Evaluator doesn't exist" {:name name})))
+    (fn [fetcher input output {:keys [rule-name agent-name] :as run-info}]
+      (let [target-pstate-name (if (= :agent (:type run-info))
+                                 (po/agent-root-task-global-name agent-name)
+                                 (po/agent-node-task-global-name agent-name))
+            target-pstate (retrieve-pstate target-pstate-name)
+            target (if (= :agent (:type run-info))
+                     (:agent-invoke run-info)
+                     (:node-invoke run-info))
+            target-task-id (:task-id target)
+            k (if (= :agent (:type run-info))
+                (:agent-invoke-id target)
+                (:node-invoke-id target))
+            curr-eval-agent-invoke (foreign-select-one [(keypath k)
+                                                        (fb/action-state-path rule-name)]
+                                                       target-pstate
+                                                       {:pkey target-task-id})
+            eval-agent-invoke (or curr-eval-agent-invoke
+                                  (aor-types/->AgentInvokeImpl (random-task-id)
+                                                               (h/random-uuid7)))]
+        (when (nil? curr-eval-agent-invoke)
+          (pstate-write! target-pstate-name
+                         (path (keypath k)
+                               (fb/set-action-state-path rule-name eval-agent-invoke))
+                         (aor-types/->DirectTaskId target-task-id)))
+        (binding [aor-types/FORCED-AGENT-INVOKE-ID (:agent-invoke-id eval-agent-invoke)
+                  aor-types/FORCED-AGENT-TASK-ID   (:task-id eval-agent-invoke)]
+          ;; this is a no-op if it was already initiated
+          (exp/initiate-eval eval-client
+                             eval-info
+                             :regular
+                             input
+                             nil
+                             [output]
+                             name
+                             (:builder-name eval-info)
+                             (:builder-params eval-info)
+                             [(aor-types/->valid-EvalInfo agent-name target)]
+                             (aor-types/->valid-ActionSourceImpl (:rule-name run-info))))
+        ;; should be guaranteed to be delivered, so the timeout is just in case
+        (let [{:keys [stats result]}
+              (.get
+               ^CompletableFuture
+               (aor-types/subagent-next-step-async eval-client
+                                                   eval-agent-invoke)
+               180
+               TimeUnit/SECONDS)]
+          (merge {"invoke" eval-agent-invoke}
+                 (if (instance? Throwable result)
+                   {"success?" false "failure" (h/throwable->str result)}
+                   {"success?" true "stats" stats})))
+      ))))
+
+(defn add-to-dataset-action-builder-fn
+  [{:strs [datasetId inputJsonPathTemplate outputJsonPathTemplate]}]
+  ;; TODO: <<<<>>>>
+)
+
 (def BUILT-IN-ACTIONS
   {"aor/eval"
-   {:builder-fn
-    (fn [{:strs [name]}]
-      (let [evals-pstate (retrieve-pstate (po/evaluators-task-global-name))
-            eval-info    (foreign-select-one (keypath name) evals-pstate)
-            eval-client  (get-agent-client aor-types/EVALUATOR-AGENT-NAME)]
-        (when (nil? eval-info)
-          (throw (h/ex-info "Evaluator doesn't exist" {:name name})))
-        (fn [fetcher input output {:keys [rule-name agent-name] :as run-info}]
-          (let [target-pstate-name (if (= :agent (:type run-info))
-                                     (po/agent-root-task-global-name agent-name)
-                                     (po/agent-node-task-global-name agent-name))
-                target-pstate (retrieve-pstate target-pstate-name)
-                target (if (= :agent (:type run-info))
-                         (:agent-invoke run-info)
-                         (:node-invoke run-info))
-                target-task-id (:task-id target)
-                k (if (= :agent (:type run-info))
-                    (:agent-invoke-id target)
-                    (:node-invoke-id target))
-                curr-eval-agent-invoke (foreign-select-one [(keypath k)
-                                                            (fb/action-state-path rule-name)]
-                                                           target-pstate
-                                                           {:pkey target-task-id})
-                eval-agent-invoke (or curr-eval-agent-invoke
-                                      (aor-types/->AgentInvokeImpl (random-task-id)
-                                                                   (h/random-uuid7)))]
-            (when (nil? curr-eval-agent-invoke)
-              (pstate-write! target-pstate-name
-                             (path (keypath k)
-                                   (fb/set-action-state-path rule-name eval-agent-invoke))
-                             (aor-types/->DirectTaskId target-task-id)))
-            (binding [aor-types/FORCED-AGENT-INVOKE-ID (:agent-invoke-id eval-agent-invoke)
-                      aor-types/FORCED-AGENT-TASK-ID   (:task-id eval-agent-invoke)]
-              ;; this is a no-op if it was already initiated
-              (exp/initiate-eval eval-client
-                                 eval-info
-                                 :regular
-                                 input
-                                 nil
-                                 [output]
-                                 name
-                                 (:builder-name eval-info)
-                                 (:builder-params eval-info)
-                                 [(aor-types/->valid-EvalInfo agent-name target)]
-                                 (aor-types/->valid-ActionSourceImpl (:rule-name run-info))))
-            ;; should be guaranteed to be delivered, so the timeout is just in case
-            (let [{:keys [stats result]}
-                  (.get
-                   ^CompletableFuture
-                   (aor-types/subagent-next-step-async eval-client
-                                                       eval-agent-invoke)
-                   180
-                   TimeUnit/SECONDS)]
-              (merge {"invoke" eval-agent-invoke}
-                     (if (instance? Throwable result)
-                       {"success?" false "failure" (h/throwable->str result)}
-                       {"success?" true "stats" stats})))
-          ))))
-    :description
-    "Run an evaluator to add feedback to a node or agent"
-    :options
-    {:params
-     {"name"
-      {:description
-       "Evaluator to use"
-      }}
-     :limit-concurrency? true}
-   }})
+   {:builder-fn  eval-action-builder-fn
+    :description "Run an evaluator to add feedback to a node or agent"
+    :options     {:params
+                  {"name" {:description "Evaluator to use"}}
+                  :limit-concurrency? true}}
+   "aor/add-to-dataset"
+   {:builder-fn add-to-dataset-action-builder-fn
+    :description "Add a run to a dataset"
+    :options {:params
+              {"datasetId" {:description "Dataset to add to"}
+               "inputJsonPathTemplate"
+               {:description
+                "JSON path template to translate input of a run to dataset example input"
+                :default     "$"}
+               "outputJsonPathTemplate"
+               {:description
+                "JSON path template to translate output of a run to dataset example output"
+                :default     "$"}}
+             }}
+
+  })
 
 
 (defn all-action-builders
