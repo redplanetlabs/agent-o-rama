@@ -459,7 +459,7 @@
 (defaorrecord AddEvaluator
   [name :- String
    builder-name :- String
-   params :- {String Object}
+   params :- {String (s/maybe Object)}
    description :- String
    input-json-path :- (s/maybe String)
    output-json-path :- (s/maybe String)
@@ -574,7 +574,7 @@
    outputs :- [Object]
    eval-name :- String
    builder-name :- String
-   builder-params :- {String Object}
+   builder-params :- {String (s/maybe Object)}
    eval-type :- (s/enum :regular :comparative)
    eval-infos :- [EvalInfo]
    source :- (s/maybe InfoSource)
@@ -633,7 +633,7 @@
   (getBasicStats [this] basic-stats))
 
 (defaorrecord FeedbackImpl
-  [scores :- {String Object}
+  [scores :- {String (s/maybe Object)}
    source :- InfoSource
    created-at :- Long
    modified-at :- Long]

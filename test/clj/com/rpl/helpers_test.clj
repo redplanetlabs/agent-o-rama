@@ -54,3 +54,15 @@
                           (aor-types/->AgentNodeEmit (h/random-uuid7) nil 2 "defg" ["a" 3])
                           (aor-types/->AgentNodeEmit (h/random-uuid7) nil 2 "abc" ["aa" "bb"])])))
 )
+
+(deftest json-path-template-test
+  (letlocals
+   (bind template (h/parse-json-path-template "$.a"))
+   (is (= 1 (h/resolve-json-path-template template {"a" 1 "b" 2})))
+   (bind template (h/parse-json-path-template "\"$.a\""))
+   (is (= 1 (h/resolve-json-path-template template {"a" 1 "b" 2})))
+   (bind template (h/parse-json-path-template "{\"q\": \"$.a[1]\"}"))
+   (is (= {"q" 2} (h/resolve-json-path-template template {"a" [1 2 3] "b" [4 5 6]})))
+   (bind template (h/parse-json-path-template "{\"q\": \"$$.a\"}"))
+   (is (= {"q" "$.a"} (h/resolve-json-path-template template {"a" [1 2 3] "b" [4 5 6]})))
+  ))
