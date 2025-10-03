@@ -884,7 +884,8 @@
            (:all-action-builders-query (aor-types/underlying-objects agent-manager)))
 
          (bind all-builders (foreign-invoke-query all-action-builders-query))
-         (is (= #{"aor/eval" "action1" "action2" "action3" "action4"} (set (keys all-builders))))
+         (is (= (set (concat (keys ana/BUILT-IN-ACTIONS) ["action1" "action2" "action3" "action4"]))
+                (set (keys all-builders))))
 
          (TopologyUtils/advanceSimTime 1000)
 
