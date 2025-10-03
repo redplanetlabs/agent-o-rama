@@ -9,7 +9,7 @@
 
    [com.rpl.specter :as s]
 
-   ["react" :refer [useState useCallback useEffect useLayoutEffect]]
+   ["react" :refer [useState useCallback useEffect useLayoutEffect useRef]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle useReactFlow ReactFlowProvider]]
    ["elkjs/lib/elk.bundled.js" :default ELK]))
 
@@ -255,28 +255,32 @@
 
         ;; Get React Flow instance with fitView function
         react-flow-instance (useReactFlow)
-        fit-view (when react-flow-instance (.-fitView react-flow-instance))]
+        fit-view (when react-flow-instance (.-fitView react-flow-instance))
+
+        ;; Track which graph layout we've already applied so fitView only runs once
+        layout-key-ref (useRef nil)]
 
     ;; Calculate layout whenever the graph data changes
     (useLayoutEffect
      (fn []
        (when (and nodes edges)
-         (let [opts elk-options]
-           (-> (get-layouted-elements nodes edges opts start-id)
-               (.then (fn [result]
-                        (let [layouted-nodes (clj->js (.-nodes result))
-                              layouted-edges (clj->js (.-edges result))]
-                          (set-nodes layouted-nodes)
-                          (set-edges layouted-edges)
-                          (when (fn? fit-view)
-                            ;; Wrap fitView in a small timeout. This ensures it runs
-                            ;; after React Flow has processed the new nodes/edges,
-                            ;; preventing race conditions.
-                            (js/setTimeout #(fit-view #js {:duration 200}) 50))))))))
+         (let [layout-key (hash {:nodes nodes :edges edges :start-id start-id})
+               prev-key (.-current layout-key-ref)]
+           (when (not= layout-key prev-key)
+             (set! (.-current layout-key-ref) layout-key)
+             (let [opts elk-options]
+               (-> (get-layouted-elements nodes edges opts start-id)
+                   (.then (fn [result]
+                            (let [layouted-nodes (clj->js (.-nodes result))
+                                  layouted-edges (clj->js (.-edges result))]
+                              (set-nodes layouted-nodes)
+                              (set-edges layouted-edges)
+                              (when (fn? fit-view)
+                                ;; Run fitView once after layout so the user can pan/zoom freely afterwards.
+                                (js/requestAnimationFrame (fn [] (fit-view #js {:duration 0}))))))))))))
        js/undefined)
-     ;; Simplified dependencies. This effect will now correctly
-     ;; re-run whenever the input graph changes.
-     #js [nodes edges fit-view])
+     ;; Re-run when incoming graph data or the fitView function changes.
+     #js [nodes edges start-id fit-view])
 
     ($ :div {:style {:width "100%" :height height}}
        ($ ReactFlow {:nodes flow-nodes
