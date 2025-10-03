@@ -5,6 +5,7 @@
    [com.rpl.agent-o-rama.impl.analytics :as analytics]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
+   [com.rpl.agent-o-rama.impl.stats :as stats]
    [jsonista.core :as j])
   (:import [com.rpl.agentorama AgentInvoke]))
 
@@ -48,7 +49,7 @@
                                                   {:pkey agent-task-id})}
                       summary-info-raw
                       (when-let [stats (:stats summary-info-raw)]
-                        {:stats (merge {:aggregated-stats (analytics/aggregated-basic-stats stats)} stats)}))
+                        {:stats (merge {:aggregated-stats (stats/aggregated-basic-stats stats)} stats)}))
 
         root-invoke-id (when is-initial-load?
                          (foreign-select-one [(keypath agent-id) :root-invoke-id] root-pstate {:pkey agent-task-id}))

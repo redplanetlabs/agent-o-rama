@@ -91,7 +91,8 @@
                                        [metosin/reitit-malli "0.7.2"]
                                        ;; to fix dynlink error on arm macs
                                        [net.java.dev.jna/jna "5.17.0"]
-                                       [org.clojure/clojure "1.12.0"]]}
+                                       [org.clojure/clojure "1.12.0"]]
+                        :repl-options {:port 7888}}
              :test     {:jvm-opts ["-Daor.test-runner"]}}
   :codox {:source-paths ["src/clj"]
           :metadata     {:doc/format :markdown}
