@@ -34,10 +34,10 @@
                   :exclusions
                   [org.slf4j/slf4j-api]]
                  [expound "0.9.0"]
+                 [http-kit "2.8.0"]
 
                  ;; ui dependencies
                  [ring/ring-core "1.9.5"]
-                 [http-kit "2.8.0"]
                  [ring/ring-codec "1.2.0"]
                  [com.taoensso/sente "1.20.0"]
                  [ring/ring-defaults "0.4.0"]
