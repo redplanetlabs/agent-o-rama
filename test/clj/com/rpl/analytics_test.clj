@@ -21,7 +21,8 @@
    [com.rpl.test-common :as tc]
    [jsonista.core :as j]
    [meander.epsilon :as m]
-   [org.httpkit.server :as server])
+   [org.httpkit.server :as server]
+   [taoensso.nippy :as nippy])
   (:import
    [com.rpl.agentorama
     AgentFailedException]
@@ -2018,6 +2019,16 @@
                }))
       ))))
 
+(nippy/extend-freeze java.lang.ProcessHandleImpl
+                     ::process-handle
+                     [^java.lang.ProcessHandle ph out]
+                     (nippy/freeze-to-out! out (.pid ph)))
+
+(nippy/extend-thaw ::process-handle
+                   [in]
+                   (let [pid (nippy/thaw-from-in! in)]
+                     (.orElse (java.lang.ProcessHandle/of pid) nil)))
+
 (deftest webhook-action-test
   (let [received-atom (atom [])
         stop-server
@@ -2045,13 +2056,22 @@
            (bind module
              (aor/agentmodule
               [topology]
+              (aor/declare-evaluator-builder
+               topology
+               "ph-eval"
+               ""
+               (fn [params]
+                 (fn [fetcher input ref-output output]
+                   {"score" (java.lang.ProcessHandle/current)})))
               (-> topology
                   (aor/new-agent "foo")
                   (aor/node
                    "start"
                    nil
                    (fn [agent-node input]
-                     (aor/result! agent-node (str input "!")))))
+                     (if (= input "qqq")
+                       (aor/result! agent-node (java.lang.ProcessHandle/current))
+                       (aor/result! agent-node (str input "!"))))))
              ))
            (rtest/launch-module! ipc module {:tasks 2 :threads 2})
            (bind module-name (get-module-name module))
@@ -2081,6 +2101,11 @@
                                   "aor/conciseness"
                                   {"threshold" "5"}
                                   "")
+           (aor/create-evaluator! agent-manager
+                                  "my-ph-eval"
+                                  "ph-eval"
+                                  {}
+                                  "")
 
            (ana/add-rule! global-actions-depot
                           "eval1"
@@ -2097,14 +2122,12 @@
                           "foo"
                           {:node-name         "start"
                            :action-name       "aor/eval"
-                           :action-params     {"name" "concise5"}
+                           :action-params     {"name" "my-ph-eval"}
                            :filter            (aor-types/->AndFilter [])
                            :sampling-rate     1.0
                            :start-time-millis 0
                            :include-failures? false
                           })
-
-
 
 
            (ana/add-rule!
@@ -2147,6 +2170,7 @@
 
 
            (ana/delete-rule! global-actions-depot "foo" "my-webhook")
+           (ana/delete-rule! global-actions-depot "foo" "eval1")
            (cycle!)
            (ana/add-rule!
             global-actions-depot
@@ -2159,22 +2183,35 @@
               "headers"       "{\"a\": \"abcdefg\"}"
               "timeoutMillis" "30000"
               "payloadTemplate"
-              "{\"i\": %input, \"r\":
+              "{\"o\": %output, \"r\":
                                                %runInfo}"}
              :filter            (aor-types/->FeedbackFilter "eval2"
-                                                            "concise?"
+                                                            "score"
                                                             (aor-types/->ComparatorSpec :not= "a"))
              :sampling-rate     1.0
              :start-time-millis 0
              :include-failures? false
             })
 
-
-           ;; TODO: <<<><>>>
-           ;;   - add non-json serializable values in eval scores and input/output
-           ;;   - test on node
-
-
+           (bind res (aor/agent-invoke foo "qqq"))
+           (is (instance? java.lang.ProcessHandle res))
+           (cycle!)
+           (cycle!)
+           (is (= 1 (count @received-atom)))
+           (bind r (first @received-atom))
+           (is (= "abcdefg" (get (:headers r) "a")))
+           (bind m (j/read-value (slurp (:body r)) ana/STR-MAPPER))
+           (bind pid-str (str (java.lang.ProcessHandle/current)))
+           (is (= #{"o" "r"} (set (keys m))))
+           (is (= pid-str (get m "o")))
+           (bind ri (get m "r"))
+           (is (= "my-webhook-start" (get ri "ruleName")))
+           (is (= "foo" (get ri "agentName")))
+           (is (>= (get ri "latencyMillis") 0))
+           (is (= "aor/webhook" (get ri "actionName")))
+           (is (= "node" (get ri "type")))
+           (is (> (get ri "startTimeMillis") 0))
+           (is (= [{"source" "eval[my-ph-eval]" "scores" {"score" pid-str}}] (get ri "feedback")))
           )))
       (finally
         (stop-server)))))
