@@ -1,7 +1,9 @@
 (ns com.rpl.agent-o-rama.ui.evaluators
   (:require
    [uix.core :as uix :refer [defui $]]
-   ["@heroicons/react/24/outline" :refer [PlusIcon BeakerIcon TrashIcon EllipsisVerticalIcon ChevronDownIcon XMarkIcon InformationCircleIcon]]
+   ["@heroicons/react/24/outline" :refer [PlusIcon BeakerIcon TrashIcon EllipsisVerticalIcon ChevronDownIcon XMarkIcon InformationCircleIcon MagnifyingGlassIcon PlayIcon]]
+   ["react" :refer [useState]]
+   ["use-debounce" :refer [useDebounce]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
@@ -21,8 +23,22 @@
 
 (defui EvaluatorDetailsModal [{:keys [spec]}]
   (let [{:keys [name type description builder-name builder-params
-                input-json-path output-json-path reference-output-json-path]} spec]
+                input-json-path output-json-path reference-output-json-path]} spec
+        ;; Get module-id from the route params to pass to the new event
+        module-id (state/use-sub [:route :path-params :module-id])]
     ($ :div.p-6.text-sm
+       ;; NEW: Try Evaluator button at the top
+       ($ :div.flex.justify-end.mb-4
+          ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
+             {:onClick (fn []
+                         ;; Close the details modal first, then show try modal
+                         (state/dispatch [:modal/hide])
+                         (js/setTimeout
+                          #(state/dispatch [:evaluators/show-try-modal {:evaluator spec :module-id module-id}])
+                          100))}
+             ($ PlayIcon {:className "h-5 w-5 mr-2"})
+             "Try Evaluator"))
+
        ($ :dl.divide-y.divide-gray-100
           ($ DetailItem {:label "Name"} ($ :span.font-mono name))
           ($ DetailItem {:label "Description"} (if (str/blank? description) ($ :span.italic.text-gray-500 "No description") description))
@@ -34,11 +50,14 @@
 
           (when (seq builder-params)
             ($ DetailItem {:label "Parameters"}
-               ($ :div.bg-gray-50.p-2.rounded-md.border
+               ($ :div.bg-gray-100.rounded-md.p-3.space-y-3
                   (for [[k v] (sort-by key builder-params)]
-                    ($ :div.flex.justify-between.font-mono.text-xs {:key (str k)}
-                       ($ :span.text-gray-600 (clojure.core/name k))
-                       ($ :span.text-gray-800 (str v)))))))
+                    (let [v-str (str v)
+                          has-newlines? (str/includes? v-str "\n")]
+                      ($ :div {:key (str k)
+                               :className (if has-newlines? "flex flex-col gap-1" "flex gap-4 items-center")}
+                         ($ :span.text-gray-600.font-medium.font-mono.text-xs (clojure.core/name k))
+                         ($ :pre.text-gray-800.bg-white.px-2.py-1.rounded.font-mono.text-xs.whitespace-pre-wrap v-str)))))))
 
           ($ DetailItem {:label ($ :div.flex.items-center.gap-2 "Input JSONPath" ($ JsonPathTooltip))}
              (if (str/blank? input-json-path)
@@ -62,7 +81,7 @@
 ;; JSONPATH TOOLTIP COMPONENT
 ;; =============================================================================
 
-(defui JsonPathTooltip []
+(defui InfoTooltip [{:keys [content]}]
   (let [[open? set-open!] (uix/use-state false)
         [timeout-id set-timeout-id!] (uix/use-state nil)
         hovering-ref (uix/use-ref false)
@@ -73,7 +92,6 @@
                          (set-timeout-id! nil)))
 
         schedule-close (fn schedule-close []
-                         (println "schedule close")
                          (clear-close!)
                          (let [new-timeout (js/setTimeout (fn []
                                                             (if (.-current hovering-ref)
@@ -87,26 +105,30 @@
        ($ InformationCircleIcon {:className "h-4 w-4 text-gray-400 hover:text-blue-500 cursor-help"
                                  :onClick (fn [] (set-open! (not open?)))
                                  :tabIndex 0
-                                 :onMouseEnter (fn [] (println "onMouseEnter1")
+                                 :onMouseEnter (fn []
                                                  (set! (.-current hovering-ref) true)
                                                  (clear-close!)
                                                  (set-open! true))
-                                 :onMouseLeave (fn [] (println "onMouseLeave1")
+                                 :onMouseLeave (fn []
                                                  (set! (.-current hovering-ref) false)
                                                  (schedule-close))})
        (when open?
          ($ :div.absolute.bottom-full.mb-2.w-64.bg-gray-800.text-white.text-xs.rounded.py-2.px-3.shadow-lg.z-50
-            {:onMouseEnter (fn [] (println "onMouseEnter2")
+            {:onMouseEnter (fn []
                              (set! (.-current hovering-ref) true)
                              (clear-close!))
-             :onMouseLeave (fn [] (println "onMouseLeave2")
+             :onMouseLeave (fn []
                              (set! (.-current hovering-ref) false)
                              (schedule-close))}
-            "A JSONPath expression to extract a value from the JSON object."
-            ($ :br)
-            ($ :a.text-blue-300.hover:underline.cursor-pointer
-               {:onClick #(js/window.open "https://en.wikipedia.org/wiki/JSONPath" "_blank")}
-               "Learn more on Wikipedia."))))))
+            content)))))
+
+(defui JsonPathTooltip []
+  ($ InfoTooltip {:content ($ :div
+                              "A JSONPath expression to extract a value from the JSON object."
+                              ($ :br)
+                              ($ :a.text-blue-300.hover:underline.cursor-pointer
+                                 {:onClick #(js/window.open "https://en.wikipedia.org/wiki/JSONPath" "_blank")}
+                                 "Learn more on Wikipedia."))}))
 
 ;; =============================================================================
 
@@ -166,7 +188,6 @@
         description-field (forms/use-form-field form-id :description)
         builder-params (get-in selected-builder [:spec :options :params] {})
         builder-options (get-in selected-builder [:spec :options] {})
-        [show-advanced? set-show-advanced!] (uix/use-state false)
         show-input-path? (get builder-options :input-path? true)
         show-output-path? (get builder-options :output-path? true)
         show-ref-output-path? (get builder-options :reference-output-path? true)]
@@ -187,38 +208,45 @@
          ($ :div.mt-6.pt-4.border-t
             ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "Builder Parameters")
             (for [[param-key param-spec] builder-params]
-              ($ forms/form-field
-                 {:key (str param-key)
-                  :label (str (name param-key))
-                  :value (get-in params [param-key]),
-                  :on-change #(set-field! [:params param-key] %)
-                  :error (get-in field-errors [:params param-key])
-                  :placeholder (:description param-spec)}))))
+              (let [param-description (:description param-spec)
+                    param-value (get params param-key)
+                    ;; Convert value to string for display
+                    value-str (cond
+                                (string? param-value) param-value
+                                (nil? param-value) ""
+                                :else (str param-value))
+                    ;; Check if value contains newlines to determine field type
+                    has-newlines? (str/includes? value-str "\n")]
+                ($ forms/form-field
+                   {:key (str param-key)
+                    :label ($ :div.flex.items-center.gap-2
+                              (str (name param-key))
+                              (when param-description
+                                ($ InfoTooltip {:content param-description})))
+                    :type (if has-newlines? :textarea :text)
+                    :rows (when has-newlines? 6)
+                    :value value-str
+                    :on-change #(set-field! [:params param-key] %)
+                    :error (get-in field-errors [:params param-key])})))))
        (when (or show-input-path? show-output-path? show-ref-output-path?)
          ($ :div.mt-6.pt-4.border-t
-            ($ :button.flex.items-center.text-sm.font-medium.text-gray-700.hover:text-gray-900
-               {:type "button", :onClick #(set-show-advanced! (not show-advanced?))}
-               "Advanced Options"
-               ($ :svg {:className (common/cn "ml-2 h-4 w-4 transform transition-transform" {"rotate-180" show-advanced?})
-                        :fill "none", :viewBox "0 0 24 24", :stroke "currentColor"}
-                  ($ :path {:strokeLinecap "round", :strokeLinejoin "round", :strokeWidth 2, :d "M19 9l-7 7-7-7"})))
-            (when show-advanced?
-              ($ :div.mt-4.space-y-4
-                 (when show-input-path?
-                   ($ forms/form-field {:label "Input JSON Path"
-                                        :value input-json-path
-                                        :on-change #(set-field! [:input-json-path] %)
-                                        :error (:input-json-path field-errors)}))
-                 (when show-output-path?
-                   ($ forms/form-field {:label "Output JSON Path"
-                                        :value output-json-path
-                                        :on-change #(set-field! [:output-json-path] %)
-                                        :error (:output-json-path field-errors)}))
-                 (when show-ref-output-path?
-                   ($ forms/form-field {:label "Reference Output JSON Path"
-                                        :value reference-output-json-path
-                                        :on-change #(set-field! [:reference-output-json-path] %)
-                                        :error (:reference-output-json-path field-errors)})))))))))
+            ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "JSONPath Configuration")
+            ($ :div.space-y-4
+               (when show-input-path?
+                 ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Input JSON Path" ($ JsonPathTooltip))
+                                      :value input-json-path
+                                      :on-change #(set-field! [:input-json-path] %)
+                                      :error (:input-json-path field-errors)}))
+               (when show-output-path?
+                 ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Output JSON Path" ($ JsonPathTooltip))
+                                      :value output-json-path
+                                      :on-change #(set-field! [:output-json-path] %)
+                                      :error (:output-json-path field-errors)}))
+               (when show-ref-output-path?
+                 ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Reference Output JSON Path" ($ JsonPathTooltip))
+                                      :value reference-output-json-path
+                                      :on-change #(set-field! [:reference-output-json-path] %)
+                                      :error (:reference-output-json-path field-errors)}))))))))
 
 (forms/reg-form
  :create-evaluator
@@ -232,18 +260,23 @@
 
   :configure
   {:initial-fields (fn [current-form-state]
-                     ;; In multi-step forms, we receive the current form state
-                     ;; and only add new fields that don't exist yet
-                     (merge {:name ""
-                             :description ""
-                             :input-json-path ""
-                             :output-json-path ""
-                             :reference-output-json-path ""
-                             :params {}}
-                            current-form-state))
+                     ;; Extract defaults from selected builder params
+                     (let [builder-params (get-in current-form-state [:selected-builder :spec :options :params] {})
+                           default-params (into {} (for [[k v] builder-params]
+                                                     [k (:default v)]))]
+;; Merge current-form-state FIRST to preserve step 1 data,
+;; then override with new defaults to reset step 2 fields
+                       (merge current-form-state
+                              {:name ""
+                               :description ""
+                               :input-json-path "$"
+                               :output-json-path "$"
+                               :reference-output-json-path "$"
+                               :params default-params})))
    :validators {:name [forms/required]}
    :ui (fn [{:keys [form-id]}] ($ CreateEvaluatorForm {:form-id form-id}))
-   :modal-props {:title "Create Evaluator"}}
+   :modal-props (fn [form-state]
+                  {:title (str "Create Evaluator: " (get-in form-state [:selected-builder :name]))})}
 
   :on-submit
   (fn [db form-state] ; Updated to use the new flattened signature!
@@ -272,11 +305,12 @@
              (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
              (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)])))))))})
 
-(defui RunEvaluatorModal [{:keys [module-id dataset-id mode example selected-example-ids]}]
-  (let [[selected-evaluator set-selected-evaluator] (uix/use-state nil)
-        ;; NEW: State hooks for all three fields as editable textareas
-        [input-str set-input-str] (uix/use-state #(common/pp-json (:input example)))
-        [ref-output-str set-ref-output-str] (uix/use-state #(common/pp-json (:reference-output example)))
+(defui RunEvaluatorModal [{:keys [module-id dataset-id mode example selected-example-ids pre-selected-evaluator]}]
+  (let [;; NEW: If pre-selected, use it. Otherwise, state is nil.
+        [selected-evaluator set-selected-evaluator] (uix/use-state pre-selected-evaluator)
+        ;; NEW: Initialize textareas from the example if it exists, otherwise empty strings.
+        [input-str set-input-str] (uix/use-state #(common/pp-json (or (:input example) "")))
+        [ref-output-str set-ref-output-str] (uix/use-state #(common/pp-json (or (:reference-output example) "")))
         [output-str set-output-str] (uix/use-state "") ; For :regular type
 
         [model-outputs-input set-model-outputs-input] (uix/use-state [{:id (random-uuid) :value ""}]) ; For :comparative type user input
@@ -353,10 +387,18 @@
      [dropdown-open?])
 
     ($ :div.p-6.space-y-6
-       ;; 1. Evaluator Selection Dropdown
+       ;; 1. Evaluator Selection Dropdown (or display if pre-selected)
        ($ :div
           ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Select Evaluator")
           (cond
+            ;; NEW: If pre-selected, just display the name
+            pre-selected-evaluator
+            ($ :div.p-3.bg-gray-100.rounded-md.border.border-gray-300
+               ($ :span.font-medium (:name pre-selected-evaluator))
+               ($ :span.ml-2.inline-flex.items-center.px-2.py-0.5.rounded-full.text-xs.font-medium
+                  {:className (get-evaluator-type-badge-style (:type pre-selected-evaluator))}
+                  (get-evaluator-type-display (:type pre-selected-evaluator))))
+
             loading? ($ :div.text-sm.text-gray-500 "Loading evaluators...")
             error ($ :div.text-sm.text-red-600 "Error loading evaluators")
             (empty? evaluators) ($ :div.text-sm.text-gray-500 (if (= mode :single) "No regular or comparative evaluators available." "No summary evaluators available."))
@@ -450,16 +492,47 @@
             ($ :div.bg-green-50.rounded-md.p-4.border.border-green-200
                ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono (js/JSON.stringify (clj->js evaluation-result) nil 2))))))))
 
+;; Event handler to show the Try Evaluator modal with a pre-selected evaluator
+(state/reg-event
+ :evaluators/show-try-modal
+ (fn [_db {:keys [evaluator module-id]}]
+   ;; Dispatch the generic :modal/show event with RunEvaluatorModal
+   ;; In :single mode with a nil example, which signals empty textareas
+   (state/dispatch [:modal/show :run-evaluator
+                    {:title (str "Try Evaluator: " (:name evaluator))
+                     :component ($ RunEvaluatorModal
+                                   {:module-id module-id
+                                    :mode :single ;; Testing a single run
+                                    :pre-selected-evaluator evaluator ;; Pre-select the evaluator
+                                    :example nil ;; nil example means "start from scratch"
+                                    :dataset-id nil
+                                    :selected-example-ids nil})}])))
+
  ;; =============================================================================
 ;; MAIN PAGE COMPONENT
 ;; =============================================================================
 
 (defui index []
   (let [{:keys [module-id]} (state/use-sub [:route :path-params])
+        ;; Add state for search term and debounce it
+        [search-term set-search-term] (useState "")
+        [debounced-search-term] (useDebounce search-term 300)
+
+        ;; Add state for type filter
+        [selected-type set-selected-type] (useState "all")
+
+        ;; Update the query to use the debounced search term and type filter
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
-         {:query-key [:evaluator-instances module-id]
-          :sente-event [:evaluators/get-all-instances {:module-id module-id}]
+         {:query-key [:evaluator-instances module-id debounced-search-term selected-type]
+          :sente-event [:evaluators/get-all-instances
+                        {:module-id module-id
+                         :filters (cond-> {}
+                                    (not (str/blank? debounced-search-term))
+                                    (assoc :search-string debounced-search-term)
+
+                                    (not= selected-type "all")
+                                    (assoc :types #{(keyword selected-type)}))}]
           :enabled? (boolean module-id)
           :refetch-interval-ms 5000})
 
@@ -478,10 +551,31 @@
                        [module-id refetch])]
 
     ($ :div.p-6
-      ;; Header
+      ;; Header with search input and type filter
        ($ :div.flex.justify-between.items-center.mb-6
           ($ :div.flex.items-center.gap-3
-             ($ BeakerIcon {:className "h-8 w-8 text-indigo-600"}))
+             ($ BeakerIcon {:className "h-8 w-8 text-indigo-600"})
+             ;; Search input field
+             ($ :div.relative.ml-4
+                ($ :div.pointer-events-none.absolute.inset-y-0.left-0.flex.items-center.pl-3
+                   ($ MagnifyingGlassIcon {:className "h-5 w-5 text-gray-400"}))
+                ($ :input
+                   {:type "text"
+                    :value search-term
+                    :onChange #(set-search-term (.. % -target -value))
+                    :className "block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    :placeholder "Search evaluators..."}))
+
+             ;; Type filter dropdown
+             ($ :div.m-4
+                ($ :select
+                   {:value selected-type
+                    :onChange #(set-selected-type (.. % -target -value))
+                    :className "block rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"}
+                   ($ :option {:value "all"} "All Types")
+                   ($ :option {:value "regular"} "Regular")
+                   ($ :option {:value "comparative"} "Comparative")
+                   ($ :option {:value "summary"} "Summary"))))
 
           ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
              {:onClick #(state/dispatch [:modal/show-form :create-evaluator {:module-id module-id}])}

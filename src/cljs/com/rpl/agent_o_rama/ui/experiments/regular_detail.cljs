@@ -259,26 +259,44 @@
           label)
        ($ :span.font-mono content-text))))
 
+(defui TimeCapsule [{:keys [duration-ms]}]
+  (let [duration-text (common/format-duration-ms duration-ms)
+        title-text (str "Execution time: " duration-ms "ms")]
+    ($ :div.inline-flex.items-center.px-2.py-1.rounded-sm.text-xs.font-medium.bg-gray-100.text-gray-800
+       {:title title-text}
+       ($ :span.font-mono duration-text))))
+
 (defui EvaluatorCapsulesContainer [{:keys [run module-id columns-metadata]}]
-  ($ :div.mt-2.flex.flex-wrap.gap-1
-     ;; Render capsules for successful evaluations
-     (for [[eval-name metrics] (:evals run)
-           [metric-key metric-value] metrics]
-       ($ EvaluatorCapsule {:key (str eval-name metric-key)
-                            :eval-name eval-name
-                            :metric-key metric-key
-                            :metric-value metric-value
-                            :eval-invoke (get-in run [:eval-initiates eval-name])
-                            :module-id module-id
-                            :columns-metadata columns-metadata}))
-     ;; Render capsules for failed evaluations
-     (for [[eval-name failure-info] (:eval-failures run)]
-       ($ EvaluatorCapsule {:key (str eval-name "-failure")
-                            :eval-name eval-name
-                            :eval-failure failure-info
-                            :eval-invoke (get-in run [:eval-initiates eval-name])
-                            :module-id module-id
-                            :columns-metadata columns-metadata}))))
+  (let [;; Calculate duration from agent-results
+        duration-ms (when-let [agent-results (:agent-results run)]
+                      (when-let [result (first (vals agent-results))]
+                        (when (and (:start-time-millis result)
+                                   (:finish-time-millis result))
+                          (unchecked-subtract (:finish-time-millis result)
+                                              (:start-time-millis result)))))]
+    ($ :div.mt-2.flex.flex-wrap.gap-1
+       ;; Render capsules for successful evaluations
+       (for [[eval-name metrics] (:evals run)
+             [metric-key metric-value] metrics]
+         ($ EvaluatorCapsule {:key (str eval-name metric-key)
+                              :eval-name eval-name
+                              :metric-key metric-key
+                              :metric-value metric-value
+                              :eval-invoke (get-in run [:eval-initiates eval-name])
+                              :module-id module-id
+                              :columns-metadata columns-metadata}))
+       ;; Render capsules for failed evaluations
+       (for [[eval-name failure-info] (:eval-failures run)]
+         ($ EvaluatorCapsule {:key (str eval-name "-failure")
+                              :eval-name eval-name
+                              :eval-failure failure-info
+                              :eval-invoke (get-in run [:eval-initiates eval-name])
+                              :module-id module-id
+                              :columns-metadata columns-metadata}))
+       ;; Render time capsule last if duration is available
+       (when duration-ms
+         ($ TimeCapsule {:key "time"
+                         :duration-ms duration-ms})))))
 
 (defui CellContent [{:keys [content truncated? on-expand]}]
   (let [content-str (common/pp content)
@@ -445,7 +463,6 @@
                                      ($ EvaluatorCapsulesContainer {:run run
                                                                     :module-id module-id
                                                                     :columns-metadata evaluator-metadata})))))))))))))))
-                       ;; Trace Column placeholder (if needed later)
 
 (defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
   (let [{:keys [data loading? error]}

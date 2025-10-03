@@ -3,13 +3,13 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [clojure.string :as str]
    [goog.i18n.DateTimeFormat :as dtf]
-   [goog.date.UtcDateTime    :as utc-dt]
-   
+   [goog.date.UtcDateTime :as utc-dt]
+
    [uix.core :as uix :refer [defui defhook $]]
-   
+
    [com.rpl.specter :as s]
 
-   ["react" :refer [useState useCallback useEffect useLayoutEffect]]
+   ["react" :refer [useState useCallback useEffect useLayoutEffect useRef]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle useReactFlow ReactFlowProvider]]
    ["elkjs/lib/elk.bundled.js" :default ELK]))
 
@@ -21,89 +21,89 @@
   (let [{:keys [id sourceX sourceY targetX targetY data markerEnd style]} (js->clj props :keywordize-keys true)
         elk-points (:elkPoints data)
         edge-color (or (:stroke style) "#a5b4fc")
-        
+
         ;; Helper function to create smooth B-spline curve through points
         create-smooth-path (fn [points]
-                              (let [pts (vec points)
-                                    n (count pts)]
-                                (cond
+                             (let [pts (vec points)
+                                   n (count pts)]
+                               (cond
                                   ;; No points or single point
-                                  (<= n 1) ""
-                                  
+                                 (<= n 1) ""
+
                                   ;; Two points - straight line
-                                  (= n 2)
-                                  (str "M " (:x (first pts)) " " (:y (first pts))
-                                       " L " (:x (second pts)) " " (:y (second pts)))
-                                  
+                                 (= n 2)
+                                 (str "M " (:x (first pts)) " " (:y (first pts))
+                                      " L " (:x (second pts)) " " (:y (second pts)))
+
                                   ;; Three or more points - create B-spline
-                                  :else
-                                  (let [;; B-spline basis function (cubic)
-                                        b-spline-basis (fn [t]
-                                                         (let [t2 (* t t)
-                                                               t3 (* t2 t)]
-                                                           [(/ (+ 1 (* -3 t) (* 3 t2) (* -1 t3)) 6)
-                                                            (/ (+ 4 (* 0 t) (* -6 t2) (* 3 t3)) 6)
-                                                            (/ (+ 1 (* 3 t) (* 3 t2) (* -3 t3)) 6)
-                                                            (/ (+ 0 (* 0 t) (* 0 t2) (* 1 t3)) 6)]))
-                                        
+                                 :else
+                                 (let [;; B-spline basis function (cubic)
+                                       b-spline-basis (fn [t]
+                                                        (let [t2 (* t t)
+                                                              t3 (* t2 t)]
+                                                          [(/ (+ 1 (* -3 t) (* 3 t2) (* -1 t3)) 6)
+                                                           (/ (+ 4 (* 0 t) (* -6 t2) (* 3 t3)) 6)
+                                                           (/ (+ 1 (* 3 t) (* 3 t2) (* -3 t3)) 6)
+                                                           (/ (+ 0 (* 0 t) (* 0 t2) (* 1 t3)) 6)]))
+
                                         ;; Calculate a point on the B-spline curve
-                                        calc-spline-point (fn [p0 p1 p2 p3 t]
-                                                            (let [[b0 b1 b2 b3] (b-spline-basis t)]
-                                                              {:x (+ (* b0 (:x p0))
-                                                                     (* b1 (:x p1))
-                                                                     (* b2 (:x p2))
-                                                                     (* b3 (:x p3)))
-                                                               :y (+ (* b0 (:y p0))
-                                                                     (* b1 (:y p1))
-                                                                     (* b2 (:y p2))
-                                                                     (* b3 (:y p3)))}))
-                                        
+                                       calc-spline-point (fn [p0 p1 p2 p3 t]
+                                                           (let [[b0 b1 b2 b3] (b-spline-basis t)]
+                                                             {:x (+ (* b0 (:x p0))
+                                                                    (* b1 (:x p1))
+                                                                    (* b2 (:x p2))
+                                                                    (* b3 (:x p3)))
+                                                              :y (+ (* b0 (:y p0))
+                                                                    (* b1 (:y p1))
+                                                                    (* b2 (:y p2))
+                                                                    (* b3 (:y p3)))}))
+
                                         ;; Extend points for proper B-spline (duplicate first and last)
-                                        extended-pts (vec (concat [(first pts)] pts [(last pts)]))
-                                        
+                                       extended-pts (vec (concat [(first pts)] pts [(last pts)]))
+
                                         ;; Number of segments between each control point pair
-                                        segments-per-curve 10
-                                        
+                                       segments-per-curve 10
+
                                         ;; Generate interpolated points along the B-spline
-                                        curve-points (atom [])]
-                                    
+                                       curve-points (atom [])]
+
                                     ;; Start with the first point explicitly
-                                    (swap! curve-points conj (first pts))
-                                    
+                                   (swap! curve-points conj (first pts))
+
                                     ;; Generate B-spline curve points
-                                    (doseq [i (range (- (count extended-pts) 3))]
-                                      (let [p0 (nth extended-pts i)
-                                            p1 (nth extended-pts (+ i 1))
-                                            p2 (nth extended-pts (+ i 2))
-                                            p3 (nth extended-pts (+ i 3))]
-                                        (doseq [j (range 1 segments-per-curve)]  ;; Start from 1 to avoid duplicating start point
-                                          (let [t (/ j segments-per-curve)
-                                                pt (calc-spline-point p0 p1 p2 p3 t)]
-                                            (swap! curve-points conj pt)))))
-                                    
+                                   (doseq [i (range (- (count extended-pts) 3))]
+                                     (let [p0 (nth extended-pts i)
+                                           p1 (nth extended-pts (+ i 1))
+                                           p2 (nth extended-pts (+ i 2))
+                                           p3 (nth extended-pts (+ i 3))]
+                                       (doseq [j (range 1 segments-per-curve)] ;; Start from 1 to avoid duplicating start point
+                                         (let [t (/ j segments-per-curve)
+                                               pt (calc-spline-point p0 p1 p2 p3 t)]
+                                           (swap! curve-points conj pt)))))
+
                                     ;; Add the last point explicitly
-                                    (swap! curve-points conj (last pts))
-                                    
+                                   (swap! curve-points conj (last pts))
+
                                     ;; Build SVG path from the interpolated points
-                                    (let [path-points @curve-points]
-                                      (if (empty? path-points)
-                                        ""
-                                        (str "M " (:x (first path-points)) " " (:y (first path-points))
-                                             (apply str
-                                                    (map (fn [pt]
-                                                           (str " L " (:x pt) " " (:y pt)))
-                                                         (rest path-points))))))))))
-        
+                                   (let [path-points @curve-points]
+                                     (if (empty? path-points)
+                                       ""
+                                       (str "M " (:x (first path-points)) " " (:y (first path-points))
+                                            (apply str
+                                                   (map (fn [pt]
+                                                          (str " L " (:x pt) " " (:y pt)))
+                                                        (rest path-points))))))))))
+
         ;; Build SVG path from ELK points
         edge-path (if (and elk-points (seq elk-points))
                     (create-smooth-path elk-points)
                     ;; Fallback to straight line if no ELK points
                     (str "M " sourceX " " sourceY " L " targetX " " targetY))
-        
+
         ;; Calculate arrow rotation based on last two DISTINCT points
         points-vec (when elk-points (vec elk-points))
         ;; Find the last two distinct points (skip duplicates)
-        [second-last-distinct last-point] 
+        [second-last-distinct last-point]
         (when (and points-vec (>= (count points-vec) 2))
           (let [last-pt (last points-vec)]
             ;; Find the last point that's different from the final point
@@ -115,16 +115,16 @@
                     [pt last-pt]
                     (recur (dec idx))))
                 [nil last-pt]))))
-        
+
         arrow-angle (when (and second-last-distinct last-point)
                       (let [dx (- (:x last-point) (:x second-last-distinct))
                             dy (- (:y last-point) (:y second-last-distinct))]
                         (* (/ 180 js/Math.PI) (js/Math.atan2 dy dx))))
-        
+
         ;; Arrow position at the end point
         arrow-x (or (:x last-point) targetX)
         arrow-y (or (:y last-point) targetY)]
-    
+
     ($ :g
        ;; Draw the edge path
        ($ :path {:d edge-path
@@ -134,7 +134,7 @@
        ;; Draw arrow at the end
        (when markerEnd
          ($ :g {:transform (str "translate(" arrow-x "," arrow-y ") "
-                               (when arrow-angle (str "rotate(" arrow-angle ")")))}
+                                (when arrow-angle (str "rotate(" arrow-angle ")")))}
             ($ :path {:d "M 0 0 L -12 -5 L -12 5 z"
                       :fill edge-color}))))))
 
@@ -165,7 +165,7 @@
                                   :is-start? (= k start-id)}
                            :width 170
                            :height 40})))
-        
+
         edges (s/select
                [:node-map
                 s/ALL
@@ -186,7 +186,7 @@
         ;; ELK provides edge routing as sections with start, end, and bend points
         raw-points (when (seq sections)
                      (mapcat (fn [section]
-                               (concat 
+                               (concat
                                 [(:startPoint section)]
                                 (:bendPoints section [])
                                 [(:endPoint section)]))
@@ -215,32 +215,32 @@
         edge-map (into {} (map (fn [e] [(:id e) e]) edges))
         graph #js {:id "root"
                    :layoutOptions options
-                   :children (clj->js 
-                             (map (fn [node]
-                                    (-> node
+                   :children (clj->js
+                              (map (fn [node]
+                                     (-> node
                                          (cond-> (= start-id (:id node))
                                            (assoc :layoutOptions {"elk.layered.layering.layerConstraint" "FIRST"}))
-                                        (assoc :targetPosition (if is-horizontal "left" "top"))
-                                        (assoc :sourcePosition (if is-horizontal "right" "bottom"))
-                                        (assoc :width 170)
-                                        (assoc :height 40)))
-                                  nodes))
+                                         (assoc :targetPosition (if is-horizontal "left" "top"))
+                                         (assoc :sourcePosition (if is-horizontal "right" "bottom"))
+                                         (assoc :width 170)
+                                         (assoc :height 40)))
+                                   nodes))
                    :edges (clj->js edges)}]
     (-> (.layout elk graph)
         (.then (fn [layouted-graph]
                  (let [layouted-nodes (-> (.-children layouted-graph)
-                                         (js->clj :keywordize-keys true)
-                                         (->> (map (fn [node]
-                                                    (-> node
-                                                        (assoc :position {:x (:x node) :y (:y node)})
-                                                        (dissoc :x :y))))))
+                                          (js->clj :keywordize-keys true)
+                                          (->> (map (fn [node]
+                                                      (-> node
+                                                          (assoc :position {:x (:x node) :y (:y node)})
+                                                          (dissoc :x :y))))))
                        layouted-edges (-> (.-edges layouted-graph)
-                                         (js->clj :keywordize-keys true)
-                                         (->> (map (fn [elk-edge]
+                                          (js->clj :keywordize-keys true)
+                                          (->> (map (fn [elk-edge]
                                                      ;; Merge original edge properties with ELK results
-                                                     (let [original-edge (get edge-map (:id elk-edge))
-                                                           processed-edge (process-elk-edge elk-edge)]
-                                                       (merge original-edge processed-edge))))))]
+                                                      (let [original-edge (get edge-map (:id elk-edge))
+                                                            processed-edge (process-elk-edge elk-edge)]
+                                                        (merge original-edge processed-edge))))))]
                    #js {:nodes layouted-nodes
                         :edges layouted-edges})))
         (.catch js/console.error))))
@@ -248,37 +248,42 @@
 (defui graph-flow [{:keys [initial-data height selected-node set-selected-node]}]
   (let [;; Extract initial nodes and edges
         {:keys [nodes edges start-id]} (extract-graph-elements initial-data)
-        
+
         ;; Use React Flow's state management hooks
         [flow-nodes set-nodes on-nodes-change] (useNodesState #js [])
         [flow-edges set-edges on-edges-change] (useEdgesState #js [])
-        
+
         ;; Get React Flow instance with fitView function
         react-flow-instance (useReactFlow)
         fit-view (when react-flow-instance (.-fitView react-flow-instance))
-        
-        ;; Track if initial layout has been done
-        [initial-layout-done? set-initial-layout-done] (useState false)]
-    
-    ;; Calculate initial layout on mount - only when data changes
+
+        ;; Track which graph layout we've already applied so fitView only runs once
+        layout-key-ref (useRef nil)]
+
+    ;; Calculate layout whenever the graph data changes
     (useLayoutEffect
      (fn []
-       (when (and nodes edges (not initial-layout-done?))
-         (let [opts elk-options]
-           (-> (get-layouted-elements nodes edges opts start-id)
-               (.then (fn [result]
-                        (let [layouted-nodes (clj->js (.-nodes result))
-                              layouted-edges (clj->js (.-edges result))]
-                          (set-nodes layouted-nodes)
-                          (set-edges layouted-edges)
-                          (set-initial-layout-done true)
-                          (when (fn? fit-view) 
-                            (fit-view))))))))
+       (when (and nodes edges)
+         (let [layout-key (hash {:nodes nodes :edges edges :start-id start-id})
+               prev-key (.-current layout-key-ref)]
+           (when (not= layout-key prev-key)
+             (set! (.-current layout-key-ref) layout-key)
+             (let [opts elk-options]
+               (-> (get-layouted-elements nodes edges opts start-id)
+                   (.then (fn [result]
+                            (let [layouted-nodes (clj->js (.-nodes result))
+                                  layouted-edges (clj->js (.-edges result))]
+                              (set-nodes layouted-nodes)
+                              (set-edges layouted-edges)
+                              (when (fn? fit-view)
+                                ;; Run fitView once after layout so the user can pan/zoom freely afterwards.
+                                (js/requestAnimationFrame (fn [] (fit-view #js {:duration 0}))))))))))))
        js/undefined)
-     #js [nodes edges initial-layout-done? fit-view])
-    
+     ;; Re-run when incoming graph data or the fitView function changes.
+     #js [nodes edges start-id fit-view])
+
     ($ :div {:style {:width "100%" :height height}}
-       ($ ReactFlow {:nodes flow-nodes 
+       ($ ReactFlow {:nodes flow-nodes
                      :edges flow-edges
                      :onNodesChange on-nodes-change
                      :onEdgesChange on-edges-change
@@ -287,7 +292,7 @@
                      (clj->js {"custom"
                                (uix.core/as-react
                                 (fn [{:keys [data id]}]
-                                   (let [data (js->clj data :keywordize-keys true)
+                                  (let [data (js->clj data :keywordize-keys true)
                                         label (:label data)
                                         node-id (:node-id data)
                                         node-type (:node-type data)

@@ -62,8 +62,8 @@
       (empty? data) ($ :div.flex.justify-center.items-center.py-8
                        ($ :div.text-gray-500 "No agents found"))
       :else ($ :div.p-4
-               ($ :div {:className (:container common/table-classes)}
-                  ($ :table {:className (:table common/table-classes)}
+               ($ :div {:className "inline-block bg-white shadow sm:rounded-md"}
+                  ($ :table {:className "divide-y divide-gray-200"}
                      ($ :thead {:className (:thead common/table-classes)}
                         ($ :tr
                            ($ :th {:className (:th common/table-classes)} "Module")

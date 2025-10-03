@@ -56,7 +56,8 @@
                         :source-paths      ["src/clj"
                                             "src/cljs"
                                             "resource"
-                                            "examples/clj/src"]
+                                            "examples/clj/src"
+                                            "dev"]
                         :test-paths        ["test/clj"
                                             "examples/clj/test"]
                         :java-source-paths ["src/java" "test/java"]
@@ -70,6 +71,7 @@
                          [etaoin "1.1.43"]
                          [clj-test-containers/clj-test-containers "0.7.4"]
                          [org.testcontainers/testcontainers "1.20.4"]]}
+                         [clj-kondo "2025.09.22"]]}
              :provided {:dependencies
                         ;; TODO: fix Rama version
                         [[com.rpl/rama "0.0.6-SNAPSHOT"]

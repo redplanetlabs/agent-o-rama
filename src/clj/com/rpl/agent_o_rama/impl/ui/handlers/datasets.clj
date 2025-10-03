@@ -10,11 +10,31 @@
   (:import [java.util UUID])
   (:use [com.rpl.rama]))
 
+(defn- process-example-source
+  "Add source-string to example by calling getSourceString() on the source object"
+  [example]
+  (if-let [source (:source example)]
+    (assoc example :source-string (aor-types/source-string source))
+    example))
+
+(defn- process-examples
+  "Process a collection of examples to add source-string"
+  [examples]
+  (mapv process-example-source examples))
+
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-all
-  [{:keys [manager pagination]} uid]
-  ;; TODO search will use different query
-  (let [datasets-page-query (:datasets-page-query (aor-types/underlying-objects manager))]
-    (foreign-invoke-query datasets-page-query 1000 pagination)))
+  [{:keys [manager pagination filters]} uid]
+  (let [underlying-objects (aor-types/underlying-objects manager)
+        search-string (get filters :search-string)]
+    (if-not (str/blank? search-string)
+      ;; Use the search query when a search string is provided
+      (let [search-query (:search-datasets-query underlying-objects)]
+        (->> (foreign-invoke-query search-query search-string 500)
+             (mapv (fn [[id name]] {:dataset-id id, :name name}))
+             (hash-map :datasets)))
+      ;; Otherwise, use the existing page query
+      (let [datasets-page-query (:datasets-page-query underlying-objects)]
+        (foreign-invoke-query datasets-page-query 1000 pagination)))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-props
   [{:keys [manager dataset-id]} uid]
@@ -48,21 +68,24 @@
   [{:keys [manager dataset-id snapshot-name filters limit pagination]} uid]
   (let [{:keys [search-examples-query]} (aor-types/underlying-objects manager)]
     ;; [*dataset-id *snapshot *filters *limit *next-key :> *res]
-    (foreign-invoke-query search-examples-query
-                          dataset-id
-                          (when-not (str/blank? snapshot-name) snapshot-name)
-                          (or filters {}) ; filters map for search functionality
-                          (or limit 20) ; reasonable default limit
-                          pagination)))
+    (let [result (foreign-invoke-query search-examples-query
+                                       dataset-id
+                                       (when-not (str/blank? snapshot-name) snapshot-name)
+                                       (or filters {}) ; filters map for search functionality
+                                       (or limit 20) ; reasonable default limit
+                                       pagination)]
+      ;; Process examples to add source-string
+      (update result :examples process-examples))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-example
   [{:keys [manager dataset-id snapshot-name input output tags]} uid]
-  (aor/add-dataset-example! manager
-                            dataset-id
-                            input
-                            {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)
-                             :reference-output output
-                             :tags (set tags)})
+  (binding [aor-types/OPERATION-SOURCE (aor-types/->HumanSourceImpl "user")]
+    (aor/add-dataset-example! manager
+                              dataset-id
+                              input
+                              {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)
+                               :reference-output output
+                               :tags (set tags)}))
   {:status :ok})
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-snapshot-names
@@ -150,7 +173,7 @@
                                              [example-id])
           example (get examples-map example-id)]
       (if example
-        {:status :ok :example example}
+        {:status :ok :example (process-example-source example)}
         {:status :error :error "Example not found"}))))
 
 ;; =============================================================================
@@ -221,6 +244,7 @@
           input-validation (throw (ex-info (str "Input schema validation failed: " input-validation) {}))
           output-validation (throw (ex-info (str "Output schema validation failed: " output-validation) {}))
           :else (do
-                  (aor/add-dataset-example! manager dataset-id input
-                                            {:reference-output output})
+                  (binding [aor-types/OPERATION-SOURCE (aor-types/->HumanSourceImpl "user")]
+                    (aor/add-dataset-example! manager dataset-id input
+                                              {:reference-output output}))
                   {:status :ok}))))))

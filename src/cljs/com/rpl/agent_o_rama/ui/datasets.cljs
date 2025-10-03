@@ -1,7 +1,9 @@
 (ns com.rpl.agent-o-rama.ui.datasets
   (:require
    [uix.core :as uix :refer [defui defhook $]]
-   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon XMarkIcon LockClosedIcon InformationCircleIcon DocumentDuplicateIcon]]
+   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon XMarkIcon LockClosedIcon InformationCircleIcon DocumentDuplicateIcon MagnifyingGlassIcon]]
+   ["react" :refer [useState]]
+   ["use-debounce" :refer [useDebounce]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.sente :as sente]
@@ -14,6 +16,12 @@
    [reitit.frontend.easy :as rfe]
    [clojure.string :as str]
    [com.rpl.specter :as s]))
+
+(defui SourceDisplay [{:keys [example]}]
+  (let [source-string (:source-string example)]
+    ($ :div.flex.flex-col.gap-1
+       ($ :div.flex.items-center
+          source-string))))
 
 ;; =============================================================================
 ;; EXAMPLE ACTIONS AND EDITING
@@ -201,11 +209,17 @@
                               :current-example example
                               :read-only? is-read-only?}) ;; Pass read-only state
 
-            ;; Tags section
+;; Tags section
             ($ :div
                ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tags")
                ($ :div.bg-gray-50.rounded-md.p-4.border
                   ($ TagInput {:tags (:tags example) :module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name :example-id example-id :read-only? is-read-only?}))) ;; Pass read-only state
+
+            ;; Source section
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Source")
+               ($ :div.bg-gray-50.rounded-md.p-4.border
+                  ($ SourceDisplay {:example example})))
 
             ;; Example ID (read-only)
             ($ :div
@@ -459,6 +473,7 @@
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Tags")
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Created")
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Modified")
+                ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Source")
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Actions")))
           ($ :tbody.bg-white.divide-y.divide-gray-200
              (for [example examples]
@@ -521,6 +536,8 @@
                     ($ :td.px-6.py-4.text-sm.text-gray-600
                        {:title (common/format-timestamp (:modified-at example))}
                        (common/format-relative-time (:modified-at example)))
+                    ($ :td.px-6.py-4.whitespace-nowrap.text-sm.text-gray-500
+                       ($ SourceDisplay {:example example :full-details? false}))
                     ;; Actions column
                     ($ :td.px-6.py-4.whitespace-nowrap.text-right.text-sm.font-medium
                        ;; Conditionally render actions
@@ -611,20 +628,38 @@
 ;; =============================================================================
 
 (defui index [{:keys [module-id]}]
-  (let [{:keys [data loading? error]}
+  (let [;; Add state for search term and debounce it
+        [search-term set-search-term] (useState "")
+        [debounced-search-term] (useDebounce search-term 300)
+
+        ;; Update the query to use the debounced search term
+        {:keys [data loading? error]}
         (queries/use-sente-query
-         {:query-key [:datasets module-id]
-          :sente-event [:datasets/get-all {:module-id module-id
-                                           :pagination nil}]
+         {:query-key [:datasets module-id debounced-search-term]
+          :sente-event [:datasets/get-all
+                        {:module-id module-id
+                         :pagination nil
+                         :filters (when-not (str/blank? debounced-search-term)
+                                    {:search-string debounced-search-term})}]
           :enabled? (boolean module-id)})
 
         datasets (:datasets data)]
 
     ($ :div.p-6
-       ;; Header
+       ;; Header with search input
        ($ :div.flex.justify-between.items-center.mb-6
           ($ :div.flex.items-center.gap-3
-             ($ CircleStackIcon {:className "h-8 w-8 text-indigo-600"}))
+             ($ CircleStackIcon {:className "h-8 w-8 text-indigo-600"})
+             ;; Search input field
+             ($ :div.relative.ml-4
+                ($ :div.pointer-events-none.absolute.inset-y-0.left-0.flex.items-center.pl-3
+                   ($ MagnifyingGlassIcon {:className "h-5 w-5 text-gray-400"}))
+                ($ :input
+                   {:type "text"
+                    :value search-term
+                    :onChange #(set-search-term (.. % -target -value))
+                    :className "block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    :placeholder "Search datasets..."})))
 
           ($ :div.flex.items-center.gap-2
              ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
