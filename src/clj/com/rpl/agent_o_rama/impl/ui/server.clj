@@ -36,10 +36,9 @@
     (cond
       ;; Sente routes are the only specific routes we need
       (= uri "/chsk")
-      (->
-        (case method
-          :get (sente/ring-ajax-get-or-ws-handshake request)
-          :post (sente/ring-ajax-post request)))
+      (case method
+        :get (sente/ring-ajax-get-or-ws-handshake request)
+        :post (sente/ring-ajax-post request))
 
       ;; Dataset export
       (and (= method :get)
