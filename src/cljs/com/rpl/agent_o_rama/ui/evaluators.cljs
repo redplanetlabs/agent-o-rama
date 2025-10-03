@@ -1,7 +1,9 @@
 (ns com.rpl.agent-o-rama.ui.evaluators
   (:require
    [uix.core :as uix :refer [defui $]]
-   ["@heroicons/react/24/outline" :refer [PlusIcon BeakerIcon TrashIcon EllipsisVerticalIcon ChevronDownIcon XMarkIcon InformationCircleIcon]]
+   ["@heroicons/react/24/outline" :refer [PlusIcon BeakerIcon TrashIcon EllipsisVerticalIcon ChevronDownIcon XMarkIcon InformationCircleIcon MagnifyingGlassIcon]]
+   ["react" :refer [useState]]
+   ["use-debounce" :refer [useDebounce]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
@@ -471,10 +473,18 @@
 
 (defui index []
   (let [{:keys [module-id]} (state/use-sub [:route :path-params])
+        ;; Add state for search term and debounce it
+        [search-term set-search-term] (useState "")
+        [debounced-search-term] (useDebounce search-term 300)
+
+        ;; Update the query to use the debounced search term
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
-         {:query-key [:evaluator-instances module-id]
-          :sente-event [:evaluators/get-all-instances {:module-id module-id}]
+         {:query-key [:evaluator-instances module-id debounced-search-term]
+          :sente-event [:evaluators/get-all-instances
+                        {:module-id module-id
+                         :filters (when-not (str/blank? debounced-search-term)
+                                    {:search-string debounced-search-term})}]
           :enabled? (boolean module-id)
           :refetch-interval-ms 5000})
 
@@ -493,10 +503,20 @@
                        [module-id refetch])]
 
     ($ :div.p-6
-      ;; Header
+      ;; Header with search input
        ($ :div.flex.justify-between.items-center.mb-6
           ($ :div.flex.items-center.gap-3
-             ($ BeakerIcon {:className "h-8 w-8 text-indigo-600"}))
+             ($ BeakerIcon {:className "h-8 w-8 text-indigo-600"})
+             ;; Search input field
+             ($ :div.relative.ml-4
+                ($ :div.pointer-events-none.absolute.inset-y-0.left-0.flex.items-center.pl-3
+                   ($ MagnifyingGlassIcon {:className "h-5 w-5 text-gray-400"}))
+                ($ :input
+                   {:type "text"
+                    :value search-term
+                    :onChange #(set-search-term (.. % -target -value))
+                    :className "block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    :placeholder "Search evaluators..."})))
 
           ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
              {:onClick #(state/dispatch [:modal/show-form :create-evaluator {:module-id module-id}])}

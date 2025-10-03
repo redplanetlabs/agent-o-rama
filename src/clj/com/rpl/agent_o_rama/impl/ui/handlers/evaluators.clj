@@ -15,14 +15,14 @@
   (foreign-invoke-query (:all-eval-builders-query (aor-types/underlying-objects manager))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/get-all-instances
-  [{:keys [manager]} uid]
+  [{:keys [manager module-id filters]} uid]
   (let [underlying-objects (aor-types/underlying-objects manager)
-        search-query (:search-evals-query underlying-objects)]
-    ;; Invoke the search query with no filters to get all instances.
-    ;; We use a high limit to fetch all, assuming there won't be thousands.
-    ;; A more advanced implementation could handle pagination here.
+        search-query (:search-evals-query underlying-objects)
+        search-string (get filters :search-string)]
+    ;; Invoke the search query with optional search string filter
     (foreign-invoke-query search-query
-                          nil ; no filters
+                          (when-not (str/blank? search-string)
+                            {:search-string search-string})
                           1000 ; limit
                           nil ; no pagination key
                           )))
