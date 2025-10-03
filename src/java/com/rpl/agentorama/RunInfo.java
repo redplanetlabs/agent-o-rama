@@ -52,6 +52,14 @@ public interface RunInfo {
    * @return run type
    */
   RunType getRunType();
+
+  /**
+   * Returns the start time of the run.
+   *
+   * @return start time in milliseconds since epoch
+   */
+  long getStartTimeMillis();
+
   /**
    * Return latency of this run. May be null if the node failed and never completed.
    *

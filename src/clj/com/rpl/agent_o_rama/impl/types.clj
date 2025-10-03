@@ -652,6 +652,7 @@
    agent-invoke :- AgentInvokeImpl
    node-invoke :- (s/maybe NodeInvokeImpl)
    type :- (s/enum :agent :node)
+   start-time-millis :- Long
    latency-millis :- (s/maybe Long)
    feedback :- [FeedbackImpl]
    agent-stats :- (s/maybe AgentInvokeStatsImpl)
@@ -673,6 +674,7 @@
 
       :else
       (throw (h/ex-info "Unexpected run type" {:type type}))))
+  (getStartTimeMillis [this] start-time-millis)
   (getLatencyMillis [this] latency-millis)
   (getFeedback [this] feedback)
   (getAgentStats [this] agent-stats)
