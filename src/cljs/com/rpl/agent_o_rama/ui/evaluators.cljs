@@ -247,9 +247,9 @@
                                                      [k (:default v)]))]
                        (merge {:name ""
                                :description ""
-                               :input-json-path ""
-                               :output-json-path ""
-                               :reference-output-json-path ""
+                               :input-json-path "$"
+                               :output-json-path "$"
+                               :reference-output-json-path "$"
                                :params default-params}
                               current-form-state)))
    :validators {:name [forms/required]}
