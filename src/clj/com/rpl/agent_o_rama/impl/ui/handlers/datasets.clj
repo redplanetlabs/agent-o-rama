@@ -10,6 +10,18 @@
   (:import [java.util UUID])
   (:use [com.rpl.rama]))
 
+(defn- process-example-source
+  "Add source-string to example by calling getSourceString() on the source object"
+  [example]
+  (if-let [source (:source example)]
+    (assoc example :source-string (aor-types/source-string source))
+    example))
+
+(defn- process-examples
+  "Process a collection of examples to add source-string"
+  [examples]
+  (mapv process-example-source examples))
+
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-all
   [{:keys [manager pagination filters]} uid]
   (let [underlying-objects (aor-types/underlying-objects manager)
@@ -56,12 +68,14 @@
   [{:keys [manager dataset-id snapshot-name filters limit pagination]} uid]
   (let [{:keys [search-examples-query]} (aor-types/underlying-objects manager)]
     ;; [*dataset-id *snapshot *filters *limit *next-key :> *res]
-    (foreign-invoke-query search-examples-query
-                          dataset-id
-                          (when-not (str/blank? snapshot-name) snapshot-name)
-                          (or filters {}) ; filters map for search functionality
-                          (or limit 20) ; reasonable default limit
-                          pagination)))
+    (let [result (foreign-invoke-query search-examples-query
+                                       dataset-id
+                                       (when-not (str/blank? snapshot-name) snapshot-name)
+                                       (or filters {}) ; filters map for search functionality
+                                       (or limit 20) ; reasonable default limit
+                                       pagination)]
+      ;; Process examples to add source-string
+      (update result :examples process-examples))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-example
   [{:keys [manager dataset-id snapshot-name input output tags]} uid]
@@ -159,7 +173,7 @@
                                              [example-id])
           example (get examples-map example-id)]
       (if example
-        {:status :ok :example example}
+        {:status :ok :example (process-example-source example)}
         {:status :error :error "Example not found"}))))
 
 ;; =============================================================================
