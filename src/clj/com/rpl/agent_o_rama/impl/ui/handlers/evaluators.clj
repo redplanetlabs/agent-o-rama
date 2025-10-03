@@ -18,11 +18,16 @@
   [{:keys [manager module-id filters]} uid]
   (let [underlying-objects (aor-types/underlying-objects manager)
         search-query (:search-evals-query underlying-objects)
-        search-string (get filters :search-string)]
-    ;; Invoke the search query with optional search string filter
+        search-string (get filters :search-string)
+        types (get filters :types)]
+    ;; Invoke the search query with optional search string and types filters
     (foreign-invoke-query search-query
-                          (when-not (str/blank? search-string)
-                            {:search-string search-string})
+                          (cond-> {}
+                            (not (str/blank? search-string))
+                            (assoc :search-string search-string)
+
+                            (seq types)
+                            (assoc :types types))
                           1000 ; limit
                           nil ; no pagination key
                           )))

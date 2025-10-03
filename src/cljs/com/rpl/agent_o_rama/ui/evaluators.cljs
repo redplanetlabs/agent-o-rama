@@ -477,14 +477,21 @@
         [search-term set-search-term] (useState "")
         [debounced-search-term] (useDebounce search-term 300)
 
-        ;; Update the query to use the debounced search term
+        ;; Add state for type filter
+        [selected-type set-selected-type] (useState "all")
+
+        ;; Update the query to use the debounced search term and type filter
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
-         {:query-key [:evaluator-instances module-id debounced-search-term]
+         {:query-key [:evaluator-instances module-id debounced-search-term selected-type]
           :sente-event [:evaluators/get-all-instances
                         {:module-id module-id
-                         :filters (when-not (str/blank? debounced-search-term)
-                                    {:search-string debounced-search-term})}]
+                         :filters (cond-> {}
+                                    (not (str/blank? debounced-search-term))
+                                    (assoc :search-string debounced-search-term)
+
+                                    (not= selected-type "all")
+                                    (assoc :types #{(keyword selected-type)}))}]
           :enabled? (boolean module-id)
           :refetch-interval-ms 5000})
 
@@ -503,7 +510,7 @@
                        [module-id refetch])]
 
     ($ :div.p-6
-      ;; Header with search input
+      ;; Header with search input and type filter
        ($ :div.flex.justify-between.items-center.mb-6
           ($ :div.flex.items-center.gap-3
              ($ BeakerIcon {:className "h-8 w-8 text-indigo-600"})
@@ -516,7 +523,18 @@
                     :value search-term
                     :onChange #(set-search-term (.. % -target -value))
                     :className "block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                    :placeholder "Search evaluators..."})))
+                    :placeholder "Search evaluators..."}))
+
+             ;; Type filter dropdown
+             ($ :div.m-4
+                ($ :select
+                   {:value selected-type
+                    :onChange #(set-selected-type (.. % -target -value))
+                    :className "block rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"}
+                   ($ :option {:value "all"} "All Types")
+                   ($ :option {:value "regular"} "Regular")
+                   ($ :option {:value "comparative"} "Comparative")
+                   ($ :option {:value "summary"} "Summary"))))
 
           ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
              {:onClick #(state/dispatch [:modal/show-form :create-evaluator {:module-id module-id}])}
