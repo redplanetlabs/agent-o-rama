@@ -4,6 +4,7 @@
   (:require
    [clojure.set :as set]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
+   [com.rpl.agent-o-rama.impl.clojure :as c]
    [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.feedback :as fb]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -68,6 +69,10 @@
   [name]
   (.getAgentClient (declared-objects) name))
 
+(defn get-agent-manager
+  []
+  (.getThisModuleAgentManager (declared-objects)))
+
 (defn eval-action-builder-fn
   [{:strs [name]}]
   (let [evals-pstate (retrieve-pstate (po/evaluators-task-global-name))
@@ -129,8 +134,15 @@
 
 (defn add-to-dataset-action-builder-fn
   [{:strs [datasetId inputJsonPathTemplate outputJsonPathTemplate]}]
-  ;; TODO: <<<<>>>>
-)
+  (let [input-template  (h/parse-json-path-template (or inputJsonPathTemplate "$"))
+        output-template (h/parse-json-path-template (or outputJsonPathTemplate "$"))
+        dataset-id      (java.util.UUID/fromString datasetId)
+        manager         (get-agent-manager)]
+    (fn [fetcher input output run-info]
+      (let [input  (h/resolve-json-path-template input-template input)
+            output (h/resolve-json-path-template output-template output)]
+        (c/add-dataset-example! manager dataset-id input {:reference-output output})
+      ))))
 
 (def BUILT-IN-ACTIONS
   {"aor/eval"

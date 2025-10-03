@@ -1178,28 +1178,15 @@
 
 (defn add-dataset-example-async!
   (^CompletableFuture [manager dataset-id input]
-   (add-dataset-example-async! manager dataset-id input nil))
+   (c/add-dataset-example-async! manager dataset-id input))
   (^CompletableFuture [^AgentManager manager dataset-id input options]
-   ;; types are validated by Java API
-   (h/validate-options! name
-                        options
-                        {:snapshot h/any-spec
-                         :reference-output h/any-spec
-                         :tags     h/any-spec})
-   (let [joptions (AddDatasetExampleOptions.)]
-     (set! (.snapshotName joptions) (:snapshot options))
-     (set! (.referenceOutput joptions) (:reference-output options))
-     (set! (.tags joptions) (:tags options))
-     (.addDatasetExampleAsync manager
-                              dataset-id
-                              input
-                              joptions))))
+   (c/add-dataset-example-async! manager dataset-id input options)))
 
 (defn add-dataset-example!
   ([manager dataset-id input]
-   (.get (add-dataset-example-async! manager dataset-id input)))
+   (c/add-dataset-example! manager dataset-id input))
   ([^AgentManager manager dataset-id input options]
-   (.get (add-dataset-example-async! manager dataset-id input options))))
+   (c/add-dataset-example! manager dataset-id input options)))
 
 (defn set-dataset-example-input!
   ([manager dataset-id example-id input]

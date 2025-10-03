@@ -1,11 +1,14 @@
 (ns com.rpl.agent-o-rama.impl.clojure
   (:require
    [com.rpl.agent-o-rama.impl.graph :as graph]
+   [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.types :as aor-types])
   (:import
    [com.rpl.agentorama
+    AddDatasetExampleOptions
     AgentClient
     AgentInvoke
+    AgentManager
     AgentNode
     AgentTopology]
    [java.util.concurrent
@@ -63,3 +66,28 @@
 (defn agent-result-async
   ^CompletableFuture [^AgentClient agent-client agent-invoke]
   (.resultAsync agent-client agent-invoke))
+
+(defn add-dataset-example-async!
+  (^CompletableFuture [manager dataset-id input]
+   (add-dataset-example-async! manager dataset-id input nil))
+  (^CompletableFuture [^AgentManager manager dataset-id input options]
+   ;; types are validated by Java API
+   (h/validate-options! name
+                        options
+                        {:snapshot h/any-spec
+                         :reference-output h/any-spec
+                         :tags     h/any-spec})
+   (let [joptions (AddDatasetExampleOptions.)]
+     (set! (.snapshotName joptions) (:snapshot options))
+     (set! (.referenceOutput joptions) (:reference-output options))
+     (set! (.tags joptions) (:tags options))
+     (.addDatasetExampleAsync manager
+                              dataset-id
+                              input
+                              joptions))))
+
+(defn add-dataset-example!
+  ([manager dataset-id input]
+   (.get (add-dataset-example-async! manager dataset-id input)))
+  ([^AgentManager manager dataset-id input options]
+   (.get (add-dataset-example-async! manager dataset-id input options))))
