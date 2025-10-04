@@ -49,6 +49,7 @@
    ipc
    com.rpl.agent-o-rama.ui.trace-analytics-test-agent/TraceAnalyticsTestAgentModule
    {:tasks 1 :threads 1})
+
   (rtest/update-module!
    ipc
    com.rpl.agent-o-rama.ui.trace-analytics-test-agent/TraceAnalyticsTestAgentModule

@@ -9,7 +9,7 @@
    :compiler-options {:optimizations :none
                       :source-map    true}
    :devtools         {:http-root "target/public"
-                      :http-port 3001
+                      :http-port 3100
                       ;; :before-load chat-rama.frontend.core/stop
                       ;; :after-load  chat-rama.frontend.core/start
                      }}
