@@ -93,11 +93,15 @@
    Takes basic-stats and optional execution-time and retry-count."
   [{:keys [basic-stats execution-time retry-count]}]
   (let [[nested-ops-expanded? set-nested-ops-expanded!] (uix/use-state false)
+        [node-stats-expanded? set-node-stats-expanded!] (uix/use-state false)
 
         ;; Token counts from basic stats
         total-tokens  (:total-token-count basic-stats)
         input-tokens  (:input-token-count basic-stats)
         output-tokens (:output-token-count basic-stats)
+
+        ;; Node stats
+        node-stats-map (:node-stats basic-stats)
 
         ;; Local helper for getting operation stats
         get-op (partial get-op-stats basic-stats)
@@ -106,7 +110,8 @@
         has-stats? (or execution-time
                        (and retry-count (> retry-count 0))
                        (and total-tokens (pos? total-tokens))
-                       (has-operations? basic-stats nested-op-keys))]
+                       (has-operations? basic-stats nested-op-keys)
+                       (seq node-stats-map))]
     ($ :div
        {:className "grid grid-cols-1 gap-2"}
 
@@ -199,6 +204,30 @@
                        {:label "Human Inputs" :stats (get-op :human-input)})
                     ($ op-stat-row
                        {:label "Other" :stats (get-op :other)}))))))
+
+       ;; Node stats (expandable)
+       (when (seq node-stats-map)
+         ($ stat-card
+            {:data-id "node-stats"}
+            ($ :div
+               ($ :button
+                  {:className "flex items-center gap-2 w-full text-left text-sm font-medium text-gray-700 mb-2"
+                   :data-id   "node-stats-toggle"
+                   :onClick   #(set-node-stats-expanded! not)}
+                  (if node-stats-expanded?
+                    ($ ChevronDownIcon {:className "h-4 w-4"})
+                    ($ ChevronRightIcon {:className "h-4 w-4"}))
+                  "Node Stats")
+               (when node-stats-expanded?
+                 ($ :div
+                    {:className "space-y-2"
+                     :data-id   "node-stats-list"}
+                    (map (fn [[node-name stats]]
+                           ($ op-stat-row
+                              {:key   node-name
+                               :label node-name
+                               :stats stats}))
+                         (sort-by first node-stats-map)))))))
 
        ;; Fallback when no stats
        (when-not has-stats?

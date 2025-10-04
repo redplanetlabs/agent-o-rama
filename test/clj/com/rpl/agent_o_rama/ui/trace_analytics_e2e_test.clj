@@ -278,6 +278,42 @@
   ;; Test dropdown expand/collapse functionality
   (with-webdriver [driver (:port env)]
 
+    (testing "node-stats dropdown toggles correctly"
+      (let [env     @system
+            manager (aor/agent-manager (:ipc env) (:module-name env))
+            agent   (aor/agent-client manager "TraceTestAgent")
+            invoke  (aor/agent-initiate agent {"mode" "basic"})]
+
+        @(aor/agent-result-async agent invoke)
+
+        (e/with-postmortem driver {:dir "target/etaoin"}
+          (let [trace-url (agent-invoke-url env "TraceTestAgent" invoke)]
+            (e/go driver trace-url)
+            (e/wait-visible
+             driver
+             {:data-id "trace-analytics"}
+             {:timeout default-timeout})
+
+            (testing "node-stats section exists"
+              (is (e/visible? driver {:data-id "node-stats"})))
+
+            (testing "initially collapsed"
+              (is (not (e/visible? driver {:data-id "node-stats-list"}))))
+
+            (testing "expands on click"
+              (e/click driver {:data-id "node-stats-toggle"})
+              (e/wait-visible
+               driver
+               {:data-id "node-stats-list"}
+               {:timeout 2})
+              (is (e/visible? driver {:data-id "node-stats-list"})))
+
+            (testing "collapses on second click"
+              (e/click driver {:data-id "node-stats-toggle"})
+              (Thread/sleep 200)
+              (is (not
+                   (e/visible? driver {:data-id "node-stats-list"}))))))))
+
     (testing "other-operations dropdown toggles correctly"
       (let [env     @system
             manager (aor/agent-manager (:ipc env) (:module-name env))
