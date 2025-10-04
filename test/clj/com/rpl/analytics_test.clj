@@ -951,7 +951,7 @@
                          :filter            (aor-types/->AndFilter [])
                          :sampling-rate     0.5
                          :start-time-millis 15000
-                         :include-failures? false
+                         :status-filter     :success
                         })
 
 
@@ -1004,7 +1004,7 @@
                                                           (aor-types/->ComparatorSpec := true))
            :sampling-rate     1.0
            :start-time-millis 0
-           :include-failures? false
+           :status-filter     :success
           })
 
 
@@ -1062,7 +1062,7 @@
                                                           (aor-types/->ComparatorSpec :not= ""))
            :sampling-rate     0.1
            :start-time-millis 50000
-           :include-failures? false
+           :status-filter     :success
           })
          (ana/add-rule!
           global-actions-depot
@@ -1081,7 +1081,7 @@
                                 (aor-types/->InputMatchFilter "$[0]" #"a")])
            :sampling-rate     0.7
            :start-time-millis 50000
-           :include-failures? false
+           :status-filter     :success
           })
          (ana/add-rule!
           global-actions-depot
@@ -1092,7 +1092,7 @@
            :filter            (aor-types/->AndFilter [])
            :sampling-rate     0.8
            :start-time-millis 50000
-           :include-failures? false
+           :status-filter     :success
           })
          (ana/add-rule!
           global-actions-depot
@@ -1103,7 +1103,7 @@
            :filter            (aor-types/->AndFilter [])
            :sampling-rate     0.9
            :start-time-millis 50000
-           :include-failures? false
+           :status-filter     :success
           })
 
 
@@ -1221,7 +1221,7 @@
            :filter            (aor-types/->AndFilter [])
            :sampling-rate     0.5
            :start-time-millis (h/current-time-millis)
-           :include-failures? false
+           :status-filter     :success
           })
          (ana/add-rule!
           global-actions-depot
@@ -1233,7 +1233,7 @@
            :filter            (aor-types/->AndFilter [])
            :sampling-rate     0.6
            :start-time-millis (h/current-time-millis)
-           :include-failures? false
+           :status-filter     :success
           })
          (ana/add-rule!
           global-actions-depot
@@ -1244,7 +1244,7 @@
            :filter            (aor-types/->AndFilter [])
            :sampling-rate     0.55
            :start-time-millis (h/current-time-millis)
-           :include-failures? false
+           :status-filter     :success
           })
          (ana/add-rule!
           global-actions-depot
@@ -1255,7 +1255,7 @@
            :filter            (aor-types/->AndFilter [])
            :sampling-rate     0.65
            :start-time-millis (h/current-time-millis)
-           :include-failures? false
+           :status-filter     :success
           })
 
          (TopologyUtils/advanceSimTime 1000)
@@ -1316,7 +1316,7 @@
            :filter            (aor-types/->AndFilter [])
            :sampling-rate     0.51
            :start-time-millis (h/current-time-millis)
-           :include-failures? false
+           :status-filter     :success
           })
 
 
@@ -1329,7 +1329,7 @@
                          :filter            (aor-types/->AndFilter [])
                          :sampling-rate     0.52
                          :start-time-millis (h/current-time-millis)
-                         :include-failures? false
+                         :status-filter     :success
                         })
 
          (ana/add-rule!
@@ -1344,7 +1344,7 @@
                                                           (aor-types/->ComparatorSpec :not= "a"))
            :sampling-rate     0.53
            :start-time-millis (h/current-time-millis)
-           :include-failures? false
+           :status-filter     :success
           })
 
          (TopologyUtils/advanceSimTime 1000)
@@ -1427,7 +1427,7 @@
                          :filter            (aor-types/->AndFilter [])
                          :sampling-rate     0.6
                          :start-time-millis (h/current-time-millis)
-                         :include-failures? false
+                         :status-filter     :success
                         })
          (ana/add-rule!
           global-actions-depot
@@ -1438,7 +1438,7 @@
            :filter            (aor-types/->AndFilter [])
            :sampling-rate     0.61
            :start-time-millis (h/current-time-millis)
-           :include-failures? false
+           :status-filter     :success
           })
          (ana/add-rule!
           global-actions-depot
@@ -1449,7 +1449,7 @@
            :filter            (aor-types/->AndFilter [])
            :sampling-rate     0.62
            :start-time-millis (h/current-time-millis)
-           :include-failures? false
+           :status-filter     :success
           })
 
 
@@ -1600,7 +1600,7 @@
                        :filter            (aor-types/->AndFilter [])
                        :sampling-rate     1.0
                        :start-time-millis 0
-                       :include-failures? false
+                       :status-filter     :success
                       })
        (ana/add-rule! global-actions-depot
                       "foo-agent-fail"
@@ -1611,7 +1611,18 @@
                        :filter            (aor-types/->AndFilter [])
                        :sampling-rate     1.0
                        :start-time-millis 0
-                       :include-failures? true
+                       :status-filter     :all
+                      })
+       (ana/add-rule! global-actions-depot
+                      "foo-agent-only-fail"
+                      "foo"
+                      {:node-name         nil
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :status-filter     :fail
                       })
        (ana/add-rule! global-actions-depot
                       "foo-agent"
@@ -1622,7 +1633,7 @@
                        :filter            (aor-types/->AndFilter [])
                        :sampling-rate     1.0
                        :start-time-millis 0
-                       :include-failures? false
+                       :status-filter     :success
                       })
        (ana/add-rule! global-actions-depot
                       "foo-start-fail"
@@ -1633,7 +1644,18 @@
                        :filter            (aor-types/->AndFilter [])
                        :sampling-rate     1.0
                        :start-time-millis 0
-                       :include-failures? true
+                       :status-filter     :all
+                      })
+       (ana/add-rule! global-actions-depot
+                      "foo-start-only-fail"
+                      "foo"
+                      {:node-name         "start"
+                       :action-name       "action1"
+                       :action-params     {}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :status-filter     :fail
                       })
        (ana/add-rule! global-actions-depot
                       "foo-start"
@@ -1644,14 +1666,15 @@
                        :filter            (aor-types/->AndFilter [])
                        :sampling-rate     1.0
                        :start-time-millis 0
-                       :include-failures? false
+                       :status-filter     :success
                       })
-
 
        (bind inv (aor/agent-initiate foo "bad-action-return"))
        (is (= "bad-action-return!?" (aor/agent-result foo inv)))
 
        (cycle!)
+       (is (nil? (last-action "foo-start-only-fail")))
+       (is (nil? (last-action "foo-agent-only-fail")))
        (bind action (last-action "foo-agent"))
        (is (not (:success? action)))
        (is (= ["exception"] (keys (:info-map action))))
@@ -1660,6 +1683,8 @@
        (bind inv (aor/agent-initiate foo "action-exception"))
        (is (= "action-exception!?" (aor/agent-result foo inv)))
        (cycle!)
+       (is (nil? (last-action "foo-start-only-fail")))
+       (is (nil? (last-action "foo-agent-only-fail")))
        (bind action (last-action "foo-agent"))
        (is (not (:success? action)))
        (is (= ["exception"] (keys (:info-map action))))
@@ -1688,6 +1713,8 @@
        (bind inv (aor/agent-initiate foo "a"))
        (is (= "a!?" (aor/agent-result foo inv)))
        (cycle!)
+       (is (nil? (last-action "foo-start-only-fail")))
+       (is (nil? (last-action "foo-agent-only-fail")))
        (bind ares
          (aor-types/->valid-ActionLog
           0
@@ -1715,22 +1742,33 @@
        (is (= nres (last-action-normed "foo-start")))
 
        (bind action (last-action "foo-agent-fail"))
-       (is (= inv (:agent-invoke action)))
+       (bind action2 (last-action "foo-agent-only-fail"))
+       (is (= inv (:agent-invoke action) (:agent-invoke action2)))
        (is (nil? (:node-invoke action)))
+       (is (nil? (:node-invoke action2)))
        (is (:success? action))
+       (is (:success? action2))
        (bind im (:info-map action))
-       (is (= ["fail-agent"] (get im "input")))
+       (bind im2 (:info-map action2))
+       (is (= ["fail-agent"] (get im "input") (get im2 "input")))
        (is (instance? AgentFailedException (get im "output")))
+       (is (instance? AgentFailedException (get im2 "output")))
        (is (some? (get im "latency")))
+       (is (some? (get im2 "latency")))
 
        (bind action (last-action "foo-start-fail"))
-       (is (= inv (:agent-invoke action)))
+       (bind action2 (last-action "foo-start-only-fail"))
+       (is (= inv (:agent-invoke action) (:agent-invoke action2)))
        (is (some? (:node-invoke action)))
+       (is (some? (:node-invoke action2)))
        (is (:success? action))
+       (is (:success? action2))
        (bind im (:info-map action))
-       (is (= ["fail-agent"] (get im "input")))
-       (is (= [] (get im "output")))
+       (bind im2 (:info-map action2))
+       (is (= ["fail-agent"] (get im "input") (get im2 "input")))
+       (is (= [] (get im "output") (get im2 "output")))
        (is (nil? (get im "latency")))
+       (is (nil? (get im2 "latency")))
       ))))
 
 
@@ -1830,7 +1868,7 @@
                        :filter            (aor-types/->AndFilter [])
                        :sampling-rate     1.0
                        :start-time-millis 0
-                       :include-failures? true
+                       :status-filter     :all
                       })
        (ana/add-rule! global-actions-depot
                       "foo-start"
@@ -1841,7 +1879,7 @@
                        :filter            (aor-types/->AndFilter [])
                        :sampling-rate     1.0
                        :start-time-millis 0
-                       :include-failures? false
+                       :status-filter     :success
                       })
        (ana/add-rule! global-actions-depot
                       "foo-start-fail"
@@ -1852,7 +1890,7 @@
                        :filter            (aor-types/->AndFilter [])
                        :sampling-rate     1.0
                        :start-time-millis 0
-                       :include-failures? true
+                       :status-filter     :all
                       })
 
 
@@ -1982,7 +2020,7 @@
                        :filter            (aor-types/->AndFilter [])
                        :sampling-rate     1.0
                        :start-time-millis 0
-                       :include-failures? false
+                       :status-filter     :success
                       })
 
 
@@ -2115,7 +2153,7 @@
                            :filter            (aor-types/->AndFilter [])
                            :sampling-rate     1.0
                            :start-time-millis 0
-                           :include-failures? false
+                           :status-filter     :success
                           })
            (ana/add-rule! global-actions-depot
                           "eval2"
@@ -2126,7 +2164,7 @@
                            :filter            (aor-types/->AndFilter [])
                            :sampling-rate     1.0
                            :start-time-millis 0
-                           :include-failures? false
+                           :status-filter     :success
                           })
 
 
@@ -2145,7 +2183,7 @@
                                                             (aor-types/->ComparatorSpec :not= "a"))
              :sampling-rate     1.0
              :start-time-millis 0
-             :include-failures? false
+             :status-filter     :success
             })
 
 
@@ -2190,7 +2228,7 @@
                                                             (aor-types/->ComparatorSpec :not= "a"))
              :sampling-rate     1.0
              :start-time-millis 0
-             :include-failures? false
+             :status-filter     :success
             })
 
            (bind res (aor/agent-invoke foo "qqq"))

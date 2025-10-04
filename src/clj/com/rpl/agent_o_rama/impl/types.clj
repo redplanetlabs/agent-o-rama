@@ -758,7 +758,7 @@
    filter :- (s/protocol RuleFilter)
    sampling-rate :- Double
    start-time-millis :- Long
-   include-failures? :- Boolean]
+   status-filter :- (s/enum :all :success :fail)]
   RuleEvent)
 
 (defaorrecord DeleteRule

@@ -666,12 +666,15 @@
 
 
 (defn include-result-from-status?
-  [include-failures? {:keys [run-type result finish-time-millis]}]
-  (or include-failures?
-      (if (= :agent run-type)
-        (not (:failure? result))
-        (some? finish-time-millis)
-      )))
+  [status-filter {:keys [run-type result finish-time-millis]}]
+  (let [success? (if (= :agent run-type)
+                   (not (:failure? result))
+                   (some? finish-time-millis))]
+    (condp = status-filter
+      :all true
+      :success success?
+      :fail (not success?)
+      (throw (h/ex-info "Unexpected status filter" {:status-filter status-filter})))))
 
 (deframaop find-qualified-offsets-and-run-unlimited
   [*agent->rule->info *cache-pstate-name *processed-pstate-name]
@@ -683,7 +686,7 @@
    (get *rule-info
         :definition
         :> {:keys [*filter *node-name *sampling-rate *action-name *action-params
-                   *include-failures?]})
+                   *status-filter]})
    (aor-types/dependency-rule-names *filter :> *dependency-names)
    (select> [:cursors ALL (collect-one FIRST) LAST]
      *rule-info
@@ -721,7 +724,7 @@
      (:> (and> (not (experiment-source? *data))
                (not (contains? *data :invoked-agg-invoke-id))
                (contains? *data :start-time-millis) ; not stricly necessary
-               (include-result-from-status? *include-failures? *data)
+               (include-result-from-status? *status-filter *data)
                (or> (nil? *node-name) (= *node-name (get *data :node)))
                (aor-types/rule-filter-matches? *filter *data)
                (sample? *sampling-rate))))
@@ -880,7 +883,7 @@
 (defn add-rule!
   [global-actions-depot name agent-name
    {:keys [node-name action-name action-params filter sampling-rate start-time-millis
-           include-failures?]}]
+           status-filter]}]
   (let [{error aor-types/AGENT-TOPOLOGY-NAME}
         (foreign-append!
          global-actions-depot
@@ -894,7 +897,7 @@
           filter
           sampling-rate
           start-time-millis
-          include-failures?))]
+          status-filter))]
     (when error
       (throw (h/ex-info "Error adding rule" {:info error})))))
 
