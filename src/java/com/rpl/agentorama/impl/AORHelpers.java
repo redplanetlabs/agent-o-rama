@@ -22,6 +22,8 @@ public class AORHelpers {
       Util.getIFn("com.rpl.agent-o-rama.impl.java", "mk-evaluator-builder-options");
   public static IFn MAKE_ACTION_BUILDER_OPTIONS =
       Util.getIFn("com.rpl.agent-o-rama.impl.java", "mk-action-builder-options");
+  public static IFn MAKE_AGENT_CONTEXT =
+      Util.getIFn("com.rpl.agent-o-rama.impl.java", "mk-agent-context");
   public static IFn CREATE_TOOL_INFO =
       Util.getIFn("com.rpl.agent-o-rama.impl.java", "create-tool-info");
   public static IFn CREATE_TOOL_INFO_WITH_CONTEXT =
