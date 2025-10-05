@@ -492,17 +492,25 @@
                 ($ :button.text-sm.text-blue-600.hover:underline {:onClick #(set-model-outputs-input (conj model-outputs-input {:id (random-uuid) :value ""}))} "Add another output")))
 
            :summary
-           ($ :div.p-4.bg-blue-50.border.border-blue-200.rounded-md
-              ($ :h4.text-sm.font-medium.text-blue-800
-                 (str "This will run the summary evaluator '" (:name selected-evaluator) "' on "
-                      (count selected-example-ids) " selected examples.")))
+           (if (zero? (count selected-example-ids))
+             ($ :div.p-4.bg-yellow-50.border.border-yellow-200.rounded-md
+                ($ :h4.text-sm.font-medium.text-yellow-800
+                   "To test a summary evaluator, select examples from a dataset and click the \"Try Summary Evaluator\" button from the selection menu."))
+             ($ :div.p-4.bg-blue-50.border.border-blue-200.rounded-md
+                ($ :h4.text-sm.font-medium.text-blue-800
+                   (str "This will run the summary evaluator '" (:name selected-evaluator) "' on "
+                        (count selected-example-ids) " selected examples."))))
 
            nil))
 
        ;; 5. Run Button and Output
        ($ :div.flex.justify-center
           ($ :button.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
-             {:onClick handle-run, :disabled (or (not selected-evaluator) loading?)}
+             {:onClick handle-run
+              :disabled (or (not selected-evaluator)
+                            loading?
+                            (and (= evaluator-type :summary)
+                                 (zero? (count selected-example-ids))))}
              (if loading? "Running..." "Run Evaluator")))
 
        (when error ($ :div.p-4.bg-red-50.border.border-red-200.rounded-md ($ :p.text-sm.text-red-700 error)))
