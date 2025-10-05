@@ -326,6 +326,14 @@
           :sente-event [:evaluators/get-all-instances {:module-id module-id}]
           :enabled? (boolean module-id)})
 
+        ;; Fetch evaluator builders to get their options for conditional rendering
+        builders-query (queries/use-sente-query
+                        {:query-key [:evaluator-builders module-id]
+                         :sente-event [:evaluators/get-all-builders {:module-id module-id}]
+                         :enabled? (boolean module-id)})
+
+        builders-by-name (:data builders-query)
+
         ;; Filter evaluators based on the modal's mode (:single or :multi)
         evaluators (filter
                     (if (= mode :single)
@@ -335,24 +343,34 @@
 
         evaluator-type (:type selected-evaluator)
 
+        ;; Determine visibility flags based on selected evaluator's builder options
+        builder-options (when selected-evaluator
+                          (get-in builders-by-name [(:builder-name selected-evaluator) :options] {}))
+        show-input-path? (get builder-options :input-path? true)
+        show-output-path? (get builder-options :output-path? true)
+        show-ref-output-path? (get builder-options :reference-output-path? true)
+
         handle-run (fn []
                      (when selected-evaluator
                        (set-loading true)
                        (set-error nil)
 
                        (try
-                         (let [parsed-input (-> input-str js/JSON.parse js->clj)
-                               parsed-ref-output (when-not (str/blank? ref-output-str)
+                         (let [parsed-input (when (and show-input-path? (not (str/blank? input-str)))
+                                              (-> input-str js/JSON.parse js->clj))
+                               parsed-ref-output (when (and show-ref-output-path? (not (str/blank? ref-output-str)))
                                                    (-> ref-output-str js/JSON.parse js->clj))
 
                                run-data (case evaluator-type
-                                          :regular {:input parsed-input
-                                                    :referenceOutput parsed-ref-output
-                                                    :output (when-not (str/blank? output-str)
-                                                              (-> output-str js/JSON.parse js->clj))}
-                                          :comparative {:input parsed-input
-                                                        :referenceOutput parsed-ref-output
-                                                        :outputs (mapv #(-> % :value js/JSON.parse js->clj) model-outputs-input)}
+                                          :regular (cond-> {}
+                                                     show-input-path? (assoc :input parsed-input)
+                                                     show-ref-output-path? (assoc :referenceOutput parsed-ref-output)
+                                                     show-output-path? (assoc :output (when-not (str/blank? output-str)
+                                                                                        (-> output-str js/JSON.parse js->clj))))
+                                          :comparative (cond-> {}
+                                                         show-input-path? (assoc :input parsed-input)
+                                                         show-ref-output-path? (assoc :referenceOutput parsed-ref-output)
+                                                         show-output-path? (assoc :outputs (mapv #(-> % :value js/JSON.parse js->clj) model-outputs-input)))
                                           :summary {:dataset-id dataset-id
                                                     :example-ids selected-example-ids})]
                            (sente/request!
@@ -421,8 +439,8 @@
                                                                      {:className (get-evaluator-type-badge-style (:type evaluator))}
                                                                      (get-evaluator-type-display (:type evaluator))))}))))))))
 
-       ;; 2. Example Input (now editable) - only for single mode
-       (when (= mode :single)
+       ;; 2. Example Input (conditionally rendered) - only for single mode
+       (when (and (= mode :single) show-input-path?)
          ($ forms/form-field
             {:label "Input (JSON)"
              :type :textarea
@@ -430,8 +448,8 @@
              :value input-str
              :on-change set-input-str}))
 
-       ;; 3. Reference Output (now editable) - only for single mode
-       (when (= mode :single)
+       ;; 3. Reference Output (conditionally rendered) - only for single mode
+       (when (and (= mode :single) show-ref-output-path?)
          ($ forms/form-field
             {:label "Reference Output (JSON)"
              :type :textarea
@@ -443,33 +461,35 @@
        (when selected-evaluator
          (case evaluator-type
            :regular
-           ($ forms/form-field
-              {:label "Model Output (JSON)"
-               :type :textarea
-               :rows 4
-               :value output-str
-               :on-change set-output-str
-               :placeholder "{\"result\": \"...\"}"})
+           (when show-output-path?
+             ($ forms/form-field
+                {:label "Model Output (JSON)"
+                 :type :textarea
+                 :rows 4
+                 :value output-str
+                 :on-change set-output-str
+                 :placeholder "{\"result\": \"...\"}"}))
 
            :comparative
-           ($ :div
-              ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Model Outputs (One valid JSON per line)")
-              (doall (for [output-item model-outputs-input]
-                       ($ :div.flex.items-center.gap-2.mb-2 {:key (:id output-item)}
-                          ($ :textarea.flex-1.p-2.border.border-gray-300.rounded-md.font-mono.text-xs
-                             {:rows 1
-                              :value (:value output-item)
-                              :onChange #(set-model-outputs-input
-                                          (mapv (fn [item]
-                                                  (if (= (:id item) (:id output-item))
-                                                    (assoc item :value (.. % -target -value))
-                                                    item))
-                                                model-outputs-input))})
-                          ($ :button.text-red-500.hover:text-red-700
-                             {:onClick #(set-model-outputs-input
-                                         (filterv (fn [item] (not= (:id item) (:id output-item))) model-outputs-input))}
-                             ($ XMarkIcon {:className "h-4 w-4"})))))
-              ($ :button.text-sm.text-blue-600.hover:underline {:onClick #(set-model-outputs-input (conj model-outputs-input {:id (random-uuid) :value ""}))} "Add another output"))
+           (when show-output-path?
+             ($ :div
+                ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Model Outputs (One valid JSON per line)")
+                (doall (for [output-item model-outputs-input]
+                         ($ :div.flex.items-center.gap-2.mb-2 {:key (:id output-item)}
+                            ($ :textarea.flex-1.p-2.border.border-gray-300.rounded-md.font-mono.text-xs
+                               {:rows 1
+                                :value (:value output-item)
+                                :onChange #(set-model-outputs-input
+                                            (mapv (fn [item]
+                                                    (if (= (:id item) (:id output-item))
+                                                      (assoc item :value (.. % -target -value))
+                                                      item))
+                                                  model-outputs-input))})
+                            ($ :button.text-red-500.hover:text-red-700
+                               {:onClick #(set-model-outputs-input
+                                           (filterv (fn [item] (not= (:id item) (:id output-item))) model-outputs-input))}
+                               ($ XMarkIcon {:className "h-4 w-4"})))))
+                ($ :button.text-sm.text-blue-600.hover:underline {:onClick #(set-model-outputs-input (conj model-outputs-input {:id (random-uuid) :value ""}))} "Add another output")))
 
            :summary
            ($ :div.p-4.bg-blue-50.border.border-blue-200.rounded-md
