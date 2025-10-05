@@ -63,9 +63,8 @@ export async function createEvaluator(page, { name, builderName, description, pa
     await modal.getByLabel(paramKey, { exact: true }).fill(paramValue);
   }
 
-  // Optionally set JSONPath fields by expanding Advanced Options
+  // Optionally set JSONPath fields
   if (inputJsonPath || outputJsonPath || referenceOutputJsonPath) {
-    await modal.getByRole('button', { name: 'Advanced Options' }).click();
     if (inputJsonPath) {
       await modal.getByLabel('Input JSON Path').fill(inputJsonPath);
     }
