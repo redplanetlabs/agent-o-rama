@@ -578,6 +578,7 @@
                         (let [args (convert-input->args input parsed-templates)]
                           (if (aor-types/AgentTarget? target-spec)
                             {:agent-name   agent-name
+                             ;; TODO: <<<<>>> include metadata
                              :agent-invoke (apply c/agent-initiate client args)}
                             {:agent-name   aor-types/EVALUATOR-AGENT-NAME
                              :agent-invoke (c/agent-initiate client
@@ -867,7 +868,7 @@
      ;; have to do it this way since cannot do :ack on the depot append since it's running as part
      ;; of the same stream topology
      (h/random-uuid7 :> *agent-invoke-id)
-     (aor-types/->valid-AgentInitiate [*data] nil *agent-invoke-id nil :> *initiate)
+     (aor-types/->valid-AgentInitiate [*data] nil *agent-invoke-id nil nil :> *initiate)
      (depot-partition-append!
       *agent-depot
       *initiate

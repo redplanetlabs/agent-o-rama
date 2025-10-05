@@ -187,10 +187,15 @@
 
 ;; Core types
 
+(defn valid-metadata-value?
+  [v]
+  (contains? #{Integer Long Float Double Boolean String} v))
+
 (defaorrecord AgentInitiate
   [args :- [s/Any]
    forced-agent-task-id :- (s/maybe Long)
    forced-agent-invoke-id :- (s/maybe UUID)
+   metadata :- (s/maybe {String (s/pred valid-metadata-value?)})
    source :- (s/maybe InfoSource)
   ])
 
@@ -516,6 +521,7 @@
 (defaorrecord ExperimentTarget
   [target-spec :- (s/protocol TargetSpec)
    ;; these are list of JSON path templates
+   ;; TODO: <<<<>>> need metadata here, which is included for nodes as well
    input->args :- [String]])
 
 (defprotocol ExperimentSpec
@@ -809,6 +815,8 @@
                                       (if options @options)))
 
 (defprotocol AgentClientInternal
+  (invoke-with-context-async-internal [this context args])
+  (initiate-with-context-async-internal [this context args])
   (stream-internal [this agent-invoke node callback-fn])
   (stream-specific-internal [this agent-invoke node node-invoke-id callback-fn])
   (stream-all-internal [this agent-invoke node callback-fn])

@@ -115,9 +115,8 @@
 
 
 (defn mk-agent-context
-  [args]
-  (let [args     (into [] args)
-        metadata (volatile! {})]
+  []
+  (let [metadata (volatile! {})]
     (reify
      AgentContext$Impl
      (^AgentContext$Impl metadata [this ^String name ^int val]
@@ -140,6 +139,5 @@
        this)
      clojure.lang.IDeref
      (deref [this]
-       {:args     args
-        :metadata @metadata}
+       {:metadata @metadata}
      ))))

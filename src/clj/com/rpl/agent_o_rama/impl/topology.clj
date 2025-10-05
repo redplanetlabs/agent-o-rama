@@ -209,6 +209,7 @@
    (ops/current-task-id :> *agent-task-id)
    (get *data :forced-agent-invoke-id :> *forced-agent-id)
    (get *data :source :> *source)
+   ;; TODO: <<<<>>>> handle metadata
    (<<if (some? *forced-agent-id)
      ;; stop if already exists for idempotency
      (local-select> [(keypath *forced-agent-id) nil?] $$root)

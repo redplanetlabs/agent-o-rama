@@ -15,8 +15,12 @@ public interface AgentClient extends Closeable {
 
   <T> T invoke(Object... args);
   <T> CompletableFuture<T> invokeAsync(Object... args);
+  <T> T invokeWithContext(AgentContext context, Object... args);
+  <T> CompletableFuture<T> invokeWithContextAsync(AgentContext context, Object... args);
   AgentInvoke initiate(Object... args);
   CompletableFuture<AgentInvoke> initiateAsync(Object... args);
+  AgentInvoke initiateWithContext(AgentContext context, Object... args);
+  CompletableFuture<AgentInvoke> initiateWithContextAsync(AgentContext context, Object... args);
 
   <T> T fork(AgentInvoke invoke, Map<UUID, List> nodeInvokeIdToNewArgs);
   <T> CompletableFuture<T> forkAsync(AgentInvoke invoke, Map<UUID, List> nodeInvokeIdToNewArgs);
