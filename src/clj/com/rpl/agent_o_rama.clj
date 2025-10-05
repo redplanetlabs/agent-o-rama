@@ -1082,22 +1082,21 @@
   ^CompletableFuture [agent-client & args]
   (apply c/agent-initiate-async agent-client args))
 
-
 (defn agent-invoke-with-context-async
-  ^CompletableFuture [agent-client & args]
+  ^CompletableFuture [agent-client context & args]
   (aor-types/invoke-with-context-async-internal agent-client context (into [] args)))
 
 (defn agent-invoke-with-context
   [agent-client context & args]
-  (.get (apply invoke-with-context-async agent-client context args)))
+  (.get ^CompletableFuture (apply agent-invoke-with-context-async agent-client context args)))
 
 (defn agent-initiate-with-context-async
   ^CompletableFuture [agent-client context & args]
-  (aor-types/agent-initiate-with-context-async agent-client context (into [] args)))
+  (aor-types/initiate-with-context-async-internal agent-client context (into [] args)))
 
 (defn agent-initiate-with-context
   ^AgentInvoke [agent-client context & args]
-  (.get (apply initiate-with-context-async agent-client context args)))
+  (.get ^CompletableFuture (apply agent-initiate-with-context-async agent-client context args)))
 
 
 (defn agent-fork
