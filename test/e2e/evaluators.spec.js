@@ -44,12 +44,14 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
   // Step 2: Fill out the form but deliberately omit the threshold parameter
   await modal.getByLabel('Name').fill('test-error-handling');
   await modal.getByLabel('Description').fill('Testing error handling');
-  // Deliberately NOT filling the threshold parameter
+  // Clear the threshold parameter that now has a default value
+  await modal.getByLabel('threshold').clear();
 
   await modal.getByRole('button', { name: 'Submit' }).click();
 
   // Step 3: Verify error message appears and spinner stops
-  await expect(modal.getByText(/Mismatched params.*threshold/)).toBeVisible({ timeout: 10000 });
+  // Now checking for NumberFormatException since cleared field is empty string, not nil
+  await expect(modal.getByText(/NumberFormatException.*For input string/)).toBeVisible({ timeout: 10000 });
   console.log('Error handling test passed - error message displayed correctly');
 
   // Close the modal to continue with successful creation
