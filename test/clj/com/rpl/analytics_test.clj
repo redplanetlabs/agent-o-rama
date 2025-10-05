@@ -840,14 +840,28 @@
                 (aor/new-agent "foo")
                 (aor/node
                  "start"
-                 "node1"
+                 ["node1" "as"]
                  (fn [agent-node input]
-                   (aor/emit! agent-node "node1" (str input "!"))))
+                   (if (= input "agg")
+                     (aor/emit! agent-node "as")
+                     (aor/emit! agent-node "node1" (str input "!")))))
                 (aor/node
                  "node1"
                  nil
                  (fn [agent-node input]
-                   (aor/result! agent-node (str input "?")))))
+                   (aor/result! agent-node (str input "?"))))
+                (aor/agg-start-node
+                 "as"
+                 "agg"
+                 (fn [agent-node]
+                   (aor/emit! agent-node "agg" 1)
+                   (aor/emit! agent-node "agg" 2)))
+                (aor/agg-node
+                 "agg"
+                 nil
+                 aggs/+sum
+                 (fn [agent-node agg node-start-res]
+                   (aor/result! agent-node (str agg "!")))))
             (-> topology
                 (aor/new-agent "bar")
                 (aor/node
@@ -1416,6 +1430,7 @@
          (ana/delete-rule! global-actions-depot "bar" "foo-a1")
          (ana/delete-rule! global-actions-depot "bar" "bar-n1")
          (ana/delete-rule! global-actions-depot "bar" "meval")
+         (ana/delete-rule! global-actions-depot "foo" "foo-a1")
          (cycle!)
 
 
@@ -1473,6 +1488,118 @@
          (is (= (repeat 4 "foo-a1") (first iters)))
          (is (every? #(= 2 (count %)) (rest iters)))
          (is (= #{"foo-a2" "eval1"} (set (apply concat (rest iters)))))
+
+
+         ;; now verify node processing when there are aggs
+         (ana/delete-rule! global-actions-depot "foo" "foo-a1")
+         (ana/delete-rule! global-actions-depot "foo" "foo-a2")
+         (ana/delete-rule! global-actions-depot "foo" "eval1")
+         (cycle!)
+
+         (TopologyUtils/advanceSimTime 1000)
+
+         (ana/add-rule!
+          global-actions-depot
+          "foo-as"
+          "foo"
+          {:node-name         "as"
+           :action-name       "action1"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.71
+           :start-time-millis (h/current-time-millis)
+           :status-filter     :success
+          })
+         (ana/add-rule!
+          global-actions-depot
+          "foo-agg"
+          "foo"
+          {:node-name         "agg"
+           :action-name       "action1"
+           :action-params     {}
+           :filter            (aor-types/->AndFilter [])
+           :sampling-rate     0.72
+           :start-time-millis (h/current-time-millis)
+           :status-filter     :success
+          })
+         (is (thrown? Exception
+                      (ana/add-rule!
+                       global-actions-depot
+                       "foo-as"
+                       "foo"
+                       {:node-name         "as"
+                        :action-name       "action1"
+                        :action-params     {}
+                        :filter            (aor-types/->AndFilter [])
+                        :sampling-rate     0.71
+                        :start-time-millis (h/current-time-millis)
+                        :status-filter     :success
+                       })))
+         (is (thrown? Exception
+                      (ana/add-rule!
+                       global-actions-depot
+                       "foo-abc"
+                       "foo"
+                       {:action-name       "notanaction"
+                        :action-params     {}
+                        :filter            (aor-types/->AndFilter [])
+                        :sampling-rate     0.71
+                        :start-time-millis (h/current-time-millis)
+                        :status-filter     :success
+                       })))
+
+         (TopologyUtils/advanceSimTime 1000)
+
+         (bind inv (aor/agent-initiate foo "agg"))
+         (is (= "3!" (aor/agent-result foo inv)))
+         (cycle!)
+         (is (= {0.71 1 0.72 1} (frequencies @sample-rates)))
+         (is (= (set @ACTIONS)
+                #{[:action1 [] [{"node" "agg" "args" [1]} {"node" "agg" "args" [2]}]
+                   {:action-name    "action1"
+                    :agent-name     "foo"
+                    :node-name      "as"
+                    :type           :node
+                    :latency-millis 0}
+                   []
+                   []
+                   false]
+                  [:action1 [3 nil] "3!"
+                   {:action-name    "action1"
+                    :agent-name     "foo"
+                    :node-name      "agg"
+                    :type           :node
+                    :latency-millis 0}
+                   []
+                   []
+                   false]}
+             ))
+
+         ;; do it again to make sure nothing gets blocked on any of the intermediate agg nodes
+         (bind inv (aor/agent-initiate foo "agg"))
+         (is (= "3!" (aor/agent-result foo inv)))
+         (cycle!)
+         (is (= {0.71 1 0.72 1} (frequencies @sample-rates)))
+         (is (= (set @ACTIONS)
+                #{[:action1 [] [{"node" "agg" "args" [1]} {"node" "agg" "args" [2]}]
+                   {:action-name    "action1"
+                    :agent-name     "foo"
+                    :node-name      "as"
+                    :type           :node
+                    :latency-millis 0}
+                   []
+                   []
+                   false]
+                  [:action1 [3 nil] "3!"
+                   {:action-name    "action1"
+                    :agent-name     "foo"
+                    :node-name      "agg"
+                    :type           :node
+                    :latency-millis 0}
+                   []
+                   []
+                   false]}
+             ))
         )))))
 
 (deftest action-failures-test

@@ -408,7 +408,7 @@
    [$$rules (po/agent-rules-task-global *agent-name)]
    (<<subsource *data
     (case> AddRule :> {:keys [*name *id *action-name *start-time-millis]})
-     (local-select> [(keypath *name) :id] $$rules :> *curr-id)
+     (local-select> [(keypath *name) :definition :id] $$rules :> *curr-id)
      (<<cond
       (case> (and> (some? *curr-id) (not= *curr-id *id)))
        (ack-return> (format "Rule '%s' already exists" *name))
