@@ -5,7 +5,9 @@
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.rama.test :as rtest]
    [shadow.cljs.devtools.api :as shadow]
-   [shadow.cljs.devtools.server])
+   [shadow.cljs.devtools.server]
+   [com.rpl.agent.basic.basic-agent :as basic-agent]
+   [com.rpl.agent.research-agent :as research-agent])
   (:import
    [dev.langchain4j.data.message
     SystemMessage
@@ -28,9 +30,28 @@
   (shadow/watch :dev)
   (aor/start-ui ipc))
 
+(defn launch-for-playwright
+  "playwright tests assume these modules are launched.
+  unfortunately, research module needs OPENAI_API_KEY, and TAVILY_API_KEY in env
+  TODO port test to different module"
+  [ipc]
+  
+  (start-repl ipc)
+  
+  (rtest/launch-module!
+   ipc
+   basic-agent/BasicAgentModule
+   {:tasks 1 :threads 1})
+  
+  (rtest/launch-module!
+   ipc
+   research-agent/ResearchAgentModule
+   {:tasks 1 :threads 1}))
+
 (comment
   (def ipc (open-cluster-manager-internal {"conductor.host" "localhost"}))
   (def ipc (rtest/create-ipc))
+  (launch-for-playwright ipc)
 
   (aor/stop-ui)
 
@@ -104,4 +125,4 @@
 
 
   (shadow/compile :frontend)
-)
+  )
