@@ -370,8 +370,9 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     console.log('Verified both experiments are listed before cleanup.');
 
     // Navigate back again to delete the dataset
-    await page.getByText('Datasets & Experiments').click();
-    await deleteDataset(page, datasetName);
+    // don't delete dataset, so I can look at the experiment results.
+    // await page.getByText('Datasets & Experiments').click();
+    // await deleteDataset(page, datasetName);
     
     // Delete all evaluators
     await page.getByText('Evaluators').click();
