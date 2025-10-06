@@ -28,18 +28,23 @@
    {:count 0 :total-time-millis 0}))
 
 (defn format-op-stats
-  "Format operation stats as 'Nx  ·  Nms'"
+  "Format operation stats as 'Nx  ·  Nms'.
+   Returns a map with :display (formatted string) and :tooltip (average time)."
   [{:keys [count total-time-millis]}]
-  (str count "x  ·  " (.toLocaleString (or total-time-millis 0)) "ms"))
+  (let [avg-time (if (pos? count) (/ total-time-millis count) 0)]
+    {:display (str count "x  ·  " (common/format-duration-ms (or total-time-millis 0)))
+     :tooltip (str "Avg: " (common/format-duration-ms avg-time))}))
 
 (defui op-stat-row
   "Display a single operation stat row"
   [{:keys [label stats text-size]}]
   (when (pos? (:count stats))
-    ($ :div {:className "flex justify-between items-center"}
-       ($ :div {:className "text-xs text-gray-600"} label)
-       ($ :div {:className (str (or text-size "text-sm") " font-bold text-gray-800")}
-          (format-op-stats stats)))))
+    (let [formatted (format-op-stats stats)]
+      ($ :div {:className "flex justify-between items-center"}
+         ($ :div {:className "text-xs text-gray-600"} label)
+         ($ :div {:className (str (or text-size "text-sm") " font-bold text-gray-800")
+                  :title (:tooltip formatted)}
+            (:display formatted))))))
 
 (defui multi-value-display
   "Display one or more labeled values in a flexible layout.
@@ -54,7 +59,8 @@
 
        ;; Single value: horizontal layout
        (if (= value-count 1)
-         (let [{:keys [label value stats icon]} (first values)]
+         (let [{:keys [label value stats icon]} (first values)
+               formatted (when stats (format-op-stats stats))]
            ($ :div
               {:className "flex justify-between items-center"}
               ($ :div
@@ -64,19 +70,22 @@
               ($ :div
                  {:className "text-right"}
                  ($ :div
-                    {:className "text-sm font-bold text-gray-800"}
-                    (or value (format-op-stats stats))))))
+                    {:className "text-sm font-bold text-gray-800"
+                     :title (when formatted (:tooltip formatted))}
+                    (or value (:display formatted))))))
 
          ;; Multiple values: vertical columns layout
          ($ :div
             {:className "flex justify-between items-center"}
             (for [{:keys [label value stats icon] :as _v} values]
-              ($ :div
-                 {:key label}
-                 (when icon ($ icon {:className "h-4 w-4 text-gray-600 mb-1"}))
-                 ($ :div {:className "text-xs text-gray-600"} label)
-                 ($ :div {:className "text-sm font-bold text-gray-800"}
-                    (or value (format-op-stats stats))))))))))
+              (let [formatted (when stats (format-op-stats stats))]
+                ($ :div
+                   {:key label}
+                   (when icon ($ icon {:className "h-4 w-4 text-gray-600 mb-1"}))
+                   ($ :div {:className "text-xs text-gray-600"} label)
+                   ($ :div {:className "text-sm font-bold text-gray-800"
+                            :title (when formatted (:tooltip formatted))}
+                      (or value (:display formatted)))))))))))
 
 (defui stat-card
   "Common card wrapper for stat sections"
@@ -310,7 +319,7 @@
                           {:basic-stats basic-stats}))
 
                     ;; Sub-agent entries
-                    (map (fn [[agent-ref sa-stats]]
+                    (mapv (fn [[agent-ref sa-stats]]
                            (let [module-name    (:module-name agent-ref)
                                  agent-name     (:agent-name agent-ref)
                                  count          (:count sa-stats)
@@ -323,21 +332,23 @@
                                    {:className "space-y-2"
                                     :data-id   (str "subagent-" agent-name)}
                                    ($ :div
-   {:className "space-y-1"}
-   ($ :div
-      {:className "text-sm font-semibold text-gray-800 overflow-hidden"
-       :style     {:direction "rtl"
-                   :whiteSpace "nowrap"
-                   :textOverflow "ellipsis"
-                   :maxWidth "100%"}
-       :title     (str module-name "/" agent-name)}
-      (str module-name "/" agent-name))
-   (let [total-time (reduce + 0 (map :total-time-millis (vals (:node-stats sa-basic-stats))))]
-  ($ :div
-     {:className "text-xs text-gray-500 text-right"}
-     (str count " call" (when (not= count 1) "s")
-          " · "
-          (.toLocaleString total-time) "ms"))))
+                                      {:className "space-y-1"}
+                                      ($ :div
+                                         {:className "text-sm font-semibold text-gray-800 overflow-hidden"
+                                          :style     {:direction    "rtl"
+                                                      :whiteSpace   "nowrap"
+                                                      :textOverflow "ellipsis"
+                                                      :maxWidth     "100%"}
+                                          :title     (str module-name "/" agent-name)}
+                                         (str module-name "/" agent-name))
+                                      (let [total-time (reduce + 0 (map :total-time-millis (vals (:node-stats sa-basic-stats))))
+                                            avg-time   (if (pos? count) (/ total-time count) 0)]
+                                        ($ :div
+                                           {:className "text-xs text-gray-500 text-right"
+                                            :title (str "Avg: " (common/format-duration-ms avg-time))}
+                                           (str count " call" (when (not= count 1) "s")
+                                                " · "
+                                                (common/format-duration-ms total-time)))))
                                    ($ agent-stats-display
                                       {:basic-stats sa-basic-stats})))))
                          subagent-stats-map))))))))
