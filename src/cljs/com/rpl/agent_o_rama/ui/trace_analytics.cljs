@@ -325,8 +325,13 @@
                                    ($ :div
                                       {:className "flex items-baseline gap-2"}
                                       ($ :div
-                                         {:className "text-sm font-semibold text-gray-800"}
-                                         (str module-name "/" agent-name))
+   {:className "text-sm font-semibold text-gray-800 overflow-hidden"
+    :style     {:direction "rtl"
+                :whiteSpace "nowrap"
+                :textOverflow "ellipsis"
+                :maxWidth "100%"}
+    :title     (str module-name "/" agent-name)}
+   (str module-name "/" agent-name))
                                       ($ :div
                                          {:className "text-xs text-gray-500"}
                                          (str "(" count " call"
