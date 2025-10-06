@@ -218,7 +218,25 @@
         agent-name-field (forms/use-form-field form-id (conj path :target-spec :agent-name))
         node-name-field (forms/use-form-field form-id (conj path :target-spec :node))
         input-mappings (or (get-in form (conj path :input->args)) [])
-        is-comparative? (= :comparative (get-in form [:spec :type]))]
+        is-comparative? (= :comparative (get-in form [:spec :type]))
+        
+        ;; Fetch graph data for the selected agent
+        selected-agent-name (:value agent-name-field)
+        graph-query (queries/use-sente-query
+                     {:query-key [:graph module-id selected-agent-name]
+                      :sente-event [:invocations/get-graph {:module-id module-id
+                                                           :agent-name selected-agent-name}]
+                      ;; Only run the query if an agent is selected
+                      :enabled? (and (boolean module-id) (not (str/blank? selected-agent-name)))})
+        graph-data (get-in graph-query [:data :graph])
+        node-names (when graph-data (-> graph-data :node-map keys sort vec))]
+
+    ;; Effect to reset node name when agent changes
+    (uix/use-effect
+     (fn []
+       ;; When the selected agent changes, clear the selected node name.
+       ((:on-change node-name-field) ""))
+     [selected-agent-name])
 
     ($ :div.p-4.bg-gray-50.border.rounded-lg
        ($ :h4.text-md.font-semibold.mb-3 (str "Target " (inc index)))
@@ -236,14 +254,35 @@
              {:module-id module-id
               :selected-agent (:value agent-name-field)
               :on-select-agent (:on-change agent-name-field)}))
-
+       
+       ;; Conditionally render node name dropdown
        (when (= (:value target-spec-type-field) :node)
          ($ :div.mt-4
-            ($ forms/form-field
-               {:label "Node Name" :required? true
-                :value (:value node-name-field)
-                :on-change (:on-change node-name-field)
-                :error (:error node-name-field)})))
+            ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Node Name")
+            ($ :select.w-full.p-2.border.rounded-md.text-sm
+               {:className (if (:error node-name-field)
+                             "border-red-300 focus:ring-red-500 focus:border-red-500"
+                             "border-gray-300 focus:ring-blue-500 focus:border-blue-500")
+                :value (or (:value node-name-field) "")
+                :onChange #((:on-change node-name-field) (.. % -target -value))
+                :disabled (or (not selected-agent-name) (:loading? graph-query))}
+               (cond
+                 (not selected-agent-name)
+                 ($ :option {:value ""} "← Select an agent first")
+
+                 (:loading? graph-query)
+                 ($ :option {:value ""} "Loading nodes...")
+
+                 (:error graph-query)
+                 ($ :option {:value ""} "Error loading nodes")
+
+                 :else
+                 ($ :<>
+                    ($ :option {:value ""} "Select a node...")
+                    (for [node-name node-names]
+                      ($ :option {:key node-name :value node-name} node-name)))))
+            (when (:error node-name-field)
+              ($ :p.text-sm.text-red-600.mt-1 (:error node-name-field)))))
 
        ($ :div.mt-4
           ($ :label.block.text-sm.font-medium.text-gray-700 "Input Mappings")
