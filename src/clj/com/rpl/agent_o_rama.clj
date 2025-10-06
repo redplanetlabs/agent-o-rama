@@ -787,7 +787,7 @@
              (h/cf-function [agent-invoke]
                (.resultAsync this agent-invoke))))
           (initiate-with-context-async-internal [this context args]
-            (let [{:keys [metadata] :as context} (merge context {:metadata {}})]
+            (let [{:keys [metadata] :as context} (merge {:metadata {}} context)]
               (h/validate-options! agentName
                                    context
                                    {:metadata h/map-spec})
@@ -805,7 +805,7 @@
                  (vec args)
                  aor-types/FORCED-AGENT-TASK-ID
                  aor-types/FORCED-AGENT-INVOKE-ID
-                 (:metadata context)
+                 metadata
                  aor-types/OPERATION-SOURCE))
                (h/cf-function [{[agent-task-id agent-id]
                                 aor-types/AGENT-TOPOLOGY-NAME}]
@@ -1102,7 +1102,6 @@
 (defn agent-initiate-with-context
   ^AgentInvoke [agent-client context & args]
   (.get ^CompletableFuture (apply agent-initiate-with-context-async agent-client context args)))
-
 
 (defn agent-fork
   [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]

@@ -462,7 +462,7 @@
                                   *retry-num)
    (:> *agent-task-id
        *agent-id
-       (aor-types/->valid-AgentExecutionContext *metadata nil)
+       (aor-types/->valid-AgentExecutionContext *metadata *source)
        *node
        *agg-invoke-id
        *start-time-millis)))

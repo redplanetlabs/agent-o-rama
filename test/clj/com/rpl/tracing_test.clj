@@ -158,10 +158,8 @@
         )))
      (rtest/launch-module! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
-     (bind depot
-       (foreign-depot ipc
-                      module-name
-                      (po/agent-depot-name "foo")))
+     (bind agent-manager (aor/agent-manager ipc module-name))
+     (bind foo (aor/agent-client agent-manager "foo"))
      (bind root-pstate
        (foreign-pstate ipc
                        module-name
@@ -170,8 +168,15 @@
        (foreign-query ipc
                       module-name
                       (queries/tracing-query-name "foo")))
-     (bind [agent-task-id agent-id]
-       (invoke-agent-and-wait! depot root-pstate ["xyz"]))
+     (bind source (aor-types/->HumanSourceImpl "user1"))
+
+     (bind {agent-task-id :task-id agent-id :agent-invoke-id}
+       (binding [aor-types/OPERATION-SOURCE source]
+         (aor/agent-initiate-with-context
+          foo
+          {:metadata {"a" 1}}
+          "xyz")))
+     (wait-agent-finished! root-pstate agent-task-id agent-id)
      (bind root-invoke-id
        (foreign-select-one [(keypath agent-id) :root-invoke-id]
                            root-pstate
@@ -200,6 +205,8 @@
                :agent-id      ?agent-id
                :input         ["xyz"]
                :agent-task-id ?agent-task-id
+               :metadata      {"a" 1}
+               :source        {:name "user1"}
               }
         !id2  {:agg-invoke-id nil
                :emits
@@ -216,7 +223,9 @@
                :result        nil
                :agent-id      ?agent-id
                :input         ["xyz-0"]
-               :agent-task-id ?agent-task-id}
+               :agent-task-id ?agent-task-id
+               :metadata      {"a" 1}
+               :source        {:name "user1"}}
         !id3  {:agg-invoke-id nil
                :emits
                [{:invoke-id      !id5
@@ -228,7 +237,9 @@
                :result        nil
                :agent-id      ?agent-id
                :input         ["xyz-0-00"]
-               :agent-task-id ?agent-task-id}
+               :agent-task-id ?agent-task-id
+               :metadata      {"a" 1}
+               :source        {:name "user1"}}
         !id5  {:agg-invoke-id !agg0
                :emits
                [{:invoke-id      !id6
@@ -249,7 +260,9 @@
                :result        nil
                :agent-id      ?agent-id
                :input         ["xyz-0-00-000"]
-               :agent-task-id ?agent-task-id}
+               :agent-task-id ?agent-task-id
+               :metadata      {"a" 1}
+               :source        {:name "user1"}}
         !id6  {:agg-invoke-id !agg0
                :emits
                [{:invoke-id      !id9
@@ -261,7 +274,9 @@
                :result        nil
                :agent-id      ?agent-id
                :input         [1]
-               :agent-task-id ?agent-task-id}
+               :agent-task-id ?agent-task-id
+               :metadata      {"a" 1}
+               :source        {:name "user1"}}
         !id9  {:invoked-agg-invoke-id !agg0}
         !id7  {:agg-invoke-id !agg0
                :emits
@@ -274,7 +289,9 @@
                :result        nil
                :agent-id      ?agent-id
                :input         [1]
-               :agent-task-id ?agent-task-id}
+               :agent-task-id ?agent-task-id
+               :metadata      {"a" 1}
+               :source        {:name "user1"}}
         !id10 {:invoked-agg-invoke-id !agg0}
         !id8  {:agg-invoke-id !agg0
                :emits
@@ -287,7 +304,9 @@
                :result        nil
                :agent-id      ?agent-id
                :input         [1]
-               :agent-task-id ?agent-task-id}
+               :agent-task-id ?agent-task-id
+               :metadata      {"a" 1}
+               :source        {:name "user1"}}
         !id11 {:invoked-agg-invoke-id !agg0}
         !id4  {:agg-invoke-id nil
                :emits
@@ -300,7 +319,9 @@
                :result        nil
                :agent-id      ?agent-id
                :input         ["xyz-0-01"]
-               :agent-task-id ?agent-task-id}
+               :agent-task-id ?agent-task-id
+               :metadata      {"a" 1}
+               :source        {:name "user1"}}
         !id12 {:agg-invoke-id !agg1
                :emits
                [{:invoke-id      !id13
@@ -321,7 +342,9 @@
                :result        nil
                :agent-id      ?agent-id
                :input         ["xyz-0-01-000"]
-               :agent-task-id ?agent-task-id}
+               :agent-task-id ?agent-task-id
+               :metadata      {"a" 1}
+               :source        {:name "user1"}}
         !id13 {:agg-invoke-id !agg1
                :emits
                [{:invoke-id      !id16
@@ -333,7 +356,9 @@
                :result        nil
                :agent-id      ?agent-id
                :input         [1]
-               :agent-task-id ?agent-task-id}
+               :agent-task-id ?agent-task-id
+               :metadata      {"a" 1}
+               :source        {:name "user1"}}
         !id16 {:invoked-agg-invoke-id !agg1}
         !id14 {:agg-invoke-id !agg1
                :emits
@@ -346,7 +371,9 @@
                :result        nil
                :agent-id      ?agent-id
                :input         [1]
-               :agent-task-id ?agent-task-id}
+               :agent-task-id ?agent-task-id
+               :metadata      {"a" 1}
+               :source        {:name "user1"}}
         !id17 {:invoked-agg-invoke-id !agg1}
         !id15 {:agg-invoke-id !agg1
                :emits
@@ -359,7 +386,9 @@
                :result        nil
                :agent-id      ?agent-id
                :input         [1]
-               :agent-task-id ?agent-task-id}
+               :agent-task-id ?agent-task-id
+               :metadata      {"a" 1}
+               :source        {:name "user1"}}
         !id18 {:invoked-agg-invoke-id !agg1}
         !agg0 {:agg-invoke-id   nil
                :agg-input-count 3
@@ -380,7 +409,9 @@
                :input           [["1-a" "1-a" "1-a"]
                                  "xyz-0-00-000-0000"]
                :agg-start-invoke-id !id5
-               :agent-task-id   ?agent-task-id}
+               :agent-task-id   ?agent-task-id
+               :metadata        {"a" 1}
+               :source          {:name "user1"}}
         !agg1 {:agg-invoke-id   nil
                :agg-input-count 3
                :agg-start-res   "xyz-0-01-000-0000"
@@ -400,7 +431,9 @@
                :input           [["1-a" "1-a" "1-a"]
                                  "xyz-0-01-000-0000"]
                :agg-start-invoke-id !id12
-               :agent-task-id   ?agent-task-id}
+               :agent-task-id   ?agent-task-id
+               :metadata        {"a" 1}
+               :source          {:name "user1"}}
        }
        (m/guard
         (and (= ?agent-id agent-id)

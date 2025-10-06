@@ -189,7 +189,7 @@
 
 (defn valid-metadata-value?
   [v]
-  (contains? #{Integer Long Float Double Boolean String} v))
+  (contains? #{Integer Long Float Double Boolean String} (class v)))
 
 (def METADATA-SCHEMA (s/maybe {String (s/pred valid-metadata-value?)}))
 
