@@ -66,13 +66,13 @@ export async function createEvaluator(page, { name, builderName, description, pa
   // Optionally set JSONPath fields
   if (inputJsonPath || outputJsonPath || referenceOutputJsonPath) {
     if (inputJsonPath) {
-      await modal.getByLabel('Input JSON Path').fill(inputJsonPath);
+      await modal.getByLabel('Input JSON Path', { exact: true }).fill(inputJsonPath);
     }
     if (outputJsonPath) {
-      await modal.getByLabel('Output JSON Path').fill(outputJsonPath);
+      await modal.getByLabel('Output JSON Path', { exact: true }).fill(outputJsonPath);
     }
     if (referenceOutputJsonPath) {
-      await modal.getByLabel('Reference Output JSON Path').fill(referenceOutputJsonPath);
+      await modal.getByLabel('Reference Output JSON Path', { exact: true }).fill(referenceOutputJsonPath);
     }
   }
 
