@@ -417,8 +417,8 @@
                  :title (when is-read-only? "Cannot remove tags from a read-only snapshot.")}
                 "Remove Tag...")
 
-             ;; Try Summary Evaluator button
-             ($ :button.px-3.py-1.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
+;; Try Summary Evaluator button
+             ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                 {:onClick #(when (seq selected-example-ids)
                              ;; Show the new unified modal in :multi mode
                              (state/dispatch [:modal/show :run-evaluator
@@ -429,8 +429,8 @@
                                                                                            :selected-example-ids selected-example-ids})}]))}
                 "Try summary evaluator")
 
-             ;; Delete Selected button
-             ($ :button.px-3.py-1.text-sm.bg-red-600.text-white.rounded-md.hover:bg-red-700.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
+;; Delete Selected button
+             ($ :button.px-3.py-1.text-sm.bg-white.border.border-red-300.text-red-700.rounded-md.hover:bg-red-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                 {:disabled is-read-only?
                  :onClick #(when-not is-read-only?
                              (datasets-forms/handle-delete-selected! module-id dataset-id snapshot-name selected-example-ids))
@@ -854,8 +854,8 @@
 
 ;; Right side - Action buttons
              ($ :div.flex.items-center.space-x-4
-                   ;; Export button
-                ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-green-600.hover:bg-green-700.cursor-pointer
+;; Export button
+                ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.bg-white.border.border-gray-300.hover:bg-gray-50.cursor-pointer
                    {:onClick (fn [_]
                                (let [snapshot-param (when-not (str/blank? selected-snapshot-name)
                                                       (str "?snapshot=" (common/url-encode selected-snapshot-name)))
@@ -914,7 +914,7 @@
                                                                                                    ($ :p "The import operation failed with the following error:")
                                                                                                    ($ :div.mt-2.p-3.bg-red-50.border.border-red-200.rounded.text-red-800.font-mono.text-xs
                                                                                                       (str err))))}]))))))))})
-                     ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-indigo-600.hover:bg-indigo-700.cursor-pointer.disabled:bg-gray-400.disabled:cursor-not-allowed
+                     ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.bg-white.border.border-gray-300.hover:bg-gray-50.cursor-pointer.disabled:opacity-50.disabled:cursor-not-allowed
                         {:onClick (fn [_]
                                     (when-let [node (.-current file-input-ref)]
                                       (.click node)))
