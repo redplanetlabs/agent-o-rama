@@ -42,7 +42,7 @@ const evaluatorB = {
 
 const evaluatorC = {
   name: `Evaluator-C-${uniqueId}`,
-  builderName: 'com.rpl.agent.research-agent/contains-keyword',
+  builderName: 'contains-keyword',
   description: 'Evaluator C - produces unique "contains-keyword?" metric.',
   outputJsonPath: '$[0].args[0]', // Extract first arg from node output
   params: {
@@ -153,7 +153,7 @@ test.describe('Evaluator Metric Name Disambiguation', () => {
     console.log('Verified: Conflicting "concise?" metrics are disambiguated with evaluator name prefixes.');
 
     // Assert that the unique "contains-keyword?" metric is NOT disambiguated
-    const uniqueCapsule = outputCell.locator('a').filter({ hasText: /^contains-keyword\?$/ });
+    const uniqueCapsule = outputCell.locator('a').filter({ hasText: /^contains-keyword\?/ });
     await expect(uniqueCapsule).toBeVisible();
     console.log('Verified: Unique "contains-keyword?" metric is NOT disambiguated (no prefix).');
     
