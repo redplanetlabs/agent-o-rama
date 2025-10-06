@@ -5,7 +5,6 @@
    [com.rpl.agent-o-rama.impl.stats :as stats]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
-   [com.rpl.agent-o-rama.impl.stats :as stats]
    [jsonista.core :as j])
   (:import [com.rpl.agentorama AgentInvoke]))
 

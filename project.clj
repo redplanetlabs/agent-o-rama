@@ -82,8 +82,7 @@
                         :dependencies [[comb "0.1.1"]
                                        [org.clojure/clojure "1.12.0"]]}
              :ui       {:source-paths ["test/cljs"]
-                        :dependencies [[prismatic/schema "1.4.1"]
-                                       [com.rpl/specter "1.1.4"] ;; only cljs
+                        :dependencies [[com.rpl/specter "1.1.4"] ;; only cljs
                                        [com.pitch/uix.core "1.4.3"]
                                        [com.pitch/uix.dom "1.4.3"]
                                        [thheller/shadow-cljs "3.1.7"]
