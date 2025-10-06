@@ -183,13 +183,13 @@
      (source> agent-depot-sym {:retry-mode :none} :> *data)
       (at/intake-agent-depot agent-name
                              *data
-                             :> *agent-task-id *agent-id *retry-num *op)
+                             :> *agent-task-id *agent-id *execution-context *retry-num *op)
       (<<subsource *op
        (case> NodeOp)
-        (at/handle-node-op agent-name *agent-task-id *agent-id *retry-num *op)
+        (at/handle-node-op agent-name *agent-task-id *agent-id *execution-context *retry-num *op)
 
        (case> AggAckOp :> {:keys [*agg-invoke-id *ack-val]})
-        (at/ack-agg! agent-name *agg-invoke-id *retry-num *ack-val)
+        (at/ack-agg! agent-name *agg-invoke-id *execution-context *retry-num *ack-val)
       )
     )))
 

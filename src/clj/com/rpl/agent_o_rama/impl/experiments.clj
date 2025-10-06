@@ -257,6 +257,7 @@
             emits-vol          (volatile! [])
 
             wrapper-agent-node
+            ;; TODO: <<<<>>>> this needs to return the metadata configured for the run
             (reify
              AgentNode
              (emit [this node args]

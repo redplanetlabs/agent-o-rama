@@ -191,7 +191,7 @@
   (h/random-uuid7))
 
 (defn mk-agent-node
-  [agent-name agent-graph agent-task-id agent-id curr-node invoke-id retry-num
+  [agent-name agent-graph agent-task-id agent-id execution-context curr-node invoke-id retry-num
    store-info ^RamaClientsTaskGlobal rama-clients]
   (let [task-id             (ops/current-task-id)
         result-vol          (volatile! nil)
@@ -257,6 +257,8 @@
        (when-not (empty? @emits-vol)
          (throw (h/ex-info "Cannot both emit and result" {})))
        (vreset! result-vol (aor-types/->valid-AgentResult arg false)))
+     (getMetadata [this]
+       (:metadata execution-context))
      (getAgentObject [this name]
        (.getAgentObject fetcher name))
      (getStore [this name]
@@ -807,7 +809,7 @@
    (:> (aor-types/get-config *config-map *config))))
 
 (deframaop handle-node-invoke
-  [*agent-name *agent-task-id *agent-id *node-fn *invoke-id *retry-num
+  [*agent-name *agent-task-id *agent-id *execution-context *node-fn *invoke-id *retry-num
    *next-node *args *agg-invoke-id *fork-context]
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)
@@ -818,6 +820,7 @@
                   *agent-graph
                   *agent-task-id
                   *agent-id
+                  *execution-context
                   *next-node
                   *invoke-id
                   *retry-num
@@ -836,12 +839,14 @@
      (:> (reduce-kv
           assoc
           *m
-          {:agent-id      *agent-id
-           :agent-task-id *agent-task-id
-           :node          *next-node
+          {:agent-id          *agent-id
+           :agent-task-id     *agent-task-id
+           :node              *next-node
+           :metadata          (get *execution-context :metadata)
+           :source            (get *execution-context :source)
            :start-time-millis *start-time-millis
-           :input         *args
-           :agg-invoke-id *agg-invoke-id
+           :input             *args
+           :agg-invoke-id     *agg-invoke-id
           })))
    (local-transform> [(keypath *invoke-id) (term %merger)] $$nodes)
    (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]

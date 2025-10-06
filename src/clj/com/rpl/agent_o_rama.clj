@@ -471,6 +471,11 @@
   [^AgentNode agent-node prompt]
   (.getHumanInput agent-node prompt))
 
+
+(defn get-metadata
+  [^AgentNode agent-node]
+  (.getMetadata agent-node))
+
 (defn- parse-map-options
   [[arg1 & rest-args :as args]]
   (if (map? arg1) [arg1 rest-args] [{} args]))

@@ -119,6 +119,7 @@
      :finish-time-millis Long
      :last-progress-time-millis Long
      :retry-num          Long
+     :metadata           {String Object}
      :source             InfoSource
      :stats              AgentInvokeStatsImpl
      :feedback           FEEDBACK-SCHEMA
@@ -181,6 +182,8 @@
      :finish-time-millis  Long
      :exceptions          [String] ; throwable strs
      :feedback            FEEDBACK-SCHEMA
+     :metadata            {String Object}
+     :source              InfoSource
 
      :agg-invoke-id       UUID
 

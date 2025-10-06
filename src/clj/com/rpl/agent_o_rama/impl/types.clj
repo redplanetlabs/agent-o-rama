@@ -191,13 +191,19 @@
   [v]
   (contains? #{Integer Long Float Double Boolean String} v))
 
+(def METADATA-SCHEMA (s/maybe {String (s/pred valid-metadata-value?)}))
+
 (defaorrecord AgentInitiate
   [args :- [s/Any]
    forced-agent-task-id :- (s/maybe Long)
    forced-agent-invoke-id :- (s/maybe UUID)
-   metadata :- (s/maybe {String (s/pred valid-metadata-value?)})
+   metadata :- METADATA-SCHEMA
    source :- (s/maybe InfoSource)
   ])
+
+(defaorrecord AgentExecutionContext
+  [metadata :- METADATA-SCHEMA
+   source :- (s/maybe InfoSource)])
 
 (defaorrecord AgentResult
   [val :- s/Any
