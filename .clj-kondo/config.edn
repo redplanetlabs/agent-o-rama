@@ -2,5 +2,8 @@
  :lint-as
  {com.rpl.agent-o-rama/defagentmodule clojure.core/defn
   uix.core/defui clojure.core/defn
-  com.rpl.agent-o-rama.ui.trace-analytics-e2e-test/with-webdriver clojure.core/let
-  com.rpl.agent-o-rama.ui.trace-analytics-e2e-test/with-agent-env clojure.core/let}}
+  com.rpl.agent-o-rama.ui.trace-analytics-e2e-test/with-agent-env clojure.core/let}
+ :hooks
+ {:analyze-call
+  {com.rpl.agent-o-rama.ui.trace-analytics-e2e-test/with-webdriver
+   hooks.trace-analytics-e2e-test/with-webdriver}}}
