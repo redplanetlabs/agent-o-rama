@@ -109,7 +109,7 @@
              ($ ChevronUpIcon {:className "h-4 w-4"})
              ($ ChevronDownIcon {:className "h-4 w-4"}))))
      ($ :div.flex.items-center.gap-4
-        ($ :span.px-3.py-1.rounded-full.text-sm.font-medium
+        ($ :span.px-3.py-1.rounded-full.text-sm.font-medium.inline-flex.items-center.gap-2
            {:className (case status
                          :completed "bg-green-100 text-green-800"
                          :failed "bg-red-100 text-red-800"
@@ -117,7 +117,7 @@
            (case status
              :completed "✅ Completed"
              :failed "❌ Failed"
-             "🔄 Running"))
+             ($ :<> ($ common/spinner {:size :small}) "Running")))
         ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
            {:onClick on-rerun}
            ($ PlayIcon {:className "h-5 w-5 mr-2"})
@@ -434,35 +434,41 @@
                        ;; Output Cell with evaluator capsules
                        (let [agent-result (get-in run [:agent-results 0])]
                          ($ :td {:key "output-cell" :className (:td common/table-classes)}
-                            ($ :div {:className "flex flex-col gap-2"}
-                               ($ :div {:className (if show-full-text?
-                                                     "max-w-xl whitespace-pre-wrap break-words"
-                                                     "max-w-xs")}
-                                  ($ :div {:className (if show-full-text?
-                                                        "whitespace-pre-wrap break-words"
-                                                        "truncate")}
-                                     (if (:failure? (:result agent-result))
-                                       ($ :div.space-y-2
-                                          (if-let [throwable (get-in agent-result [:result :val :throwable])]
-                                            ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
-                                               {:onClick #(state/dispatch [:modal/show :exception-detail
-                                                                           {:title "Error Details"
-                                                                            :component ($ ExceptionModal {:throwable throwable})}])}
-                                               "View Error")
-                                            ($ :span.text-red-500.font-semibold "FAIL")))
-                                       (let [output-content (common/pp (:val (:result agent-result)))
-                                             is-long? (> (count output-content) 100)]
-                                         ($ :div.relative.group
-                                            output-content
-                                            (when (and is-long? (not show-full-text?))
-                                              ($ :button.absolute.top-0.right-0.opacity-0.group-hover:opacity-100.transition-opacity.bg-blue-500.text-white.rounded.text-xs.px-2.py-1.hover:bg-blue-600
-                                                 {:onClick #(state/dispatch [:modal/show :content-detail
-                                                                             {:title "Output"
-                                                                              :component ($ ContentModal {:content output-content :title "Output"})}])}
-                                                 "↗")))))
-                                     ($ EvaluatorCapsulesContainer {:run run
-                                                                    :module-id module-id
-                                                                    :columns-metadata evaluator-metadata})))))))))))))))
+                            (if agent-result
+                              ;; If results exist, render the content (success or failure)
+                              ($ :div {:className "flex flex-col gap-2"}
+                                 ($ :div {:className (if show-full-text?
+                                                       "max-w-xl whitespace-pre-wrap break-words"
+                                                       "max-w-xs")}
+                                    ($ :div {:className (if show-full-text?
+                                                          "whitespace-pre-wrap break-words"
+                                                          "truncate")}
+                                       (if (:failure? (:result agent-result))
+                                         ($ :div.space-y-2
+                                            (if-let [throwable (get-in agent-result [:result :val :throwable])]
+                                              ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
+                                                 {:onClick #(state/dispatch [:modal/show :exception-detail
+                                                                             {:title "Error Details"
+                                                                              :component ($ ExceptionModal {:throwable throwable})}])}
+                                                 "View Error")
+                                              ($ :span.text-red-500.font-semibold "FAIL")))
+                                         (let [output-content (common/pp (:val (:result agent-result)))
+                                               is-long? (> (count output-content) 100)]
+                                           ($ :div.relative.group
+                                              output-content
+                                              (when (and is-long? (not show-full-text?))
+                                                ($ :button.absolute.top-0.right-0.opacity-0.group-hover:opacity-100.transition-opacity.bg-blue-500.text-white.rounded.text-xs.px-2.py-1.hover:bg-blue-600
+                                                   {:onClick #(state/dispatch [:modal/show :content-detail
+                                                                               {:title "Output"
+                                                                                :component ($ ContentModal {:content output-content :title "Output"})}])}
+                                                   "↗"))))))
+                                    ($ EvaluatorCapsulesContainer {:run run
+                                                                   :module-id module-id
+                                                                   :columns-metadata evaluator-metadata})))
+                              ;; If no results yet, render the spinner
+                              ($ :div.flex.items-center.justify-center.h-full.text-gray-500.text-sm
+                                 ($ common/spinner {:size :medium})
+                                 ($ :span.ml-2 "Running..."))))))))))))))
 
 (defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
   (let [{:keys [data loading? error]}
