@@ -229,7 +229,21 @@
                       ;; Only run the query if an agent is selected
                       :enabled? (and (boolean module-id) (not (str/blank? selected-agent-name)))})
         graph-data (get-in graph-query [:data :graph])
-        node-names (when graph-data (-> graph-data :node-map keys sort vec))]
+        node-names (when graph-data (-> graph-data :node-map keys sort vec))
+        
+        ;; Node dropdown state - always called (Rules of Hooks)
+        [node-dropdown-open? set-node-dropdown-open] (uix/use-state false)
+        selected-node (:value node-name-field)
+        handle-select (fn [node-name]
+                        (set-node-dropdown-open false)
+                        ((:on-change node-name-field) node-name))
+        is-disabled? (or (not selected-agent-name) (:loading? graph-query))
+        display-text (cond
+                       (not selected-agent-name) "← Select an agent first"
+                       (:loading? graph-query) "Loading nodes..."
+                       (:error graph-query) "Error loading nodes"
+                       selected-node selected-node
+                       :else "Select a node...")]
 
     ;; Effect to reset node name when agent changes
     (uix/use-effect
@@ -237,6 +251,14 @@
        ;; When the selected agent changes, clear the selected node name.
        ((:on-change node-name-field) ""))
      [selected-agent-name])
+    
+    ;; Effect to close node dropdown when clicking outside
+    (uix/use-effect
+     (fn []
+       (let [handle-click (fn [e] (when node-dropdown-open? (set-node-dropdown-open false)))]
+         (.addEventListener js/document "click" handle-click)
+         #(.removeEventListener js/document "click" handle-click)))
+     [node-dropdown-open?])
 
     ($ :div.p-4.bg-gray-50.border.rounded-lg
        ($ :h4.text-md.font-semibold.mb-3 (str "Target " (inc index)))
@@ -259,28 +281,23 @@
        (when (= (:value target-spec-type-field) :node)
          ($ :div.mt-4
             ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Node Name")
-            ($ :select.w-full.p-2.border.rounded-md.text-sm
-               {:className (if (:error node-name-field)
-                             "border-red-300 focus:ring-red-500 focus:border-red-500"
-                             "border-gray-300 focus:ring-blue-500 focus:border-blue-500")
-                :value (or (:value node-name-field) "")
-                :onChange #((:on-change node-name-field) (.. % -target -value))
-                :disabled (or (not selected-agent-name) (:loading? graph-query))}
-               (cond
-                 (not selected-agent-name)
-                 ($ :option {:value ""} "← Select an agent first")
+            ($ :div.relative.inline-block.text-left.w-full
+               ($ :button.inline-flex.items-center.justify-between.w-full.px-3.py-2.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.disabled:bg-gray-100.cursor-pointer
+                  {:type "button"
+                   :onClick (fn [e] (.stopPropagation e) (when-not is-disabled? (set-node-dropdown-open (not node-dropdown-open?))))
+                   :disabled is-disabled?}
+                  ($ :span.truncate display-text)
+                  ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
 
-                 (:loading? graph-query)
-                 ($ :option {:value ""} "Loading nodes...")
-
-                 (:error graph-query)
-                 ($ :option {:value ""} "Error loading nodes")
-
-                 :else
-                 ($ :<>
-                    ($ :option {:value ""} "Select a node...")
-                    (for [node-name node-names]
-                      ($ :option {:key node-name :value node-name} node-name)))))
+               (when (and node-dropdown-open? (seq node-names))
+                 ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
+                    {:onClick #(.stopPropagation %)}
+                    ($ :div.py-1.max-h-60.overflow-y-auto
+                       (for [node-name node-names]
+                         ($ common/DropdownRow {:key node-name
+                                                :label node-name
+                                                :selected? (= selected-node node-name)
+                                                :on-select #(handle-select node-name)}))))))
             (when (:error node-name-field)
               ($ :p.text-sm.text-red-600.mt-1 (:error node-name-field)))))
 
