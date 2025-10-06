@@ -188,3 +188,35 @@
                delete-button)))
        ;; Extra content below the main row
        (when extra-content extra-content))))
+
+;; A simple modal component to display pre-formatted text content.
+(defui ContentDetailModal [{:keys [title content]}]
+  ($ :div.p-6
+     ($ :h3.text-lg.font-bold.mb-4 title)
+     ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-auto.max-h-screen.font-mono
+        content)))
+
+;; A reusable component for displaying truncated content that expands into a modal.
+(defui ExpandableContent [{:keys [content truncate-length modal-title color on-expand]
+                           :or {truncate-length 150}}]
+  (let [content-str (pp-json content) ; Use pretty-printed JSON string
+        is-long? (> (count content-str) truncate-length)
+        truncated-str (if is-long?
+                        (str (subs content-str 0 truncate-length) "...")
+                        content-str)
+        handle-expand (fn [e]
+                        (.stopPropagation e)
+                        (when on-expand
+                          (on-expand {:title modal-title
+                                      :content content-str})))]
+    ($ :div.relative.group.p-2.rounded
+       {:className (when is-long? "cursor-pointer hover:bg-gray-100")
+        :onClick (when is-long? handle-expand)}
+       ($ :pre.text-sm.font-mono.whitespace-pre-wrap
+          {:className (str "text-" color "-800")}
+          truncated-str)
+       (when is-long?
+         ($ :div {:className "absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"}
+            ($ :button {:className "text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                        :onClick handle-expand}
+               "Expand"))))))
