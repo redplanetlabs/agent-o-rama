@@ -57,7 +57,7 @@
                :submitting {}}
         :datasets {:selected-examples {}
                    :selected-snapshot-per-dataset {}}}
-   :sente nil})
+   :sente {:connected? false}})
 
 (defonce app-db (atom initial-db))
 

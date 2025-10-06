@@ -10,6 +10,7 @@
                       :source-map    true}
    :devtools         {:http-root "target/public"
                       :http-port 3100
+                      :proxy-url "http://localhost:1974"
                       ;; :before-load chat-rama.frontend.core/stop
                       ;; :after-load  chat-rama.frontend.core/start
                      }}

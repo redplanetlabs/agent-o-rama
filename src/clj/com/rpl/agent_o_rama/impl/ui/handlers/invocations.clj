@@ -105,6 +105,7 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-graph
   [{:keys [client]} uid]
-  {:graph (foreign-invoke-query
-           (:current-graph-query
-            (aor-types/underlying-objects client)))})
+  (when client
+    {:graph (foreign-invoke-query
+             (:current-graph-query
+              (aor-types/underlying-objects client)))}))
