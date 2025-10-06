@@ -323,19 +323,21 @@
                                    {:className "space-y-2"
                                     :data-id   (str "subagent-" agent-name)}
                                    ($ :div
-                                      {:className "flex items-baseline gap-2"}
-                                      ($ :div
-   {:className "text-sm font-semibold text-gray-800 overflow-hidden"
-    :style     {:direction "rtl"
-                :whiteSpace "nowrap"
-                :textOverflow "ellipsis"
-                :maxWidth "100%"}
-    :title     (str module-name "/" agent-name)}
-   (str module-name "/" agent-name))
-                                      ($ :div
-                                         {:className "text-xs text-gray-500"}
-                                         (str "(" count " call"
-                                              (when (not= count 1) "s") ")")))
+   {:className "space-y-1"}
+   ($ :div
+      {:className "text-sm font-semibold text-gray-800 overflow-hidden"
+       :style     {:direction "rtl"
+                   :whiteSpace "nowrap"
+                   :textOverflow "ellipsis"
+                   :maxWidth "100%"}
+       :title     (str module-name "/" agent-name)}
+      (str module-name "/" agent-name))
+   (let [total-time (reduce + 0 (map :total-time-millis (vals (:node-stats sa-basic-stats))))]
+  ($ :div
+     {:className "text-xs text-gray-500 text-right"}
+     (str count " call" (when (not= count 1) "s")
+          " · "
+          (.toLocaleString total-time) "ms"))))
                                    ($ agent-stats-display
                                       {:basic-stats sa-basic-stats})))))
                          subagent-stats-map))))))))
