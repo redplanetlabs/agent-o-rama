@@ -233,7 +233,7 @@
                             (str/blank? selected-agent-name) "← Select an agent first"
                             (:loading? graph-query) "Loading nodes..."
                             (:error graph-query) "Error loading nodes"
-                            (:value node-name-field) (:value node-name-field)
+                            (not (str/blank? (:value node-name-field))) (:value node-name-field)
                             :else "Select a node...")
         node-items (mapv (fn [node-name]
                            {:key node-name
