@@ -1,7 +1,9 @@
 (ns com.rpl.agent-o-rama.ui.common
-  (:require [cognitect.transit :as t]
-            [clojure.string :as str]
-            [uix.core :as uix :refer [defhook defui $]]))
+  (:require
+   [cognitect.transit :as t]
+   [clojure.string :as str]
+   [uix.core :as uix :refer [defhook defui $]]
+   ["@heroicons/react/24/outline" :refer [ChevronDownIcon]]))
 
 (defn url-decode [s]
   "Decode URL-encoded string using standard browser decoding"
@@ -163,18 +165,22 @@
            :fill "currentColor"
            :d "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"}))))
 
-(defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content data-testid]}]
+(defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content data-testid disabled?]}]
   (let [row-classes (cn
-                     "flex items-center justify-between w-full px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
+                     "flex items-center justify-between w-full px-4 py-2 text-sm"
+                     (if disabled?
+                       "text-gray-400 cursor-not-allowed"
+                       "cursor-pointer hover:bg-gray-100 focus:bg-gray-100")
                      {"bg-blue-50 text-blue-700" selected?
-                      "text-blue-600 hover:bg-blue-50" action?
-                      "text-gray-700" (not (or selected? action?))})]
+                      "text-blue-600 hover:bg-blue-50" (and action? (not disabled?))
+                      "text-gray-700" (and (not (or selected? action?)) (not disabled?))})]
     ($ :div
        ;; Main clickable area
        ($ :div
           {:onClick (fn [e]
                       (.stopPropagation e)
-                      (when on-select (on-select)))
+                      (when (and (not disabled?) on-select)
+                        (on-select)))
            :className row-classes
            :data-testid data-testid}
           ($ :div.flex.items-center.flex-1
@@ -188,6 +194,54 @@
                delete-button)))
        ;; Extra content below the main row
        (when extra-content extra-content))))
+
+(defui Dropdown
+  "Reusable dropdown container for button-triggered menus."
+  [{:keys [label disabled? display-text items loading? error? empty-content data-testid on-toggle]}]
+  (let [[open? set-open] (uix/use-state false)
+        close-dropdown (fn [] (set-open false))
+        handle-toggle (fn [e]
+                        (.stopPropagation e)
+                        (when-not disabled?
+                          (let [next (not open?)]
+                            (set-open next)
+                            (when on-toggle (on-toggle next)))))
+        handle-select (fn [on-select]
+                        (when (fn? on-select)
+                          (on-select))
+                        (close-dropdown))]
+
+    (uix/use-effect
+     (fn []
+       (let [handle-click (fn [_] (when open? (close-dropdown)))]
+         (.addEventListener js/document "click" handle-click)
+         #(.removeEventListener js/document "click" handle-click)))
+     [open?])
+
+    ($ :div.relative.inline-block.text-left.w-full
+       ($ :button.inline-flex.items-center.justify-between.w-full.px-3.py-2.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.disabled:bg-gray-100.cursor-pointer
+          {:type "button"
+           :disabled disabled?
+           :data-testid data-testid
+           :onClick handle-toggle}
+          ($ :span.truncate (or display-text label))
+          ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
+
+       (when (and open? (not disabled?))
+         ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
+            {:onClick #(.stopPropagation %)}
+            ($ :div.py-1.max-h-60.overflow-y-auto
+               (cond
+                 loading? ($ :div.px-4.py-2.text-sm.text-gray-500 "Loading...")
+                 error? ($ :div.px-4.py-2.text-sm.text-red-500 "Error")
+                 (seq items) (for [{:keys [key label selected? disabled? on-select]} items]
+                               ($ DropdownRow {:key key
+                                               :label label
+                                               :selected? selected?
+                                               :disabled? disabled?
+                                               :on-select #(handle-select on-select)}))
+                 empty-content empty-content
+                 :else ($ :div.px-4.py-2.text-sm.text-gray-500 "No options available."))))))))
 
 ;; A simple modal component to display pre-formatted text content.
 (defui ContentDetailModal [{:keys [title content]}]

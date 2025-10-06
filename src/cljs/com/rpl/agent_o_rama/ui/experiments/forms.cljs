@@ -67,46 +67,35 @@
 ;; =============================================================================
 
 (defui AgentSelectorDropdown [{:keys [module-id selected-agent on-select-agent disabled?]}]
-  (println "AgentSelectorDropdown - selected-agent:" selected-agent "type:" (type selected-agent) "nil?:" (nil? selected-agent))
-  (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
-        {:keys [data loading? error]}
+  (let [{:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:module-agents module-id]
           :sente-event [:agents/get-for-module {:module-id module-id}]
           :enabled? (boolean module-id)})
-        agents (or data [])
-        handle-select (fn [agent-name]
-                        (set-dropdown-open false)
-                        (on-select-agent agent-name))]
+        agent-items (->> data
+                         (keep (fn [agent]
+                                 (let [decoded-name (common/url-decode (:agent-name agent))]
+                                   (when (not= decoded-name "_aor-evaluator")
+                                     {:key decoded-name
+                                      :label decoded-name
+                                      :selected? (= selected-agent decoded-name)
+                                      :on-select #(on-select-agent decoded-name)}))))
+                         vec)
+        display-text (cond
+                       loading? "Loading agents..."
+                       selected-agent selected-agent
+                       :else "Select an agent")
+        dropdown-disabled? (or disabled? loading? (not module-id))
+        empty-content ($ :div.px-4.py-2.text-sm.text-gray-500 "No agents found in this module.")]
 
-    (uix/use-effect
-     (fn []
-       (let [handle-click (fn [e] (when dropdown-open? (set-dropdown-open false)))]
-         (.addEventListener js/document "click" handle-click)
-         #(.removeEventListener js/document "click" handle-click)))
-     [dropdown-open?])
-
-    ($ :div.relative.inline-block.text-left
-       ($ :button.inline-flex.items-center.justify-between.w-full.px-3.py-2.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.disabled:bg-gray-100.cursor-pointer
-          {:type "button"
-           :onClick (fn [e] (.stopPropagation e) (set-dropdown-open (not dropdown-open?)))
-           :disabled (or loading? disabled?)}
-          ($ :span.truncate (if loading? "Loading agents..." (or selected-agent "Select an agent")))
-          ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
-
-       (when dropdown-open?
-         ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
-            {:onClick #(.stopPropagation %)}
-            ($ :div.py-1.max-h-60.overflow-y-auto
-               (if (seq agents)
-                 (for [agent agents
-                       :let [decoded-name (common/url-decode (:agent-name agent))]
-                       :when (not= decoded-name "_aor-evaluator")]
-                   ($ common/DropdownRow {:key decoded-name
-                                          :label decoded-name
-                                          :selected? (= selected-agent decoded-name)
-                                          :on-select #(handle-select decoded-name)}))
-                 ($ :div.px-4.py-2.text-sm.text-gray-500 "No agents found in this module."))))))))
+    ($ common/Dropdown
+       {:label "Agent"
+        :disabled? dropdown-disabled?
+        :display-text display-text
+        :items agent-items
+        :loading? loading?
+        :error? error
+        :empty-content empty-content})))
 
 (defui EvaluatorSelector [{:keys [module-id selected-evaluators on-change]}]
   (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
@@ -219,46 +208,39 @@
         node-name-field (forms/use-form-field form-id (conj path :target-spec :node))
         input-mappings (or (get-in form (conj path :input->args)) [])
         is-comparative? (= :comparative (get-in form [:spec :type]))
-        
-        ;; Fetch graph data for the selected agent
+
         selected-agent-name (:value agent-name-field)
+        handle-select-agent (fn [agent-name]
+                              ((:on-change agent-name-field) agent-name)
+                              ;; Reset node selection whenever agent changes
+                              (when (not= selected-agent-name agent-name)
+                                ((:on-change node-name-field) nil)))
+
         graph-query (queries/use-sente-query
                      {:query-key [:graph module-id selected-agent-name]
                       :sente-event [:invocations/get-graph {:module-id module-id
-                                                           :agent-name selected-agent-name}]
-                      ;; Only run the query if an agent is selected
-                      :enabled? (and (boolean module-id) (not (str/blank? selected-agent-name)))})
+                                                            :agent-name selected-agent-name}]
+                      :enabled? (and (boolean module-id)
+                                     (not (str/blank? selected-agent-name)))})
         graph-data (get-in graph-query [:data :graph])
-        node-names (when graph-data (-> graph-data :node-map keys sort vec))
-        
-        ;; Node dropdown state - always called (Rules of Hooks)
-        [node-dropdown-open? set-node-dropdown-open] (uix/use-state false)
-        selected-node (:value node-name-field)
-        handle-select (fn [node-name]
-                        (set-node-dropdown-open false)
-                        ((:on-change node-name-field) node-name))
-        is-disabled? (or (not selected-agent-name) (:loading? graph-query))
-        display-text (cond
-                       (not selected-agent-name) "← Select an agent first"
-                       (:loading? graph-query) "Loading nodes..."
-                       (:error graph-query) "Error loading nodes"
-                       selected-node selected-node
-                       :else "Select a node...")]
-
-    ;; Effect to reset node name when agent changes
-    (uix/use-effect
-     (fn []
-       ;; When the selected agent changes, clear the selected node name.
-       ((:on-change node-name-field) ""))
-     [selected-agent-name])
-    
-    ;; Effect to close node dropdown when clicking outside
-    (uix/use-effect
-     (fn []
-       (let [handle-click (fn [e] (when node-dropdown-open? (set-node-dropdown-open false)))]
-         (.addEventListener js/document "click" handle-click)
-         #(.removeEventListener js/document "click" handle-click)))
-     [node-dropdown-open?])
+        node-names (->> (or (:node-map graph-data) {})
+                        keys
+                        sort
+                        vec)
+        node-disabled? (or (str/blank? selected-agent-name)
+                           (:loading? graph-query))
+        node-display-text (cond
+                            (str/blank? selected-agent-name) "← Select an agent first"
+                            (:loading? graph-query) "Loading nodes..."
+                            (:error graph-query) "Error loading nodes"
+                            (:value node-name-field) (:value node-name-field)
+                            :else "Select a node...")
+        node-items (mapv (fn [node-name]
+                           {:key node-name
+                            :label node-name
+                            :selected? (= (:value node-name-field) node-name)
+                            :on-select #((:on-change node-name-field) node-name)})
+                         node-names)]
 
     ($ :div.p-4.bg-gray-50.border.rounded-lg
        ($ :h4.text-md.font-semibold.mb-3 (str "Target " (inc index)))
@@ -274,30 +256,21 @@
           ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Agent Name")
           ($ AgentSelectorDropdown
              {:module-id module-id
-              :selected-agent (:value agent-name-field)
-              :on-select-agent (:on-change agent-name-field)}))
-       
+              :selected-agent selected-agent-name
+              :on-select-agent handle-select-agent}))
+
        ;; Conditionally render node name dropdown
        (when (= (:value target-spec-type-field) :node)
          ($ :div.mt-4
             ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Node Name")
-            ($ :div.relative.inline-block.text-left.w-full
-               ($ :button.inline-flex.items-center.justify-between.w-full.px-3.py-2.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.disabled:bg-gray-100.cursor-pointer
-                  {:type "button"
-                   :onClick (fn [e] (.stopPropagation e) (when-not is-disabled? (set-node-dropdown-open (not node-dropdown-open?))))
-                   :disabled is-disabled?}
-                  ($ :span.truncate display-text)
-                  ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
-
-               (when (and node-dropdown-open? (seq node-names))
-                 ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
-                    {:onClick #(.stopPropagation %)}
-                    ($ :div.py-1.max-h-60.overflow-y-auto
-                       (for [node-name node-names]
-                         ($ common/DropdownRow {:key node-name
-                                                :label node-name
-                                                :selected? (= selected-node node-name)
-                                                :on-select #(handle-select node-name)}))))))
+            ($ common/Dropdown
+               {:label "Node"
+                :disabled? node-disabled?
+                :display-text node-display-text
+                :items node-items
+                :loading? (:loading? graph-query)
+                :error? (:error graph-query)
+                :empty-content ($ :div.px-4.py-2.text-sm.text-gray-500 "No nodes found for this agent.")})
             (when (:error node-name-field)
               ($ :p.text-sm.text-red-600.mt-1 (:error node-name-field)))))
 
