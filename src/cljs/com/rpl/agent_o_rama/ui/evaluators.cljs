@@ -175,11 +175,11 @@
                   ($ :div.bg-white.rounded-lg.p-4.cursor-pointer.hover:bg-gray-50.hover:shadow-md.transition-all.duration-200.border.border-gray-100.shadow-sm
                      {:key builder-name, :onClick #(handle-select {:name builder-name, :spec builder-spec})}
                      ($ :div.flex.justify-between.items-start.mb-2
-                        ($ :h3.font-medium.text-gray-900 builder-name)
+                        ($ :h3.font-medium.text-gray-900 (str builder-name))
                         ($ :span.inline-flex.px-2.py-1.text-xs.font-medium.rounded-full
                            {:className (get-evaluator-type-badge-style type)}
                            (get-evaluator-type-display type)))
-                     ($ :p.text-sm.text-gray-600 description))))))))))
+                     ($ :p.text-sm.text-gray-600 (str description)))))))))))
 
 (defui CreateEvaluatorForm [{:keys [form-id]}]
   (let [form-state (forms/use-form form-id)

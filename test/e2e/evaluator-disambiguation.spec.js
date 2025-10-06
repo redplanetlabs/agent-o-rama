@@ -18,51 +18,35 @@ const experimentName = `e2e-disambiguation-experiment-${uniqueId}`;
 const agentToRun = 'researcher';
 
 // Evaluator definitions
+// - Two conciseness evaluators produce the same "concise?" metric → SHOULD be disambiguated
+// - One custom evaluator produces unique "contains-keyword?" metric → should NOT be disambiguated
 const evaluatorA = {
   name: `Evaluator-A-${uniqueId}`,
-  builderName: 'aor/llm-judge',
-  description: 'Evaluator A with a "score" metric.',
+  builderName: 'aor/conciseness',
+  description: 'Evaluator A - produces "concise?" metric with threshold 100.',
   outputJsonPath: '$[0].args[0]', // Extract first arg from node output
   params: {
-    prompt: 'Just score it.',
-    model: 'openai-non-streaming', // This is a mock, doesn't need to exist for UI test
-    temperature: '0.0',
-    outputSchema: JSON.stringify({
-      type: 'object',
-      properties: { score: { type: 'integer' } },
-    }),
+    threshold: '100',
   },
 };
 
 const evaluatorB = {
   name: `Evaluator-B-${uniqueId}`,
-  builderName: 'aor/llm-judge',
-  description: 'Evaluator B, also with a "score" metric to create a conflict.',
+  builderName: 'aor/conciseness',
+  description: 'Evaluator B - produces "concise?" metric with threshold 200.',
   outputJsonPath: '$[0].args[0]', // Extract first arg from node output
   params: {
-    prompt: 'Score it differently.',
-    model: 'openai-non-streaming',
-    temperature: '0.0',
-    outputSchema: JSON.stringify({
-      type: 'object',
-      properties: { score: { type: 'integer' } },
-    }),
+    threshold: '200',
   },
 };
 
 const evaluatorC = {
   name: `Evaluator-C-${uniqueId}`,
-  builderName: 'aor/llm-judge',
-  description: 'Evaluator C with a unique metric name.',
+  builderName: 'com.rpl.agent.research-agent/contains-keyword',
+  description: 'Evaluator C - produces unique "contains-keyword?" metric.',
   outputJsonPath: '$[0].args[0]', // Extract first arg from node output
   params: {
-    prompt: 'Give a uniqueness score.',
-    model: 'openai-non-streaming',
-    temperature: '0.0',
-    outputSchema: JSON.stringify({
-      type: 'object',
-      properties: { uniqueness_score: { type: 'integer' } },
-    }),
+    keyword: 'the', // Common word likely to appear in output
   },
 };
 
@@ -75,7 +59,7 @@ test.describe('Evaluator Metric Name Disambiguation', () => {
   // This is a long test, so give it a generous timeout.
   test.setTimeout(5 * 60 * 1000); // 5 minutes
 
-  test('should disambiguate metric names only when necessary', async ({ page }) => {
+  test('should disambiguate conflicting metrics but not unique ones', async ({ page }) => {
     // ---
     // PHASE 1: SETUP
     // ---
@@ -161,17 +145,17 @@ test.describe('Evaluator Metric Name Disambiguation', () => {
     const resultRow = resultsTable.locator('tbody tr').first();
     const outputCell = resultRow.locator('td').nth(2);
 
-    // Assert that the conflicting metric "score" IS disambiguated
-    const disambiguatedCapsuleA = outputCell.locator('a').filter({ hasText: new RegExp(`^${evaluatorA.name}/score`) });
-    const disambiguatedCapsuleB = outputCell.locator('a').filter({ hasText: new RegExp(`^${evaluatorB.name}/score`) });
+    // Assert that the two conflicting "concise?" metrics ARE disambiguated
+    const disambiguatedCapsuleA = outputCell.locator('a').filter({ hasText: new RegExp(`^${evaluatorA.name}/concise\\?`) });
+    const disambiguatedCapsuleB = outputCell.locator('a').filter({ hasText: new RegExp(`^${evaluatorB.name}/concise\\?`) });
     await expect(disambiguatedCapsuleA).toBeVisible();
     await expect(disambiguatedCapsuleB).toBeVisible();
-    console.log('Verified: Conflicting metric "score" is disambiguated.');
+    console.log('Verified: Conflicting "concise?" metrics are disambiguated with evaluator name prefixes.');
 
-    // Assert that the unique metric "uniqueness_score" IS NOT disambiguated
-    const uniqueCapsule = outputCell.locator('a').filter({ hasText: /^uniqueness_score$/ });
+    // Assert that the unique "contains-keyword?" metric is NOT disambiguated
+    const uniqueCapsule = outputCell.locator('a').filter({ hasText: /^contains-keyword\?$/ });
     await expect(uniqueCapsule).toBeVisible();
-    console.log('Verified: Unique metric "uniqueness_score" is NOT disambiguated.');
+    console.log('Verified: Unique "contains-keyword?" metric is NOT disambiguated (no prefix).');
     
     // ---
     // PHASE 4: TEARDOWN

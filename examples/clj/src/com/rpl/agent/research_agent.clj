@@ -396,6 +396,17 @@ Here are the sections to reflect on for writing: %s")
   [topology]
   (aor/declare-agent-object topology "openai-api-key" (System/getenv "OPENAI_API_KEY"))
   (aor/declare-agent-object topology "tavily-api-key" (System/getenv "TAVILY_API_KEY"))
+
+  ;; Simple evaluator for E2E testing - checks if output contains a keyword
+  (aor/declare-evaluator-builder
+   topology
+   "contains-keyword"
+   :regular
+   (fn [{:strs [keyword]}]
+     (fn [fetcher input ref-output output]
+       {"contains-keyword?" (boolean (re-find (re-pattern keyword) (str output)))}))
+   {:params {"keyword" {:description "Keyword to search for in output"}}})
+
   (aor/declare-agent-object-builder
    topology
    "openai"
