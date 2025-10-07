@@ -43,6 +43,12 @@
   (shadow.cljs.devtools.server/stop!)
   (shadow.cljs.devtools.server/reload!)
 
+  (require 'com.rpl.agent-o-rama.ui.feedback-test-agent)
+  (rtest/launch-module!
+   ipc
+   com.rpl.agent-o-rama.ui.feedback-test-agent/FeedbackTestAgentModule
+   {:tasks 1 :threads 1})
+
   (require 'com.rpl.agent-o-rama.ui.trace-analytics-test-agent)
 
   (rtest/launch-module!
