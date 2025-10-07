@@ -10,18 +10,27 @@
 
 (def ^:private default-timeout 120)
 
+;;; Helper functions
+
+(defn make-post-deploy-hook
+  "Creates a post-deploy hook that sets up feedback testing.
+   Options are passed through to setup-feedback-testing!"
+  [opts]
+  (fn [ipc module-name]
+    (let [manager (aor/agent-manager ipc module-name)
+          depot   (:global-actions-depot (aor-types/underlying-objects manager))]
+      (setup-feedback-testing! manager depot opts))))
+
 (deftest agent-level-feedback-test
   ;; Test agent-level feedback display in the main Feedback tab.
   ;; Uses feedback-test-agent which generates agent-level evaluator feedback.
   (helpers/with-system FeedbackTestAgentModule
+    :post-deploy-hook (make-post-deploy-hook {:include-node-rules? false})
     (helpers/with-webdriver [driver]
       (testing "agent-level feedback displays correctly"
-        (let [env     @helpers/system
-              manager (aor/agent-manager (:ipc env) (:module-name env))
-              depot   (:global-actions-depot (aor-types/underlying-objects manager))
-              _       (setup-feedback-testing! manager depot {:include-node-rules? false})
-              agent   (aor/agent-client manager "FeedbackTestAgent")
-              invoke  (aor/agent-initiate agent {"mode" "medium" "text" "test"})]
+        (let [env    @helpers/system
+              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env)) "FeedbackTestAgent")
+              invoke (aor/agent-initiate agent {"mode" "medium" "text" "test"})]
 
           @(aor/agent-result-async agent invoke)
 
@@ -52,14 +61,12 @@
   ;; Test node-level feedback display in node details Feedback tab.
   ;; Uses feedback-test-agent which generates node-level evaluator feedback.
   (helpers/with-system FeedbackTestAgentModule
+    :post-deploy-hook (make-post-deploy-hook {})
     (helpers/with-webdriver [driver]
       (testing "node-level feedback displays correctly"
-        (let [env     @helpers/system
-              manager (aor/agent-manager (:ipc env) (:module-name env))
-              depot   (:global-actions-depot (aor-types/underlying-objects manager))
-              _       (setup-feedback-testing! manager depot)
-              agent   (aor/agent-client manager "FeedbackTestAgent")
-              invoke  (aor/agent-initiate agent {"mode" "long" "text" "eval"})]
+        (let [env    @helpers/system
+              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env)) "FeedbackTestAgent")
+              invoke (aor/agent-initiate agent {"mode" "long" "text" "eval"})]
 
           @(aor/agent-result-async agent invoke)
 
@@ -95,10 +102,9 @@
   (helpers/with-system FeedbackTestAgentModule
     (helpers/with-webdriver [driver]
       (testing "empty feedback state displays correctly"
-        (let [env     @helpers/system
-              manager (aor/agent-manager (:ipc env) (:module-name env))
-              agent   (aor/agent-client manager "FeedbackTestAgent")
-              invoke  (aor/agent-initiate agent {"mode" "short"})]
+        (let [env    @helpers/system
+              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env)) "FeedbackTestAgent")
+              invoke (aor/agent-initiate agent {"mode" "short"})]
 
           @(aor/agent-result-async agent invoke)
 
@@ -120,14 +126,12 @@
   ;; Test display of different score types (boolean and numeric).
   ;; Uses feedback-test-agent evaluators that return different score formats.
   (helpers/with-system FeedbackTestAgentModule
+    :post-deploy-hook (make-post-deploy-hook {})
     (helpers/with-webdriver [driver]
       (testing "feedback scores display with correct types"
-        (let [env     @helpers/system
-              manager (aor/agent-manager (:ipc env) (:module-name env))
-              depot   (:global-actions-depot (aor-types/underlying-objects manager))
-              _       (setup-feedback-testing! manager depot)
-              agent   (aor/agent-client manager "FeedbackTestAgent")
-              invoke  (aor/agent-initiate agent {"mode" "prefixed" "text" "score-check"})]
+        (let [env    @helpers/system
+              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env)) "FeedbackTestAgent")
+              invoke (aor/agent-initiate agent {"mode" "prefixed" "text" "score-check"})]
 
           @(aor/agent-result-async agent invoke)
 
@@ -159,14 +163,12 @@
   ;; Test that feedback from multiple evaluators displays together.
   ;; Uses both agent-level and node-level evaluators.
   (helpers/with-system FeedbackTestAgentModule
+    :post-deploy-hook (make-post-deploy-hook {})
     (helpers/with-webdriver [driver]
       (testing "multiple feedback sources display together"
-        (let [env     @helpers/system
-              manager (aor/agent-manager (:ipc env) (:module-name env))
-              depot   (:global-actions-depot (aor-types/underlying-objects manager))
-              _       (setup-feedback-testing! manager depot)
-              agent   (aor/agent-client manager "FeedbackTestAgent")
-              invoke  (aor/agent-initiate agent {"mode" "medium" "text" "multi-eval"})]
+        (let [env    @helpers/system
+              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env)) "FeedbackTestAgent")
+              invoke (aor/agent-initiate agent {"mode" "medium" "text" "multi-eval"})]
 
           @(aor/agent-result-async agent invoke)
 

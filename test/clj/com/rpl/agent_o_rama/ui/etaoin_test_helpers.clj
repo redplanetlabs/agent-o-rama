@@ -77,12 +77,20 @@
 
 (defn setup-agent-module
   "Deploy agent module and start UI server.
-   Returns a map with :ipc, :module-name, and :port."
-  [ipc agent-module {:keys [port] :or {port default-port}}]
+   Returns a map with :ipc, :module-name, and :port.
+   
+   Options:
+   - :port - UI server port (default: 8080)
+   - :post-deploy-hook - Function to call after module is deployed, receives ipc and module-name"
+  [ipc agent-module {:keys [port post-deploy-hook] :or {port default-port}}]
   (let [module-name (rama/get-module-name agent-module)]
     (when-not (:launched @system)
       (rtest/launch-module! ipc agent-module {:tasks 1 :threads 1})
-      (vswap! system assoc :launched true :module-name module-name))
+      (vswap! system assoc :launched true :module-name module-name)
+      
+      ;; Call post-deploy hook if provided
+      (when post-deploy-hook
+        (post-deploy-hook ipc module-name)))
 
     (when-not (:ui-launched @system)
       (shadow/compile :frontend)
@@ -93,10 +101,13 @@
      :port        port}))
 
 (defn setup-system
-  "Setup all resources in order: IPC, module, container."
-  [agent-module]
+  "Setup all resources in order: IPC, module, container.
+   
+   Options:
+   - :post-deploy-hook - Function to call after module is deployed, receives ipc and module-name"
+  [agent-module & {:keys [post-deploy-hook]}]
   (let [ipc (setup-ipc)]
-    (setup-agent-module ipc agent-module {:port default-port})
+    (setup-agent-module ipc agent-module {:port default-port :post-deploy-hook post-deploy-hook})
     (setup-container default-port)))
 
 (defn teardown-system
@@ -117,9 +128,12 @@
 (defn reusable-system-fixture
   "Test fixture that sets up system resources.
    agent-module: The agent module to deploy
-   f: The test function to execute"
-  [agent-module f]
-  (setup-system agent-module)
+   f: The test function to execute
+   
+   Options:
+   - :post-deploy-hook - Function to call after module is deployed, receives ipc and module-name"
+  [agent-module f & {:keys [post-deploy-hook]}]
+  (setup-system agent-module :post-deploy-hook post-deploy-hook)
   (try
     (f)
     (finally
@@ -128,12 +142,26 @@
 
 (defmacro with-system
   "Execute body with a system setup.
-   agent-module: The agent module to deploy"
+   agent-module: The agent module to deploy
+   
+   Options:
+   - :post-deploy-hook - Function to call after module is deployed, receives ipc and module-name
+   
+   Example:
+   (with-system FeedbackTestAgentModule
+     :post-deploy-hook (fn [ipc module-name] ...)
+     (testing ...))"
   [agent-module & body]
-  `(reusable-system-fixture
-    ~agent-module
-    (fn []
-      ~@body)))
+  (let [[opts body] (if (keyword? (first body))
+                      [(apply hash-map (take-while keyword? (concat body [nil])))
+                       (drop-while (complement list?) body)]
+                      [{} body])
+        hook (:post-deploy-hook opts)]
+    `(reusable-system-fixture
+      ~agent-module
+      (fn []
+        ~@body)
+      ~@(when hook [:post-deploy-hook hook]))))
 
 (defn webdriver-fixture
   "Test fixture that sets up webdriver resources.
