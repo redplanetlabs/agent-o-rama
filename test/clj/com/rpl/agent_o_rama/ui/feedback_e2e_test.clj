@@ -24,8 +24,7 @@
 (deftest agent-level-feedback-test
   ;; Test agent-level feedback display in the main Feedback tab.
   ;; Uses feedback-test-agent which generates agent-level evaluator feedback.
-  (helpers/with-system FeedbackTestAgentModule
-    :post-deploy-hook (make-post-deploy-hook {:include-node-rules? false})
+  (helpers/with-system [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {:include-node-rules? false})}]
     (helpers/with-webdriver [driver]
       (testing "agent-level feedback displays correctly"
         (let [env    @helpers/system
@@ -60,8 +59,7 @@
 (deftest node-level-feedback-test
   ;; Test node-level feedback display in node details Feedback tab.
   ;; Uses feedback-test-agent which generates node-level evaluator feedback.
-  (helpers/with-system FeedbackTestAgentModule
-    :post-deploy-hook (make-post-deploy-hook {})
+  (helpers/with-system [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
     (helpers/with-webdriver [driver]
       (testing "node-level feedback displays correctly"
         (let [env    @helpers/system
@@ -99,7 +97,7 @@
 (deftest empty-feedback-state-test
   ;; Test empty state display when no feedback is present.
   ;; Uses an agent run without any evaluator rules configured.
-  (helpers/with-system FeedbackTestAgentModule
+  (helpers/with-system [FeedbackTestAgentModule]
     (helpers/with-webdriver [driver]
       (testing "empty feedback state displays correctly"
         (let [env    @helpers/system
@@ -125,8 +123,7 @@
 (deftest feedback-score-types-test
   ;; Test display of different score types (boolean and numeric).
   ;; Uses feedback-test-agent evaluators that return different score formats.
-  (helpers/with-system FeedbackTestAgentModule
-    :post-deploy-hook (make-post-deploy-hook {})
+  (helpers/with-system [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
     (helpers/with-webdriver [driver]
       (testing "feedback scores display with correct types"
         (let [env    @helpers/system
@@ -162,8 +159,7 @@
 (deftest multiple-feedback-sources-test
   ;; Test that feedback from multiple evaluators displays together.
   ;; Uses both agent-level and node-level evaluators.
-  (helpers/with-system FeedbackTestAgentModule
-    :post-deploy-hook (make-post-deploy-hook {})
+  (helpers/with-system [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
     (helpers/with-webdriver [driver]
       (testing "multiple feedback sources display together"
         (let [env    @helpers/system

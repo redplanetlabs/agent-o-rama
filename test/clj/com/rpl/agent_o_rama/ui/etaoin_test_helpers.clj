@@ -142,26 +142,24 @@
 
 (defmacro with-system
   "Execute body with a system setup.
-   agent-module: The agent module to deploy
    
-   Options:
-   - :post-deploy-hook - Function to call after module is deployed, receives ipc and module-name
+   Arguments:
+   - agent-module: The agent module to deploy
+   - opts (optional): Map with options
+     - :post-deploy-hook - Function to call after module is deployed, receives ipc and module-name
    
-   Example:
-   (with-system FeedbackTestAgentModule
-     :post-deploy-hook (fn [ipc module-name] ...)
+   Examples:
+   (with-system [FeedbackTestAgentModule]
+     (testing ...))
+   
+   (with-system [FeedbackTestAgentModule {:post-deploy-hook (fn [ipc module-name] ...)}]
      (testing ...))"
-  [agent-module & body]
-  (let [[opts body] (if (keyword? (first body))
-                      [(apply hash-map (take-while keyword? (concat body [nil])))
-                       (drop-while (complement list?) body)]
-                      [{} body])
-        hook (:post-deploy-hook opts)]
-    `(reusable-system-fixture
-      ~agent-module
-      (fn []
-        ~@body)
-      ~@(when hook [:post-deploy-hook hook]))))
+  [[agent-module & [{:keys [post-deploy-hook]}]] & body]
+  `(reusable-system-fixture
+    ~agent-module
+    (fn []
+      ~@body)
+    ~@(when post-deploy-hook [:post-deploy-hook post-deploy-hook])))
 
 (defn webdriver-fixture
   "Test fixture that sets up webdriver resources.
