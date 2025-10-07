@@ -248,9 +248,11 @@
   (let [pstate-write-depot-sym   (symbol (po/agent-pstate-write-depot-name))
         datasets-depot-sym       (symbol (po/datasets-depot-name))
         global-actions-depot-sym (symbol (po/global-actions-depot-name))
-        analytics-tick-depot-sym (symbol (po/agent-analytics-tick-depot-name))]
+        analytics-tick-depot-sym (symbol (po/agent-analytics-tick-depot-name))
+        agent-edit-depot-sym     (symbol (po/agent-edit-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
     (declare-depot* setup datasets-depot-sym (hash-by :dataset-id))
+    (declare-depot* setup agent-edit-depot-sym apart/agent-task-id-depot-partitioner)
     (declare-depot* setup global-actions-depot-sym :random {:global? true})
     (if SUBSTITUTE-TICK-DEPOTS
       (declare-depot* setup
@@ -282,7 +284,7 @@
      {:key-partitioner apart/task-id-key-partitioner})
 
     (doseq [depot-sym [pstate-write-depot-sym datasets-depot-sym
-                       global-actions-depot-sym]]
+                       global-actions-depot-sym agent-edit-depot-sym]]
       (set-launch-depot-dynamic-option!* setup
                                          depot-sym
                                          "depot.max.entries.per.partition"
@@ -314,6 +316,9 @@
 
      (source> datasets-depot-sym :> *data)
       (datasets/handle-datasets-op *data)
+
+     (source> agent-edit-depot-sym :> *data)
+      (at/handle-agent-edit *data)
 
      (source> global-actions-depot-sym :> *data)
       (<<cond

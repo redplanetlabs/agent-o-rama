@@ -201,6 +201,13 @@
    source :- (s/maybe InfoSource)
   ])
 
+(defaorrecord EditMetadata
+  [agent-name :- String
+   agent-task-id :- Long
+   agent-invoke-id :- UUID
+   key :- String
+   value :- (s/maybe (s/pred valid-metadata-value?))])
+
 (defaorrecord AgentExecutionContext
   [metadata :- METADATA-SCHEMA
    source :- (s/maybe InfoSource)])
@@ -821,6 +828,7 @@
                                       (if options @options)))
 
 (defprotocol AgentClientInternal
+  (set-metadata-internal! [this agent-invoke key value])
   (invoke-with-context-async-internal [this context args])
   (initiate-with-context-async-internal [this context args])
   (stream-internal [this agent-invoke node callback-fn])

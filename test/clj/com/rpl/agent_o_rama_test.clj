@@ -3182,6 +3182,20 @@
        (is (= 10 (aor/agent-result foo inv)))
        (is (= @RESULTS expected-results))
 
+
+       ;; test editing
+       (is (= {"a" 1} (aor/get-metadata foo inv)))
+       (aor/set-metadata! foo inv "b" 2)
+       (is (= {"a" 1 "b" 2} (aor/get-metadata foo inv)))
+       (aor/set-metadata! foo inv "c" "abc")
+       (aor/set-metadata! foo inv "d" 0.5)
+       (aor/set-metadata! foo inv "e" true)
+       (is (= {"a" 1 "b" 2 "c" "abc" "d" 0.5 "e" true} (aor/get-metadata foo inv)))
+       (aor/remove-metadata! foo inv "c")
+       (aor/remove-metadata! foo inv "a")
+       (aor/remove-metadata! foo inv "b")
+       (is (= {"d" 0.5 "e" true} (aor/get-metadata foo inv)))
+
        (bind root-invoke-id
          (foreign-select-one [(keypath agent-invoke-id) :root-invoke-id]
                              root-pstate

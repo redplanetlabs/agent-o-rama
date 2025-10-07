@@ -234,6 +234,24 @@
        *retry-num
        *op)))
 
+(defn metadata-edit-val
+  [v]
+  (if (nil? v) NONE v))
+
+(deframaop handle-agent-edit
+  [{:keys [*agent-name *agent-invoke-id *key *value]}]
+  (po/agent-names-set :> *agent-names)
+  (filter> (contains? *agent-names *agent-name))
+  (<<with-substitutions
+   [$$root (po/agent-root-task-global *agent-name)]
+   (filter> (or> (nil? *value) (aor-types/valid-metadata-value? *value)))
+   (<<ramafn %metadata-edit-val
+     [_]
+     (:> (metadata-edit-val *value)))
+   (local-transform> [(must *agent-invoke-id) :metadata (keypath *key) (term %metadata-edit-val)]
+                     $$root)
+  ))
+
 (defn hook:received-retry [agent-task-id agent-id retry-num])
 (deframaop hook:running-retry>
   [*agent-task-id *agent-id *retry-num]

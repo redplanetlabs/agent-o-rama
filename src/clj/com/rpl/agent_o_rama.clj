@@ -473,8 +473,10 @@
 
 
 (defn get-metadata
-  [^AgentNode agent-node]
-  (.getMetadata agent-node))
+  ([^AgentClient client agent-invoke]
+   (.getMetadata client agent-invoke))
+  ([^AgentNode agent-node]
+   (.getMetadata agent-node)))
 
 (defn- parse-map-options
   [[arg1 & rest-args :as args]]
@@ -513,6 +515,8 @@
         datasets-depot            (foreign-depot cluster
                                                  module-name
                                                  (po/datasets-depot-name))
+
+        agent-edit-depot          (foreign-depot cluster module-name (po/agent-edit-depot-name))
         datasets-pstate           (foreign-pstate
                                    cluster
                                    module-name
@@ -702,6 +706,28 @@
                      (.complete cf (:val result))))
                ))))
 
+
+          (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^int value]
+            (aor-types/set-metadata-internal! this agent-invoke key (long value)))
+          (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^long value]
+            (aor-types/set-metadata-internal! this agent-invoke key value))
+          (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^float value]
+            (aor-types/set-metadata-internal! this agent-invoke key (double value)))
+          (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^double value]
+            (aor-types/set-metadata-internal! this agent-invoke key value))
+          (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^String value]
+            (aor-types/set-metadata-internal! this agent-invoke key value))
+          (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^boolean value]
+            (aor-types/set-metadata-internal! this agent-invoke key value))
+          (removeMetadata [this {:keys [task-id agent-invoke-id]} key]
+            (foreign-append!
+             agent-edit-depot
+             (aor-types/->valid-EditMetadata agentName task-id agent-invoke-id key nil)))
+          (getMetadata [this {:keys [task-id agent-invoke-id]}]
+            (foreign-select-one [(keypath agent-invoke-id) :metadata]
+                                root-pstate
+                                {:pkey task-id}))
+
           (isAgentInvokeComplete [this agent-invoke]
             (let [agent-task-id (.getTaskId agent-invoke)
                   agent-id      (.getAgentInvokeId agent-invoke)]
@@ -780,6 +806,10 @@
             (close! agent-depot)
             (close! agent-config-depot))
           aor-types/AgentClientInternal
+          (set-metadata-internal! [this {:keys [task-id agent-invoke-id]} key value]
+            (foreign-append!
+             agent-edit-depot
+             (aor-types/->valid-EditMetadata agentName task-id agent-invoke-id key value)))
           (invoke-with-context-async-internal [this context args]
             (.thenCompose
              ^CompletableFuture
@@ -1130,6 +1160,14 @@
   ^CompletableFuture
   [^AgentClient client agent-invoke]
   (.nextStepAsync client agent-invoke))
+
+(defn set-metadata!
+  [client agent-invoke key value]
+  (aor-types/set-metadata-internal! client agent-invoke key value))
+
+(defn remove-metadata!
+  [^AgentClient client agent-invoke key]
+  (.removeMetadata client agent-invoke key))
 
 (defn human-input-request?
   [obj]

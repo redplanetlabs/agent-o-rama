@@ -49,6 +49,10 @@
   []
   RamaClientsTaskGlobal/AGENT_PSTATE_WRITE_DEPOT)
 
+(defn agent-edit-depot-name
+  []
+  "*_agent-edit-depot")
+
 (defn agent-depot-name
   [name]
   (RamaClientsTaskGlobal/agentDepotName name))
@@ -368,6 +372,10 @@
   ^AgentDeclaredObjectsTaskGlobal []
   (declared-object-task-global (agent-declared-objects-name)))
 
+(defn agent-edit-depot-task-global
+  []
+  (this-module-pobject-task-global (agent-edit-depot-name)))
+
 (defn agent-depot-task-global
   [name]
   (this-module-pobject-task-global (agent-depot-name name)))
@@ -454,3 +462,10 @@
 (defn log-throttler
   []
   (AgentNodeExecutorTaskGlobal/getLogThrottler))
+
+(defn agent-names-set
+  []
+  (-> (agent-declared-objects-task-global)
+      .getAgentGraphs
+      keys
+      set))
