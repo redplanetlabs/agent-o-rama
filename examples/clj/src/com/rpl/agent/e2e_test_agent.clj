@@ -18,13 +18,13 @@
 (defonce E2E_RETRY_STORE "$$e2e-retries")
 
 (defn- check-for-failure!
-  "Helper function to deterministically fail a node based on control parameters.
+  "Helper function to deterministically fail a node based on params.
    It uses a PStateStore to track the number of times a node has been entered for a given run,
    allowing simulation of retries."
-  [agent-node control-params current-node-name]
-  (let [fail-at-node (get control-params "fail-at-node")
-        retries-before-success (get control-params "retries-before-success")
-        run-id (get control-params "run-id")]
+  [agent-node params current-node-name]
+  (let [fail-at-node (get params "fail-at-node")
+        retries-before-success (get params "retries-before-success")
+        run-id (get params "run-id")]
     ;; Only check for failure if this is the target node
     (when (= fail-at-node current-node-name)
       (let [retry-store (aor/get-store agent-node E2E_RETRY_STORE)
@@ -99,17 +99,16 @@
        ["a_very_long_node_name_that_is_designed_specifically_to_test_ui_overflow_rendering_and_text_wrapping_behavior"
         "short_path_node"]
        (fn [agent-node params]
-         (let [control-params (get params "control-params" {})
-               run-id (get control-params "run-id")
+         (let [run-id (get params "run-id")
                retry-store (aor/get-store agent-node E2E_RETRY_STORE)]
 
            ;; Initialize or reset the retry count for this run
            (when run-id
              (store/put! retry-store run-id 0))
 
-           (check-for-failure! agent-node control-params "start")
+           (check-for-failure! agent-node params "start")
 
-           (if (get control-params "long-node-names?")
+           (if (get params "long-node-names?")
              (aor/emit! agent-node "a_very_long_node_name_that_is_designed_specifically_to_test_ui_overflow_rendering_and_text_wrapping_behavior" params)
              (aor/emit! agent-node "short_path_node" params)))))
 
@@ -118,33 +117,29 @@
        "a_very_long_node_name_that_is_designed_specifically_to_test_ui_overflow_rendering_and_text_wrapping_behavior"
        "processing_node"
        (fn [agent-node params]
-         (let [control-params (get params "control-params" {})]
-           (check-for-failure! agent-node control-params "a_very_long_node_name_that_is_designed_specifically_to_test_ui_overflow_rendering_and_text_wrapping_behavior")
-           (aor/emit! agent-node "processing_node" params))))
+         (check-for-failure! agent-node params "a_very_long_node_name_that_is_designed_specifically_to_test_ui_overflow_rendering_and_text_wrapping_behavior")
+         (aor/emit! agent-node "processing_node" params)))
 
       ;; 2b. SHORT PATH: The alternative, short-named path.
       (aor/node
        "short_path_node"
        "processing_node"
        (fn [agent-node params]
-         (let [control-params (get params "control-params" {})]
-           (check-for-failure! agent-node control-params "short_path_node")
-           (aor/emit! agent-node "processing_node" params))))
+         (check-for-failure! agent-node params "short_path_node")
+         (aor/emit! agent-node "processing_node" params)))
 
       ;; 3. PROCESSING: A common node where both paths converge.
       (aor/node
        "processing_node"
        "final_result_node"
        (fn [agent-node params]
-         (let [control-params (get params "control-params" {})]
-           (check-for-failure! agent-node control-params "processing_node")
-           (aor/emit! agent-node "final_result_node" params))))
+         (check-for-failure! agent-node params "processing_node")
+         (aor/emit! agent-node "final_result_node" params)))
 
       ;; 4. FINAL RESULT: Produces the controlled output.
       (aor/node
        "final_result_node"
        nil
        (fn [agent-node params]
-         (let [control-params (get params "control-params" {})]
-           (check-for-failure! agent-node control-params "final_result_node")
-           (aor/result! agent-node (get control-params "output-value")))))))
+         (check-for-failure! agent-node params "final_result_node")
+         (aor/result! agent-node (get params "output-value"))))))

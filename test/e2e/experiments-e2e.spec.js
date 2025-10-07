@@ -36,45 +36,37 @@ const examples = [
   {
     // #1: Pure success with long node name path
     input: {
-      control_params: {
-        'long-node-names?': true,
-        'run-id': `success-long-${uniqueId}`,
-        'output-value': 'A successful run!',
-      },
+      'long-node-names?': true,
+      'run-id': `success-long-${uniqueId}`,
+      'output-value': 'A successful run!',
     },
     output: 'A successful run!',
   },
   {
     // #2: Node failure with successful retry
     input: {
-      control_params: {
-        'fail-at-node': 'processing_node',
-        'retries-before-success': 1,
-        'run-id': `node-fail-retry-${uniqueId}`,
-        'output-value': 'Succeeded after one retry.',
-      },
+      'fail-at-node': 'processing_node',
+      'retries-before-success': 1,
+      'run-id': `node-fail-retry-${uniqueId}`,
+      'output-value': 'Succeeded after one retry.',
     },
     output: 'Succeeded after one retry.',
   },
   {
     // #3: Agent failure (exceeds max retries)
     input: {
-      control_params: {
-        'fail-at-node': 'start',
-        'retries-before-success': 5, // Assumes max retries is < 5
-        'run-id': `agent-fail-${uniqueId}`,
-        'output-value': 'This should never be reached.',
-      },
+      'fail-at-node': 'start',
+      'retries-before-success': 5, // Assumes max retries is < 5
+      'run-id': `agent-fail-${uniqueId}`,
+      'output-value': 'This should never be reached.',
     },
     output: 'N/A',
   },
   {
     // #4: Successful agent run that triggers an evaluator failure
     input: {
-      control_params: {
-        'run-id': `eval-fail-${uniqueId}`,
-        'output-value': 'trigger-eval-failure',
-      },
+      'run-id': `eval-fail-${uniqueId}`,
+      'output-value': 'trigger-eval-failure',
     },
     output: 'trigger-eval-failure',
   },
