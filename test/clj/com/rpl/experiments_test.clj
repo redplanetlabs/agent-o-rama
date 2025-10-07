@@ -65,9 +65,13 @@
         (throw (ex-info "Scores mismatch" {:scores scores :score-sets score-sets})))
     )))
 
+(def CAPTURED-METADATA)
+
 (deftest basic-experiments-test
   (let [example-id-chunks-atom (atom [])]
-    (with-redefs [exp/hook:running-invoke-node
+    (with-redefs [CAPTURED-METADATA (atom [])
+
+                  exp/hook:running-invoke-node
                   (fn [result+example-ids]
                     (swap! example-id-chunks-atom conj (count result+example-ids)))]
       (with-open [ipc (rtest/create-ipc)]
@@ -124,6 +128,7 @@
                  "start"
                  ["end" "end2" "a" "b"]
                  (fn [agent-node action & inputs]
+                   (setval [ATOM AFTER-ELEM] (aor/get-metadata agent-node) CAPTURED-METADATA)
                    (aor/record-nested-op!
                     agent-node
                     :model-call
@@ -161,6 +166,7 @@
                  "a"
                  ["end" "a"]
                  (fn [agent-node arg1 arg2]
+                   (setval [ATOM AFTER-ELEM] (aor/get-metadata agent-node) CAPTURED-METADATA)
                    (aor/emit! agent-node "end" (+ arg1 arg2 3))
                    (aor/emit! agent-node "a" (str arg1 "+" arg2))
                    (aor/emit! agent-node "end" (str arg1 "!"))
@@ -540,6 +546,7 @@
          ;;   - node with emits
          ;;   - JSON paths for regular evaluators
          (reset! example-id-chunks-atom [])
+         (reset! CAPTURED-METADATA [])
          (bind exp-id (h/random-uuid7))
          (bind {exp-invoke aor-types/AGENT-TOPOLOGY-NAME}
            (foreign-append!
@@ -554,11 +561,11 @@
              (aor-types/->valid-ComparativeExperiment
               [(aor-types/->valid-ExperimentTarget
                 (aor-types/->valid-NodeTarget "foo" "a")
-                {}
+                {"a" 1}
                 ["$.a" "$.b"])
                (aor-types/->valid-ExperimentTarget
                 (aor-types/->valid-AgentTarget "foo")
-                {}
+                {"b" 2}
                 ["\"other\"" "$.a" "$.b"])])
              1
              2)))
@@ -570,6 +577,7 @@
          (is (aor-types/AgentInvokeImpl? (:experiment-invoke res)))
          (is (= 2 (count @example-id-chunks-atom)))
          (is (= #{2 1} (set @example-id-chunks-atom)))
+         (is (= {{"a" 1} 3 {"b" 2} 3} (frequencies @CAPTURED-METADATA)))
 
 
          (is

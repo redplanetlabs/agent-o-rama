@@ -36,7 +36,8 @@
     NodeAggStart]
    [com.rpl.aortest
     EarlySumAccum
-    EarlySumCombiner]
+    EarlySumCombiner
+    TestSnippets]
    [com.rpl.rama.helpers
     TopologyUtils]
    [com.rpl.rama.ops
@@ -3159,18 +3160,21 @@
                         module-name
                         (queries/tracing-query-name "foo")))
 
-       (bind expected-results
-         {"start" {"a" 1} "as" {"a" 1} "node1" {"a" 1} "agg" {"a" 1} "end" {"a" 1}})
+       (bind expected-results-fn
+         (fn [m]
+           {"start" m "as" m "node1" m "agg" m "end" m}))
 
+       (bind expected-results
+         (expected-results-fn
+          {"l" 1 "i" (int 1) "f" (float 0.5) "d" (double 0.5) "s" "abc" "b" true}))
        (bind inv
-         (aor/agent-initiate-with-context
-          foo
-          {:metadata {"a" 1}}))
+         (TestSnippets/initiateWithContext foo))
        (is (= 10 (aor/agent-result foo inv)))
        (is (= @RESULTS expected-results))
 
        (reset! RESULTS {})
        (reset! FAIL true)
+       (bind expected-results (expected-results-fn {"a" 1}))
        (bind {:keys [task-id agent-invoke-id] :as inv}
          (aor/agent-initiate-with-context
           foo
