@@ -47,7 +47,7 @@
 (s/defschema InvocationsSchema
              {:all-invokes       [(spy "all-invokes")]
               :pagination-params (s/maybe {s/Int (s/maybe s/Int)})
-              :has-more?         s/Bool
+              :has-more?         (s/maybe s/Bool)
               :loading?          s/Bool})
 
 (s/defschema QueryStateSchema
