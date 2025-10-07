@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.trace-analytics-e2e-test
   (:require
    [clj-test-containers.core :as tc]
-   [clojure.test :refer [deftest is testing use-fixtures]]
+   [clojure.test :refer [deftest is testing]]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.ui.trace-analytics-test-agent
     :refer [TraceAnalyticsTestAgentModule]]
@@ -18,7 +18,7 @@
     Testcontainers]))
 
 (def ^:private default-port 8080)
-(def ^:private default-timeout 60)
+(def ^:private default-timeout 120)
 
 (defonce system (volatile! nil))
 
@@ -123,9 +123,6 @@
       (when in-test-runner?
         (teardown-system @system)))))
 
-;; used by test runners
-(use-fixtures :once reusable-resource-fixture)
-
 (comment
   ;; Use these at a repl
   (setup-system)
@@ -141,14 +138,17 @@
 
 (defmacro with-webdriver
   "Execute body with a webdriver setup.
-   Binds driver-sym to the driver instance."
+   Binds driver-sym to the driver instance.
+   Calls reusable-resource-fixture to setup and teardown system resources."
   [[driver-sym] & body]
-  `(let [container#  (:container @~'system)
-         ~driver-sym (setup-webdriver container#)]
-     (try
-       ~@body
-       (finally
-         (teardown-webdriver ~driver-sym)))))
+  `(reusable-resource-fixture
+    (fn []
+      (let [container#  (:container @~'system)
+            ~driver-sym (setup-webdriver container#)]
+        (try
+          ~@body
+          (finally
+            (teardown-webdriver ~driver-sym)))))))
 
 (defmacro with-agent-env
   "Execute body with an agent environment setup.
