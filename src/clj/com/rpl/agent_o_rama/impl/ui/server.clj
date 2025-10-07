@@ -4,6 +4,7 @@
    ;; Load all handler namespaces to register their defmethods
    ;; Load all handler namespaces to register their defmethods
    [com.rpl.agent-o-rama.impl.ui.handlers.agents]
+   [com.rpl.agent-o-rama.impl.ui.handlers.analytics]
    [com.rpl.agent-o-rama.impl.ui.handlers.config]
    [com.rpl.agent-o-rama.impl.ui.handlers.datasets]
    [com.rpl.agent-o-rama.impl.ui.handlers.evaluators]

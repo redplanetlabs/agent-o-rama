@@ -50,10 +50,10 @@ export default defineConfig({
     // If you already have a dev server running, Playwright will use it instead of starting a new one.
     // This is disabled in CI to ensure a clean state.
     reuseExistingServer: !process.env.CI,
-    
+
     // Give your server up to 2 minutes to start up. Shadow-cljs can sometimes be slow on the first compile.
-    timeout: 120 * 1000, 
-    
+    timeout: 120 * 1000,
+
     // Pipe server output to console for debugging.
     stdout: 'pipe',
     stderr: 'pipe',

@@ -95,11 +95,11 @@
 (deftest format-op-stats-test
   (testing "format-op-stats"
     (testing "formats stats correctly"
-      (is (= "5x  ·  100ms" (ta/format-op-stats {:count 5 :total-time-millis 100})))
-      (is (= "0x  ·  0ms" (ta/format-op-stats {:count 0 :total-time-millis 0}))))
+      (is (= "5x  ·  100ms" (:display (ta/format-op-stats {:count 5 :total-time-millis 100}))))
+      (is (= "0x  ·  0ms" (:display (ta/format-op-stats {:count 0 :total-time-millis 0})))))
 
     (testing "handles nil time"
-      (is (= "5x  ·  0ms" (ta/format-op-stats {:count 5 :total-time-millis nil}))))))
+      (is (= "5x  ·  0ms" (:display (ta/format-op-stats {:count 5 :total-time-millis nil})))))))
 
 ;;; Integration tests with aggregated stats
 
@@ -243,9 +243,9 @@
             sorted-nodes (sort-by first (:node-stats basic-stats))]
 
         (is (= ["a-node" "m-node" "z-node"] (map first sorted-nodes)))
-        (is (= "1x  ·  100ms" (ta/format-op-stats (second (first (filter #(= "z-node" (first %)) sorted-nodes))))))
-        (is (= "2x  ·  200ms" (ta/format-op-stats (second (first (filter #(= "a-node" (first %)) sorted-nodes))))))
-        (is (= "3x  ·  300ms" (ta/format-op-stats (second (first (filter #(= "m-node" (first %)) sorted-nodes))))))))
+        (is (= "1x  ·  100ms" (:display (ta/format-op-stats (second (first (filter #(= "z-node" (first %)) sorted-nodes)))))))
+        (is (= "2x  ·  200ms" (:display (ta/format-op-stats (second (first (filter #(= "a-node" (first %)) sorted-nodes)))))))
+        (is (= "3x  ·  300ms" (:display (ta/format-op-stats (second (first (filter #(= "m-node" (first %)) sorted-nodes)))))))))
 
     (testing "subagent stats with node-stats"
       (let [node-stats  {"sub-start" {:count 2 :total-time-millis 150}

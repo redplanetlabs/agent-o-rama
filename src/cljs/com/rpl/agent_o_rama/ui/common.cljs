@@ -16,6 +16,16 @@
 (defn url-encode [s]
   (js/encodeURIComponent s))
 
+(defn agent-invoke->url
+  "Convert an agent-invoke map to an invocation URL.
+  Takes module-id, agent-name, and an agent-invoke with :task-id and :agent-invoke-id."
+  [module-id agent-name agent-invoke]
+  (when (and module-id agent-name agent-invoke)
+    (let [task-id (:task-id agent-invoke)
+          agent-invoke-id (:agent-invoke-id agent-invoke)
+          invoke-id (str task-id "-" agent-invoke-id)]
+      (str "/agents/" (url-encode module-id) "/agent/" (url-encode agent-name) "/invocations/" invoke-id))))
+
 (defn coerce-uuid
   "Converts a string to a UUID if it matches UUID format, otherwise returns the original value."
   [s]

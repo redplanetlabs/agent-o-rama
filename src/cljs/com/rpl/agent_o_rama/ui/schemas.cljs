@@ -131,7 +131,9 @@
    :datasets         DatasetsUiSchema
    (s/optional-key :manual-run) ManualRunSchema
    (s/optional-key :node-details)
-   {:active-tab (s/enum :feedback :info)}})
+   {:active-tab (s/enum :feedback :info)}
+   (s/optional-key :rules)
+   {:refetch-trigger {s/Any s/Any}}})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Top-Level App DB Schema

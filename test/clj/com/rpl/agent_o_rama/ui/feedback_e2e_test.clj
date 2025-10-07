@@ -11,6 +11,8 @@
 
 (def ^:private default-timeout 120)
 
+(defonce system (volatile! nil))
+
 ;;; Helper functions
 
 (defn make-post-deploy-hook
@@ -19,8 +21,8 @@
   [opts]
   (fn [ipc module-name]
     (let [manager (aor/agent-manager ipc module-name)
-          depot   (:global-actions-depot
-                   (aor-types/underlying-objects manager))]
+          depot (:global-actions-depot
+                 (aor-types/underlying-objects manager))]
       (setup-feedback-testing! manager depot opts))))
 
 (defn- wait-for-feedback
@@ -40,14 +42,14 @@
   ;; Test agent-level feedback display in the main Feedback tab.
   ;; Uses feedback-test-agent which generates agent-level evaluator feedback.
   (eth/with-system
-    [FeedbackTestAgentModule
+    [system FeedbackTestAgentModule
      {:post-deploy-hook (make-post-deploy-hook {:include-node-rules? false})}]
-    (eth/with-webdriver [driver]
+    (eth/with-webdriver [system driver]
       (testing "agent-level feedback displays correctly"
-        (let [env    @eth/system
-              agent  (aor/agent-client
-                      (aor/agent-manager (:ipc env) (:module-name env))
-                      "FeedbackTestAgent")
+        (let [env @system
+              agent (aor/agent-client
+                     (aor/agent-manager (:ipc env) (:module-name env))
+                     "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "medium" "text" "test"})]
 
           @(aor/agent-result-async agent invoke)
@@ -81,13 +83,13 @@
   ;; Test node-level feedback display in node details Feedback tab.
   ;; Uses feedback-test-agent which generates node-level evaluator feedback.
   (eth/with-system
-    [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
-    (eth/with-webdriver [driver]
+    [system FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
+    (eth/with-webdriver [system driver]
       (testing "node-level feedback displays correctly"
-        (let [env    @eth/system
-              agent  (aor/agent-client
-                      (aor/agent-manager (:ipc env) (:module-name env))
-                      "FeedbackTestAgent")
+        (let [env @system
+              agent (aor/agent-client
+                     (aor/agent-manager (:ipc env) (:module-name env))
+                     "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "long" "text" "eval"})]
 
           @(aor/agent-result-async agent invoke)
@@ -121,13 +123,13 @@
 (deftest ^:integration empty-feedback-state-test
   ;; Test empty state display when no feedback is present.
   ;; Uses an agent run without any evaluator rules configured.
-  (eth/with-system [FeedbackTestAgentModule]
-    (eth/with-webdriver [driver]
+  (eth/with-system [system FeedbackTestAgentModule]
+    (eth/with-webdriver [system driver]
       (testing "empty feedback state displays correctly"
-        (let [env    @eth/system
-              agent  (aor/agent-client
-                      (aor/agent-manager (:ipc env) (:module-name env))
-                      "FeedbackTestAgent")
+        (let [env @system
+              agent (aor/agent-client
+                     (aor/agent-manager (:ipc env) (:module-name env))
+                     "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "short"})]
 
           (e/with-postmortem driver {:dir "target/etaoin"}
@@ -157,13 +159,13 @@
   ;; Test display of different score types (boolean and numeric).
   ;; Uses feedback-test-agent evaluators that return different score formats.
   (eth/with-system
-    [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
-    (eth/with-webdriver [driver]
+    [system FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
+    (eth/with-webdriver [system driver]
       (testing "feedback scores display with correct types"
-        (let [env    @eth/system
-              agent  (aor/agent-client
-                      (aor/agent-manager (:ipc env) (:module-name env))
-                      "FeedbackTestAgent")
+        (let [env @system
+              agent (aor/agent-client
+                     (aor/agent-manager (:ipc env) (:module-name env))
+                     "FeedbackTestAgent")
               invoke (aor/agent-initiate
                       agent
                       {"mode" "prefixed" "text" "score-check"})]
@@ -198,13 +200,13 @@
   ;; Test that feedback from multiple evaluators displays together.
   ;; Uses both agent-level and node-level evaluators.
   (eth/with-system
-    [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
-    (eth/with-webdriver [driver]
+    [system FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
+    (eth/with-webdriver [system driver]
       (testing "multiple feedback sources display together"
-        (let [env    @eth/system
-              agent  (aor/agent-client
-                      (aor/agent-manager (:ipc env) (:module-name env))
-                      "FeedbackTestAgent")
+        (let [env @system
+              agent (aor/agent-client
+                     (aor/agent-manager (:ipc env) (:module-name env))
+                     "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "medium"})
               wait-for-mb-count
               #(rtest/wait-for-microbatch-processed-count

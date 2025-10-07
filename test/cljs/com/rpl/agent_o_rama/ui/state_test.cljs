@@ -53,8 +53,9 @@
     (testing "sets a value at a simple path"
       ;; Remove and re-add the console-logger watch to avoid window reference issues
       (state/reset-db!)
-      (state/dispatch [:db/set-value [:ui :selected-node-id] "test-node-123"])
-      (is (= "test-node-123" (s/select-one [:ui :selected-node-id] (state/get-db)))))
+      (let [test-uuid (random-uuid)]
+        (state/dispatch [:db/set-value [:ui :selected-node-id] test-uuid])
+        (is (= test-uuid (s/select-one [:ui :selected-node-id] (state/get-db))))))
 
     (testing "sets a nested value"
       (state/reset-db!)

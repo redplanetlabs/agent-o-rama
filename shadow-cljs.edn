@@ -2,25 +2,16 @@
  :builds
  {:dev
   {:target           :browser
-   :output-dir       "target/public"
-   :asset-path       "/js"
-   :modules          {:main
-                      {:init-fn com.rpl.agent-o-rama.ui/init}}
+   :output-dir       "resource/public/"
+   :modules          {:main {:init-fn com.rpl.agent-o-rama.ui/init}}
    :compiler-options {:optimizations :none
-                      :source-map    true}
-   :devtools         {:http-root "target/public"
-                      :http-port 3100
-                      :proxy-url "http://localhost:1974"
-                      ;; :before-load chat-rama.frontend.core/stop
-                      ;; :after-load  chat-rama.frontend.core/start
-                     }}
+                      :source-map    true}}
   :frontend
   {:target           :browser
    :modules          {:main {:init-fn com.rpl.agent-o-rama.ui/init}}
    :output-dir       "resource/public/"
-   :compiler-options
-   {:optimizations :advanced :infer-externs :auto :source-map true}}
-
+   :compiler-options {:optimizations :advanced
+                      :infer-externs :auto}}
   :test
   {:target    :node-test
    :output-to "target/test/test.js"
@@ -29,4 +20,4 @@
    :dev-tools {:preloads [com.rpl.agent-o-rama.ui.dom]}
    :esm       true}}
  :nrepl  {:middleware [cider.nrepl/cider-middleware]
-          :port       61000}}
+          #_#_:port 61000}}

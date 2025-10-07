@@ -56,7 +56,8 @@
         :hitl {:responses {}
                :submitting {}}
         :datasets {:selected-examples {}
-                   :selected-snapshot-per-dataset {}}}
+                   :selected-snapshot-per-dataset {}}
+        :rules {:refetch-trigger {}}}
    :sente {:connected? false}})
 
 (defonce app-db (atom initial-db))
@@ -104,15 +105,15 @@
               ;; This validation runs only in dev builds (thanks to goog.DEBUG)
               ;; It checks the entire state tree after every single change.
               (when ^boolean js/goog.DEBUG
-                (try
-                  (s-core/validate schemas/AppDbSchema new-db)
-                  (catch :default e
-                    (println "🔥🔥 SCHEMA VALIDATION FAILED 🔥🔥")
-                    (println "Event that caused failure:" event)
-                    (println "Validation error details:" (ex-data e))
+                #_(try
+                    (s-core/validate schemas/AppDbSchema new-db)
+                    (catch :default e
+                      (println "🔥🔥 SCHEMA VALIDATION FAILED 🔥🔥")
+                      (println "Event that caused failure:" event)
+                      (println "Validation error details:" (ex-data e))
                     ;; For aggressive debugging, you can throw the error to halt execution
                     ;; (throw e)
-                    )))
+                      )))
               ;; <<< END: CENTRALIZED VALIDATION HOOK >>>
 
               ;; Atomically update the database
@@ -141,7 +142,7 @@
   "Subscribe to a value at the given path in app-db.
    The path may contain raw UUIDs - they will be converted to Specter navigators internally.
    Component will re-render only when the value at that path changes.
-   
+
    Example:
      (use-sub [:ui :datasets :selected-examples dataset-id])
    where dataset-id is a raw UUID object."

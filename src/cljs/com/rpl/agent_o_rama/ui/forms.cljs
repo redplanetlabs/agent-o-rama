@@ -71,7 +71,8 @@
    - :placeholder - Placeholder text
    - :class-name - Additional CSS classes
    - :rows - For textarea, number of rows"
-  [{:keys [label value on-change error required? placeholder class-name type rows]
+  [{:keys [label value on-change error required? placeholder class-name
+           type rows data-id]
     :or {type :text rows 3}}]
 
   (let [input-classes (str "w-full p-3 border rounded-md text-sm transition-colors "
@@ -90,20 +91,24 @@
 
        (case type
          :textarea
-         ($ :textarea {:id field-id
-                       :className input-classes
-                       :value (or value "")
-                       :placeholder placeholder
-                       :rows rows
-                       :onChange #(on-change (.. % -target -value))})
+         ($ :textarea
+            (cond-> {:id field-id
+                     :className input-classes
+                     :value (or value "")
+                     :placeholder placeholder
+                     :rows rows
+                     :onChange #(on-change (.. % -target -value))}
+              data-id (assoc :data-id data-id)))
 
          ;; Default to text input for all other types
-         ($ :input {:id field-id
-                    :type (name type)
-                    :className input-classes
-                    :value (or value "")
-                    :placeholder placeholder
-                    :onChange #(on-change (.. % -target -value))}))
+         ($ :input
+            (cond-> {:id field-id
+                     :type (name type)
+                     :className input-classes
+                     :value (or value "")
+                     :placeholder placeholder
+                     :onChange #(on-change (.. % -target -value))}
+              data-id (assoc :data-id data-id))))
 
        (if error
          ($ :p.text-sm.text-red-600.mt-1 error)
@@ -111,7 +116,7 @@
 
 (defui form-error
   "Reusable error display component.
-   
+
    Props:
    - :error - Error message to display
    - :class-name - Additional CSS classes"
@@ -286,7 +291,7 @@
 (defn- validate-form-fields
   "Validate fields against validators keyed by Specter paths.
    Returns a map {:valid? boolean :errors {nested-error-map}}
-   
+
    The form-state contains both field data and metadata. We need to extract
    only the field data for validation by excluding known metadata keys."
   [form-state validators]
@@ -491,5 +496,3 @@
                                                 :data {}
                                                 :form {:submitting? false
                                                        :error nil}})]))
-
-

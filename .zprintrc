@@ -14,117 +14,118 @@
  ;; @see https://github.com/kkinnear/zprint/blob/master/doc/options/pairs.md
  :binding         {:justify? true :indent 0}
  :fn-map
- {"<<ramaop" [:arg1-body
-              {:list       {:indent-arg 2}
-               :next-inner {:list {:indent-arg 1}}}]
-  "<<ramafn" [:arg1-body
-              {:list       {:indent-arg 2}
-               :next-inner {:list {:indent-arg 1}}}]
-  "<<atomic" [:none-body
-              {:list       {:indent-arg 2}
-               :next-inner {:list {:indent-arg 1}}}]
-  "<<batch" [:arg1-body
-             {:list       {:indent-arg 2}
-              :next-inner {:list {:indent-arg 1}}}]
-  "<<branch" [:arg1-body
-              {:list       {:indent-arg 2}
-               :next-inner {:list {:indent-arg 1}}}]
-  "<<cond" [:arg1-body
-            {:list       {:indent-arg 2}
-             :next-inner {:list {:indent-arg 1}}}]
-  "<<if" [:arg1-force-nl
-          {:list       {:indent-arg 2}
-           :next-inner {:list {:indent-arg 1}}}]
-  "<<query-topology" :arg1-body
-  "<<shadowif" [:arg1-force-nl
-                {:list       {:indent-arg 2}
-                 :next-inner {:list {:indent-arg 1}}}]
-  "<<subsource" :arg1-body
-  "<<switch" :arg1-body
-  ":import" [:flow
-             {:vector    {:fn-format :flow}
-              :vector-fn {:indent 1}}]
-  ":require" [:flow-body {:list {:indent 1}}]
-  "batch<-" [:arg1-body
-               {:list       {:indent-arg 2}
-                :next-inner {:list {:indent-arg 1}}}]
-  "branch>" [:none {:self-indent+ -1}]
-  "bind" [:arg1-body
-          {:list       {:indent-arg 2}
-           :next-inner {:list {:indent-arg 1}}}]
-  "case>" [:none {:self-indent+ -1}]
-  "cf-function" [:arg1-body
-               {:list       {:indent-arg 2}
-                :next-inner {:list {:indent-arg 1}}}]
-  "defdepotpartitioner" [:arg1-body
-                         {:list       {:indent-arg 2}
-                          :next-inner {:list {:indent-arg 1}}}]
-  "deframaop" [:arg1-body
-               {:list       {:indent-arg 2}
-                :next-inner {:list {:indent-arg 1}}}]
-  "deframafn" [:arg1-body
-               {:list       {:indent-arg 2}
-                :next-inner {:list {:indent-arg 1}}}]
-  "default>" [:none {:self-indent+ -1}]
-  "defagentmodule" [:arg1-body
-                      {:list       {:indent-arg 2}
-                       :next-inner {:list {:indent-arg 1}}}]
-  "defbasicsegmacro" [:arg1-body
-                      {:list       {:indent-arg 2}
-                       :next-inner {:list {:indent-arg 1}}}]
+ {"<<ramaop"              [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "<<ramafn"              [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "<<atomic"              [:none-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "<<batch"               [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "<<branch"              [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "<<cond"                [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "<<if"                  [:arg1-force-nl
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "<<query-topology"      :arg1-body
+  "<<shadowif"            [:arg1-force-nl
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "<<subsource"           :arg1-body
+  "<<switch"              :arg1-body
+  ":import"               [:flow
+                           {:vector    {:fn-format :flow}
+                            :vector-fn {:indent 1}}]
+  ":require"              [:flow-body {:list {:indent 1}}]
+  "batch<-"               [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "branch>"               [:none {:self-indent+ -1}]
+  "bind"                  [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "case>"                 [:none {:self-indent+ -1}]
+  "cf-function"           [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "defdepotpartitioner"   [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "deframaop"             [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "deframafn"             [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "default>"              [:none {:self-indent+ -1}]
+  "defagentmodule"        [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "defbasicsegmacro"      [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
   "defbasicblocksegmacro" [:arg1-body
                            {:list       {:indent-arg 2}
                             :next-inner {:list {:indent-arg 1}}}]
-  "defblock" :arg1-body
-  "defconfig" :none-body
-  "defgenerator" [:arg1-body
-                  {:list       {:indent-arg 2}
-                   :next-inner {:list {:indent-arg 1}}}]
-  "definterface" :arg1-body
-  "defmodule" :arg1-body
-  "defnav" :arg1-body
-  "defnk" :arg1-body
-  "defaorrecord" [:arg2-extend
-                  {:list       {:indent-arg 2}
-                   :next-inner {:list {:indent-arg 1}}}]
-  "defrecord+" [:arg2-extend
-                {:list       {:indent-arg 2}
-                 :next-inner {:list {:indent-arg 1}}}]
-  "defrichnav" :arg1-body
-  "defsegmacro" [:arg1-body
-                 {:list       {:indent-arg 2}
-                  :next-inner {:list {:indent-arg 1}}}]
-  "dofor" :arg1-body
-  "dofor-indexed" :arg1-body
-  "doreduce" :arg1-body
-  "doto" [:arg1-body
-          {:list       {:indent-arg 2}
-           :next-inner {:list {:indent-arg 1}}}]
-  "else>" [:none {:self-indent+ -1}]
-  "extend-protocol" [:arg2-fn
-                     {:list       {:indent-arg 2}
-                      :next-inner {:list {:indent-arg 1}}}]
-  "extend-protocolpath" [:arg2
-                         {:list       {:indent-arg 2}
-                          :next-inner {:list {:indent-arg 1}}}]
-  "finally" [:none-body
-             {:list       {:indent-arg 2}
-              :next-inner {:list {:indent-arg 1}}}]
-  "generator" :arg1-body
-  "+group-by" [:arg1-body
-               {:list       {:indent-arg 2}
-                :next-inner {:list {:indent-arg 1}}}]  "if-path" :arg1-body
-  "ifexpr" :arg1-body
+  "defblock"              :arg1-body
+  "defconfig"             :none-body
+  "defgenerator"          [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "definterface"          :arg1-body
+  "defmodule"             :arg1-body
+  "defnav"                :arg1-body
+  "defnk"                 :arg1-body
+  "defaorrecord"          [:arg2-extend
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "defrecord+"            [:arg2-extend
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "defrichnav"            :arg1-body
+  "defsegmacro"           [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "dofor"                 :arg1-body
+  "dofor-indexed"         :arg1-body
+  "doreduce"              :arg1-body
+  "doto"                  [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "else>"                 [:none {:self-indent+ -1}]
+  "extend-protocol"       [:arg2-fn
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "extend-protocolpath"   [:arg2
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "finally"               [:none-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "generator"             :arg1-body
+  "+group-by"             [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "if-path"               :arg1-body
+  "ifexpr"                :arg1-body
   "locking"
   [:arg1-body
    {:list       {:indent-arg 2}
     :next-inner {:list {:indent-arg 1}}}]
-  "loop" :binding
-  "loop<-" [:arg1-body
-            {:list       {:indent-arg 2}
-             :next-inner {:list {:indent-arg 1}}}]
-  "map" :none
-  "mapv" :none
+  "loop"                  :binding
+  "loop<-"                [:arg1-body
+                           {:list       {:indent-arg 2}
+                            :next-inner {:list {:indent-arg 1}}}]
+  "map"                   :none
+  "mapv"                  :none
   "module"
   [:arg1-body
    {:list       {:indent-arg 2}
@@ -166,13 +167,12 @@
   [:arg1-body
    {:list       {:indent-arg 2}
     :next-inner {:list {:indent-arg 1}}}]
-  "transform>"      :arg1-body
-  "while"           :arg1-body
-  "with-agent-env"  :arg1-body
-  "with-postmortem" :arg2
-  "with-retriever"  :arg1-body
-  "with-system"     :arg1-body
-  "with-webdriver"  :arg1-body
+  "transform>"            :arg1-body
+  "while"                 :arg1-body
+  "with-postmortem"       :arg2
+  "with-retriever"        :arg1-body
+  "with-system"           :arg1-body
+  "with-webdriver"        :arg1-body
  }
  :factor-output-streams? true
  ;; see https://github.com/kkinnear/zprint/issues/187

@@ -19,16 +19,18 @@
    [reitit.coercion :as coercion]
    [reitit.coercion.malli :as malli]
    ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon ChevronLeftIcon ChevronRightIcon
-                                          RectangleStackIcon ChartBarIcon BeakerIcon Cog6ToothIcon]]
+                                          RectangleStackIcon ChartBarIcon BeakerIcon Cog6ToothIcon BoltIcon]]
 
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.forms :refer [global-modal-component]]
    [com.rpl.agent-o-rama.ui.queries :as queries]
-   [com.rpl.agent-o-rama.ui.events]
+   [com.rpl.agent-o-rama.ui.events] ;; Ensure event handlers are registered at app startup
    [com.rpl.agent-o-rama.ui.experiments.forms]
-   [com.rpl.agent-o-rama.ui.datasets.add-from-trace])) ;; Ensure event handlers are registered at app startup
+   [com.rpl.agent-o-rama.ui.datasets.add-from-trace]
+   [com.rpl.agent-o-rama.ui.rules :as rules]
+   [com.rpl.agent-o-rama.ui.action-log :as action-log]))
 
 (def routes
   [""
@@ -53,6 +55,9 @@
       ["/invocations"
        ["" {:name :agent/invocations, :views [agents/invocations]}]
        ["/:invoke-id" {:name :agent/invocation-detail, :views [agents/invoke]}]]
+      ["/rules"
+       ["" {:name :agent/rules, :views [rules/rules-page]}]
+       ["/:rule-name/action-log" {:name :agent/action-log, :views [action-log/action-log-page]}]]
       ["/config" {:name :agent/config, :views [config-page/config-page]}]]]]])
 
 (defui ViewStack []
@@ -125,6 +130,11 @@
                     :location location :collapsed? collapsed? :title "Invocations"}
           ($ RectangleStackIcon {:className "h-5 w-5 flex-shrink-0"})
           (when-not collapsed? ($ :span.ml-3 "Invocations")))
+
+       ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/rules")
+                    :location location :collapsed? collapsed? :title "Rules/Actions"}
+          ($ BoltIcon {:className "h-5 w-5 flex-shrink-0"})
+          (when-not collapsed? ($ :span.ml-3 "Rules/Actions")))
 
        ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/config")
                     :location location :collapsed? collapsed? :title "Config"}
@@ -232,13 +242,24 @@
 
 (defui breadcrumb []
   (let [match (state/use-sub [:route])
-        {:keys [module-id agent-name dataset-id invoke-id]} (or (:path-params match) {})
+        {:keys [module-id agent-name dataset-id invoke-id rule-name]} (or (:path-params match) {})
         route-name (get-in match [:data :name])
 
         ;; Build breadcrumb items based on current route
         build-breadcrumbs (fn []
                             (let [items []]
                               (cond
+                                ;; Action log for a specific rule
+                                (and module-id agent-name rule-name)
+                                [{:label (common/url-decode module-id)
+                                  :path (rfe/href :module/detail {:module-id module-id})}
+                                 {:label (common/url-decode agent-name)
+                                  :path (rfe/href :agent/detail {:module-id module-id :agent-name agent-name})}
+                                 {:label "Rules"
+                                  :path (rfe/href :agent/rules {:module-id module-id :agent-name agent-name})}
+                                 {:label (common/url-decode rule-name)
+                                  :path nil}] ; Current page
+
                                 ;; Agent invocation detail
                                 (and module-id agent-name invoke-id)
                                 [{:label (common/url-decode module-id)
@@ -258,6 +279,7 @@
                                   :path (rfe/href :agent/detail {:module-id module-id :agent-name agent-name})}
                                  {:label (case route-name
                                            :agent/invocations "Invocations"
+                                           :agent/rules "Rules"
                                            :agent/config "Config"
                                            :agent/stats "Stats"
                                            "Agent")
