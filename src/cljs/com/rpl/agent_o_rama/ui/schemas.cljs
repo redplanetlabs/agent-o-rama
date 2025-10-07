@@ -129,7 +129,9 @@
               :modal            ModalStateSchema
               :hitl             HitlStateSchema
               :datasets         DatasetsUiSchema
-              (s/optional-key :manual-run) ManualRunSchema})
+              (s/optional-key :manual-run) ManualRunSchema
+              (s/optional-key :node-details)
+              {:active-tab (s/enum :feedback :info)}})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Top-Level App DB Schema

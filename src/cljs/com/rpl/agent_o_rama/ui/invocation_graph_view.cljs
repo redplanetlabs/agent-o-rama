@@ -520,8 +520,10 @@
 
               :feedback
               ($ :div {:data-id "node-feedback-container"}
-                 ($ feedback/feedback-list {:feedback-data feedback
-                                            :module-id module-id}))
+                 (when feedback
+                   ($ feedback/feedback-list
+                      {:feedback-data feedback
+                       :module-id     module-id})))
 
               ;; Default case
               nil))))))
