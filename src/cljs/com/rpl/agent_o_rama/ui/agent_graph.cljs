@@ -312,7 +312,8 @@
                                     ($ :div {:className "relative"}
                                        ($ :div {:className node-className
                                                 :style {:width "170px" :height "40px"}}
-                                          label)
+                                          ($ :div {:className "truncate" :title label}
+                                             label))
                                        ($ Handle {:type "target" :position "top" :style {:display "none"}})
                                        ($ Handle {:type "source" :position "bottom" :style {:display "none"}})))))})
                      :edgeTypes
