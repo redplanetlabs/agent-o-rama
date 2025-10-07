@@ -7,10 +7,12 @@
 
 (def sample-feedback-data
   "Sample feedback data matching FEEDBACK-SCHEMA structure"
-  {:actions {"agent-single-eval" {:task-id 0
-                                  :agent-invoke-id #uuid "0199bef6-04f5-753f-a6d2-91f1c5e779ff"}
-             "agent-dual-eval"   {:agent-invoke-id #uuid "0199bef6-04f5-773b-a6d3-4b83640befa7"
-                                  :task-id 0}}
+  {:actions {"agent-single-eval"  {:task-id         0
+                                   :agent-invoke-id #uuid "0199bef6-04f5-753f-a6d2-91f1c5e779ff"}
+             "agent-dual-eval"    {:agent-invoke-id #uuid "0199bef6-04f5-773b-a6d3-4b83640befa7"
+                                   :task-id         0}
+             "agent-numeric-eval" {:task-id         0
+                                   :agent-invoke-id #uuid "0199bef6-04f5-773b-a6d3-4b83640befa8"}}
    :results [{:source      {:eval-name    "dual-eval"
                             :agent-invoke {:agent-invoke-id #uuid "0199bef6-04f5-773b-a6d3-4b83640befa7"
                                            :task-id         0}
@@ -25,7 +27,16 @@
                                            :agent-invoke-id #uuid "0199bef6-04f5-753f-a6d2-91f1c5e779ff"}}
               :modified-at 1759845419722
               :created-at  1759845419722
-              :scores      {"quality" true}}]})
+              :scores      {"quality" true}}
+             {:source      {:source       "action[FeedbackTestAgent/agent-numeric-eval]"
+                            :eval-name    "numeric-eval"
+                            :agent-invoke {:task-id         0
+                                           :agent-invoke-id #uuid "0199bef6-04f5-773b-a6d3-4b83640befa8"}}
+              :modified-at 1759845420500
+              :created-at  1759845420500
+              :scores      {:accuracy  0.95
+                            :precision 0.87
+                            :recall    0.92}}]})
 
 ;;; Tests for format-ms
 
@@ -57,11 +68,11 @@
 
     (testing "actions is a map"
       (is (map? (:actions sample-feedback-data)))
-      (is (= 2 (count (:actions sample-feedback-data)))))
+      (is (= 3 (count (:actions sample-feedback-data)))))
 
     (testing "results is a vector"
       (is (vector? (:results sample-feedback-data)))
-      (is (= 2 (count (:results sample-feedback-data)))))
+      (is (= 3 (count (:results sample-feedback-data)))))
 
     (testing "each result has required keys"
       (doseq [result (:results sample-feedback-data)]
@@ -91,6 +102,15 @@
       (let [second-result (second (:results sample-feedback-data))
             scores (:scores second-result)]
         (is (= true (get scores "quality")))))
+
+    (testing "third result has keyword keys and numeric values"
+      (let [third-result (nth (:results sample-feedback-data) 2)
+            scores (:scores third-result)]
+        (is (= 0.95 (:accuracy scores)))
+        (is (= 0.87 (:precision scores)))
+        (is (= 0.92 (:recall scores)))
+        (is (every? keyword? (keys scores)))
+        (is (every? number? (vals scores)))))
 
     (testing "source strings contain agent name"
       (let [first-source (get-in sample-feedback-data [:results 0 :source :source])
@@ -173,15 +193,16 @@
   (testing "complete feedback data processing"
     (testing "can access all feedback results"
       (let [results (:results sample-feedback-data)]
-        (is (= 2 (count results)))
+        (is (= 3 (count results)))
         (is (every? #(contains? % :scores) results))
         (is (every? #(contains? % :source) results))))
 
     (testing "can access all actions"
       (let [actions (:actions sample-feedback-data)]
-        (is (= 2 (count actions)))
+        (is (= 3 (count actions)))
         (is (contains? actions "agent-single-eval"))
-        (is (contains? actions "agent-dual-eval"))))
+        (is (contains? actions "agent-dual-eval"))
+        (is (contains? actions "agent-numeric-eval"))))
 
     (testing "can format all timestamps"
       (let [results (:results sample-feedback-data)]
@@ -193,5 +214,12 @@
 
     (testing "all scores are accessible"
       (let [all-scores (mapcat #(seq (:scores %)) (:results sample-feedback-data))]
-        (is (= 3 (count all-scores)))
-        (is (every? (fn [[k v]] (and (string? k) (some? v))) all-scores))))))
+        (is (= 6 (count all-scores)))
+        (is (every? (fn [[k v]] (some? v)) all-scores))))
+
+    (testing "mixed score key types"
+      (let [results (:results sample-feedback-data)
+            string-key-scores (filter #(every? string? (keys (:scores %))) results)
+            keyword-key-scores (filter #(every? keyword? (keys (:scores %))) results)]
+        (is (= 2 (count string-key-scores)))
+        (is (= 1 (count keyword-key-scores)))))))
