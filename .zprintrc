@@ -171,7 +171,7 @@
   "with-agent-env"  :arg1-body
   "with-postmortem" :arg2
   "with-retriever"  :arg1-body
-  "with-system"     :none-body
+  "with-system"     :arg1-body
   "with-webdriver"  :arg1-body
  }
  :factor-output-streams? true

@@ -6,4 +6,6 @@
  :hooks
  {:analyze-call
   {com.rpl.agent-o-rama.ui.trace-analytics-e2e-test/with-webdriver
-   hooks.trace-analytics-e2e-test/with-webdriver}}}
+   hooks.trace-analytics-e2e-test/with-webdriver
+   com.rpl.agent-o-rama.ui.etaoin-test-helpers/with-system
+   hooks.etaoin-test-helpers/with-system}}}

@@ -37,6 +37,9 @@ CLAUDE.md
 # clojure-mcp
 .clojure-mcp/code_index.txt
 
+# clj-kondo hooks (exception to global gitignore)
+!.clj-kondo/hooks/
+
 # playwright
 test-results/
 playwright-report/
