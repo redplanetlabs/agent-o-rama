@@ -1029,7 +1029,8 @@
                                                        ($ :div {:className "relative"}
                                                           ($ :div {:className node-className
                                                                    :style {:width "170px" :height "40px" :opacity (if is-affected "0.6" "1.0")}}
-                                                             label)
+                                                             ($ :div {:className "truncate" :title label}
+                                                                label))
                                                           ;; Consolidated status indicator bar in top-right corner
                                                           ($ node-status-bar {:in-progress? in-progress?
                                                                               :is-stuck? is-stuck?
@@ -1052,7 +1053,8 @@
                                                                            (on-paginate-node missing-node-id))}
                                                           ($ :div {:className "bg-gray-100 text-gray-600 p-3 rounded-md shadow-lg border-2 border-dashed border-gray-400 hover:bg-gray-200 transition-colors"
                                                                    :style {:width "170px" :height "40px"}}
-                                                             (:label data))
+                                                             ($ :div {:className "truncate" :title (:label data)}
+                                                                (:label data)))
                                                           ($ Handle {:type "target" :position "top"})))))})
                              :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}}
                              :onNodeClick (fn [_ node] (handle-select-node-click node))}
