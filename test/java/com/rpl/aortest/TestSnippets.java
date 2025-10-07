@@ -126,7 +126,6 @@ public class TestSnippets {
   }
 
   public static AgentInvoke initiateWithContext(AgentClient client) {
-    // {"l" 1 "i" (int 1) "f" (float 0.5) "d" (double 0.5) "s" "abc" "b" true}
     return client.initiateWithContext(
       AgentContext.metadata("l", 1L)
                   .metadata("i", 1)
@@ -134,5 +133,14 @@ public class TestSnippets {
                   .metadata("d", 0.5d)
                   .metadata("s", "abc")
                   .metadata("b", true));
+  }
+
+  public static void setMetadata(AgentClient client, AgentInvoke inv) {
+    client.setMetadata(inv, "l", 1L);
+    client.setMetadata(inv, "i", 1);
+    client.setMetadata(inv, "f", 0.5);
+    client.setMetadata(inv, "d", 0.5d);
+    client.setMetadata(inv, "s", "abc");
+    client.setMetadata(inv, "b", true);
   }
 }
