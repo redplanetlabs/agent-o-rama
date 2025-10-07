@@ -22,9 +22,9 @@
    It uses a PStateStore to track the number of times a node has been entered for a given run,
    allowing simulation of retries."
   [agent-node control-params current-node-name]
-  (let [{"fail-at-node" fail-at-node
-         "retries-before-success" retries-before-success
-         "run-id" run-id} control-params]
+  (let [fail-at-node (get control-params "fail-at-node")
+        retries-before-success (get control-params "retries-before-success")
+        run-id (get control-params "run-id")]
     ;; Only check for failure if this is the target node
     (when (= fail-at-node current-node-name)
       (let [retry-store (aor/get-store agent-node E2E_RETRY_STORE)
@@ -75,7 +75,7 @@
          (if (str/includes? (str output) fail-trigger)
            (throw (ex-info "Intentional evaluator failure." {"trigger" fail-trigger}))
            {"passed?" true}))))
-   {"params" {"fail_if_contains" {"description" "Substring that causes failure."}}})
+   {:params {"fail_if_contains" {:description "Substring that causes failure."}}})
 
   ;; A comparative evaluator for testing that part of the UI.
   (aor/declare-comparative-evaluator-builder
