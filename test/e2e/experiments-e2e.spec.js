@@ -20,13 +20,13 @@ const agentToRun = 'E2ETestAgent';
 // Evaluator Definitions
 const randomFloatEvaluator = {
   name: `e2e-random-float-${uniqueId}`,
-  builderName: 'e2e/random-float',
+  builderName: 'random-float',
   description: 'Returns a random float for sorting tests.',
 };
 
 const failingEvaluator = {
   name: `e2e-failing-eval-${uniqueId}`,
-  builderName: 'e2e/fail-on-output',
+  builderName: 'fail-on-output',
   description: 'Fails when output contains a specific trigger.',
   params: { fail_if_contains: 'trigger-eval-failure' },
 };
@@ -42,7 +42,7 @@ const examples = [
         'output-value': 'A successful run!',
       },
     },
-    reference_output: 'A successful run!',
+    output: 'A successful run!',
   },
   {
     // #2: Node failure with successful retry
@@ -54,7 +54,7 @@ const examples = [
         'output-value': 'Succeeded after one retry.',
       },
     },
-    reference_output: 'Succeeded after one retry.',
+    output: 'Succeeded after one retry.',
   },
   {
     // #3: Agent failure (exceeds max retries)
@@ -66,7 +66,7 @@ const examples = [
         'output-value': 'This should never be reached.',
       },
     },
-    reference_output: 'N/A',
+    output: 'N/A',
   },
   {
     // #4: Successful agent run that triggers an evaluator failure
@@ -76,7 +76,7 @@ const examples = [
         'output-value': 'trigger-eval-failure',
       },
     },
-    reference_output: 'trigger-eval-failure',
+    output: 'trigger-eval-failure',
   },
 ];
 
