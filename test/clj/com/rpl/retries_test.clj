@@ -201,7 +201,8 @@
            (fn []
              (let [s @checks-atom]
                (foreign-append! check-depot nil)
-               (is (condition-attained? (= (+ 1 s) @checks-atom)))
+               (when-not (condition-attained? (= (+ 1 s) @checks-atom))
+                 (throw (ex-info "Didn't make progress" {:checks @checks-atom})))
              )))
 
          (bind reset-test!
