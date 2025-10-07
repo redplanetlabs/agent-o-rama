@@ -316,6 +316,7 @@
              (aor-types/->valid-RegularExperiment
               (aor-types/->valid-ExperimentTarget
                (aor-types/->valid-AgentTarget "foo")
+               {}
                ["\"counts\"" "$"]
               ))
              2
@@ -553,9 +554,11 @@
              (aor-types/->valid-ComparativeExperiment
               [(aor-types/->valid-ExperimentTarget
                 (aor-types/->valid-NodeTarget "foo" "a")
+                {}
                 ["$.a" "$.b"])
                (aor-types/->valid-ExperimentTarget
                 (aor-types/->valid-AgentTarget "foo")
+                {}
                 ["\"other\"" "$.a" "$.b"])])
              1
              2)))
@@ -667,6 +670,7 @@
              (aor-types/->valid-RegularExperiment
               (aor-types/->valid-ExperimentTarget
                (aor-types/->valid-NodeTarget "foo" "b")
+               {}
                ["\"$.a\"" "$.b"]
               ))
              1
@@ -734,6 +738,7 @@
              (aor-types/->valid-RegularExperiment
               (aor-types/->valid-ExperimentTarget
                (aor-types/->valid-NodeTarget "foo" "b")
+               {}
                ["$" "\"!\""]
               ))
              1
@@ -787,6 +792,7 @@
              (aor-types/->valid-RegularExperiment
               (aor-types/->valid-ExperimentTarget
                (aor-types/->valid-NodeTarget "foo" "b")
+               {}
                ["$" "\"!!!\""]
               ))
              1
@@ -832,6 +838,7 @@
              (aor-types/->valid-RegularExperiment
               (aor-types/->valid-ExperimentTarget
                (aor-types/->valid-NodeTarget "foo" "b")
+               {}
                ["$" "\"!!!\""]
               ))
              1
@@ -871,6 +878,7 @@
              (aor-types/->valid-RegularExperiment
               (aor-types/->valid-ExperimentTarget
                (aor-types/->valid-NodeTarget "foo" "notanode")
+               {}
                ["$"]
               ))
              1
@@ -916,6 +924,7 @@
              (aor-types/->valid-RegularExperiment
               (aor-types/->valid-ExperimentTarget
                (aor-types/->valid-NodeTarget "foo" "a")
+               {}
                ["$" "$"]
               ))
              1
@@ -942,6 +951,7 @@
              (aor-types/->valid-RegularExperiment
               (aor-types/->valid-ExperimentTarget
                (aor-types/->valid-NodeTarget "foo" "a")
+               {}
                ["$" "$"]
               ))
              1
@@ -969,6 +979,7 @@
              (aor-types/->valid-RegularExperiment
               (aor-types/->valid-ExperimentTarget
                (aor-types/->valid-NodeTarget "foo" "a")
+               {}
                ["$" "$"]
               ))
              1
@@ -1004,9 +1015,11 @@
              (aor-types/->valid-ComparativeExperiment
               [(aor-types/->valid-ExperimentTarget
                 (aor-types/->valid-NodeTarget "foo" "a")
+                {}
                 ["$.a" "$.b"])
                (aor-types/->valid-ExperimentTarget
                 (aor-types/->valid-AgentTarget "foo")
+                {}
                 ["\"other\"" "$.a" "$.b"])])
              1
              2)))
@@ -1137,6 +1150,7 @@
            (aor-types/->valid-RegularExperiment
             (aor-types/->valid-ExperimentTarget
              (aor-types/->valid-AgentTarget "foo")
+             {}
              ["$"]
             ))
            1
@@ -1199,6 +1213,7 @@
            (aor-types/->valid-RegularExperiment
             (aor-types/->valid-ExperimentTarget
              (aor-types/->valid-NodeTarget "foo" "a")
+             {}
              ["$"]
             ))
            1
@@ -1264,6 +1279,7 @@
            (aor-types/->valid-RegularExperiment
             (aor-types/->valid-ExperimentTarget
              (aor-types/->valid-AgentTarget "foo")
+             {}
              ["$"]
             ))
            1
@@ -1315,9 +1331,11 @@
            (aor-types/->valid-ComparativeExperiment
             [(aor-types/->valid-ExperimentTarget
               (aor-types/->valid-AgentTarget "foo")
+              {}
               ["$"])
              (aor-types/->valid-ExperimentTarget
               (aor-types/->valid-NodeTarget "foo" "a")
+              {}
               ["$"])])
            1
            2)))
@@ -1539,6 +1557,7 @@
            (aor-types/->valid-RegularExperiment
             (aor-types/->valid-ExperimentTarget
              (aor-types/->valid-AgentTarget "foo")
+             {}
              ["$"]))
            1
            1)))
@@ -1605,6 +1624,7 @@
            (aor-types/->valid-RegularExperiment
             (aor-types/->valid-ExperimentTarget
              (aor-types/->valid-AgentTarget "foo")
+             {}
              ["$"]))
            1
            1)))
@@ -1669,9 +1689,11 @@
            (aor-types/->valid-ComparativeExperiment
             [(aor-types/->valid-ExperimentTarget
               (aor-types/->valid-AgentTarget "foo")
+              {}
               ["$"])
              (aor-types/->valid-ExperimentTarget
               (aor-types/->valid-AgentTarget "foo")
+              {}
               ["$"])])
            1
            1)))
@@ -1747,6 +1769,7 @@
            (aor-types/->valid-RegularExperiment
             (aor-types/->valid-ExperimentTarget
              (aor-types/->valid-AgentTarget "foo")
+             {}
              ["$"]))
            1
            1)))
@@ -1877,6 +1900,7 @@
            (aor-types/->valid-RegularExperiment
             (aor-types/->valid-ExperimentTarget
              (aor-types/->valid-AgentTarget "foo")
+             {}
              ["$"]))
            1
            1))
@@ -1895,9 +1919,11 @@
            (aor-types/->valid-ComparativeExperiment
             [(aor-types/->valid-ExperimentTarget
               (aor-types/->valid-AgentTarget "foo")
+              {}
               ["$"])
              (aor-types/->valid-ExperimentTarget
               (aor-types/->valid-AgentTarget "foo")
+              {}
               ["$"])])
            1
            1))

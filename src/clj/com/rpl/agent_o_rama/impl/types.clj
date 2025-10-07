@@ -526,8 +526,8 @@
 
 (defaorrecord ExperimentTarget
   [target-spec :- (s/protocol TargetSpec)
+   metadata :- METADATA-SCHEMA
    ;; these are list of JSON path templates
-   ;; TODO: <<<<>>> need metadata here, which is included for nodes as well
    input->args :- [String]])
 
 (defprotocol ExperimentSpec

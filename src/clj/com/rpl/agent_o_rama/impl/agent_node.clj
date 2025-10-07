@@ -413,6 +413,10 @@
           (close [this]
             (close! client))
           aor-types/AgentClientInternal
+          (invoke-with-context-async-internal [this context args]
+            (aor-types/invoke-with-context-async-internal client context args))
+          (initiate-with-context-async-internal [this context args]
+            (aor-types/initiate-with-context-async-internal client context args))
           (subagent-next-step-async [this agent-invoke]
             (aor-types/subagent-next-step-async client agent-invoke))
           aor-types/UnderlyingObjects

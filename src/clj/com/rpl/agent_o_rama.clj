@@ -1097,11 +1097,11 @@
 
 (defn agent-initiate-with-context-async
   ^CompletableFuture [agent-client context & args]
-  (aor-types/initiate-with-context-async-internal agent-client context (into [] args)))
+  (apply c/agent-initiate-with-context-async agent-client context args))
 
 (defn agent-initiate-with-context
   ^AgentInvoke [agent-client context & args]
-  (.get ^CompletableFuture (apply agent-initiate-with-context-async agent-client context args)))
+  (apply c/agent-initiate-with-context agent-client context args))
 
 (defn agent-fork
   [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
