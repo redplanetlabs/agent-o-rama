@@ -120,13 +120,13 @@
     (reify
      AgentContext$Impl
      (^AgentContext$Impl metadata [this ^String name ^int val]
-       (vswap! metadata assoc name val)
+       (vswap! metadata assoc name (long val))
        this)
      (^AgentContext$Impl metadata [this ^String name ^long val]
        (vswap! metadata assoc name val)
        this)
      (^AgentContext$Impl metadata [this ^String name ^float val]
-       (vswap! metadata assoc name val)
+       (vswap! metadata assoc name (double val))
        this)
      (^AgentContext$Impl metadata [this ^String name ^double val]
        (vswap! metadata assoc name val)
