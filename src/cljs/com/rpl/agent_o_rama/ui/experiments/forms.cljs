@@ -66,7 +66,7 @@
 ;; REUSABLE SUB-COMPONENTS FOR THE FORM
 ;; =============================================================================
 
-(defui AgentSelectorDropdown [{:keys [module-id selected-agent on-select-agent disabled?]}]
+(defui AgentSelectorDropdown [{:keys [module-id selected-agent on-select-agent disabled? data-testid]}]
   (let [{:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:module-agents module-id]
@@ -95,7 +95,8 @@
         :items agent-items
         :loading? loading?
         :error? error
-        :empty-content empty-content})))
+        :empty-content empty-content
+        :data-testid data-testid})))
 
 (defui EvaluatorSelector [{:keys [module-id selected-evaluators on-change]}]
   (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
@@ -257,7 +258,8 @@
           ($ AgentSelectorDropdown
              {:module-id module-id
               :selected-agent selected-agent-name
-              :on-select-agent handle-select-agent}))
+              :on-select-agent handle-select-agent
+              :data-testid "agent-name-dropdown"}))
 
        ;; Conditionally render node name dropdown
        (when (= (:value target-spec-type-field) :node)
@@ -270,7 +272,8 @@
                 :items node-items
                 :loading? (:loading? graph-query)
                 :error? (:error graph-query)
-                :empty-content ($ :div.px-4.py-2.text-sm.text-gray-500 "No nodes found for this agent.")})
+                :empty-content ($ :div.px-4.py-2.text-sm.text-gray-500 "No nodes found for this agent.")
+                :data-testid "node-name-dropdown"})
             (when (:error node-name-field)
               ($ :p.text-sm.text-red-600.mt-1 (:error node-name-field)))))
 

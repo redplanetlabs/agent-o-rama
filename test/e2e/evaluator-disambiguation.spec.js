@@ -104,10 +104,13 @@ test.describe('Evaluator Metric Name Disambiguation', () => {
     // Select Target Type: Node
     await expModal.locator('select').first().selectOption('node');
     
-    // Select the agent and node
-    await expModal.getByRole('button', { name: /Select an agent/i }).click();
+    // Select the agent
+    await expModal.getByTestId('agent-name-dropdown').click();
     await expModal.getByText(agentToRun, { exact: true }).click();
-    await expModal.getByLabel('Node Name').fill('write-section');
+    
+    // Select the node from dropdown
+    await expModal.getByTestId('node-name-dropdown').click();
+    await expModal.getByText('write-section', { exact: true }).click();
 
     // Configure input mappings for node (expects 3 args: persona, messages, context)
     const mappingsSection = expModal.locator('div').filter({ hasText: /^Input Mappings/ });
