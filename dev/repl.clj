@@ -7,7 +7,8 @@
    [shadow.cljs.devtools.api :as shadow]
    [shadow.cljs.devtools.server]
    [com.rpl.agent.basic.basic-agent :as basic-agent]
-   [com.rpl.agent.research-agent :as research-agent])
+   [com.rpl.agent.research-agent :as research-agent]
+   [com.rpl.agent.e2e-test-agent :as e2e-test-agent])
   (:import
    [dev.langchain4j.data.message
     SystemMessage
@@ -46,6 +47,10 @@
   (rtest/launch-module!
    ipc
    research-agent/ResearchAgentModule
+   {:tasks 1 :threads 1})
+  (rtest/launch-module!
+   ipc
+   e2e-test-agent/E2ETestAgentModule
    {:tasks 1 :threads 1}))
 
 (comment
