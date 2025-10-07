@@ -216,10 +216,13 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     // Select Target Type: Node (the control is a <select>)
     await expModal.locator('select').first().selectOption('node');
 
-    // Select the agent and node
-    await expModal.getByRole('button', { name: /Select an agent/i }).click();
+    // Select the agent
+    await expModal.getByTestId('agent-name-dropdown').click();
     await expModal.getByText(agentToRun, { exact: true }).click();
-    await expModal.getByLabel('Node Name').fill('write-section');
+    
+    // Select the node from dropdown
+    await expModal.getByTestId('node-name-dropdown').click();
+    await expModal.getByText('write-section', { exact: true }).click();
 
     // Configure input mappings (ensure we have 3 and fill them)
     const mappingsSection = expModal.locator('div').filter({ hasText: /^Input Mappings/ });
@@ -254,10 +257,11 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     // ---
     // We navigate directly to the experiment detail page after starting
     await expect(page).toHaveURL(/experiments\//, { timeout: 30000 });
-    // Wait until the page shows a status (Running or Completed)
-    await expect(page.getByText(/Running|Completed/)).toBeVisible({ timeout: 30000 });
+    // Wait for the status badge (not the table cell)
+    const statusBadge = page.locator('.bg-blue-100, .bg-green-100').filter({ hasText: /Running|Completed/ });
+    await expect(statusBadge).toBeVisible({ timeout: 30000 });
     // Then wait for completion
-    await expect(page.getByText('Completed')).toBeVisible({ timeout: 120000 });
+    await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 120000 });
     console.log('Experiment completed.');
     
     // Check for the evaluator results in the detailed view
@@ -297,8 +301,8 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     // 7b. Verify the form is pre-filled with the original experiment's data
     await expect(rerunModal.getByLabel('Experiment Name')).toHaveValue(`Copy of ${experimentName}`);
     await expect(rerunModal.locator('select').first()).toHaveValue('node');
-    await expect(rerunModal.getByRole('button', { name: agentToRun })).toBeVisible();
-    await expect(rerunModal.getByLabel('Node Name')).toHaveValue('write-section');
+    await expect(rerunModal.getByTestId('agent-name-dropdown')).toHaveText(agentToRun);
+    await expect(rerunModal.getByTestId('node-name-dropdown')).toHaveText('write-section');
     
     // Verify input mappings using more specific selectors
     const inputMappingsSection = rerunModal.locator('div').filter({ hasText: /^Input Mappings/ });
@@ -329,7 +333,7 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     await expect(page.getByRole('heading', { name: rerunExperimentName })).toBeVisible();
 
     // Wait for completion and verify results, just like the first run
-    await expect(page.getByText('Completed')).toBeVisible({ timeout: 120000 });
+    await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 120000 });
     console.log('Re-run experiment completed.');
     
     const rerunResultsTable = page.locator('table').filter({ hasText: 'Input' });

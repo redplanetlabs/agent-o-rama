@@ -107,7 +107,7 @@ async function runAndVerifyExperiment(page, { experimentName, snapshot, selector
   }
 
   // Configure Target Agent
-  await modal.getByRole('button', { name: /Select an agent/ }).click();
+  await modal.getByTestId('agent-name-dropdown').click();
   await modal.getByText(agentToRun, { exact: true }).click();
   await modal.locator('div').filter({ hasText: /^Input Mappings/ }).getByRole('textbox').fill('$');
   
@@ -123,7 +123,7 @@ async function runAndVerifyExperiment(page, { experimentName, snapshot, selector
 
   // 3. Wait for completion and verify results
   await expect(page).toHaveURL(/experiments\//, { timeout: 30000 });
-  await expect(page.getByText('Completed')).toBeVisible({ timeout: 120000 }); // Wait up to 2 mins for completion
+  await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 120000 }); // Wait up to 2 mins for completion
   console.log('Experiment completed.');
 
   // The most important check: verify the number of examples it ran on.

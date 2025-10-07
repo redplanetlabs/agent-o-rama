@@ -141,7 +141,7 @@ test.describe('Evaluator Metric Name Disambiguation', () => {
     // ---
     console.log('--- PHASE 3: VERIFICATION ---');
     await expect(page).toHaveURL(/experiments\//, { timeout: 30000 });
-    await expect(page.getByText('Completed')).toBeVisible({ timeout: 120000 });
+    await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 120000 });
     console.log('Experiment completed.');
 
     const resultsTable = page.locator('table').filter({ hasText: 'Input' });
