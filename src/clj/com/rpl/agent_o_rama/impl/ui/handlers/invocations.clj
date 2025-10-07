@@ -46,10 +46,14 @@
 
           ;; Add aggregated stats to the stats object
           summary-info (merge
-                        {:forks (foreign-select-one [(keypath agent-id) :forks (sorted-set-range-to-end 100)]
-                                                    root-pstate
-                                                    {:pkey agent-task-id})}
-                        summary-info-raw
+                        {:forks (foreign-select-one
+                                 [(keypath agent-id) :forks (sorted-set-range-to-end 100)]
+                                 root-pstate
+                                 {:pkey agent-task-id})}
+                        (transform
+                         [:feedback :results ALL :source :source]
+                         aor-types/source-string
+                         summary-info-raw)
                         (when-let [stats (:stats summary-info-raw)]
                           {:stats (merge {:aggregated-stats (stats/aggregated-basic-stats stats)} stats)}))
 
