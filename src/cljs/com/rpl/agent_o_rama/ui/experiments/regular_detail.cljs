@@ -366,6 +366,28 @@
 (defui ResultsTable [{:keys [results target module-id]}]
   (let [[show-full-text? set-show-full-text] (uix/use-state false)
         [active-filter set-active-filter] (uix/use-state :all)
+        [sort-by set-sort-by] (uix/use-state nil) ; nil or {:eval-name "...", :metric-key :...}
+        [reverse-sort? set-reverse-sort] (uix/use-state false)
+
+        ;; Collect all available evaluator metrics
+        available-metrics (reduce
+                           (fn [acc run]
+                             (reduce-kv
+                              (fn [acc2 eval-name metrics]
+                                (reduce-kv
+                                 (fn [acc3 metric-key _metric-val]
+                                   (conj acc3 {:eval-name eval-name
+                                               :metric-key metric-key
+                                               :label (str (evaluators/identifier-title eval-name) 
+                                                          " / " 
+                                                          (evaluators/metric-title metric-key))}))
+                                 acc2
+                                 metrics))
+                              acc
+                              (:evals run)))
+                           #{}
+                           results)
+        available-metrics-vec (vec (sort-by :label available-metrics))
 
         ;; NEW: Filtering logic
         is-failure? (fn [run]
@@ -377,20 +399,65 @@
         filtered-results (case active-filter
                            :all results
                            :success (filter is-success? results)
-                           :failure (filter is-failure? results))]
+                           :failure (filter is-failure? results))
+
+        ;; Sort the filtered results
+        sorted-results (if sort-by
+                         (let [comparator-fn (fn [run]
+                                               (let [val (get-in run [:evals (:eval-name sort-by) (:metric-key sort-by)])]
+                                                 ;; Handle different types for sorting
+                                                 (cond
+                                                   (number? val) val
+                                                   (true? val) 1
+                                                   (false? val) 0
+                                                   (nil? val) -1  ; Put nils at the end
+                                                   :else 0)))
+                               sorted (sort-by comparator-fn filtered-results)]
+                           (if reverse-sort?
+                             (reverse sorted)
+                             sorted))
+                         filtered-results)]
     ($ :div
        ($ :div.flex.justify-between.items-center.mb-4
           ($ :h3.text-xl.font-bold "Detailed Results")
           ($ :div.flex.items-center.gap-4
              ($ FilterButtons {:active-filter active-filter
                                :on-change set-active-filter})
+             ;; Sort by dropdown
+             (when (seq available-metrics-vec)
+               ($ :div.flex.items-center.gap-2
+                  ($ :label.text-sm.text-gray-600 "Sort by:")
+                  ($ :select
+                     {:value (if sort-by
+                               (str (:eval-name sort-by) "|||" (name (:metric-key sort-by)))
+                               "")
+                      :onChange #(let [val (.. % -target -value)]
+                                   (if (empty? val)
+                                     (set-sort-by nil)
+                                     (let [[eval-name metric-key-str] (str/split val #"\|\|\|")]
+                                       (set-sort-by {:eval-name eval-name
+                                                     :metric-key (keyword metric-key-str)}))))
+                      :className "text-sm border-gray-300 rounded-md"}
+                     ($ :option {:value ""} "None")
+                     (for [metric available-metrics-vec]
+                       ($ :option {:key (str (:eval-name metric) "-" (:metric-key metric))
+                                   :value (str (:eval-name metric) "|||" (name (:metric-key metric)))}
+                          (:label metric))))))
+             ;; Reverse sort checkbox
+             (when sort-by
+               ($ :label.flex.items-center.gap-2.text-sm.text-gray-600
+                  ($ :input {:type "checkbox"
+                             :checked reverse-sort?
+                             :onChange #(set-reverse-sort (not reverse-sort?))
+                             :className "rounded"})
+                  "Reverse"))
              ($ :label.flex.items-center.gap-2.text-sm.text-gray-600
                 ($ :input {:type "checkbox"
                            :checked show-full-text?
                            :onChange #(set-show-full-text (not show-full-text?))
                            :className "rounded"})
                 "Show full text")))
-       (if (empty? filtered-results)
+       (if (empty? sorted-results)
          ($ :div.text-center.py-8.text-gray-500.bg-gray-50.rounded-lg
             "No results match the current filter.")
          ($ :div {:className (:container common/table-classes)}
@@ -401,7 +468,7 @@
                      ($ :th {:className (:th common/table-classes)} "Reference Output")
                      ($ :th {:className (common/cn (:th common/table-classes) "w-1/3")} "Output & Evaluations")))
                ($ :tbody
-                  (for [[idx run] (map-indexed vector filtered-results)
+                  (for [[idx run] (map-indexed vector sorted-results)
                         :let [evaluator-metadata (evaluators/collect-column-metadata (:evals run))
                               target-initiate (-> run :agent-initiates vals first)]]
                     ($ :tr.border-b {:key (str (:example-id run) "-" idx)}
