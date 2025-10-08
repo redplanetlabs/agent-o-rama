@@ -2227,7 +2227,7 @@
                ""
                (fn [params]
                  (fn [fetcher input ref-output output]
-                   {"score" (java.lang.ProcessHandle/current)})))
+                   {"score" 10})))
               (-> topology
                   (aor/new-agent "foo")
                   (aor/node
@@ -2376,7 +2376,7 @@
            (is (= "aor/webhook" (get ri "actionName")))
            (is (= "node" (get ri "type")))
            (is (> (get ri "startTimeMillis") 0))
-           (is (= [{"source" "eval[my-ph-eval]" "scores" {"score" pid-str}}] (get ri "feedback")))
+           (is (= [{"source" "eval[my-ph-eval]" "scores" {"score" 10}}] (get ri "feedback")))
           )))
       (finally
         (stop-server)))))

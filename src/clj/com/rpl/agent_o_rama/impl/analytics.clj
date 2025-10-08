@@ -162,14 +162,6 @@
 
 (def STR-MAPPER (j/object-mapper {:decode-key-fn str}))
 
-(defn json-compatible-value
-  [v]
-  (try
-    (j/write-value-as-string v)
-    v
-    (catch Throwable t
-      (str v))))
-
 (defn best-effort-json
   [v]
   (try
@@ -190,7 +182,9 @@
            "startTimeMillis" start-time-millis
            "latencyMillis"   latency-millis
            "feedback"        (mapv (fn [{:keys [scores source]}]
-                                     {"scores" (transform MAP-VALS json-compatible-value scores)
+                                     ;; scores are mandated by AOR to be numbers, strings, or
+                                     ;; booleans, so don't need any special handling here
+                                     {"scores" scores
                                       "source" (aor-types/source-string source)})
                                    feedback)}))
 
