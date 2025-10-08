@@ -162,11 +162,6 @@
         ;; --- Perform calculations for each required metric ---
         num-examples (or (:count latency-stats) 0)
 
-        success-rate (let [passed-count (count (filter #(not-any? :failure? (vals (:agent-results %))) results))]
-                       (if (pos? num-examples)
-                         (str (int (* 100 (/ passed-count num-examples))) "%")
-                         "N/A"))
-
         avg-latency (let [total (:total latency-stats 0)
                           count (:count latency-stats 0)]
                       (if (pos? count)
@@ -190,7 +185,6 @@
              ($ :tbody
                 ($ :tr
                    ($ StatCell {:label "# Examples" :value num-examples})
-                   ($ StatCell {:label "Success Rate" :value success-rate})
                    ($ StatCell {:label "Avg Latency" :value avg-latency})
                    ($ StatCell {:label "P99 Latency"
                                 :value p99-latency
