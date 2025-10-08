@@ -5,7 +5,7 @@
   com.rpl.agent-o-rama.ui.trace-analytics-e2e-test/with-agent-env clojure.core/let}
  :hooks
  {:analyze-call
-  {com.rpl.agent-o-rama.ui.trace-analytics-e2e-test/with-webdriver
+  {com.rpl.agent-o-rama.ui.etaoin-test-helpers/with-webdriver
    hooks.trace-analytics-e2e-test/with-webdriver
    com.rpl.agent-o-rama.ui.etaoin-test-helpers/with-system
    hooks.etaoin-test-helpers/with-system}}}
