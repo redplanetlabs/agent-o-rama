@@ -366,7 +366,7 @@
 (defui ResultsTable [{:keys [results target module-id]}]
   (let [[show-full-text? set-show-full-text] (uix/use-state false)
         [active-filter set-active-filter] (uix/use-state :all)
-        [sort-by set-sort-by] (uix/use-state nil) ; nil or {:eval-name "...", :metric-key :...}
+        [sort-by-state set-sort-by-state] (uix/use-state nil) ; nil or {:eval-name "...", :metric-key :...}
         [reverse-sort? set-reverse-sort] (uix/use-state false)
 
         ;; Collect all available evaluator metrics with proper disambiguation
@@ -389,40 +389,53 @@
                            :success (filter is-success? results)
                            :failure (filter is-failure? results))
 
+        _ (println "sort-by-state:" sort-by-state)
+        _ (println "available-columns:" available-columns)
         ;; Sort the filtered results
-        sorted-results (if sort-by
-                         (let [comparator-fn (fn [run]
-                                               (let [val (get-in run [:evals (:eval-name sort-by) (:metric-key sort-by)])]
-                                                 ;; Handle different types for sorting
+        sorted-results (if sort-by-state
+                         (let [_ (println "Sorting with sort-by-state:" sort-by-state)
+                               _ (println "filtered-results count:" (count filtered-results))
+                               comparator-fn (fn [run]
+                                               (let [eval-name (:eval-name sort-by-state)
+                                                     metric-key (:metric-key sort-by-state)
+                                                     _ (println "Looking for eval-name:" eval-name "metric-key:" metric-key)
+                                                     _ (println "run evals:" (:evals run))
+                                                     val (get-in run [:evals eval-name metric-key])]
+                                                 (println "val:" val)
                                                  (cond
                                                    (number? val) val
                                                    (true? val) 1
                                                    (false? val) 0
-                                                   (nil? val) -1 ; Put nils at the end
+                                                   (nil? val) -1
                                                    :else 0)))
-                               sorted (sort-by comparator-fn filtered-results)]
+                               sorted (vec (sort-by comparator-fn filtered-results))]
                            (if reverse-sort?
-                             (reverse sorted)
+                             (vec (reverse sorted))
                              sorted))
-                         filtered-results)
+                         (vec filtered-results))
 
         ;; Dropdown items for sort selector
         sort-dropdown-items (concat
                              [{:key "none"
                                :label "None"
-                               :selected? (nil? sort-by)
-                               :on-select #(set-sort-by nil)}]
+                               :selected? (nil? sort-by-state)
+                               :on-select (fn []
+                                            (println "Selecting None")
+                                            (set-sort-by-state nil))}]
                              (for [{:keys [eval-name metric-key label]} available-columns]
                                {:key (str eval-name "::" metric-key)
                                 :label label
-                                :selected? (and sort-by
-                                                (= (:eval-name sort-by) eval-name)
-                                                (= (:metric-key sort-by) metric-key))
-                                :on-select #(set-sort-by {:eval-name eval-name
-                                                          :metric-key metric-key})}))
-        current-sort-label (when sort-by
-                             (let [col (first (filter #(and (= (:eval-name %) (:eval-name sort-by))
-                                                            (= (:metric-key %) (:metric-key sort-by)))
+                                :selected? (and sort-by-state
+                                                (= (:eval-name sort-by-state) eval-name)
+                                                (= (:metric-key sort-by-state) metric-key))
+                                :on-select (fn []
+                                             (println "Selecting:" label "eval-name:" eval-name "metric-key:" metric-key)
+                                             (set-sort-by-state {:eval-name eval-name
+                                                                 :metric-key metric-key}))}))
+        _ (println "sort-dropdown-items:" (count sort-dropdown-items))
+        current-sort-label (when sort-by-state
+                             (let [col (first (filter #(and (= (:eval-name %) (:eval-name sort-by-state))
+                                                            (= (:metric-key %) (:metric-key sort-by-state)))
                                                       available-columns))]
                                (:label col)))]
     ($ :div
@@ -441,8 +454,8 @@
                          :display-text (or current-sort-label "None")
                          :items sort-dropdown-items
                          :data-testid "sort-by-dropdown"}))))
-             ;; Reverse sort checkbox
-             (when sort-by
+;; Reverse sort checkbox
+             (when sort-by-state
                ($ :label.flex.items-center.gap-2.text-sm.text-gray-600
                   ($ :input {:type "checkbox"
                              :checked reverse-sort?
