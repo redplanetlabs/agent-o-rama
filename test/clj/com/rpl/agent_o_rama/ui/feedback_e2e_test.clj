@@ -24,11 +24,13 @@
 (deftest agent-level-feedback-test
   ;; Test agent-level feedback display in the main Feedback tab.
   ;; Uses feedback-test-agent which generates agent-level evaluator feedback.
-  (helpers/with-system [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {:include-node-rules? false})}]
+  (helpers/with-system [FeedbackTestAgentModule
+                        {:post-deploy-hook (make-post-deploy-hook {:include-node-rules? false})}]
     (helpers/with-webdriver [driver]
       (testing "agent-level feedback displays correctly"
         (let [env    @helpers/system
-              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env)) "FeedbackTestAgent")
+              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env))
+                                       "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "medium" "text" "test"})]
 
           @(aor/agent-result-async agent invoke)
@@ -42,7 +44,6 @@
                 (is (e/visible? driver {:data-id "feedback-tab"})))
 
               (testing "switch to feedback tab"
-                (e/scroll-query driver {:data-id "feedback-tab"})
                 (e/click driver {:data-id "feedback-tab"})
                 (e/wait-visible driver {:data-id "feedback-list"} {:timeout 2}))
 
@@ -63,22 +64,24 @@
     (helpers/with-webdriver [driver]
       (testing "node-level feedback displays correctly"
         (let [env    @helpers/system
-              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env)) "FeedbackTestAgent")
+              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env))
+                                       "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "long" "text" "eval"})]
 
           @(aor/agent-result-async agent invoke)
+          (Thread/sleep 100)
 
           (e/with-postmortem driver {:dir "target/etaoin"}
             (let [trace-url (helpers/agent-invoke-url env "FeedbackTestAgent" invoke)]
               (e/go driver trace-url)
               (e/wait-visible driver {:data-id "feedback-tab"} {:timeout default-timeout})
 
-              (testing "navigate to graph view to select a node"
+              #_(testing "navigate to graph view to select a node"
                 (e/click driver {:data-id "info-tab"})
                 (e/wait-visible driver {:class "react-flow__node"} {:timeout 2}))
 
               (testing "click on process node"
-                (e/click driver {:data-id "node-process"})
+                (e/click driver {:data-id "agent-graph-node-process"})
                 (e/wait-visible driver {:data-id "node-feedback-tab"} {:timeout 2}))
 
               (testing "node feedback tab exists"
@@ -101,7 +104,8 @@
     (helpers/with-webdriver [driver]
       (testing "empty feedback state displays correctly"
         (let [env    @helpers/system
-              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env)) "FeedbackTestAgent")
+              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env))
+                                       "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "short"})]
 
           @(aor/agent-result-async agent invoke)
@@ -118,7 +122,9 @@
 
               (testing "empty state is visible"
                 (is (e/visible? driver {:data-id "feedback-empty-state"}))
-                (is (e/has-text? driver {:data-id "feedback-empty-state"} "No feedback available"))))))))))
+                (is (e/has-text? driver
+                                 {:data-id "feedback-empty-state"}
+                                 "No feedback available"))))))))))
 
 (deftest feedback-score-types-test
   ;; Test display of different score types (boolean and numeric).
@@ -127,18 +133,28 @@
     (helpers/with-webdriver [driver]
       (testing "feedback scores display with correct types"
         (let [env    @helpers/system
-              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env)) "FeedbackTestAgent")
-              invoke (aor/agent-initiate agent {"mode" "prefixed" "text" "score-check"})]
+              agent  (aor/agent-client
+                      (aor/agent-manager (:ipc env) (:module-name env))
+                      "FeedbackTestAgent")
+              invoke (aor/agent-initiate
+                      agent
+                      {"mode" "prefixed" "text" "score-check"})]
 
           @(aor/agent-result-async agent invoke)
+          (Thread/sleep 100)
 
           (e/with-postmortem driver {:dir "target/etaoin"}
-            (let [trace-url (helpers/agent-invoke-url env "FeedbackTestAgent" invoke)]
+            (let [trace-url (helpers/agent-invoke-url
+                             env
+                             "FeedbackTestAgent"
+                             invoke)]
               (e/go driver trace-url)
-              (e/wait-visible driver {:data-id "feedback-tab"} {:timeout default-timeout})
+              (e/wait-visible
+               driver
+               {:data-id "feedback-tab"}
+               {:timeout default-timeout})
 
               (testing "switch to feedback tab"
-                (e/scroll-query driver {:data-id "feedback-tab"})
                 (e/click driver {:data-id "feedback-tab"})
                 (e/wait-visible driver {:data-id "feedback-list"} {:timeout 2}))
 
@@ -159,19 +175,30 @@
 (deftest multiple-feedback-sources-test
   ;; Test that feedback from multiple evaluators displays together.
   ;; Uses both agent-level and node-level evaluators.
-  (helpers/with-system [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
+  (helpers/with-system
+    [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
     (helpers/with-webdriver [driver]
       (testing "multiple feedback sources display together"
         (let [env    @helpers/system
-              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env)) "FeedbackTestAgent")
-              invoke (aor/agent-initiate agent {"mode" "medium" "text" "multi-eval"})]
+              agent  (aor/agent-client
+                      (aor/agent-manager (:ipc env) (:module-name env))
+                      "FeedbackTestAgent")
+              invoke (aor/agent-initiate
+                      agent
+                      {"mode" "medium" "text" "multi-eval"})]
 
           @(aor/agent-result-async agent invoke)
 
           (e/with-postmortem driver {:dir "target/etaoin"}
-            (let [trace-url (helpers/agent-invoke-url env "FeedbackTestAgent" invoke)]
+            (let [trace-url (helpers/agent-invoke-url
+                             env
+                             "FeedbackTestAgent"
+                             invoke)]
               (e/go driver trace-url)
-              (e/wait-visible driver {:data-id "feedback-tab"} {:timeout default-timeout})
+              (e/wait-visible
+               driver
+               {:data-id "feedback-tab"}
+               {:timeout default-timeout})
 
               (testing "agent-level feedback has multiple items"
                 (e/click driver {:data-id "feedback-tab"})
