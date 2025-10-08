@@ -21,7 +21,11 @@
    [org.testcontainers
     Testcontainers]))
 
-(def ^:private default-port 8080)
+(def ^:private default-port
+  (if (System/getProperty "aor.test.runner")
+    8081
+    8080))
+
 (def ^:private default-timeout 120)
 
 (defonce system (volatile! nil))
