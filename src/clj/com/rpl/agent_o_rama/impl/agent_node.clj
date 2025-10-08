@@ -527,41 +527,60 @@
      "firstTokenTimeMillis" first-token-time-millis
     })))
 
+(defn record-model-failure!
+  [agent-node start-time-millis t]
+  (record-nested-op!-impl
+   agent-node
+   :model-call
+   start-time-millis
+   (h/current-time-millis)
+   {"failure" (h/throwable->str t)}))
+
 (defn- instrument-chat!
   [name request response-fn]
-  (let [^AgentNode agent-node (h/thread-local-get AGENT-NODE-CONTEXT)
-        start-time-millis (h/current-time-millis)
-        response (response-fn)]
-    ;; TODO: <<<<>>> want to record failure of LLM call
-    (record-model-call! name agent-node request response start-time-millis nil)
-    response
-  ))
+  (try
+    (let [^AgentNode agent-node (h/thread-local-get AGENT-NODE-CONTEXT)
+          start-time-millis (h/current-time-millis)
+          response (response-fn)]
+      (record-model-call! name agent-node request response start-time-millis nil)
+      response)
+    (catch Throwable t
+      (record-model-failure! agent-node start-time-milis t)
+      (throw t))))
 
 (defn- instrument-streaming-chat!
   [name ^ChatRequest request initiate-fn]
-  (let [^AgentNode agent-node (h/thread-local-get AGENT-NODE-CONTEXT)
-        cf (CompletableFuture.)
-        start-time-millis (h/current-time-millis)
-        first-token-time-millis (atom nil)
-        update-token-time!
-        (fn [] (swap! first-token-time-millis (fn [v] (or v (h/current-time-millis)))))
-        _ (initiate-fn
-           (reify
-            StreamingChatResponseHandler
-            (onPartialResponse [this partial]
-              (update-token-time!)
-              (.streamChunk agent-node partial))
-            (onCompleteResponse [this response]
-              (update-token-time!)
-              (.complete cf response))
-            (onError [this t]
-              (.completeExceptionally
-               cf
-               (h/ex-info "Streaming failed" {:name name} t)))))
-        response (.get cf)]
-    ;; TODO: <<<<>>> want to record failure of LLM call
-    (record-model-call! name agent-node request response start-time-millis @first-token-time-millis)
-    response
+  (try
+    (let [^AgentNode agent-node (h/thread-local-get AGENT-NODE-CONTEXT)
+          cf (CompletableFuture.)
+          start-time-millis (h/current-time-millis)
+          first-token-time-millis (atom nil)
+          update-token-time!
+          (fn [] (swap! first-token-time-millis (fn [v] (or v (h/current-time-millis)))))
+          _ (initiate-fn
+             (reify
+              StreamingChatResponseHandler
+              (onPartialResponse [this partial]
+                (update-token-time!)
+                (.streamChunk agent-node partial))
+              (onCompleteResponse [this response]
+                (update-token-time!)
+                (.complete cf response))
+              (onError [this t]
+                (.completeExceptionally
+                 cf
+                 (h/ex-info "Streaming failed" {:name name} t)))))
+          response (.get cf)]
+      (record-model-call! name
+                          agent-node
+                          request
+                          response
+                          start-time-millis
+                          @first-token-time-millis)
+      response)
+    (catch Throwable t
+      (record-model-failure! agent-node start-time-milis t)
+      (throw t))
   ))
 
 (defmacro with-traced

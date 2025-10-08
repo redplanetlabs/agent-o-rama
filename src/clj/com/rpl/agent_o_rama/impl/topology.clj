@@ -436,7 +436,7 @@
                                   *retry-num)
    (local-transform> [(keypath *invoke-id)
                       (multi-path
-                       [:nested-ops (termval *nested-ops)]
+                       [:nested-ops NIL->VECTOR END (termval *nested-ops)]
                        [:exceptions AFTER-ELEM (termval *throwable-str)])]
                      $$nodes)
    (|direct *agent-task-id)
@@ -536,11 +536,13 @@
      [*m]
      (:> (reduce-kv assoc
                     *m
-                    {:emits      *emits
-                     :result     *result
-                     :nested-ops *nested-ops
+                    {:emits  *emits
+                     :result *result
                      :finish-time-millis *finish-time-millis})))
-   (local-transform> [(keypath *invoke-id) (term %merger)]
+   (local-transform> [(keypath *invoke-id)
+                      (multi-path
+                       (term %merger)
+                       [:nested-ops NIL->VECTOR END (termavl *nested-ops)])]
                      $$nodes)
 
    (<<if (-> (po/agent-graph-task-global *agent-name)
