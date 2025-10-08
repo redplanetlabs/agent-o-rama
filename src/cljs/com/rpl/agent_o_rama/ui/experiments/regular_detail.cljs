@@ -369,25 +369,13 @@
         [sort-by set-sort-by] (uix/use-state nil) ; nil or {:eval-name "...", :metric-key :...}
         [reverse-sort? set-reverse-sort] (uix/use-state false)
 
-        ;; Collect all available evaluator metrics
-        available-metrics (reduce
-                           (fn [acc run]
-                             (reduce-kv
-                              (fn [acc2 eval-name metrics]
-                                (reduce-kv
-                                 (fn [acc3 metric-key _metric-val]
-                                   (conj acc3 {:eval-name eval-name
-                                               :metric-key metric-key
-                                               :label (str (evaluators/identifier-title eval-name) 
-                                                          " / " 
-                                                          (evaluators/metric-title metric-key))}))
-                                 acc2
-                                 metrics))
-                              acc
-                              (:evals run)))
-                           #{}
-                           results)
-        available-metrics-vec (vec (sort-by :label available-metrics))
+        ;; Collect all available evaluator metrics with proper disambiguation
+        all-evals (reduce (fn [acc run]
+                            (merge-with merge acc (:evals run)))
+                          {}
+                          results)
+        metadata (evaluators/collect-column-metadata all-evals)
+        available-columns (:columns metadata)
 
         ;; NEW: Filtering logic
         is-failure? (fn [run]
@@ -410,13 +398,33 @@
                                                    (number? val) val
                                                    (true? val) 1
                                                    (false? val) 0
-                                                   (nil? val) -1  ; Put nils at the end
+                                                   (nil? val) -1 ; Put nils at the end
                                                    :else 0)))
                                sorted (sort-by comparator-fn filtered-results)]
                            (if reverse-sort?
                              (reverse sorted)
                              sorted))
-                         filtered-results)]
+                         filtered-results)
+
+        ;; Dropdown items for sort selector
+        sort-dropdown-items (concat
+                             [{:key "none"
+                               :label "None"
+                               :selected? (nil? sort-by)
+                               :on-select #(set-sort-by nil)}]
+                             (for [{:keys [eval-name metric-key label]} available-columns]
+                               {:key (str eval-name "::" metric-key)
+                                :label label
+                                :selected? (and sort-by
+                                                (= (:eval-name sort-by) eval-name)
+                                                (= (:metric-key sort-by) metric-key))
+                                :on-select #(set-sort-by {:eval-name eval-name
+                                                          :metric-key metric-key})}))
+        current-sort-label (when sort-by
+                             (let [col (first (filter #(and (= (:eval-name %) (:eval-name sort-by))
+                                                            (= (:metric-key %) (:metric-key sort-by)))
+                                                      available-columns))]
+                               (:label col)))]
     ($ :div
        ($ :div.flex.justify-between.items-center.mb-4
           ($ :h3.text-xl.font-bold "Detailed Results")
@@ -424,25 +432,15 @@
              ($ FilterButtons {:active-filter active-filter
                                :on-change set-active-filter})
              ;; Sort by dropdown
-             (when (seq available-metrics-vec)
+             (when (seq available-columns)
                ($ :div.flex.items-center.gap-2
                   ($ :label.text-sm.text-gray-600 "Sort by:")
-                  ($ :select
-                     {:value (if sort-by
-                               (str (:eval-name sort-by) "|||" (name (:metric-key sort-by)))
-                               "")
-                      :onChange #(let [val (.. % -target -value)]
-                                   (if (empty? val)
-                                     (set-sort-by nil)
-                                     (let [[eval-name metric-key-str] (str/split val #"\|\|\|")]
-                                       (set-sort-by {:eval-name eval-name
-                                                     :metric-key (keyword metric-key-str)}))))
-                      :className "text-sm border-gray-300 rounded-md"}
-                     ($ :option {:value ""} "None")
-                     (for [metric available-metrics-vec]
-                       ($ :option {:key (str (:eval-name metric) "-" (:metric-key metric))
-                                   :value (str (:eval-name metric) "|||" (name (:metric-key metric)))}
-                          (:label metric))))))
+                  ($ :div.w-64
+                     ($ common/Dropdown
+                        {:label "Sort by"
+                         :display-text (or current-sort-label "None")
+                         :items sort-dropdown-items
+                         :data-testid "sort-by-dropdown"}))))
              ;; Reverse sort checkbox
              (when sort-by
                ($ :label.flex.items-center.gap-2.text-sm.text-gray-600
