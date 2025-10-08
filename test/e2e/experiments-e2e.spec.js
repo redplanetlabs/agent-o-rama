@@ -178,29 +178,84 @@ test.describe('Full Experiment Flow with E2E Test Agent', () => {
     await expect(failedCapsule).toHaveAttribute('href', /invocations\//);
     console.log('Evaluator failure display verified.');
 
-    // Verify #121: Sort by Eval
+    // Verify #121: Sort by Eval using dropdown
     console.log('Verifying #121: Sort by evaluator results...');
-    const scoreHeader = page.getByRole('columnheader', { name: 'score' });
     
-    // Helper to get scores from the table
-    const getScores = async () => {
-      const scoreCells = await resultsTable.locator('td:nth-child(8)').all(); // Assuming score is 8th col
-      return Promise.all(scoreCells.map(async cell => parseFloat(await cell.innerText())));
+    // Helper to get run-ids in order from the table
+    const getRunIds = async () => {
+      const inputCells = await resultsTable.locator('tbody tr td:nth-child(1)').all();
+      const runIds = [];
+      for (const cell of inputCells) {
+        const text = await cell.innerText();
+        const match = text.match(/run-id[^\n]*\n([^\n]+)/);
+        if (match) runIds.push(match[1]);
+      }
+      return runIds;
     };
 
-    // Ascending sort
-    await scoreHeader.click();
-    await page.waitForTimeout(500); // Wait for sort animation
-    let scores = await getScores();
-    expect(scores.every((val, i, arr) => i === 0 || val >= arr[i - 1])).toBe(true);
-    console.log('Ascending sort verified.');
+    // Helper to get score capsule values in order from the table
+    const getScoreValues = async () => {
+      const rows = await resultsTable.locator('tbody tr').all();
+      const scores = [];
+      for (const row of rows) {
+        const scoreCapsule = row.locator('a').filter({ hasText: /score/ });
+        const capsuleText = await scoreCapsule.innerText();
+        const scoreMatch = capsuleText.match(/score\s*([\d.]+)/);
+        if (scoreMatch) {
+          scores.push(parseFloat(scoreMatch[1]));
+        } else {
+          scores.push(null); // For rows without scores
+        }
+      }
+      return scores;
+    };
+
+    // Open sort dropdown and select "score"
+    const sortDropdown = page.getByTestId('sort-by-dropdown');
+    await sortDropdown.click();
+    await page.getByText('score', { exact: true }).click();
+    await page.waitForTimeout(300);
     
-    // Descending sort
-    await scoreHeader.click();
-    await page.waitForTimeout(500);
-    scores = await getScores();
-    expect(scores.every((val, i, arr) => i === 0 || val <= arr[i - 1])).toBe(true);
-    console.log('Descending sort verified.');
+    // Verify ascending sort
+    let scores = await getScoreValues();
+    const validScores = scores.filter(s => s !== null);
+    expect(validScores.every((val, i, arr) => i === 0 || val >= arr[i - 1])).toBe(true);
+    console.log('Ascending sort by score verified.');
+    
+    // Click reverse checkbox for descending sort
+    await page.getByLabel('Reverse').click();
+    await page.waitForTimeout(300);
+    scores = await getScoreValues();
+    const validScoresDesc = scores.filter(s => s !== null);
+    expect(validScoresDesc.every((val, i, arr) => i === 0 || val <= arr[i - 1])).toBe(true);
+    console.log('Descending sort by score verified.');
+    
+    // Test sorting by passed? evaluator
+    await sortDropdown.click();
+    await page.getByText('passed?', { exact: true }).click();
+    await page.waitForTimeout(300);
+    
+    // Uncheck reverse for ascending
+    await page.getByLabel('Reverse').click();
+    await page.waitForTimeout(300);
+    
+    // Verify that runs are sorted (true=1, false=0, so false should come first ascending)
+    const runIdsAfterPassedSort = await getRunIds();
+    // eval-fail should be first (has passed?=false in failing eval, or missing due to eval failure)
+    // success-long and node-fail-retry should be later (passed?=true)
+    expect(runIdsAfterPassedSort.indexOf(`eval-fail-${uniqueId}`)).toBeLessThan(
+      runIdsAfterPassedSort.indexOf(`success-long-${uniqueId}`)
+    );
+    console.log('Sort by passed? verified.');
+    
+    // Reset sort to None
+    await sortDropdown.click();
+    await page.getByText('None', { exact: true }).click();
+    await page.waitForTimeout(300);
+    
+    // Reverse checkbox should disappear when sort is None
+    await expect(page.getByLabel('Reverse')).not.toBeVisible();
+    console.log('Sort reset verified.');
 
     // Verify #118: Long Node Names
     console.log('Verifying #118: Long node names...');
