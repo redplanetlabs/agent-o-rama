@@ -79,7 +79,7 @@ const examples = [
 test.describe('Full Experiment Flow with E2E Test Agent', () => {
   test.setTimeout(5 * 60 * 1000); // 5 minutes for the entire flow
 
-  test.afterAll(async ({ page }) => {
+  test.afterEach(async ({ page }) => {
     console.log('--- Starting Cleanup ---');
     page.on('dialog', (dialog) => dialog.accept());
 
@@ -199,10 +199,15 @@ test.describe('Full Experiment Flow with E2E Test Agent', () => {
       const scores = [];
       for (const row of rows) {
         const scoreCapsule = row.locator('a').filter({ hasText: /score/ });
-        const capsuleText = await scoreCapsule.innerText();
-        const scoreMatch = capsuleText.match(/score\s*([\d.]+)/);
-        if (scoreMatch) {
-          scores.push(parseFloat(scoreMatch[1]));
+        const count = await scoreCapsule.count();
+        if (count > 0) {
+          const capsuleText = await scoreCapsule.first().innerText();
+          const scoreMatch = capsuleText.match(/score\s*([\d.]+)/);
+          if (scoreMatch) {
+            scores.push(parseFloat(scoreMatch[1]));
+          } else {
+            scores.push(null);
+          }
         } else {
           scores.push(null); // For rows without scores
         }
@@ -213,7 +218,7 @@ test.describe('Full Experiment Flow with E2E Test Agent', () => {
     // Open sort dropdown and select "score"
     const sortDropdown = page.getByTestId('sort-by-dropdown');
     await sortDropdown.click();
-    await page.getByText('score', { exact: true }).click();
+    await page.locator('.origin-top-right').getByText('score', { exact: true }).click();
     await page.waitForTimeout(300);
     
     // Verify ascending sort
@@ -232,7 +237,7 @@ test.describe('Full Experiment Flow with E2E Test Agent', () => {
     
     // Test sorting by passed? evaluator
     await sortDropdown.click();
-    await page.getByText('passed?', { exact: true }).click();
+    await page.locator('.origin-top-right').getByText('passed?', { exact: true }).click();
     await page.waitForTimeout(300);
     
     // Uncheck reverse for ascending
@@ -250,7 +255,7 @@ test.describe('Full Experiment Flow with E2E Test Agent', () => {
     
     // Reset sort to None
     await sortDropdown.click();
-    await page.getByText('None', { exact: true }).click();
+    await page.locator('.origin-top-right').getByText('None', { exact: true }).click();
     await page.waitForTimeout(300);
     
     // Reverse checkbox should disappear when sort is None
