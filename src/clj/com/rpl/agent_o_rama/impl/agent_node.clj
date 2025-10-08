@@ -528,13 +528,15 @@
     })))
 
 (defn record-model-failure!
-  [agent-node start-time-millis t]
+  [name agent-node ^ChatRequest request start-time-millis t]
   (record-nested-op!-impl
    agent-node
    :model-call
    start-time-millis
    (h/current-time-millis)
-   {"failure" (h/throwable->str t)}))
+   {"objectName" name
+    "input"      (lc4j-trace/messages->trace (.messages request))
+    "failure"    (h/throwable->str t)}))
 
 (defn- instrument-chat!
   [name request response-fn]
@@ -545,7 +547,7 @@
         (record-model-call! name agent-node request response start-time-millis nil)
         response)
       (catch Throwable t
-        (record-model-failure! agent-node start-time-millis t)
+        (record-model-failure! name agent-node request start-time-millis t)
         (throw t)))))
 
 (defn- instrument-streaming-chat!
@@ -579,7 +581,7 @@
                             @first-token-time-millis)
         response)
       (catch Throwable t
-        (record-model-failure! agent-node start-time-millis t)
+        (record-model-failure! name agent-node request start-time-millis t)
         (throw t))
     )))
 

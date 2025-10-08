@@ -15,6 +15,7 @@
    [com.rpl.agent-o-rama.impl.retries :as retries]
    [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.store :as store]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
@@ -28,6 +29,18 @@
     AgentNodeExecutorTaskGlobal]
    [com.rpl.rama.helpers
     TopologyUtils]
+   [dev.langchain4j.data.message
+    AiMessage]
+   [dev.langchain4j.model.chat.response
+    ChatResponse$Builder]
+   [dev.langchain4j.model.chat
+    ChatModel
+    StreamingChatModel]
+   [dev.langchain4j.model.chat.response
+    ChatResponse]
+   [dev.langchain4j.model.output
+    FinishReason
+    TokenUsage]
    [java.util.concurrent
     CompletableFuture]))
 
@@ -1174,16 +1187,54 @@
 
 (def VAL-ATOM)
 
+(defrecord MockChatModel []
+  ChatModel
+  (doChat [this request]
+    (let [v (swap! VAL-ATOM dec)]
+      (if (even? v)
+        (-> (ChatResponse$Builder.)
+            (.aiMessage (AiMessage. "!!!"))
+            (.finishReason FinishReason/STOP)
+            (.modelName "aor-model")
+            (.tokenUsage (TokenUsage. (int 10) (int 20)))
+            .build)
+        (throw (ex-info "intentional" {:v v}))))))
+
+(defrecord MockStreamingChatModel []
+  StreamingChatModel
+  (doChat [this request handler]
+    (let [response (-> (ChatResponse$Builder.)
+                       (.aiMessage (AiMessage. "!!!"))
+                       (.finishReason FinishReason/LENGTH)
+                       (.modelName "s-aor-model")
+                       (.tokenUsage (TokenUsage. (int 10) (int 20)))
+                       .build)
+          v        @VAL-ATOM]
+      (if (or (odd? v) (= 0 v))
+        (.onCompleteResponse handler response)
+        (throw (ex-info "intentional" {:v v}))
+      ))))
+
+
 (deftest exceptions-test
   (with-redefs [SEM      (h/mk-semaphore 0)
                 VAL-ATOM (atom 0)
                 anode/log-node-error (fn [& args])
                 aor-types/get-config (max-retries-override 3)]
-    (with-open [ipc (rtest/create-ipc)]
+    (with-open [ipc (rtest/create-ipc)
+                _ (TopologyUtils/startSimTime)]
       (letlocals
        (bind module
          (aor/agentmodule
           [topology]
+          (aor/declare-agent-object-builder
+           topology
+           "chat1"
+           (fn [setup] (->MockChatModel)))
+          (aor/declare-agent-object-builder
+           topology
+           "schat1"
+           (fn [setup] (->MockStreamingChatModel)))
           (->
             topology
             (aor/new-agent "foo")
@@ -1191,18 +1242,19 @@
              "start"
              nil
              (fn [agent-node]
-               (aor/record-nested-op!
-                agent-node
-                :other
-                10
-                11
-                {"abc" 123})
-               (h/acquire-semaphore SEM)
-               (let [v (swap! VAL-ATOM dec)]
-                 (if (= 0 v)
-                   (aor/result! agent-node "done")
-                   (throw (ex-info "intentional" {:v v}))))
-             )))
+               (let [chat  (aor/get-agent-object agent-node "chat1")
+                     schat (aor/get-agent-object agent-node "schat1")]
+                 (aor/record-nested-op!
+                  agent-node
+                  :other
+                  10
+                  11
+                  {"abc" 123})
+                 (h/acquire-semaphore SEM)
+                 (lc4j/basic-chat chat "prompt")
+                 (lc4j/basic-chat schat "prompt")
+                 (aor/result! agent-node "done")
+               ))))
          ))
        (rtest/launch-module! ipc module {:tasks 4 :threads 2})
        (bind module-name (get-module-name module))
@@ -1312,19 +1364,82 @@
                                 [[task-id root-invoke-id]]
                                 10000)))
        (is (= 1 (count trace)))
-       (bind nested-ops (select [MAP-VALS :nested-ops ALL (view #(into {} %))] trace))
-       ;; verifies nested-ops are additive on both failure and success
+
+       (bind nested-ops
+         (select [MAP-VALS :nested-ops ALL (transformed [:info (must "failure")] (constantly :fail))
+                  (view #(into {} %))]
+                 trace))
+
+       ;; verifies:
+       ;;  - nested-ops are additive on both failure and success
+       ;;  - failed model calls are recorded
        (is (= nested-ops
               [{:start-time-millis 10
                 :finish-time-millis 11
                 :type :other
                 :info {"abc" 123}}
+               {:start-time-millis 0
+                :finish-time-millis 0
+                :type :model-call
+                :info
+                {"totalTokenCount"  30
+                 "modelName"        "aor-model"
+                 "inputTokenCount"  10
+                 "finishReason"     "stop"
+                 "objectName"       "chat1"
+                 "input"
+                 [{"type" "user" "contents" [{"type" "text" "text" "prompt"}]}]
+                 "response"         "!!!"
+                 "outputTokenCount" 20}}
+               {:start-time-millis 0
+                :finish-time-millis 0
+                :type :model-call
+                :info
+                {"objectName" "schat1"
+                 "input"
+                 [{"type" "user" "contents" [{"type" "text" "text" "prompt"}]}]
+                 "failure"    :fail}}
                {:start-time-millis 10
                 :finish-time-millis 11
                 :type :other
                 :info {"abc" 123}}
+               {:start-time-millis 0
+                :finish-time-millis 0
+                :type :model-call
+                :info
+                {"objectName" "chat1"
+                 "input"
+                 [{"type" "user" "contents" [{"type" "text" "text" "prompt"}]}]
+                 "failure"    :fail}}
                {:start-time-millis 10
                 :finish-time-millis 11
                 :type :other
-                :info {"abc" 123}}]))
+                :info {"abc" 123}}
+               {:start-time-millis 0
+                :finish-time-millis 0
+                :type :model-call
+                :info
+                {"totalTokenCount"  30
+                 "modelName"        "aor-model"
+                 "inputTokenCount"  10
+                 "finishReason"     "stop"
+                 "objectName"       "chat1"
+                 "input"
+                 [{"type" "user" "contents" [{"type" "text" "text" "prompt"}]}]
+                 "response"         "!!!"
+                 "outputTokenCount" 20}}
+               {:start-time-millis 0
+                :finish-time-millis 0
+                :type :model-call
+                :info
+                {"totalTokenCount"      30
+                 "modelName"            "s-aor-model"
+                 "inputTokenCount"      10
+                 "finishReason"         "length"
+                 "objectName"           "schat1"
+                 "firstTokenTimeMillis" 0
+                 "input"
+                 [{"type" "user" "contents" [{"type" "text" "text" "prompt"}]}]
+                 "response"             "!!!"
+                 "outputTokenCount"     20}}]))
       ))))
