@@ -663,6 +663,23 @@
       :fail (not success?)
       (throw (h/ex-info "Unexpected status filter" {:status-filter status-filter})))))
 
+;; TODO: <<<<>>>>>
+;;  - seems like this is where some of analytics should happen
+;;      - for each rule, follow up to where they're processed so far (treat like a dependency)
+;;      - aggregate to either numeric or categorical, split by metadata of the run
+;;      - that's just for feedback evals
+;;  - then have:
+;;      - trace counts
+;;      - trace success vs. failure vs. success with retries
+;;      - LLM call counts (look at nested ops on $$nodes)
+;;      - input/output/total token counts
+;;      - LLM success rate
+;;      - streaming metrics:
+;;        - agent time to first token
+;;            - need to compare start time of agent with time first token is received
+;;                - just capture that one timestamp on write
+;;        - LLM time to first token
+;;          - this would need to be part of a nested op?
 (deframaop find-qualified-offsets-and-run-unlimited
   [*agent->rule->info *cache-pstate-name *processed-pstate-name]
   (<<with-substitutions

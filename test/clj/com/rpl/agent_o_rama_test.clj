@@ -2814,6 +2814,9 @@
        (bind agent-manager (aor/agent-manager ipc module-name))
        (bind foo (aor/agent-client agent-manager "foo"))
 
+       ;; TODO: <<<<>>>> add test case here of time to first token
+
+
        (bind inv (aor/agent-initiate foo))
        (bind res-atom (atom []))
        (bind as

@@ -113,34 +113,35 @@
 (def AGENT-ROOT-PSTATE-SCHEMA
   {UUID
    (fixed-keys-schema
-    {:root-invoke-id     UUID
-     :invoke-args        [Object]
-     :graph-version      Long
-     :result             AgentResult
+    {:root-invoke-id UUID
+     :invoke-args [Object]
+     :graph-version Long
+     :result AgentResult
      :exception-summaries [ExceptionSummary]
-     :ack-val            Long
-     :start-time-millis  Long
+     :ack-val Long
+     :start-time-millis Long
      :finish-time-millis Long
      :last-progress-time-millis Long
-     :retry-num          Long
-     :metadata           {String Object}
-     :source             InfoSource
-     :stats              AgentInvokeStatsImpl
-     :feedback           FEEDBACK-SCHEMA
-     :human-requests     (set-schema NodeHumanInputRequest {:subindex? true})
-     :fork-of            (fixed-keys-schema
-                          {:parent-agent-id UUID
-                           :fork-context    ForkContext})
-     :forks              (set-schema UUID {:subindex? true}) ; agent ids
-     :streaming          (map-schema
-                          String           ; node name
-                          (fixed-keys-schema
-                           {:all     (vector-schema StreamingChunk {:subindex? true})
-                            :invokes (map-schema
-                                      UUID ; invoke-id
-                                      Long ; index
-                                      {:subindex? true})})
-                          {:subindex? true})
+     :retry-num Long
+     :metadata {String Object}
+     :source InfoSource
+     :stats AgentInvokeStatsImpl
+     :feedback FEEDBACK-SCHEMA
+     :human-requests (set-schema NodeHumanInputRequest {:subindex? true})
+     :fork-of (fixed-keys-schema
+               {:parent-agent-id UUID
+                :fork-context    ForkContext})
+     :forks (set-schema UUID {:subindex? true}) ; agent ids
+     :first-token-time-millis Long
+     :streaming (map-schema
+                 String           ; node name
+                 (fixed-keys-schema
+                  {:all     (vector-schema StreamingChunk {:subindex? true})
+                   :invokes (map-schema
+                             UUID ; invoke-id
+                             Long ; index
+                             {:subindex? true})})
+                 {:subindex? true})
     })})
 
 (defn agent-root-count-task-global-name

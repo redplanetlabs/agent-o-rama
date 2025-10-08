@@ -815,16 +815,24 @@
     *streaming-index
     *value
     :> *chunk)
+   (h/current-time-millis :> *curr-millis)
+   (<<ramafn %update-nil-time
+     [*v]
+     (:> (or> *v *curr-millis)))
    (local-transform>
-    [(keypath *agent-id :streaming *node)
+    [(keypath *agent-id)
      (selected?
+      (keypath :streaming *node)
       :invokes
       (keypath *invoke-id)
       (nil->val -1)
       (pred %correct-index?))
      (multi-path
-      [:all AFTER-ELEM (termval *chunk)]
-      [:invokes (keypath *invoke-id) (termval *streaming-index)])]
+      [:first-token-time-millis (term %update-nil-time)]
+      [(keypath :streaming *node)
+       (multi-path
+        [:all AFTER-ELEM (termval *chunk)]
+        [:invokes (keypath *invoke-id) (termval *streaming-index)])])]
     $$root)
   ))
 

@@ -495,8 +495,8 @@
     (close! obj)))
 
 (defn- record-model-call!
-  [name agent-node ^ChatRequest request ^ChatResponse response
-   start-time-millis]
+  [name agent-node ^ChatRequest request ^ChatResponse response start-time-millis
+   first-token-time-millis]
   (record-nested-op!-impl
    agent-node
    :model-call
@@ -524,6 +524,7 @@
      "totalTokenCount"  (h/safe-> response
                                   .tokenUsage
                                   .totalTokenCount)
+     "firstTokenTimeMillis" first-token-time-millis
     })))
 
 (defn- instrument-chat!
@@ -531,7 +532,8 @@
   (let [^AgentNode agent-node (h/thread-local-get AGENT-NODE-CONTEXT)
         start-time-millis (h/current-time-millis)
         response (response-fn)]
-    (record-model-call! name agent-node request response start-time-millis)
+    ;; TODO: <<<<>>> want to record failure of LLM call
+    (record-model-call! name agent-node request response start-time-millis nil)
     response
   ))
 
@@ -540,19 +542,25 @@
   (let [^AgentNode agent-node (h/thread-local-get AGENT-NODE-CONTEXT)
         cf (CompletableFuture.)
         start-time-millis (h/current-time-millis)
+        first-token-time-millis (atom nil)
+        update-token-time!
+        (fn [] (swap! first-token-time-millis (fn [v] (or v (h/current-time-millis)))))
         _ (initiate-fn
            (reify
             StreamingChatResponseHandler
             (onPartialResponse [this partial]
+              (update-token-time!)
               (.streamChunk agent-node partial))
             (onCompleteResponse [this response]
+              (update-token-time!)
               (.complete cf response))
             (onError [this t]
               (.completeExceptionally
                cf
                (h/ex-info "Streaming failed" {:name name} t)))))
         response (.get cf)]
-    (record-model-call! name agent-node request response start-time-millis)
+    ;; TODO: <<<<>>> want to record failure of LLM call
+    (record-model-call! name agent-node request response start-time-millis @first-token-time-millis)
     response
   ))
 
