@@ -19,6 +19,8 @@
    [com.rpl.test-common :as tc]
    [meander.epsilon :as m])
   (:import
+   [com.rpl.rama.helpers
+    TopologyUtils]
    [dev.langchain4j.data.embedding
     Embedding]
    [dev.langchain4j.data.message
@@ -256,9 +258,13 @@
                        (.modelName "s-aor-model")
                        (.tokenUsage (TokenUsage. (int 10) (int 20)))
                        .build)]
+      (TopologyUtils/advanceSimTime 150)
       (.onPartialResponse handler "You ")
+      (TopologyUtils/advanceSimTime 100)
       (.onPartialResponse handler "said ")
+      (TopologyUtils/advanceSimTime 100)
       (.onPartialResponse handler s)
+      (TopologyUtils/advanceSimTime 100)
       (.onCompleteResponse handler response)
     )))
 
@@ -306,7 +312,8 @@
     )))
 
 (deftest object-wrapping-test
-  (with-open [ipc (rtest/create-ipc)]
+  (with-open [ipc (rtest/create-ipc)
+              _ (TopologyUtils/startSimTime)]
     (letlocals
      (bind module
        (aor/agentmodule
@@ -422,7 +429,9 @@
         (and (= ?agent-id agent-id)
              (= ?agent-task-id agent-task-id)))
       ))
-
+     (is (nil? (select-any [:invokes-map MAP-VALS :nested-ops ALL :info
+                            (keypath "firstTokenTimeMillis")]
+                           trace)))
 
      (bind inv (aor/agent-initiate foo "chat2" "Hello"))
      (bind [agent-task-id agent-id] (tc/extract-invoke inv))
@@ -517,16 +526,17 @@
          :result        {:val "You said Hi" :failure? false}
          :nested-ops    [{:type :model-call
                           :info
-                          {"modelName"        "s-aor-model"
-                           "inputTokenCount"  10
-                           "finishReason"     "length"
-                           "objectName"       "schat1"
+                          {"modelName"            "s-aor-model"
+                           "inputTokenCount"      10
+                           "finishReason"         "length"
+                           "objectName"           "schat1"
                            "input"
                            [{"type"     "user"
                              "contents" [{"type" "text" "text" "Hi"}]}]
-                           "response"         "You said Hi"
-                           "outputTokenCount" 20
-                           "totalTokenCount"  30}}]
+                           "response"             "You said Hi"
+                           "outputTokenCount"     20
+                           "totalTokenCount"      30
+                           "firstTokenTimeMillis" 150}}]
          :input         ["schat1" "Hi"]}}
        (m/guard
         (and (= ?agent-id agent-id)
