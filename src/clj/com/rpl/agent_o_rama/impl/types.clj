@@ -187,11 +187,11 @@
 
 ;; Core types
 
-(defn valid-metadata-value?
+(defn valid-restricted-map-value?
   [v]
   (contains? #{Long Double Boolean String} (class v)))
 
-(def METADATA-SCHEMA (s/maybe {String (s/pred valid-metadata-value?)}))
+(def METADATA-SCHEMA (s/maybe {String (s/pred valid-restricted-map-value?)}))
 
 (defaorrecord AgentInitiate
   [args :- [s/Any]
@@ -206,7 +206,7 @@
    agent-task-id :- Long
    agent-invoke-id :- UUID
    key :- String
-   value :- (s/maybe (s/pred valid-metadata-value?))])
+   value :- (s/maybe (s/pred valid-restricted-map-value?))])
 
 (defaorrecord AgentExecutionContext
   [metadata :- METADATA-SCHEMA

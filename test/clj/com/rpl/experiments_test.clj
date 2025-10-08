@@ -96,9 +96,9 @@
              ""
              (fn [params]
                (fn [fetcher input ref-output outputs]
-                 {"outputs"    outputs
-                  "input"      input
-                  "ref-output" ref-output})))
+                 {"outputs"    (str outputs)
+                  "input"      (str input)
+                  "ref-output" (str ref-output)})))
             (aor/declare-summary-evaluator-builder
              topology
              "count"
@@ -579,7 +579,6 @@
          (is (= #{2 1} (set @example-id-chunks-atom)))
          (is (= {{"a" 1} 3 {"b" 2} 3} (frequencies @CAPTURED-METADATA)))
 
-
          (is
           (trace-matches?
            res
@@ -603,7 +602,7 @@
                1 {:result {:val [{"node" "xyz" "args" [11]}] :failure? false}}}
               :evals
               {"identity-compare"
-               {"outputs" [[14] [11]] "input" 1 "ref-output" "89"}}
+               {"outputs" "[[14] [11]]" "input" "1" "ref-output" "89"}}
               :input            {"a" 1 "b" 10}
               :reference-output ["1234567" "89"]}
              1
@@ -623,7 +622,7 @@
                1 {:result {:val [{"node" "xyz" "args" [102]}] :failure? false}}}
               :evals
               {"identity-compare"
-               {"outputs" [[105] [102]] "input" 2 "ref-output" nil}}
+               {"outputs" "[[105] [102]]" "input" "2" "ref-output" ""}}
               :input            {"a" 2 "b" 100}
               :reference-output nil}
              2
@@ -643,7 +642,7 @@
                1 {:result {:val [{"node" "xyz" "args" [1003]}] :failure? false}}}
               :evals
               {"identity-compare"
-               {"outputs" [[1006] [1003]] "input" 3 "ref-output" "hijklmnop"}}
+               {"outputs" "[[1006] [1003]]" "input" "3" "ref-output" "hijklmnop"}}
               :input            {"a" 3 "b" 1000}
               :reference-output ["abcdefg" "hijklmnop"]}}}
           ))
@@ -1066,7 +1065,7 @@
              (fn [fetcher input ref-output output]
                (if (= output "a!")
                  (throw (ex-info "fail" {}))
-                 {"res" output}))))
+                 {"res" (str output)}))))
           (aor/declare-comparative-evaluator-builder
            topology
            "cfail"
@@ -1075,7 +1074,7 @@
              (fn [fetcher input ref-output outputs]
                (if (some #(= "a!" %) outputs)
                  (throw (ex-info "fail" {}))
-                 {"res" outputs}))))
+                 {"res" (str outputs)}))))
           (aor/declare-comparative-evaluator-builder
            topology
            "ccount"
@@ -1380,7 +1379,7 @@
             :agent-results
             {0 {:result {:val "b!" :failure? false}}
              1 {:result {:val "b?" :failure? false}}}
-            :evals            {"cfail" {"res" ["b!" "b?"]} "ccount" {"res" 2}}
+            :evals            {"cfail" {"res" "[\"b!\" \"b?\"]"} "ccount" {"res" 2}}
             :input            "b"
             :reference-output nil}}}
         ))
@@ -1419,7 +1418,7 @@
             :agent-results
             {0 {:result {:val "b!" :failure? false}}
              1 {:result {:val "b?" :failure? false}}}
-            :evals            {"cfail" {"res" ["b!" "b?"]} "ccount" {"res" 2}}
+            :evals            {"cfail" {"res" "[\"b!\" \"b?\"]"} "ccount" {"res" 2}}
             :input            "b"
             :reference-output nil}}}
         ))

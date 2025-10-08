@@ -47,10 +47,22 @@
 
 (defn get-evaluator
   [agent-node name builder-name params]
-  (.getEvaluator ^AgentDeclaredObjectsTaskGlobal (anode/get-declared-objects agent-node)
-                 name
-                 builder-name
-                 params))
+  (let [eval-fn (.getEvaluator ^AgentDeclaredObjectsTaskGlobal
+                               (anode/get-declared-objects agent-node)
+                               name
+                               builder-name
+                               params)]
+    (fn [& args]
+      (let [res (apply eval-fn args)]
+        (if (instance? java.util.Map res)
+          (transform MAP-VALS
+                     (fn [v]
+                       (cond (instance? Integer v) (long v)
+                             (instance? Float v) (double v)
+                             :else v))
+                     (into {} res))
+          res)
+      ))))
 
 (defmacro with-retriever
   [[agent-node experiment remote-info] [retriever-sym] & body]
@@ -304,8 +316,13 @@
 
 (defn validate-results!
   [o]
-  (when-not (and (instance? java.util.Map o) (every? string? (keys o)))
-    (throw (h/ex-info "Invalid map of results (must be map with string keys)" {:return o}))))
+  (when-not (and (instance? java.util.Map o)
+                 (every? string? (keys o))
+                 (every? aor-types/valid-restricted-map-value? (vals o)))
+    (throw
+     (h/ex-info
+      "Invalid map of results (must be map with string keys and int, long, float, double, string, or boolean values)"
+      {:return o}))))
 
 (defn non-summary-evaluate!
   [agent-node eval-type eval-fn input reference-output outputs]

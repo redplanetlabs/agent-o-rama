@@ -244,7 +244,7 @@
   (filter> (contains? *agent-names *agent-name))
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)]
-   (filter> (or> (nil? *value) (aor-types/valid-metadata-value? *value)))
+   (filter> (or> (nil? *value) (aor-types/valid-restricted-map-value? *value)))
    (<<ramafn %metadata-edit-val
      [_]
      (:> (metadata-edit-val *value)))

@@ -824,7 +824,7 @@
               (when-not (every? string? (keys metadata))
                 (throw (h/ex-info "Metadata keys must be strings"
                                   {:keys (pr-str (keys metadata))})))
-              (when-not (every? aor-types/valid-metadata-value? (vals metadata))
+              (when-not (every? aor-types/valid-restricted-map-value? (vals metadata))
                 (throw (h/ex-info
                         "Metadata values must be ints, longs, floats, doubles, booleans, or strings"
                         {:vals (pr-str (vals metadata))})))
