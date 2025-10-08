@@ -82,7 +82,7 @@
 (defn setup-agent-module
   "Deploy agent module and start UI server.
    Returns a map with :ipc, :module-name, and :port.
-   
+
    Options:
    - :port - UI server port (default: 8080)
    - :post-deploy-hook - Function to call after module is deployed, receives ipc and module-name"
@@ -91,7 +91,7 @@
     (when-not (:launched @system)
       (rtest/launch-module! ipc agent-module {:tasks 1 :threads 1})
       (vswap! system assoc :launched true :module-name module-name)
-      
+
       ;; Call post-deploy hook if provided
       (when post-deploy-hook
         (post-deploy-hook ipc module-name)))
@@ -106,7 +106,7 @@
 
 (defn setup-system
   "Setup all resources in order: IPC, module, container.
-   
+
    Options:
    - :post-deploy-hook - Function to call after module is deployed, receives ipc and module-name"
   [agent-module & {:keys [post-deploy-hook]}]
@@ -133,7 +133,7 @@
   "Test fixture that sets up system resources.
    agent-module: The agent module to deploy
    f: The test function to execute
-   
+
    Options:
    - :post-deploy-hook - Function to call after module is deployed, receives ipc and module-name"
   [agent-module f & {:keys [post-deploy-hook]}]
@@ -146,16 +146,16 @@
 
 (defmacro with-system
   "Execute body with a system setup.
-   
+
    Arguments:
    - agent-module: The agent module to deploy
    - opts (optional): Map with options
      - :post-deploy-hook - Function to call after module is deployed, receives ipc and module-name
-   
+
    Examples:
    (with-system [FeedbackTestAgentModule]
      (testing ...))
-   
+
    (with-system [FeedbackTestAgentModule {:post-deploy-hook (fn [ipc module-name] ...)}]
      (testing ...))"
   [[agent-module & [{:keys [post-deploy-hook]}]] & body]
