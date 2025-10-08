@@ -389,19 +389,12 @@
                            :success (filter is-success? results)
                            :failure (filter is-failure? results))
 
-        _ (println "sort-by-state:" sort-by-state)
-        _ (println "available-columns:" available-columns)
-        ;; Sort the filtered results
+;; Sort the filtered results
         sorted-results (if sort-by-state
-                         (let [_ (println "Sorting with sort-by-state:" sort-by-state)
-                               _ (println "filtered-results count:" (count filtered-results))
-                               comparator-fn (fn [run]
+                         (let [comparator-fn (fn [run]
                                                (let [eval-name (:eval-name sort-by-state)
                                                      metric-key (:metric-key sort-by-state)
-                                                     _ (println "Looking for eval-name:" eval-name "metric-key:" metric-key)
-                                                     _ (println "run evals:" (:evals run))
                                                      val (get-in run [:evals eval-name metric-key])]
-                                                 (println "val:" val)
                                                  (cond
                                                    (number? val) val
                                                    (true? val) 1
@@ -419,20 +412,15 @@
                              [{:key "none"
                                :label "None"
                                :selected? (nil? sort-by-state)
-                               :on-select (fn []
-                                            (println "Selecting None")
-                                            (set-sort-by-state nil))}]
+                               :on-select #(set-sort-by-state nil)}]
                              (for [{:keys [eval-name metric-key label]} available-columns]
                                {:key (str eval-name "::" metric-key)
                                 :label label
                                 :selected? (and sort-by-state
                                                 (= (:eval-name sort-by-state) eval-name)
                                                 (= (:metric-key sort-by-state) metric-key))
-                                :on-select (fn []
-                                             (println "Selecting:" label "eval-name:" eval-name "metric-key:" metric-key)
-                                             (set-sort-by-state {:eval-name eval-name
-                                                                 :metric-key metric-key}))}))
-        _ (println "sort-dropdown-items:" (count sort-dropdown-items))
+                                :on-select #(set-sort-by-state {:eval-name eval-name
+                                                                :metric-key metric-key})}))
         current-sort-label (when sort-by-state
                              (let [col (first (filter #(and (= (:eval-name %) (:eval-name sort-by-state))
                                                             (= (:metric-key %) (:metric-key sort-by-state)))
