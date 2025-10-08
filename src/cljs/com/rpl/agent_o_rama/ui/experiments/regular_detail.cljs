@@ -370,9 +370,7 @@
         ;; NEW: Filtering logic
         is-failure? (fn [run]
                       (let [agent-failed? (get-in run [:agent-results 0 :result :failure?])
-                            eval-failed? (some (fn [[_eval-name metrics]]
-                                                 (some false? (vals metrics)))
-                                               (:evals run))]
+                            eval-failed? (seq (:eval-failures run))]
                         (or agent-failed? eval-failed?)))
         is-success? (fn [run] (not (is-failure? run)))
 
