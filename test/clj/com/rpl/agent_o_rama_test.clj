@@ -2788,7 +2788,8 @@
 
 (deftest stream-close-test
   (with-redefs [SEM (h/mk-semaphore 0)]
-    (with-open [ipc (rtest/create-ipc)]
+    (with-open [ipc (rtest/create-ipc)
+                _ (TopologyUtils/startSimTime)]
       (letlocals
        (bind module
          (aor/agentmodule
@@ -2800,8 +2801,12 @@
              "start"
              nil
              (fn [agent-node]
+               (TopologyUtils/advanceSimTime 100)
                (aor/stream-chunk! agent-node "a")
+               (h/acquire-semaphore SEM 1)
+               (TopologyUtils/advanceSimTime 200)
                (aor/stream-chunk! agent-node "b")
+               (TopologyUtils/advanceSimTime 300)
                (aor/stream-chunk! agent-node "c")
                (h/acquire-semaphore SEM 1)
                (aor/stream-chunk! agent-node "d")
@@ -2813,11 +2818,29 @@
 
        (bind agent-manager (aor/agent-manager ipc module-name))
        (bind foo (aor/agent-client agent-manager "foo"))
+       (bind foo-root
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "foo")))
 
-       ;; TODO: <<<<>>>> add test case here of time to first token
+
+       ;; verify first token time capturing as part of this test
+       (bind {:keys [task-id agent-invoke-id] :as inv} (aor/agent-initiate foo))
+       (is (condition-attained?
+            (foreign-select-one [(keypath agent-invoke-id) :first-token-time-millis (view some?)]
+                                foo-root
+                                {:pkey task-id})))
+       (h/release-semaphore SEM 2)
+       (is (= "abcd" (aor/agent-result foo inv)))
+       (bind first-token-time
+         (foreign-select-one [(keypath agent-invoke-id) :first-token-time-millis]
+                             foo-root
+                             {:pkey task-id}))
+       (is (= 100 first-token-time))
 
 
        (bind inv (aor/agent-initiate foo))
+       (h/release-semaphore SEM 1)
        (bind res-atom (atom []))
        (bind as
          (aor/agent-stream foo

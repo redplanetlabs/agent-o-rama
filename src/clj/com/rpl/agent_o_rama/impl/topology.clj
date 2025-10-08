@@ -542,7 +542,7 @@
    (local-transform> [(keypath *invoke-id)
                       (multi-path
                        (term %merger)
-                       [:nested-ops NIL->VECTOR END (termavl *nested-ops)])]
+                       [:nested-ops NIL->VECTOR END (termval *nested-ops)])]
                      $$nodes)
 
    (<<if (-> (po/agent-graph-task-global *agent-name)
