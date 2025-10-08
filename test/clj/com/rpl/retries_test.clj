@@ -1191,6 +1191,12 @@
              "start"
              nil
              (fn [agent-node]
+               (aor/record-nested-op!
+                agent-node
+                :other
+                10
+                11
+                {"abc" 123})
                (h/acquire-semaphore SEM)
                (let [v (swap! VAL-ATOM dec)]
                  (if (= 0 v)
@@ -1290,4 +1296,35 @@
                "clojure.lang.ExceptionInfo: intentional {:v 2}"
                "clojure.lang.ExceptionInfo: intentional {:v 1}"]
               (mapv h/first-line excs)))
+
+       (reset! VAL-ATOM 3)
+       (bind {:keys [task-id agent-invoke-id] :as inv} (aor/agent-initiate foo))
+       (is (= "done" (aor/agent-result foo inv)))
+       (bind root-invoke-id
+         (foreign-select-one [(keypath agent-invoke-id) :root-invoke-id]
+                             root-pstate
+                             {:pkey task-id}))
+
+       (bind trace
+         (:invokes-map
+          (foreign-invoke-query traces-query
+                                task-id
+                                [[task-id root-invoke-id]]
+                                10000)))
+       (is (= 1 (count trace)))
+       (bind nested-ops (select [MAP-VALS :nested-ops ALL (view #(into {} %))] trace))
+       ;; verifies nested-ops are additive on both failure and success
+       (is (= nested-ops
+              [{:start-time-millis 10
+                :finish-time-millis 11
+                :type :other
+                :info {"abc" 123}}
+               {:start-time-millis 10
+                :finish-time-millis 11
+                :type :other
+                :info {"abc" 123}}
+               {:start-time-millis 10
+                :finish-time-millis 11
+                :type :other
+                :info {"abc" 123}}]))
       ))))
