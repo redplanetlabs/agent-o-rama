@@ -124,4 +124,23 @@ public class TestSnippets {
     },
     ActionBuilderOptions.param("jparam1", "jp jp", "aaa").param("jparam2", "jp2"));
   }
+
+  public static AgentInvoke initiateWithContext(AgentClient client) {
+    return client.initiateWithContext(
+      AgentContext.metadata("l", 1L)
+                  .metadata("i", 1)
+                  .metadata("f", 0.5)
+                  .metadata("d", 0.5d)
+                  .metadata("s", "abc")
+                  .metadata("b", true));
+  }
+
+  public static void setMetadata(AgentClient client, AgentInvoke inv) {
+    client.setMetadata(inv, "l", 1L);
+    client.setMetadata(inv, "i", 1);
+    client.setMetadata(inv, "f", 0.5);
+    client.setMetadata(inv, "d", 0.5d);
+    client.setMetadata(inv, "s", "abc");
+    client.setMetadata(inv, "b", true);
+  }
 }

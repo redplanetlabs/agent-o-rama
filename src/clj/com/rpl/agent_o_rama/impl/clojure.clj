@@ -59,6 +59,14 @@
   ^CompletableFuture [^AgentClient agent-client & args]
   (.initiateAsync agent-client (into-array Object args)))
 
+(defn agent-initiate-with-context-async
+  ^CompletableFuture [agent-client context & args]
+  (aor-types/initiate-with-context-async-internal agent-client context (into [] args)))
+
+(defn agent-initiate-with-context
+  ^AgentInvoke [agent-client context & args]
+  (.get ^CompletableFuture (apply agent-initiate-with-context-async agent-client context args)))
+
 (defn agent-result
   [^AgentClient agent-client agent-invoke]
   (.result agent-client agent-invoke))

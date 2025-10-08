@@ -7,19 +7,25 @@
 
 (defn mock-aggregated-stats
   "Create mock aggregated stats (already computed by backend)"
-  [ops-map token-counts]
-  {:nested-op-stats    ops-map
-   :input-token-count  (:input token-counts 0)
-   :output-token-count (:output token-counts 0)
-   :total-token-count  (:total token-counts 0)})
+  ([ops-map token-counts]
+   (mock-aggregated-stats ops-map token-counts {}))
+  ([ops-map token-counts node-stats]
+   {:nested-op-stats    ops-map
+    :input-token-count  (:input token-counts 0)
+    :output-token-count (:output token-counts 0)
+    :total-token-count  (:total token-counts 0)
+    :node-stats         node-stats}))
 
 (defn mock-subagent-basic-stats
   "Create mock basic stats for a sub-agent"
-  [ops-map token-counts]
-  {:nested-op-stats    ops-map
-   :input-token-count  (:input token-counts 0)
-   :output-token-count (:output token-counts 0)
-   :total-token-count  (:total token-counts 0)})
+  ([ops-map token-counts]
+   (mock-subagent-basic-stats ops-map token-counts {}))
+  ([ops-map token-counts node-stats]
+   {:nested-op-stats    ops-map
+    :input-token-count  (:input token-counts 0)
+    :output-token-count (:output token-counts 0)
+    :total-token-count  (:total token-counts 0)
+    :node-stats         node-stats}))
 
 (defn mock-subagent-stats
   [count basic-stats]
@@ -70,14 +76,14 @@
 (deftest get-op-stats-test
   (testing "get-op-stats"
     (testing "returns stats for existing operation"
-      (let [ops    {:db-read {:count 5 :total-time-millis 100}}
-            result (ta/get-op-stats ops :db-read)]
+      (let [basic-stats {:nested-op-stats {:db-read {:count 5 :total-time-millis 100}}}
+            result      (ta/get-op-stats basic-stats :db-read)]
         (is (= 5 (:count result)))
         (is (= 100 (:total-time-millis result)))))
 
     (testing "returns default empty stats for missing operation"
-      (let [ops    {:db-read {:count 5 :total-time-millis 100}}
-            result (ta/get-op-stats ops :missing)]
+      (let [basic-stats {:nested-op-stats {:db-read {:count 5 :total-time-millis 100}}}
+            result      (ta/get-op-stats basic-stats :missing)]
         (is (= 0 (:count result)))
         (is (= 0 (:total-time-millis result)))))
 
@@ -121,7 +127,7 @@
       (is (ta/has-operations? basic-stats [:tool-call :agent-call]))
 
       ;; Verify get-op-stats works with aggregated stats
-      (let [get-op (partial ta/get-op-stats (:nested-op-stats basic-stats))]
+      (let [get-op (partial ta/get-op-stats basic-stats)]
         (is (= 7 (:count (get-op :db-read))))
         (is (= 140 (:total-time-millis (get-op :db-read))))
         (is (= 5 (:count (get-op :model-call))))
@@ -209,3 +215,45 @@
           (is (some? (:agent-name agent-ref)))
           (is (number? (:count sa-stats)))
           (is (some? (:basic-stats sa-stats))))))))
+
+(deftest node-stats-display-test
+  ;; Test that node stats are properly structured and accessible
+  (testing "node-stats display data"
+    (testing "basic stats with node-stats"
+      (let [node-stats  {"start"  {:count 1 :total-time-millis 100}
+                         "node1"  {:count 1 :total-time-millis 250}
+                         "finish" {:count 1 :total-time-millis 50}}
+            basic-stats (mock-aggregated-stats {} {} node-stats)]
+
+        (is (some? (:node-stats basic-stats)))
+        (is (= 3 (count (:node-stats basic-stats))))
+        (is (= 100 (get-in basic-stats [:node-stats "start" :total-time-millis])))
+        (is (= 1 (get-in basic-stats [:node-stats "start" :count])))))
+
+    (testing "basic stats without node-stats"
+      (let [basic-stats (mock-aggregated-stats {} {})]
+        (is (= {} (:node-stats basic-stats)))
+        (is (empty? (:node-stats basic-stats)))))
+
+    (testing "node stats sorting and formatting"
+      (let [node-stats  {"z-node" {:count 1 :total-time-millis 100}
+                         "a-node" {:count 2 :total-time-millis 200}
+                         "m-node" {:count 3 :total-time-millis 300}}
+            basic-stats (mock-aggregated-stats {} {} node-stats)
+            sorted-nodes (sort-by first (:node-stats basic-stats))]
+
+        (is (= ["a-node" "m-node" "z-node"] (map first sorted-nodes)))
+        (is (= "1x  ·  100ms" (ta/format-op-stats (second (first (filter #(= "z-node" (first %)) sorted-nodes))))))
+        (is (= "2x  ·  200ms" (ta/format-op-stats (second (first (filter #(= "a-node" (first %)) sorted-nodes))))))
+        (is (= "3x  ·  300ms" (ta/format-op-stats (second (first (filter #(= "m-node" (first %)) sorted-nodes))))))))
+
+    (testing "subagent stats with node-stats"
+      (let [node-stats  {"sub-start" {:count 2 :total-time-millis 150}
+                         "sub-end"   {:count 2 :total-time-millis 75}}
+            sub-ops     {:model-call {:count 2 :total-time-millis 300}}
+            sub-basic   (mock-subagent-basic-stats sub-ops {:input 50 :output 25 :total 75} node-stats)
+            sub-stats   (mock-subagent-stats 2 sub-basic)]
+
+        (is (some? (get-in sub-stats [:basic-stats :node-stats])))
+        (is (= 2 (count (get-in sub-stats [:basic-stats :node-stats]))))
+        (is (= 150 (get-in sub-stats [:basic-stats :node-stats "sub-start" :total-time-millis])))))))

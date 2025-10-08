@@ -40,7 +40,7 @@
         ;; 2. The single useEffect to initiate data loading
         _ (uix/use-effect
            (fn []
-             (when (and invoke-id module-id agent-name connected?)
+             (when (and invoke-id module-id agent-name)
                (state/dispatch [:invocation/start-graph-loading
                                 {:invoke-id  invoke-id
                                  :module-id  module-id
@@ -48,7 +48,7 @@
              ;; Cleanup function
              (fn []
                (state/dispatch [:invocation/cleanup {:invoke-id invoke-id}])))
-           [invoke-id module-id agent-name connected?])
+           [invoke-id module-id agent-name])
 
         ;; 3. Polling effect removed in favor of unified streaming loop in events
 
@@ -115,11 +115,6 @@
 
     ;; 5. Render based on explicit status and connection state
     (cond
-      (not connected?)
-      ($ :div.flex.items-center.justify-center.p-8
-         ($ common/spinner {:size :medium})
-         ($ :div.text-gray-500.ml-2 "Connecting to server..."))
-
       ;; Explicit loading state
       (= status :loading)
       ($ :div.flex.items-center.justify-center.p-8

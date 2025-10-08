@@ -14,28 +14,37 @@
 
 (defn has-operations?
   "Check if aggregated operations contain any of the specified operation types."
-  [aggregated-ops op-keys]
-  (some #(pos? (:count (get-in aggregated-ops [:nested-op-stats %]) 0))
+  [basic-stats op-keys]
+  (some #(pos? (get-in basic-stats [:nested-op-stats % :count] 0))
         op-keys))
 
 (defn get-op-stats
-  "Get operation stats for a specific operation key, returning default empty stats if not present."
-  [aggregated-ops op-key]
-  (get aggregated-ops op-key {:count 0 :total-time-millis 0}))
+  "Get operation stats for a specific operation key.
+  Returns default empty stats if not present."
+  [basic-stats op-key]
+  (get-in
+   basic-stats
+   [:nested-op-stats op-key]
+   {:count 0 :total-time-millis 0}))
 
 (defn format-op-stats
-  "Format operation stats as 'Nx  ·  Nms'"
+  "Format operation stats as 'Nx  ·  Nms'.
+   Returns a map with :display (formatted string) and :tooltip (average time)."
   [{:keys [count total-time-millis]}]
-  (str count "x  ·  " (.toLocaleString (or total-time-millis 0)) "ms"))
+  (let [avg-time (if (pos? count) (/ total-time-millis count) 0)]
+    {:display (str count "x  ·  " (common/format-duration-ms (or total-time-millis 0)))
+     :tooltip (str "Avg: " (common/format-duration-ms avg-time))}))
 
 (defui op-stat-row
   "Display a single operation stat row"
   [{:keys [label stats text-size]}]
   (when (pos? (:count stats))
-    ($ :div {:className "flex justify-between items-center"}
-       ($ :div {:className "text-xs text-gray-600"} label)
-       ($ :div {:className (str (or text-size "text-sm") " font-bold text-gray-800")}
-          (format-op-stats stats)))))
+    (let [formatted (format-op-stats stats)]
+      ($ :div {:className "flex justify-between items-center"}
+         ($ :div {:className "text-xs text-gray-600"} label)
+         ($ :div {:className (str (or text-size "text-sm") " font-bold text-gray-800")
+                  :title (:tooltip formatted)}
+            (:display formatted))))))
 
 (defui multi-value-display
   "Display one or more labeled values in a flexible layout.
@@ -50,7 +59,8 @@
 
        ;; Single value: horizontal layout
        (if (= value-count 1)
-         (let [{:keys [label value stats icon]} (first values)]
+         (let [{:keys [label value stats icon]} (first values)
+               formatted (when stats (format-op-stats stats))]
            ($ :div
               {:className "flex justify-between items-center"}
               ($ :div
@@ -60,19 +70,22 @@
               ($ :div
                  {:className "text-right"}
                  ($ :div
-                    {:className "text-sm font-bold text-gray-800"}
-                    (or value (format-op-stats stats))))))
+                    {:className "text-sm font-bold text-gray-800"
+                     :title (when formatted (:tooltip formatted))}
+                    (or value (:display formatted))))))
 
          ;; Multiple values: vertical columns layout
          ($ :div
             {:className "flex justify-between items-center"}
             (for [{:keys [label value stats icon] :as _v} values]
-              ($ :div
-                 {:key label}
-                 (when icon ($ icon {:className "h-4 w-4 text-gray-600 mb-1"}))
-                 ($ :div {:className "text-xs text-gray-600"} label)
-                 ($ :div {:className "text-sm font-bold text-gray-800"}
-                    (or value (format-op-stats stats))))))))))
+              (let [formatted (when stats (format-op-stats stats))]
+                ($ :div
+                   {:key label}
+                   (when icon ($ icon {:className "h-4 w-4 text-gray-600 mb-1"}))
+                   ($ :div {:className "text-xs text-gray-600"} label)
+                   ($ :div {:className "text-sm font-bold text-gray-800"
+                            :title (when formatted (:tooltip formatted))}
+                      (or value (:display formatted)))))))))))
 
 (defui stat-card
   "Common card wrapper for stat sections"
@@ -89,11 +102,15 @@
    Takes basic-stats and optional execution-time and retry-count."
   [{:keys [basic-stats execution-time retry-count]}]
   (let [[nested-ops-expanded? set-nested-ops-expanded!] (uix/use-state false)
+        [node-stats-expanded? set-node-stats-expanded!] (uix/use-state false)
 
         ;; Token counts from basic stats
         total-tokens  (:total-token-count basic-stats)
         input-tokens  (:input-token-count basic-stats)
         output-tokens (:output-token-count basic-stats)
+
+        ;; Node stats
+        node-stats-map (:node-stats basic-stats)
 
         ;; Local helper for getting operation stats
         get-op (partial get-op-stats basic-stats)
@@ -102,7 +119,8 @@
         has-stats? (or execution-time
                        (and retry-count (> retry-count 0))
                        (and total-tokens (pos? total-tokens))
-                       (has-operations? basic-stats nested-op-keys))]
+                       (has-operations? basic-stats nested-op-keys)
+                       (seq node-stats-map))]
     ($ :div
        {:className "grid grid-cols-1 gap-2"}
 
@@ -167,9 +185,11 @@
                   :value (str (.toLocaleString total-tokens))}]})))
 
        ;; Other operations (expandable)
+       (.log js/console "STATS" (pr-str basic-stats))
        (when (has-operations?
               basic-stats
               [:tool-call :agent-call :human-input :other])
+         (.log js/console "IN OTHER")
          ($ stat-card
             {:data-id "other-operations"}
             ($ :div
@@ -193,6 +213,30 @@
                        {:label "Human Inputs" :stats (get-op :human-input)})
                     ($ op-stat-row
                        {:label "Other" :stats (get-op :other)}))))))
+
+       ;; Node stats (expandable)
+       (when (seq node-stats-map)
+         ($ stat-card
+            {:data-id "node-stats"}
+            ($ :div
+               ($ :button
+                  {:className "flex items-center gap-2 w-full text-left text-sm font-medium text-gray-700 mb-2"
+                   :data-id   "node-stats-toggle"
+                   :onClick   #(set-node-stats-expanded! not)}
+                  (if node-stats-expanded?
+                    ($ ChevronDownIcon {:className "h-4 w-4"})
+                    ($ ChevronRightIcon {:className "h-4 w-4"}))
+                  "Node Stats")
+               (when node-stats-expanded?
+                 ($ :div
+                    {:className "space-y-2"
+                     :data-id   "node-stats-list"}
+                    (map (fn [[node-name stats]]
+                           ($ op-stat-row
+                              {:key   node-name
+                               :label node-name
+                               :stats stats}))
+                         (sort-by first node-stats-map)))))))
 
        ;; Fallback when no stats
        (when-not has-stats?
@@ -275,7 +319,7 @@
                           {:basic-stats basic-stats}))
 
                     ;; Sub-agent entries
-                    (map (fn [[agent-ref sa-stats]]
+                    (mapv (fn [[agent-ref sa-stats]]
                            (let [module-name    (:module-name agent-ref)
                                  agent-name     (:agent-name agent-ref)
                                  count          (:count sa-stats)
@@ -288,14 +332,23 @@
                                    {:className "space-y-2"
                                     :data-id   (str "subagent-" agent-name)}
                                    ($ :div
-                                      {:className "flex items-baseline gap-2"}
+                                      {:className "space-y-1"}
                                       ($ :div
-                                         {:className "text-sm font-semibold text-gray-800"}
+                                         {:className "text-sm font-semibold text-gray-800 overflow-hidden"
+                                          :style     {:direction    "rtl"
+                                                      :whiteSpace   "nowrap"
+                                                      :textOverflow "ellipsis"
+                                                      :maxWidth     "100%"}
+                                          :title     (str module-name "/" agent-name)}
                                          (str module-name "/" agent-name))
-                                      ($ :div
-                                         {:className "text-xs text-gray-500"}
-                                         (str "(" count " call"
-                                              (when (not= count 1) "s") ")")))
+                                      (let [total-time (reduce + 0 (map :total-time-millis (vals (:node-stats sa-basic-stats))))
+                                            avg-time   (if (pos? count) (/ total-time count) 0)]
+                                        ($ :div
+                                           {:className "text-xs text-gray-500 text-right"
+                                            :title (str "Avg: " (common/format-duration-ms avg-time))}
+                                           (str count " call" (when (not= count 1) "s")
+                                                " · "
+                                                (common/format-duration-ms total-time)))))
                                    ($ agent-stats-display
                                       {:basic-stats sa-basic-stats})))))
                          subagent-stats-map))))))))

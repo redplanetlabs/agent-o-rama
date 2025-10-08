@@ -69,6 +69,7 @@
     :else
     (next-agent-task num-partitions)))
 
+
 (defn task-id-key-partitioner
   [num-partitions task-id]
   task-id)

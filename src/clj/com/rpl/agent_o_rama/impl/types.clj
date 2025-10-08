@@ -187,12 +187,30 @@
 
 ;; Core types
 
+(defn valid-metadata-value?
+  [v]
+  (contains? #{Long Double Boolean String} (class v)))
+
+(def METADATA-SCHEMA (s/maybe {String (s/pred valid-metadata-value?)}))
+
 (defaorrecord AgentInitiate
   [args :- [s/Any]
    forced-agent-task-id :- (s/maybe Long)
    forced-agent-invoke-id :- (s/maybe UUID)
+   metadata :- METADATA-SCHEMA
    source :- (s/maybe InfoSource)
   ])
+
+(defaorrecord EditMetadata
+  [agent-name :- String
+   agent-task-id :- Long
+   agent-invoke-id :- UUID
+   key :- String
+   value :- (s/maybe (s/pred valid-metadata-value?))])
+
+(defaorrecord AgentExecutionContext
+  [metadata :- METADATA-SCHEMA
+   source :- (s/maybe InfoSource)])
 
 (defaorrecord AgentResult
   [val :- s/Any
@@ -515,6 +533,7 @@
 
 (defaorrecord ExperimentTarget
   [target-spec :- (s/protocol TargetSpec)
+   metadata :- METADATA-SCHEMA
    ;; these are list of JSON path templates
    input->args :- [String]])
 
@@ -809,6 +828,9 @@
                                       (if options @options)))
 
 (defprotocol AgentClientInternal
+  (set-metadata-internal! [this agent-invoke key value])
+  (invoke-with-context-async-internal [this context args])
+  (initiate-with-context-async-internal [this context args])
   (stream-internal [this agent-invoke node callback-fn])
   (stream-specific-internal [this agent-invoke node node-invoke-id callback-fn])
   (stream-all-internal [this agent-invoke node callback-fn])

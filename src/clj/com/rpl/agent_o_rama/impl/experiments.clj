@@ -263,6 +263,7 @@
                (vswap! emits-vol conj {"node" node "args" (vec args)}))
              (result [this arg]
                (vreset! result-vol {:result arg}))
+             (getMetadata [this] (.getMetadata agent-node))
              (getAgentObject [this name]
                (.getAgentObject agent-node name))
              (getAgentClient [this name]
@@ -570,7 +571,7 @@
                source       (aor-types/->valid-ExperimentSourceImpl dataset-id id)
                initiate-fns
                (mapv
-                (fn [{:keys [target-spec input->args]} client]
+                (fn [{:keys [target-spec metadata input->args]} client]
                   (let [agent-name       (:agent-name target-spec)
                         parsed-templates (mapv h/parse-json-path-template input->args)]
                     (fn [input]
@@ -578,13 +579,18 @@
                         (let [args (convert-input->args input parsed-templates)]
                           (if (aor-types/AgentTarget? target-spec)
                             {:agent-name   agent-name
-                             :agent-invoke (apply c/agent-initiate client args)}
+                             :agent-invoke (apply c/agent-initiate-with-context
+                                            client
+                                            {:metadata metadata}
+                                            args)}
                             {:agent-name   aor-types/EVALUATOR-AGENT-NAME
-                             :agent-invoke (c/agent-initiate client
-                                                             (aor-types/->valid-ExperimentNodeInvoke
-                                                              agent-name
-                                                              (:node target-spec)
-                                                              args))})
+                             :agent-invoke (c/agent-initiate-with-context
+                                            client
+                                            {:metadata metadata}
+                                            (aor-types/->valid-ExperimentNodeInvoke
+                                             agent-name
+                                             (:node target-spec)
+                                             args))})
                         )))))
                 targets
                 clients)]
@@ -867,7 +873,7 @@
      ;; have to do it this way since cannot do :ack on the depot append since it's running as part
      ;; of the same stream topology
      (h/random-uuid7 :> *agent-invoke-id)
-     (aor-types/->valid-AgentInitiate [*data] nil *agent-invoke-id nil :> *initiate)
+     (aor-types/->valid-AgentInitiate [*data] nil *agent-invoke-id nil nil :> *initiate)
      (depot-partition-append!
       *agent-depot
       *initiate

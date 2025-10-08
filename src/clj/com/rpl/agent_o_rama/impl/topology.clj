@@ -168,7 +168,7 @@
 
 
 (deframaop init-root
-  [*agent-name *agent-id *retry-num *args *source]
+  [*agent-name *agent-id *retry-num *args *metadata *source]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
     $$root-count (po/agent-root-count-task-global *agent-name)]
@@ -187,6 +187,7 @@
                :last-progress-time-millis *current-time-millis
                :retry-num         *retry-num
                :stats             stats/EMPTY-AGENT-STATS
+               :metadata          *metadata
                :source            *source
                :start-time-millis *current-time-millis})]
     $$root)
@@ -209,6 +210,7 @@
    (ops/current-task-id :> *agent-task-id)
    (get *data :forced-agent-invoke-id :> *forced-agent-id)
    (get *data :source :> *source)
+   (get *data :metadata :> *metadata)
    (<<if (some? *forced-agent-id)
      ;; stop if already exists for idempotency
      (local-select> [(keypath *forced-agent-id) nil?] $$root)
@@ -216,7 +218,7 @@
     (else>)
      (gen-new-agent-id *agent-name :> *agent-id))
    (init-retry-num :> *retry-num)
-   (init-root *agent-name *agent-id *retry-num *args *source :> *invoke-id)
+   (init-root *agent-name *agent-id *retry-num *args *metadata *source :> *invoke-id)
    (local-transform> [(keypath *agent-id) (termval true)]
                      $$active)
    (aor-types/->valid-NodeOp *invoke-id
@@ -226,7 +228,29 @@
                              *args
                              nil
                              :> *op)
-   (:> *agent-task-id *agent-id *retry-num *op)))
+   (:> *agent-task-id
+       *agent-id
+       (aor-types/->valid-AgentExecutionContext *metadata *source)
+       *retry-num
+       *op)))
+
+(defn metadata-edit-val
+  [v]
+  (if (nil? v) NONE v))
+
+(deframaop handle-agent-edit
+  [{:keys [*agent-name *agent-invoke-id *key *value]}]
+  (po/agent-names-set :> *agent-names)
+  (filter> (contains? *agent-names *agent-name))
+  (<<with-substitutions
+   [$$root (po/agent-root-task-global *agent-name)]
+   (filter> (or> (nil? *value) (aor-types/valid-metadata-value? *value)))
+   (<<ramafn %metadata-edit-val
+     [_]
+     (:> (metadata-edit-val *value)))
+   (local-transform> [(must *agent-invoke-id) :metadata (keypath *key) (term %metadata-edit-val)]
+                     $$root)
+  ))
 
 (defn hook:received-retry [agent-task-id agent-id retry-num])
 (deframaop hook:running-retry>
@@ -264,6 +288,7 @@
                       *args :invoke-args
                       *result :result
                       *source :source
+                      *metadata :metadata
 
                       {:keys [*fork-context
                               *parent-root-invoke-id]}
@@ -300,7 +325,7 @@
      (<<if (= :restart *handle-mode)
        (local-transform> [(keypath *root-invoke-id) (termval nil)]
                          $$gc)
-       (init-root *agent-name *agent-id *retry-num *args *source :> *root-invoke-id)
+       (init-root *agent-name *agent-id *retry-num *args *metadata *source :> *root-invoke-id)
       (else>)
        (identity *root-invoke-id :> *root-invoke-id))
 
@@ -325,7 +350,11 @@
                                  *args
                                  nil
                                  :> *op)
-       (:> *agent-task-id *agent-id *retry-num *op)
+       (:> *agent-task-id
+           *agent-id
+           (aor-types/->valid-AgentExecutionContext *metadata *source)
+           *retry-num
+           *op)
      ))))
 
 (deframaop intake-fork
@@ -337,7 +366,7 @@
     %affected-aggs (queries/fork-affected-aggs-query-task-global *agent-name)]
    (local-select> (keypath *agent-id)
                   $$root
-                  :> {:keys [*root-invoke-id *invoke-args *graph-version]})
+                  :> {:keys [*root-invoke-id *invoke-args *graph-version *metadata]})
    (<<if (nil? *invoke-args)
      (throw! (h/ex-info "Forked agent ID does not exist"
                         {:agent-id *agent-id})))
@@ -356,6 +385,7 @@
               *fork-agent-id
               *retry-num
               *invoke-args
+              *metadata
               nil
               :> *invoke-id)
    (local-select> [(keypath *fork-agent-id) :graph-version]
@@ -384,7 +414,11 @@
                              *invoke-args
                              nil
                              :> *op)
-   (:> *agent-task-id *fork-agent-id *retry-num *op)))
+   (:> *agent-task-id
+       *fork-agent-id
+       (aor-types/->valid-AgentExecutionContext *metadata nil)
+       *retry-num
+       *op)))
 
 (deframaop intake-node-failure
   [*agent-name {:keys [*invoke-id *retry-num *throwable-str *nested-ops]}]
@@ -437,13 +471,19 @@
    (local-select> (keypath *invoke-id)
                   $$nodes
                   :> {:keys [*agent-task-id *agent-id *node
-                             *agg-invoke-id *start-time-millis]})
+                             *agg-invoke-id *start-time-millis
+                             *metadata *source]})
    (filter> (some? *agent-id))
    (apart/filter-valid-retry-num> *agent-name
                                   *agent-task-id
                                   *agent-id
                                   *retry-num)
-   (:> *agent-task-id *agent-id *node *agg-invoke-id *start-time-millis)))
+   (:> *agent-task-id
+       *agent-id
+       (aor-types/->valid-AgentExecutionContext *metadata *source)
+       *node
+       *agg-invoke-id
+       *start-time-millis)))
 
 (deframaop handle-node-complete-emits
   [*agent-name *agent-task-id *agent-id *retry-num *node *invoke-id
@@ -487,10 +527,11 @@
            *finish-time-millis]}]
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)]
-   (begin-node-complete *agent-name
-                        *invoke-id
-                        *retry-num
-                        :> *agent-task-id *agent-id *node *agg-invoke-id *start-time-millis)
+   (begin-node-complete
+    *agent-name
+    *invoke-id
+    *retry-num
+    :> *agent-task-id *agent-id *execution-context *node *agg-invoke-id *start-time-millis)
    (<<ramafn %merger
      [*m]
      (:> (reduce-kv assoc
@@ -525,7 +566,7 @@
     *stats
     nil
     :> *op)
-   (:> *agent-task-id *agent-id *retry-num *op)
+   (:> *agent-task-id *agent-id *execution-context *retry-num *op)
   ))
 
 (defn extract-agg-result
@@ -546,7 +587,7 @@
 (defn hook:running-complete-agg! [])
 
 (deframaop complete-agg!
-  [*agent-name *invoke-id *retry-num]
+  [*agent-name *invoke-id *execution-context *retry-num]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
     $$nodes (po/agent-node-task-global *agent-name)
@@ -564,6 +605,7 @@
    (anode/handle-node-invoke *agent-name
                              *agent-task-id
                              *agent-id
+                             *execution-context
                              *node-fn
                              *invoke-id
                              *retry-num
@@ -577,7 +619,7 @@
    (:>)))
 
 (deframaop ack-agg!
-  [*agent-name *invoke-id *retry-num *ack-val]
+  [*agent-name *invoke-id *execution-context *retry-num *ack-val]
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
@@ -600,11 +642,11 @@
    (apart/|aor [*agent-name *agent-task-id *agent-id *retry-num]
                |direct
                (ops/current-task-id))
-   (complete-agg! *agent-name *invoke-id *retry-num)
+   (complete-agg! *agent-name *invoke-id *execution-context *retry-num)
    (:>)))
 
 (deframaop reset-aggregation-state!
-  [*agent-name *agent-task-id *agent-id *retry-num *agg-node-name *invoke-id
+  [*agent-name *agent-task-id *agent-id *execution-context *retry-num *agg-node-name *invoke-id
    *agg-invoke-id *parent-agg-invoke-id]
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)
@@ -637,6 +679,8 @@
                :agg-state           *init-agg-state
                :agg-ack-val         (h/half-uuid *invoke-id)
                :agg-start-invoke-id *invoke-id
+               :metadata            (get *execution-context :metadata)
+               :source              (get *execution-context :source)
               })]
     $$nodes)
    (:>)))
@@ -654,7 +698,7 @@
    (begin-node-complete *agent-name
                         *invoke-id
                         *retry-num
-                        :> *agent-task-id *agent-id *node *agg-invoke-id _)
+                        :> *agent-task-id *agent-id *execution-context *node *agg-invoke-id _)
    (hook:handling-retry-node-complete> *agent-name *node *invoke-id *retry-num)
    (get-node-obj *agent-graph *node :> *node-obj)
    (local-select> (keypath *invoke-id)
@@ -677,13 +721,14 @@
                                                *fork-context)
           :append-ack)
         (else>)
-         (complete-agg! *agent-name *agg-invoke-id *retry-num))
+         (complete-agg! *agent-name *agg-invoke-id *execution-context *retry-num))
        (filter> (some? *fork-context))
       (else>)
        (reset-aggregation-state!
         *agent-name
         *agent-task-id
         *agent-id
+        *execution-context
         *retry-num
         *agg-node-name
         *invoke-id
@@ -704,7 +749,7 @@
     nil
     *fork-context
     :> *op)
-   (:> *agent-task-id *agent-id *retry-num *op)))
+   (:> *agent-task-id *agent-id *execution-context *retry-num *op)))
 
 (deframaop intake-agent-depot
   [*agent-name *data]
@@ -712,39 +757,39 @@
    (case> (aor-types/AgentInitiate? *data))
     (intake-agent-initiate *agent-name
                            *data
-                           :> *agent-task-id *agent-id *retry-num *op)
+                           :> *agent-task-id *agent-id *execution-context *retry-num *op)
     (ack-return> [*agent-task-id *agent-id])
 
    (case> (aor-types/RetryAgentInvoke? *data))
     (intake-retry *agent-name
                   *data
-                  :> *agent-task-id *agent-id *retry-num *op)
+                  :> *agent-task-id *agent-id *execution-context *retry-num *op)
 
    (case> (aor-types/ForkAgentInvoke? *data))
     (intake-fork *agent-name
                  *data
-                 :> *agent-task-id *agent-id *retry-num *op)
+                 :> *agent-task-id *agent-id *execution-context *retry-num *op)
     (ack-return> [*agent-task-id *agent-id])
 
    (case> (aor-types/NodeFailure? *data))
     ;; doesn't actually emit here, but emit needed for unification
     (intake-node-failure *agent-name
                          *data
-                         :> *agent-task-id *agent-id *retry-num *op)
+                         :> *agent-task-id *agent-id *execution-context *retry-num *op)
 
    (case> (aor-types/NodeComplete? *data))
     (intake-node-complete *agent-name
                           *data
-                          :> *agent-task-id *agent-id *retry-num *op)
+                          :> *agent-task-id *agent-id *execution-context *retry-num *op)
 
    (case> (aor-types/RetryNodeComplete? *data))
     (intake-retry-node-complete *agent-name
                                 *data
-                                :> *agent-task-id *agent-id *retry-num *op)
+                                :> *agent-task-id *agent-id *execution-context *retry-num *op)
 
    (default> :unify false)
     (throw! (h/ex-info "Unrecognized data type" {:class (class *data)})))
-  (:> *agent-task-id *agent-id *retry-num *op))
+  (:> *agent-task-id *agent-id *execution-context *retry-num *op))
 
 (defn hook:processing-streaming [node streaming-index value])
 
@@ -854,10 +899,12 @@
                     :> {:keys [*finish-time-millis]})
      (:> (some? *finish-time-millis))
    )))
+
 (deframaop execute-node-op
   [*agent-name
    *agent-task-id
    *agent-id
+   *execution-context
    *retry-num
    {:keys [*invoke-id *next-node *args *agg-invoke-id
            *fork-invoke-id *fork-context]}]
@@ -870,6 +917,7 @@
       *agent-name
       *agent-task-id
       *agent-id
+      *execution-context
       *node-fn
       *invoke-id
       *retry-num
@@ -887,6 +935,7 @@
       *agent-name
       *agent-task-id
       *agent-id
+      *execution-context
       *retry-num
       *agg-node-name
       *invoke-id
@@ -896,6 +945,7 @@
       *agent-name
       *agent-task-id
       *agent-id
+      *execution-context
       *node-fn
       *invoke-id
       *retry-num
@@ -946,10 +996,11 @@
      ;; rest of agg subgraph from ever completing and calling complete-agg!
      ;; again
      (<<if *finished?
-       (complete-agg! *agent-name *agg-invoke-id *retry-num)
+       (complete-agg! *agent-name *agg-invoke-id *execution-context *retry-num)
       (else>)
        (ack-agg! *agent-name
                  *agg-invoke-id
+                 *execution-context
                  *retry-num
                  (h/half-uuid *invoke-id)))
    )))
@@ -1007,6 +1058,7 @@
   [*agent-name
    *agent-task-id
    *agent-id
+   *execution-context
    *retry-num
    {:keys [*next-node *invoke-id *fork-invoke-id *fork-context *agg-invoke-id]
     :as   *node-op}]
@@ -1024,6 +1076,7 @@
      (execute-node-op *agent-name
                       *agent-task-id
                       *agent-id
+                      *execution-context
                       *retry-num
                       (assoc
                        *node-op
@@ -1054,10 +1107,13 @@
                       $$nodes
                       :> {*agg-node      :node
                           *agg-start-res :agg-start-res})
+       ;; forks don't change metadata, so execution context metadata is the same as in the forked
+       ;; agg state
        (local-transform> [(keypath *new-agg-invoke-id)
                           (termval {:agent-task-id *agent-task-id
                                     :agent-id      *agent-id
                                     :node          *agg-node
+                                    :metadata      (get *execution-context :metadata)
                                     :agg-invoke-id *agg-invoke-id
                                     :agg-start-res *agg-start-res
                                     :agg-start-invoke-id *invoke-id})]
@@ -1097,6 +1153,7 @@
      (execute-node-op *agent-name
                       *agent-task-id
                       *agent-id
+                      *execution-context
                       *retry-num
                       *node-op))))
 

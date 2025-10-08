@@ -42,6 +42,107 @@
     "Performs arithmetic operations")
    simple-calculator-tool))
 
+(defn test-agent
+  [agent-node {:strs [mode input]}]
+  (let [mode (if (string? mode) (keyword mode) mode)]
+    (case mode
+      :basic
+      ;; No nested operations, just return result
+      (aor/result!
+       agent-node
+       {"mode" "basic" "result" (str "Processed: " (or input "test"))})
+
+      :sub-agent
+      ;; Call sub-agent
+      (let [input     (or input "test")
+            sub-agent (aor/agent-client agent-node "BasicSubAgent")
+            result    (aor/agent-invoke sub-agent input)]
+        (aor/result!
+         agent-node
+         {"mode" "sub-agent" "sub-result" result}))
+
+      :chat
+      ;; Use chat model
+      (let [input    (or input "hello")
+            model    (aor/get-agent-object agent-node "openai-model")
+            messages [(SystemMessage. "You are helpful.")
+                      (UserMessage. (str input))]
+            response (lc4j/chat model (lc4j/chat-request messages {}))
+            text     (.text (.aiMessage response))]
+        (aor/result! agent-node {"mode" "chat" "response" text}))
+
+      :tool-call
+      ;; Use chat model with tools
+      (let [model          (aor/get-agent-object
+                            agent-node
+                            "openai-model")
+            tools-agent    (aor/agent-client agent-node "ToolsAgent")
+            ^String prompt (or input "What is 5 plus 3?")
+            response       (lc4j/chat
+                            model
+                            (lc4j/chat-request
+                             [(UserMessage. prompt)]
+                             {:tools [CALCULATOR-TOOL]}))
+            ai-message     (.aiMessage response)
+            tool-calls     (vec (.toolExecutionRequests ai-message))]
+        (if (seq tool-calls)
+          (let [results (aor/agent-invoke tools-agent tool-calls)]
+            (aor/result! agent-node
+                         {"mode"         "tool-call"
+                          "tool-calls"   (count tool-calls)
+                          "tool-results" results}))
+          (aor/result! agent-node
+                       {"mode"     "tool-call"
+                        "response" (.text ai-message)})))
+
+      :store
+      ;; Use key-value store
+      (let [kv-store (aor/get-store agent-node "$$test-store")
+            key      (or input "test-key")
+            _ (store/put! kv-store key (str "value-" key))
+            value    (store/get kv-store key)]
+        (aor/result!
+         agent-node
+         {"mode" "store" "key" key "value" value}))
+
+      :db
+      ;; Simulate DB operation with record-nested-op!
+      (let [start-time   (System/currentTimeMillis)
+            _ (Thread/sleep 10)
+            query-result {"rows" 42 "query" "SELECT * FROM test"}
+            finish-time  (System/currentTimeMillis)]
+        (aor/record-nested-op!
+         agent-node
+         :db-read
+         start-time
+         finish-time
+         {"query"  "SELECT * FROM test"
+          "rows"   42
+          "result" "success"})
+        (aor/result!
+         agent-node
+         {"mode" "db" "query-result" query-result}))
+
+      :other
+      ;; Simulate other operation with record-nested-op!
+      (let [start-time  (System/currentTimeMillis)
+            _ (Thread/sleep 10)
+            op-result   {"status" "completed" "data" input}
+            finish-time (System/currentTimeMillis)]
+        (aor/record-nested-op! agent-node
+                               :other
+                               start-time
+                               finish-time
+                               {"operation" "custom-processing"
+                                "status"    "completed"
+                                "input"     (str input)})
+        (aor/result! agent-node {"mode" "other" "op-result" op-result}))
+
+      ;; Default
+      (aor/result! agent-node
+                   {"mode"  "unknown"
+                    "error" (str "Unknown mode: " mode)}))))
+
 ;;; Test agent module
 (aor/defagentmodule TraceAnalyticsTestAgentModule
   [topology]
@@ -79,89 +180,6 @@
       (aor/node
        "execute"
        nil
-       (fn [agent-node {:keys [mode input] :or {input "test"}}]
-         (let [mode (if (string? mode) (keyword mode) mode)]
-           (case mode
-             :basic
-             ;; No nested operations, just return result
-             (aor/result! agent-node {:mode :basic :result (str "Processed: " input)})
-
-             :sub-agent
-             ;; Call sub-agent
-             (let [sub-agent (aor/agent-client agent-node "BasicSubAgent")
-                   result    (aor/agent-invoke sub-agent input)]
-               (aor/result! agent-node {:mode :sub-agent :sub-result result}))
-
-             :chat
-             ;; Use chat model
-             (let [model    (aor/get-agent-object agent-node "openai-model")
-                   messages [(SystemMessage. "You are helpful.")
-                             (UserMessage. (str input))]
-                   response (lc4j/chat model (lc4j/chat-request messages {}))
-                   text     (.text (.aiMessage response))]
-               (aor/result! agent-node {:mode :chat :response text}))
-
-             :tool-call
-             ;; Use chat model with tools
-             (let [model          (aor/get-agent-object agent-node "openai-model")
-                   tools-agent    (aor/agent-client agent-node "ToolsAgent")
-                   ^String prompt (or input "What is 5 plus 3?")
-                   response       (lc4j/chat
-                                   model
-                                   (lc4j/chat-request
-                                    [(UserMessage. prompt)]
-                                    {:tools [CALCULATOR-TOOL]}))
-                   ai-message     (.aiMessage response)
-                   tool-calls     (vec (.toolExecutionRequests ai-message))]
-               (if (seq tool-calls)
-                 (let [results (aor/agent-invoke tools-agent tool-calls)]
-                   (aor/result! agent-node
-                                {:mode         :tool-call
-                                 :tool-calls   (count tool-calls)
-                                 :tool-results results}))
-                 (aor/result! agent-node
-                              {:mode     :tool-call
-                               :response (.text ai-message)})))
-
-             :store
-             ;; Use key-value store
-             (let [kv-store (aor/get-store agent-node "$$test-store")
-                   key      (or input "test-key")
-                   _ (store/put! kv-store key (str "value-" key))
-                   value    (store/get kv-store key)]
-               (aor/result! agent-node {:mode :store :key key :value value}))
-
-             :db
-             ;; Simulate DB operation with record-nested-op!
-             (let [start-time   (System/currentTimeMillis)
-                   _ (Thread/sleep 10)
-                   query-result {:rows 42 :query "SELECT * FROM test"}
-                   finish-time  (System/currentTimeMillis)]
-               (aor/record-nested-op! agent-node
-                                      :db-read
-                                      start-time
-                                      finish-time
-                                      {"query"  "SELECT * FROM test"
-                                       "rows"   42
-                                       "result" "success"})
-               (aor/result! agent-node {:mode :db :query-result query-result}))
-
-             :other
-             ;; Simulate other operation with record-nested-op!
-             (let [start-time  (System/currentTimeMillis)
-                   _ (Thread/sleep 10)
-                   op-result   {:status "completed" :data input}
-                   finish-time (System/currentTimeMillis)]
-               (aor/record-nested-op! agent-node
-                                      :other
-                                      start-time
-                                      finish-time
-                                      {"operation" "custom-processing"
-                                       "status"    "completed"
-                                       "input"     (str input)})
-               (aor/result! agent-node {:mode :other :op-result op-result}))
-
-             ;; Default
-             (aor/result! agent-node
-                          {:mode  :unknown
-                           :error (str "Unknown mode: " mode)})))))))
+       (fn [agent-node m]
+         ;; wrapper so we can modify the test-agent at the repl
+         (test-agent agent-node m)))))

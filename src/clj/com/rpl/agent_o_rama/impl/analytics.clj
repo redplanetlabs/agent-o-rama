@@ -392,16 +392,9 @@
     (when (some? conflict)
       (format "Deletion failed because rule '%s' depends on it" conflict))))
 
-(defn agent-names-set
-  []
-  (-> (po/agent-declared-objects-task-global)
-      .getAgentGraphs
-      keys
-      set))
-
 (deframaop handle-rule-event
   [{:keys [*agent-name] :as *data}]
-  (agent-names-set :> *agent-names)
+  (po/agent-names-set :> *agent-names)
   (filter> (contains? *agent-names *agent-name))
   (set (keys (all-action-builders)) :> *action-names)
   (<<with-substitutions
@@ -442,7 +435,7 @@
 (deframafn read-rules
   []
   (<<batch
-    (ops/explode (agent-names-set) :> *agent-name)
+    (ops/explode (po/agent-names-set) :> *agent-name)
     (po/agent-rules-task-global *agent-name :> $$rules)
     (po/agent-rule-cursors-task-global *agent-name :> $$rule-cursors)
     (local-select> STAY $$rules :> *rules)
@@ -816,7 +809,7 @@
 (deframafn update-rule-offsets!
   [*agent->rule->cursors]
   (<<atomic
-    (ops/explode (agent-names-set) :> *agent-name)
+    (ops/explode (po/agent-names-set) :> *agent-name)
     (get *agent->rule->cursors *agent-name :> *rule->cursors)
     (po/agent-rule-cursors-task-global *agent-name :> $$rule-cursors)
     (local-transform> (termval *rule->cursors) $$rule-cursors))

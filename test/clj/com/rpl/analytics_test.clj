@@ -1487,7 +1487,7 @@
          (bind iters (split-on :loop @event-log))
          (is (= (repeat 4 "foo-a1") (first iters)))
          (is (every? #(= 2 (count %)) (rest iters)))
-         (is (= #{"foo-a2" "eval1"} (set (apply concat (rest iters)))))
+         (is (= #{"foo-a2" "eval1"} (set (apply concat (rest iters)))) (pr-str @event-log))
 
 
          ;; now verify node processing when there are aggs

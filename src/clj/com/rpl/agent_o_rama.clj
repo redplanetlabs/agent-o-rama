@@ -471,6 +471,13 @@
   [^AgentNode agent-node prompt]
   (.getHumanInput agent-node prompt))
 
+
+(defn get-metadata
+  ([^AgentClient client agent-invoke]
+   (.getMetadata client agent-invoke))
+  ([^AgentNode agent-node]
+   (.getMetadata agent-node)))
+
 (defn- parse-map-options
   [[arg1 & rest-args :as args]]
   (if (map? arg1) [arg1 rest-args] [{} args]))
@@ -508,6 +515,8 @@
         datasets-depot            (foreign-depot cluster
                                                  module-name
                                                  (po/datasets-depot-name))
+
+        agent-edit-depot          (foreign-depot cluster module-name (po/agent-edit-depot-name))
         datasets-pstate           (foreign-pstate
                                    cluster
                                    module-name
@@ -625,19 +634,18 @@
           (initiate [this args]
             (.get (.initiateAsync this args)))
           (initiateAsync [this args]
-            (.thenApply
-             (foreign-append-async!
-              agent-depot
-              (aor-types/->AgentInitiate
-               (vec args)
-               aor-types/FORCED-AGENT-TASK-ID
-               aor-types/FORCED-AGENT-INVOKE-ID
-               aor-types/OPERATION-SOURCE))
-             (h/cf-function [{[agent-task-id agent-id]
-                              aor-types/AGENT-TOPOLOGY-NAME}]
-               (aor-types/->AgentInvokeImpl agent-task-id agent-id)
-             )))
+            (.initiateWithContextAsync this nil args))
 
+          (invokeWithContext [this context args]
+            (.get (.invokeWithContextAsync this context args)))
+          (invokeWithContextAsync [this context args]
+            (aor-types/invoke-with-context-async-internal this @context (into [] args)))
+          (initiateWithContext [this context args]
+            (.get (.initiateWithContextAsync this context args)))
+          (initiateWithContextAsync [this context args]
+            (aor-types/initiate-with-context-async-internal this
+                                                            (if context @context)
+                                                            (into [] args)))
           (fork [this invoke nodeInvokeIdToNewArgs]
             (.get (.forkAsync this invoke nodeInvokeIdToNewArgs)))
           (forkAsync [this invoke nodeInvokeIdToNewArgs]
@@ -697,6 +705,28 @@
                       (i/mk-failure-exception result exceptions))
                      (.complete cf (:val result))))
                ))))
+
+
+          (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^int value]
+            (aor-types/set-metadata-internal! this agent-invoke key (long value)))
+          (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^long value]
+            (aor-types/set-metadata-internal! this agent-invoke key value))
+          (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^float value]
+            (aor-types/set-metadata-internal! this agent-invoke key (double value)))
+          (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^double value]
+            (aor-types/set-metadata-internal! this agent-invoke key value))
+          (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^String value]
+            (aor-types/set-metadata-internal! this agent-invoke key value))
+          (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^boolean value]
+            (aor-types/set-metadata-internal! this agent-invoke key value))
+          (removeMetadata [this {:keys [task-id agent-invoke-id]} key]
+            (foreign-append!
+             agent-edit-depot
+             (aor-types/->valid-EditMetadata agentName task-id agent-invoke-id key nil)))
+          (getMetadata [this {:keys [task-id agent-invoke-id]}]
+            (foreign-select-one [(keypath agent-invoke-id) :metadata]
+                                root-pstate
+                                {:pkey task-id}))
 
           (isAgentInvokeComplete [this agent-invoke]
             (let [agent-task-id (.getTaskId agent-invoke)
@@ -776,6 +806,41 @@
             (close! agent-depot)
             (close! agent-config-depot))
           aor-types/AgentClientInternal
+          (set-metadata-internal! [this {:keys [task-id agent-invoke-id]} key value]
+            (foreign-append!
+             agent-edit-depot
+             (aor-types/->valid-EditMetadata agentName task-id agent-invoke-id key value)))
+          (invoke-with-context-async-internal [this context args]
+            (.thenCompose
+             ^CompletableFuture
+             (aor-types/initiate-with-context-async-internal this context args)
+             (h/cf-function [agent-invoke]
+               (.resultAsync this agent-invoke))))
+          (initiate-with-context-async-internal [this context args]
+            (let [{:keys [metadata] :as context} (merge {:metadata {}} context)]
+              (h/validate-options! agentName
+                                   context
+                                   {:metadata h/map-spec})
+              (when-not (every? string? (keys metadata))
+                (throw (h/ex-info "Metadata keys must be strings"
+                                  {:keys (pr-str (keys metadata))})))
+              (when-not (every? aor-types/valid-metadata-value? (vals metadata))
+                (throw (h/ex-info
+                        "Metadata values must be ints, longs, floats, doubles, booleans, or strings"
+                        {:vals (pr-str (vals metadata))})))
+              (.thenApply
+               (foreign-append-async!
+                agent-depot
+                (aor-types/->AgentInitiate
+                 (vec args)
+                 aor-types/FORCED-AGENT-TASK-ID
+                 aor-types/FORCED-AGENT-INVOKE-ID
+                 metadata
+                 aor-types/OPERATION-SOURCE))
+               (h/cf-function [{[agent-task-id agent-id]
+                                aor-types/AGENT-TOPOLOGY-NAME}]
+                 (aor-types/->AgentInvokeImpl agent-task-id agent-id)
+               ))))
           (stream-internal [this agent-invoke node callback-fn]
             (iclient/agent-stream-impl
              root-pstate
@@ -1026,7 +1091,7 @@
         :search-experiments-query  search-experiments-query
         :search-datasets-query     datasets-search-query
         :experiments-results-query experiments-results-query
-        }))))
+       }))))
 
 (defn agent-client
   ^AgentClient [^IFetchAgentClient agent-client-fetcher agent-name]
@@ -1051,6 +1116,22 @@
 (defn agent-initiate-async
   ^CompletableFuture [agent-client & args]
   (apply c/agent-initiate-async agent-client args))
+
+(defn agent-invoke-with-context-async
+  ^CompletableFuture [agent-client context & args]
+  (aor-types/invoke-with-context-async-internal agent-client context (into [] args)))
+
+(defn agent-invoke-with-context
+  [agent-client context & args]
+  (.get ^CompletableFuture (apply agent-invoke-with-context-async agent-client context args)))
+
+(defn agent-initiate-with-context-async
+  ^CompletableFuture [agent-client context & args]
+  (apply c/agent-initiate-with-context-async agent-client context args))
+
+(defn agent-initiate-with-context
+  ^AgentInvoke [agent-client context & args]
+  (apply c/agent-initiate-with-context agent-client context args))
 
 (defn agent-fork
   [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
@@ -1079,6 +1160,14 @@
   ^CompletableFuture
   [^AgentClient client agent-invoke]
   (.nextStepAsync client agent-invoke))
+
+(defn set-metadata!
+  [client agent-invoke key value]
+  (aor-types/set-metadata-internal! client agent-invoke key value))
+
+(defn remove-metadata!
+  [^AgentClient client agent-invoke key]
+  (.removeMetadata client agent-invoke key))
 
 (defn human-input-request?
   [obj]
@@ -1194,7 +1283,7 @@
    (set-dataset-example-input! manager dataset-id example-id input nil))
   ([^AgentManager manager dataset-id example-id input options]
    ;; types are validated by Java API
-   (h/validate-options! name
+   (h/validate-options! {:dataset-id dataset-id :example-id example-id}
                         options
                         {:snapshot h/any-spec})
    (.setDatasetExampleInput manager
@@ -1212,7 +1301,7 @@
                                           nil))
   ([^AgentManager manager dataset-id example-id reference-output options]
    ;; types are validated by Java API
-   (h/validate-options! name
+   (h/validate-options! {:dataset-id dataset-id :example-id example-id}
                         options
                         {:snapshot h/any-spec})
    (.setDatasetExampleReferenceOutput manager
@@ -1226,7 +1315,7 @@
    (remove-dataset-example! manager dataset-id example-id nil))
   ([^AgentManager manager dataset-id example-id options]
    ;; types are validated by Java API
-   (h/validate-options! name
+   (h/validate-options! {:dataset-id dataset-id :example-id example-id}
                         options
                         {:snapshot h/any-spec})
    (.removeDatasetExample manager
@@ -1239,7 +1328,7 @@
    (add-dataset-example-tag! manager dataset-id example-id tag nil))
   ([^AgentManager manager dataset-id example-id tag options]
    ;; types are validated by Java API
-   (h/validate-options! name
+   (h/validate-options! {:dataset-id dataset-id :example-id example-id :tag tag}
                         options
                         {:snapshot h/any-spec})
    (.addDatasetExampleTag manager
@@ -1253,7 +1342,7 @@
    (remove-dataset-example-tag! manager dataset-id example-id tag nil))
   ([^AgentManager manager dataset-id example-id tag options]
    ;; types are validated by Java API
-   (h/validate-options! name
+   (h/validate-options! {:dataset-id dataset-id :example-id example-id :tag tag}
                         options
                         {:snapshot h/any-spec})
    (.removeDatasetExampleTag manager

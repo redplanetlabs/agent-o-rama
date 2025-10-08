@@ -7,6 +7,7 @@
   (:import
    [com.rpl.agentorama
     ActionBuilderOptions$Impl
+    AgentContext$Impl
     EvaluatorBuilderOptions$Impl
     ToolsAgentOptions$Impl
     ToolsAgentOptions$FunctionHandler
@@ -110,4 +111,33 @@
      clojure.lang.IDeref
      (deref [this]
        @options
+     ))))
+
+
+(defn mk-agent-context
+  []
+  (let [metadata (volatile! {})]
+    (reify
+     AgentContext$Impl
+     (^AgentContext$Impl metadata [this ^String name ^int val]
+       (vswap! metadata assoc name (long val))
+       this)
+     (^AgentContext$Impl metadata [this ^String name ^long val]
+       (vswap! metadata assoc name val)
+       this)
+     (^AgentContext$Impl metadata [this ^String name ^float val]
+       (vswap! metadata assoc name (double val))
+       this)
+     (^AgentContext$Impl metadata [this ^String name ^double val]
+       (vswap! metadata assoc name val)
+       this)
+     (^AgentContext$Impl metadata [this ^String name ^boolean val]
+       (vswap! metadata assoc name val)
+       this)
+     (^AgentContext$Impl metadata [this ^String name ^String val]
+       (vswap! metadata assoc name val)
+       this)
+     clojure.lang.IDeref
+     (deref [this]
+       {:metadata @metadata}
      ))))

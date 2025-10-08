@@ -311,7 +311,8 @@
                                         node-className (str/join " " (concat base-classes selection-classes common-classes))]
                                     ($ :div {:className "relative"}
                                        ($ :div {:className node-className
-                                                :style {:width "170px" :height "40px"}}
+                                                :style {:width "170px" :height "40px"}
+                                                :data-id (str "agent-graph-node-" node-id)}
                                           ($ :div {:className "truncate" :title label}
                                              label))
                                        ($ Handle {:type "target" :position "top" :style {:display "none"}})

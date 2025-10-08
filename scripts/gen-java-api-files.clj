@@ -136,6 +136,20 @@
    ["noInputBeforeClose" "UIOptions" []]
   ])
 
+(def AGENT-CONTEXT-METHODS
+  [["metadata" "AgentContext.Impl"
+    [["String" "name"] ["long" "val"]]]
+   ["metadata" "AgentContext.Impl"
+    [["String" "name"] ["int" "val"]]]
+   ["metadata" "AgentContext.Impl"
+    [["String" "name"] ["String" "val"]]]
+   ["metadata" "AgentContext.Impl"
+    [["String" "name"] ["float" "val"]]]
+   ["metadata" "AgentContext.Impl"
+    [["String" "name"] ["double" "val"]]]
+   ["metadata" "AgentContext.Impl"
+    [["String" "name"] ["boolean" "val"]]]
+  ])
 
 (def ^:dynamic *operation-index*)
 

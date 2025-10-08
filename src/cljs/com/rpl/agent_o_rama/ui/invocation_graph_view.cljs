@@ -11,6 +11,7 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.trace-analytics :as trace-analytics]
+   [com.rpl.agent-o-rama.ui.feedback :as feedback]
 
    ["react" :refer [useState useCallback useEffect]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
@@ -258,45 +259,6 @@
   [invoke-args result-val]
   {"node" "agent" "args" [result-val]})
 
-(defui feedback-panel [{:keys [feedback]}]
-  (when (and feedback (seq (:scores feedback)))
-    (let [scores (:scores feedback)
-          source (:source feedback)
-          created-at (:created-at feedback)
-          modified-at (:modified-at feedback)
-          source-str (when source
-                       (cond
-                         (:human? source) "Human"
-                         (:ai? source) "AI"
-                         (:api? source) "API"
-                         (:bulk-upload? source) "Bulk Upload"
-                         (:experiment? source) (str "Experiment: " (:experiment-name source))
-                         (:agent-run? source) (str "Agent: " (:agent-name source))
-                         :else "Unknown"))]
-      ($ :div {:className "bg-purple-50 p-3 rounded-lg border border-purple-200"
-               :data-id "feedback-panel"}
-         ($ :div {:className "text-sm font-medium text-purple-700 mb-2 flex items-center justify-between"}
-            ($ :span "Feedback")
-            (when source-str
-              ($ :span {:className "text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded-full"}
-                 source-str)))
-         ($ :div {:className "space-y-2"}
-            ;; Display scores
-            (for [[score-name score-value] (sort-by key scores)]
-              ($ :div {:key score-name
-                       :className "bg-white p-2 rounded border border-purple-100"}
-                 ($ :div {:className "flex justify-between items-center"}
-                    ($ :span {:className "text-xs font-medium text-purple-600"}
-                       score-name)
-                    ($ :span {:className "text-sm font-semibold text-purple-800"}
-                       (if (number? score-value)
-                         (.toFixed score-value 2)
-                         (str score-value))))))
-            ;; Display timestamp if available
-            (when created-at
-              ($ :div {:className "text-xs text-purple-500 mt-2 pt-2 border-t border-purple-200"}
-                 (str "Created: " (format-ms created-at)))))))))
-
 (defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes module-id agent-name invoke-id]}]
   (let [data (when selected-node
                (js->clj (.-data selected-node) :keywordize-keys true))
@@ -321,43 +283,72 @@
                                        [:ui :hitl :responses :placeholder]))
         submitting? (state/use-sub (if hr-invoke-id
                                      [:ui :hitl :submitting hr-invoke-id]
-                                     [:ui :hitl :submitting :placeholder]))]
+                                     [:ui :hitl :submitting :placeholder]))
+
+        active-tab (state/use-sub [:ui :node-details :active-tab])]
+
+    ;; Default to :info tab
+    (uix/use-effect
+     (fn []
+       (when (nil? active-tab)
+         (state/dispatch [:db/set-value [:ui :node-details :active-tab] :info])))
+     [active-tab])
 
     (when selected-node
       ($ :div {:className (common/cn "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl")
                :data-id "node-invoke-details-panel"}
-         ($ :div {:className "p-6"}
-            ;; Human input section
-            (when hr
-              ($ :div {:className "bg-amber-50 p-3 rounded-md mt-4 border border-amber-200"}
-                 ($ :div {:className "text-sm font-medium text-amber-800 mb-2"} "Human input required")
-                 ($ :div {:className "text-sm text-amber-700 mb-3 whitespace-pre-wrap"} (:prompt hr))
-                 ($ :div
-                    ($ :textarea {:className "w-full border rounded p-2 text-sm resize-y"
-                                  :rows 3
-                                  :placeholder "Type your response..."
-                                  :value (or hitl-response "")
-                                  :disabled submitting?
-                                  :onChange #(state/dispatch [:db/set-value
-                                                              [:ui :hitl :responses hr-invoke-id]
-                                                              (.. % -target -value)])})
-                    ($ :button {:className (common/cn "mt-2 px-3 py-2 rounded text-sm font-medium transition-colors"
-                                                      {"bg-gray-400 text-gray-600 cursor-not-allowed" submitting?
-                                                       "bg-blue-600 hover:bg-blue-700 text-white" (not submitting?)})
-                                :disabled (or submitting? (empty? (str/trim (or hitl-response ""))))
-                                :onClick #(when (and (not submitting?)
-                                                     (not (empty? (str/trim (or hitl-response "")))))
-                                            (state/dispatch [:hitl/submit
-                                                             {:module-id module-id
-                                                              :agent-name agent-name
-                                                              :invoke-id invoke-id
-                                                              :request hr
-                                                              :response (str/trim hitl-response)}])
-                                            ;; Clear the response after submission
-                                            (state/dispatch [:db/set-value [:ui :hitl :responses hr-invoke-id] ""]))}
-                       (if submitting? "Submitting..." "Submit Response")))))
+         ;; Tab header
+         ($ :div {:className (common/cn "border-b border-gray-200 p-4")}
+            ($ :div {:className (common/cn "flex space-x-1 bg-gray-100 rounded-lg p-1")}
+               ($ :button {:className (common/cn "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors"
+                                                 {"bg-white text-gray-900 shadow-sm" (= active-tab :info)
+                                                  "text-gray-600 hover:text-gray-900" (not= active-tab :info)})
+                           :data-id "node-info-tab"
+                           :onClick #(state/dispatch [:db/set-value [:ui :node-details :active-tab] :info])}
+                  "Info")
+               ($ :button {:className (common/cn "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors"
+                                                 {"bg-white text-gray-900 shadow-sm" (= active-tab :feedback)
+                                                  "text-gray-600 hover:text-gray-900" (not= active-tab :feedback)})
+                           :data-id "node-feedback-tab"
+                           :onClick #(state/dispatch [:db/set-value [:ui :node-details :active-tab] :feedback])}
+                  "Feedback")))
 
-            ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}
+         ;; Tab content
+         ($ :div {:className "p-6"}
+            (case active-tab
+              :info
+              ($ :<>
+                 ;; Human input section
+                 (when hr
+                   ($ :div {:className "bg-amber-50 p-3 rounded-md mt-4 border border-amber-200"}
+                      ($ :div {:className "text-sm font-medium text-amber-800 mb-2"} "Human input required")
+                      ($ :div {:className "text-sm text-amber-700 mb-3 whitespace-pre-wrap"} (:prompt hr))
+                      ($ :div
+                         ($ :textarea {:className "w-full border rounded p-2 text-sm resize-y"
+                                       :rows 3
+                                       :placeholder "Type your response..."
+                                       :value (or hitl-response "")
+                                       :disabled submitting?
+                                       :onChange #(state/dispatch [:db/set-value
+                                                                   [:ui :hitl :responses hr-invoke-id]
+                                                                   (.. % -target -value)])})
+                         ($ :button {:className (common/cn "mt-2 px-3 py-2 rounded text-sm font-medium transition-colors"
+                                                           {"bg-gray-400 text-gray-600 cursor-not-allowed" submitting?
+                                                            "bg-blue-600 hover:bg-blue-700 text-white" (not submitting?)})
+                                     :disabled (or submitting? (empty? (str/trim (or hitl-response ""))))
+                                     :onClick #(when (and (not submitting?)
+                                                          (not (empty? (str/trim (or hitl-response "")))))
+                                                 (state/dispatch [:hitl/submit
+                                                                  {:module-id module-id
+                                                                   :agent-name agent-name
+                                                                   :invoke-id invoke-id
+                                                                   :request hr
+                                                                   :response (str/trim hitl-response)}])
+                                                 ;; Clear the response after submission
+                                                 (state/dispatch [:db/set-value [:ui :hitl :responses hr-invoke-id] ""]))}
+                            (if submitting? "Submitting..." "Submit Response")))))
+
+                 ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}
                ($ :div {:className "flex justify-between items-center"}
                   ($ :span {:className "text-sm font-medium text-indigo-700"} "Node")
                   ($ :span {:className "text-sm text-indigo-600 font-mono"} node-name))
@@ -381,7 +372,7 @@
                                                      :source-emits output-data}])))}
                      "Add node to Dataset")))
 
-            (when result
+                 (when result
               ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-blue-700 mb-1"} "Result")
                  ($ generic-data-viewer {:data result
@@ -389,7 +380,7 @@
                                          :truncate-length 100
                                          :depth 0})))
 
-            (when (seq exceptions)
+                 (when (seq exceptions)
               ($ :div {:className "bg-red-50 p-3 rounded-md mt-4 border border-red-200"}
                  ($ :div {:className (common/cn "text-sm font-medium text-red-700 mb-2 flex items-center gap-2")}
                     ($ ExclamationTriangleIcon {:className (common/cn "w-5 h-5")})
@@ -407,7 +398,7 @@
                                  :title "Click to view full exception"}
                            ($ :div {:className "text-xs font-mono text-red-800"}
                               first-line)))))))
-            (when (and start-time finish-time)
+                 (when (and start-time finish-time)
               ($ :div {:className "bg-yellow-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-yellow-700 mb-2"} "Timing")
                  ($ :div {:className "space-y-1"}
@@ -425,7 +416,7 @@
                        ($ :span {:className "text-xs text-yellow-600 font-mono"}
                           (format-ms finish-time))))))
 
-            (when input
+                 (when input
               ($ :div {:className "bg-green-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
                  ($ generic-data-viewer {:data input
@@ -433,7 +424,7 @@
                                          :truncate-length 100
                                          :depth 0})))
 
-            (when (not (empty? (:nested-ops data)))
+                 (when (not (empty? (:nested-ops data)))
               ($ :div {:className "bg-sky-50 p-3 rounded-md mt-4"}
                  ($ :div {:className "text-sm font-medium text-sky-700 mb-2"}
                     (str "Operations (" (count (:nested-ops data)) ")"))
@@ -489,7 +480,7 @@
                            ($ :div {:className "text-xs text-sky-600 mt-1"}
                               ($ generic-data-viewer {:data info :color "sky" :depth 0}))))))))
 
-            (when (and emits (> (count emits) 0))
+                 (when (and emits (> (count emits) 0))
               ($ :div {:className "mt-4 bg-purple-50 p-3 rounded-md"}
                  ($ :div {:className "text-sm font-medium text-purple-700 mb-2"}
                     (str "Emits (" (count emits) ")"))
@@ -524,9 +515,18 @@
                                                         :truncate-length 60
                                                         :depth 0}))
                               ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
-                                 (str "ID: " emit-id)))))))))
+                                 (str "ID: " emit-id))))))))))
 
-            ($ feedback-panel {:feedback feedback}))))))
+
+              :feedback
+              ($ :div {:data-id "node-feedback-container"}
+                 (when feedback
+                   ($ feedback/feedback-list
+                      {:feedback-data feedback
+                       :module-id     module-id})))
+
+              ;; Default case
+              nil))))))
 
 (defui forking-input-component [{:keys [selected-node changed-nodes on-change-node-input affected-nodes]}]
   (let [data (when selected-node
@@ -745,7 +745,7 @@
                             :graph-data graph-data
                             :on-select-node on-select-node})
 
-       ($ feedback-panel {:feedback feedback})
+       ($ feedback/feedback-panel {:feedback feedback})
 
        ($ trace-analytics/info {:invoke-id invoke-id}))))
 
@@ -781,6 +781,12 @@
                          :data-id "info-tab"
                          :onClick #(state/dispatch [:db/set-value [:ui :active-tab] :info])}
                 "Info")
+             ($ :button {:className (common/cn "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors"
+                                               {"bg-white text-gray-900 shadow-sm" (= active-tab :feedback)
+                                                "text-gray-600 hover:text-gray-900" (not= active-tab :feedback)})
+                         :data-id "feedback-tab"
+                         :onClick #(state/dispatch [:db/set-value [:ui :active-tab] :feedback])}
+                "Feedback")
              ;; Only show Fork tab when not in live mode
              (when-not is-live
                ($ :button {:className (common/cn "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors"
@@ -802,6 +808,9 @@
                                  :forks forks
                                  :fork-of fork-of
                                  :invoke-id invoke-id})
+
+            :feedback ($ feedback/feedback-list {:feedback-data (:feedback summary-data)
+                                                 :module-id module-id})
 
             :fork (if (empty? changed-nodes)
                     ($ :div {:className "text-gray-500 text-center py-8"

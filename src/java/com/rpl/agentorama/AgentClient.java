@@ -15,8 +15,12 @@ public interface AgentClient extends Closeable {
 
   <T> T invoke(Object... args);
   <T> CompletableFuture<T> invokeAsync(Object... args);
+  <T> T invokeWithContext(AgentContext context, Object... args);
+  <T> CompletableFuture<T> invokeWithContextAsync(AgentContext context, Object... args);
   AgentInvoke initiate(Object... args);
   CompletableFuture<AgentInvoke> initiateAsync(Object... args);
+  AgentInvoke initiateWithContext(AgentContext context, Object... args);
+  CompletableFuture<AgentInvoke> initiateWithContextAsync(AgentContext context, Object... args);
 
   <T> T fork(AgentInvoke invoke, Map<UUID, List> nodeInvokeIdToNewArgs);
   <T> CompletableFuture<T> forkAsync(AgentInvoke invoke, Map<UUID, List> nodeInvokeIdToNewArgs);
@@ -31,6 +35,14 @@ public interface AgentClient extends Closeable {
   <T> CompletableFuture<T> resultAsync(AgentInvoke invoke);
 
   boolean isAgentInvokeComplete(AgentInvoke invoke);
+  void setMetadata(AgentInvoke invoke, String key, int value);
+  void setMetadata(AgentInvoke invoke, String key, long value);
+  void setMetadata(AgentInvoke invoke, String key, float value);
+  void setMetadata(AgentInvoke invoke, String key, double value);
+  void setMetadata(AgentInvoke invoke, String key, String value);
+  void setMetadata(AgentInvoke invoke, String key, boolean value);
+  void removeMetadata(AgentInvoke invoke, String key);
+  Map<String, Object> getMetadata(AgentInvoke invoke);
 
   AgentStream stream(AgentInvoke invoke, String node);
   <T> AgentStream stream(AgentInvoke invoke, String node, StreamCallback<T> callback);

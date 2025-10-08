@@ -13,7 +13,6 @@
    [jsonista.core :as j])
   (:import
    [com.rpl.agentorama
-    AgentNode
     AgentObjectFetcher]
    [com.rpl.agent_o_rama.impl.types
     AddEvaluator

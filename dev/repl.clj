@@ -3,6 +3,7 @@
    [com.rpl.rama])
   (:require
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.test :as rtest]
    [shadow.cljs.devtools.api :as shadow]
    [shadow.cljs.devtools.server]
@@ -29,6 +30,7 @@
   [ipc]
   (shadow.cljs.devtools.server/start!)
   (shadow/watch :dev)
+  (shadow/nrepl-select :dev)
   (aor/start-ui ipc))
 
 (defn launch-for-playwright
@@ -67,6 +69,34 @@
 
   (shadow.cljs.devtools.server/stop!)
   (shadow.cljs.devtools.server/reload!)
+
+  (require 'com.rpl.agent-o-rama.ui.feedback-test-agent)
+  (rtest/launch-module!
+   ipc
+   com.rpl.agent-o-rama.ui.feedback-test-agent/FeedbackTestAgentModule
+   {:tasks 1 :threads 1})
+  (let [agent-manager
+        (aor/agent-manager
+         ipc
+         (get-module-name
+          com.rpl.agent-o-rama.ui.feedback-test-agent/FeedbackTestAgentModule))
+        global-actions-depot (:global-actions-depot
+                              (aor-types/underlying-objects agent-manager))]
+    (com.rpl.agent-o-rama.ui.feedback-test-agent/setup-feedback-testing!
+     agent-manager
+     global-actions-depot))
+
+  (require 'com.rpl.agent-o-rama.ui.trace-analytics-test-agent)
+
+  (rtest/launch-module!
+   ipc
+   com.rpl.agent-o-rama.ui.trace-analytics-test-agent/TraceAnalyticsTestAgentModule
+   {:tasks 1 :threads 1})
+
+  (rtest/update-module!
+   ipc
+   com.rpl.agent-o-rama.ui.trace-analytics-test-agent/TraceAnalyticsTestAgentModule
+   {:tasks 1 :threads 1})
 
   (require 'com.rpl.agent.basic.basic-agent)
 

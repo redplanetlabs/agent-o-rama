@@ -29,8 +29,7 @@
        "/chsk"
        nil ; No CSRF token for development
        {:type   (if (firefox?) :ajax :auto)
-        :packer transit-packer
-        :port   1974})]
+        :packer transit-packer})]
 
   ;; 2. Define the vars for our Sente client
   (def chsk chsk) ; The channel socket itself
@@ -104,4 +103,12 @@
 
 (defn init!
   []
-  (start-router!))
+  (start-router!)
+  ;; Defer the connection state check to ensure React components have mounted
+  ;; and their watches are set up before we dispatch the state
+  (js/setTimeout
+   (fn []
+     (when-let [current-state @chsk-state]
+       (let [connected? (boolean (:open? current-state))]
+         (state/dispatch [:db/set-value [:sente :connected?] connected?]))))
+   100))

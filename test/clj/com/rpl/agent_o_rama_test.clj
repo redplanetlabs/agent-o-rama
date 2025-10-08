@@ -36,7 +36,8 @@
     NodeAggStart]
    [com.rpl.aortest
     EarlySumAccum
-    EarlySumCombiner]
+    EarlySumCombiner
+    TestSnippets]
    [com.rpl.rama.helpers
     TopologyUtils]
    [com.rpl.rama.ops
@@ -786,7 +787,7 @@
          (dotimes [_ 10]
            (let [{[agent-task-id agent-id] "_agent-topology"}
                  (foreign-append! depot
-                                  (aor-types/->AgentInitiate ["hello"] nil nil nil))]
+                                  (aor-types/->AgentInitiate ["hello"] nil nil nil nil))]
              (is (= 0
                     (foreign-select-one [(keypath agent-id) :graph-version]
                                         root-pstate
@@ -839,7 +840,7 @@
          (reset! task-counts-atom {})
          (dotimes [_ 10]
            (let [{[agent-task-id agent-id] "_agent-topology"}
-                 (foreign-append! depot (aor-types/->AgentInitiate [] nil nil nil))]
+                 (foreign-append! depot (aor-types/->AgentInitiate [] nil nil nil nil))]
              (is (= 1
                     (foreign-select-one [(keypath agent-id) :graph-version]
                                         root-pstate
@@ -1596,85 +1597,85 @@
         )))))
 
 (aor/defagentmodule
- LoopedModule
- [topology]
- (->
-   topology
-   (aor/new-agent "foo")
-   (aor/node
-    "start"
-    ["node1" "AS1"]
-    (fn [agent-node arg res]
-      (if (= arg 2)
-        (aor/emit! agent-node "AS1" (inc arg) (conj res "start"))
-        (aor/emit! agent-node "node1" (inc arg) (conj res "start")))))
-   (aor/node
-    "node1"
-    "start"
-    (fn [agent-node arg res]
-      (aor/emit! agent-node "start" arg (conj res "node1"))))
-   (aor/agg-start-node
-    "AS1"
-    "AS1-n1"
-    (fn [agent-node arg res]
-      (aor/emit! agent-node "AS1-n1" 0)
-      {:arg arg :res res}))
-   (aor/node
-    "AS1-n1"
-    ["AS1-n2" "AS2"]
-    (fn [agent-node n]
-      (when (< n 2)
-        (aor/emit! agent-node "AS1-n2" (inc n)))
-      (aor/emit! agent-node "AS2" 0)
-    ))
-   (aor/node
-    "AS1-n2"
-    "AS1-n3"
-    (fn [agent-node n]
-      (aor/emit! agent-node "AS1-n3" n)))
-   (aor/node
-    "AS1-n3"
-    "AS1-n1"
-    (fn [agent-node n]
-      (aor/emit! agent-node "AS1-n1" n)))
-   (aor/agg-start-node
-    "AS2"
-    "AS2-n1"
-    (fn [agent-node n]
-      (aor/emit! agent-node "AS2-n1" n)
-      {}))
-   (aor/node
-    "AS2-n1"
-    ["AS2-n2" "AS2-agg"]
-    (fn [agent-node n]
-      (aor/emit! agent-node "AS2-agg" 1)
-      (when (< n 2)
-        (aor/emit! agent-node "AS2-n2" (inc n)))
-    ))
-   (aor/node
-    "AS2-n2"
-    "AS2-n1"
-    (fn [agent-node n]
-      (aor/emit! agent-node "AS2-n1" n)
-    ))
-   (aor/agg-node
-    "AS2-agg"
-    ["AS1-agg" "AS2"]
-    aggs/+sum
-    (fn [agent-node agg node-start-res]
-      ;; will loop once
-      (when (= agg 3)
-        (aor/emit! agent-node "AS2" 1))
-      (aor/emit! agent-node "AS1-agg" agg)
-    ))
-   (aor/agg-node
-    "AS1-agg"
-    nil
-    aggs/+sum
-    (fn [agent-node agg {:keys [arg res]}]
-      (aor/result! agent-node (conj res agg))
-    ))
- ))
+  LoopedModule
+  [topology]
+  (->
+    topology
+    (aor/new-agent "foo")
+    (aor/node
+     "start"
+     ["node1" "AS1"]
+     (fn [agent-node arg res]
+       (if (= arg 2)
+         (aor/emit! agent-node "AS1" (inc arg) (conj res "start"))
+         (aor/emit! agent-node "node1" (inc arg) (conj res "start")))))
+    (aor/node
+     "node1"
+     "start"
+     (fn [agent-node arg res]
+       (aor/emit! agent-node "start" arg (conj res "node1"))))
+    (aor/agg-start-node
+     "AS1"
+     "AS1-n1"
+     (fn [agent-node arg res]
+       (aor/emit! agent-node "AS1-n1" 0)
+       {:arg arg :res res}))
+    (aor/node
+     "AS1-n1"
+     ["AS1-n2" "AS2"]
+     (fn [agent-node n]
+       (when (< n 2)
+         (aor/emit! agent-node "AS1-n2" (inc n)))
+       (aor/emit! agent-node "AS2" 0)
+     ))
+    (aor/node
+     "AS1-n2"
+     "AS1-n3"
+     (fn [agent-node n]
+       (aor/emit! agent-node "AS1-n3" n)))
+    (aor/node
+     "AS1-n3"
+     "AS1-n1"
+     (fn [agent-node n]
+       (aor/emit! agent-node "AS1-n1" n)))
+    (aor/agg-start-node
+     "AS2"
+     "AS2-n1"
+     (fn [agent-node n]
+       (aor/emit! agent-node "AS2-n1" n)
+       {}))
+    (aor/node
+     "AS2-n1"
+     ["AS2-n2" "AS2-agg"]
+     (fn [agent-node n]
+       (aor/emit! agent-node "AS2-agg" 1)
+       (when (< n 2)
+         (aor/emit! agent-node "AS2-n2" (inc n)))
+     ))
+    (aor/node
+     "AS2-n2"
+     "AS2-n1"
+     (fn [agent-node n]
+       (aor/emit! agent-node "AS2-n1" n)
+     ))
+    (aor/agg-node
+     "AS2-agg"
+     ["AS1-agg" "AS2"]
+     aggs/+sum
+     (fn [agent-node agg node-start-res]
+       ;; will loop once
+       (when (= agg 3)
+         (aor/emit! agent-node "AS2" 1))
+       (aor/emit! agent-node "AS1-agg" agg)
+     ))
+    (aor/agg-node
+     "AS1-agg"
+     nil
+     aggs/+sum
+     (fn [agent-node agg {:keys [arg res]}]
+       (aor/result! agent-node (conj res agg))
+     ))
+  ))
 
 (deftest looped-test
   (with-open [ipc (rtest/create-ipc)]
@@ -3087,4 +3088,153 @@
        (is (condition-attained? (= 1 (count (pending-invokes)))))
        (h/release-semaphore SEM 1)
        (is (condition-attained? (empty? (pending-invokes))))
+      ))))
+
+(def RESULTS)
+(def FAIL)
+
+(defn fail-and-add-metadata!
+  [agent-node name]
+  (let [contains? (contains? @RESULTS name)]
+    (when-not contains?
+      (swap! RESULTS assoc name (aor/get-metadata agent-node))
+      (when @FAIL
+        (throw (ex-info "fail" {}))))))
+
+(defn of-name
+  [trace n]
+  (select-one!
+   [ALL (selected? LAST :node (pred= n)) FIRST]
+   trace))
+
+(deftest metadata-test
+  (with-redefs [RESULTS (atom {})
+                FAIL    (atom false)
+                anode/log-node-error (fn [& args])
+                aor-types/get-config (max-retries-override 10)]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (-> topology
+              (aor/new-agent "foo")
+              (aor/node "start"
+                        "as"
+                        (fn [agent-node]
+                          (fail-and-add-metadata! agent-node "start")
+                          (aor/emit! agent-node "as")))
+              (aor/agg-start-node "as"
+                                  "node1"
+                                  (fn [agent-node]
+                                    (fail-and-add-metadata! agent-node "as")
+                                    (aor/emit! agent-node "node1")
+                                  ))
+              (aor/node "node1"
+                        "agg"
+                        (fn [agent-node]
+                          (fail-and-add-metadata! agent-node "node1")
+                          (aor/emit! agent-node "agg" 1)))
+              (aor/agg-node "agg"
+                            "end"
+                            aggs/+sum
+                            (fn [agent-node agg node-start-res]
+                              (fail-and-add-metadata! agent-node "agg")
+                              (aor/emit! agent-node "end")))
+              (aor/node "end"
+                        nil
+                        (fn [agent-node]
+                          (fail-and-add-metadata! agent-node "end")
+                          (aor/result! agent-node 10)))
+          )))
+       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind foo (aor/agent-client agent-manager "foo"))
+       (bind root-pstate
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "foo")))
+       (bind traces-query
+         (foreign-query ipc
+                        module-name
+                        (queries/tracing-query-name "foo")))
+
+       (bind expected-results-fn
+         (fn [m]
+           {"start" m "as" m "node1" m "agg" m "end" m}))
+
+       (bind expected-results
+         (expected-results-fn
+          {"l" 1 "i" (int 1) "f" 0.5 "d" 0.5 "s" "abc" "b" true}))
+       (bind inv
+         (TestSnippets/initiateWithContext foo))
+       (is (= 10 (aor/agent-result foo inv)))
+       (is (= @RESULTS expected-results))
+
+       (reset! RESULTS {})
+       (reset! FAIL true)
+       (bind expected-results (expected-results-fn {"a" 1}))
+       (bind {:keys [task-id agent-invoke-id] :as inv}
+         (aor/agent-initiate-with-context
+          foo
+          {:metadata {"a" 1}}))
+       (is (= 10 (aor/agent-result foo inv)))
+       (is (= @RESULTS expected-results))
+
+
+       ;; test editing
+       (is (= {"a" 1} (aor/get-metadata foo inv)))
+       (aor/set-metadata! foo inv "b" 2)
+       (is (= {"a" 1 "b" 2} (aor/get-metadata foo inv)))
+       (aor/set-metadata! foo inv "c" "abc")
+       (aor/set-metadata! foo inv "d" 0.4)
+       (aor/set-metadata! foo inv "e" true)
+       (is (= {"a" 1 "b" 2 "c" "abc" "d" 0.4 "e" true} (aor/get-metadata foo inv)))
+       (aor/remove-metadata! foo inv "c")
+       (aor/remove-metadata! foo inv "a")
+       (aor/remove-metadata! foo inv "b")
+       (is (= {"d" 0.4 "e" true} (aor/get-metadata foo inv)))
+       (TestSnippets/setMetadata foo inv)
+       (is (=
+            {"e" true "l" 1 "i" 1 "f" 0.5 "d" 0.5 "s" "abc" "b" true}
+            (aor/get-metadata foo inv)))
+       (doseq [k (keys (aor/get-metadata foo inv))]
+         (aor/remove-metadata! foo inv k))
+       (aor/set-metadata! foo inv "a" 1)
+
+
+       (bind root-invoke-id
+         (foreign-select-one [(keypath agent-invoke-id) :root-invoke-id]
+                             root-pstate
+                             {:pkey task-id}))
+
+       (bind trace
+         (:invokes-map
+          (foreign-invoke-query traces-query
+                                task-id
+                                [[task-id root-invoke-id]]
+                                10000)))
+
+       (bind start (of-name trace "start"))
+       (bind as (of-name trace "as"))
+       (bind node1 (of-name trace "node1"))
+       (bind agg (of-name trace "agg"))
+
+       (reset! FAIL false)
+       (reset! RESULTS {})
+       (is (= 10 (aor/agent-fork foo inv {start []})))
+       (is (= @RESULTS expected-results))
+
+       (reset! RESULTS {})
+       (is (= 10 (aor/agent-fork foo inv {as []})))
+       (is (= @RESULTS (dissoc expected-results "start")))
+
+       (reset! RESULTS {})
+       (is (= 10 (aor/agent-fork foo inv {node1 []})))
+       (is (= @RESULTS (dissoc expected-results "start" "as")))
+
+       (reset! RESULTS {})
+       (is (= 10 (aor/agent-fork foo inv {agg [nil nil]})))
+       (is (= @RESULTS (dissoc expected-results "start" "as" "node1")))
       ))))
