@@ -555,206 +555,28 @@
          ($ :div {:className "p-6"}
             (case active-tab
               :info
-              ($ :<>
-                 ;; Human input section
-                 (when hr
-                   ($ :div {:className "bg-amber-50 p-3 rounded-md mt-4 border border-amber-200"}
-                      ($ :div {:className "text-sm font-medium text-amber-800 mb-2"} "Human input required")
-                      ($ :div {:className "text-sm text-amber-700 mb-3 whitespace-pre-wrap"} (:prompt hr))
-                      ($ :div
-                         ($ :textarea {:className "w-full border rounded p-2 text-sm resize-y"
-                                       :rows 3
-                                       :placeholder "Type your response..."
-                                       :value (or hitl-response "")
-                                       :disabled submitting?
-                                       :onChange #(state/dispatch [:db/set-value
-                                                                   [:ui :hitl :responses hr-invoke-id]
-                                                                   (.. % -target -value)])})
-                         ($ :button {:className (common/cn "mt-2 px-3 py-2 rounded text-sm font-medium transition-colors"
-                                                           {"bg-gray-400 text-gray-600 cursor-not-allowed" submitting?
-                                                            "bg-blue-600 hover:bg-blue-700 text-white" (not submitting?)})
-                                     :disabled (or submitting? (empty? (str/trim (or hitl-response ""))))
-                                     :onClick #(when (and (not submitting?)
-                                                          (not (empty? (str/trim (or hitl-response "")))))
-                                                 (state/dispatch [:hitl/submit
-                                                                  {:module-id module-id
-                                                                   :agent-name agent-name
-                                                                   :invoke-id invoke-id
-                                                                   :request hr
-                                                                   :response (str/trim hitl-response)}])
-                                                 ;; Clear the response after submission
-                                                 (state/dispatch [:db/set-value [:ui :hitl :responses hr-invoke-id] ""]))}
-                            (if submitting? "Submitting..." "Submit Response")))))
-
-                 ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}
-               ($ :div {:className "flex justify-between items-center"}
-                  ($ :span {:className "text-sm font-medium text-indigo-700"} "Node")
-                  ($ :span {:className "text-sm text-indigo-600 font-mono"} node-name))
-               ($ :div {:className "flex justify-between items-center mt-1"}
-                  ($ :span {:className "text-sm font-medium text-indigo-700"} "ID")
-                  ($ :span {:className "text-xs text-indigo-500 font-mono"} (str node-id)))
-               ;; Add to Dataset button for individual node
-               ($ :div {:className "mt-3"}
-                  ($ :button
-                     {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
-                      :onClick (fn [e]
-                                 (.stopPropagation e)
-                                 (let [raw-node-data (get graph-data node-id)
-                                       input-data (transform-node-input-for-dataset raw-node-data node-name)
-                                       output-data (transform-node-data-for-dataset raw-node-data node-name)]
-                                   (state/dispatch [:modal/show-form :add-from-trace
-                                                    {:module-id module-id
-                                                     :title (str "Add Node '" node-name "' to Dataset")
-                                                     :source-type :node
-                                                     :source-args input-data
-                                                     :source-emits output-data}])))}
-                     "Add node to Dataset")))
-
-                 (when result
-              ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4"}
-                 ($ :div {:className "text-sm font-medium text-blue-700 mb-1"} "Result")
-                 ($ generic-data-viewer {:data result
-                                         :color "blue"
-                                         :truncate-length 100
-                                         :depth 0})))
-
-                 (when (seq exceptions)
-              ($ :div {:className "bg-red-50 p-3 rounded-md mt-4 border border-red-200"}
-                 ($ :div {:className (common/cn "text-sm font-medium text-red-700 mb-2 flex items-center gap-2")}
-                    ($ ExclamationTriangleIcon {:className (common/cn "w-5 h-5")})
-                    (str "Exceptions (" (count exceptions) ")"))
-                 ($ :div {:className "space-y-2"}
-                    (for [[idx exc-str] (map-indexed vector exceptions)]
-                      (let [first-line (first (str/split-lines exc-str))]
-                        ($ :div {:key idx
-                                 :className "bg-white p-2 rounded border border-red-100 cursor-pointer hover:bg-red-50 transition-colors"
-                                 :onClick (fn [e]
-                                            (.stopPropagation e)
-                                            (state/dispatch [:modal/show :exception-detail
-                                                             {:title (str "Exception " (inc idx))
-                                                              :component ($ ExceptionDetailModal {:title (str "Exception " (inc idx)) :content exc-str})}]))
-                                 :title "Click to view full exception"}
-                           ($ :div {:className "text-xs font-mono text-red-800"}
-                              first-line)))))))
-                 (when (and start-time finish-time)
-              ($ :div {:className "bg-yellow-50 p-3 rounded-md mt-4"}
-                 ($ :div {:className "text-sm font-medium text-yellow-700 mb-2"} "Timing")
-                 ($ :div {:className "space-y-1"}
-                    ($ :div {:className "flex justify-between"}
-                       ($ :span {:className "text-xs text-yellow-600"} "Duration")
-                       ($ :span {:className "text-xs text-yellow-600 font-mono"
-                                 :title (str "Started: " (format-ms start-time) "\nFinished: " (format-ms finish-time))}
-                          (str duration "ms")))
-                    ($ :div {:className "flex justify-between"}
-                       ($ :span {:className "text-xs text-yellow-600"} "Started")
-                       ($ :span {:className "text-xs text-yellow-600 font-mono"}
-                          (format-ms start-time)))
-                    ($ :div {:className "flex justify-between"}
-                       ($ :span {:className "text-xs text-yellow-600"} "Finished")
-                       ($ :span {:className "text-xs text-yellow-600 font-mono"}
-                          (format-ms finish-time))))))
-
-                 (when input
-              ($ :div {:className "bg-green-50 p-3 rounded-md mt-4"}
-                 ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
-                 ($ generic-data-viewer {:data input
-                                         :color "green"
-                                         :truncate-length 100
-                                         :depth 0})))
-
-                 (when (not (empty? (:nested-ops data)))
-              ($ :div {:className "bg-sky-50 p-3 rounded-md mt-4"}
-                 ($ :div {:className "text-sm font-medium text-sky-700 mb-2"}
-                    (str "Operations (" (count (:nested-ops data)) ")"))
-                 ($ :div {:className "space-y-2"}
-                    (for [op (:nested-ops data)]
-                      (let [info (:info op)
-                            op-type (:type op)
-                            start-time (:start-time-millis op)
-                            finish-time (:finish-time-millis op)
-                            duration (when (and start-time finish-time)
-                                       (str (- finish-time start-time)))]
-                        ($ :div {:key (str (str start-time) "-" (str finish-time))
-                                 :className "bg-white p-3 rounded border border-sky-200"}
-
-                           ;; 1. The Header: Keep this part to display consistent op-level info
-                           ($ :div {:className (common/cn "flex justify-between items-start mb-2")}
-                              ($ :div {:className "flex-1"}
-                                 ($ :div {:className "flex items-center gap-2"}
-                                    ($ :span {:className "text-sm font-medium text-sky-800 bg-sky-100 px-2 py-1 rounded"}
-                                       op-type)
-                                    ;; The generic viewer will show objectName, so this is optional, but nice for a header
-                                    (when (:objectName info)
-                                      ($ :span {:className "text-sm font-mono text-sky-700"}
-                                         (:objectName info)))))
-                              ;; Always display the duration
-                              ($ :div {:className "flex items-center gap-2"}
-                                 ;; Always display the duration
-                                 (when duration
-                                   ($ :div {:className "text-xs text-sky-500 font-mono"
-                                            :title (str "Started: " (format-ms start-time) "\nFinished: " (format-ms finish-time))}
-                                      (str duration "ms")))
-                                 ;; Add navigation button for agent-call operations
-                                 (when (= (keyword op-type) :agent-call)
-                                   (let [invoke-data (if (= (str (:op info)) "initiate")
-                                                       (:result info)
-                                                       (:agent-invoke info))
-                                         task-id (:task-id invoke-data)
-                                         agent-invoke-id (:agent-invoke-id invoke-data)
-                                         module-id (:agent-module-name info)
-                                         agent-name (:agent-name info)
-                                         can-navigate? (and (not (nil? task-id)) (not (nil? agent-invoke-id)) module-id agent-name)
-                                         target-url (when can-navigate?
-                                                      (str "/agents/" (common/url-encode module-id)
-                                                           "/agent/" (common/url-encode agent-name)
-                                                           "/invocations/" task-id "-" agent-invoke-id))]
-                                     (when target-url
-                                       ($ :button {:onClick (fn [] (js/window.open target-url "_blank"))
-                                                   :className "inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-colors cursor-pointer shadow-sm"}
-                                          "View"
-                                          ($ ArrowTopRightOnSquareIcon {:className "h-3 w-3"})))))))
-
-                           ;; 2. The Body: Replace all specific logic with the generic viewer
-                           ($ :div {:className "text-xs text-sky-600 mt-1"}
-                              ($ generic-data-viewer {:data info :color "sky" :depth 0}))))))))
-
-                 (when (and emits (> (count emits) 0))
-              ($ :div {:className "mt-4 bg-purple-50 p-3 rounded-md"}
-                 ($ :div {:className "text-sm font-medium text-purple-700 mb-2"}
-                    (str "Emits (" (count emits) ")"))
-                 ($ :div {:className "space-y-2"}
-                    (for [[idx emit] (map-indexed vector (js->clj emits :keywordize-keys true))]
-                      (let [emit-id (str (:invoke-id emit))
-                            is-loaded (contains? graph-data (:invoke-id emit))
-                            ;; We no longer track loading state locally
-                            border-class (if is-loaded "border-purple-200" "border-dashed border-purple-300")
-                            cursor-class "cursor-pointer"
-                            bg-class (if is-loaded "bg-gray-50" "bg-white hover:bg-purple-50")]
-                        ($ :div {:key (str "emit-" idx)
-                                 :className (str bg-class " p-2 rounded border " border-class " " cursor-class " transition-colors")
-                                 :onClick (fn [e]
-                                            (.stopPropagation e)
-                                            (if is-loaded
-                                              ;; Find and select the loaded node
-                                              (let [nodes (js->clj flow-nodes :keywordize-keys true)
-                                                    target-node (->> nodes
-                                                                     (filter #(= (-> % :data :node-id) (:invoke-id emit)))
-                                                                     first)]
-                                                (when (and target-node on-select-node)
-                                                  (on-select-node (:invoke-id emit))))
-                                              ;; Load the unloaded node
-                                              (when on-paginate-node
-                                                (on-paginate-node emit-id))))}
-                           ($ :div {:className "text-xs text-purple-600"}
-                              ($ :div (str "→ " (:node-name emit)))
-                              (when (:args emit)
-                                ($ generic-data-viewer {:data (:args emit)
-                                                        :color "purple"
-                                                        :truncate-length 60
-                                                        :depth 0}))
-                              ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
-                                 (str "ID: " emit-id))))))))))
-
+              ($ node-details-info-panel
+                 {:data data
+                  :hr hr
+                  :hr-invoke-id hr-invoke-id
+                  :hitl-response hitl-response
+                  :submitting? submitting?
+                  :module-id module-id
+                  :agent-name agent-name
+                  :invoke-id invoke-id
+                  :node-id node-id
+                  :node-name node-name
+                  :result result
+                  :exceptions exceptions
+                  :start-time start-time
+                  :finish-time finish-time
+                  :duration duration
+                  :input input
+                  :emits emits
+                  :graph-data graph-data
+                  :flow-nodes flow-nodes
+                  :on-select-node on-select-node
+                  :on-paginate-node on-paginate-node})
 
               :feedback
               ($ :div {:data-id "node-feedback-container"}
