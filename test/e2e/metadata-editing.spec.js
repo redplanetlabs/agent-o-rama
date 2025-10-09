@@ -39,7 +39,7 @@ test.describe('Metadata Editing on Invocation Trace', () => {
     await expect(page).toHaveURL(/\/invocations\//, { timeout: 30000 });
     
     // Wait for the agent to complete
-    await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 60000 });
+    await expect(page.getByText('Final Result').first()).toBeVisible({ timeout: 60000 });
     
     invokeURL = page.url(); // Store the URL for subsequent tests
     console.log(`Setup complete. Agent run with metadata at: ${invokeURL}`);
@@ -134,23 +134,13 @@ test.describe('Metadata Editing on Invocation Trace', () => {
     // Don't fill in metadata field
     await manualRunForm.getByRole('button', { name: 'Submit' }).click();
     await expect(page).toHaveURL(/\/invocations\//, { timeout: 30000 });
-    await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 60000 });
+    await expect(page.getByText('Final Result').first()).toBeVisible({ timeout: 60000 });
 
     // Verify the metadata panel shows the empty state message
     const metadataPanel = page.locator('div').filter({ hasText: /^Metadata/ }).first();
     await expect(metadataPanel).toBeVisible();
     await expect(metadataPanel.getByText('No metadata exists')).toBeVisible();
     console.log('Empty metadata state verified.');
-  });
-
-  test('should disable editing for live/in-progress runs', async ({ page }) => {
-    console.log('Testing that editing is disabled for live runs...');
-    
-    // This test would need a long-running agent to properly test.
-    // For now, we'll skip this or implement with a mock long-running agent
-    // Alternatively, we could test that the is-live? logic works by checking
-    // that edit buttons are hidden when finish-time-millis is not present
-    test.skip();
   });
 });
 
