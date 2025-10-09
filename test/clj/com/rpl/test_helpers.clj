@@ -134,7 +134,7 @@
   ([f
     {:keys [max-wait max-delay initial-delay backoff-factor retry-on-exception
             context]
-     :or   {max-wait           10000
+     :or   {max-wait           30000
             max-delay          100
             initial-delay      10
             backoff-factor     2

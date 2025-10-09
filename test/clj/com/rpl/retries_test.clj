@@ -215,7 +215,7 @@
              (let [s @checks-atom]
                (foreign-append! check-depot nil)
                (when-not (condition-attained? (= (+ 1 s) @checks-atom))
-                 (throw (ex-info "Didn't make progress" {:checks @checks-atom})))
+                 (throw (ex-info "Didn't make progress" {:checks @checks-atom :s s})))
              )))
 
          (bind reset-test!
@@ -263,8 +263,7 @@
                     first
                     last)))
 
-         ;; now check stall happening on an emit from a finished node not making
-         ;; it
+         ;; now check stall happening on an emit from a finished node not making it
          (reset-test!)
          (reset! init-retry-num-atom 2)
          (reset! drop-emits-atom #{"next2"})
