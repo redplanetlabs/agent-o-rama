@@ -92,8 +92,8 @@
                                        ;; to fix dynlink error on arm macs
                                        [net.java.dev.jna/jna "5.17.0"]
                                        [org.clojure/clojure "1.12.0"]
-                                       [prismatic/schema "1.4.1"]]
-                        :repl-options {:port 7888}}
+                                       [prismatic/schema "1.4.1"]]}
+             :mcp      {:repl-options {:port 7888}}
              :test     {:jvm-opts ["-Daor.test.runner=1"]}}
   :codox {:source-paths ["src/clj"]
           :metadata     {:doc/format :markdown}

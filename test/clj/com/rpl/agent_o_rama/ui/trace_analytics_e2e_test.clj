@@ -11,7 +11,7 @@
 
 (deftest conditional-rendering-test
   ;; Test conditional rendering of stat sections based on available data
-  (helpers/with-system TraceAnalyticsTestAgentModule
+  (helpers/with-system [TraceAnalyticsTestAgentModule]
     (helpers/with-webdriver [driver]
       (testing "basic mode shows only execution time"
         (let [env     @helpers/system
@@ -113,7 +113,7 @@
 
 (deftest dropdown-toggle-test
   ;; Test dropdown expand/collapse functionality
-  (helpers/with-system TraceAnalyticsTestAgentModule
+  (helpers/with-system [TraceAnalyticsTestAgentModule]
     (helpers/with-webdriver [driver]
       (testing "node-stats dropdown toggles correctly"
         (let [env     @helpers/system
@@ -251,7 +251,7 @@
   ;; Test trace analytics with model calls and token tracking
   (testing "Trace analytics with chat model mode"
     (when (System/getenv "OPENAI_API_KEY")
-      (helpers/with-system TraceAnalyticsTestAgentModule
+      (helpers/with-system [TraceAnalyticsTestAgentModule]
         (helpers/with-webdriver [driver]
           (testing "chat mode shows model-calls and tokens sections"
             (let [env     @helpers/system
