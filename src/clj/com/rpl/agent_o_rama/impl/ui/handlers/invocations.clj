@@ -31,17 +31,17 @@
   (when client
     (let [;; Correctly get all underlying objects from the agent-specific client
           client-objects (aor-types/underlying-objects client)
-          tracing-query  (:tracing-query client-objects)
-          root-pstate    (:root-pstate client-objects) ; <-- FIX: Use client-objects
+          tracing-query (:tracing-query client-objects)
+          root-pstate (:root-pstate client-objects) ; <-- FIX: Use client-objects
           history-pstate (:graph-history-pstate client-objects) ; <-- FIX: Use client-objects
 
           [agent-task-id agent-id] invoke-pair
-          is-initial-load?         (boolean initial?)
+          is-initial-load? (boolean initial?)
 
           ;; This query is now safe because root-pstate is correctly sourced
           summary-info-raw (foreign-select-one
                             [(keypath agent-id)
-                             (submap [:result :start-time-millis :finish-time-millis :graph-version :retry-num :fork-of :exception-summaries :invoke-args :stats :feedback])]
+                             (submap [:result :start-time-millis :finish-time-millis :graph-version :retry-num :fork-of :exception-summaries :invoke-args :stats :feedback :metadata])]
                             root-pstate
                             {:pkey agent-task-id})
 
@@ -96,9 +96,9 @@
 
       (cond-> {:is-complete agent-is-complete?}
         (seq cleaned-nodes) (assoc :nodes cleaned-nodes)
-        (seq next-leaves)   (assoc :next-leaves next-leaves)
-        true                (assoc :summary summary-info :task-id agent-task-id :agent-id agent-id)
-        is-initial-load?    (assoc :root-invoke-id root-invoke-id :historical-graph historical-graph)))))
+        (seq next-leaves) (assoc :next-leaves next-leaves)
+        true (assoc :summary summary-info :task-id agent-task-id :agent-id agent-id)
+        is-initial-load? (assoc :root-invoke-id root-invoke-id :historical-graph historical-graph)))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/execute-fork
   [{:keys [client invoke-pair changed-nodes]} uid]
@@ -125,3 +125,23 @@
     {:graph (foreign-invoke-query
              (:current-graph-query
               (aor-types/underlying-objects client)))}))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/set-metadata
+  [{:keys [client invoke-id key value-str]} uid]
+  (let [[task-id agent-id] (common/parse-url-pair invoke-id)
+        invoke (aor-types/->AgentInvokeImpl task-id agent-id)]
+    (let [parsed-value (j/read-value value-str)]
+      (aor/set-metadata! client
+                         invoke
+                         key
+                         (if (= java.lang.Integer (class parsed-value))
+                           (long parsed-value)
+                           parsed-value))
+      {:success true})))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/remove-metadata
+  [{:keys [client invoke-id key]} uid]
+  (let [[task-id agent-id] (common/parse-url-pair invoke-id)
+        invoke (aor-types/->AgentInvokeImpl task-id agent-id)]
+    (aor/remove-metadata! client invoke key)
+    {:success true}))
