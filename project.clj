@@ -56,7 +56,9 @@
                         :source-paths      ["src/clj"
                                             "src/cljs"
                                             "resource"
-                                            "dev"]
+                                            "dev"
+                                            "examples/clj/src"
+                                            "examples/clj/test"]
                         :test-paths        ["test/clj"]
                         :java-source-paths ["src/java" "test/java"]
                         :dependencies
