@@ -35,9 +35,9 @@
           ;; e.g., "action[FeedbackTestAgent/agent-dual-eval]" -> "action[agent-dual-eval]"
           source-str (if-let [slash-idx (clojure.string/index-of raw-source-str "/")]
                        (let [before-slash (subs raw-source-str 0 slash-idx)
-                         after-slash (subs raw-source-str (inc slash-idx))
+                             after-slash (subs raw-source-str (inc slash-idx))
                          ;; Find the opening bracket before the slash
-                         bracket-idx (clojure.string/last-index-of before-slash "[")]
+                             bracket-idx (clojure.string/last-index-of before-slash "[")]
                          (if bracket-idx
                            (str (subs before-slash 0 (inc bracket-idx)) after-slash)
                            raw-source-str))
@@ -82,7 +82,7 @@
                  (str "Created: " (format-ms created-at)))))))))
 
 (defui feedback-list
-   "Displays a list of feedback items from the summary data.
+  "Displays a list of feedback items from the summary data.
    Props:
    - :feedback-data - The feedback object containing :results (vector of FeedbackImpl)
    - :module-id - The module ID for constructing URLs"

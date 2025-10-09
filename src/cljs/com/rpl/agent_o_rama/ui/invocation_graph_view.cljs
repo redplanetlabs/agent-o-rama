@@ -852,7 +852,6 @@
                                :is-live? is-live?})))
          ($ :p.text-sm.text-gray-500.italic "No metadata exists")))))
 
-
 (defui result-panel [{:keys [result summary-data module-id]}]
   (when result
     (let [failure? (:failure? result)
@@ -899,8 +898,8 @@
                          :fork-of fork-of})
 
        ($ result-panel {:result result
-                       :summary-data summary-data
-                       :module-id module-id})
+                        :summary-data summary-data
+                        :module-id module-id})
 
        ($ exceptions-panel {:summary-data summary-data
                             :graph-data graph-data
@@ -1048,13 +1047,13 @@
                                                  :module-id module-id})
 
             :fork ($ fork-panel {:changed-nodes changed-nodes
-                              :graph-data graph-data
-                              :affected-nodes affected-nodes
-                              :flow-nodes flow-nodes
-                              :on-select-node on-select-node
-                              :on-remove-node-change on-remove-node-change
-                              :on-execute-fork on-execute-fork
-                              :on-clear-fork on-clear-fork}))))))
+                                 :graph-data graph-data
+                                 :affected-nodes affected-nodes
+                                 :flow-nodes flow-nodes
+                                 :on-select-node on-select-node
+                                 :on-remove-node-change on-remove-node-change
+                                 :on-execute-fork on-execute-fork
+                                 :on-clear-fork on-clear-fork}))))))
 
 (defn process-graph-data
   "Applies Dagre layout to pre-processed nodes and edges."

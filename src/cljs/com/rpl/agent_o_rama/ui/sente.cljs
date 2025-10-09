@@ -75,7 +75,7 @@
   []
   (stop-router!)
   (reset! router_
-    (sente/start-client-chsk-router! ch-chsk event-msg-handler)))
+          (sente/start-client-chsk-router! ch-chsk event-msg-handler)))
 
 ;; =============================================================================
 ;; REQUEST HELPERS

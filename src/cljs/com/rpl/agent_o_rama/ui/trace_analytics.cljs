@@ -299,56 +299,56 @@
                   ($ ChevronDownIcon {:className "h-4 w-4"})
                   ($ ChevronRightIcon {:className "h-4 w-4"}))
                 (str "By agent (" (inc (count (or subagent-stats-map {}))) ")"))
-               (when subagent-expanded?
-                 ($ :div
-                    {:className "space-y-2 mt-2"
-                     :data-id   "subagent-stats-list"}
+             (when subagent-expanded?
+               ($ :div
+                  {:className "space-y-2 mt-2"
+                   :data-id   "subagent-stats-list"}
                     ;; Top-level node entry
-                    ($ :div
-                       {:key       "top-level"
-                        :className "space-y-2"
-                        :data-id   "subagent-top-level"}
-                       ($ :div
-                          {:className "flex items-baseline gap-2"}
-                          ($ :div
-                             {:className "text-sm font-semibold text-gray-800"}
-                             "Top-level")
-                          ($ :div {:className "text-xs text-gray-500"}
-                             "(main agent)"))
-                       ($ agent-stats-display
-                          {:basic-stats basic-stats}))
+                  ($ :div
+                     {:key       "top-level"
+                      :className "space-y-2"
+                      :data-id   "subagent-top-level"}
+                     ($ :div
+                        {:className "flex items-baseline gap-2"}
+                        ($ :div
+                           {:className "text-sm font-semibold text-gray-800"}
+                           "Top-level")
+                        ($ :div {:className "text-xs text-gray-500"}
+                           "(main agent)"))
+                     ($ agent-stats-display
+                        {:basic-stats basic-stats}))
 
                     ;; Sub-agent entries
-                    (mapv (fn [[agent-ref sa-stats]]
-                           (let [module-name    (:module-name agent-ref)
-                                 agent-name     (:agent-name agent-ref)
-                                 count          (:count sa-stats)
-                                 sa-basic-stats (:basic-stats sa-stats)]
-                             ($ :<>
-                                {:key (str module-name "/" agent-name)}
-                                ($ :div
-                                   {:className "border-t border-gray-300 my-2"})
-                                ($ :div
-                                   {:className "space-y-2"
-                                    :data-id   (str "subagent-" agent-name)}
-                                   ($ :div
-                                      {:className "space-y-1"}
-                                      ($ :div
-                                         {:className "text-sm font-semibold text-gray-800 overflow-hidden"
-                                          :style     {:direction    "rtl"
-                                                      :whiteSpace   "nowrap"
-                                                      :textOverflow "ellipsis"
-                                                      :maxWidth     "100%"}
-                                          :title     (str module-name "/" agent-name)}
-                                         (str module-name "/" agent-name))
-                                      (let [total-time (reduce + 0 (map :total-time-millis (vals (:node-stats sa-basic-stats))))
-                                            avg-time   (if (pos? count) (/ total-time count) 0)]
-                                        ($ :div
-                                           {:className "text-xs text-gray-500 text-right"
-                                            :title (str "Avg: " (common/format-duration-ms avg-time))}
-                                           (str count " call" (when (not= count 1) "s")
-                                                " · "
-                                                (common/format-duration-ms total-time)))))
-                                   ($ agent-stats-display
-                                      {:basic-stats sa-basic-stats})))))
-                         subagent-stats-map))))))))
+                  (mapv (fn [[agent-ref sa-stats]]
+                          (let [module-name    (:module-name agent-ref)
+                                agent-name     (:agent-name agent-ref)
+                                count          (:count sa-stats)
+                                sa-basic-stats (:basic-stats sa-stats)]
+                            ($ :<>
+                               {:key (str module-name "/" agent-name)}
+                               ($ :div
+                                  {:className "border-t border-gray-300 my-2"})
+                               ($ :div
+                                  {:className "space-y-2"
+                                   :data-id   (str "subagent-" agent-name)}
+                                  ($ :div
+                                     {:className "space-y-1"}
+                                     ($ :div
+                                        {:className "text-sm font-semibold text-gray-800 overflow-hidden"
+                                         :style     {:direction    "rtl"
+                                                     :whiteSpace   "nowrap"
+                                                     :textOverflow "ellipsis"
+                                                     :maxWidth     "100%"}
+                                         :title     (str module-name "/" agent-name)}
+                                        (str module-name "/" agent-name))
+                                     (let [total-time (reduce + 0 (map :total-time-millis (vals (:node-stats sa-basic-stats))))
+                                           avg-time   (if (pos? count) (/ total-time count) 0)]
+                                       ($ :div
+                                          {:className "text-xs text-gray-500 text-right"
+                                           :title (str "Avg: " (common/format-duration-ms avg-time))}
+                                          (str count " call" (when (not= count 1) "s")
+                                               " · "
+                                               (common/format-duration-ms total-time)))))
+                                  ($ agent-stats-display
+                                     {:basic-stats sa-basic-stats})))))
+                        subagent-stats-map))))))))
