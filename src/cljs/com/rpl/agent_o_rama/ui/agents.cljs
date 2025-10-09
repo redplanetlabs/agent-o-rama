@@ -9,7 +9,8 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.sente :as sente]
-   [com.rpl.agent-o-rama.ui.queries :as queries]))
+   [com.rpl.agent-o-rama.ui.queries :as queries]
+   [clojure.string :as str]))
 
 (defui result-badge [{:keys [result human-request?]}]
   (cond
