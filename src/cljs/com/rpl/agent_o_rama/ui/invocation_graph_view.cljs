@@ -696,6 +696,102 @@
                                               "Go to node"
                                               "Node not loaded (pagination)")}
                             "Go to Node")))))))))))
+(defui metadata-row [{:keys [m-key m-val module-id agent-name invoke-id on-change is-live?]}]
+  (let [[editing? set-editing!] (uix/use-state false)
+        [edit-value set-edit-value!] (uix/use-state "")
+        [is-saving? set-is-saving!] (uix/use-state false)
+        [error set-error!] (uix/use-state nil)
+
+        handle-edit #(do
+                       (set-editing! true)
+                       (set-edit-value! (common/pp-json m-val))
+                       (set-error! nil))
+
+        handle-cancel #(set-editing! false)
+
+        handle-save (fn []
+                      (set-is-saving! true)
+                      (set-error! nil)
+                      (try
+                        ;; Test if it's valid JSON
+                        (js/JSON.parse edit-value)
+                        (com.rpl.agent-o-rama.ui.sente/request!
+                         [:invocations/set-metadata {:module-id module-id
+                                                     :agent-name agent-name
+                                                     :invoke-id invoke-id
+                                                     :key m-key
+                                                     :value-str edit-value}]
+                         10000
+                         (fn [reply]
+                           (set-is-saving! false)
+                           (if (:success reply)
+                             (do
+                               (set-editing! false)
+                               (on-change))
+                             (set-error! (or (:error reply) "Save failed.")))))
+                        (catch :default e
+                          (set-is-saving! false)
+                          (set-error! (str "Invalid JSON: " (.-message e))))))
+
+        handle-delete (fn []
+                        (when (js/confirm (str "Are you sure you want to remove the metadata key '" m-key "'?"))
+                          (com.rpl.agent-o-rama.ui.sente/request!
+                           [:invocations/remove-metadata {:module-id module-id
+                                                          :agent-name agent-name
+                                                          :invoke-id invoke-id
+                                                          :key m-key}]
+                           10000
+                           (fn [reply]
+                             (if (:success reply)
+                               (on-change)
+                               (js/alert (str "Failed to remove metadata: " (:error reply))))))))]
+
+    ($ :div.py-2.sm:grid.sm:grid-cols-3.sm:gap-4.sm:px-0
+       ($ :dt.text-sm.font-medium.leading-6.text-gray-900.font-mono.truncate {:title m-key} m-key)
+       (if editing?
+         ($ :dd.mt-1.text-sm.leading-6.text-gray-700.sm:col-span-2.sm:mt-0
+            ($ :div.space-y-2
+               ($ :textarea.w-full.p-2.border.border-gray-300.rounded-md.font-mono.text-sm
+                  {:rows 4
+                   :value edit-value
+                   :onChange #(set-edit-value! (.. % -target -value))})
+               (when error
+                 ($ :p.text-xs.text-red-600 error))
+               ($ :div.flex.gap-2
+                  ($ :button.px-3.py-1.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:bg-gray-400
+                     {:onClick handle-save
+                      :disabled is-saving?}
+                     (if is-saving? "Saving..." "Save"))
+                  ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.text-gray-700.rounded-md.hover:bg-gray-50
+                     {:onClick handle-cancel}
+                     "Cancel"))))
+         ($ :dd.mt-1.text-sm.leading-6.text-gray-700.sm:col-span-2.sm:mt-0.flex.justify-between.items-start.group
+            ($ :div.flex-1.min-w-0
+               ($ generic-data-viewer {:data m-val :color "gray" :truncate-length 100 :depth 0}))
+            (when-not is-live?
+              ($ :div.flex.items-center.gap-2.pl-2.opacity-0.group-hover:opacity-100.transition-opacity
+                 ($ :button.p-1.text-gray-500.hover:text-blue-600 {:title "Edit value" :onClick handle-edit}
+                    ($ PencilIcon {:className "h-4 w-4"}))
+                 ($ :button.p-1.text-gray-500.hover:text-red-600 {:title "Remove key" :onClick handle-delete}
+                    ($ XMarkIcon {:className "h-4 w-4"})))))))))
+
+(defui metadata-panel [{:keys [summary-data module-id agent-name invoke-id on-change is-live?]}]
+  (let [metadata (get-in summary-data [:metadata])]
+    ($ :div.bg-gray-50.p-4.rounded-lg.border.border-gray-200.mb-4
+       ($ :h4.text-md.font-semibold.text-gray-700.mb-2 "Metadata")
+       (if (seq metadata)
+         ($ :dl.divide-y.divide-gray-200
+            (for [[k v] (sort-by key metadata)]
+              ($ metadata-row {:key (str k)
+                               :m-key (str k)
+                               :m-val v
+                               :module-id module-id
+                               :agent-name agent-name
+                               :invoke-id invoke-id
+                               :on-change on-change
+                               :is-live? is-live?})))
+         ($ :p.text-sm.text-gray-500.italic "No metadata exists")))))
+
 
 (defui info-panel [{:keys [graph-data summary-data on-select-node module-id agent-name task-id forks fork-of invoke-id]}]
   (let [result (:result summary-data)
@@ -747,7 +843,10 @@
 
        ($ feedback/feedback-panel {:feedback feedback})
 
-       ($ trace-analytics/info {:invoke-id invoke-id}))))
+       ($ trace-analytics/info {:invoke-id invoke-id})
+       ($ metadata-panel {:summary-data summary-data
+                          :module-id module-id
+                          :agent-name agent-name}))))
 
 (defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live
                             module-id agent-name task-id forks fork-of invoke-id]}]
