@@ -45,9 +45,9 @@
                  [com.cognitect/transit-clj "1.0.333"]
                  [com.cognitect/transit-cljs "0.8.280"]]
   :test-selectors
-  {:default (complement #(re-find #"^com\.rpl\.agent\-o\-rama\.ui" (str (ns-name %))))
-   :all     (constantly true)
-   :ui      #(re-find #"^com\.rpl\.agent\-o\-rama\.ui" (str (ns-name %)))}
+  {:default (complement #(re-find #"^com\.rpl\.agent\-o\-rama\.ui" (str (:ns %))))
+   :ui      #(re-find #"^com\.rpl\.agent\-o\-rama\.ui" (str (:ns %)))
+   :all     (constantly true)}
   :global-vars {*warn-on-reflection* true}
   :repositories
   [["releases"
