@@ -831,7 +831,7 @@
               (.thenApply
                (foreign-append-async!
                 agent-depot
-                (aor-types/->AgentInitiate
+                (aor-types/->valid-AgentInitiate
                  (vec args)
                  aor-types/FORCED-AGENT-TASK-ID
                  aor-types/FORCED-AGENT-INVOKE-ID
