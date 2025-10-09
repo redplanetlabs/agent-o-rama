@@ -53,7 +53,8 @@
   [container]
   (let [webdriver-port 4444
         driver         (e/chrome
-                        {:headless false
+                        {:headless true
+                         :size     [1280 800]
                          :port     (get (:mapped-ports container) webdriver-port)
                          :host     (:host container)
                          :args     ["--no-sandbox"]})]
@@ -85,7 +86,8 @@
 
    Options:
    - :port - UI server port (default: 8080)
-   - :post-deploy-hook - Function to call after module is deployed, receives ipc and module-name"
+   - :post-deploy-hook - Function to call after module is deployed,
+                         receives ipc and module-name"
   [ipc agent-module {:keys [port post-deploy-hook] :or {port default-port}}]
   (let [module-name (rama/get-module-name agent-module)]
     (when-not (:launched @system)
@@ -111,7 +113,11 @@
    - :post-deploy-hook - Function to call after module is deployed, receives ipc and module-name"
   [agent-module & {:keys [post-deploy-hook]}]
   (let [ipc (setup-ipc)]
-    (setup-agent-module ipc agent-module {:port default-port :post-deploy-hook post-deploy-hook})
+    (setup-agent-module
+     ipc
+     agent-module
+     {:port default-port
+      :post-deploy-hook post-deploy-hook})
     (setup-container default-port)))
 
 (defn teardown-system
@@ -217,3 +223,17 @@
      "/invocations/"
      task-id
      "-" invoke-id)))
+
+(defn wait-visible
+  [driver data-id]
+  (e/wait-visible
+   driver
+   {:data-id data-id}
+   {:timeout default-timeout}))
+
+(defn scroll
+  [driver data-id]
+  (e/scroll-query
+   driver
+   {:data-id data-id}
+   {"behavior" "instant" "block" "start"}))

@@ -3,9 +3,10 @@
    [clojure.test :refer [deftest is testing]]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.agent-o-rama.ui.etaoin-test-helpers :as helpers]
+   [com.rpl.agent-o-rama.ui.etaoin-test-helpers :as eth]
    [com.rpl.agent-o-rama.ui.feedback-test-agent
     :refer [FeedbackTestAgentModule setup-feedback-testing!]]
+   [com.rpl.rama.test :as rtest]
    [etaoin.api :as e]))
 
 (def ^:private default-timeout 120)
@@ -18,27 +19,46 @@
   [opts]
   (fn [ipc module-name]
     (let [manager (aor/agent-manager ipc module-name)
-          depot   (:global-actions-depot (aor-types/underlying-objects manager))]
+          depot   (:global-actions-depot
+                   (aor-types/underlying-objects manager))]
       (setup-feedback-testing! manager depot opts))))
+
+(defn- wait-for-feedback
+  [driver trace-url]
+  (loop [i 0]
+    (e/go driver trace-url)
+    (eth/wait-visible driver "feedback-tab")
+    (eth/scroll driver "agent-info-panel")
+    (eth/scroll driver "feedback-tab")
+    (e/click driver {:data-id "feedback-tab"})
+    (when-not (or (> i 20)
+                  (e/visible? driver {:data-id "feedback-list"}))
+      (Thread/sleep 1000)
+      (recur (unchecked-inc i)))))
 
 (deftest ^:integration agent-level-feedback-test
   ;; Test agent-level feedback display in the main Feedback tab.
   ;; Uses feedback-test-agent which generates agent-level evaluator feedback.
-  (helpers/with-system [FeedbackTestAgentModule
-                        {:post-deploy-hook (make-post-deploy-hook {:include-node-rules? false})}]
-    (helpers/with-webdriver [driver]
+  (eth/with-system
+    [FeedbackTestAgentModule
+     {:post-deploy-hook (make-post-deploy-hook {:include-node-rules? false})}]
+    (eth/with-webdriver [driver]
       (testing "agent-level feedback displays correctly"
-        (let [env    @helpers/system
-              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env))
-                                       "FeedbackTestAgent")
+        (let [env    @eth/system
+              agent  (aor/agent-client
+                      (aor/agent-manager (:ipc env) (:module-name env))
+                      "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "medium" "text" "test"})]
 
           @(aor/agent-result-async agent invoke)
 
           (e/with-postmortem driver {:dir "target/etaoin"}
-            (let [trace-url (helpers/agent-invoke-url env "FeedbackTestAgent" invoke)]
-              (e/go driver trace-url)
-              (e/wait-visible driver {:data-id "feedback-tab"} {:timeout default-timeout})
+            (let [trace-url (eth/agent-invoke-url
+                             env
+                             "FeedbackTestAgent"
+                             invoke)]
+              (wait-for-feedback driver trace-url)
+              (eth/wait-visible driver "feedback-tab")
 
               (testing "feedback tab exists"
                 (is (e/visible? driver {:data-id "feedback-tab"})))
@@ -60,36 +80,37 @@
 (deftest ^:integration node-level-feedback-test
   ;; Test node-level feedback display in node details Feedback tab.
   ;; Uses feedback-test-agent which generates node-level evaluator feedback.
-  (helpers/with-system [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
-    (helpers/with-webdriver [driver]
+  (eth/with-system
+    [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
+    (eth/with-webdriver [driver]
       (testing "node-level feedback displays correctly"
-        (let [env    @helpers/system
-              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env))
-                                       "FeedbackTestAgent")
+        (let [env    @eth/system
+              agent  (aor/agent-client
+                      (aor/agent-manager (:ipc env) (:module-name env))
+                      "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "long" "text" "eval"})]
 
           @(aor/agent-result-async agent invoke)
           (Thread/sleep 100)
 
           (e/with-postmortem driver {:dir "target/etaoin"}
-            (let [trace-url (helpers/agent-invoke-url env "FeedbackTestAgent" invoke)]
-              (e/go driver trace-url)
-              (e/wait-visible driver {:data-id "feedback-tab"} {:timeout default-timeout})
-
-              #_(testing "navigate to graph view to select a node"
-                  (e/click driver {:data-id "info-tab"})
-                  (e/wait-visible driver {:class "react-flow__node"} {:timeout 2}))
+            (let [trace-url (eth/agent-invoke-url
+                             env
+                             "FeedbackTestAgent"
+                             invoke)]
+              (wait-for-feedback driver trace-url)
+              (eth/wait-visible driver "feedback-tab")
 
               (testing "click on process node"
-                (e/click driver {:data-id "agent-graph-node-process"})
-                (e/wait-visible driver {:data-id "node-feedback-tab"} {:timeout 2}))
+                (e/click driver {:fn/has-text "process"})
+                (eth/wait-visible driver "node-feedback-tab"))
 
               (testing "node feedback tab exists"
                 (is (e/visible? driver {:data-id "node-feedback-tab"})))
 
               (testing "switch to node feedback tab"
                 (e/click driver {:data-id "node-feedback-tab"})
-                (e/wait-visible driver {:data-id "node-feedback-container"} {:timeout 2}))
+                (eth/wait-visible driver "node-feedback-container"))
 
               (testing "node feedback is visible"
                 (is (e/visible? driver {:data-id "feedback-list"})))
@@ -100,25 +121,31 @@
 (deftest ^:integration empty-feedback-state-test
   ;; Test empty state display when no feedback is present.
   ;; Uses an agent run without any evaluator rules configured.
-  (helpers/with-system [FeedbackTestAgentModule]
-    (helpers/with-webdriver [driver]
+  (eth/with-system [FeedbackTestAgentModule]
+    (eth/with-webdriver [driver]
       (testing "empty feedback state displays correctly"
-        (let [env    @helpers/system
-              agent  (aor/agent-client (aor/agent-manager (:ipc env) (:module-name env))
-                                       "FeedbackTestAgent")
+        (let [env    @eth/system
+              agent  (aor/agent-client
+                      (aor/agent-manager (:ipc env) (:module-name env))
+                      "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "short"})]
 
-          @(aor/agent-result-async agent invoke)
-
           (e/with-postmortem driver {:dir "target/etaoin"}
-            (let [trace-url (helpers/agent-invoke-url env "FeedbackTestAgent" invoke)]
+            (let [trace-url (eth/agent-invoke-url
+                             env
+                             "FeedbackTestAgent"
+                             invoke)]
               (e/go driver trace-url)
-              (e/wait-visible driver {:data-id "feedback-tab"} {:timeout default-timeout})
+              (aor/agent-result agent invoke)
+
+              ;; NOTE rules run after node invocation is complete
+              ;; which means display is not updated.
+              (eth/wait-visible driver "feedback-tab")
 
               (testing "switch to feedback tab"
-                (e/scroll-query driver {:data-id "feedback-tab"})
+                (eth/scroll driver "feedback-tab")
                 (e/click driver {:data-id "feedback-tab"})
-                (e/wait-visible driver {:data-id "feedback-empty-state"} {:timeout 2}))
+                (eth/wait-visible driver "feedback-empty-state"))
 
               (testing "empty state is visible"
                 (is (e/visible? driver {:data-id "feedback-empty-state"}))
@@ -129,10 +156,11 @@
 (deftest ^:integration feedback-score-types-test
   ;; Test display of different score types (boolean and numeric).
   ;; Uses feedback-test-agent evaluators that return different score formats.
-  (helpers/with-system [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
-    (helpers/with-webdriver [driver]
+  (eth/with-system
+    [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
+    (eth/with-webdriver [driver]
       (testing "feedback scores display with correct types"
-        (let [env    @helpers/system
+        (let [env    @eth/system
               agent  (aor/agent-client
                       (aor/agent-manager (:ipc env) (:module-name env))
                       "FeedbackTestAgent")
@@ -140,34 +168,28 @@
                       agent
                       {"mode" "prefixed" "text" "score-check"})]
 
-          @(aor/agent-result-async agent invoke)
-          (Thread/sleep 100)
+          (aor/agent-result agent invoke)
 
           (e/with-postmortem driver {:dir "target/etaoin"}
-            (let [trace-url (helpers/agent-invoke-url
+            (let [trace-url (eth/agent-invoke-url
                              env
                              "FeedbackTestAgent"
                              invoke)]
-              (e/go driver trace-url)
-              (e/wait-visible
-               driver
-               {:data-id "feedback-tab"}
-               {:timeout default-timeout})
+              (wait-for-feedback driver trace-url)
+              (eth/wait-visible driver "feedback-tab")
 
               (testing "switch to feedback tab"
                 (e/click driver {:data-id "feedback-tab"})
-                (e/wait-visible driver {:data-id "feedback-list"} {:timeout 2}))
+                (eth/wait-visible driver "feedback-list"))
 
               (testing "feedback items display"
                 (is (e/visible? driver {:data-id "feedback-item-0"})))
 
               (testing "navigate to node feedback for numeric scores"
-                (e/click driver {:data-id "info-tab"})
-                (e/wait-visible driver {:class "react-flow__node"} {:timeout 2})
-                (e/click driver {:data-id "node-process"})
-                (e/wait-visible driver {:data-id "node-feedback-tab"} {:timeout 2})
+                (e/click driver {:fn/has-text "process"})
+                (eth/wait-visible driver "node-feedback-tab")
                 (e/click driver {:data-id "node-feedback-tab"})
-                (e/wait-visible driver {:data-id "node-feedback-container"} {:timeout 2}))
+                (eth/wait-visible driver "node-feedback-container"))
 
               (testing "numeric scores display in node feedback"
                 (is (e/visible? driver {:data-id "feedback-list"}))))))))))
@@ -175,43 +197,47 @@
 (deftest ^:integration multiple-feedback-sources-test
   ;; Test that feedback from multiple evaluators displays together.
   ;; Uses both agent-level and node-level evaluators.
-  (helpers/with-system
+  (eth/with-system
     [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
-    (helpers/with-webdriver [driver]
+    (eth/with-webdriver [driver]
       (testing "multiple feedback sources display together"
-        (let [env    @helpers/system
+        (let [env    @eth/system
               agent  (aor/agent-client
                       (aor/agent-manager (:ipc env) (:module-name env))
                       "FeedbackTestAgent")
-              invoke (aor/agent-initiate
-                      agent
-                      {"mode" "medium" "text" "multi-eval"})]
+              invoke (aor/agent-initiate agent {"mode" "medium"})
+              wait-for-mb-count
+              #(rtest/wait-for-microbatch-processed-count
+                (:ipc env)
+                (:module-name env)
+                aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME
+                %)]
 
-          @(aor/agent-result-async agent invoke)
+          (is (= "test-medium-result" (aor/agent-result agent invoke)))
+
+          (wait-for-mb-count 5) ; wait for rules to run
 
           (e/with-postmortem driver {:dir "target/etaoin"}
-            (let [trace-url (helpers/agent-invoke-url
+            (let [trace-url (eth/agent-invoke-url
                              env
                              "FeedbackTestAgent"
                              invoke)]
-              (e/go driver trace-url)
-              (e/wait-visible
-               driver
-               {:data-id "feedback-tab"}
-               {:timeout default-timeout})
 
               (testing "agent-level feedback has multiple items"
-                (e/click driver {:data-id "feedback-tab"})
-                (e/wait-visible driver {:data-id "feedback-list"} {:timeout 2})
+                (wait-for-feedback driver trace-url)
+                (is (e/visible? driver {:data-id "feedback-list"}))
                 (is (e/exists? driver {:data-id "feedback-item-0"}))
                 (is (e/exists? driver {:data-id "feedback-item-1"})))
 
               (testing "node-level feedback also has multiple items"
-                (e/click driver {:data-id "info-tab"})
-                (e/wait-visible driver {:class "react-flow__node"} {:timeout 2})
-                (e/click driver {:data-id "node-process"})
-                (e/wait-visible driver {:data-id "node-feedback-tab"} {:timeout 2})
+                ;; (e/click driver {:data-id "info-tab"})
+                ;; (e/wait-visible
+                ;;  driver
+                ;;  {:class "react-flow__node"}
+                ;;  {:timeout default-timeout})
+                (e/click driver {:fn/has-text "process"})
+                (eth/wait-visible driver "node-feedback-tab")
                 (e/click driver {:data-id "node-feedback-tab"})
-                (e/wait-visible driver {:data-id "node-feedback-container"} {:timeout 2})
+                (eth/wait-visible driver "node-feedback-container")
                 (is (e/exists? driver {:data-id "feedback-item-0"}))
                 (is (e/exists? driver {:data-id "feedback-item-1"}))))))))))
