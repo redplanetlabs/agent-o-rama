@@ -44,12 +44,13 @@
 (defn- parse-target
   [t]
   (let [target-spec (:target-spec t)
-        type        (:type target-spec)]
+        type (:type target-spec)
+        metadata (get t :metadata {})]
     (aor-types/->ExperimentTarget
      (if (= type :agent)
        (aor-types/->AgentTarget (:agent-name target-spec))
        (aor-types/->NodeTarget (:agent-name target-spec) (:node target-spec)))
-     nil ;; TODO: fix
+     metadata
      (:input->args t))))
 
 (defn- parse-spec [spec]
@@ -84,8 +85,7 @@
                                            dataset-id
                                            experiment-id)]
 
-
-    ;; 2. NEW LOGIC STARTS HERE: Check for early failure.
+;; 2. NEW LOGIC STARTS HERE: Check for early failure.
     (if-let [invoke (:experiment-invoke base-results)]
       ;; If we have the invoke coordinates for the experimenter agent...
       (do

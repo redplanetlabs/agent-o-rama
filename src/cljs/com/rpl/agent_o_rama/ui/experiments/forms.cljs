@@ -207,6 +207,7 @@
         target-spec-type-field (forms/use-form-field form-id (conj path :target-spec :type))
         agent-name-field (forms/use-form-field form-id (conj path :target-spec :agent-name))
         node-name-field (forms/use-form-field form-id (conj path :target-spec :node))
+        metadata-field (forms/use-form-field form-id (conj path :metadata))
         input-mappings (or (get-in form (conj path :input->args)) [])
         is-comparative? (= :comparative (get-in form [:spec :type]))
 
@@ -276,6 +277,16 @@
                 :data-testid "node-name-dropdown"})
             (when (:error node-name-field)
               ($ :p.text-sm.text-red-600.mt-1 (:error node-name-field)))))
+
+       ($ :div.mt-4
+          ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Metadata (JSON map, optional)")
+          ($ :textarea.w-full.p-2.border.border-gray-300.rounded-md.text-sm.font-mono
+             {:placeholder "{ \"key\": \"value\" }"
+              :value (or (:value metadata-field) "")
+              :onChange (:on-change metadata-field)
+              :rows 3})
+          (when (:error metadata-field)
+            ($ :p.text-sm.text-red-600.mt-1 (:error metadata-field))))
 
        ($ :div.mt-4
           ($ :label.block.text-sm.font-medium.text-gray-700 "Input Mappings")
@@ -452,6 +463,7 @@
                  :selector {:type :all :tag ""}
                  :spec {:type :regular
                         :targets [{:target-spec {:type :agent :agent-name nil}
+                                   :metadata ""
                                    :input->args [{:id (random-uuid) :value "$"}]}]}
                  :evaluators []
                  :num-repetitions 1
@@ -480,11 +492,14 @@
                                 (assoc-in form-state [:selector :example-ids] (vec selected-ids))
                                 form-state)
 
-          ;; Convert input->args back to simple strings for the backend
+          ;; Parse metadata and convert input->args back to simple strings for the backend
           cleaned-form-state (update-in form-with-selection [:spec :targets]
                                         (fn [targets]
                                           (mapv (fn [target]
-                                                  (update target :input->args (fn [args] (mapv :value args))))
+                                                  (-> target
+                                                      ;; TODO this is questionable..
+                                                      (update :metadata #(if (str/blank? %) {} (-> % js/JSON.parse js->clj)))
+                                                      (update :input->args (fn [args] (mapv :value args)))))
                                                 targets)))]
       (sente/request!
        [:experiments/start

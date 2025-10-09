@@ -295,6 +295,7 @@
   (let [;; Subscribe to state from app-db
         manual-run-state (state/use-sub [:ui :manual-run module-id agent-name])
         args (or (:args manual-run-state) "")
+        metadata-args (or (:metadata-args manual-run-state) "")
         loading? (or (:loading? manual-run-state) false)
         error-msg (:error-msg manual-run-state)
 
@@ -307,17 +308,25 @@
                         (update-field :error-msg nil)
                         (update-field :loading? true)
 
-                        ;; Parse JSON arguments
-                        (let [parsed-args (try
-                                            (js->clj (js/JSON.parse args))
-                                            (catch js/Error e
-                                              nil))]
-                          (if parsed-args
-                            ;; Make Sente request
+                        ;; Parse both arguments and metadata
+                        (let [parsed-args (try (js->clj (js/JSON.parse args)) (catch js/Error e nil))
+                              parsed-metadata (try (if (str/blank? metadata-args) {} (js->clj (js/JSON.parse metadata-args))) (catch js/Error e nil))]
+                          (cond
+                            (not parsed-args)
+                            (do (update-field :loading? false)
+                                (update-field :error-msg "Error: Invalid JSON format for arguments"))
+
+                            (not parsed-metadata)
+                            (do (update-field :loading? false)
+                                (update-field :error-msg "Error: Invalid JSON format for metadata"))
+
+                            :else
+                            ;; Make Sente request with new metadata field
                             (sente/request!
                              [:invocations/run-agent {:module-id module-id
                                                       :agent-name agent-name
-                                                      :args parsed-args}]
+                                                      :args parsed-args
+                                                      :metadata parsed-metadata}]
                              5000
                              (fn [reply]
                                (update-field :loading? false)
@@ -325,12 +334,9 @@
                                  (let [data (:data reply)
                                        trace-url (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations/" (:task-id data) "-" (:invoke-id data))]
                                    (update-field :args "") ;; Clear args on success
+                                   (update-field :metadata-args "") ;; Clear metadata on success
                                    (rfe/push-state :agent/invocation-detail {:module-id module-id :agent-name agent-name :invoke-id (str (:task-id data) "-" (:invoke-id data))}))
-                                 (update-field :error-msg (str "Error: " (or (:error reply) "Unknown error"))))))
-                            ;; Invalid JSON
-                            (do
-                              (update-field :loading? false)
-                              (update-field :error-msg "Error: Invalid JSON format")))))]
+                                 (update-field :error-msg (str "Error: " (or (:error reply) "Unknown error")))))))))]
 
     ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6
        ($ :form {:onSubmit handle-submit}
@@ -340,6 +346,12 @@
                 {:placeholder "[arg1, arg2, arg3, ...] (json)"
                  :value args
                  :onChange #(update-field :args (.. % -target -value))
+                 :rows 3
+                 :disabled loading?})
+             ($ :textarea.flex-1.p-3.border.border-gray-300.rounded-md.text-sm.focus:ring-2.focus:ring-blue-500.focus:border-blue-500.transition-colors.duration-150
+                {:placeholder "Metadata (JSON map, optional)"
+                 :value metadata-args
+                 :onChange #(update-field :metadata-args (.. % -target -value))
                  :rows 3
                  :disabled loading?})
              ($ :button

@@ -17,10 +17,11 @@
        10 pages))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/run-agent
-  [{:keys [client args]} uid]
+  [{:keys [client args metadata]} uid]
   (when-not (vector? args)
     (throw (ex-info "must be a json list of args" {:bad-args args})))
-  (let [^AgentInvoke inv (apply aor/agent-initiate client args)]
+  (let [metadata (or metadata {})
+        ^AgentInvoke inv (apply aor/agent-initiate-with-context client {:metadata metadata} args)]
     {:task-id (.getTaskId inv)
      :invoke-id (.getAgentInvokeId inv)}))
 
