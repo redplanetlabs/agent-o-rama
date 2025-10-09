@@ -9,7 +9,7 @@
 
 (def ^:private default-timeout 120)
 
-(deftest conditional-rendering-test
+(deftest ^:integration conditional-rendering-test
   ;; Test conditional rendering of stat sections based on available data
   (helpers/with-system [TraceAnalyticsTestAgentModule]
     (helpers/with-webdriver [driver]
@@ -111,7 +111,7 @@
                    {:data-id "other-operations"}
                    "Other Operations")))))))))
 
-(deftest dropdown-toggle-test
+(deftest ^:integration dropdown-toggle-test
   ;; Test dropdown expand/collapse functionality
   (helpers/with-system [TraceAnalyticsTestAgentModule]
     (helpers/with-webdriver [driver]

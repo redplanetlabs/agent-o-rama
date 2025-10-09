@@ -21,7 +21,7 @@
           depot   (:global-actions-depot (aor-types/underlying-objects manager))]
       (setup-feedback-testing! manager depot opts))))
 
-(deftest agent-level-feedback-test
+(deftest ^:integration agent-level-feedback-test
   ;; Test agent-level feedback display in the main Feedback tab.
   ;; Uses feedback-test-agent which generates agent-level evaluator feedback.
   (helpers/with-system [FeedbackTestAgentModule
@@ -57,7 +57,7 @@
               (testing "feedback panels display scores"
                 (is (e/visible? driver {:data-id "feedback-panel"}))))))))))
 
-(deftest node-level-feedback-test
+(deftest ^:integration node-level-feedback-test
   ;; Test node-level feedback display in node details Feedback tab.
   ;; Uses feedback-test-agent which generates node-level evaluator feedback.
   (helpers/with-system [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
@@ -77,8 +77,8 @@
               (e/wait-visible driver {:data-id "feedback-tab"} {:timeout default-timeout})
 
               #_(testing "navigate to graph view to select a node"
-                (e/click driver {:data-id "info-tab"})
-                (e/wait-visible driver {:class "react-flow__node"} {:timeout 2}))
+                  (e/click driver {:data-id "info-tab"})
+                  (e/wait-visible driver {:class "react-flow__node"} {:timeout 2}))
 
               (testing "click on process node"
                 (e/click driver {:data-id "agent-graph-node-process"})
@@ -97,7 +97,7 @@
               (testing "has feedback items from node-level evaluators"
                 (is (e/exists? driver {:data-id "feedback-item-0"}))))))))))
 
-(deftest empty-feedback-state-test
+(deftest ^:integration empty-feedback-state-test
   ;; Test empty state display when no feedback is present.
   ;; Uses an agent run without any evaluator rules configured.
   (helpers/with-system [FeedbackTestAgentModule]
@@ -126,7 +126,7 @@
                                  {:data-id "feedback-empty-state"}
                                  "No feedback available"))))))))))
 
-(deftest feedback-score-types-test
+(deftest ^:integration feedback-score-types-test
   ;; Test display of different score types (boolean and numeric).
   ;; Uses feedback-test-agent evaluators that return different score formats.
   (helpers/with-system [FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
@@ -172,7 +172,7 @@
               (testing "numeric scores display in node feedback"
                 (is (e/visible? driver {:data-id "feedback-list"}))))))))))
 
-(deftest multiple-feedback-sources-test
+(deftest ^:integration multiple-feedback-sources-test
   ;; Test that feedback from multiple evaluators displays together.
   ;; Uses both agent-level and node-level evaluators.
   (helpers/with-system
