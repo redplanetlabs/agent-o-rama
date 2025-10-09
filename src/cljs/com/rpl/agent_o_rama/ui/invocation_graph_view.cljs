@@ -861,6 +861,69 @@
                                               :agent-name agent-name}]))
                           :is-live? (not (:finish-time-millis summary-data))}))))
 
+(defui fork-panel [{:keys [changed-nodes graph-data affected-nodes flow-nodes on-select-node on-remove-node-change on-execute-fork on-clear-fork]}]
+  (if (empty? changed-nodes)
+    ($ :div {:className "text-gray-500 text-center py-8"
+             :data-id "fork-empty-state"}
+       "No changes yet. Select a node to edit its input.")
+
+    ($ :div {:className "space-y-3"
+             :data-id "fork-content"}
+       ;; Changed nodes list
+       ($ :div {:data-id "changed-nodes-list"}
+          (for [[node-id new-input] changed-nodes]
+            (let [node-data (get graph-data node-id)
+                  node-name (:node node-data)
+                  is-overridden (contains? affected-nodes node-id)
+                  handle-select-node (fn [e]
+                                       (.stopPropagation e)
+                                       ;; Find the corresponding flow node and select it
+                                       (let [nodes (js->clj flow-nodes :keywordize-keys true)
+                                             target-node (->> nodes
+                                                              (filter #(= (-> % :data :node-id) node-id))
+                                                              first)]
+                                         (when (and target-node on-select-node)
+                                           (on-select-node node-id))))]
+
+              ($ :div {:key node-id
+                       :className (common/cn "border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow"
+                                             {"bg-yellow-50 border-yellow-300 hover:bg-yellow-100" is-overridden
+                                              "bg-gray-50 border-gray-200 hover:bg-gray-100" (not is-overridden)})
+                       :onClick handle-select-node}
+                 ($ :div {:className "flex justify-between items-start mb-2"}
+                    ($ :div
+                       ($ :div {:className "font-medium text-gray-800 text-sm flex items-center gap-2"}
+                          node-name)
+                       ($ :div {:className "text-xs text-gray-500 font-mono"} (str "ID: " node-id))
+                       (when is-overridden
+                         ($ :div {:className "bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded mt-1 font-medium"}
+                            "⚠️ This change will not be reached")))
+                    ($ :button {:className "cursor-pointer text-red-500 hover:text-red-700 text-sm"
+                                :onClick (fn [e]
+                                           (.stopPropagation e)
+                                           (when on-remove-node-change
+                                             (on-remove-node-change node-id)))}
+                       "Remove"))
+
+                 ($ :div {:className "text-xs"}
+                    ($ :div {:className "text-gray-600 mb-1"} "New input:")
+                    ($ :div {:className "bg-white p-2 rounded border font-mono text-gray-800 break-all"}
+                       (if (> (count new-input) 100)
+                         (str (subs new-input 0 100) "...")
+                         new-input)))))))
+
+       ;; Action buttons
+       ($ :div {:className "pt-4 border-t border-gray-200 space-y-2"
+                :data-id "fork-action-buttons"}
+          ($ :button {:className "w-full font-medium py-2 px-4 rounded-md transition-colors bg-blue-600 hover:bg-blue-700 text-white"
+                      :data-id "execute-fork-button"
+                      :onClick on-execute-fork}
+             (str "Execute Fork (" (count changed-nodes) " changes)"))
+          ($ :button {:className "w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors"
+                      :data-id "clear-fork-button"
+                      :onClick on-clear-fork}
+             "Clear All Changes")))))
+
 (defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live
                             module-id agent-name task-id forks fork-of invoke-id]}]
   (let [active-tab (state/use-sub [:ui :active-tab])]
@@ -924,67 +987,14 @@
             :feedback ($ feedback/feedback-list {:feedback-data (:feedback summary-data)
                                                  :module-id module-id})
 
-            :fork (if (empty? changed-nodes)
-                    ($ :div {:className "text-gray-500 text-center py-8"
-                             :data-id "fork-empty-state"}
-                       "No changes yet. Select a node to edit its input.")
-
-                    ($ :div {:className "space-y-3"
-                             :data-id "fork-content"}
-                       ;; Changed nodes list
-                       ($ :div {:data-id "changed-nodes-list"}
-                          (for [[node-id new-input] changed-nodes]
-                            (let [node-data (get graph-data node-id)
-                                  node-name (:node node-data)
-                                  is-overridden (contains? affected-nodes node-id)
-                                  handle-select-node (fn [e]
-                                                       (.stopPropagation e)
-                                                       ;; Find the corresponding flow node and select it
-                                                       (let [nodes (js->clj flow-nodes :keywordize-keys true)
-                                                             target-node (->> nodes
-                                                                              (filter #(= (-> % :data :node-id) node-id))
-                                                                              first)]
-                                                         (when (and target-node on-select-node)
-                                                           (on-select-node node-id))))]
-
-                              ($ :div {:key node-id
-                                       :className (common/cn "border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow"
-                                                             {"bg-yellow-50 border-yellow-300 hover:bg-yellow-100" is-overridden
-                                                              "bg-gray-50 border-gray-200 hover:bg-gray-100" (not is-overridden)})
-                                       :onClick handle-select-node}
-                                 ($ :div {:className "flex justify-between items-start mb-2"}
-                                    ($ :div
-                                       ($ :div {:className "font-medium text-gray-800 text-sm flex items-center gap-2"}
-                                          node-name)
-                                       ($ :div {:className "text-xs text-gray-500 font-mono"} (str "ID: " node-id))
-                                       (when is-overridden
-                                         ($ :div {:className "bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded mt-1 font-medium"}
-                                            "⚠️ This change will not be reached")))
-                                    ($ :button {:className "cursor-pointer text-red-500 hover:text-red-700 text-sm"
-                                                :onClick (fn [e]
-                                                           (.stopPropagation e)
-                                                           (when on-remove-node-change
-                                                             (on-remove-node-change node-id)))}
-                                       "Remove"))
-
-                                 ($ :div {:className "text-xs"}
-                                    ($ :div {:className "text-gray-600 mb-1"} "New input:")
-                                    ($ :div {:className "bg-white p-2 rounded border font-mono text-gray-800 break-all"}
-                                       (if (> (count new-input) 100)
-                                         (str (subs new-input 0 100) "...")
-                                         new-input)))))))
-
-                       ;; Action buttons
-                       ($ :div {:className "pt-4 border-t border-gray-200 space-y-2"
-                                :data-id "fork-action-buttons"}
-                          ($ :button {:className "w-full font-medium py-2 px-4 rounded-md transition-colors bg-blue-600 hover:bg-blue-700 text-white"
-                                      :data-id "execute-fork-button"
-                                      :onClick on-execute-fork}
-                             (str "Execute Fork (" (count changed-nodes) " changes)"))
-                          ($ :button {:className "w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors"
-                                      :data-id "clear-fork-button"
-                                      :onClick on-clear-fork}
-                             "Clear All Changes")))))))))
+            :fork ($ fork-panel {:changed-nodes changed-nodes
+                              :graph-data graph-data
+                              :affected-nodes affected-nodes
+                              :flow-nodes flow-nodes
+                              :on-select-node on-select-node
+                              :on-remove-node-change on-remove-node-change
+                              :on-execute-fork on-execute-fork
+                              :on-clear-fork on-clear-fork}))))))
 
 (defn process-graph-data
   "Applies Dagre layout to pre-processed nodes and edges."
