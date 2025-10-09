@@ -44,9 +44,10 @@
                  [ring-cors/ring-cors "0.1.13"]
                  [com.cognitect/transit-clj "1.0.333"]
                  [com.cognitect/transit-cljs "0.8.280"]]
-  :test-selectors {:default     (complement :integration)
-                   :integration :integration
-                   :all         (constantly true)}
+  :test-selectors
+  {:default (complement #(re-find #"^com\.rpl\.agent\-o\-rama\.ui" (str (ns-name %))))
+   :all     (constantly true)
+   :ui      #(re-find #"^com\.rpl\.agent\-o\-rama\.ui" (str (ns-name %)))}
   :global-vars {*warn-on-reflection* true}
   :repositories
   [["releases"

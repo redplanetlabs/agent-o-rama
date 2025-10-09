@@ -249,7 +249,7 @@
               (is (not
                    (e/visible? driver {:data-id "subagent-stats-list"}))))))))))
 
-(deftest ^:integration trace-analytics-with-model-calls-test
+(deftest trace-analytics-with-model-calls-test
   ;; Test trace analytics with model calls and token tracking
   (testing "Trace analytics with chat model mode"
     (when (System/getenv "OPENAI_API_KEY")
