@@ -16,7 +16,7 @@
    ["react" :refer [useState useCallback useEffect]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
    ["@dagrejs/dagre" :as Dagre]
-   ["@heroicons/react/24/outline" :refer [ExclamationTriangleIcon ArrowPathIcon ArrowTopRightOnSquareIcon]]))
+   ["@heroicons/react/24/outline" :refer [ExclamationTriangleIcon ArrowPathIcon ArrowTopRightOnSquareIcon PencilIcon XMarkIcon]]))
 
 (defui ExpandableContentModal [{:keys [title content]}]
   ($ :div.p-6.space-y-4
@@ -846,7 +846,15 @@
        ($ trace-analytics/info {:invoke-id invoke-id})
        ($ metadata-panel {:summary-data summary-data
                           :module-id module-id
-                          :agent-name agent-name}))))
+                          :agent-name agent-name
+                          :invoke-id invoke-id
+                          :on-change
+                          (fn []
+                            (state/dispatch [:invocation/start-graph-loading
+                                             {:invoke-id invoke-id
+                                              :module-id module-id
+                                              :agent-name agent-name}]))
+                          :is-live? (not (:finish-time-millis summary-data))}))))
 
 (defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live
                             module-id agent-name task-id forks fork-of invoke-id]}]
