@@ -56,10 +56,8 @@
                         :source-paths      ["src/clj"
                                             "src/cljs"
                                             "resource"
-                                            "examples/clj/src"
                                             "dev"]
-                        :test-paths        ["test/clj"
-                                            "examples/clj/test"]
+                        :test-paths        ["test/clj"]
                         :java-source-paths ["src/java" "test/java"]
                         :dependencies
                         [[org.clojure/clojure "1.12.0"]
@@ -72,6 +70,8 @@
                          [clj-test-containers/clj-test-containers "0.7.4"]
                          [org.testcontainers/testcontainers "1.20.4"]
                          [clj-kondo "2025.09.22"]]}
+             :examples {:test-paths   ["examples/clj/test"]
+                        :source-paths ["examples/clj/src"]}
              :provided {:dependencies
                         ;; TODO: fix Rama version
                         [[com.rpl/rama "0.0.6-SNAPSHOT"]
@@ -102,6 +102,7 @@
                          com.rpl.agent-o-rama.langchain4j
                          com.rpl.agent-o-rama.store
                          com.rpl.agent-o-rama.tools]}
+  :aliases {"test-all" ["with-profile" "+examples" "test"]}
   :plugins [[lein-exec "0.3.7"]
             [lein-codox "0.10.8"]
             [lein-doo "0.1.11"]])
