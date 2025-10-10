@@ -105,15 +105,15 @@
               ;; This validation runs only in dev builds (thanks to goog.DEBUG)
               ;; It checks the entire state tree after every single change.
               (when ^boolean js/goog.DEBUG
-                #_(try
-                    (s-core/validate schemas/AppDbSchema new-db)
-                    (catch :default e
-                      (println "🔥🔥 SCHEMA VALIDATION FAILED 🔥🔥")
-                      (println "Event that caused failure:" event)
-                      (println "Validation error details:" (ex-data e))
+                (try
+                  (s-core/validate schemas/AppDbSchema new-db)
+                  (catch :default e
+                    (println "🔥🔥 SCHEMA VALIDATION FAILED 🔥🔥")
+                    (println "Event that caused failure:" event)
+                    (println "Validation error details:" (ex-data e))
                     ;; For aggressive debugging, you can throw the error to halt execution
                     ;; (throw e)
-                      )))
+                    )))
               ;; <<< END: CENTRALIZED VALIDATION HOOK >>>
 
               ;; Atomically update the database
