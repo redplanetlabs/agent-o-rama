@@ -88,16 +88,18 @@
           ($ :div.flex.items-center.gap-4
              ;; Selector evaluator dropdown (show when any selector evaluator exists)
              (when (seq selector-eval-names)
-               ($ :div.w-64
-                  ($ common/Dropdown
-                     {:label "Selector Evaluator"
-                      :display-text (str "Highlighting: " (or active-selector "None"))
-                      :data-testid "selector-evaluator-dropdown"
-                      :items (for [eval-name selector-eval-names]
-                               {:key eval-name
-                                :label eval-name
-                                :selected? (= eval-name active-selector)
-                                :on-select #(set-selected-selector eval-name)})})))
+               ($ :div.flex.items-center.gap-2
+                  ($ :label.text-sm.font-medium.text-gray-700 "Highlighting:")
+                  ($ :div.w-48
+                     ($ common/Dropdown
+                        {:label "Selector Evaluator"
+                         :display-text (or active-selector "None")
+                         :data-testid "selector-evaluator-dropdown"
+                         :items (for [eval-name selector-eval-names]
+                                  {:key eval-name
+                                   :label eval-name
+                                   :selected? (= eval-name active-selector)
+                                   :on-select #(set-selected-selector eval-name)})}))))
              ;; Show full text checkbox
              ($ :label.flex.items-center.gap-2.text-sm.text-gray-600
                 ($ :input {:type "checkbox"

@@ -214,11 +214,11 @@ test.describe('Comparative Experiment Flow', () => {
     console.log('Verified: Row 3 - Output 3 is highlighted as winner.');
 
     // Verify Selector Evaluator Dropdown (Single Selector Case)
+    await expect(page.getByText('Highlighting:')).toBeVisible();
     const selectorDropdown = page.getByTestId('selector-evaluator-dropdown');
     await expect(selectorDropdown).toBeVisible();
-    await expect(selectorDropdown).toContainText('Highlighting:');
-    await expect(selectorDropdown).not.toContainText('Highlighting: None');
     await expect(selectorDropdown).toContainText(selectLongestEvaluator.name);
+    await expect(selectorDropdown).not.toContainText('None');
     console.log('Verified: Selector evaluator dropdown is visible even with only one selector.');
     
     // Verify dropdown only shows one selector evaluator
@@ -277,9 +277,9 @@ test.describe('Comparative Experiment Flow', () => {
     console.log('Re-run experiment completed.');
     
     // Verify Selector Evaluator Dropdown (Multiple Selectors Case)
+    await expect(page.getByText('Highlighting:')).toBeVisible();
     const multiSelectorDropdown = page.getByTestId('selector-evaluator-dropdown');
     await expect(multiSelectorDropdown).toBeVisible();
-    await expect(multiSelectorDropdown).toContainText('Highlighting:');
     console.log('Verified: Selector evaluator dropdown is visible with multiple selectors.');
     
     // Test switching between selector evaluators
