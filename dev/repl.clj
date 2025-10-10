@@ -26,13 +26,6 @@
   (aor/stop-ui)
   (close! ipc))
 
-(defn start-dev!
-  [ipc]
-  (shadow.cljs.devtools.server/start!)
-  (shadow/watch :dev)
-  (shadow/nrepl-select :dev)
-  (aor/start-ui ipc))
-
 (defn launch-for-playwright
   "playwright tests assume these modules are launched.
   unfortunately, research module needs OPENAI_API_KEY, and TAVILY_API_KEY in env

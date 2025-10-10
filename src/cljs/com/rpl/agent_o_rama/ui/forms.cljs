@@ -208,8 +208,12 @@
                              :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium "
                                              (if (not (:valid? form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
                     "Next")
-                 ($ :button {:type "button", :disabled (or (not (:valid? form)) (:submitting? form) (:error form)), :onClick (:submit! form)
-                             :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
+                 ($ :button
+                    {:type "button"
+                     :disabled (or (not (:valid? form)) (:submitting? form) (:error form))
+                     :onClick (:submit! form)
+                     :data-id "form-submit"
+                     :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
                                              (if (or (not (:valid? form)) (:submitting? form) (:error form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
                     (when (:submitting? form) ($ common/spinner {:size :medium}))
                     (:submit-text modal-data "Submit")))))))))
@@ -258,7 +262,8 @@
 
              ;; Wrap component in proper scrollable container
              (when (:component data)
-               ($ :div {:className "flex-1 min-h-0 overflow-y-auto"}
+               ($ :div {:className "flex-1 min-h-0 overflow-y-auto"
+                        :data-id "form-container"}
                   (:component data)))))
        (.-body js/document)))))
 

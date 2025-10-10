@@ -167,6 +167,7 @@
          ($ :<>
             ($ :div.bg-white.shadow.overflow-hidden.sm:rounded-md.mb-4
                ($ :table.min-w-full.divide-y.divide-gray-200
+                  {:data-id "action-log-table"}
                   ($ :thead.bg-gray-50
                      ($ :tr
                         ($ :th.px-4.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase "Start Time")

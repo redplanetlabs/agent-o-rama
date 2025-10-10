@@ -75,25 +75,34 @@
   "Select an action from the dropdown"
   [driver action-name]
   (e/wait-visible driver {:data-id :action-selector} {:timeout 5})
-  (e/click driver {:data-id :action-selector})
+  (eth/scroll driver "action-selector")
+  ;; (e/click driver {:data-id :action-selector})
   (Thread/sleep 200)
   (e/click driver {:tag :option :fn/has-text action-name}))
 
 (defn- click-save-button
   "Click the Save button in the modal"
   [driver]
-  (e/wait-visible driver {:tag :button :fn/has-text "Add Rule"} {:timeout 5})
-  (e/scroll-query
-   driver
-   {:tag :button :fn/has-text "Add Rule"}
-   {"behavior" "instant"})
-  (e/click driver {:tag :button :fn/has-text "Add Rule"}))
+  (e/wait-visible driver {:data-id "form-submit" :tag :button :fn/has-text "Add Rule"} {:timeout 5})
+  (do #_#_let [container (e/query {:data-id "form-container"})]
+      (e/scroll-query
+       driver
+       {:tag :button :fn/has-text "Add Rule"}
+       {"behavior" "instant"}))
+  (e/click driver {:data-id "form-submit" :tag :button :fn/has-text "Add Rule"}))
 
 (defn- click-delete-rule
   "Click the delete button for a specific rule"
   [driver rule-name]
-  (let [row (e/query driver {:tag :tr :fn/has-text rule-name})]
-    (e/click driver (e/child row {:tag :button :fn/has-class "hover:text-red-600"}))))
+  (e/scroll driver {:tag :tr :fn/has-string rule-name})
+  (let [row    (e/query driver {:tag :tr :fn/has-string rule-name})
+        button (e/query-from
+                driver
+                row
+                {:tag :button :fn/has-class "hover:text-red-600"})]
+    (is row)
+    (is button)
+    (e/click-el driver button)))
 
 (defn- confirm-delete
   "Confirm the delete action in the browser alert"
@@ -103,13 +112,15 @@
 (defn- click-view-log
   "Click the 'View Log' link for a specific rule"
   [driver rule-name]
-  (let [row (e/query driver {:tag :tr :fn/has-text rule-name})]
-    (e/click driver (e/child row {:tag :a :fn/has-text "View Log"}))))
+  (e/scroll driver {:tag :tr :fn/has-string rule-name})
+  (let [row  (e/query driver {:tag :tr :fn/has-string rule-name})
+        link (e/query-from driver row {:tag :a :fn/has-string "View"})]
+    (e/click-el driver link)))
 
 (defn- wait-for-action-log-entries
   "Wait for action log entries to appear"
   [driver]
-  (e/wait-visible driver {:tag :table} {:timeout 10})
+  (eth/wait-visible driver "action-log-table")
   (Thread/sleep 500))
 
 (defn- count-action-log-entries
@@ -127,6 +138,7 @@
     [system RulesTestAgentModule {:post-deploy-hook (post-deploy-hook {})}]
     (eth/with-webdriver [system driver]
       (e/with-postmortem driver {:dir "target/etaoin"}
+        (System/gc)
         (testing "add a new rule"
           (let [env @system]
             (navigate-to-rules-page driver env)
@@ -142,6 +154,7 @@
               (wait-for-rules-table driver)
 
               (testing "rule appears in table"
+                (e/wait-exists driver {:tag :td :fn/text "test-rule-1"})
                 (is (rule-exists? driver "test-rule-1"))
                 (is (= (inc initial-count) (count-table-rows driver)))))))
 
@@ -158,7 +171,8 @@
 
                 (testing "rule is removed from table"
                   (is (not (rule-exists? driver "test-rule-1")))
-                  (is (= (dec initial-count) (count-table-rows driver))))))))))))
+                  (is (= (dec initial-count)
+                         (count-table-rows driver))))))))))))
 
 (deftest ^:integration action-log-test
   ;; Test that rules execute and actions appear in the action log
@@ -166,39 +180,23 @@
     [system RulesTestAgentModule {:post-deploy-hook (post-deploy-hook {})}]
     (eth/with-webdriver [system driver]
       (e/with-postmortem driver {:dir "target/etaoin"}
+        (System/gc)
         (testing "rule execution generates action log entries"
           (let [env     @system
                 manager (aor/agent-manager (:ipc env) (:module-name env))
-                agent   (aor/agent-client manager "RulesTestAgent")
-                global-actions-depot (:global-actions-depot (aor-types/underlying-objects manager))]
+                agent   (aor/agent-client manager "RulesTestAgent")]
 
-            (ana/add-rule!
-             global-actions-depot
-             "test-success-rule"
-             "RulesTestAgent"
-             {:node-name         nil
-              :action-name       "logging-action"
-              :action-params     {}
-              :filter            (aor-types/->AndFilter [])
-              :sampling-rate     1.0
-              :start-time-millis 0
-              :status-filter     :success})
+            (let [invoke (aor/agent-initiate agent {"mode" "success"})]
+              (aor/agent-result agent invoke))
 
-            (Thread/sleep 2000)
-
-            (let [invoke (aor/agent-initiate agent {"mode" "success" "input" "test"})]
-              @(aor/agent-result-async agent invoke))
-
-            (Thread/sleep 2000)
+            (Thread/sleep 5000)
 
             (navigate-to-rules-page driver env)
-            (click-view-log driver "test-success-rule")
+            (click-view-log driver "success-rule")
             (wait-for-action-log-entries driver)
 
             (testing "action log contains entries"
-              (is (>= (count-action-log-entries driver) 1)))
-
-            (ana/delete-rule! global-actions-depot "RulesTestAgent" "test-success-rule")))))))
+              (is (>= (count-action-log-entries driver) 1)))))))))
 
 (deftest ^:integration multiple-filter-types-test
   ;; Test rules with different filter types
@@ -206,46 +204,19 @@
     [system RulesTestAgentModule {:post-deploy-hook (post-deploy-hook {})}]
     (eth/with-webdriver [system driver]
       (e/with-postmortem driver {:dir "target/etaoin"}
+        (System/gc)
         (testing "rules with different filters execute correctly"
           (let [env     @system
                 manager (aor/agent-manager (:ipc env) (:module-name env))
-                agent   (aor/agent-client manager "RulesTestAgent")
-                global-actions-depot (:global-actions-depot (aor-types/underlying-objects manager))]
-
-            (ana/add-rule!
-             global-actions-depot
-             "error-filter-rule"
-             "RulesTestAgent"
-             {:node-name         nil
-              :action-name       "counting-action"
-              :action-params     {}
-              :filter            (aor-types/->ErrorFilter)
-              :sampling-rate     1.0
-              :start-time-millis 0
-              :status-filter     :all})
-
-            (ana/add-rule!
-             global-actions-depot
-             "latency-filter-rule"
-             "RulesTestAgent"
-             {:node-name         nil
-              :action-name       "counting-action"
-              :action-params     {}
-              :filter            (aor-types/->LatencyFilter
-                                  (aor-types/->ComparatorSpec :gte 500))
-              :sampling-rate     1.0
-              :start-time-millis 0
-              :status-filter     :success})
-
-            (Thread/sleep 2000)
+                agent   (aor/agent-client manager "RulesTestAgent")]
 
             (testing "error filter triggers on error"
               (try
-                (let [invoke (aor/agent-initiate agent {"mode" "error" "input" "test"})]
-                  @(aor/agent-result-async agent invoke))
+                (let [invoke (aor/agent-initiate agent {"mode" "error"})]
+                  (aor/agent-result agent invoke))
                 (catch Exception _))
 
-              (Thread/sleep 2000)
+              (Thread/sleep 5000)
 
               (navigate-to-rules-page driver env)
               (click-view-log driver "error-filter-rule")
@@ -254,19 +225,16 @@
               (is (>= (count-action-log-entries driver) 1)))
 
             (testing "latency filter triggers on slow execution"
-              (let [invoke (aor/agent-initiate agent {"mode" "slow" "input" "test"})]
+              (let [invoke (aor/agent-initiate agent {"mode" "slow"})]
                 @(aor/agent-result-async agent invoke))
 
-              (Thread/sleep 2000)
+              (Thread/sleep 5000)
 
               (navigate-to-rules-page driver env)
-              (click-view-log driver "latency-filter-rule")
+              (click-view-log driver "latency-rule")
               (wait-for-action-log-entries driver)
 
-              (is (>= (count-action-log-entries driver) 1)))
-
-            (ana/delete-rule! global-actions-depot "RulesTestAgent" "error-filter-rule")
-            (ana/delete-rule! global-actions-depot "RulesTestAgent" "latency-filter-rule")))))))
+              (is (>= (count-action-log-entries driver) 1)))))))))
 
 (deftest ^:integration node-specific-rules-test
   ;; Test node-specific vs agent-level rules
@@ -274,48 +242,20 @@
     [system RulesTestAgentModule {:post-deploy-hook (post-deploy-hook {})}]
     (eth/with-webdriver [system driver]
       (e/with-postmortem driver {:dir "target/etaoin"}
+        (System/gc)
         (testing "node-specific rules only trigger on specified node"
           (let [env     @system
                 manager (aor/agent-manager (:ipc env) (:module-name env))
                 agent   (aor/agent-client manager "RulesTestAgent")
-                global-actions-depot (:global-actions-depot (aor-types/underlying-objects manager))]
+                invoke  (aor/agent-initiate agent {"mode" "node-specific"})]
 
-            (ana/add-rule!
-             global-actions-depot
-             "agent-level-rule"
-             "RulesTestAgent"
-             {:node-name         nil
-              :action-name       "logging-action"
-              :action-params     {}
-              :filter            (aor-types/->AndFilter [])
-              :sampling-rate     1.0
-              :start-time-millis 0
-              :status-filter     :success})
+            (aor/agent-result agent invoke)
 
-            (ana/add-rule!
-             global-actions-depot
-             "node-specific-rule"
-             "RulesTestAgent"
-             {:node-name         "process-node"
-              :action-name       "logging-action"
-              :action-params     {}
-              :filter            (aor-types/->AndFilter [])
-              :sampling-rate     1.0
-              :start-time-millis 0
-              :status-filter     :success})
-
-            (Thread/sleep 2000)
-
-            (let [invoke (aor/agent-initiate
-                          agent
-                          {"mode" "node-specific" "input" "test"})]
-              @(aor/agent-result-async agent invoke))
-
-            (Thread/sleep 2000)
+            (Thread/sleep 5000)
 
             (testing "agent-level rule triggers"
               (navigate-to-rules-page driver env)
-              (click-view-log driver "agent-level-rule")
+              (click-view-log driver "success-rule")
               (wait-for-action-log-entries driver)
               (is (>= (count-action-log-entries driver) 1)))
 
@@ -323,16 +263,7 @@
               (navigate-to-rules-page driver env)
               (click-view-log driver "node-specific-rule")
               (wait-for-action-log-entries driver)
-              (is (>= (count-action-log-entries driver) 1)))
-
-            (ana/delete-rule!
-             global-actions-depot
-             "RulesTestAgent"
-             "agent-level-rule")
-            (ana/delete-rule!
-             global-actions-depot
-             "RulesTestAgent"
-             "node-specific-rule")))))))
+              (is (>= (count-action-log-entries driver) 1)))))))))
 
 (deftest ^:integration token-count-filter-test
   ;; Test token-count filter with actual model calls
@@ -342,25 +273,19 @@
         [system RulesTestAgentModule {:post-deploy-hook (post-deploy-hook {})}]
         (eth/with-webdriver [system driver]
           (e/with-postmortem driver {:dir "target/etaoin"}
+            (System/gc)
             (let [env     @system
                   manager (aor/agent-manager (:ipc env) (:module-name env))
                   agent   (aor/agent-client manager "RulesTestAgent")
-                  global-actions-depot (:global-actions-depot
-                                        (aor-types/underlying-objects manager))
                   invoke  (aor/agent-initiate
                            agent
                            {"mode" "chat" "input" "Say hello"})]
               (aor/agent-result agent invoke)
 
-              (Thread/sleep 2000)
+              (Thread/sleep 5000)
 
               (testing "token-count filter triggers on model calls"
                 (navigate-to-rules-page driver env)
                 (click-view-log driver "token-count-rule")
                 (wait-for-action-log-entries driver)
-                (is (>= (count-action-log-entries driver) 1)))
-
-              (ana/delete-rule!
-               global-actions-depot
-               "RulesTestAgent"
-               "token-count-rule"))))))))
+                (is (>= (count-action-log-entries driver) 1))))))))))
