@@ -72,7 +72,7 @@ export async function createEvaluator(page, { name, builderName, description, pa
 
   const modal = page.locator('[role="dialog"]');
   await expect(modal).toBeVisible();
-  await modal.getByText(builderName).click();
+  await modal.getByText(builderName, { exact: true }).click();
   await expect(modal.getByLabel('Name')).toBeVisible();
 
   await modal.getByLabel('Name').fill(name);
