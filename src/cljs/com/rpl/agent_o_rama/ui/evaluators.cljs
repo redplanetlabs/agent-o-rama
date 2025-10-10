@@ -298,7 +298,9 @@
              (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
              (state/dispatch [:modal/hide])
              (let [decoded-module-id (when module-id (common/url-decode module-id))]
-               (state/dispatch [:query/invalidate {:query-key-pattern [:evaluator-instances decoded-module-id]}]))
+               (state/dispatch [:query/invalidate
+                                {:query-key-pattern
+                                 [:evaluator-instances decoded-module-id]}]))
              (state/dispatch [:form/clear form-id]))
            (do
              (println "Setting error and stopping spinner in form:" (:error reply) form-id)
@@ -552,7 +554,10 @@
         ;; Update the query to use the debounced search term and type filter
         {:keys [data loading? error refetch]}
         (queries/use-sente-query
-         {:query-key [:evaluator-instances module-id debounced-search-term selected-type]
+         {:query-key [:evaluator-instances
+                      module-id
+                      debounced-search-term
+                      selected-type]
           :sente-event [:evaluators/get-all-instances
                         {:module-id module-id
                          :filters (cond-> {}
