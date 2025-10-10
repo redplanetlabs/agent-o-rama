@@ -82,3 +82,20 @@
           "should include ≤")
       (is (some #(= :>= (:value %)) fb/COMPARATORS)
           "should include ≥"))))
+
+(deftest filter-initialization-test
+  ;; Tests that filter types are initialized with correct default values
+  (testing "filter initialization"
+    (testing "InputMatchFilter has prefilled values"
+      (let [filter-value {:type :input-match :json-path "$" :regex ".*"}]
+        (is (= "$" (:json-path filter-value))
+            "json-path should be prefilled with $")
+        (is (= ".*" (:regex filter-value))
+            "regex should be prefilled with .*")))
+
+    (testing "OutputMatchFilter has prefilled values"
+      (let [filter-value {:type :output-match :json-path "$" :regex ".*"}]
+        (is (= "$" (:json-path filter-value))
+            "json-path should be prefilled with $")
+        (is (= ".*" (:regex filter-value))
+            "regex should be prefilled with .*")))))

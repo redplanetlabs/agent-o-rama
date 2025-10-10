@@ -241,8 +241,8 @@
                                      new-filter (case new-type
                                                   :error {:type :error}
                                                   :latency {:type :latency :comparator := :value 0}
-                                                  :input-match {:type :input-match :json-path "" :regex ""}
-                                                  :output-match {:type :output-match :json-path "" :regex ""}
+                                                  :input-match {:type :input-match :json-path "$" :regex ".*"}
+                                                  :output-match {:type :output-match :json-path "$" :regex ".*"}
                                                   :token-count {:type :token-count :token-type :total :comparator-spec {:comparator := :value 0}}
                                                   :feedback {:type :feedback :rule-name "" :feedback-key "" :comparator-spec {:comparator := :value ""}}
                                                   :and {:type :and :filters []}
