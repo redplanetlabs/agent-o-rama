@@ -10,15 +10,32 @@
    [com.rpl.agent-o-rama.ui.experiments.regular-detail :as regular-detail]
    [reitit.frontend.easy :as rfe]))
 
-(defn find-winner-index
-  "Find the winning target index from evaluator results.
-   Returns the first evaluator result that contains an 'index' key.
+(defn find-all-selector-evaluators
+  "Find all evaluators that return an 'index' key.
+   Returns a map of evaluator-name -> index value.
    Checks both keyword and string keys since data may come from JSON."
   [evals]
-  (some (fn [[_eval-name metrics]]
-          (or (get metrics "index")
-              (get metrics :index)))
-        evals))
+  (into {}
+        (keep (fn [[eval-name metrics]]
+                (when-let [idx (or (get metrics "index")
+                                   (get metrics :index))]
+                  [eval-name idx]))
+              evals)))
+
+(defn find-winner-index
+  "Find the winning target index from a specific evaluator's results.
+   If evaluator-name is provided, returns the index from that evaluator.
+   Otherwise, returns the first evaluator result that contains an 'index' key."
+  ([evals] (find-winner-index evals nil))
+  ([evals evaluator-name]
+   (if evaluator-name
+     (let [metrics (get evals evaluator-name)]
+       (or (get metrics "index")
+           (get metrics :index)))
+     (some (fn [[_eval-name metrics]]
+             (or (get metrics "index")
+                 (get metrics :index)))
+           evals))))
 
 (defn filter-non-selector-evals
   "Filter out evaluators that have an 'index' key (selector evaluators).
@@ -36,6 +53,16 @@
         num-targets (count targets)
         results (vals (:results data))
 
+        ;; Find all selector evaluators across all results
+        all-selector-evals (reduce (fn [acc run]
+                                     (merge acc (find-all-selector-evaluators (:evals run))))
+                                   {}
+                                   results)
+        selector-eval-names (keys all-selector-evals)
+
+        ;; State for selected selector evaluator
+        [selected-selector set-selected-selector] (uix/use-state (first selector-eval-names))
+
         ;; Collect all evaluator metrics for metadata
         all-evals (reduce (fn [acc run]
                             (merge-with merge acc (filter-non-selector-evals (:evals run))))
@@ -46,12 +73,26 @@
     ($ :div
        ($ :div.flex.justify-between.items-center.mb-4
           ($ :h3.text-xl.font-bold "Comparative Results")
-          ($ :label.flex.items-center.gap-2.text-sm.text-gray-600
-             ($ :input {:type "checkbox"
-                        :checked show-full-text?
-                        :onChange on-toggle-full-text
-                        :className "rounded"})
-             "Show full text"))
+          ($ :div.flex.items-center.gap-4
+             ;; Selector evaluator dropdown (show when any selector evaluator exists)
+             (when (seq selector-eval-names)
+               ($ :div.w-64
+                  ($ common/Dropdown
+                     {:label "Selector Evaluator"
+                      :display-text (str "Highlighting: " (or selected-selector "None"))
+                      :data-testid "selector-evaluator-dropdown"
+                      :items (for [eval-name selector-eval-names]
+                               {:key eval-name
+                                :label eval-name
+                                :selected? (= eval-name selected-selector)
+                                :on-select #(set-selected-selector eval-name)})})))
+             ;; Show full text checkbox
+             ($ :label.flex.items-center.gap-2.text-sm.text-gray-600
+                ($ :input {:type "checkbox"
+                           :checked show-full-text?
+                           :onChange on-toggle-full-text
+                           :className "rounded"})
+                "Show full text")))
 
        (if (empty? results)
          ($ :div.text-center.py-8.text-gray-500.bg-gray-50.rounded-lg
@@ -70,7 +111,7 @@
                      ($ :th {:className (:th common/table-classes)} "Evals")))
                ($ :tbody
                   (for [[idx run] (map-indexed vector results)]
-                    (let [winning-index (find-winner-index (:evals run))
+                    (let [winning-index (find-winner-index (:evals run) selected-selector)
                           non-selector-evals (filter-non-selector-evals (:evals run))]
                       ($ :tr.border-b {:key (str (:example-id run) "-" idx)}
                          ;; Input Cell
@@ -95,7 +136,7 @@
                                  is-winner? (and winning-index (= i winning-index))]
                              ($ :td {:key (str "output-" i)
                                      :className (common/cn (:td common/table-classes)
-                                                           {"bg-green-50" is-winner?})}
+                                                           {"bg-green-50 border-2 border-green-400" is-winner?})}
                                 (if agent-result
                                   (if (:failure? (:result agent-result))
                                     ($ :div.space-y-2
