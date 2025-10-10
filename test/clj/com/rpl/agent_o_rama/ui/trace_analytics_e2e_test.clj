@@ -13,7 +13,7 @@
 
 (deftest ^:integration conditional-rendering-test
   ;; Test conditional rendering of stat sections based on available data
-  (eth/with-system [TraceAnalyticsTestAgentModule]
+  (eth/with-system [system TraceAnalyticsTestAgentModule]
     (eth/with-webdriver [system driver]
       (testing "basic mode shows only execution time"
         (let [env     @system
@@ -21,7 +21,7 @@
               agent   (aor/agent-client manager "TraceTestAgent")
               invoke  (aor/agent-initiate agent {"mode" "basic"})]
 
-          @(aor/agent-result-async agent invoke)
+          (aor/agent-result agent invoke)
 
           (e/with-postmortem driver {:dir "target/etaoin"}
             (let [trace-url (eth/agent-invoke-url env "TraceTestAgent" invoke)]
@@ -115,7 +115,7 @@
 
 (deftest ^:integration dropdown-toggle-test
   ;; Test dropdown expand/collapse functionality
-  (eth/with-system [TraceAnalyticsTestAgentModule]
+  (eth/with-system [system TraceAnalyticsTestAgentModule]
     (eth/with-webdriver [system driver]
       (testing "node-stats dropdown toggles correctly"
         (let [env     @system
@@ -253,7 +253,7 @@
   ;; Test trace analytics with model calls and token tracking
   (testing "Trace analytics with chat model mode"
     (when (System/getenv "OPENAI_API_KEY")
-      (eth/with-system [TraceAnalyticsTestAgentModule]
+      (eth/with-system [system TraceAnalyticsTestAgentModule]
         (eth/with-webdriver [system driver]
           (testing "chat mode shows model-calls and tokens sections"
             (let [env     @system

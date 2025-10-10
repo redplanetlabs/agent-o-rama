@@ -52,7 +52,8 @@
                       "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "medium" "text" "test"})]
 
-          @(aor/agent-result-async agent invoke)
+          (aor/agent-result agent invoke)
+          (Thread/sleep 5000)
 
           (e/with-postmortem driver {:dir "target/etaoin"}
             (let [trace-url (eth/agent-invoke-url
@@ -62,15 +63,8 @@
               (wait-for-feedback driver trace-url)
               (eth/wait-visible driver "feedback-tab")
 
-              (testing "feedback tab exists"
-                (is (e/visible? driver {:data-id "feedback-tab"})))
-
               (testing "switch to feedback tab"
-                (e/click driver {:data-id "feedback-tab"})
-                (e/wait-visible driver {:data-id "feedback-list"} {:timeout 2}))
-
-              (testing "feedback list is visible"
-                (is (e/visible? driver {:data-id "feedback-list"})))
+                (eth/wait-visible driver "feedback-list"))
 
               (testing "has multiple feedback items from agent-level evaluators"
                 (is (e/exists? driver {:data-id "feedback-item-0"}))

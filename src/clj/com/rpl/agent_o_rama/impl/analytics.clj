@@ -42,7 +42,7 @@
 (def ^:dynamic ACTION-HELPERS)
 (defn declared-objects ^AgentDeclaredObjectsTaskGlobal [] (:declared-objects ACTION-HELPERS))
 (defn rama-clients ^RamaClientsTaskGlobal [] (:rama-clients ACTION-HELPERS))
-(defn random-task-id [] (rand-int (:num-tasks ACTION-HELPERS)))
+(defn random-task-id [] (long (rand-int (:num-tasks ACTION-HELPERS))))
 
 
 (defn get-num-tasks

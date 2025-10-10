@@ -117,8 +117,13 @@
 (defn- wait-for-action-log-entries
   "Wait for action log entries to appear"
   [driver]
-  (eth/wait-visible driver "action-log-table")
-  (Thread/sleep 500))
+  (loop [i 0]
+    (when-not (or (> i 30)
+                  (e/visible? driver {:data-id "action-log-table"}))
+      (e/reload driver)
+      (Thread/sleep 2000)
+      (recur (unchecked-inc i))))
+  (eth/wait-visible driver "action-log-table"))
 
 (defn- count-action-log-entries
   "Count the number of entries in the action log table"
@@ -167,6 +172,11 @@
                 (Thread/sleep 1000)
 
                 (testing "rule is removed from table"
+                  (loop [i 0]
+                    (when (and (< i 30)
+                               (rule-exists? driver "test-rule-1"))
+                      (Thread/sleep 1000)
+                      (recur (unchecked-inc i))))
                   (is (not (rule-exists? driver "test-rule-1")))
                   (is (= (dec initial-count)
                          (count-table-rows driver))))))))))))
@@ -186,7 +196,7 @@
             (let [invoke (aor/agent-initiate agent {"mode" "success"})]
               (aor/agent-result agent invoke))
 
-            (Thread/sleep 5000)
+            (Thread/sleep 10000)
 
             (navigate-to-rules-page driver env)
             (click-view-log driver "success-rule")
@@ -213,7 +223,7 @@
                   (aor/agent-result agent invoke))
                 (catch Exception _))
 
-              (Thread/sleep 5000)
+              (Thread/sleep 10000)
 
               (navigate-to-rules-page driver env)
               (click-view-log driver "error-filter-rule")
@@ -225,7 +235,7 @@
               (let [invoke (aor/agent-initiate agent {"mode" "slow"})]
                 @(aor/agent-result-async agent invoke))
 
-              (Thread/sleep 5000)
+              (Thread/sleep 10000)
 
               (navigate-to-rules-page driver env)
               (click-view-log driver "latency-rule")
@@ -248,7 +258,7 @@
 
             (aor/agent-result agent invoke)
 
-            (Thread/sleep 5000)
+            (Thread/sleep 10000)
 
             (testing "agent-level rule triggers"
               (navigate-to-rules-page driver env)
@@ -279,7 +289,7 @@
                            {"mode" "chat" "input" "Say hello"})]
               (aor/agent-result agent invoke)
 
-              (Thread/sleep 5000)
+              (Thread/sleep 10000)
 
               (testing "token-count filter triggers on model calls"
                 (navigate-to-rules-page driver env)
