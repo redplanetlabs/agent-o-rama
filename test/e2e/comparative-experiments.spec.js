@@ -245,7 +245,7 @@ test.describe('Comparative Experiment Flow', () => {
     
     // Click Re-run Experiment button
     await page.getByRole('button', { name: 'Re-run Experiment' }).click();
-    const rerunModal = page.locator('[role="dialog"]').filter({ hasText: 'Run Comparative Experiment' });
+    const rerunModal = page.locator('[role="dialog"]').filter({ hasText: 'Run Experiment' });
     await expect(rerunModal).toBeVisible();
     console.log('Re-run modal opened with pre-filled form state.');
     
