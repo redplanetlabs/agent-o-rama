@@ -9,12 +9,16 @@
 
 (def ^:private default-timeout 120)
 
+(defonce system (volatile! nil))
+;; (eth/teardown-system system)
+;; (vreset! system nil)
+
 (deftest ^:integration conditional-rendering-test
   ;; Test conditional rendering of stat sections based on available data
   (helpers/with-system [TraceAnalyticsTestAgentModule]
-    (helpers/with-webdriver [driver]
+    (helpers/with-webdriver [system driver]
       (testing "basic mode shows only execution time"
-        (let [env     @helpers/system
+        (let [env     @system
               manager (aor/agent-manager (:ipc env) (:module-name env))
               agent   (aor/agent-client manager "TraceTestAgent")
               invoke  (aor/agent-initiate agent {"mode" "basic"})]
@@ -38,7 +42,7 @@
                 (is (not (e/exists? driver {:data-id "other-operations"}))))))))
 
       (testing "db mode shows db-operations section"
-        (let [env     @helpers/system
+        (let [env     @system
               manager (aor/agent-manager (:ipc env) (:module-name env))
               agent   (aor/agent-client manager "TraceTestAgent")
               invoke  (aor/agent-initiate agent {"mode" "db"})]
@@ -62,7 +66,7 @@
               (is (not (e/exists? driver {:data-id "tokens"})))))))
 
       (testing "store mode shows store-operations section"
-        (let [env     @helpers/system
+        (let [env     @system
               manager (aor/agent-manager (:ipc env) (:module-name env))
               agent   (aor/agent-client manager "TraceTestAgent")
               invoke  (aor/agent-initiate agent {"mode" "store"})]
@@ -90,7 +94,7 @@
                 (is (not (e/exists? driver {:data-id "tokens"}))))))))
 
       (testing "other mode shows other-operations section"
-        (let [env     @helpers/system
+        (let [env     @system
               manager (aor/agent-manager (:ipc env) (:module-name env))
               agent   (aor/agent-client manager "TraceTestAgent")
               invoke  (aor/agent-initiate agent {"mode" "other"})]
@@ -114,9 +118,9 @@
 (deftest ^:integration dropdown-toggle-test
   ;; Test dropdown expand/collapse functionality
   (helpers/with-system [TraceAnalyticsTestAgentModule]
-    (helpers/with-webdriver [driver]
+    (helpers/with-webdriver [system driver]
       (testing "node-stats dropdown toggles correctly"
-        (let [env     @helpers/system
+        (let [env     @system
               manager (aor/agent-manager (:ipc env) (:module-name env))
               agent   (aor/agent-client manager "TraceTestAgent")
               invoke  (aor/agent-initiate agent {"mode" "basic"})]
@@ -152,7 +156,7 @@
                      (e/visible? driver {:data-id "node-stats-list"}))))))))
 
       (testing "other-operations dropdown toggles correctly"
-        (let [env     @helpers/system
+        (let [env     @system
               manager (aor/agent-manager (:ipc env) (:module-name env))
               agent   (aor/agent-client manager "TraceTestAgent")
               invoke  (aor/agent-initiate agent {"mode" "other"})]
@@ -189,7 +193,7 @@
                      (e/visible? driver {:data-id "other-operations-list"}))))))))
 
       (testing "subagent-stats dropdown toggles correctly"
-        (let [env     @helpers/system
+        (let [env     @system
               manager (aor/agent-manager (:ipc env) (:module-name env))
               agent   (aor/agent-client manager "TraceTestAgent")
               invoke  (aor/agent-initiate agent {"mode" "sub-agent"})]
@@ -252,9 +256,9 @@
   (testing "Trace analytics with chat model mode"
     (when (System/getenv "OPENAI_API_KEY")
       (helpers/with-system [TraceAnalyticsTestAgentModule]
-        (helpers/with-webdriver [driver]
+        (helpers/with-webdriver [system driver]
           (testing "chat mode shows model-calls and tokens sections"
-            (let [env     @helpers/system
+            (let [env     @system
                   manager (aor/agent-manager (:ipc env) (:module-name env))
                   agent   (aor/agent-client manager "TraceTestAgent")
                   invoke  (aor/agent-initiate agent
