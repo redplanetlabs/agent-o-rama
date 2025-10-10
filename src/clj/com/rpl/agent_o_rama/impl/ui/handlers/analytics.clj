@@ -67,14 +67,21 @@
       nil)))
 
 (defmethod sente/-event-msg-handler :analytics/fetch-rules
-  [{:keys [manager decoded-agent-name names-only?]} uid]
+  [{:keys [manager decoded-agent-name names-only? filter-by-action]} uid]
   (when manager
     (let [agent-client (aor/agent-client manager decoded-agent-name)
           agent-rules-pstate (:agent-rules-pstate
                               (aor-types/underlying-objects agent-client))
-          rules (ana/fetch-agent-rules agent-rules-pstate)]
+          rules (ana/fetch-agent-rules agent-rules-pstate)
+          filtered-rules (if filter-by-action
+                           (into {}
+                                 (filter (fn [[_rule-name rule-info]]
+                                           (= filter-by-action
+                                              (get-in rule-info [:definition :action-name])))
+                                         rules))
+                           rules)]
       (if names-only?
-        (vec (keys rules))
+        (vec (keys filtered-rules))
         (into {}
               (map (fn [[rule-name rule-info]]
                      (let [definition (:definition rule-info)]
@@ -86,7 +93,7 @@
                               :action-params :filter :sampling-rate
                               :start-time-millis :status-filter])
                             (update :filter filter->ui))]))
-                   rules))))))
+                   filtered-rules))))))
 
 (defn ui-comparator-spec->comparator-spec
   "Convert a UI comparator spec map to a ComparatorSpec record."

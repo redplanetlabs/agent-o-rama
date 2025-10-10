@@ -122,7 +122,10 @@
        (when (and module-id agent-name)
          (set-loading! true)
          (sente/request!
-          [:analytics/fetch-rules {:module-id module-id :agent-name agent-name :names-only? true}]
+          [:analytics/fetch-rules {:module-id module-id
+                                    :agent-name agent-name
+                                    :names-only? true
+                                    :filter-by-action "aor/eval"}]
           5000
           (fn [reply]
             (set-loading! false)
