@@ -167,6 +167,13 @@
                             new-val (extract-value new-db)]
                         (when (not= old-val new-val)
                           (set-value new-val)))))
+
+         ;; Sync with current state immediately after adding watch
+         ;; This handles race conditions where the state changed between initial render and effect
+         (let [current-value (extract-value @app-db)]
+           (when (not= value current-value)
+             (set-value current-value)))
+
          ;; Cleanup function
          (fn []
            (remove-watch app-db watch-key))))

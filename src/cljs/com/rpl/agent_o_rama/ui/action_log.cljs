@@ -141,14 +141,19 @@
 
     (uix/use-effect
      (fn []
-       (when connected?
+       (when (and connected? module-id agent-name rule-name)
          (fetch-actions nil false))
        js/undefined)
-     [fetch-actions connected?])
+     [fetch-actions connected? module-id agent-name rule-name])
 
     ($ :div.p-6
 
        (cond
+         (not (and module-id agent-name rule-name))
+         ($ :div.flex.justify-center.items-center.py-8
+            ($ :div.text-gray-500 "Loading page...")
+            ($ common/spinner {:size :medium}))
+
          (and loading? (empty? actions))
          ($ :div.flex.justify-center.items-center.py-8
             ($ :div.text-gray-500 "Loading action log...")
