@@ -136,7 +136,7 @@
                                  is-winner? (and winning-index (= i winning-index))]
                              ($ :td {:key (str "output-" i)
                                      :className (common/cn (:td common/table-classes)
-                                                           {"bg-green-50 border-2 border-green-400" is-winner?})}
+                                                           {"bg-green-50" is-winner?})}
                                 (if agent-result
                                   (if (:failure? (:result agent-result))
                                     ($ :div.space-y-2
