@@ -37,7 +37,7 @@
   ;; Tests the URL generation helper for agent invocations
   (testing "agent-invoke->url"
     (testing "generates correct URL for agent invocation"
-      (let [url (common/agent-invoke->url "TestModule" "TestAgent" {:task-id 42 :agent-id "xyz"})]
+      (let [url (common/agent-invoke->url "TestModule" "TestAgent" {:task-id 42 :agent-invoke-id "xyz"})]
         (is (= "/agents/TestModule/agent/TestAgent/invocations/42-xyz" url)
             "should generate correct invocation URL")))
 
@@ -47,7 +47,7 @@
             "should return nil when agent-invoke is nil")))
 
     (testing "URL encodes module-id and agent-name"
-      (let [url (common/agent-invoke->url "Test Module" "Test Agent" {:task-id 1 :agent-id "a"})]
+      (let [url (common/agent-invoke->url "Test Module" "Test Agent" {:task-id 1 :agent-invoke-id "a"})]
         (is (= "/agents/Test%20Module/agent/Test%20Agent/invocations/1-a" url)
             "should URL-encode spaces in module-id and agent-name")))))
 
