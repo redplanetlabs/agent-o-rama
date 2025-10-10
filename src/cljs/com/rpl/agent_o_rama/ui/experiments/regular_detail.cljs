@@ -200,7 +200,9 @@
   (cond
     (true? value) ($ :span.text-green-700 "True")
     (false? value) ($ :span.text-red-700 "False")
-    (number? value) (str value)
+    (number? value) (if (and (float? value) (not= value (js/Math.floor value)))
+                      (.toFixed value 2)
+                      (str value))
     (string? value) (if (> (count value) 20) (str (subs value 0 17) "…") value)
     (nil? value) ($ :span.italic.text-gray-400 "nil")
     :else ($ :span.italic.text-gray-400 "…")))

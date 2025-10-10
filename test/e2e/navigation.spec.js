@@ -303,7 +303,7 @@ test.describe('Inline editing validation', () => {
 
     // Open the example details
     await page.locator('table tbody tr').filter({ hasText: stringInput }).click();
-    await expect(page.getByText('Example Details')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole('dialog').getByRole('heading', { name: 'Example Details' })).toBeVisible({ timeout: 30000 });
 
     // Test inline editing of Input field
     const inputEditButton = page.locator('[role="dialog"]').getByRole('button', { name: 'Edit' }).first();
