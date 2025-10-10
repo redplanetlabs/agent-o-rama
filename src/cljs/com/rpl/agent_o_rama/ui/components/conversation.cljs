@@ -107,28 +107,45 @@
   preview-text should be a vector of lines to display."
   [{:keys [messages color preview-text]
     :or {color "blue"}}]
-  ($ :div
-     {:className
-      (str "text-" color "-600 bg-" color "-50 border border-" color "-200 rounded p-2 min-w-0 max-w-full")}
-     ($ :div {:className "text-xs font-semibold mb-1 min-w-0"
-              :style {:color "#6b7280"}}
-        (str "💬 Conversation (" (count messages) " messages)"))
-     ($ :div
-        {:className
-         (str "cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded transition-colors min-w-0")
-         :onClick
-         (fn [e]
-           (.stopPropagation e)
-           (state/dispatch
-            [:modal/show :conversation
-             {:title     (str "Conversation (" (count messages) " messages)")
-              :component
-              ($ ConversationModal
-                 {:title (str "Conversation (" (count messages) " messages)")
-                  :messages messages})}]))
-         :title     "Click to view full conversation"}
-        ($ :div {:className "text-xs font-sans space-y-0.5 min-w-0"}
-           (for [[idx line] (map-indexed vector preview-text)]
-             ($ :div {:key       idx
-                      :className "truncate min-w-0"}
-                line))))))
+  (let [num-messages (count messages)
+        display-modal
+        (fn [e]
+          (.stopPropagation e)
+          (state/dispatch
+           [:modal/show :conversation
+            {:title (str "Conversation (" num-messages " messages)")
+             :component
+             ($ ConversationModal
+                {:title    (str "Conversation (" num-messages " messages)")
+                 :messages messages})}]))
+        display-json-modal
+        (fn [e]
+          (.stopPropagation e)
+          (let [json-str (js/JSON.stringify (clj->js messages) nil 2)]
+            (state/dispatch
+             [:modal/show :conversation-json
+              {:title "Conversation (JSON)"
+               :component
+               ($ :div.p-6
+                  ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-y-auto.max-h-96.font-mono.whitespace-pre-wrap.break-words
+                     json-str))}])))]
+    ($ :div
+       {:className
+        (str "text-" color "-600 bg-" color "-50 border border-" color "-200 rounded p-2 min-w-0 max-w-full")}
+       ($ :div {:className "flex items-center justify-between text-xs font-semibold mb-1 min-w-0 gap-2"
+                :style     {:color "#6b7280"}}
+          ($ :span (str "💬 Conversation (" num-messages " messages)"))
+          ($ :a {:className "text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                 :onClick display-json-modal
+                 :title "View as JSON"}
+             "as json"))
+       ($ :div
+          {:className
+           (str "cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded transition-colors min-w-0")
+           :onClick display-modal
+           :title   "Click to view full conversation"}
+          ($ :div {:className "text-xs font-sans space-y-0.5 min-w-0"}
+             (for [[idx line] (map-indexed vector preview-text)]
+               ($ :div {:key       idx
+                        :className "truncate min-w-0"}
+                  line)))))))
