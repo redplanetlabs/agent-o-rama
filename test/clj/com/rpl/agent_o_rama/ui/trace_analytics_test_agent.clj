@@ -69,7 +69,11 @@
                       (UserMessage. (str input))]
             response (lc4j/chat model (lc4j/chat-request messages {}))
             text     (.text (.aiMessage response))]
-        (aor/result! agent-node {"mode" "chat" "response" text}))
+        (aor/result!
+         agent-node
+         {"mode"     "chat"
+          "response" text
+          "messages" (conj messages (.aiMessage response))}))
 
       :tool-call
       ;; Use chat model with tools

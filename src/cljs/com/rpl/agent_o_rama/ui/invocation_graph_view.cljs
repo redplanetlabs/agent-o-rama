@@ -12,6 +12,7 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.trace-analytics :as trace-analytics]
    [com.rpl.agent-o-rama.ui.feedback :as feedback]
+   [com.rpl.agent-o-rama.ui.components.conversation :as conversation]
 
    ["react" :refer [useState useCallback useEffect]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
@@ -27,6 +28,8 @@
   ($ :div.p-6.space-y-4
      ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-auto.max-h-80.font-mono
         content)))
+
+
 
 (defn format-ms [ms]
   (let [date (js/Date. ms)
@@ -180,6 +183,13 @@
           (and (sequential? data) (empty? data)))
       ($ :span {:className "text-gray-400 italic text-xs"} "(empty)")
 
+      ;; Check if data is a conversation (before other sequential checks)
+      (conversation/conversation? data)
+      ($ conversation/conversation-display
+         {:messages data
+          :color color
+          :preview-text (conversation/conversation-preview-text data)})
+
       ;; If we've hit max depth, fall back to expandable components
       (>= depth max-depth)
       (cond
@@ -206,12 +216,13 @@
          (for [[k v] (sort-by (comp str key) data)]
            ($ :div {:key (str k)}
               ($ :div {:className "flex items-start gap-1"}
-                 ($ :span {:className "text-gray-500 font-medium"} (str (name k) ":"))
-                 ;; Recursive call to render the value, whatever its type.
-                 ($ generic-data-viewer {:data v
-                                         :color color
-                                         :truncate-length truncate-length
-                                         :depth next-depth})))))
+           ($ :span {:className "text-gray-500 font-medium"} (str (name k) ":"))
+           ;; Wrap value in a div with flex constraints to enable truncation
+           ($ :div {:className "flex-1 min-w-0"}
+              ($ generic-data-viewer {:data v
+                                      :color color
+                                      :truncate-length truncate-length
+                                      :depth next-depth}))))))
 
       ;; Case 2: The data is a list or vector. Use the existing list component.
       (sequential? data)
