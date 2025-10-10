@@ -21,8 +21,8 @@
   [opts]
   (fn [ipc module-name]
     (let [manager (aor/agent-manager ipc module-name)
-          depot (:global-actions-depot
-                 (aor-types/underlying-objects manager))]
+          depot   (:global-actions-depot
+                   (aor-types/underlying-objects manager))]
       (setup-feedback-testing! manager depot opts))))
 
 (defn- wait-for-feedback
@@ -46,10 +46,10 @@
      {:post-deploy-hook (make-post-deploy-hook {:include-node-rules? false})}]
     (eth/with-webdriver [system driver]
       (testing "agent-level feedback displays correctly"
-        (let [env @system
-              agent (aor/agent-client
-                     (aor/agent-manager (:ipc env) (:module-name env))
-                     "FeedbackTestAgent")
+        (let [env    @system
+              agent  (aor/agent-client
+                      (aor/agent-manager (:ipc env) (:module-name env))
+                      "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "medium" "text" "test"})]
 
           @(aor/agent-result-async agent invoke)
@@ -86,10 +86,10 @@
     [system FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
     (eth/with-webdriver [system driver]
       (testing "node-level feedback displays correctly"
-        (let [env @system
-              agent (aor/agent-client
-                     (aor/agent-manager (:ipc env) (:module-name env))
-                     "FeedbackTestAgent")
+        (let [env    @system
+              agent  (aor/agent-client
+                      (aor/agent-manager (:ipc env) (:module-name env))
+                      "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "long" "text" "eval"})]
 
           @(aor/agent-result-async agent invoke)
@@ -126,10 +126,10 @@
   (eth/with-system [system FeedbackTestAgentModule]
     (eth/with-webdriver [system driver]
       (testing "empty feedback state displays correctly"
-        (let [env @system
-              agent (aor/agent-client
-                     (aor/agent-manager (:ipc env) (:module-name env))
-                     "FeedbackTestAgent")
+        (let [env    @system
+              agent  (aor/agent-client
+                      (aor/agent-manager (:ipc env) (:module-name env))
+                      "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "short"})]
 
           (e/with-postmortem driver {:dir "target/etaoin"}
@@ -162,10 +162,10 @@
     [system FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
     (eth/with-webdriver [system driver]
       (testing "feedback scores display with correct types"
-        (let [env @system
-              agent (aor/agent-client
-                     (aor/agent-manager (:ipc env) (:module-name env))
-                     "FeedbackTestAgent")
+        (let [env    @system
+              agent  (aor/agent-client
+                      (aor/agent-manager (:ipc env) (:module-name env))
+                      "FeedbackTestAgent")
               invoke (aor/agent-initiate
                       agent
                       {"mode" "prefixed" "text" "score-check"})]
@@ -179,10 +179,6 @@
                              invoke)]
               (wait-for-feedback driver trace-url)
               (eth/wait-visible driver "feedback-tab")
-
-              (testing "switch to feedback tab"
-                (e/click driver {:data-id "feedback-tab"})
-                (eth/wait-visible driver "feedback-list"))
 
               (testing "feedback items display"
                 (is (e/visible? driver {:data-id "feedback-item-0"})))
@@ -203,10 +199,10 @@
     [system FeedbackTestAgentModule {:post-deploy-hook (make-post-deploy-hook {})}]
     (eth/with-webdriver [system driver]
       (testing "multiple feedback sources display together"
-        (let [env @system
-              agent (aor/agent-client
-                     (aor/agent-manager (:ipc env) (:module-name env))
-                     "FeedbackTestAgent")
+        (let [env    @system
+              agent  (aor/agent-client
+                      (aor/agent-manager (:ipc env) (:module-name env))
+                      "FeedbackTestAgent")
               invoke (aor/agent-initiate agent {"mode" "medium"})
               wait-for-mb-count
               #(rtest/wait-for-microbatch-processed-count

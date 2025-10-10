@@ -2,13 +2,10 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [com.rpl.agent-o-rama :as aor]
-   [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.ui.etaoin-test-helpers :as eth]
    [com.rpl.agent-o-rama.ui.rules-test-agent :as rta :refer [RulesTestAgentModule]]
    [etaoin.api :as e]))
-
-(def ^:private default-timeout 120)
 
 (defonce system (volatile! nil))
 ;; (eth/teardown-system system)
