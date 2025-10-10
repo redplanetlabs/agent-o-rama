@@ -30,14 +30,33 @@ const otherEvaluator = {
   description: 'Comparative evaluator that does NOT return an index.',
 };
 
-const example = {
-  input: {
-    target1_output: 'short output',
-    target2_output: 'this is the longest output and should be the winner',
-    target3_output: 'a medium length output',
+// Multiple examples to test different winners
+const examples = [
+  {
+    input: {
+      target1_output: 'short',
+      target2_output: 'this is the longest output and should be the winner for example 1',
+      target3_output: 'medium length',
+    },
+    output: 'reference output 1',
   },
-  output: 'some reference output',
-};
+  {
+    input: {
+      target1_output: 'this is the longest output and should be the winner for example 2',
+      target2_output: 'short',
+      target3_output: 'medium length',
+    },
+    output: 'reference output 2',
+  },
+  {
+    input: {
+      target1_output: 'short',
+      target2_output: 'medium length',
+      target3_output: 'this is the longest output and should be the winner for example 3',
+    },
+    output: 'reference output 3',
+  },
+];
 
 // =============================================================================
 // TEST SUITE
@@ -60,13 +79,15 @@ test.describe('Comparative Experiment Flow', () => {
     await createEvaluator(page, winningEvaluator);
     await createEvaluator(page, otherEvaluator);
 
-    // Create Dataset and Example
+    // Create Dataset and Examples
     await page.getByText('Datasets & Experiments').click();
     await createDataset(page, datasetName);
     await page.getByRole('link', { name: datasetName }).click();
     await page.getByRole('link', { name: 'Examples' }).click();
-    await addExample(page, example);
-    console.log('Setup complete: All resources created.');
+    for (const example of examples) {
+      await addExample(page, example);
+    }
+    console.log('Setup complete: All resources created with 3 examples.');
 
     // ---
     // PHASE 2: EXECUTION
@@ -139,7 +160,7 @@ test.describe('Comparative Experiment Flow', () => {
     await expect(page.locator('table').filter({ hasText: '# Examples' })).not.toBeVisible();
     console.log('Verified: No summary stats table is displayed.');
 
-    // Verify table structure and content
+    // Verify table structure
     const resultsTable = page.locator('table').filter({ hasText: 'Input' });
     await expect(resultsTable.locator('th').nth(0)).toHaveText('Input');
     await expect(resultsTable.locator('th').nth(1)).toHaveText('Reference Output');
@@ -147,27 +168,49 @@ test.describe('Comparative Experiment Flow', () => {
     await expect(resultsTable.locator('th').nth(3)).toHaveText('Output 2');
     await expect(resultsTable.locator('th').nth(4)).toHaveText('Output 3');
     await expect(resultsTable.locator('th').nth(5)).toHaveText('Evals');
+    console.log('Verified: Table structure with dynamic output columns.');
 
-    const resultRow = resultsTable.locator('tbody tr').first();
-    const output1Cell = resultRow.locator('td').nth(2);
-    const output2Cell = resultRow.locator('td').nth(3);
-    const output3Cell = resultRow.locator('td').nth(4);
-    const evalsCell = resultRow.locator('td').nth(5);
+    // Verify all three result rows
+    const allRows = resultsTable.locator('tbody tr');
+    await expect(allRows).toHaveCount(3);
+    console.log('Verified: All 3 examples are displayed.');
 
-    await expect(output1Cell).toContainText(example.input.target1_output);
-    await expect(output2Cell).toContainText(example.input.target2_output);
-    await expect(output3Cell).toContainText(example.input.target3_output);
-    console.log('Verified: Output columns contain the correct agent results.');
+    // Verify Row 1: Output 2 should win (longest)
+    const row1 = allRows.nth(0);
+    await expect(row1.locator('td').nth(2)).toContainText('short');
+    await expect(row1.locator('td').nth(3)).toContainText('winner for example 1');
+    await expect(row1.locator('td').nth(4)).toContainText('medium length');
+    await expect(row1.locator('td').nth(2)).not.toHaveClass(/bg-green-50/);
+    await expect(row1.locator('td').nth(3)).toHaveClass(/bg-green-50/); // Winner
+    await expect(row1.locator('td').nth(4)).not.toHaveClass(/bg-green-50/);
+    console.log('Verified: Row 1 - Output 2 is highlighted as winner.');
 
-    // Verify winner highlighting
-    await expect(output1Cell).not.toHaveClass(/bg-green-50/);
-    await expect(output2Cell).toHaveClass(/bg-green-50/); // Output 2 is the winner
-    await expect(output3Cell).not.toHaveClass(/bg-green-50/);
-    console.log('Verified: "Winner" output cell is correctly highlighted.');
+    // Verify Row 2: Output 1 should win (longest)
+    const row2 = allRows.nth(1);
+    await expect(row2.locator('td').nth(2)).toContainText('winner for example 2');
+    await expect(row2.locator('td').nth(3)).toContainText('short');
+    await expect(row2.locator('td').nth(4)).toContainText('medium length');
+    await expect(row2.locator('td').nth(2)).toHaveClass(/bg-green-50/); // Winner
+    await expect(row2.locator('td').nth(3)).not.toHaveClass(/bg-green-50/);
+    await expect(row2.locator('td').nth(4)).not.toHaveClass(/bg-green-50/);
+    console.log('Verified: Row 2 - Output 1 is highlighted as winner.');
 
-    // Verify "Evals" column content
-    await expect(evalsCell.locator('a').filter({ hasText: new RegExp(winningEvaluator.name) })).not.toBeVisible();
-    await expect(evalsCell.locator('a').filter({ hasText: new RegExp(otherEvaluator.name) })).toBeVisible();
+    // Verify Row 3: Output 3 should win (longest)
+    const row3 = allRows.nth(2);
+    await expect(row3.locator('td').nth(2)).toContainText('short');
+    await expect(row3.locator('td').nth(3)).toContainText('medium length');
+    await expect(row3.locator('td').nth(4)).toContainText('winner for example 3');
+    await expect(row3.locator('td').nth(2)).not.toHaveClass(/bg-green-50/);
+    await expect(row3.locator('td').nth(3)).not.toHaveClass(/bg-green-50/);
+    await expect(row3.locator('td').nth(4)).toHaveClass(/bg-green-50/); // Winner
+    console.log('Verified: Row 3 - Output 3 is highlighted as winner.');
+
+    // Verify "Evals" column content (check any row)
+    const evalsCell = row1.locator('td').nth(5);
+    // The selector evaluator (with "index" key) should NOT appear in the Evals column
+    await expect(evalsCell.locator('a').filter({ hasText: /index/ })).not.toBeVisible();
+    await expect(evalsCell.locator('a').filter({ hasText: /longest_value/ })).not.toBeVisible();
+    // The non-selector evaluator should appear, showing just the metric name (no collision)
     await expect(evalsCell.locator('a').filter({ hasText: /random_score/ })).toBeVisible();
     console.log('Verified: "Evals" column correctly displays non-indexing evaluator results.');
 
