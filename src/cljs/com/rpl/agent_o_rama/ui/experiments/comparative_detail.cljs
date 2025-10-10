@@ -12,19 +12,22 @@
 
 (defn find-winner-index
   "Find the winning target index from evaluator results.
-   Returns the first evaluator result that contains an 'index' key."
+   Returns the first evaluator result that contains an 'index' key.
+   Checks both keyword and string keys since data may come from JSON."
   [evals]
   (some (fn [[_eval-name metrics]]
-          (when-let [idx (:index metrics)]
-            idx))
+          (or (get metrics "index")
+              (get metrics :index)))
         evals))
 
 (defn filter-non-selector-evals
-  "Filter out evaluators that have an 'index' key (selector evaluators)."
+  "Filter out evaluators that have an 'index' key (selector evaluators).
+   Checks both keyword and string keys since data may come from JSON."
   [evals]
   (into {}
         (remove (fn [[_eval-name metrics]]
-                  (contains? metrics :index))
+                  (or (contains? metrics "index")
+                      (contains? metrics :index)))
                 evals)))
 
 (defui ComparativeResultsTable [{:keys [data module-id show-full-text? on-toggle-full-text]}]

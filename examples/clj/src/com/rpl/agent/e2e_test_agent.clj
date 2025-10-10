@@ -86,8 +86,18 @@
      (fn [fetcher input ref-output outputs]
        (let [indexed-outputs (map-indexed vector outputs)
              longest (apply max-key (fn [[idx out]] (count (str out))) indexed-outputs)]
-         {"longest_index" (first longest)
+         {"index" (first longest)
           "longest_value" (second longest)}))))
+
+  ;; A comparative evaluator that does NOT return an 'index' key.
+  ;; This is to test the 'Evals' column rendering in comparative experiments.
+  (aor/declare-comparative-evaluator-builder
+   topology
+   "random-float-comparative"
+   "Returns a random float score for the set of outputs."
+   (fn [params]
+     (fn [fetcher input ref-output outputs]
+       {"random_score" (rand)})))
 
   ;; --- The E2E Test Agent Definition ---
   (-> topology
