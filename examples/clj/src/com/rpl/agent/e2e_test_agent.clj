@@ -99,6 +99,18 @@
      (fn [fetcher input ref-output outputs]
        {"random_score" (rand)})))
 
+  ;; A comparative evaluator that returns a random index.
+  ;; This is to test the selector evaluator dropdown when multiple selectors exist.
+  (aor/declare-comparative-evaluator-builder
+   topology
+   "select-random"
+   "Randomly selects one of the outputs as the winner."
+   (fn [params]
+     (fn [fetcher input ref-output outputs]
+       (let [random-index (rand-int (count outputs))]
+         {"index" random-index
+          "explanation" (str "Randomly selected output " random-index)}))))
+
   ;; --- The E2E Test Agent Definition ---
   (-> topology
       (aor/new-agent "E2ETestAgent")

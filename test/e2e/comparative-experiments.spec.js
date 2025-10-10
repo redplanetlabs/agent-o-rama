@@ -18,10 +18,16 @@ const datasetName = `e2e-comparative-dataset-${uniqueId}`;
 const experimentName = `e2e-comparative-experiment-${uniqueId}`;
 const agentToRun = 'E2ETestAgent';
 
-const winningEvaluator = {
+const selectLongestEvaluator = {
   name: `e2e-select-longest-${uniqueId}`,
   builderName: 'select-longest',
-  description: 'Comparative evaluator that returns an index.',
+  description: 'Comparative evaluator that selects the longest output.',
+};
+
+const selectRandomEvaluator = {
+  name: `e2e-select-random-${uniqueId}`,
+  builderName: 'select-random',
+  description: 'Comparative evaluator that randomly selects an output.',
 };
 
 const otherEvaluator = {
@@ -76,7 +82,8 @@ test.describe('Comparative Experiment Flow', () => {
 
     // Create Evaluators
     await page.getByText('Evaluators').click();
-    await createEvaluator(page, winningEvaluator);
+    await createEvaluator(page, selectLongestEvaluator);
+    await createEvaluator(page, selectRandomEvaluator);
     await createEvaluator(page, otherEvaluator);
 
     // Create Dataset and Examples
@@ -128,17 +135,21 @@ test.describe('Comparative Experiment Flow', () => {
     await target2.locator('div').filter({ hasText: /^Input Mappings/ }).getByRole('textbox').fill('{"output-value": "$.target3_output"}');
     console.log('Configured 3 targets for the experiment.');
 
-    // Configure Evaluators
+    // Configure Evaluators (add all three)
     await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
     const evaluatorDropdown = page.locator('.origin-top-left');
-    await expect(evaluatorDropdown.getByText(winningEvaluator.name, { exact: true })).toBeVisible();
+    await expect(evaluatorDropdown.getByText(selectLongestEvaluator.name, { exact: true })).toBeVisible();
+    await expect(evaluatorDropdown.getByText(selectRandomEvaluator.name, { exact: true })).toBeVisible();
     await expect(evaluatorDropdown.getByText(otherEvaluator.name, { exact: true })).toBeVisible();
     await expect(evaluatorDropdown.getByText('aor/conciseness')).not.toBeVisible(); // Verify filtering
-    await evaluatorDropdown.getByText(winningEvaluator.name, { exact: true }).click();
+    await evaluatorDropdown.getByText(selectLongestEvaluator.name, { exact: true }).click();
+    
+    await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
+    await evaluatorDropdown.getByText(selectRandomEvaluator.name, { exact: true }).click();
     
     await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
     await evaluatorDropdown.getByText(otherEvaluator.name, { exact: true }).click();
-    console.log('Evaluators configured.');
+    console.log('Evaluators configured (2 selector + 1 non-selector).');
 
     // Run Experiment
     await expModal.getByRole('button', { name: 'Run Experiment' }).click();
@@ -205,6 +216,27 @@ test.describe('Comparative Experiment Flow', () => {
     await expect(row3.locator('td').nth(4)).toHaveClass(/bg-green-50/); // Winner
     console.log('Verified: Row 3 - Output 3 is highlighted as winner.');
 
+    // Verify Selector Evaluator Dropdown
+    const selectorDropdown = page.getByTestId('selector-evaluator-dropdown');
+    await expect(selectorDropdown).toBeVisible();
+    await expect(selectorDropdown).toContainText('Highlighting:');
+    await expect(selectorDropdown).toContainText(selectLongestEvaluator.name);
+    console.log('Verified: Selector evaluator dropdown is visible and shows current selection.');
+    
+    // Test switching selector evaluators
+    await selectorDropdown.click();
+    const dropdownMenu = page.locator('.origin-top-right');
+    await expect(dropdownMenu.getByText(selectLongestEvaluator.name, { exact: true })).toBeVisible();
+    await expect(dropdownMenu.getByText(selectRandomEvaluator.name, { exact: true })).toBeVisible();
+    await dropdownMenu.getByText(selectRandomEvaluator.name, { exact: true }).click();
+    await expect(selectorDropdown).toContainText(selectRandomEvaluator.name);
+    console.log('Verified: Can switch between selector evaluators in the dropdown.');
+    
+    // Switch back to select-longest for remaining verifications
+    await selectorDropdown.click();
+    await dropdownMenu.getByText(selectLongestEvaluator.name, { exact: true }).click();
+    console.log('Switched back to select-longest evaluator.');
+
     // Verify "Evals" column content (check any row)
     const evalsCell = row1.locator('td').nth(5);
     // The selector evaluator (with "index" key) should NOT appear in the Evals column
@@ -224,7 +256,8 @@ test.describe('Comparative Experiment Flow', () => {
     await deleteDataset(page, datasetName);
 
     await page.getByText('Evaluators').click();
-    await deleteEvaluator(page, winningEvaluator.name);
+    await deleteEvaluator(page, selectLongestEvaluator.name);
+    await deleteEvaluator(page, selectRandomEvaluator.name);
     await deleteEvaluator(page, otherEvaluator.name);
 
     console.log('--- Test successfully completed and cleaned up. ---');
