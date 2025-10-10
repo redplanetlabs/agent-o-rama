@@ -61,7 +61,19 @@
         selector-eval-names (keys all-selector-evals)
 
         ;; State for selected selector evaluator
-        [selected-selector set-selected-selector] (uix/use-state (first selector-eval-names))
+        [selected-selector set-selected-selector] (uix/use-state nil)
+        active-selector (or selected-selector (first selector-eval-names))
+
+        ;; Update selected selector when data loads or changes
+        _ (uix/use-effect
+           (fn []
+             (if (seq selector-eval-names)
+               (when (or (nil? selected-selector)
+                         (not (contains? (set selector-eval-names) selected-selector)))
+                 (set-selected-selector (first selector-eval-names)))
+               (when (some? selected-selector)
+                 (set-selected-selector nil))))
+           #js [(count selector-eval-names) (pr-str (sort selector-eval-names)) selected-selector])
 
         ;; Collect all evaluator metrics for metadata
         all-evals (reduce (fn [acc run]
@@ -79,12 +91,12 @@
                ($ :div.w-64
                   ($ common/Dropdown
                      {:label "Selector Evaluator"
-                      :display-text (str "Highlighting: " (or selected-selector "None"))
+                      :display-text (str "Highlighting: " (or active-selector "None"))
                       :data-testid "selector-evaluator-dropdown"
                       :items (for [eval-name selector-eval-names]
                                {:key eval-name
                                 :label eval-name
-                                :selected? (= eval-name selected-selector)
+                                :selected? (= eval-name active-selector)
                                 :on-select #(set-selected-selector eval-name)})})))
              ;; Show full text checkbox
              ($ :label.flex.items-center.gap-2.text-sm.text-gray-600
@@ -111,7 +123,7 @@
                      ($ :th {:className (:th common/table-classes)} "Evals")))
                ($ :tbody
                   (for [[idx run] (map-indexed vector results)]
-                    (let [winning-index (find-winner-index (:evals run) selected-selector)
+                    (let [winning-index (find-winner-index (:evals run) active-selector)
                           non-selector-evals (filter-non-selector-evals (:evals run))]
                       ($ :tr.border-b {:key (str (:example-id run) "-" idx)}
                          ;; Input Cell

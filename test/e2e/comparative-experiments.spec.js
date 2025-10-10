@@ -217,6 +217,7 @@ test.describe('Comparative Experiment Flow', () => {
     const selectorDropdown = page.getByTestId('selector-evaluator-dropdown');
     await expect(selectorDropdown).toBeVisible();
     await expect(selectorDropdown).toContainText('Highlighting:');
+    await expect(selectorDropdown).not.toContainText('Highlighting: None');
     await expect(selectorDropdown).toContainText(selectLongestEvaluator.name);
     console.log('Verified: Selector evaluator dropdown is visible even with only one selector.');
     
