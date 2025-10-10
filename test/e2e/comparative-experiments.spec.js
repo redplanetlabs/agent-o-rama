@@ -135,7 +135,7 @@ test.describe('Comparative Experiment Flow', () => {
     await target2.locator('div').filter({ hasText: /^Input Mappings/ }).getByRole('textbox').fill('{"output-value": "$.target3_output"}');
     console.log('Configured 3 targets for the experiment.');
 
-    // Configure Evaluators (add all three)
+    // Configure Evaluators (only 1 selector + 1 non-selector for first run)
     await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
     const evaluatorDropdown = page.locator('.origin-top-left');
     await expect(evaluatorDropdown.getByText(selectLongestEvaluator.name, { exact: true })).toBeVisible();
@@ -145,11 +145,8 @@ test.describe('Comparative Experiment Flow', () => {
     await evaluatorDropdown.getByText(selectLongestEvaluator.name, { exact: true }).click();
     
     await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
-    await evaluatorDropdown.getByText(selectRandomEvaluator.name, { exact: true }).click();
-    
-    await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
     await evaluatorDropdown.getByText(otherEvaluator.name, { exact: true }).click();
-    console.log('Evaluators configured (2 selector + 1 non-selector).');
+    console.log('Evaluators configured (1 selector + 1 non-selector for first run).');
 
     // Run Experiment
     await expModal.getByRole('button', { name: 'Run Experiment' }).click();
@@ -216,26 +213,20 @@ test.describe('Comparative Experiment Flow', () => {
     await expect(row3.locator('td').nth(4)).toHaveClass(/bg-green-50/); // Winner
     console.log('Verified: Row 3 - Output 3 is highlighted as winner.');
 
-    // Verify Selector Evaluator Dropdown
+    // Verify Selector Evaluator Dropdown (Single Selector Case)
     const selectorDropdown = page.getByTestId('selector-evaluator-dropdown');
     await expect(selectorDropdown).toBeVisible();
     await expect(selectorDropdown).toContainText('Highlighting:');
     await expect(selectorDropdown).toContainText(selectLongestEvaluator.name);
-    console.log('Verified: Selector evaluator dropdown is visible and shows current selection.');
+    console.log('Verified: Selector evaluator dropdown is visible even with only one selector.');
     
-    // Test switching selector evaluators
+    // Verify dropdown only shows one selector evaluator
     await selectorDropdown.click();
-    const dropdownMenu = page.locator('.origin-top-right');
+    let dropdownMenu = page.locator('.origin-top-right');
     await expect(dropdownMenu.getByText(selectLongestEvaluator.name, { exact: true })).toBeVisible();
-    await expect(dropdownMenu.getByText(selectRandomEvaluator.name, { exact: true })).toBeVisible();
-    await dropdownMenu.getByText(selectRandomEvaluator.name, { exact: true }).click();
-    await expect(selectorDropdown).toContainText(selectRandomEvaluator.name);
-    console.log('Verified: Can switch between selector evaluators in the dropdown.');
-    
-    // Switch back to select-longest for remaining verifications
-    await selectorDropdown.click();
-    await dropdownMenu.getByText(selectLongestEvaluator.name, { exact: true }).click();
-    console.log('Switched back to select-longest evaluator.');
+    await expect(dropdownMenu.getByText(selectRandomEvaluator.name, { exact: true })).not.toBeVisible();
+    await page.keyboard.press('Escape'); // Close dropdown
+    console.log('Verified: Dropdown shows only the single selector evaluator.');
 
     // Verify "Evals" column content (check any row)
     const evalsCell = row1.locator('td').nth(5);
@@ -245,6 +236,74 @@ test.describe('Comparative Experiment Flow', () => {
     // The non-selector evaluator should appear, showing just the metric name (no collision)
     await expect(evalsCell.locator('a').filter({ hasText: /random_score/ })).toBeVisible();
     console.log('Verified: "Evals" column correctly displays non-indexing evaluator results.');
+
+    // ---
+    // PHASE 3.5: RE-RUN WITH MULTIPLE SELECTOR EVALUATORS
+    // ---
+    console.log('--- PHASE 3.5: RE-RUN WITH MULTIPLE SELECTORS ---');
+    
+    // Click Re-run Experiment button
+    await page.getByRole('button', { name: 'Re-run Experiment' }).click();
+    const rerunModal = page.locator('[role="dialog"]').filter({ hasText: 'Run Comparative Experiment' });
+    await expect(rerunModal).toBeVisible();
+    console.log('Re-run modal opened with pre-filled form state.');
+    
+    // Verify existing evaluators are present
+    await expect(rerunModal.getByText(selectLongestEvaluator.name)).toBeVisible();
+    await expect(rerunModal.getByText(otherEvaluator.name)).toBeVisible();
+    console.log('Verified: Existing evaluators are pre-filled in the form.');
+    
+    // Add the second selector evaluator
+    await rerunModal.getByRole('button', { name: 'Add Evaluator' }).click();
+    const rerunEvalDropdown = page.locator('.origin-top-left');
+    await rerunEvalDropdown.getByText(selectRandomEvaluator.name, { exact: true }).click();
+    console.log('Added second selector evaluator to the form.');
+    
+    // Update experiment name to distinguish from first run
+    const nameField = rerunModal.getByLabel('Experiment Name');
+    await nameField.clear();
+    await nameField.fill(experimentName + ' (multi-selector)');
+    
+    // Run the updated experiment
+    await rerunModal.getByRole('button', { name: 'Run Experiment' }).click();
+    await expect(rerunModal).not.toBeVisible();
+    console.log('Re-run experiment started.');
+    
+    // Navigate to the new experiment
+    await expect(page).toHaveURL(/comparative-experiments$/, { timeout: 30000 });
+    await page.getByRole('row').filter({ hasText: experimentName + ' (multi-selector)' }).click();
+    await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 120000 });
+    console.log('Re-run experiment completed.');
+    
+    // Verify Selector Evaluator Dropdown (Multiple Selectors Case)
+    const multiSelectorDropdown = page.getByTestId('selector-evaluator-dropdown');
+    await expect(multiSelectorDropdown).toBeVisible();
+    await expect(multiSelectorDropdown).toContainText('Highlighting:');
+    console.log('Verified: Selector evaluator dropdown is visible with multiple selectors.');
+    
+    // Test switching between selector evaluators
+    await multiSelectorDropdown.click();
+    const multiDropdownMenu = page.locator('.origin-top-right');
+    await expect(multiDropdownMenu.getByText(selectLongestEvaluator.name, { exact: true })).toBeVisible();
+    await expect(multiDropdownMenu.getByText(selectRandomEvaluator.name, { exact: true })).toBeVisible();
+    console.log('Verified: Dropdown shows both selector evaluators.');
+    
+    // Switch to the random selector
+    await multiDropdownMenu.getByText(selectRandomEvaluator.name, { exact: true }).click();
+    await expect(multiSelectorDropdown).toContainText(selectRandomEvaluator.name);
+    console.log('Verified: Successfully switched to random selector evaluator.');
+    
+    // Switch back to longest selector
+    await multiSelectorDropdown.click();
+    await multiDropdownMenu.getByText(selectLongestEvaluator.name, { exact: true }).click();
+    await expect(multiSelectorDropdown).toContainText(selectLongestEvaluator.name);
+    console.log('Verified: Successfully switched back to longest selector evaluator.');
+    
+    // Verify results are still correct with multiple selectors
+    const multiResultsTable = page.locator('table').filter({ hasText: 'Input' });
+    const multiRow1 = multiResultsTable.locator('tbody tr').nth(0);
+    await expect(multiRow1.locator('td').nth(3)).toHaveClass(/bg-green-50/); // Output 2 should still win
+    console.log('Verified: Winner highlighting still works correctly with multiple selectors.');
 
     // ---
     // PHASE 4: TEARDOWN
