@@ -98,7 +98,7 @@
         :empty-content empty-content
         :data-testid data-testid})))
 
-(defui EvaluatorSelector [{:keys [module-id selected-evaluators on-change]}]
+(defui EvaluatorSelector [{:keys [module-id selected-evaluators on-change filter-type]}]
   (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
         trigger-ref (uix/use-ref nil)
         [position set-position] (uix/use-state nil)
@@ -108,8 +108,12 @@
           :sente-event [:evaluators/get-all-instances {:module-id module-id}]
           :enabled? (boolean module-id)})
         all-evaluators (or (:items data) [])
+        ;; Filter evaluators based on the experiment type
+        filtered-evaluators (if filter-type
+                              (filter #(= (:type %) filter-type) all-evaluators)
+                              all-evaluators)
         selected-names (set (map :name selected-evaluators))
-        available-evaluators (remove #(contains? selected-names (:name %)) all-evaluators)
+        available-evaluators (remove #(contains? selected-names (:name %)) filtered-evaluators)
         recalc-position (fn []
                           (when-let [el (.-current trigger-ref)]
                             (let [rect (.getBoundingClientRect el)
@@ -139,7 +143,7 @@
           ($ :div.flex.flex-wrap.gap-2.mb-2
              (if (seq selected-evaluators)
                (for [e selected-evaluators
-                     :let [evaluator-info (first (filter #(= (:name %) (:name e)) all-evaluators))]]
+                     :let [evaluator-info (first (filter #(= (:name %) (:name e)) filtered-evaluators))]]
                  ($ :div.inline-flex.items-center.gap-2.px-3.py-2.rounded-lg.text-xs.font-medium.bg-indigo-100.text-indigo-800.border.border-indigo-200
                     {:key (:name e)}
                     ($ :<>
@@ -179,7 +183,10 @@
                    (cond
                      loading? ($ :div.px-4.py-2.text-sm.text-gray-500 "Loading...")
                      error ($ :div.px-4.py-2.text-sm.text-red-500 "Error")
-                     (empty? available-evaluators) ($ :div.px-4.py-2.text-sm.text-gray-500 "No more evaluators to add.")
+                     (empty? available-evaluators) ($ :div.px-4.py-2.text-sm.text-gray-500
+                                                      (if filter-type
+                                                        (str "No " (name filter-type) " evaluators available to add.")
+                                                        "No more evaluators to add."))
                      :else (for [e available-evaluators]
                              ($ :div.px-3.py-2.hover:bg-gray-50.cursor-pointer.border-b.border-gray-100.last:border-b-0
                                 {:key (:name e)
@@ -429,7 +436,8 @@
             ($ EvaluatorSelector
                {:module-id module-id
                 :selected-evaluators (:value evaluators-field)
-                :on-change (:on-change evaluators-field)})))
+                :on-change (:on-change evaluators-field)
+                :filter-type spec-type})))
 
        ;; Execution Settings Section
        ($ :div.mb-8
