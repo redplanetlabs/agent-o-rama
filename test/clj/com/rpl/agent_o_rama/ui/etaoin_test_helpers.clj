@@ -29,7 +29,7 @@
 
 (def default-timeout 120)
 
-(def ^:private in-test-runner? (System/getenv "aor.test-runner"))
+(def ^:private in-test-runner? (System/getProperty "aor.test.runner"))
 
 (defn- url-encode
   [^String s]
@@ -108,10 +108,11 @@
    - :port - UI server port (default: 8080)"
   [system {:keys [port] :or {port default-port}}]
   (when-not (:ui-launched system)
-    (shadow/compile :dev)
-    (when-not in-test-runner?
-      (shadow.cljs.devtools.server/start!)
-      (shadow/watch :dev))
+    (if in-test-runner?
+      (shadow/compile :dev)
+      (do
+        (shadow.cljs.devtools.server/start!)
+        (shadow/watch :dev)))
     (aor/start-ui (:ipc system) {:port port})
     {:ui-launched true
      :port        port}))
