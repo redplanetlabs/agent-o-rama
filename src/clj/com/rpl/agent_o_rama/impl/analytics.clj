@@ -467,10 +467,10 @@
   ))
 
 (defn action-target-pstate
-  [agent-name node-name]
-  (if (nil? node-name)
-    (po/agent-root-task-global agent-name)
-    (po/agent-node-task-global agent-name)))
+  [agent-name node?]
+  (if node?
+    (po/agent-node-task-global agent-name)
+    (po/agent-root-task-global agent-name)))
 
 (defn scan-amt [] 100)
 
@@ -511,9 +511,13 @@
       max-scan-offset
     )))
 
+(aor-types/defaorrecord AnaNodeTarget [node-name :- String])
+(aor-types/defaorrecord AnaRootTarget [])
+(aor-types/defaorrecord AnaAllNodesTarget [])
+
 (defn complete-node-map
-  [m node-name node-exec]
-  (if (nil? node-name)
+  [m target node-exec]
+  (if (AnaRootTarget? target)
     m
     (let [stall-time      (node-stall-time)
           max-time        (max-node-scan-time)
@@ -686,6 +690,52 @@
       :fail (not success?)
       (throw (h/ex-info "Unexpected status filter" {:status-filter status-filter})))))
 
+(deframafn matching-data
+  [*agent-name *target *offset *dep-end-offset *status-filter *filter *sampling-rate]
+  (<<if (AnaRootTarget? *target)
+    (po/agent-active-invokes-task-global *agent-name :> $$active)
+    (local-select> [(subselect FIRST) (view first) (view first)] $$active :> *max-scan-offset)
+   (else>)
+    (identity nil :> *max-scan-offset))
+  (action-target-pstate *agent-name (not (AnaRootTarget? *target)) :> $$p)
+  (compute-end-offset *dep-end-offset *max-scan-offset :> *end-offset)
+  (scan-amt :> *scan-amt)
+  (<<ramafn %add-run-type
+    [*m]
+    (:> (assoc (into {} *m) :run-type (ifexpr (AnaRootTarget? *target) :agent :node))))
+  (po/agent-node-executor-task-global :> *node-exec)
+  (local-select> [(sorted-map-range-from *offset *scan-amt)
+                  (sorted-map-range *offset *end-offset)
+                  (view complete-node-map *target *node-exec)
+                  (transformed MAP-VALS %add-run-type)]
+                 $$p
+                 :> *m)
+  (compute-end-scan-offset *m *offset :> *end-scan-offset)
+  (<<ramafn %match?
+    [*data]
+    (:> (and> (not (experiment-source? *data))
+              (not (contains? *data :invoked-agg-invoke-id))
+              (contains? *data :start-time-millis) ; not stricly necessary
+              (include-result-from-status? *status-filter *data)
+              (or> (not (AnaNodeTarget? *target))
+                   (= (get *target :node-name) (get *data :node)))
+              (aor-types/rule-filter-matches? *filter *data)
+              (sample? *sampling-rate))))
+  (select> (subselect ALL
+                      (selected? LAST (pred %match?))
+                      FIRST)
+    *m
+    :> *matching-offsets)
+  (:> *m *matching-offsets *end-scan-offset))
+
+(deframafn compute-dep-end-offset
+  [*rule->info *task-id *dependency-names]
+  (<<batch
+    (ops/explode *dependency-names :> *dname)
+    (select> [(keypath *dname) :cursors (keypath *task-id)] *rule->info :> *other-offset)
+    (+min-uuid *other-offset :> *dep-end-offset))
+  (:> *dep-end-offset))
+
 (deframaop find-qualified-offsets-and-run-unlimited
   [*agent->rule->info *cache-pstate-name *processed-pstate-name]
   (<<with-substitutions
@@ -701,64 +751,21 @@
    (select> [:cursors ALL (collect-one FIRST) LAST]
      *rule-info
      :> [*task-id *offset])
-   (<<batch
-     (ops/explode *dependency-names :> *dname)
-     (select> [(keypath *dname) :cursors (keypath *task-id)] *rule->info :> *other-offset)
-     (+min-uuid *other-offset :> *dep-end-offset))
+   (compute-dep-end-offset *rule->info *task-id *dependency-names :> *dep-end-offset)
    (|direct *task-id)
    (all-action-builders :> *action-builders)
    (get *action-builders *action-name :> {:keys [*builder-fn *options]})
    (get *options :limit-concurrency? false :> *limit-concurrency?)
    (completable-future> (build-action-fn *builder-fn *action-params) :> *action-fn)
-   (<<if (some? *node-name)
-     (identity nil :> *max-scan-offset)
-    (else>)
-     (po/agent-active-invokes-task-global *agent-name :> $$active)
-     (local-select> [(subselect FIRST) (view first) (view first)] $$active :> *max-scan-offset))
-   (compute-end-offset *dep-end-offset *max-scan-offset :> *end-offset)
-   (action-target-pstate *agent-name *node-name :> $$p)
-   (scan-amt :> *scan-amt)
-   (<<ramafn %add-run-type
-     [*m]
-     (:> (assoc (into {} *m) :run-type (ifexpr (some? *node-name) :node :agent))))
-   (po/agent-node-executor-task-global :> *node-exec)
-   ;; TODO: <<<<>>>>
-   ;;   - this is the logic that I want for time-series, along with dependency offset from before
-   ;;   - %match stuff below is still relevant
-   ;;     - use sampling-rate 1 for this
-   ;;     - for node stats it would be no node name but would be on the nodes PState
-   ;;   - should rewrite this so it doesn't re-query underlying data for each chart/rules,
-   ;;   especially if they're synced
-   ;;     - cache should be more intelligent
-   ;;     - it should be querying what's not already cached
-   ;;       - should be agent-name -> :data -> #{:agent, :node} -> data
-   ;;                              -> :rules -> rule-name -> {:action-fn, :end-scan-offset,
-   ;;                                                         :matching-offsets}
-   ;;   - if offset is before the start offset in the cache, then need to read full scan amt
-   ;;       - since not going to scan farther
-   ;;       - if offset is in cache range, then can check how many needs to be read by seeing how
-   ;;       many are in cache after that point
-   (local-select> [(sorted-map-range-from *offset *scan-amt)
-                   (sorted-map-range *offset *end-offset)
-                   (view complete-node-map *node-name *node-exec)
-                   (transformed MAP-VALS %add-run-type)]
-                  $$p
-                  :> *m)
-   (compute-end-scan-offset *m *offset :> *end-scan-offset)
-   (<<ramafn %match?
-     [*data]
-     (:> (and> (not (experiment-source? *data))
-               (not (contains? *data :invoked-agg-invoke-id))
-               (contains? *data :start-time-millis) ; not stricly necessary
-               (include-result-from-status? *status-filter *data)
-               (or> (nil? *node-name) (= *node-name (get *data :node)))
-               (aor-types/rule-filter-matches? *filter *data)
-               (sample? *sampling-rate))))
-   (select> (subselect ALL
-                       (selected? LAST (pred %match?))
-                       FIRST)
-     *m
-     :> *matching-offsets)
+   (matching-data
+    *agent-name
+    (ifexpr (some? *node-name) (->AnaNodeTarget *node-name) (->AnaRootTarget))
+    *offset
+    *dep-end-offset
+    *status-filter
+    *filter
+    *sampling-rate
+    :> *m *matching-offsets *end-scan-offset)
    (local-transform> [(keypath *agent-name *rule-name)
                       (multi-path [:data (termval *m)]
                                   [:action-fn (termval *action-fn)]
@@ -865,6 +872,12 @@
      [anode/read-global-config aor-types/ACTIONS-PROCESSING-ITERATION-TIME-MILLIS-CONFIG :> '*target-millis]
      [h/current-time-millis :> '*actions-start-time-millis]
      [read-rules :> '*agent->rule->info]
+      ;; TODO: <<<<>>>> branch here to do analytics in parallel
+      ;;  - if branching, then can't update the cursors the same way
+      ;;    - so in this case, use different PState for its cursors
+      ;;    - and analytics cursors can just be local on each task then
+      ;;      - except that dependency rule cursors are on root
+      ;;        - but can fetch the subset of those to transfer over
      [<<batch
       [filter> false]
       [materialize> :> cache-pstate]
