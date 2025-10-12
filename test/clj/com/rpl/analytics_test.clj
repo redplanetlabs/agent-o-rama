@@ -803,6 +803,8 @@
                   (fn [& args]
                     (h/random-uuid7-at-timestamp (h/current-time-millis)))
 
+                  ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
+
                   at/gen-new-agent-id
                   (fn [agent-name]
                     (if (#{"foo" "bar"} agent-name)
@@ -1627,10 +1629,12 @@
 
                 anode/log-node-error (fn [& args])
 
+                ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
+
                 i/hook:analytics-tick
                 (fn [& args] (swap! TICKS inc))
 
-                ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
+                ana/node-stall-time (fn [] (+ (h/current-time-millis) 60000))
                ]
     (with-open [ipc (rtest/create-ipc)]
       (letlocals
@@ -1929,6 +1933,8 @@
 
                 anode/log-node-error (fn [& args])
 
+                ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
+
                 anode/gen-node-id
                 (fn [& args]
                   (h/random-uuid7-at-timestamp (h/current-time-millis)))
@@ -2222,6 +2228,8 @@
     (try
       (with-redefs [TICKS (atom 0)
                     i/SUBSTITUTE-TICK-DEPOTS true
+
+                    ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
 
                     i/hook:analytics-tick
                     (fn [& args] (swap! TICKS inc))]

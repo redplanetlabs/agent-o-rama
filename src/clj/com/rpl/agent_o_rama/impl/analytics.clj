@@ -480,10 +480,18 @@
        (aor-types/ExperimentSourceImpl? (:source data))))
 
 (def NODE-ACTION-STALL-TIME-MILLIS (* 1000 60 2))
+(def NODE-ACTION-MIN-WAIT-MILLIS (* 1000 30))
 
-(defn max-node-scan-time
+(defn node-stall-time
   []
   (- (h/current-time-millis) NODE-ACTION-STALL-TIME-MILLIS))
+
+;; - this is because nodes can be written out of order, as their IDs are generated on different
+;; tasks
+;; - so we give a little time for them to be written before scanning past them
+(defn max-node-scan-time
+  []
+  (- (h/current-time-millis) NODE-ACTION-MIN-WAIT-MILLIS))
 
 (defn compute-end-offset
   [dep-offset max-scan-offset]
@@ -507,14 +515,17 @@
   [m node-name node-exec]
   (if (nil? node-name)
     m
-    (let [max-time        (max-node-scan-time)
+    (let [stall-time      (node-stall-time)
+          max-time        (max-node-scan-time)
           invalid-offset?
           (fn [[k data]]
-            (and (not (contains? data :finish-time-millis))
-                 (not (contains? data :invoked-agg-invoke-id))
-                 (or (retries/invoke-id-executing? node-exec k)
-                     (and (contains? data :start-time-millis); not strictly necessary
-                          (> (:start-time-millis data) max-time)))))
+            (or (and (contains? data :start-time-millis)
+                     (> (:start-time-millis data) max-time))
+                (and (not (contains? data :finish-time-millis))
+                     (not (contains? data :invoked-agg-invoke-id))
+                     (or (retries/invoke-id-executing? node-exec k)
+                         (and (contains? data :start-time-millis) ; not strictly necessary
+                              (> (:start-time-millis data) stall-time))))))
           first-invalid-offset (select-first [ALL invalid-offset? FIRST] m)]
       (if (nil? first-invalid-offset)
         m
@@ -711,6 +722,22 @@
      [*m]
      (:> (assoc (into {} *m) :run-type (ifexpr (some? *node-name) :node :agent))))
    (po/agent-node-executor-task-global :> *node-exec)
+   ;; TODO: <<<<>>>>
+   ;;   - this is the logic that I want for time-series, along with dependency offset from before
+   ;;   - %match stuff below is still relevant
+   ;;     - use sampling-rate 1 for this
+   ;;     - for node stats it would be no node name but would be on the nodes PState
+   ;;   - should rewrite this so it doesn't re-query underlying data for each chart/rules,
+   ;;   especially if they're synced
+   ;;     - cache should be more intelligent
+   ;;     - it should be querying what's not already cached
+   ;;       - should be agent-name -> :data -> #{:agent, :node} -> data
+   ;;                              -> :rules -> rule-name -> {:action-fn, :end-scan-offset,
+   ;;                                                         :matching-offsets}
+   ;;   - if offset is before the start offset in the cache, then need to read full scan amt
+   ;;       - since not going to scan farther
+   ;;       - if offset is in cache range, then can check how many needs to be read by seeing how
+   ;;       many are in cache after that point
    (local-select> [(sorted-map-range-from *offset *scan-amt)
                    (sorted-map-range *offset *end-offset)
                    (view complete-node-map *node-name *node-exec)

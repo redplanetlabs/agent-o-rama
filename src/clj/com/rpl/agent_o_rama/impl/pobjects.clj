@@ -31,7 +31,9 @@
     StartExperiment
     StreamingChunk]
    [java.util
-    UUID]))
+    UUID]
+   [rpl.rama.distributed.stats.number_stats
+    NumberStats]))
 
 (defn agents-store-info-name
   []
@@ -326,6 +328,42 @@
         :total-token-number-stats EvalNumberStats
        })
       {:subindex? true})
+    })})
+
+
+(defn telemetry-task-global-name
+  [agent-name]
+  (str "$$_aor-telemetry-" agent-name))
+
+(defn- stats-schema
+  [leaf-schema]
+  (map-schema
+   String ; metric name
+   (map-schema
+    Long  ; bucket
+    (fixed-keys-schema
+     {:overall leaf-schema
+      :by-meta (map-schema
+                String ; metadata key
+                {String ; metadata value
+                 leaf-schema}
+                {:subindex? true})
+     })
+    {:subindex? true})
+   {:subindex? true}))
+
+(def GRANULARITIES
+  [60 ; minute`
+   3600 ; hour
+   (* 24 3600) ; day
+   (* 24 3600 30) ; 30-day
+  ])
+
+(def TELEMETRY-PSTATE-SCHEMA
+  {Long  ; granularity as seconds (60 for minute, 3600 for hour, etc.)
+   (fixed-keys-schema
+    {:numeric     (stats-schema NumberStats)
+     :categorical (stats-schema {String Long}) ; category -> counrt
     })})
 
 (defn evaluators-task-global-name
