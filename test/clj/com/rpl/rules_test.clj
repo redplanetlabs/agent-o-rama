@@ -1,4 +1,4 @@
-(ns com.rpl.analytics-test
+(ns com.rpl.rules-test
   (:use [clojure.test]
         [com.rpl.test-helpers]
         [com.rpl.rama]
