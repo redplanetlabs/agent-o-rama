@@ -690,8 +690,8 @@
       :fail (not success?)
       (throw (h/ex-info "Unexpected status filter" {:status-filter status-filter})))))
 
-(deframafn matching-data
-  [*agent-name *target *offset *dep-end-offset *status-filter *filter *sampling-rate]
+(deframafn fetch-data
+  [*agent-name *target *offset *dep-end-offset]
   (<<if (AnaRootTarget? *target)
     (po/agent-active-invokes-task-global *agent-name :> $$active)
     (local-select> [(subselect FIRST) (view first) (view first)] $$active :> *max-scan-offset)
@@ -714,6 +714,10 @@
                    $$p
                    :> *m))
   (compute-end-scan-offset *m *offset :> *end-scan-offset)
+  (:> *m *end-scan-offset))
+
+(deframafn get-matching-offsets
+  [*m *status-filter *filter *sampling-rate]
   (<<ramafn %match?
     [*data]
     (:> (and> (not (experiment-source? *data))
@@ -729,7 +733,7 @@
                       FIRST)
     *m
     :> *matching-offsets)
-  (:> *m *matching-offsets *end-scan-offset))
+  (:> *matching-offsets))
 
 (deframafn compute-dep-end-offset
   [*rule->info *task-id *dependency-names]
@@ -760,15 +764,13 @@
    (get *action-builders *action-name :> {:keys [*builder-fn *options]})
    (get *options :limit-concurrency? false :> *limit-concurrency?)
    (completable-future> (build-action-fn *builder-fn *action-params) :> *action-fn)
-   (matching-data
+   (fetch-data
     *agent-name
     (ifexpr (some? *node-name) (->AnaNodeTarget *node-name) (->AnaRootTarget))
     *offset
     *dep-end-offset
-    *status-filter
-    *filter
-    *sampling-rate
-    :> *m *matching-offsets *end-scan-offset)
+    :> *m *end-scan-offset)
+   (get-matching-offsets *m *status-filter *filter *sampling-rate :> *matching-offsets)
    (local-transform> [(keypath *agent-name *rule-name)
                       (multi-path [:data (termval *m)]
                                   [:action-fn (termval *action-fn)]
@@ -788,30 +790,39 @@
 (deframaop explode-metrics
   [*rule->info]
   ;; TODO: <<<<>>>> implement this
+  ;;  - one per rule with aor/eval action
+  ;;      - possibly multiple metrics per eval?
+  ;;  - one query/metrics list for metrics based on $$nodes
+  ;;  - one query/metrics list for metrics based on $$root
+
+  ;: TODO: <<<<<>>>>
+  ;;  - metrics is just list of fragments that take in the map of data?
+  ;;      - and can have builders for those that target particular parts of $$metrics PState
 )
 
 (deframaop compute-metrics!
   [*agent->rule->info]
   (ops/explode-map *agent->rule->info :> *agent-name *rule->info)
   (explode-metrics *rule->info
-                   :> {:keys [*query-name *dependency-rule-names *target *status-filter *filter]}
-                      *metrics)
+                   :> {:keys [*query-name *dependency-rule-names *target]} *metrics)
   (range> 0 (get-num-tasks) :> *task-id)
   (compute-dep-end-offset *rule->info *task-id *dependency-rule-names :> *dep-end-offset)
   (|direct *task-id)
   (po/agent-metric-cursors-task-global *agent-name :> $$metric-cursors)
   (local-select> (keypath *agent-name *query-name) $$metric-cursors :> *offset)
-  (matching-data
+  (fetch-data
    *agent-name
    *target
    *offset
    *dep-end-offset
-   *status-filter
-   *filter
-   1.0
-   :> *m *matching-offsets *end-scan-offset)
+   :> *m *end-scan-offset)
   (local-transform> [(keypath *agent-name *query-name) (termval *end-scan-offset)] $$metric-cursors)
   ;; TODO: <<<<>>>> compute metrics
+
+
+  ;; TODO: <<<<>>>>
+  ;;;  - metric will have its own status-filter / filter
+  ;(get-matching-offsets *m *status-filter *filter 1.0 :> *matching-offsets)
 
 )
 

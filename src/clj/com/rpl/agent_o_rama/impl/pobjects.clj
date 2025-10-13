@@ -331,7 +331,7 @@
     })})
 
 
-(defn telemetry-task-global-name
+(defn agent-telemetry-task-global-name
   [agent-name]
   (str "$$_aor-telemetry-" agent-name))
 
@@ -359,17 +359,16 @@
    (* 24 3600 30) ; 30-day
   ])
 
-(def TELEMETRY-PSTATE-SCHEMA
+(def AGENT-TELEMETRY-PSTATE-SCHEMA
   {Long  ; granularity as seconds (60 for minute, 3600 for hour, etc.)
    (fixed-keys-schema
     {:numeric     (stats-schema NumberStats)
-     :categorical (stats-schema {String Long}) ; category -> counrt
+     :categorical (stats-schema {String Long}) ; category -> count
     })})
 
 (defn evaluators-task-global-name
   []
   "$$_aor-evaluators")
-
 
 (def EVALUATORS-PSTATE-SCHEMA
   {String (fixed-keys-schema
@@ -493,6 +492,10 @@
 (defn agent-metric-cursors-task-global
   [name]
   (this-module-pobject-task-global (agent-metric-cursors-task-global-name name)))
+
+(defn agent-telemetry-task-global
+  [name]
+  (this-module-pobject-task-global (agent-telemetry-task-global-name name)))
 
 (defn agent-global-config-task-global
   []

@@ -163,6 +163,11 @@
      analytics-mb-topology
      (symbol (po/agent-metric-cursors-task-global-name agent-name))
      po/AGENT-METRIC-CURSORS-PSTATE-SCHEMA)
+    (declare-pstate*
+     analytics-mb-topology
+     (symbol (po/agent-telemetry-task-global-name agent-name))
+     po/AGENT-TELEMETRY-PSTATE-SCHEMA)
+
     (retries/declare-check-impl mb-topology agent-name)
     (queries/declare-tracing-query-topology topologies agent-name)
     (queries/declare-fork-affected-aggs-query-topology topologies agent-name)
