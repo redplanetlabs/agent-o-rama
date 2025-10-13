@@ -798,6 +798,9 @@
   ;: TODO: <<<<<>>>>
   ;;  - metrics is just list of fragments that take in the map of data?
   ;;      - and can have builders for those that target particular parts of $$metrics PState
+
+
+  ;; TODO: <<<<>>>>> use po/GRANULARITIES
 )
 
 (deframaop compute-metrics!
