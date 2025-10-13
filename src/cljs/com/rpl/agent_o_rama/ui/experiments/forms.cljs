@@ -98,15 +98,16 @@
         :empty-content empty-content
         :data-testid data-testid})))
 
-(defui EvaluatorSelector [{:keys [module-id selected-evaluators on-change filter-type]}]
+(defui EvaluatorSelector [{:keys [module-id selected-evaluators on-change filter-type use-remote?]}]
   (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
+        [remote-eval-name set-remote-eval-name] (uix/use-state "")
         trigger-ref (uix/use-ref nil)
         [position set-position] (uix/use-state nil)
         {:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:evaluator-instances module-id]
           :sente-event [:evaluators/get-all-instances {:module-id module-id}]
-          :enabled? (boolean module-id)})
+          :enabled? (and (boolean module-id) (not use-remote?))})
         all-evaluators (or (:items data) [])
         ;; Filter evaluators based on the experiment type
         filtered-evaluators (if filter-type
@@ -143,12 +144,19 @@
           ($ :div.flex.flex-wrap.gap-2.mb-2
              (if (seq selected-evaluators)
                (for [e selected-evaluators
-                     :let [evaluator-info (first (filter #(= (:name %) (:name e)) filtered-evaluators))]]
-                 ($ :div.inline-flex.items-center.gap-2.px-3.py-2.rounded-lg.text-xs.font-medium.bg-indigo-100.text-indigo-800.border.border-indigo-200
-                    {:key (:name e)}
+                     :let [is-remote-eval? (:remote? e)
+                           evaluator-info (when-not is-remote-eval?
+                                            (first (filter #(= (:name %) (:name e)) filtered-evaluators)))]]
+                 ($ :div.inline-flex.items-center.gap-2.px-3.py-2.rounded-lg.text-xs.font-medium
+                    {:key (:name e)
+                     :className (if is-remote-eval?
+                                  "bg-purple-100 text-purple-800 border border-purple-200"
+                                  "bg-indigo-100 text-indigo-800 border border-indigo-200")}
                     ($ :<>
                        ($ :div.flex.flex-col.gap-1
                           ($ :div.flex.items-center.gap-2
+                             (when is-remote-eval?
+                               ($ :span.uppercase.font-bold.text-purple-600.text-xs "REMOTE"))
                              ($ :span.font-semibold (:name e))
                              (when evaluator-info
                                ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
@@ -156,12 +164,34 @@
                                   (evaluators/get-evaluator-type-display (:type evaluator-info)))))
                           (when (and evaluator-info (not (str/blank? (:description evaluator-info))))
                             ($ :span.text-indigo-600.max-w-xs.truncate (:description evaluator-info))))
-                       ($ :button.p-1.rounded-full.hover:bg-indigo-200.transition-colors
-                          {:onClick #(on-change (vec (remove (fn [sel] (= (:name sel) (:name e))) selected-evaluators)))}
+                       ($ :button.p-1.rounded-full.transition-colors
+                          {:className (if is-remote-eval? "hover:bg-purple-200" "hover:bg-indigo-200")
+                           :onClick #(on-change (vec (remove (fn [sel] (= (:name sel) (:name e))) selected-evaluators)))}
                           ($ XMarkIcon {:className "h-3 w-3"})))))
                ($ :div.text-sm.text-gray-500.italic "No evaluators selected."))))
-       ($ :div.relative
-          ($ :button.inline-flex.items-center.gap-2.text-sm.text-blue-600.hover:underline
+       
+       ;; Conditional rendering based on use-remote?
+       (if use-remote?
+         ;; Remote evaluator text input
+         ($ :div.flex.gap-2.items-center
+            ($ :input.flex-1.px-3.py-2.border.border-gray-300.rounded-md.text-sm
+               {:type "text"
+                :value remote-eval-name
+                :on-change #(set-remote-eval-name (.. % -target -value))
+                :placeholder "Enter remote evaluator name (e.g., aor/conciseness)"})
+            ($ :button.inline-flex.items-center.gap-2.px-3.py-2.text-sm.bg-indigo-600.text-white.rounded-md.hover:bg-indigo-700
+               {:type "button"
+                :disabled (str/blank? remote-eval-name)
+                :onClick (fn []
+                           (when-not (str/blank? remote-eval-name)
+                             (on-change (conj selected-evaluators {:name remote-eval-name :remote? true}))
+                             (set-remote-eval-name "")))}
+               ($ PlusIcon {:className "h-4 w-4"})
+               "Add Remote Evaluator"))
+         
+         ;; Local evaluator dropdown
+         ($ :div.relative
+            ($ :button.inline-flex.items-center.gap-2.text-sm.text-blue-600.hover:underline
              {:type "button"
               :ref #(set! (.-current trigger-ref) %)
               :onClick (fn [e]
@@ -202,7 +232,7 @@
                                    (when-not (str/blank? (:description e))
                                      ($ :span.text-sm.text-gray-600.max-w-xs.truncate (:description e)))
                                    ($ :span.text-xs.text-gray-500.font-mono (:builder-name e))))))))
-             (.-body js/document)))))))
+             (.-body js/document))))))))
 
 ;; =============================================================================
 ;; MAIN EXPERIMENT FORM COMPONENTS
@@ -318,12 +348,24 @@
 (defui CreateExperimentForm [{:keys [form-id]}]
   (let [{:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
 
+        ;; Check if dataset is remote
+        {:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:dataset-props module-id dataset-id]
+          :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
+          :enabled? (and (boolean module-id) (boolean dataset-id))})
+        is-remote-dataset? (:module-name data)
+
         ;; Basic info fields
         name-field (forms/use-form-field form-id :name)
         ;; Data selection fields
         snapshot-field (forms/use-form-field form-id :snapshot)
         selector-type-field (forms/use-form-field form-id [:selector :type])
         selector-tag-field (forms/use-form-field form-id [:selector :tag])
+        
+        ;; Remote evaluator fields
+        use-remote-evaluators-field (forms/use-form-field form-id :use-remote-evaluators)
+        use-remote-evaluators? (:value use-remote-evaluators-field)
 
         ;; Get selected examples from global state
         selected-example-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
@@ -432,12 +474,30 @@
        ;; Evaluation Section
        ($ :div.mb-8
           ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "Evaluation")
+          
+          ;; Show "Use remote evaluators" checkbox only for remote datasets
+          (when is-remote-dataset?
+            ($ :div.mb-4.flex.items-center
+               ($ :input.h-4.w-4.border-gray-300.text-indigo-600.focus:ring-indigo-500
+                  {:type "checkbox"
+                   :id "use-remote-evaluators"
+                   :checked use-remote-evaluators?
+                   :on-change #(do
+                                 ;; Toggle the checkbox
+                                 ((:on-change use-remote-evaluators-field) (.. % -target -checked))
+                                 ;; Clear evaluators when toggling
+                                 (state/dispatch [:form/update-field form-id :evaluators []]))})
+               ($ :label.ml-2.block.text-sm.text-gray-700
+                  {:htmlFor "use-remote-evaluators"}
+                  "Use remote evaluators")))
+          
           (let [evaluators-field (forms/use-form-field form-id :evaluators)]
             ($ EvaluatorSelector
                {:module-id module-id
                 :selected-evaluators (:value evaluators-field)
                 :on-change (:on-change evaluators-field)
-                :filter-type spec-type})))
+                :filter-type spec-type
+                :use-remote? use-remote-evaluators?})))
 
        ;; Execution Settings Section
        ($ :div.mb-8
@@ -474,6 +534,7 @@
                                    :metadata ""
                                    :input->args [{:id (random-uuid) :value "$"}]}]}
                  :evaluators []
+                 :use-remote-evaluators false
                  :num-repetitions 1
                  :concurrency 1}
            merged (merge base props)

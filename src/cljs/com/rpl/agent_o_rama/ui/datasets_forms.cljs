@@ -27,34 +27,105 @@
 
 (defui CreateDatasetForm [{:keys [form-id]}]
   (let [{:keys [fields field-errors]} (forms/use-form form-id)
+        dataset-type-field (forms/use-form-field form-id :dataset-type)
+        is-remote? (= (:value dataset-type-field) :remote)
+        
+        ;; Local dataset fields
         name-field (forms/use-form-field form-id :name)
         description-field (forms/use-form-field form-id :description)
         input-schema-field (forms/use-form-field form-id :input-schema)
-        output-schema-field (forms/use-form-field form-id :output-schema)]
+        output-schema-field (forms/use-form-field form-id :output-schema)
+        
+        ;; Remote dataset fields
+        local-name-field (forms/use-form-field form-id :local-name)
+        remote-dataset-id-field (forms/use-form-field form-id :remote-dataset-id)
+        module-name-field (forms/use-form-field form-id :module-name)
+        host-field (forms/use-form-field form-id :cluster-conductor-host)
+        port-field (forms/use-form-field form-id :cluster-conductor-port)]
 
     ($ forms/form
-       ($ forms/form-field {:label "Name"
-                            :value (:value name-field)
-                            :on-change (:on-change name-field)
-                            :error (:error name-field)
-                            :required? true})
-       ($ forms/form-field {:label "Description"
-                            :type :textarea
-                            :value (:value description-field)
-                            :on-change (:on-change description-field)
-                            :error (:error description-field)})
-       ($ forms/form-field {:label "Input JSON Schema (Optional)"
-                            :type :textarea
-                            :value (:value input-schema-field)
-                            :on-change (:on-change input-schema-field)
-                            :error (:error input-schema-field)
-                            :placeholder example-schema})
-       ($ forms/form-field {:label "Output JSON Schema (Optional)"
-                            :type :textarea
-                            :value (:value output-schema-field)
-                            :on-change (:on-change output-schema-field)
-                            :error (:error output-schema-field)
-                            :placeholder example-schema}))))
+       ;; Dataset Type Toggle
+       ($ :div.mb-6
+          ($ :label.block.text-sm.font-medium.text-gray-700.mb-3 "Dataset Type")
+          ($ :div.flex.gap-4
+             ($ :div.flex.items-center
+                ($ :input.h-4.w-4.border-gray-300.text-indigo-600.focus:ring-indigo-500
+                   {:type "radio"
+                    :id "local-dataset"
+                    :name "dataset-type"
+                    :checked (not is-remote?)
+                    :on-change #((:on-change dataset-type-field) :local)})
+                ($ :label.ml-2.block.text-sm.text-gray-700
+                   {:htmlFor "local-dataset"}
+                   "Local Dataset"))
+             ($ :div.flex.items-center
+                ($ :input.h-4.w-4.border-gray-300.text-indigo-600.focus:ring-indigo-500
+                   {:type "radio"
+                    :id "remote-dataset"
+                    :name "dataset-type"
+                    :checked is-remote?
+                    :on-change #((:on-change dataset-type-field) :remote)})
+                ($ :label.ml-2.block.text-sm.text-gray-700
+                   {:htmlFor "remote-dataset"}
+                   "Remote Dataset Link"))))
+       
+       ;; Conditional fields based on dataset type
+       (if is-remote?
+         ;; Remote dataset fields
+         ($ :<>
+            ($ forms/form-field {:label "Local Display Name"
+                                 :value (:value local-name-field)
+                                 :on-change (:on-change local-name-field)
+                                 :error (:error local-name-field)
+                                 :required? true
+                                 :placeholder "e.g., Golden Benchmark Set v2"})
+            ($ forms/form-field {:label "Remote Dataset ID"
+                                 :value (:value remote-dataset-id-field)
+                                 :on-change (:on-change remote-dataset-id-field)
+                                 :error (:error remote-dataset-id-field)
+                                 :required? true
+                                 :placeholder "e.g., 01234567-89ab-cdef-0123-456789abcdef"})
+            ($ forms/form-field {:label "Remote Module Name"
+                                 :value (:value module-name-field)
+                                 :on-change (:on-change module-name-field)
+                                 :error (:error module-name-field)
+                                 :required? true
+                                 :placeholder "e.g., MyRemoteModule"})
+            ($ forms/form-field {:label "Conductor Host (Optional)"
+                                 :value (:value host-field)
+                                 :on-change (:on-change host-field)
+                                 :error (:error host-field)
+                                 :placeholder "e.g., cluster-b.example.com"})
+            ($ forms/form-field {:label "Conductor Port (Optional)"
+                                 :type :number
+                                 :value (:value port-field)
+                                 :on-change (:on-change port-field)
+                                 :error (:error port-field)
+                                 :placeholder "e.g., 6657"}))
+         ;; Local dataset fields
+         ($ :<>
+            ($ forms/form-field {:label "Name"
+                                 :value (:value name-field)
+                                 :on-change (:on-change name-field)
+                                 :error (:error name-field)
+                                 :required? true})
+            ($ forms/form-field {:label "Description"
+                                 :type :textarea
+                                 :value (:value description-field)
+                                 :on-change (:on-change description-field)
+                                 :error (:error description-field)})
+            ($ forms/form-field {:label "Input JSON Schema (Optional)"
+                                 :type :textarea
+                                 :value (:value input-schema-field)
+                                 :on-change (:on-change input-schema-field)
+                                 :error (:error input-schema-field)
+                                 :placeholder example-schema})
+            ($ forms/form-field {:label "Output JSON Schema (Optional)"
+                                 :type :textarea
+                                 :value (:value output-schema-field)
+                                 :on-change (:on-change output-schema-field)
+                                 :error (:error output-schema-field)
+                                 :placeholder example-schema}))))))
 
 ;; =============================================================================
 ;; NEW: REG-FORM SPECIFICATIONS
@@ -66,15 +137,43 @@
 
   :main
   {:initial-fields (fn [props]
-                     (merge {:name ""
+                     (merge {:dataset-type :local
+                             ;; Local dataset fields
+                             :name ""
                              :description ""
                              :input-schema ""
-                             :output-schema ""}
+                             :output-schema ""
+                             ;; Remote dataset fields
+                             :local-name ""
+                             :remote-dataset-id ""
+                             :module-name ""
+                             :cluster-conductor-host ""
+                             :cluster-conductor-port ""}
                             props))
 
-   :validators {:name [forms/required]
+   :validators {:name [(fn [v form-state]
+                         (when (and (= (:dataset-type form-state) :local)
+                                    (str/blank? v))
+                           "Name is required"))]
+                :local-name [(fn [v form-state]
+                              (when (and (= (:dataset-type form-state) :remote)
+                                         (str/blank? v))
+                                "Local display name is required"))]
+                :remote-dataset-id [(fn [v form-state]
+                                     (when (and (= (:dataset-type form-state) :remote)
+                                                (str/blank? v))
+                                       "Remote dataset ID is required"))]
+                :module-name [(fn [v form-state]
+                               (when (and (= (:dataset-type form-state) :remote)
+                                          (str/blank? v))
+                                 "Remote module name is required"))]
                 :input-schema [forms/valid-json]
-                :output-schema [forms/valid-json]}
+                :output-schema [forms/valid-json]
+                :cluster-conductor-port [(fn [v form-state]
+                                          (when (and (= (:dataset-type form-state) :remote)
+                                                     (not (str/blank? v))
+                                                     (js/isNaN (js/parseInt v)))
+                                            "Port must be a number"))]}
 
    :ui (fn [{:keys [form-id]}]
          ($ CreateDatasetForm {:form-id form-id}))
@@ -83,7 +182,18 @@
                  :submit-text "Create Dataset"}}
   :on-submit
   {:event (fn [db form-state]
-            [:datasets/create form-state])
+            (if (= (:dataset-type form-state) :remote)
+              ;; Remote dataset
+              [:datasets/add-remote (-> form-state
+                                        (select-keys [:local-name :remote-dataset-id :module-name 
+                                                      :cluster-conductor-host :cluster-conductor-port
+                                                      :module-id])
+                                        (assoc :cluster-conductor-port
+                                               (when-not (str/blank? (:cluster-conductor-port form-state))
+                                                 (js/parseInt (:cluster-conductor-port form-state)))))]
+              ;; Local dataset
+              [:datasets/create (select-keys form-state [:module-id :name :description 
+                                                          :input-schema :output-schema])]))
    :on-success-invalidate (fn [db {:keys [module-id]} _reply]
                             {:query-key-pattern [:datasets module-id]})}})
 

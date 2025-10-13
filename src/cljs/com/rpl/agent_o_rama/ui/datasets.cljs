@@ -693,43 +693,64 @@
                ($ :tbody
                   (into []
                         (for [dataset datasets
-                              :let [name (:name dataset)
+                              :let [is-remote? (:remote? dataset)
+                                    name (:name dataset)
                                     desc (:description dataset)
                                     dsid (:dataset-id dataset)
-                                    href (get-dataset-path module-id dsid)]]
+                                    href (get-dataset-path module-id dsid)
+                                    ;; Format remote description
+                                    remote-desc (when is-remote?
+                                                  (let [host (:remote-host dataset)
+                                                        port (:remote-port dataset)
+                                                        module (:remote-module-name dataset)]
+                                                    (cond
+                                                      (and host port) (str host ":" port " " module)
+                                                      host (str host " " module)
+                                                      :else module)))]]
                           ($ :tr {:key dsid
-                                  :className "hover:bg-gray-50 cursor-pointer"
+                                  :className (common/cn "hover:bg-gray-50 cursor-pointer"
+                                                        {"bg-purple-50" is-remote?})
                                   :onClick (fn [_]
-                                             (rfe/push-state :module/dataset-detail.examples
-                                                             {:module-id module-id
-                                                              :dataset-id dsid}))}
+                                             (when-not is-remote?
+                                               (rfe/push-state :module/dataset-detail.examples
+                                                               {:module-id module-id
+                                                                :dataset-id dsid})))}
                              ($ :td {:className (:td common/table-classes)}
-                                ($ :a.text-indigo-600.hover:text-indigo-800 {:href href} name))
+                                (if is-remote?
+                                  ($ :div.flex.flex-col.gap-1
+                                     ($ :span.text-purple-700.font-semibold.uppercase.text-xs "REMOTE DATASET")
+                                     ($ :span.text-xs.text-gray-600 name))
+                                  ($ :a.text-indigo-600.hover:text-indigo-800 {:href href} name)))
                              ($ :td {:className (:td common/table-classes)}
-                                (if (seq (str desc))
-                                  ($ :span.text-sm.text-gray-600.desc.truncate {:title desc} desc)
-                                  ($ :span.text-sm.text-gray-400.italic "—")))
+                                (if is-remote?
+                                  ($ :span.text-sm.text-purple-600.font-mono remote-desc)
+                                  (if (seq (str desc))
+                                    ($ :span.text-sm.text-gray-600.desc.truncate {:title desc} desc)
+                                    ($ :span.text-sm.text-gray-400.italic "—"))))
                              ($ :td {:className (:td common/table-classes)}
-                                ($ :span.text-sm.text-gray-600 {:title (common/format-timestamp (:created-at dataset))}
-                                   (common/format-relative-time (:created-at dataset))))
+                                (when-not is-remote?
+                                  ($ :span.text-sm.text-gray-600 {:title (common/format-timestamp (:created-at dataset))}
+                                     (common/format-relative-time (:created-at dataset)))))
                              ($ :td {:className (:td common/table-classes)}
-                                ($ :span.text-sm.text-gray-600 {:title (common/format-timestamp (:modified-at dataset))}
-                                   (common/format-relative-time (:modified-at dataset))))
+                                (when-not is-remote?
+                                  ($ :span.text-sm.text-gray-600 {:title (common/format-timestamp (:modified-at dataset))}
+                                     (common/format-relative-time (:modified-at dataset)))))
                              ($ :td {:className (:td-right common/table-classes)}
                                 ($ :div.flex.items-center.space-x-2
-                                   ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-gray-700.cursor-pointer
-                                      {:onClick (fn [e]
-                                                  (.preventDefault e)
-                                                  (.stopPropagation e)
-                                                  (state/dispatch [:modal/show-form :edit-dataset
-                                                                   {:module-id module-id
-                                                                    :dataset-id dsid
-                                                                    :name name
-                                                                    :description desc
-                                                                    :initial-name name
-                                                                    :initial-description desc}]))}
-                                      ($ PencilIcon {:className "h-4 w-4 mr-1"})
-                                      "Edit")
+                                   (when-not is-remote?
+                                     ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-gray-700.cursor-pointer
+                                        {:onClick (fn [e]
+                                                    (.preventDefault e)
+                                                    (.stopPropagation e)
+                                                    (state/dispatch [:modal/show-form :edit-dataset
+                                                                     {:module-id module-id
+                                                                      :dataset-id dsid
+                                                                      :name name
+                                                                      :description desc
+                                                                      :initial-name name
+                                                                      :initial-description desc}]))}
+                                        ($ PencilIcon {:className "h-4 w-4 mr-1"})
+                                        "Edit"))
                                    ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
                                       {:onClick (fn [e]
                                                   (.preventDefault e)
