@@ -704,12 +704,15 @@
     [*m]
     (:> (assoc (into {} *m) :run-type (ifexpr (AnaRootTarget? *target) :agent :node))))
   (po/agent-node-executor-task-global :> *node-exec)
-  (local-select> [(sorted-map-range-from *offset *scan-amt)
-                  (sorted-map-range *offset *end-offset)
-                  (view complete-node-map *target *node-exec)
-                  (transformed MAP-VALS %add-run-type)]
-                 $$p
-                 :> *m)
+  (<<if (>= (compare *offset *end-offset) 0)
+    (sorted-map :> *m)
+   (else>)
+    (local-select> [(sorted-map-range-from *offset *scan-amt)
+                    (sorted-map-range *offset *end-offset)
+                    (view complete-node-map *target *node-exec)
+                    (transformed MAP-VALS %add-run-type)]
+                   $$p
+                   :> *m))
   (compute-end-scan-offset *m *offset :> *end-scan-offset)
   (<<ramafn %match?
     [*data]
@@ -782,6 +785,35 @@
      (run-one-action! *cache-pstate-name *agent-name *rule-name *offset *action-name *node-name)
    )))
 
+(deframaop explode-metrics
+  [*rule->info]
+  ;; TODO: <<<<>>>> implement this
+)
+
+(deframaop compute-metrics!
+  [*agent->rule->info]
+  (ops/explode-map *agent->rule->info :> *agent-name *rule->info)
+  (explode-metrics *rule->info
+                   :> {:keys [*query-name *dependency-rule-names *target *status-filter *filter]}
+                      *metrics)
+  (range> 0 (get-num-tasks) :> *task-id)
+  (compute-dep-end-offset *rule->info *task-id *dependency-rule-names :> *dep-end-offset)
+  (|direct *task-id)
+  (po/agent-metric-cursors-task-global *agent-name :> $$metric-cursors)
+  (local-select> (keypath *agent-name *query-name) $$metric-cursors :> *offset)
+  (matching-data
+   *agent-name
+   *target
+   *offset
+   *dep-end-offset
+   *status-filter
+   *filter
+   1.0
+   :> *m *matching-offsets *end-scan-offset)
+  (local-transform> [(keypath *agent-name *query-name) (termval *end-scan-offset)] $$metric-cursors)
+  ;; TODO: <<<<>>>> compute metrics
+
+)
 
 (defn to-action-queue
   [task->agent->rule->info]
@@ -867,17 +899,17 @@
         cache-pstate-name (str cache-pstate)
         processed-pstate (gen-pstatevar "processed-offsets")
         processed-pstate-name (str processed-pstate)
-        processed-agg-pstate (gen-pstatevar "processed-agg")]
+        processed-agg-pstate (gen-pstatevar "processed-agg")
+        root-anchor (gen-anchorvar "root")]
     [[anode/read-global-config aor-types/MAX-LIMITED-ACTIONS-CONCURRENCY-CONFIG :> '*max-concurrency]
      [anode/read-global-config aor-types/ACTIONS-PROCESSING-ITERATION-TIME-MILLIS-CONFIG :> '*target-millis]
      [h/current-time-millis :> '*actions-start-time-millis]
      [read-rules :> '*agent->rule->info]
-      ;; TODO: <<<<>>>> branch here to do analytics in parallel
-      ;;  - if branching, then can't update the cursors the same way
-      ;;    - so in this case, use different PState for its cursors
-      ;;    - and analytics cursors can just be local on each task then
-      ;;      - except that dependency rule cursors are on root
-      ;;        - but can fetch the subset of those to transfer over
+
+     [anchor> root-anchor]
+     [compute-metrics! '*agent->rule->info]
+
+     [hook> root-anchor]
      [<<batch
       [filter> false]
       [materialize> :> cache-pstate]

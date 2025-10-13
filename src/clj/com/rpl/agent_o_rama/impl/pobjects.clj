@@ -397,6 +397,14 @@
 (def AGENT-RULE-CURSORS-PSTATE-SCHEMA
   java.util.Map)
 
+(defn agent-metric-cursors-task-global-name
+  [agent-name]
+  (str "$$_agent-metric-cursors-" agent-name))
+
+;; metric-name -> UUID
+(def AGENT-METRIC-CURSORS-PSTATE-SCHEMA
+  java.util.Map)
+
 ;; Task global fetch helpers
 
 (defn agent-node-executor-task-global
@@ -481,6 +489,10 @@
 (defn agent-rule-cursors-task-global
   [name]
   (this-module-pobject-task-global (agent-rule-cursors-task-global-name name)))
+
+(defn agent-metric-cursors-task-global
+  [name]
+  (this-module-pobject-task-global (agent-metric-cursors-task-global-name name)))
 
 (defn agent-global-config-task-global
   []
