@@ -136,25 +136,6 @@
 ;; WIZARD FORM COMPONENTS
 ;; =============================================================================
 
-(defui WizardProgressBar [{:keys [steps current-step]}]
-  ;; Only render if there are multiple steps
-  (when (> (count steps) 1)
-    ($ :div.mb-8.px-4.pt-4
-       ($ :ol.flex.items-center.w-full
-          (for [[idx step-key] (map-indexed vector steps)
-                :let [step-title (-> (name step-key) (str/replace "-" " ") str/capitalize)
-                      current-step-idx (.indexOf steps current-step)
-                      is-done (< idx current-step-idx)
-                      is-current (= idx current-step-idx)
-                      is-last? (= idx (dec (count steps)))]]
-            ($ :li {:key (str step-key)
-                    :className (common/cn "flex w-full items-center"
-                                          {"after:content-[''] after:w-full after:h-1 after:border-b after:border-4 after:inline-block" (not is-last?)}
-                                          (if is-done "after:border-blue-600" "after:border-gray-200"))}
-               ($ :span {:className (common/cn "flex items-center justify-center w-10 h-10 rounded-full shrink-0"
-                                               (if (or is-done is-current) "bg-blue-100 text-blue-600" "bg-gray-100 text-gray-500"))}
-                  ($ :span.text-xs.font-bold step-title))))))))
-
 (defui WizardForm [{:keys [form-id]}]
   (let [form (use-form form-id)
         form-spec (get @form-specs form-id)
@@ -163,10 +144,6 @@
         ui-fn (:ui current-step-spec)]
 
     ($ :div.flex.flex-col.h-full
-       ;; Only show progress bar for multi-step wizards
-       (when (> (count steps) 1)
-         ($ WizardProgressBar {:steps steps :current-step current-step}))
-
        ($ :div.flex-1.min-h-0.overflow-y-auto
           (if ui-fn
             (ui-fn {:form-id form-id :props form})
