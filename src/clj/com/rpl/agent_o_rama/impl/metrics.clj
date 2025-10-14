@@ -2,8 +2,14 @@
   (:use [com.rpl.rama]
         [com.rpl.rama path])
   (:require
-   [com.rpl.agent-o-rama.impl.types :as aor-types]))
+   [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.impl.stats :as stats]))
 
+(defn run-success?
+  [{:keys [run-type result finish-time-millis] :as _data-map}]
+  (if (= :agent run-type)
+    (not (:failure? result))
+    (some? finish-time-millis)))
 
 (def ALL-METRICS {})
 
@@ -37,6 +43,7 @@
 ;; TODO: <<<<>>>>
 ;;  - success/failure should also be an implicit metadata selection
 ;;    - "aor/status"
+;;    - this also means that it needs to be indexed for every single one...
 
 
 (defmetric
@@ -48,14 +55,7 @@
     {:type   :numeric
      :values [1]})})
 
-
-(defn run-success?
-  [{:keys [run-type result finish-time-millis] :as _data-map}]
-  (if (= :agent run-type)
-    (not (:failure? result))
-    (some? finish-time-millis)))
-
-(aor-types/defmetric
+(defmetric
  AgentSuccessRate
  {:id       [:agent :success-rate]
   :target   :root
@@ -64,7 +64,7 @@
     {:type   :numeric
      :values [(if (run-success? data-map) 1 0)]})})
 
-(aor-types/defmetric
+(defmetric
  AgentLatency
  {:id       [:agent :latency]
   :target   :root
@@ -74,10 +74,22 @@
      :values (if (and start-time-millis finish-time-millis)
                [(- finish-time-millis start-time-millis)])})})
 
+;; this is used for LLM call count (sum) as well as LLM call count / trace (percentiles)
+(defmetric
+ ModelCallCount
+ {:id       [:agent :model-call-count]
+  :target   :root
+  :value-fn
+  (fn [{:keys [stats]}]
+    (let [basic-stats (stats/aggregated-basic-stats stats)
+          count       (-> basic-stats
+                          :nested-op-stats
+                          :model-call
+                          (get :count 0))]
+      {:type   :numeric
+       :values [count]}))})
 
-; - LLM call counts (look at nested ops on $$nodes)
-;   - numeric count of nested-ops with :model-call
-;     - what about having nested-op type counts chart (could be separate one)
+
 ; - input/output/total token counts
 ;   - look at stats on root
 ;   - separate chart, or dimensions?
@@ -91,17 +103,13 @@
 ; - LLM latency
 ;   - numeric, but multiple data points in one piece of data
 ;     - so numeric should be a list of numbers
-; - trace latency
-;   - on root
-;   - numeric
+; - store/database call counts/latency stats
 ; - tokens / second
 ;   - this is just view of "total tokens"
 ;   - but how to get rate?
 ;     - it's just the total count
 ;   - maybe category charts can have "rate" switch to show category / second
-; - LLM calls / trace
-;   - numeric on root
-;   - this is just nested-op stats on trace stats
+; - tokens / trace
 ; - streaming metrics:
 ;   - agent time to first token
 ;     - on root, numeric
