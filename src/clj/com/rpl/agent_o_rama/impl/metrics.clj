@@ -48,17 +48,9 @@
 ;; TODO: <<<<>>>>
 ;;  - seems like don't need filter / status-filter on defmetric
 
-
-(defmetric
- AgentInvokeCount
- {:id       [:agent :invoke-count]
-  :target   :root
-  :value-fn
-  (fn [data-map]
-    {:type   :numeric
-     :values [1]
-    })})
-
+;; this powers:
+;;  - agent invoke count (just the count in the NumberStats)
+;   - success rate (sum over the count)
 (defmetric
  AgentSuccessRate
  {:id       [:agent :success-rate]
@@ -76,7 +68,7 @@
   :value-fn
   (fn [{:keys [start-time-millis finish-time-millis]}]
     {:type   :numeric
-     :values (if (and start-time-millis finish-time-millis)
+     :values (if (and start-time-millis finish-time-millis) ; defensive, shouldn't be necessary
                [(- finish-time-millis start-time-millis)])
     })})
 
@@ -101,7 +93,7 @@
 ;;  - token count / trace (percentiles)
 (defmetric
  TokenCounts
- {:id       [:agent :input-token-count]
+ {:id       [:agent :token-counts]
   :target   :root
   :value-fn
   (fn [{:keys [stats]}]
