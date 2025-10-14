@@ -97,36 +97,16 @@
 ;;  - token count (sum)
 ;;  - token count / trace (percentiles)
 (defmetric
- InputTokenCount
+ TokenCounts
  {:id       [:agent :input-token-count]
   :target   :root
   :value-fn
   (fn [{:keys [stats]}]
     (let [basic-stats (stats/aggregated-basic-stats stats)]
-      {:type   :numeric
-       :values [(:input-token-count basic-stats)]
-      }))})
-
-(defmetric
- OutputTokenCount
- {:id       [:agent :output-token-count]
-  :target   :root
-  :value-fn
-  (fn [{:keys [stats]}]
-    (let [basic-stats (stats/aggregated-basic-stats stats)]
-      {:type   :numeric
-       :values [(:output-token-count basic-stats)]
-      }))})
-
-(defmetric
- TotalTokenCount
- {:id       [:agent :total-token-count]
-  :target   :root
-  :value-fn
-  (fn [{:keys [stats]}]
-    (let [basic-stats (stats/aggregated-basic-stats stats)]
-      {:type   :numeric
-       :values [(:total-token-count basic-stats)]
+      {:type   :categorical
+       :values {"input"  (:input-token-count basic-stats)
+                "output" (:output-token-count basic-stats)
+                "total"  (:total-token-count basic-stats)}
       }))})
 
 (defmetric
@@ -156,7 +136,8 @@
 
 
 
-; - store/database call counts/latency stats
+; - store
+;   - operation counts/database call counts/latency stats
 ; - streaming metrics:
 ;   - agent time to first token
 ;     - on root, numeric
