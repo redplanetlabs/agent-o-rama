@@ -67,30 +67,12 @@
                     :on-change #((:on-change dataset-type-field) :remote)})
                 ($ :label.ml-2.block.text-sm.text-gray-700
                    {:htmlFor "remote-dataset"}
-                   "Remote Dataset Link"))))
+                   "Remote Dataset"))))
        
        ;; Conditional fields based on dataset type
        (if is-remote?
          ;; Remote dataset fields
          ($ :<>
-            ($ forms/form-field {:label "Local Display Name"
-                                 :value (:value local-name-field)
-                                 :on-change (:on-change local-name-field)
-                                 :error (:error local-name-field)
-                                 :required? true
-                                 :placeholder "e.g., Golden Benchmark Set v2"})
-            ($ forms/form-field {:label "Remote Dataset ID"
-                                 :value (:value remote-dataset-id-field)
-                                 :on-change (:on-change remote-dataset-id-field)
-                                 :error (:error remote-dataset-id-field)
-                                 :required? true
-                                 :placeholder "e.g., 01234567-89ab-cdef-0123-456789abcdef"})
-            ($ forms/form-field {:label "Remote Module Name"
-                                 :value (:value module-name-field)
-                                 :on-change (:on-change module-name-field)
-                                 :error (:error module-name-field)
-                                 :required? true
-                                 :placeholder "e.g., MyRemoteModule"})
             ($ forms/form-field {:label "Conductor Host (Optional)"
                                  :value (:value host-field)
                                  :on-change (:on-change host-field)
@@ -101,7 +83,25 @@
                                  :value (:value port-field)
                                  :on-change (:on-change port-field)
                                  :error (:error port-field)
-                                 :placeholder "e.g., 6657"}))
+                                 :placeholder "e.g., 6657"})
+            ($ forms/form-field {:label "Remote Module Name"
+                                 :value (:value module-name-field)
+                                 :on-change (:on-change module-name-field)
+                                 :error (:error module-name-field)
+                                 :required? true
+                                 :placeholder "e.g., MyRemoteModule"})
+            ($ forms/form-field {:label "Remote Dataset ID"
+                                 :value (:value remote-dataset-id-field)
+                                 :on-change (:on-change remote-dataset-id-field)
+                                 :error (:error remote-dataset-id-field)
+                                 :required? true
+                                 :placeholder "e.g., 01234567-89ab-cdef-0123-456789abcdef"})
+            ($ forms/form-field {:label "Local Display Name"
+                                 :value (:value local-name-field)
+                                 :on-change (:on-change local-name-field)
+                                 :error (:error local-name-field)
+                                 :required? true
+                                 :placeholder "e.g., Golden Benchmark Set v2"}))
          ;; Local dataset fields
          ($ :<>
             ($ forms/form-field {:label "Name"
