@@ -110,7 +110,7 @@
    {:actions {String Object}
     :results [FeedbackImpl]}))
 
-(def AGENT-ROOT-PSTATE-SCHEMA
+(defn AGENT-ROOT-PSTATE-SCHEMA []
   {UUID
    (fixed-keys-schema
     {:root-invoke-id UUID
@@ -174,7 +174,7 @@
   [agent-name]
   (str "$$_agent-node-" agent-name))
 
-(def AGENT-NODE-PSTATE-SCHEMA
+(defn AGENT-NODE-PSTATE-SCHEMA []
   {UUID ; invoke-id
    (fixed-keys-schema
     {:agent-id            UUID
@@ -252,7 +252,7 @@
   []
   "$$_aor-datasets")
 
-(def DATASETS-PSTATE-SCHEMA
+(defn DATASETS-PSTATE-SCHEMA []
   {UUID ; dataset-id
    (fixed-keys-schema
     {:props       (fixed-keys-schema
