@@ -31,19 +31,29 @@
         agent-id (:agent-id invoke)
         start-time (:start-time-millis invoke)
         href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations/" task-id "-" agent-id)
-        invoke-id (str task-id "-" agent-id)]
-    ($ :tr.hover:bg-gray-50.transition-colors.duration-150.cursor-pointer
-       {:key href
-        :onClick (fn [e]
-                   (. e stopPropagation)
-                   (rfe/push-state :agent/invocation-detail {:module-id module-id :agent-name agent-name :invoke-id invoke-id}))}
-       ($ :td.px-4.py-3.font-mono.text-blue-600.font-medium invoke-id)
+        invoke-id (str task-id "-" agent-id)
+        args-json (common/to-json (:invoke-args invoke))]
+    ($ :tr.hover:bg-gray-50.transition-colors.duration-150
+       {:key href}
+       ($ :td.px-4.py-3
+          ($ :button.px-3.py-1.bg-blue-100.text-blue-700.rounded.text-xs.font-medium.hover:bg-blue-200.transition-colors.duration-150.cursor-pointer
+             {:onClick (fn [e]
+                         (. e stopPropagation)
+                         (rfe/push-state :agent/invocation-detail {:module-id module-id :agent-name agent-name :invoke-id invoke-id}))}
+             "View trace"))
        ($ :td.px-4.py-3.text-sm.text-gray-600.font-mono
           {:title (common/format-timestamp start-time)}
           (common/format-relative-time start-time))
-       ($ :td.px-4.py-3.max-w-xs
+       ($ :td.px-4.py-3.max-w-md.cursor-pointer.hover:bg-gray-100.rounded
+          {:onClick (fn [e]
+                      (. e stopPropagation)
+                      (state/dispatch [:modal/show :arguments-detail
+                                       {:title "Invocation Arguments"
+                                        :component ($ common/ContentDetailModal 
+                                                     {:title "Invocation Arguments"
+                                                      :content args-json})}]))}
           ($ :div.truncate.text-gray-900.font-mono
-             (common/to-json (:invoke-args invoke))))
+             args-json))
        ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
        ($ :td.px-4.py-3.text-sm
           ($ result-badge {:result (:result invoke)
@@ -150,7 +160,7 @@
             ($ :table.w-full.text-sm
                ($ :thead.bg-gray-50.border-b.border-gray-200
                   ($ :tr
-                     ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Invoke ID")
+                     ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Trace")
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Start Time")
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Arguments")
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
@@ -197,7 +207,7 @@
          ($ :table.w-full.text-sm
             ($ :thead.bg-gray-50.border-b.border-gray-200
                ($ :tr
-                  ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Invoke ID")
+                  ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Trace")
                   ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Start Time")
                   ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Arguments")
                   ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
