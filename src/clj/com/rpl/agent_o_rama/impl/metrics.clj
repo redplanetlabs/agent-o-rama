@@ -45,6 +45,9 @@
 ;;    - "aor/status"
 ;;    - this also means that it needs to be indexed for every single one...
 
+;; TODO: <<<<>>>>
+;;  - seems like don't need filter / status-filter on defmetric
+
 
 (defmetric
  AgentInvokeCount
@@ -114,9 +117,8 @@
  {:id       [:agent :model-success-rate]
   :target   :nodes
   :value-fn
-  (fn [data-map]
-    (let [model-info-maps (select [:nested-ops (selected? :type (pred= :model-call)) :info-map]
-                                  data-map)
+  (fn [{:keys [nested-ops]}]
+    (let [model-info-maps (select [(selected? :type (pred= :model-call)) :info-map] nested-ops)
           fcount (count (filter #(contains? % "failure") model-info-maps))]
       {:type   :categorical
        :values {"success" (- (count model-calls) fcount)
@@ -125,24 +127,37 @@
 
 (defmetric
  ModelLatency
- {:id       [:agent :model-latencyu]
+ {:id       [:agent :model-latency]
   :target   :nodes
   :value-fn
-  (fn [data-map]
-    (let [model-calls (select [:nested-ops (selected? :type (pred= :model-call))] data-map)]
+  (fn [{:keys [nested-op]}]
+    (let [model-calls (select [(selected? :type (pred= :model-call))] data-map)]
       {:type   :numeric
        :values (mapv #(- (:finish-time-millis %) (:start-time-millis %)) model-calls)
       }))})
 
 
 
-; - store
-;   - operation counts/database call counts/latency stats
+; - store reads
+;   - counts
+;   - latency
+; - store writes
+;   - counts
+;   - latency
+; - database reads
+;   - counts
+;   - latency
+; - database writes
+;   - counts
+;   - latency
 ; - streaming metrics:
 ;   - agent time to first token
 ;     - on root, numeric
 ;   - LLM time to first token
 ;     - on nodes, numeric
+; - node stats
+;   - category per node name, aggregate latency (which is also call count)
+;   - this could display on the agent graph
 ; - tools:
 ;   - run count by tool name
 ;   - error rate by tool name
