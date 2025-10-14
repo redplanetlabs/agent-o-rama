@@ -3,7 +3,8 @@
         [com.rpl.rama path])
   (:require
    [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.agent-o-rama.impl.stats :as stats]))
+   [com.rpl.agent-o-rama.impl.stats :as stats]
+   [rpl.schema.core :as s]))
 
 (defn run-success?
   [{:keys [run-type result finish-time-millis] :as _data-map}]
@@ -16,8 +17,6 @@
 (aor-types/defaorrecord MetricDefinition
   [id :- [clojure.lang.Keyword]
    target :- (s/enum :root :nodes)
-   status-filter :- STATUS-FILTER-SCHEMA
-   filter :- (s/protocol RuleFilter)
    ;; (data map) -> {:type <:numeric, :categorical>, :values <values>})
    ;;  - values for :categorical is map of category string -> count
    ;;  - values for :numeric is list of numbers
@@ -30,12 +29,10 @@
 ;;        - would want that editable
 (defmacro defmetric
   [name info-map]
-  `(let [info-map# (merge {:status-filter :all :filter (->AndFilter [])} ~info-map)
+  `(let [info-map# ~info-map
          metric#   (->valid-MetricDefinition
                     (:id info-map#)
                     (:target info-map#)
-                    (:status-filter info-map#)
-                    (:filter info-map#)
                     (:value-fn info-map#))]
      (alter-var-root #'ALL-METRICS assoc (:id info-map#) metric#)
      (def ~name metric#)))
@@ -44,9 +41,6 @@
 ;;  - success/failure should also be an implicit metadata selection
 ;;    - "aor/status"
 ;;    - this also means that it needs to be indexed for every single one...
-
-;; TODO: <<<<>>>>
-;;  - seems like don't need filter / status-filter on defmetric
 
 ;; this powers:
 ;;  - agent invoke count (just the count in the NumberStats)
@@ -113,47 +107,98 @@
     (let [model-info-maps (select [(selected? :type (pred= :model-call)) :info-map] nested-ops)
           fcount (count (filter #(contains? % "failure") model-info-maps))]
       {:type   :categorical
-       :values {"success" (- (count model-calls) fcount)
+       :values {"success" (- (count model-info-maps) fcount)
                 "failure" fcount}
       }))})
+
+(defn op-latency-fn
+  [op-type]
+  (fn [{:keys [nested-ops]}]
+    (let [ops (select [ALL (selected? :type (pred= op-type))] nested-ops)]
+      {:type   :numeric
+       :values (mapv #(- (:finish-time-millis %) (:start-time-millis %)) ops)
+      })))
+
+;; these can be used for:
+;;  - op counts (count)
+;;  - op latencies (percentiles)
 
 (defmetric
  ModelLatency
  {:id       [:agent :model-latency]
   :target   :nodes
+  :value-fn (op-latency-fn :model-call)})
+
+(defmetric
+ StoreReadLatency
+ {:id       [:agent :store-read-latency]
+  :target   :nodes
+  :value-fn (op-latency-fn :store-read)})
+
+(defmetric
+ StoreWriteLatency
+ {:id       [:agent :store-write-latency]
+  :target   :nodes
+  :value-fn (op-latency-fn :store-write)})
+
+(defmetric
+ DatabaseReadLatency
+ {:id       [:agent :db-read-latency]
+  :target   :nodes
+  :value-fn (op-latency-fn :db-read)})
+
+(defmetric
+ DatabaseWriteLatency
+ {:id       [:agent :db-write-latency]
+  :target   :nodes
+  :value-fn (op-latency-fn :db-write)})
+
+(defmetric
+ AgentFirstTokenTime
+ {:id       [:agent :first-token-time]
+  :target   :root
   :value-fn
-  (fn [{:keys [nested-op]}]
-    (let [model-calls (select [(selected? :type (pred= :model-call))] data-map)]
-      {:type   :numeric
-       :values (mapv #(- (:finish-time-millis %) (:start-time-millis %)) model-calls)
+  (fn [{:keys [start-time-millis first-token-time-millis]}]
+    {:type   :numeric
+     :values (if first-token-time-millis [(- first-token-time-millis start-time-millis)])
+    })})
+
+(defmetric
+ ModelFirstTokenTime
+ {:id       [:agent :model-first-token-time]
+  :target   :nodes
+  :value-fn
+  (fn [{:keys [nested-ops]}]
+    (let [ops (select [(selected? :type (pred= :model-call))
+                       (selected? :info-map (must "firstTokenTimeMillis") number?)]
+                      nested-ops)]
+      {:type   :numerical
+       :values (mapv (fn [{:keys [start-time-millis info-map]}]
+                       (- (get info-map "firstTokenTimeMillis") start-time-millis))
+                     ops)
       }))})
 
+(defmetric
+ AgentNodeLatencies
+ {:id       [:agent :node-latencies]
+  :target   :nodes
+  :value-fn
+  (fn [{:keys [node start-time-millis finish-time-millis]}]
+    {:type   :categorical
+     :values (when (and node start-time-millis finish-time-millis)
+               {node (- finish-time-millis start-time-millis)})
+    })})
 
-
-; - store reads
-;   - counts
-;   - latency
-; - store writes
-;   - counts
-;   - latency
-; - database reads
-;   - counts
-;   - latency
-; - database writes
-;   - counts
-;   - latency
-; - streaming metrics:
-;   - agent time to first token
-;     - on root, numeric
-;   - LLM time to first token
-;     - on nodes, numeric
-; - node stats
-;   - category per node name, aggregate latency (which is also call count)
-;   - this could display on the agent graph
+;; TODO: <<<<>>>>
 ; - tools:
 ;   - run count by tool name
 ;   - error rate by tool name
 ;   - latency by tool name
 ;   - top 5 for each
-; - feedback graphs
+;;  - TODO: <<<<>>>>> no way to do top 5 with this system
+;;      - coudl record every tool fn, but this could really be unbounded
+;       - this would also only show up for tools subagent...
+;;      - agent graph could aggregate across all declared tools subagents
+;;        - don't currently have "agent dependencies" as metadata anywhere...
+; - eval graphs
 ;   - will work differently with human feedback
