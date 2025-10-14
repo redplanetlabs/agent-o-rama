@@ -363,7 +363,8 @@
   {Long  ; granularity as seconds (60 for minute, 3600 for hour, etc.)
    (fixed-keys-schema
     {:numeric     (stats-schema NumberStats)
-     :categorical (stats-schema {String Long}) ; category -> count
+     :categorical (stats-schema {String ; category
+                                 NumberStats})
     })})
 
 (defn evaluators-task-global-name

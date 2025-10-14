@@ -53,7 +53,8 @@
   :value-fn
   (fn [data-map]
     {:type   :numeric
-     :values [1]})})
+     :values [1]
+    })})
 
 (defmetric
  AgentSuccessRate
@@ -62,7 +63,8 @@
   :value-fn
   (fn [data-map]
     {:type   :numeric
-     :values [(if (run-success? data-map) 1 0)]})})
+     :values [(if (run-success? data-map) 1 0)]
+    })})
 
 (defmetric
  AgentLatency
@@ -72,7 +74,8 @@
   (fn [{:keys [start-time-millis finish-time-millis]}]
     {:type   :numeric
      :values (if (and start-time-millis finish-time-millis)
-               [(- finish-time-millis start-time-millis)])})})
+               [(- finish-time-millis start-time-millis)])
+    })})
 
 ;; this is used for LLM call count (sum) as well as LLM call count / trace (percentiles)
 (defmetric
@@ -87,29 +90,73 @@
                           :model-call
                           (get :count 0))]
       {:type   :numeric
-       :values [count]}))})
+       :values [count]
+      }))})
+
+;; these token count metrics power:
+;;  - token count (sum)
+;;  - token count / trace (percentiles)
+(defmetric
+ InputTokenCount
+ {:id       [:agent :input-token-count]
+  :target   :root
+  :value-fn
+  (fn [{:keys [stats]}]
+    (let [basic-stats (stats/aggregated-basic-stats stats)]
+      {:type   :numeric
+       :values [(:input-token-count basic-stats)]
+      }))})
+
+(defmetric
+ OutputTokenCount
+ {:id       [:agent :output-token-count]
+  :target   :root
+  :value-fn
+  (fn [{:keys [stats]}]
+    (let [basic-stats (stats/aggregated-basic-stats stats)]
+      {:type   :numeric
+       :values [(:output-token-count basic-stats)]
+      }))})
+
+(defmetric
+ TotalTokenCount
+ {:id       [:agent :total-token-count]
+  :target   :root
+  :value-fn
+  (fn [{:keys [stats]}]
+    (let [basic-stats (stats/aggregated-basic-stats stats)]
+      {:type   :numeric
+       :values [(:total-token-count basic-stats)]
+      }))})
+
+(defmetric
+ ModelSuccessRate
+ {:id       [:agent :model-success-rate]
+  :target   :nodes
+  :value-fn
+  (fn [data-map]
+    (let [model-info-maps (select [:nested-ops (selected? :type (pred= :model-call)) :info-map]
+                                  data-map)
+          fcount (count (filter #(contains? % "failure") model-info-maps))]
+      {:type   :categorical
+       :values {"success" (- (count model-calls) fcount)
+                "failure" fcount}
+      }))})
+
+(defmetric
+ ModelLatency
+ {:id       [:agent :model-latencyu]
+  :target   :nodes
+  :value-fn
+  (fn [data-map]
+    (let [model-calls (select [:nested-ops (selected? :type (pred= :model-call))] data-map)]
+      {:type   :numeric
+       :values (mapv #(- (:finish-time-millis %) (:start-time-millis %)) model-calls)
+      }))})
 
 
-; - input/output/total token counts
-;   - look at stats on root
-;   - separate chart, or dimensions?
-;     - separate chart if nothing else needs dimensions
-; - LLM success rate
-;   - one nodes
-;   - categorical
-;   - maybe category results should be category -> count
-;     - this is success-models -> count, failure-models -> count
-;     - and empty map for no update
-; - LLM latency
-;   - numeric, but multiple data points in one piece of data
-;     - so numeric should be a list of numbers
+
 ; - store/database call counts/latency stats
-; - tokens / second
-;   - this is just view of "total tokens"
-;   - but how to get rate?
-;     - it's just the total count
-;   - maybe category charts can have "rate" switch to show category / second
-; - tokens / trace
 ; - streaming metrics:
 ;   - agent time to first token
 ;     - on root, numeric
