@@ -224,6 +224,7 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
      :input-path? false
      ;; output-path? and reference-output-path? default to true
     }}})
+    
 (defn invalid-json-path
   [json-path]
   (if (empty? json-path)

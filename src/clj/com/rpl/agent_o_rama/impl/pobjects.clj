@@ -338,7 +338,7 @@
 (defn- stats-schema
   [leaf-schema]
   (map-schema
-   String ; metric name
+   clojure.lang.Keyword ; metric ID
    (map-schema
     Long  ; bucket
     (fixed-keys-schema

@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.feedback :as fb]
    [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.metrics :as metrics]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.retries :as retries]
    [com.rpl.agent-o-rama.impl.stats :as stats]
@@ -678,12 +679,9 @@
    (:>)
   ))
 
-
 (defn include-result-from-status?
-  [status-filter {:keys [run-type result finish-time-millis]}]
-  (let [success? (if (= :agent run-type)
-                   (not (:failure? result))
-                   (some? finish-time-millis))]
+  [status-filter data-map]
+  (let [success? (metrics/run-success? data-map)]
     (condp = status-filter
       :all true
       :success success?
@@ -717,7 +715,7 @@
   (:> *m *end-scan-offset))
 
 (deframafn get-matching-offsets
-  [*m *status-filter *filter *sampling-rate]
+  [*m *target *status-filter *filter *sampling-rate]
   (<<ramafn %match?
     [*data]
     (:> (and> (not (experiment-source? *data))
@@ -764,13 +762,14 @@
    (get *action-builders *action-name :> {:keys [*builder-fn *options]})
    (get *options :limit-concurrency? false :> *limit-concurrency?)
    (completable-future> (build-action-fn *builder-fn *action-params) :> *action-fn)
+   (ifexpr (some? *node-name) (->AnaNodeTarget *node-name) (->AnaRootTarget) :> *target)
    (fetch-data
     *agent-name
-    (ifexpr (some? *node-name) (->AnaNodeTarget *node-name) (->AnaRootTarget))
+    *target
     *offset
     *dep-end-offset
     :> *m *end-scan-offset)
-   (get-matching-offsets *m *status-filter *filter *sampling-rate :> *matching-offsets)
+   (get-matching-offsets *m *target *status-filter *filter *sampling-rate :> *matching-offsets)
    (local-transform> [(keypath *agent-name *rule-name)
                       (multi-path [:data (termval *m)]
                                   [:action-fn (termval *action-fn)]
@@ -798,6 +797,16 @@
   ;: TODO: <<<<<>>>>
   ;;  - metrics is just list of fragments that take in the map of data?
   ;;      - and can have builders for those that target particular parts of $$metrics PState
+  ;;  - metric is:
+  ;;    - ID
+  ;;    - name
+  ;;    - status filter
+  ;;    - filter
+  ;;    - fn(key, data) -> {:target <categorical, numeric>, :value value}
+  ;;      - value for categorical is category, which gets aggregated like that
+  ;;      - value is number for numeric
+  ;;
+
 
 
   ;; TODO: <<<<>>>>> use po/GRANULARITIES
@@ -808,7 +817,7 @@
   (ops/explode-map *agent->rule->info :> *agent-name *rule->info)
   (explode-metrics *rule->info
                    :> {:keys [*query-name *dependency-rule-names *target]} *metrics)
-  (range> 0 (get-num-tasks) :> *task-id)
+  (ops/range> 0 (get-num-tasks) :> *task-id)
   (compute-dep-end-offset *rule->info *task-id *dependency-rule-names :> *dep-end-offset)
   (|direct *task-id)
   (po/agent-metric-cursors-task-global *agent-name :> $$metric-cursors)

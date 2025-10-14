@@ -779,6 +779,8 @@
 
 (definterface RuleEvent)
 
+(def STATUS-FILTER-SCHEMA (s/enum :all :success :fail))
+
 (defaorrecord AddRule
   [name :- String
    id :- UUID
@@ -789,7 +791,7 @@
    filter :- (s/protocol RuleFilter)
    sampling-rate :- Double
    start-time-millis :- Long
-   status-filter :- (s/enum :all :success :fail)]
+   status-filter :- STATUS-FILTER-SCHEMA]
   RuleEvent)
 
 (defaorrecord DeleteRule
@@ -804,6 +806,7 @@
    node-invoke :- (s/maybe NodeInvokeImpl)
    success? :- Boolean
    info-map :- {String (s/maybe Object)}])
+
 
 ;; Misc
 
