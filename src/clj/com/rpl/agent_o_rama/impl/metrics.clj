@@ -21,11 +21,6 @@
    ;; (data map) -> {metric-id [{:type <:numeric, :categorical>, :values <values>} ...]}
    metrics-fn :- clojure.lang.IFn])
 
-;; TODO: <<<<>>>> for numeric, needs to know what to display
-;;  - it should be part of UI definition for each ID
-;;    - for evals, it can just be fixed display type for numeric or catgegorical
-;;      - or can be chosen dynamically by user somehow, or configured on the online eval rule?
-;;        - would want that editable
 
 (defn value-fn->metrics-fn
   [id value-fn]

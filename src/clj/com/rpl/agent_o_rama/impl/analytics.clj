@@ -19,7 +19,9 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [jsonista.core :as j]
-   [org.httpkit.client :as http])
+   [org.httpkit.client :as http]
+   [rpl.rama.distributed.stats.number-stats :as number-stats]
+   [rpl.rama.distributed.stats.t-digest :as t-digest])
   (:import
    [com.rpl.agentorama.impl
     AgentDeclaredObjectsTaskGlobal
@@ -860,6 +862,60 @@
   [granularity start-time-millis]
   (long (/ start-time-millis granularity)))
 
+(defn mk-number-stats
+  []
+  (number-stats/static-map->valid-NumberStats
+   {:min            nil
+    :max            nil
+    :power2-sum-set nil
+    :rest-sum       nil
+    :latest         nil
+    :t-digest       (t-digest/mk-merging-digest 25)}))
+
+(defn metric-point->category-values
+  [{:keys [type values]}]
+  (if (= type :numeric)
+    {po/DEFAULT-CATEGORY values}
+    (transform MAP-VALS vector values)))
+
+(defn add-number-stats-values
+  [number-stats values]
+  (reduce number-stats/add-value! number-stats values))
+
+(defn category-map-updater
+  [category-values]
+  (fn [m]
+    (reduce-kv
+     (fn [m cat values]
+       (let [number-stats (or (get m cat) (mk-number-stats))]
+         (assoc m cat (add-number-stats-values number-stats values))))
+     m
+     category-values)))
+
+(defn metadata-stats-updater
+  [metadata category-values]
+  (let [update-fn (category-map-updater category-values)]
+    (fn [m]
+      (reduce-kv
+       (fn [m metadata-key metadata-value]
+         (transform [(keypath metadata-key)
+                     ;; only keep first 5 metadata values seen to bound size
+                     (selected? (view count) (pred<= 5))
+                     (keypath metadata-value)]
+                    update-fn
+                    m))
+       m
+       metadata))))
+
+(defn stats-updater
+  [metadata category-values]
+  (fn [stats]
+    (multi-transform
+     (multi-path
+      [:overall (term (number-stats-updater category-values))]
+      [:by-meta (term (metadata-stats-updater metadata category-values))])
+     stats)))
+
 (deframaop compute-metrics!
   [*agent->rule->info]
   (ops/explode-map *agent->rule->info :> *agent-name *rule->info)
@@ -897,22 +953,22 @@
   (ops/explode *metrics :> {:keys [*metric-fn]})
   (h/invoke *metric-fn *data-map :> *metrics-map)
   (ops/explode-map *metrics-map :> *metric-id *metric-points)
-  (ops/explode *metric-points :> {:keys [*type *values]})
+  (ops/explode *metric-points :> *metric-point)
+  (metric-point->category-values *metric-point :> *category-values)
+
   (ops/explode po/GRANULARITIES :> *granularity)
   (to-bucket *granularity *start-time-millis :> *bucket)
+
   (|hash [*agent-name *granularity *metric-id])
   (po/agent-telemetry-task-global *agent-name :> $$telemetry)
 
   (local-transform>
    [(keypath *granularity *metric-id *bucket)
-    (multi-path
-     [:overall ...] ; TODO: <<<<>>>>
-     [:by-meta ...])] ; TODO: <<<<>>>>
+    (term (stats-updater *metadata *category-values))]
    $$telemetry)
 
-  ;; TODO: <<<<>>>> compute metrics
-  ;;    - coerce numeric to default category
-  ;;    - metadata only keeps first five
+  ;; TODO: <<<<>>>> need an index of all metadata across all agent invokes
+
 
 )
 
