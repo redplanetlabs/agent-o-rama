@@ -50,7 +50,19 @@
 
 (defmacro defaorrecord
   [name & args]
-  (let [s (with-meta name {:features {:nippy-8-byte-hash false}})]
+  (let [s (with-meta name
+            {:features {:nippy-8-byte-hash             false
+                        :schema-checker                false
+                        :schema-validator              false
+                        :static-map->constructor       false
+                        :static-map->valid-constructor false
+                        :strict-map->constructor       false
+                        :valid-type-predicate          false
+                        :map->valid!-constructor       false
+                        :map->valid-constructor        false
+                        :map->constructor              false
+                        :->valid!-constructor          false
+                       }})]
     `(drp/defrecord+ ~s ~@args)))
 
 (def ^:dynamic OPERATION-SOURCE nil)

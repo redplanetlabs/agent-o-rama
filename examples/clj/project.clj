@@ -1,12 +1,10 @@
 (defproject com.rpl/agent-o-rama-examples "1.0.0-SNAPSHOT"
   ;; TODO: fix agent-o-rama version
-  :dependencies [[org.clojure/clojure "1.12.0"]
+  :dependencies [[org.clojure/clojure "1.12.2"]
                  [com.rpl/agent-o-rama "0.9.0-SNAPSHOT"]
-                 [com.rpl/rama "0.0.6-SNAPSHOT"]
                  [dev.langchain4j/langchain4j-open-ai "1.4.0"]
                  [dev.langchain4j/langchain4j-web-search-engine-tavily
-                  "1.4.0-beta10"]
-                 [org.apache.logging.log4j/log4j-slf4j18-impl "2.16.0"]]
+                  "1.4.0-beta10"]]
   :jvm-opts ["-Xss6m"
              "-Xms6g"
              "-Xmx6g"
@@ -26,10 +24,14 @@
   [["releases"
     {:id  "maven-releases"
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
-  :profiles {:dev  {:resource-paths ["test/resources/"]
-                    :src-paths      ["src" "test"]
-                    :dependencies   [[meander/epsilon "0.0.650"]]}
-             :test {:resource-paths ["test/resources/"]
-                    :src-paths      ["src" "test"]
-                    :dependencies   [[meander/epsilon "0.0.650"]]}}
+  :profiles {:dev      {:resource-paths ["test/resources/"]
+                        :src-paths      ["src" "test"]
+                        :dependencies   [[meander/epsilon "0.0.650"]]}
+             :provided {:dependencies
+                        [[com.rpl/rama "1.2.0"]
+                         [org.apache.logging.log4j/log4j-slf4j2-impl
+                          "2.25.1"]]}
+             :test     {:resource-paths ["test/resources/"]
+                        :src-paths      ["src" "test"]
+                        :dependencies   [[meander/epsilon "0.0.650"]]}}
 )
