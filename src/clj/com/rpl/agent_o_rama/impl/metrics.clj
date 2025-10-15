@@ -44,11 +44,6 @@
      (alter-var-root #'ALL-METRICS assoc (:id info-map#) metric#)
      (def ~name metric#)))
 
-;; TODO: <<<<>>>>
-;;  - success/failure should also be an implicit metadata selection
-;;    - "aor/status"
-;;    - this also means that it needs to be indexed for every single one...
-
 ;; this powers:
 ;;  - agent invoke count (just the count in the NumberStats)
 ;   - success rate (sum over the count)
@@ -195,17 +190,3 @@
      :values (when (and node start-time-millis finish-time-millis)
                {node (- finish-time-millis start-time-millis)})
     })})
-
-;; TODO: <<<<>>>>
-; - tools:
-;   - run count by tool name
-;   - error rate by tool name
-;   - latency by tool name
-;   - top 5 for each
-;;  - TODO: <<<<>>>>> no way to do top 5 with this system
-;;      - this would need to be a separate processing topology
-
-
-;; TODO: <<<<>>>>
-; - eval graphs
-;   - will work differently with human feedback
