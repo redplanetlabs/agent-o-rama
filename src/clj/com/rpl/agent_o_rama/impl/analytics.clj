@@ -850,6 +850,16 @@
     (aggs/+vec-agg *m :> *res))
   (:> *res))
 
+(defn metrics-target
+  [target]
+  (if (= target :root)
+    (->AnaRootTarget)
+    (->AnaAllNodesTarget)))
+
+(defn to-bucket
+  [granularity start-time-millis]
+  (long (/ start-time-millis granularity)))
+
 (deframaop compute-metrics!
   [*agent->rule->info]
   (ops/explode-map *agent->rule->info :> *agent-name *rule->info)
@@ -876,14 +886,33 @@
     :> *offset)
   (fetch-data
    *agent-name
-   *target
+   (metrics-target *target)
    *offset
    *dep-end-offset
    :> *m *end-scan-offset)
   (local-transform> [(keypath *agent-name *query-id) (termval *end-scan-offset)]
                     $$metric-cursors)
+  (ops/explode-map *m :> *k {:keys [*start-time-millis *metadata] :as *data-map})
+  (filter> (some? *start-time-millis)) ; defensive
+  (ops/explode *metrics :> {:keys [*metric-fn]})
+  (h/invoke *metric-fn *data-map :> *metrics-map)
+  (ops/explode-map *metrics-map :> *metric-id *metric-points)
+  (ops/explode *metric-points :> {:keys [*type *values]})
+  (ops/explode po/GRANULARITIES :> *granularity)
+  (to-bucket *granularity *start-time-millis :> *bucket)
+  (|hash [*agent-name *granularity *metric-id])
+  (po/agent-telemetry-task-global *agent-name :> $$telemetry)
+
+  (local-transform>
+   [(keypath *granularity *metric-id *bucket)
+    (multi-path
+     [:overall ...] ; TODO: <<<<>>>>
+     [:by-meta ...])] ; TODO: <<<<>>>>
+   $$telemetry)
+
   ;; TODO: <<<<>>>> compute metrics
-  ;; TODO: <<<<>>>>> use po/GRANULARITIES
+  ;;    - coerce numeric to default category
+  ;;    - metadata only keeps first five
 
 )
 
