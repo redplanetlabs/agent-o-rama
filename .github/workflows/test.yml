@@ -35,11 +35,7 @@ jobs:
     - name: Install dependencies
       run: lein deps
 
-    - name: Run tests (without API keys)
-      run: lein test
-
-    - name: Run all tests (with API keys)
-      if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    - name: Run tests
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: lein test :all
