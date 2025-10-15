@@ -213,8 +213,10 @@
           {"response" body}
         )))))
 
+(def EVAL-ACTION-NAME "aor/eval")
+
 (def BUILT-IN-ACTIONS
-  {"aor/eval"
+  {EVAL-ACTION-NAME
    {:builder-fn  eval-action-builder-fn
     :description "Run an evaluator to add feedback to a node or agent"
     :options     {:params
@@ -786,55 +788,73 @@
      (run-one-action! *cache-pstate-name *agent-name *rule-name *offset *action-name *node-name)
    )))
 
+(defn rule-source?-pred
+  [rule-name]
+  (fn [source]
+    (and (aor-types/EvalSourceImpl? source)
+         (aor-types/ActionSourceImpl? (:source source))
+         (= rule-name
+            (-> source
+                :source
+                :rule-name)))))
+
+(defn to-eval-metric
+  [rule-name target]
+  (metrics/->valid-MetricDefinition
+   [:eval (keyword rule-name)]
+   target
+   (fn [{:keys [feedback]}]
+     (if-let [scores (select-first [:results
+                                    ALL
+                                    (selected? :source (rule-source?-pred rule-name))
+                                    :scores]
+                                   feedback)]
+       (transform
+        MAP-VALS
+        (fn [v]
+          [(cond
+             (string? v) {:type :categorical :values #{v}}
+             (boolean? v) {:type :numeric :values [(if v 1 0)]}
+             (number? v) {:type :numeric :values [v]}
+             :else (throw (h/ex-info "Unexpected eval value" {:value v :type (class v)}))
+           )])
+        scores)))))
+
 (deframaop explode-metrics
   [*rule->info]
-  ;; TODO: <<<<>>>> implement this
-  ;;  - one per rule with aor/eval action
-  ;;      - possibly multiple metrics per eval?
-  ;;  - one query/metrics list for metrics based on $$nodes
-  ;;  - one query/metrics list for metrics based on $$root
+  (metrics/all-metrics :> *built-in-metrics)
+  (anchor> <root>)
+  (ops/explode-map (group-by :target *built-in-metrics) :> *target *metric)
+  (:> *target [*target] *metric [])
 
-  ;: TODO: <<<<<>>>>
-  ;;  - metrics is just list of fragments that take in the map of data?
-  ;;      - and can have builders for those that target particular parts of $$metrics PState
-  ;;  - metric is:
-  ;;    - ID
-  ;;    - name
-  ;;    - status filter
-  ;;    - filter
-  ;;    - fn(key, data) -> {:target <categorical, numeric>, :value value}
-  ;;      - value for categorical is category, which gets aggregated like that
-  ;;      - value is number for numeric
-  ;;
-
-
-
-  ;; TODO: <<<<>>>>> use po/GRANULARITIES
-)
+  (hook> <root>)
+  (select> [ALL (collect-one FIRST) LAST :definition
+            (selected? :action-name (pred= EVAL-ACTION-NAME)) :node-name]
+    *rule->info
+    :> [*rule-name *node-name])
+  (ifexpr (nil? *node-name) :root :nodes :> *target)
+  (:> *target [:eval *rule-name] [(to-eval-metric *rule-name *target)] [*rule-name]))
 
 (deframaop compute-metrics!
   [*agent->rule->info]
   (ops/explode-map *agent->rule->info :> *agent-name *rule->info)
-  (explode-metrics *rule->info
-                   :> {:keys [*query-name *dependency-rule-names *target]} *metrics)
+  (explode-metrics *rule->info :> *target *query-id *metrics *dependency-rule-names)
   (ops/range> 0 (get-num-tasks) :> *task-id)
   (compute-dep-end-offset *rule->info *task-id *dependency-rule-names :> *dep-end-offset)
   (|direct *task-id)
+  ;; TODO: <<<<>>>> need to delete from here when something is no longer there..
   (po/agent-metric-cursors-task-global *agent-name :> $$metric-cursors)
-  (local-select> (keypath *agent-name *query-name) $$metric-cursors :> *offset)
+  (local-select> (keypath *agent-name *query-id) $$metric-cursors :> *offset)
   (fetch-data
    *agent-name
    *target
    *offset
    *dep-end-offset
    :> *m *end-scan-offset)
-  (local-transform> [(keypath *agent-name *query-name) (termval *end-scan-offset)] $$metric-cursors)
+  (local-transform> [(keypath *agent-name *query-id) (termval *end-scan-offset)]
+                    $$metric-cursors)
   ;; TODO: <<<<>>>> compute metrics
-
-
-  ;; TODO: <<<<>>>>
-  ;;;  - metric will have its own status-filter / filter
-  ;(get-matching-offsets *m *status-filter *filter 1.0 :> *matching-offsets)
+  ;; TODO: <<<<>>>>> use po/GRANULARITIES
 
 )
 

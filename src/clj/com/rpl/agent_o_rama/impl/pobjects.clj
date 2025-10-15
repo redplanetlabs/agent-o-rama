@@ -335,6 +335,16 @@
   [agent-name]
   (str "$$_aor-telemetry-" agent-name))
 
+
+(def GRANULARITIES
+  [60 ; minute`
+   3600 ; hour
+   (* 24 3600) ; day
+   (* 24 3600 30) ; 30-day
+  ])
+
+(def DEFAULT-CATEGORY "_aor/default")
+
 (defn- stats-schema
   [leaf-schema]
   (map-schema
@@ -352,20 +362,11 @@
     {:subindex? true})
    {:subindex? true}))
 
-(def GRANULARITIES
-  [60 ; minute`
-   3600 ; hour
-   (* 24 3600) ; day
-   (* 24 3600 30) ; 30-day
-  ])
-
 (def AGENT-TELEMETRY-PSTATE-SCHEMA
   {Long  ; granularity as seconds (60 for minute, 3600 for hour, etc.)
-   (fixed-keys-schema
-    {:numeric     (stats-schema NumberStats)
-     :categorical (stats-schema {String ; category
-                                 NumberStats})
-    })})
+   (stats-schema {String ; category
+                  NumberStats})
+  })
 
 (defn evaluators-task-global-name
   []

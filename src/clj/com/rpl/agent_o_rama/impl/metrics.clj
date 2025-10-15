@@ -13,27 +13,39 @@
     (some? finish-time-millis)))
 
 (def ALL-METRICS {})
+(defn all-metrics [] ALL-METRICS)
 
 (aor-types/defaorrecord MetricDefinition
   [id :- [clojure.lang.Keyword]
    target :- (s/enum :root :nodes)
-   ;; (data map) -> {:type <:numeric, :categorical>, :values <values>})
-   ;;  - values for :categorical is map of category string -> count
-   ;;  - values for :numeric is list of numbers
-   value-fn :- clojure.lang.IFn])
+   ;; (data map) -> {metric-id [{:type <:numeric, :categorical>, :values <values>} ...]}
+   metrics-fn :- clojure.lang.IFn])
 
 ;; TODO: <<<<>>>> for numeric, needs to know what to display
 ;;  - it should be part of UI definition for each ID
 ;;    - for evals, it can just be fixed display type for numeric or catgegorical
 ;;      - or can be chosen dynamically by user somehow, or configured on the online eval rule?
 ;;        - would want that editable
+
+(defn value-fn->metrics-fn
+  [id value-fn]
+  (fn [data-map]
+    {id [(value-fn data-map)]}))
+
+;; info-map has:
+;;   - :id
+;;   - :target
+;;   - :value-fn
+;;    (data map) -> {:type <:numeric, :categorical>, :values <values>})
+;;      - values for :categorical is map of category string -> count
+;;      - values for :numeric is list of numbers
 (defmacro defmetric
   [name info-map]
   `(let [info-map# ~info-map
          metric#   (->valid-MetricDefinition
                     (:id info-map#)
                     (:target info-map#)
-                    (:value-fn info-map#))]
+                    (value-fn->metrics-fn (:id info-map#) (:value-fn info-map#)))]
      (alter-var-root #'ALL-METRICS assoc (:id info-map#) metric#)
      (def ~name metric#)))
 
@@ -196,9 +208,9 @@
 ;   - latency by tool name
 ;   - top 5 for each
 ;;  - TODO: <<<<>>>>> no way to do top 5 with this system
-;;      - coudl record every tool fn, but this could really be unbounded
-;       - this would also only show up for tools subagent...
-;;      - agent graph could aggregate across all declared tools subagents
-;;        - don't currently have "agent dependencies" as metadata anywhere...
+;;      - this would need to be a separate processing topology
+
+
+;; TODO: <<<<>>>>
 ; - eval graphs
 ;   - will work differently with human feedback
