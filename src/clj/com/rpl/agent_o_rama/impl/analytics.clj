@@ -824,27 +824,56 @@
   [*rule->info]
   (metrics/all-metrics :> *built-in-metrics)
   (anchor> <root>)
-  (ops/explode-map (group-by :target *built-in-metrics) :> *target *metric)
-  (:> *target [*target] *metric [])
+  (ops/explode-map (group-by :target *built-in-metrics) :> *target *metrics)
+  (:> {:target            *target
+       :query-id          [*target]
+       :metrics           *metrics
+       :dependency-rule-names []
+       :start-time-millis 0})
 
   (hook> <root>)
   (select> [ALL (collect-one FIRST) LAST :definition
-            (selected? :action-name (pred= EVAL-ACTION-NAME)) :node-name]
+            (selected? :action-name (pred= EVAL-ACTION-NAME))]
     *rule->info
-    :> [*rule-name *node-name])
+    :> [*rule-name {:keys [*node-name *start-time-millis]}])
   (ifexpr (nil? *node-name) :root :nodes :> *target)
-  (:> *target [:eval *rule-name] [(to-eval-metric *rule-name *target)] [*rule-name]))
+  (:> {:target       *target
+       :query-id     [:eval *rule-name]
+       :metrics      [(to-eval-metric *rule-name *target)]
+       :dependency-rule-names [*rule-name]
+       :start-offset *start-time-millis}))
+
+(deframafn get-all-metrics
+  [*rule->info]
+  (<<batch
+    (explode-metrics *rule->info :> *m)
+    (aggs/+vec-agg *m :> *res))
+  (:> *res))
 
 (deframaop compute-metrics!
   [*agent->rule->info]
   (ops/explode-map *agent->rule->info :> *agent-name *rule->info)
-  (explode-metrics *rule->info :> *target *query-id *metrics *dependency-rule-names)
+  (get-all-metrics *rule->info :> *maps)
   (ops/range> 0 (get-num-tasks) :> *task-id)
-  (compute-dep-end-offset *rule->info *task-id *dependency-rule-names :> *dep-end-offset)
+  (<<ramafn %update-dep-end-offset
+    [{:keys [*dependency-rule-names] :as *m}]
+    (dissoc *m :dependency-rule-names :> *m)
+    (:> (assoc *m
+         :dep-end-offset
+         (compute-dep-end-offset *rule->info *task-id *dependency-rule-names))))
+  (mapv %update-dep-end-offset *maps :> *maps)
   (|direct *task-id)
-  ;; TODO: <<<<>>>> need to delete from here when something is no longer there..
   (po/agent-metric-cursors-task-global *agent-name :> $$metric-cursors)
-  (local-select> (keypath *agent-name *query-id) $$metric-cursors :> *offset)
+  (local-select> STAY $$metric-cursors :> *metric-cursors)
+  ;; - causes removed metrics (e.g. rules withe vals) to be cleared from here
+  ;; - since this is a microbatch topology, the existing metrics will overwrite this below and this
+  ;; clear will never be visible
+  (local-transform> (termval {}) *metric-cursors)
+  (ops/explode *maps :> {:keys [*target *query-id *metrics *dep-end-offset *start-time-millis]})
+  (select> [(keypath *agent-name *query-id)
+            (nil->val (h/min-uuid7-at-timestamp *start-time-millis))]
+    *metric-cursors
+    :> *offset)
   (fetch-data
    *agent-name
    *target
