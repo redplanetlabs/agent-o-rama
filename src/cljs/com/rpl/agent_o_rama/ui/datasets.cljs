@@ -1067,7 +1067,8 @@
           :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
           :enabled? (boolean (and module-id dataset-id))})
         ;; not sure about doing it this way, why not. maybe we can eventually decouple fetching from views?
-        dataset (state/use-sub [:queries :dataset-props module-id dataset-id :data])]
+        dataset (state/use-sub [:queries :dataset-props module-id dataset-id :data])
+        is-remote? (boolean (:module-name dataset))]
     ($ :div.h-full.flex.flex-col
        (cond
          loading? ($ :div.p-6 "Loading dataset details...")
@@ -1075,24 +1076,38 @@
          dataset
          ($ :div.h-full.flex.flex-col
             ;; Header Bar for the whole dataset page
-            ($ :div.bg-white.px-6.py-4
-               ($ :div.flex.items-center.justify-between
-                  ;; Left side - Title and info
-                  ($ :div.flex.items-center.space-x-4
-                     ($ :h1.text-2xl.font-bold.text-gray-900 (:name dataset))
-                     ;; Details button with conditional chevron
-                     ($ :button.inline-flex.items-center.px-3.py-1.text-sm.text-gray-600.hover:text-gray-800.rounded-md.hover:bg-gray-100.cursor-pointer
-                        {:onClick #(set-show-info (not show-info?))
-                         :title (if show-info? "Hide Dataset Information" "Show Dataset Information")}
-                        ($ :span.mr-1 "Details")
-                        (if show-info?
-                          ($ ChevronUpIcon {:className "h-4 w-4"})
-                          ($ ChevronDownIcon {:className "h-4 w-4"}))))
-                  ;; Right side - reserved for actions
-                  ($ :div.flex.items-center.space-x-4)))
+            (if is-remote?
+              ;; Remote dataset header - show connection info
+              ($ :div.bg-purple-50.border-b.border-purple-200.px-6.py-4
+                 ($ :div.flex.items-center.gap-3
+                    ($ :span.text-sm.font-semibold.text-purple-700.uppercase "Remote Dataset:")
+                    ($ :span.font-mono.text-purple-900
+                       (let [host (:remote-host dataset)
+                             port (:remote-port dataset)
+                             module (:module-name dataset)]
+                         (cond
+                           (and host port) (str host ":" port " / " module)
+                           host (str host " / " module)
+                           :else module)))))
+              ;; Local dataset header - show title and details
+              ($ :div.bg-white.px-6.py-4
+                 ($ :div.flex.items-center.justify-between
+                    ;; Left side - Title and info
+                    ($ :div.flex.items-center.space-x-4
+                       ($ :h1.text-2xl.font-bold.text-gray-900 (:name dataset))
+                       ;; Details button with conditional chevron
+                       ($ :button.inline-flex.items-center.px-3.py-1.text-sm.text-gray-600.hover:text-gray-800.rounded-md.hover:bg-gray-100.cursor-pointer
+                          {:onClick #(set-show-info (not show-info?))
+                           :title (if show-info? "Hide Dataset Information" "Show Dataset Information")}
+                          ($ :span.mr-1 "Details")
+                          (if show-info?
+                            ($ ChevronUpIcon {:className "h-4 w-4"})
+                            ($ ChevronDownIcon {:className "h-4 w-4"}))))
+                    ;; Right side - reserved for actions
+                    ($ :div.flex.items-center.space-x-4))))
 
-            ;; Collapsible info panel
-            (when show-info?
+            ;; Collapsible info panel (only for local datasets)
+            (when (and show-info? (not is-remote?))
               ($ :div.bg-blue-50.border-b.border-blue-200.px-6.py-4
                  ($ :div.space-y-4
                     ;; Description
@@ -1143,3 +1158,4 @@
                                                 "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "comparative")})}
                      "Comparative Experiments"))))
          :else ($ :div.p-6 "Dataset not found.")))))
+

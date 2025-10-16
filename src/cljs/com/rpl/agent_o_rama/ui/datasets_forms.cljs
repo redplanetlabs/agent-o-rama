@@ -29,15 +29,14 @@
   (let [{:keys [fields field-errors]} (forms/use-form form-id)
         dataset-type-field (forms/use-form-field form-id :dataset-type)
         is-remote? (= (:value dataset-type-field) :remote)
-        
+
         ;; Local dataset fields
         name-field (forms/use-form-field form-id :name)
         description-field (forms/use-form-field form-id :description)
         input-schema-field (forms/use-form-field form-id :input-schema)
         output-schema-field (forms/use-form-field form-id :output-schema)
-        
-        ;; Remote dataset fields
-        local-name-field (forms/use-form-field form-id :local-name)
+
+;; Remote dataset fields
         remote-dataset-id-field (forms/use-form-field form-id :remote-dataset-id)
         module-name-field (forms/use-form-field form-id :module-name)
         host-field (forms/use-form-field form-id :cluster-conductor-host)
@@ -68,7 +67,7 @@
                 ($ :label.ml-2.block.text-sm.text-gray-700
                    {:htmlFor "remote-dataset"}
                    "Remote Dataset"))))
-       
+
        ;; Conditional fields based on dataset type
        (if is-remote?
          ;; Remote dataset fields
@@ -95,13 +94,7 @@
                                  :on-change (:on-change remote-dataset-id-field)
                                  :error (:error remote-dataset-id-field)
                                  :required? true
-                                 :placeholder "e.g., 01234567-89ab-cdef-0123-456789abcdef"})
-            ($ forms/form-field {:label "Local Display Name"
-                                 :value (:value local-name-field)
-                                 :on-change (:on-change local-name-field)
-                                 :error (:error local-name-field)
-                                 :required? true
-                                 :placeholder "e.g., Golden Benchmark Set v2"}))
+                                 :placeholder "e.g., 01234567-89ab-cdef-0123-456789abcdef"}))
          ;; Local dataset fields
          ($ :<>
             ($ forms/form-field {:label "Name"
@@ -144,7 +137,6 @@
                              :input-schema ""
                              :output-schema ""
                              ;; Remote dataset fields
-                             :local-name ""
                              :remote-dataset-id ""
                              :module-name ""
                              :cluster-conductor-host ""
@@ -155,25 +147,22 @@
                          (when (and (= (:dataset-type form-state) :local)
                                     (str/blank? v))
                            "Name is required"))]
-                :local-name [(fn [v form-state]
-                              (when (and (= (:dataset-type form-state) :remote)
-                                         (str/blank? v))
-                                "Local display name is required"))]
+
                 :remote-dataset-id [(fn [v form-state]
-                                     (when (and (= (:dataset-type form-state) :remote)
-                                                (str/blank? v))
-                                       "Remote dataset ID is required"))]
+                                      (when (and (= (:dataset-type form-state) :remote)
+                                                 (str/blank? v))
+                                        "Remote dataset ID is required"))]
                 :module-name [(fn [v form-state]
-                               (when (and (= (:dataset-type form-state) :remote)
-                                          (str/blank? v))
-                                 "Remote module name is required"))]
+                                (when (and (= (:dataset-type form-state) :remote)
+                                           (str/blank? v))
+                                  "Remote module name is required"))]
                 :input-schema [forms/valid-json]
                 :output-schema [forms/valid-json]
                 :cluster-conductor-port [(fn [v form-state]
-                                          (when (and (= (:dataset-type form-state) :remote)
-                                                     (not (str/blank? v))
-                                                     (js/isNaN (js/parseInt v)))
-                                            "Port must be a number"))]}
+                                           (when (and (= (:dataset-type form-state) :remote)
+                                                      (not (str/blank? v))
+                                                      (js/isNaN (js/parseInt v)))
+                                             "Port must be a number"))]}
 
    :ui (fn [{:keys [form-id]}]
          ($ CreateDatasetForm {:form-id form-id}))
@@ -185,15 +174,15 @@
             (if (= (:dataset-type form-state) :remote)
               ;; Remote dataset
               [:datasets/add-remote (-> form-state
-                                        (select-keys [:local-name :remote-dataset-id :module-name 
+                                        (select-keys [:remote-dataset-id :module-name
                                                       :cluster-conductor-host :cluster-conductor-port
                                                       :module-id])
                                         (assoc :cluster-conductor-port
                                                (when-not (str/blank? (:cluster-conductor-port form-state))
                                                  (js/parseInt (:cluster-conductor-port form-state)))))]
               ;; Local dataset
-              [:datasets/create (select-keys form-state [:module-id :name :description 
-                                                          :input-schema :output-schema])]))
+              [:datasets/create (select-keys form-state [:module-id :name :description
+                                                         :input-schema :output-schema])]))
    :on-success-invalidate (fn [db {:keys [module-id]} _reply]
                             {:query-key-pattern [:datasets module-id]})}})
 
