@@ -71,16 +71,14 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-remote
   [{:keys [manager local-name remote-dataset-id cluster-conductor-host cluster-conductor-port module-name]} uid]
-  (let [;; Generate a new local dataset ID for the remote reference
-        dataset-id (com.rpl.agent-o-rama.impl.helpers/random-uuid7)]
-    ;; Call the internal method to add the remote dataset
-    (aor-types/add-remote-dataset-internal
-     manager
-     dataset-id
-     (when-not (str/blank? cluster-conductor-host) cluster-conductor-host)
-     (when cluster-conductor-port (long cluster-conductor-port))
-     module-name)
-    {:status :ok :dataset-id dataset-id}))
+  ;; Call the internal method to add the remote dataset
+  (aor-types/add-remote-dataset-internal
+   manager
+   (java.util.UUID/fromString remote-dataset-id)
+   (when-not (str/blank? cluster-conductor-host) cluster-conductor-host)
+   (when cluster-conductor-port (long cluster-conductor-port))
+   module-name)
+  {:status :ok :dataset-id remote-dataset-id})
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/set-name
   [{:keys [manager dataset-id name]} uid]
