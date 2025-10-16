@@ -79,10 +79,6 @@
       :key-partitioner apart/task-id-key-partitioner})
     (declare-pstate*
      stream-topology
-     (symbol (po/agent-active-invokes-task-global-name agent-name))
-     po/AGENT-ACTIVE-INVOKES-PSTATE-SCHEMA)
-    (declare-pstate*
-     stream-topology
      (symbol (po/agent-stream-shared-task-global-name agent-name))
      po/AGENT-STREAM-SHARED-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
@@ -142,13 +138,9 @@
 
     (declare-pstate*
      mb-topology
-     (symbol (po/agent-valid-invokes-task-global-name agent-name))
-     po/AGENT-VALID-INVOKES-PSTATE-SCHEMA
+     (symbol (po/agent-mb-shared-task-global-name agent-name))
+     po/AGENT-MB-SHARED-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
-    (declare-pstate*
-     mb-topology
-     (symbol (po/pending-retries-task-global-name agent-name))
-     po/PENDING-RETRIES-PSTATE-SCHEMA)
     (declare-pstate*
      analytics-mb-topology
      (symbol (po/agent-rule-cursors-task-global-name agent-name))

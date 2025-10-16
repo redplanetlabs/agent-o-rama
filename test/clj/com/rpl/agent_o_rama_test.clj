@@ -2876,12 +2876,12 @@
        (bind module
          (module
            [setup topologies]
-           (let [topology   (aor/agent-topology setup topologies)
-                 node-exec  (symbol (po/agent-node-executor-name))
-                 active-foo (symbol (po/agent-active-invokes-task-global-name
-                                     "foo"))
-                 active-bar (symbol (po/agent-active-invokes-task-global-name
-                                     "bar"))]
+           (let [topology          (aor/agent-topology setup topologies)
+                 node-exec         (symbol (po/agent-node-executor-name))
+                 stream-shared-foo (symbol (po/agent-stream-shared-task-global-name
+                                            "foo"))
+                 stream-shared-bar (symbol (po/agent-stream-shared-task-global-name
+                                            "bar"))]
              (->
                topology
                (aor/new-agent "foo")
@@ -2967,13 +2967,13 @@
                "pending-agent-count"
                [:> *res]
                (|all)
-               (local-select> MAP-KEYS active-foo :> *agent-id)
+               (local-select> [:active-invokes ALL] stream-shared-foo :> *agent-id)
                (identity "foo" :> *name)
                (anchor> <foo>)
 
                (gen>)
                (|all)
-               (local-select> MAP-KEYS active-bar :> *agent-id)
+               (local-select> [:active-invokes ALL] stream-shared-bar :> *agent-id)
                (identity "bar" :> *name)
                (anchor> <bar>)
 

@@ -338,10 +338,10 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-node-task-global-name "foo")))
-         (bind valid-pstate
+         (bind mb-shared-pstate
            (foreign-pstate ipc
                            module-name
-                           (po/agent-valid-invokes-task-global-name "foo")))
+                           (po/agent-mb-shared-task-global-name "foo")))
          (bind traces-query
            (foreign-query ipc
                           module-name
@@ -360,7 +360,7 @@
              (into #{}
                    (apply concat
                     (for [i (range 4)]
-                      (foreign-select MAP-KEYS valid-pstate {:pkey i})
+                      (foreign-select [:valid-invokes MAP-KEYS] mb-shared-pstate {:pkey i})
                     )))
            ))
 

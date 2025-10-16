@@ -695,8 +695,10 @@
 (deframafn fetch-data
   [*agent-name *target *offset *dep-end-offset]
   (<<if (AnaRootTarget? *target)
-    (po/agent-active-invokes-task-global *agent-name :> $$active)
-    (local-select> [(subselect FIRST) (view first) (view first)] $$active :> *max-scan-offset)
+    (po/agent-stream-shared-task-global *agent-name :> $$stream-shared)
+    (local-select> [:active-invokes (subselect FIRST) (view first)]
+                   $$stream-shared
+                   :> *max-scan-offset)
    (else>)
     (identity nil :> *max-scan-offset))
   (action-target-pstate *agent-name (not (AnaRootTarget? *target)) :> $$p)

@@ -150,29 +150,25 @@
   [agent-name]
   (str "$$_agent-root-count-" agent-name))
 
-(defn agent-active-invokes-task-global-name
-  [agent-name]
-  (str "$$_agent-active-invokes-" agent-name))
+(defn agent-mb-shared-task-global-name
+  [name]
+  (str "$$_agent-mb-shared-" name))
 
-(def AGENT-ACTIVE-INVOKES-PSTATE-SCHEMA
-  {UUID Boolean})
-
-(defn agent-valid-invokes-task-global-name
-  [agent-name]
-  (str "$$_agent-valid-invokes-" agent-name))
-
-(def AGENT-VALID-INVOKES-PSTATE-SCHEMA
-  ;; [agent-task-id agent-id] -> valid retry-num
-  {java.util.List Long})
+(def AGENT-MB-SHARED-PSTATE-SCHEMA
+  (fixed-keys-schema
+   {:valid-invokes   (map-schema java.util.List Long {:subindex? true})
+    :pending-retries (set-schema java.util.List {:subindex? true})}
+  ))
 
 (defn agent-stream-shared-task-global-name
   [agent-name]
-  (str "$$-agent-stream-shared-" agent-name))
+  (str "$$_agent-stream-shared-" agent-name))
 
 (def AGENT-STREAM-SHARED-PSTATE-SCHEMA
   (fixed-keys-schema
    {:history         (map-schema Long HistoricalAgentGraphInfo {:subindex? true})
     :gc-root-invokes (map-schema UUID Object {:subindex? true})
+    :active-invokes  (set-schema UUID {:subindex? true})
    }))
 
 (defn agent-node-task-global-name
@@ -225,15 +221,6 @@
     String ; rule-name
     (map-schema UUID ActionLog {:subindex? true})
     {:subindex? true})})
-
-(defn pending-retries-task-global-name
-  [agent-name]
-  (str "$$_agent-pending-retries-" agent-name))
-
-;; TODO: <<<<>>> maybe merge with VALID-INVOKES
-(def PENDING-RETRIES-PSTATE-SCHEMA
-  ;; [agent-task-id agent-id retry-num]
-  {java.util.List Object})
 
 (defn agent-config-task-global-name
   [agent-name]
@@ -454,14 +441,9 @@
   [name]
   (this-module-pobject-task-global (agent-root-count-task-global-name name)))
 
-(defn agent-active-invokes-task-global
+(defn agent-mb-shared-task-global
   [name]
-  (this-module-pobject-task-global (agent-active-invokes-task-global-name
-                                    name)))
-
-(defn agent-valid-invokes-task-global
-  [name]
-  (this-module-pobject-task-global (agent-valid-invokes-task-global-name name)))
+  (this-module-pobject-task-global (agent-mb-shared-task-global-name name)))
 
 (defn agent-stream-shared-task-global
   [name]

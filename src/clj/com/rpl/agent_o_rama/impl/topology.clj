@@ -80,7 +80,7 @@
    *emits *result *stats *fork-context]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
-    $$active (po/agent-active-invokes-task-global *agent-name)]
+    $$stream-shared (po/agent-stream-shared-task-global *agent-name)]
    (anchor> <root>)
    (ops/explode *emits
                 :> {:keys [*invoke-id *fork-invoke-id *target-task-id
@@ -127,7 +127,7 @@
        (multi-path [:result (termval *result)]
                    [:finish-time-millis (termval *finish-time-millis)])]
       $$root)
-     (local-transform> [(keypath *agent-id) NONE>] $$active))
+     (local-transform> [:active-invokes (set-elem *agent-id) NONE>] $$stream-shared))
    (<<if (some? *agg-invoke-id)
      (aor-types/->valid-AggAckOp *agg-invoke-id *ack-val :> *op)
      (anchor> <agg-ack-emit>)
@@ -206,7 +206,7 @@
   [*agent-name *data]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
-    $$active (po/agent-active-invokes-task-global *agent-name)
+    $$stream-shared (po/agent-stream-shared-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
    (get *data :args :> *args)
    (ops/current-task-id :> *agent-task-id)
@@ -221,8 +221,8 @@
      (gen-new-agent-id *agent-name :> *agent-id))
    (init-retry-num :> *retry-num)
    (init-root *agent-name *agent-id *retry-num *args *metadata *source :> *invoke-id)
-   (local-transform> [(keypath *agent-id) (termval true)]
-                     $$active)
+   (local-transform> [:active-invokes NONE-ELEM (termval *agent-id)]
+                     $$stream-shared)
    (aor-types/->valid-NodeOp *invoke-id
                              nil
                              nil
@@ -264,7 +264,7 @@
   [*agent-name *agent-id *message]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
-    $$active (po/agent-active-invokes-task-global *agent-name)]
+    $$stream-shared (po/agent-stream-shared-task-global *agent-name)]
    (h/current-time-millis :> *finish-time-millis)
    (local-transform>
     [(keypath *agent-id)
@@ -273,7 +273,7 @@
        (termval (aor-types/->valid-AgentResult *message true))]
       [:finish-time-millis (termval *finish-time-millis)])]
     $$root)
-   (local-transform> [(keypath *agent-id) NONE>] $$active)
+   (local-transform> [:active-invokes (set-elem *agent-id) NONE>] $$stream-shared)
    (:>)))
 
 (deframaop intake-retry
@@ -364,7 +364,7 @@
   [*agent-name {:keys [*agent-task-id *agent-id *invoke-id->new-args]}]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
-    $$active (po/agent-active-invokes-task-global *agent-name)
+    $$stream-shared (po/agent-stream-shared-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)
     %affected-aggs (queries/fork-affected-aggs-query-task-global *agent-name)]
    (local-select> (keypath *agent-id)
@@ -398,8 +398,8 @@
      (throw! (h/ex-info "Cannot fork a run from an old version"
                         {:current-version *fork-graph-version
                          :old-version     *graph-version})))
-   (local-transform> [(keypath *fork-agent-id) (termval true)]
-                     $$active)
+   (local-transform> [:active-invokes NONE-ELEM (termval *fork-agent-id)]
+                     $$stream-shared)
    (local-transform> [(keypath *agent-id)
                       :forks
                       NONE-ELEM

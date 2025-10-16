@@ -11,9 +11,9 @@
 (deframafn valid-retry-num?
   [*agent-name *agent-task-id *agent-id *retry-num]
   (<<with-substitutions
-   [$$valid (po/agent-valid-invokes-task-global *agent-name)]
-   (local-select> (keypath [*agent-task-id *agent-id])
-                  $$valid
+   [$$mb-shared (po/agent-mb-shared-task-global *agent-name)]
+   (local-select> (keypath :valid-invokes [*agent-task-id *agent-id])
+                  $$mb-shared
                   :> *valid-retry-num)
    (:> (or> (nil? *valid-retry-num) (= *valid-retry-num *retry-num)))))
 

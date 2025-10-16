@@ -128,8 +128,8 @@
                    s         (aor/underlying-stream-topology topology)
                    node-exec (symbol (po/agent-node-executor-name))
                    root-sym  (symbol (po/agent-root-task-global-name "foo"))
-                   agent-active-invokes-pstate-sym
-                   (symbol (po/agent-active-invokes-task-global-name "foo"))]
+                   agent-stream-shared-pstate-sym
+                   (symbol (po/agent-stream-shared-task-global-name "foo"))]
                (->
                  topology
                  (aor/new-agent "foo")
@@ -182,8 +182,8 @@
                 (source> *reset-depot :> _)
                  (|all)
                  (local-transform> [MAP-VALS NONE>] root-sym)
-                 (local-transform> [MAP-VALS NONE>]
-                                   agent-active-invokes-pstate-sym))
+                 (local-transform> [:active-invokes ALL NONE>]
+                                   agent-stream-shared-pstate-sym))
                (<<query-topology topologies
                  "clear-pending"
                  [:> *res]
@@ -200,10 +200,10 @@
            (foreign-depot ipc
                           module-name
                           (po/agent-check-tick-depot-name "foo")))
-         (bind valid-pstate
+         (bind mb-shared-pstate
            (foreign-pstate ipc
                            module-name
-                           (po/agent-valid-invokes-task-global-name "foo")))
+                           (po/agent-mb-shared-task-global-name "foo")))
          (bind reset-depot (foreign-depot ipc module-name "*reset-depot"))
          (bind agent-manager (aor/agent-manager ipc module-name))
          (bind foo (aor/agent-client agent-manager "foo"))
@@ -236,8 +236,8 @@
                 (fn [task-id]
                   (= retry-num
                      (foreign-select-one
-                      (keypath [agent-task-id invoke-id])
-                      valid-pstate
+                      (keypath :valid-invokes [agent-task-id invoke-id])
+                      mb-shared-pstate
                       {:pkey task-id})
                   ))
                 (range 4)))))
@@ -370,9 +370,7 @@
              (let [topology  (aor/agent-topology setup topologies)
                    s         (aor/underlying-stream-topology topology)
                    node-exec (symbol (po/agent-node-executor-name))
-                   root-sym  (symbol (po/agent-root-task-global-name "foo"))
-                   agent-active-invokes-pstate-sym
-                   (symbol (po/agent-active-invokes-task-global-name "foo"))]
+                   root-sym  (symbol (po/agent-root-task-global-name "foo"))]
                (->
                  topology
                  (aor/new-agent "foo")
@@ -859,22 +857,21 @@
 
           (bind agent-manager (aor/agent-manager ipc module-name))
           (bind foo (aor/agent-client agent-manager "foo"))
-          (bind active-pstate
+          (bind stream-shared-pstate
             (foreign-pstate ipc
                             module-name
-                            (po/agent-active-invokes-task-global-name "foo")))
-          (bind ks (rtest/gen-hashing-index-keys 4))
+                            (po/agent-stream-shared-task-global-name "foo")))
 
           (bind check-active!
             (fn [expected]
               (let [c (reduce
-                       (fn [c k]
+                       (fn [c task-id]
                          (+ c
-                            (foreign-select-one (view count)
-                                                active-pstate
-                                                {:pkey k})))
+                            (foreign-select-one [:active-invokes (view count)]
+                                                stream-shared-pstate
+                                                {:pkey task-id})))
                        0
-                       ks)]
+                       (range 4))]
                 (when-not (= c expected)
                   (throw (ex-info "Mismatched active count"
                                   {:expected expected :count c})))
@@ -1078,28 +1075,27 @@
           (bind bar (aor/agent-client agent-manager "bar"))
           (bind car (aor/agent-client agent-manager "car"))
 
-          (bind actives
+          (bind stream-shared
             (vec
              (for [n ["foo" "bar" "car"]]
                (foreign-pstate ipc
                                module-name
-                               (po/agent-active-invokes-task-global-name n)))))
-          (bind ks (rtest/gen-hashing-index-keys 4))
+                               (po/agent-stream-shared-task-global-name n)))))
 
           (bind check-active!
             (fn [expected]
               (let [c (reduce
-                       (fn [c k]
+                       (fn [c task-id]
                          (reduce
                           (fn [c ap]
                             (+ c
-                               (foreign-select-one (view count)
+                               (foreign-select-one [:active-invokes (view count)]
                                                    ap
-                                                   {:pkey k})))
+                                                   {:pkey task-id})))
                           c
-                          actives))
+                          stream-shared))
                        0
-                       ks)]
+                       (range 4))]
                 (when-not (= c expected)
                   (throw (ex-info "Mismatched active count"
                                   {:expected expected :count c})))
