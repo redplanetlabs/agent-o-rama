@@ -711,10 +711,9 @@
                                   :className (common/cn "hover:bg-gray-50 cursor-pointer"
                                                         {"bg-purple-50" is-remote?})
                                   :onClick (fn [_]
-                                             (when-not is-remote?
-                                               (rfe/push-state :module/dataset-detail.examples
-                                                               {:module-id module-id
-                                                                :dataset-id dsid})))}
+                                             (rfe/push-state :module/dataset-detail.examples
+                                                             {:module-id module-id
+                                                              :dataset-id dsid}))}
                              ($ :td {:className (:td common/table-classes)}
                                 (if is-remote?
                                   ($ :div.flex.flex-col.gap-1
@@ -822,6 +821,59 @@
 ;; =============================================================================
 ;; DATASET DETAIL EXAMPLES TAB COMPONENT
 ;; =============================================================================
+
+;; =============================================================================
+;; REMOTE DATASET VIEW COMPONENT
+;; =============================================================================
+
+(defui remote-detail-view [{:keys [dataset]}]
+  ($ :div.h-full.flex.items-center.justify-center.p-6
+     ($ :div.max-w-2xl.bg-purple-50.border.border-purple-200.rounded-lg.p-8
+        ($ :div.flex.items-start.gap-4
+           ($ InformationCircleIcon {:className "h-12 w-12 text-purple-600 flex-shrink-0"})
+           ($ :div.flex-1
+              ($ :h2.text-2xl.font-bold.text-purple-900.mb-4 "This is a Remote Dataset")
+              ($ :div.space-y-4.text-gray-700
+                 ($ :p.text-base
+                    "The examples for this dataset reside on a different cluster and cannot be viewed or edited here.")
+                 ($ :p.text-base
+                    "However, you can run experiments with your local agents against this remote data by navigating to the "
+                    ($ :span.font-semibold "Experiments")
+                    " tab above.")
+                 (when-let [module-name (:module-name dataset)]
+                   ($ :div.mt-6.pt-6.border-t.border-purple-200
+                      ($ :h3.text-sm.font-semibold.text-purple-800.mb-2 "Remote Dataset Information")
+                      ($ :div.space-y-2.text-sm
+                         ($ :div.flex.gap-2
+                            ($ :span.font-medium "Module:")
+                            ($ :span.font-mono.text-purple-700 module-name))
+                         (when-let [host (:remote-host dataset)]
+                           ($ :div.flex.gap-2
+                              ($ :span.font-medium "Host:")
+                              ($ :span.font-mono.text-purple-700 host)))
+                         (when-let [port (:remote-port dataset)]
+                           ($ :div.flex.gap-2
+                              ($ :span.font-medium "Port:")
+                              ($ :span.font-mono.text-purple-700 (str port)))))))))))))
+
+;; =============================================================================
+;; EXAMPLES TAB ROUTER (for local vs remote datasets)
+;; =============================================================================
+
+(defui detail-examples-router [{:keys [module-id dataset-id]}]
+  (let [{:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:dataset-props module-id dataset-id]
+          :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
+          :enabled? (boolean (and module-id dataset-id))})
+        dataset data
+        is-remote? (boolean (:module-name dataset))]
+    (cond
+      loading? ($ :div.p-6 "Loading dataset details...")
+      error ($ :div.p-6.text-red-500 "Error loading dataset details")
+      (not dataset) ($ :div.p-6.text-gray-500 "Dataset not found")
+      is-remote? ($ remote-detail-view {:dataset dataset})
+      :else ($ detail-examples {:module-id module-id :dataset-id dataset-id}))))
 
 (defui detail-examples [{:keys [module-id dataset-id]}]
   (let [;; Get selected examples for this dataset
