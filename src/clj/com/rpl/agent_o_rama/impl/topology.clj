@@ -195,6 +195,22 @@
     $$root)
    (:> *invoke-id)))
 
+(deframafn update-metadata-index!
+  [*agent-name *metadata]
+  (<<with-substitutions
+   [$$stream-shared (po/agent-stream-shared-task-global *agent-name)]
+   ;; does not need to be synchronous with the agent execution
+   (<<atomic
+     (ops/explode-map *metadata :> *k *v)
+     (local-select> [:metadata (keypath *k) (view count)] $$stream-shared :> *curr-count)
+     (<<if (< *curr-count 3)
+       (local-transform> [:metadata (keypath *k) NONE-ELEM (termval *v)] $$stream-shared)
+       (<<if (not= 0 (ops/current-task-id))
+         (|direct 0)
+         (%self *agent-name {*k *v})
+       )))
+   (:>)))
+
 (defn init-retry-num [] 0)
 
 ;; factored out for redef in tests
@@ -221,6 +237,7 @@
      (gen-new-agent-id *agent-name :> *agent-id))
    (init-retry-num :> *retry-num)
    (init-root *agent-name *agent-id *retry-num *args *metadata *source :> *invoke-id)
+   (update-metadata-index! *agent-name *metadata)
    (local-transform> [:active-invokes NONE-ELEM (termval *agent-id)]
                      $$stream-shared)
    (aor-types/->valid-NodeOp *invoke-id
@@ -250,9 +267,9 @@
    (<<ramafn %metadata-edit-val
      [_]
      (:> (metadata-edit-val *value)))
-   ;; TODO: <<<<>>>> also need to update index of metadata
    (local-transform> [(must *agent-invoke-id) :metadata (keypath *key) (term %metadata-edit-val)]
                      $$root)
+   (update-metadata-index! *agent-name {*key *value})
   ))
 
 (defn hook:received-retry [agent-task-id agent-id retry-num])

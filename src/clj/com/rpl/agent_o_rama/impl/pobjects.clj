@@ -169,6 +169,8 @@
    {:history         (map-schema Long HistoricalAgentGraphInfo {:subindex? true})
     :gc-root-invokes (map-schema UUID Object {:subindex? true})
     :active-invokes  (set-schema UUID {:subindex? true})
+    ;; metadata key -> example values
+    :metadata        (map-schema String #{Object} {:subindex? true})
    }))
 
 (defn agent-node-task-global-name

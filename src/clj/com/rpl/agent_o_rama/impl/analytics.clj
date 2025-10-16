@@ -973,8 +973,6 @@
    [(keypath *granularity *metric-id *bucket)
     (term (stats-updater *metadata *category-values))]
    $$telemetry)
-
-  ;; TODO: <<<<>>>> need an index of all metadata across all agent invokes
 )
 
 (defn to-action-queue
