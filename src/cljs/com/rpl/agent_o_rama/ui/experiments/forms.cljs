@@ -55,6 +55,7 @@
                            :input->args (normalize-mappings (:input->args t))}))
                       targets)}
      :evaluators (:evaluators info)
+     :use-remote-evaluators (some :remote? (:evaluators info))
      :num-repetitions (:num-repetitions info)
      :concurrency (:concurrency info)}))
 
