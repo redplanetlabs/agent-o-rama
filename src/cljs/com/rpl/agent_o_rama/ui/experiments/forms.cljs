@@ -147,11 +147,12 @@
                      :let [is-remote-eval? (:remote? e)
                            evaluator-info (when-not is-remote-eval?
                                             (first (filter #(= (:name %) (:name e)) filtered-evaluators)))]]
-                 ($ :div.inline-flex.items-center.gap-2.px-3.py-2.rounded-lg.text-xs.font-medium
+                 ($ :div
                     {:key (:name e)
-                     :className (if is-remote-eval?
-                                  "bg-purple-100 text-purple-800 border border-purple-200"
-                                  "bg-indigo-100 text-indigo-800 border border-indigo-200")}
+                     :className (common/cn "inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium"
+                                           (if is-remote-eval?
+                                             "bg-purple-100 text-purple-800 border border-purple-200"
+                                             "bg-indigo-100 text-indigo-800 border border-indigo-200"))}
                     ($ :<>
                        ($ :div.flex.flex-col.gap-1
                           ($ :div.flex.items-center.gap-2
