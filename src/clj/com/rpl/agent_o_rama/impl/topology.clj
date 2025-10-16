@@ -35,27 +35,29 @@
   [*agent-name]
   (<<with-substitutions
    [*graph (po/agent-graph-task-global *agent-name)
-    $$graph-history (po/graph-history-task-global *agent-name)]
+    $$stream-shared (po/agent-stream-shared-task-global *agent-name)]
    (get *graph :uuid :> *curr-uuid)
-   (local-select> (view last) $$graph-history :> [*version {:keys [*uuid]}])
+   (local-select> [:history (view last)] $$stream-shared :> [*version {:keys [*uuid]}])
    (<<if (= *uuid *curr-uuid)
      (:> *version)
     (else>)
      (ops/current-task-id :> *task-id)
      (|global)
      (hook:finding-graph-version *task-id)
-     (local-select> (view last) $$graph-history :> [*version {:keys [*uuid]}])
+     (local-select> [:history (view last)] $$stream-shared :> [*version {:keys [*uuid]}])
      (<<if (= *uuid *curr-uuid)
        (identity *version :> *found-version)
       (else>)
        (inc (or> *version -1) :> *found-version)
-       (local-transform> [(keypath *found-version)
+       (local-transform> [:history
+                          (keypath *found-version)
                           (termval (graph/graph->historical-graph-info *graph))]
-                         $$graph-history))
+                         $$stream-shared))
      (|direct *task-id)
-     (local-transform> [(keypath *found-version)
+     (local-transform> [:history
+                        (keypath *found-version)
                         (termval (graph/graph->historical-graph-info *graph))]
-                       $$graph-history)
+                       $$stream-shared)
      (:> *found-version)
    )))
 
@@ -248,6 +250,7 @@
    (<<ramafn %metadata-edit-val
      [_]
      (:> (metadata-edit-val *value)))
+   ;; TODO: <<<<>>>> also need to update index of metadata
    (local-transform> [(must *agent-invoke-id) :metadata (keypath *key) (term %metadata-edit-val)]
                      $$root)
   ))
@@ -277,7 +280,7 @@
   [*agent-name {:keys [*agent-task-id *agent-id *expected-retry-num]}]
   (<<with-substitutions
    [$$root (po/agent-root-task-global *agent-name)
-    $$gc (po/agent-gc-invokes-task-global *agent-name)
+    $$stream-shared (po/agent-stream-shared-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
    (hook:received-retry *agent-task-id *agent-id *expected-retry-num)
    (local-select> (keypath *agent-id)
@@ -323,8 +326,8 @@
      (complete-with-failure! *agent-name *agent-id "Retry dropped")
     (else>)
      (<<if (= :restart *handle-mode)
-       (local-transform> [(keypath *root-invoke-id) (termval nil)]
-                         $$gc)
+       (local-transform> [:gc-root-invokes (keypath *root-invoke-id) (termval nil)]
+                         $$stream-shared)
        (init-root *agent-name *agent-id *retry-num *args *metadata *source :> *root-invoke-id)
       (else>)
        (identity *root-invoke-id :> *root-invoke-id))
@@ -1173,7 +1176,7 @@
    [$$root (po/agent-root-task-global *agent-name)
     $$root-count (po/agent-root-count-task-global *agent-name)
     $$nodes (po/agent-node-task-global *agent-name)
-    $$gc (po/agent-gc-invokes-task-global *agent-name)
+    $$stream-shared (po/agent-stream-shared-task-global *agent-name)
     *gc-valid-depot (po/agent-gc-valid-invokes-depot-task-global *agent-name)]
    (anode/read-config *agent-name
                       aor-types/MAX-TRACES-PER-TASK-CONFIG
@@ -1212,10 +1215,11 @@
            (depot-partition-append! *gc-valid-depot
                                     [*agent-task-id *agent-id]
                                     :append-ack))
-         (local-transform> [(keypath *root-invoke-id) (termval nil)] $$gc)
+         (local-transform> [:gc-root-invokes (keypath *root-invoke-id) (termval nil)]
+                           $$stream-shared)
          (local-transform> [(keypath *agent-id) NONE>] $$root)
          (local-transform> (term dec) $$root-count))))
-   (local-select> MAP-KEYS $$gc {:allow-yield? true} :> *invoke-id)
+   (local-select> [:gc-root-invokes MAP-KEYS] $$stream-shared {:allow-yield? true} :> *invoke-id)
    (local-select> [(keypath *invoke-id)]
                   $$nodes
                   :> {:keys [*emits *started-agg? *agg-invoke-id]})
@@ -1234,11 +1238,11 @@
       (else>)
        (first *tuples :> [*emit-task-id *emit-invoke-id])
        (|direct *emit-task-id)
-       (local-transform> [(keypath *emit-invoke-id) (termval nil)] $$gc)
+       (local-transform> [:gc-root-invokes (keypath *emit-invoke-id) (termval nil)] $$stream-shared)
        (continue> (next *tuples))))
    (|direct *start-task-id)
    (local-transform> [(keypath *invoke-id) :agg-inputs NONE>] $$nodes)
    (|direct *start-task-id)
    (local-transform> [(keypath *invoke-id) NONE>] $$nodes)
-   (local-transform> [(keypath *invoke-id) NONE>] $$gc)
+   (local-transform> [:gc-root-invokes (keypath *invoke-id) NONE>] $$stream-shared)
   ))

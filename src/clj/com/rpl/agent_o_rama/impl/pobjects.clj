@@ -165,12 +165,15 @@
   ;; [agent-task-id agent-id] -> valid retry-num
   {java.util.List Long})
 
-(defn agent-gc-invokes-task-global-name
+(defn agent-stream-shared-task-global-name
   [agent-name]
-  (str "$$_agent-gc-invokes-" agent-name))
+  (str "$$-agent-stream-shared-" agent-name))
 
-(def AGENT-GC-ROOT-INVOKES-PSTATE-SCHEMA
-  {UUID Object})
+(def AGENT-STREAM-SHARED-PSTATE-SCHEMA
+  (fixed-keys-schema
+   {:history         (map-schema Long HistoricalAgentGraphInfo {:subindex? true})
+    :gc-root-invokes (map-schema UUID Object {:subindex? true})
+   }))
 
 (defn agent-node-task-global-name
   [agent-name]
@@ -223,18 +226,11 @@
     (map-schema UUID ActionLog {:subindex? true})
     {:subindex? true})})
 
-
-(defn graph-history-task-global-name
-  [agent-name]
-  (str "$$_agent-graph-history-" agent-name))
-
-(def GRAPH-HISTORY-PSTATE-SCHEMA
-  {Long HistoricalAgentGraphInfo})
-
 (defn pending-retries-task-global-name
   [agent-name]
   (str "$$_agent-pending-retries-" agent-name))
 
+;; TODO: <<<<>>> maybe merge with VALID-INVOKES
 (def PENDING-RETRIES-PSTATE-SCHEMA
   ;; [agent-task-id agent-id retry-num]
   {java.util.List Object})
@@ -467,17 +463,13 @@
   [name]
   (this-module-pobject-task-global (agent-valid-invokes-task-global-name name)))
 
-(defn agent-gc-invokes-task-global
+(defn agent-stream-shared-task-global
   [name]
-  (this-module-pobject-task-global (agent-gc-invokes-task-global-name name)))
+  (this-module-pobject-task-global (agent-stream-shared-task-global-name name)))
 
 (defn agent-node-task-global
   [name]
   (this-module-pobject-task-global (agent-node-task-global-name name)))
-
-(defn graph-history-task-global
-  [name]
-  (this-module-pobject-task-global (graph-history-task-global-name name)))
 
 (defn agent-config-task-global
   [name]

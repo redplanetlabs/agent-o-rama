@@ -599,10 +599,10 @@
                                    cluster
                                    module-name
                                    (po/agent-root-task-global-name agentName))
-             graph-history-pstate (foreign-pstate
+             stream-shared-pstate (foreign-pstate
                                    cluster
                                    module-name
-                                   (po/graph-history-task-global-name agentName))
+                                   (po/agent-stream-shared-task-global-name agentName))
              agent-rules-pstate   (foreign-pstate
                                    cluster
                                    module-name
@@ -885,7 +885,7 @@
              :agent-config-depot   agent-config-depot
              :config-pstate        config-pstate
              :root-pstate          root-pstate
-             :graph-history-pstate graph-history-pstate
+             :stream-shared-pstate stream-shared-pstate
              :agent-rules-pstate   agent-rules-pstate
              :tracing-query        tracing-query
              :invokes-page-query   invokes-page-query

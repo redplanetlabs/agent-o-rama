@@ -137,10 +137,10 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-node-task-global-name "foo")))
-         (bind gc-pstate
+         (bind stream-shared-pstate
            (foreign-pstate ipc
                            module-name
-                           (po/agent-gc-invokes-task-global-name "foo")))
+                           (po/agent-stream-shared-task-global-name "foo")))
          (bind traces-query
            (foreign-query ipc
                           module-name
@@ -150,7 +150,9 @@
              (let [elems (reduce concat
                           []
                           (for [i (range 4)]
-                            (foreign-select MAP-KEYS gc-pstate {:pkey i})))]
+                            (foreign-select [:gc-root-invokes MAP-KEYS]
+                                            stream-shared-pstate
+                                            {:pkey i})))]
                (when-not (empty? elems)
                  (throw (ex-info "GC PState not empty" {:count (count elems)})))
              )))

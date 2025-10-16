@@ -775,10 +775,10 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-root-task-global-name "foo")))
-         (bind graph-history-pstate
+         (bind stream-shared-pstate
            (foreign-pstate ipc
                            module-name
-                           (po/graph-history-task-global-name "foo")))
+                           (po/agent-stream-shared-task-global-name "foo")))
          (bind current-graph-query
            (foreign-query ipc
                           module-name
@@ -798,9 +798,9 @@
          (doseq [[_ v] @task-counts-atom]
            (is (= 1 v)))
 
-         (is (= [0] (foreign-select MAP-KEYS graph-history-pstate {:pkey 0})))
+         (is (= [0] (foreign-select [:history MAP-KEYS] stream-shared-pstate {:pkey 0})))
          (bind hgraph
-           (foreign-select-one (keypath 0) graph-history-pstate {:pkey 0}))
+           (foreign-select-one [:history (keypath 0)] stream-shared-pstate {:pkey 0}))
 
          (is (some? (:uuid hgraph)))
          (bind graph-history1
@@ -851,11 +851,11 @@
          (doseq [[_ v] @task-counts-atom]
            (is (= 1 v)))
 
-         (is (= [0 1] (foreign-select MAP-KEYS graph-history-pstate {:pkey 0})))
+         (is (= [0 1] (foreign-select [:history MAP-KEYS] stream-shared-pstate {:pkey 0})))
          (bind hgraph1
-           (foreign-select-one (keypath 0) graph-history-pstate {:pkey 0}))
+           (foreign-select-one [:history (keypath 0)] stream-shared-pstate {:pkey 0}))
          (bind hgraph2
-           (foreign-select-one (keypath 1) graph-history-pstate {:pkey 0}))
+           (foreign-select-one [:history (keypath 1)] stream-shared-pstate {:pkey 0}))
 
          (is (not= (:uuid hgraph1) (:uuid hgraph2)))
 

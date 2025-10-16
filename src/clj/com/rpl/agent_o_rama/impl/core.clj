@@ -83,18 +83,13 @@
      po/AGENT-ACTIVE-INVOKES-PSTATE-SCHEMA)
     (declare-pstate*
      stream-topology
-     (symbol (po/agent-gc-invokes-task-global-name agent-name))
-     po/AGENT-GC-ROOT-INVOKES-PSTATE-SCHEMA
+     (symbol (po/agent-stream-shared-task-global-name agent-name))
+     po/AGENT-STREAM-SHARED-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
     (declare-pstate*
      stream-topology
      (symbol (po/agent-node-task-global-name agent-name))
      po/AGENT-NODE-PSTATE-SCHEMA
-     {:key-partitioner apart/task-id-key-partitioner})
-    (declare-pstate*
-     stream-topology
-     (symbol (po/graph-history-task-global-name agent-name))
-     po/GRAPH-HISTORY-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
     (declare-pstate*
      stream-topology

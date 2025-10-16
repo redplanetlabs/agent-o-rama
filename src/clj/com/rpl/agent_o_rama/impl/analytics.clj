@@ -864,13 +864,13 @@
 
 (defn mk-number-stats
   []
-  (number-stats/static-map->valid-NumberStats
-   {:min            nil
-    :max            nil
-    :power2-sum-set nil
-    :rest-sum       nil
-    :latest         nil
-    :t-digest       (t-digest/mk-merging-digest 25)}))
+  (number-stats/->valid-NumberStats
+   nil
+   nil
+   nil
+   nil
+   nil
+   (t-digest/mk-merging-digest 25)))
 
 (defn metric-point->category-values
   [{:keys [type values]}]
@@ -912,7 +912,7 @@
   (fn [stats]
     (multi-transform
      (multi-path
-      [:overall (term (number-stats-updater category-values))]
+      [:overall (term (category-map-updater category-values))]
       [:by-meta (term (metadata-stats-updater metadata category-values))])
      stats)))
 
@@ -950,6 +950,11 @@
                     $$metric-cursors)
   (ops/explode-map *m :> *k {:keys [*start-time-millis *metadata] :as *data-map})
   (filter> (some? *start-time-millis)) ; defensive
+  (filter> (not (experiment-source? *data-map)))
+  (assoc *metadata
+   "aor/status"
+   (ifexpr (metrics/run-success? *data-map) "success" "failure")
+   :> *metadata)
   (ops/explode *metrics :> {:keys [*metric-fn]})
   (h/invoke *metric-fn *data-map :> *metrics-map)
   (ops/explode-map *metrics-map :> *metric-id *metric-points)
