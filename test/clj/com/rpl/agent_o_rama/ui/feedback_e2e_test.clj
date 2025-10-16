@@ -9,8 +9,6 @@
    [com.rpl.rama.test :as rtest]
    [etaoin.api :as e]))
 
-(def ^:private default-timeout 120)
-
 (defonce system (volatile! nil))
 
 ;;; Helper functions

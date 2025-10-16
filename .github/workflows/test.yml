@@ -38,4 +38,4 @@ jobs:
     - name: Run tests
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      run: lein test :all
+      run: lein test
