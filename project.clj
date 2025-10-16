@@ -16,6 +16,7 @@
              "-Djdk.attach.allowAttachSelf"
              ;; for java 25
              "--enable-native-access=ALL-UNNAMED"]
+  :repl-options {:port 7888}
   :dependencies [[com.rpl/rama-helpers "0.10.0"]
                  [com.github.f4b6a3/uuid-creator "6.1.1"]
                  [dev.langchain4j/langchain4j
