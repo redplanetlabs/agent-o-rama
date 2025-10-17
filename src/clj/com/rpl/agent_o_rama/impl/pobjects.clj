@@ -333,7 +333,7 @@
 (defn- stats-schema
   [leaf-schema]
   (map-schema
-   clojure.lang.Keyword ; metric ID
+   java.util.List ; metric ID
    (map-schema
     Long  ; bucket
     (fixed-keys-schema

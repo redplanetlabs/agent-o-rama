@@ -804,29 +804,35 @@
 
 (defn to-eval-metric
   [rule-name target]
-  (metrics/->valid-MetricDefinition
-   [:eval (keyword rule-name)]
-   target
-   (fn [{:keys [feedback]}]
-     (if-let [scores (select-first [:results
-                                    ALL
-                                    (selected? :source (rule-source?-pred rule-name))
-                                    :scores]
-                                   feedback)]
-       (transform
-        MAP-VALS
-        (fn [v]
-          [(cond
-             (string? v) {:type :categorical :values #{v}}
-             (boolean? v) {:type :numeric :values [(if v 1 0)]}
-             (number? v) {:type :numeric :values [v]}
-             :else (throw (h/ex-info "Unexpected eval value" {:value v :type (class v)}))
-           )])
-        scores)))))
+  (let [rule-kw (keyword rule-name)]
+    (metrics/->valid-MetricDefinition
+     [:eval rule-kw]
+     target
+     (fn [{:keys [feedback]}]
+       (if-let [scores (select-first [:results
+                                      ALL
+                                      (selected? :source (rule-source?-pred rule-name))
+                                      :scores]
+                                     feedback)]
+         (->> scores
+              (transform
+               MAP-KEYS
+               (fn [k]
+                 [:eval rule-kw (keyword k)]))
+              (transform
+               MAP-VALS
+               (fn [v]
+                 [(cond
+                    (string? v) {:type :categorical :values #{v}}
+                    (boolean? v) {:type :numeric :values [(if v 1 0)]}
+                    (number? v) {:type :numeric :values [v]}
+                    :else (throw (h/ex-info "Unexpected eval value" {:value v :type (class v)}))
+                  )])))
+       )))))
 
 (deframaop explode-metrics
   [*rule->info]
-  (metrics/all-metrics :> *built-in-metrics)
+  (vals (metrics/all-metrics) :> *built-in-metrics)
   (anchor> <root>)
   (ops/explode-map (group-by :target *built-in-metrics) :> *target *metrics)
   (:> {:target            *target
@@ -841,11 +847,11 @@
     *rule->info
     :> [*rule-name {:keys [*node-name *start-time-millis]}])
   (ifexpr (nil? *node-name) :root :nodes :> *target)
-  (:> {:target       *target
-       :query-id     [:eval *rule-name]
-       :metrics      [(to-eval-metric *rule-name *target)]
+  (:> {:target            *target
+       :query-id          [:eval *rule-name]
+       :metrics           [(to-eval-metric *rule-name *target)]
        :dependency-rule-names [*rule-name]
-       :start-offset *start-time-millis}))
+       :start-time-millis *start-time-millis}))
 
 (deframafn get-all-metrics
   [*rule->info]
@@ -936,7 +942,7 @@
   ;; - causes removed metrics (e.g. rules withe vals) to be cleared from here
   ;; - since this is a microbatch topology, the existing metrics will overwrite this below and this
   ;; clear will never be visible
-  (local-transform> (termval {}) *metric-cursors)
+  (local-transform> (termval {}) $$metric-cursors)
   (ops/explode *maps :> {:keys [*target *query-id *metrics *dep-end-offset *start-time-millis]})
   (select> [(keypath *agent-name *query-id)
             (nil->val (h/min-uuid7-at-timestamp *start-time-millis))]
@@ -957,8 +963,8 @@
    "aor/status"
    (ifexpr (metrics/run-success? *data-map) "success" "failure")
    :> *metadata)
-  (ops/explode *metrics :> {:keys [*metric-fn]})
-  (h/invoke *metric-fn *data-map :> *metrics-map)
+  (ops/explode *metrics :> {:keys [*metrics-fn]})
+  (h/invoke *metrics-fn *data-map :> *metrics-map)
   (ops/explode-map *metrics-map :> *metric-id *metric-points)
   (ops/explode *metric-points :> *metric-point)
   (metric-point->category-values *metric-point :> *category-values)
