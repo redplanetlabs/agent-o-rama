@@ -1187,6 +1187,8 @@
 ;;    - to get min, p25, p50, p75, and max: #{:min, 0.25, 0.5, 0.75, :max}
 ;; - doesn't use any anonymous functions so that this works across module update, as AOR clients
 ;; won't usually use the same compilation as running modules
+;; - metadata-key is optional
+;;   - if set, leaves are split by metadata value (5 max)
 (defn select-telemetry
   [telemetry-pstate granularity metric-id start-time-millis end-time-millis metrics-set
    metadata-key]
