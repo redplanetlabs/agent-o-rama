@@ -3307,23 +3307,50 @@
 
        (aor/agent-invoke-with-context
         foo
-        {:metadata {"b" 4}})
+        {:metadata {"b" 4 "hello" "zyx" "world-hello" 1 "a-hello" 2}})
 
        (bind m (all-meta))
        (is (= m
-              {"a" #{1}
-               "b" #{true 2 3}
-               "c" #{"abc"}
-               "d" #{0.4 0.5}
-               "e" #{true}
-               "f" #{0.5}
-               "i" #{1}
-               "l" #{1}
-               "s" #{"abc"}}))
+              {"a"           #{1}
+               "a-hello"     #{2}
+               "b"           #{true 2 3}
+               "c"           #{"abc"}
+               "d"           #{0.4 0.5}
+               "e"           #{true}
+               "f"           #{0.5}
+               "hello"       #{"zyx"}
+               "i"           #{1}
+               "l"           #{1}
+               "s"           #{"abc"}
+               "world-hello" #{1}}))
 
 
        (bind search-metadata (:search-metadata-query (aor-types/underlying-objects foo)))
 
-       ;; TODO: <<<<>>>> test metadata search
-       (println (foreign-invoke-query search-metadata "" 100 nil))
+       (bind res (foreign-invoke-query search-metadata "" 100 nil))
+       (is (= (:metadata res)
+              [{:examples #{1} :name "a"}
+               {:examples #{2} :name "a-hello"}
+               {:examples #{true 3 2} :name "b"}
+               {:examples #{"abc"} :name "c"}
+               {:examples #{0.5 0.4} :name "d"}
+               {:examples #{true} :name "e"}
+               {:examples #{0.5} :name "f"}
+               {:examples #{"zyx"} :name "hello"}
+               {:examples #{1} :name "i"}
+               {:examples #{1} :name "l"}
+               {:examples #{"abc"} :name "s"}
+               {:examples #{1} :name "world-hello"}]
+           ))
+       (is (nil? (:pagination-params res)))
+
+       (bind res (foreign-invoke-query search-metadata "HELLO" 2 nil))
+       (is (= (:metadata res)
+              [{:examples #{2} :name "a-hello"} {:examples #{"zyx"} :name "hello"}]))
+       (is (some? (:pagination-params res)))
+
+       (bind res (foreign-invoke-query search-metadata "HELLO" 2 (:pagination-params res)))
+       (is (= (:metadata res)
+              [{:examples #{1} :name "world-hello"}]))
+       (is (nil? (:pagination-params res)))
       ))))
