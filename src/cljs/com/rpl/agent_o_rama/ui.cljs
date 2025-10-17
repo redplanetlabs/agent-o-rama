@@ -177,19 +177,26 @@
          ($ :div.px-3.py-2.text-xs.text-red-500 {:title error}
             (when-not collapsed? "Error loading agents"))
 
-         ;; Render the list of agents
+;; Render the list of agents
                   ;; Render the list of agents directly in MODULE section
          (seq data)
-         (for [agent data
-               :let [decoded-agent-name (common/url-decode (:agent-name agent))]]
-           ($ nav-link {:key (:agent-name agent)
-                        :href (str "/agents/" (common/url-encode module-id) "/agent/" (:agent-name agent))
-                        :location location
-                        :collapsed? collapsed?
-                        :title decoded-agent-name}
-              ($ CpuChipIcon {:className "h-5 w-5 flex-shrink-0"})
-              (when-not collapsed?
-                ($ :span.ml-3.truncate decoded-agent-name))))))))
+         (let [sorted-agents (sort-by
+                              (fn [agent]
+                                (let [name (:agent-name agent)
+                                      decoded-name (common/url-decode name)]
+                                  ;; Put agents starting with _ last, sort alphabetically within each group
+                                  [(str/starts-with? decoded-name "_") decoded-name]))
+                              data)]
+           (for [agent sorted-agents
+                 :let [decoded-agent-name (common/url-decode (:agent-name agent))]]
+             ($ nav-link {:key (:agent-name agent)
+                          :href (str "/agents/" (common/url-encode module-id) "/agent/" (:agent-name agent))
+                          :location location
+                          :collapsed? collapsed?
+                          :title decoded-agent-name}
+                ($ CpuChipIcon {:className "h-5 w-5 flex-shrink-0"})
+                (when-not collapsed?
+                  ($ :span.ml-3.truncate decoded-agent-name)))))))))
 
 (defui sidebar-nav []
   (let [match (state/use-sub [:route])
