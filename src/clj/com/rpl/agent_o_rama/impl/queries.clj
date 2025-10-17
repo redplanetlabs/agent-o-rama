@@ -956,9 +956,7 @@
       (<<ramafn %filter
         [*name _]
         (<<cond
-         (case>
-          (not (h/contains-string? (str/lower-case (str *name))
-                                    *search-string-lower)))
+         (case> (not (h/contains-string? (str/lower-case (str *name)) *search-string-lower)))
           (:> nil nil)
 
          (default>)
