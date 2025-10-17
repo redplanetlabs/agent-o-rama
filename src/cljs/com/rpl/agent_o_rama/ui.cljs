@@ -177,8 +177,7 @@
          ($ :div.px-3.py-2.text-xs.text-red-500 {:title error}
             (when-not collapsed? "Error loading agents"))
 
-;; Render the list of agents
-                  ;; Render the list of agents directly in MODULE section
+         ;; Render the list of agents directly in MODULE section
          (seq data)
          (let [sorted-agents (sort-by
                               (fn [agent]
