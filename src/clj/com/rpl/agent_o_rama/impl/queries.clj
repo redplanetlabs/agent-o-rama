@@ -957,10 +957,8 @@
         [*name _]
         (<<cond
          (case>
-          (and>
-           (some? *search-string-lower)
-           (not (h/contains-string? (str/lower-case (str *name))
-                                     *search-string-lower))))
+          (not (h/contains-string? (str/lower-case (str *name))
+                                    *search-string-lower)))
           (:> nil nil)
 
          (default>)
