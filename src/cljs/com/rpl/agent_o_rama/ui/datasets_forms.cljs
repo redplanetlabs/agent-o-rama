@@ -553,23 +553,20 @@
                                                  (set-error! (str "An error occurred during upload: " (.-message err))))))))))]
 
     ($ :div.p-6.space-y-4
-       ;; 1. Description Text
        ($ :p.text-sm.text-gray-700
           "Upload a "
           ($ :a.text-blue-600.hover:underline {:href "https://jsonlines.org/examples/" :target "_blank"} "JSONL file")
           " to add examples to this dataset in bulk. Each line in the file should be a valid JSON object representing a single example.")
 
-       ;; 2. Explanation of the format
        ($ :div.bg-gray-50.p-3.rounded-md.border
           ($ :h4.text-sm.font-medium.text-gray-800.mb-2 "Line Format:")
           ($ :p.text-xs.text-gray-600.mb-2
              "Each JSON object can have the following keys:")
           ($ :ul.list-disc.list-inside.space-y-1.text-xs.text-gray-700
              ($ :li ($ :code.font-mono.bg-gray-200.px-1.rounded "input") " (required): The input for the agent.")
-             ($ :li ($ :code.font-mono.bg-gray-200.px-1.rounded "output") " (optional): The expected reference output. Can also be named " ($ :code "reference-output") ".")
+             ($ :li ($ :code.font-mono.bg-gray-200.px-1.rounded "output") " (optional): The expected reference output.")
              ($ :li ($ :code.font-mono.bg-gray-200.px-1.rounded "tags") " (optional): An array of strings.")))
 
-       ;; 3. Hidden File Input and "Choose File" Button
        ($ :input {:ref file-input-ref
                   :type "file"
                   :accept ".jsonl"
@@ -577,8 +574,8 @@
                   :onChange handle-file-change})
 
        ($ :div.mt-6.flex.flex-col.items-center
-          ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed
-             {:onClick #(.click (.current file-input-ref))
+          ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
+             {:onClick #(.click (.-current file-input-ref))
               :disabled uploading?}
              (if uploading?
                ($ common/spinner {:size :medium})
