@@ -5,7 +5,8 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui :as ui]
    [com.rpl.agent-o-rama.impl.json-serialize :as jser]
-   [clojure.walk :as walk])
+   [clojure.walk :as walk]
+   [clojure.string :as str])
   (:import
    [java.net URLEncoder URLDecoder]
    [java.util UUID]))
