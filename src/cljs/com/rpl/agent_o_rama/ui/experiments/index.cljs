@@ -135,7 +135,7 @@
                         ($ :div.flex.gap-6
                            (for [{:keys [chart-title data series]} valid-charts]
                              ($ :div.flex-shrink-0
-                                {:key chart-title}
+                                {:key (str chart-title "-" (count (first data)))}
                                 ($ chart/time-series-chart
                                    {:data data
                                     :series series
