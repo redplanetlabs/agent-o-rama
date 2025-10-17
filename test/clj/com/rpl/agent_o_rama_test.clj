@@ -3307,7 +3307,7 @@
 
        (aor/agent-invoke-with-context
         foo
-        {:metadata {"b" 4 "hello" "zyx" "world-hello" 1 "a-hello" 2}})
+        {:metadata {"b" 4 "hello" "zyx" "world-HeLLO" 1 "a-hello" 2}})
 
        (bind m (all-meta))
        (is (= m
@@ -3322,7 +3322,7 @@
                "i"           #{1}
                "l"           #{1}
                "s"           #{"abc"}
-               "world-hello" #{1}}))
+               "world-HeLLO" #{1}}))
 
 
        (bind search-metadata (:search-metadata-query (aor-types/underlying-objects foo)))
@@ -3340,7 +3340,7 @@
                {:examples #{1} :name "i"}
                {:examples #{1} :name "l"}
                {:examples #{"abc"} :name "s"}
-               {:examples #{1} :name "world-hello"}]
+               {:examples #{1} :name "world-HeLLO"}]
            ))
        (is (nil? (:pagination-params res)))
 
@@ -3351,6 +3351,6 @@
 
        (bind res (foreign-invoke-query search-metadata "HELLO" 2 (:pagination-params res)))
        (is (= (:metadata res)
-              [{:examples #{1} :name "world-hello"}]))
+              [{:examples #{1} :name "world-HeLLO"}]))
        (is (nil? (:pagination-params res)))
       ))))
