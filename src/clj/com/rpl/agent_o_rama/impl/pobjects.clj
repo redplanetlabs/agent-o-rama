@@ -332,28 +332,27 @@
 
 (def DEFAULT-CATEGORY "_aor/default")
 
-(defn- stats-schema
+(defn- telemetry-schema
   [leaf-schema]
-  (map-schema
-   java.util.List ; metric ID
+  {Long  ; granularity as seconds (60 for minute, 3600 for hour, etc.)
    (map-schema
-    Long  ; bucket
-    (fixed-keys-schema
-     {:overall leaf-schema
-      :by-meta (map-schema
-                String ; metadata key
-                {String ; metadata value
-                 leaf-schema}
-                {:subindex? true})
-     })
-    {:subindex? true})
-   {:subindex? true}))
+    java.util.List ; metric ID
+    (map-schema
+     Long  ; bucket
+     (fixed-keys-schema
+      {:overall leaf-schema
+       :by-meta (map-schema
+                 String ; metadata key
+                 {String ; metadata value
+                  leaf-schema}
+                 {:subindex? true})
+      })
+     {:subindex? true})
+    {:subindex? true})})
 
 (def AGENT-TELEMETRY-PSTATE-SCHEMA
-  {Long  ; granularity as seconds (60 for minute, 3600 for hour, etc.)
-   (stats-schema {String ; category
-                  NumberStats})
-  })
+  (telemetry-schema {String ; category
+                     NumberStats}))
 
 (defn evaluators-task-global-name
   []
