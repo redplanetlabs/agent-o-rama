@@ -937,63 +937,15 @@
                    "Export")
 
                    ;; Import button - next to export
-                (let [[uploading? set-uploading!] (uix/use-state false)
-                      file-input-ref (uix/use-ref nil)]
-                  ($ :<>
-                     ($ :input {:ref file-input-ref
-                                :type "file"
-                                :accept ".jsonl,application/jsonl,application/octet-stream"
-                                :style {:display "none"}
-                                :key (str "file-input-" dataset-id) ; Force re-render to clear previous selections
-                                :onChange (fn [e]
-                                            (let [files (.. e -target -files)
-                                                  f (when (and files (> (.-length files) 0)) (aget files 0))]
-                                              (js/console.log "File selected for import:" (.-name f) "size:" (.-size f))
-                                              (when f
-                                                (set-uploading! true)
-                                                ;; Clear the input value to allow re-selecting the same file
-                                                (set! (.. e -target -value) "")
-                                                (let [fd (js/FormData.)
-                                                      url (str "/api/datasets/" (common/url-encode module-id) "/" (common/url-encode (str dataset-id)) "/import")]
-                                                  (.append fd "file" f)
-                                                  (-> (js/fetch url #js {:method "POST" :body fd})
-                                                      (.then (fn [resp]
-                                                               (if (.-ok resp)
-                                                                 (.json resp)
-                                                                 (throw (js/Error. (str "HTTP " (.-status resp) ": " (.-statusText resp)))))))
-                                                      (.then (fn [data]
-                                                               (set-uploading! false)
-                                                               ;; Refresh examples after import
-                                                               (refetch)
-                                                               ;; Show results modal instead of alert
-                                                               (state/dispatch [:modal/show :import-results
-                                                                                {:title "Import Results"
-                                                                                 :component ($ ImportResultsModal
-                                                                                               {:success_count (.-success_count data)
-                                                                                                :failure_count (.-failure_count data)
-                                                                                                :errors (js->clj (.-errors data) :keywordize-keys true)})}])))
-                                                      (.catch (fn [err]
-                                                                (set-uploading! false)
-                                                                (state/dispatch [:modal/show :import-error
-                                                                                 {:title "Import Failed"
-                                                                                  :component ($ :div.p-6
-                                                                                                ($ :div.flex.items-center.gap-2.text-red-700.mb-4
-                                                                                                   ($ :svg.h-6.w-6.text-red-600 {:fill "currentColor" :viewBox "0 0 20 20"}
-                                                                                                      ($ :path {:fillRule "evenodd"
-                                                                                                                :d "M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                                                                                                                :clipRule "evenodd"}))
-                                                                                                   ($ :h3.text-lg.font-semibold "Import Failed"))
-                                                                                                ($ :div.text-sm.text-gray-700
-                                                                                                   ($ :p "The import operation failed with the following error:")
-                                                                                                   ($ :div.mt-2.p-3.bg-red-50.border.border-red-200.rounded.text-red-800.font-mono.text-xs
-                                                                                                      (str err))))}]))))))))})
-                     ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.bg-white.border.border-gray-300.hover:bg-gray-50.cursor-pointer.disabled:opacity-50.disabled:cursor-not-allowed
-                        {:onClick (fn [_]
-                                    (when-let [node (.-current file-input-ref)]
-                                      (.click node)))
-                         :disabled is-read-only?
-                         :title (when is-read-only? "Cannot import into a read-only snapshot.")}
-                        (if uploading? "Uploading..." "Import"))))
+                ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.bg-white.border.border-gray-300.hover:bg-gray-50.cursor-pointer.disabled:opacity-50.disabled:cursor-not-allowed
+                   {:onClick #(state/dispatch [:modal/show :dataset-import
+                                               {:title "Import Examples from JSONL"
+                                                :component ($ datasets-forms/ImportDatasetModal
+                                                              {:module-id module-id
+                                                               :dataset-id dataset-id})}])
+                    :disabled is-read-only?
+                    :title (when is-read-only? "Cannot import into a read-only snapshot.")}
+                   "Import")
 
                    ;; Add Example button
                 ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer.disabled:bg-gray-400.disabled:cursor-not-allowed

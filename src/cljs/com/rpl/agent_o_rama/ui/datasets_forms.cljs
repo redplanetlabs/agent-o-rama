@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.datasets-forms
   (:require
    [uix.core :as uix :refer [defui defhook $]]
-   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon XMarkIcon LockClosedIcon InformationCircleIcon]]
+   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon XMarkIcon LockClosedIcon InformationCircleIcon DocumentArrowUpIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.sente :as sente]
@@ -481,3 +481,108 @@
                       :dataset-id dataset-id
                       :snapshot-name snapshot-name
                       :example-ids example-ids}])))
+
+(defui ImportDatasetModal [{:keys [module-id dataset-id]}]
+  (let [[uploading? set-uploading!] (uix/use-state false)
+        [error set-error!] (uix/use-state nil)
+        file-input-ref (uix/use-ref nil)
+
+        handle-file-change (fn [e]
+                             (let [file (-> e .-target .-files (aget 0))]
+                               (when file
+                                 (set-uploading! true)
+                                 (set-error! nil)
+                                 (let [form-data (js/FormData.)
+                                       url (str "/api/datasets/" (common/url-encode module-id) "/" (common/url-encode (str dataset-id)) "/import")]
+                                   (.append form-data "file" file)
+                                   (-> (js/fetch url #js {:method "POST" :body form-data})
+                                       (.then (fn [resp]
+                                                (if (.-ok resp)
+                                                  (.json resp)
+                                                  (throw (js/Error. (str "Upload failed with status: " (.-status resp)))))))
+                                       (.then (fn [data]
+                                                (set-uploading! false)
+                                                (state/dispatch [:modal/hide])
+                                                ;; Invalidate query to refresh the example list
+                                                (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                                ;; Show the results modal
+                                                (state/dispatch [:modal/show :import-results
+                                                                 {:title "Import Results"
+                                                                  :component ($ :div.p-6
+                                                                                ;; Summary section
+                                                                                ($ :div.mb-6
+                                                                                   ($ :div.flex.items-center.gap-4.mb-4
+                                                                                      (if (zero? (.-failure_count data))
+                                                                                        ($ :div.flex.items-center.gap-2.text-green-700
+                                                                                           ($ :svg.h-6.w-6.text-green-600 {:fill "currentColor" :viewBox "0 0 20 20"}
+                                                                                              ($ :path {:fillRule "evenodd"
+                                                                                                        :d "M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                                                                                        :clipRule "evenodd"}))
+                                                                                           ($ :h3.text-lg.font-semibold "Import Successful"))
+                                                                                        ($ :div.flex.items-center.gap-2.text-yellow-700
+                                                                                           ($ :svg.h-6.w-6.text-yellow-600 {:fill "currentColor" :viewBox "0 0 20 20"}
+                                                                                              ($ :path {:fillRule "evenodd"
+                                                                                                        :d "M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                                                                                                        :clipRule "evenodd"}))
+                                                                                           ($ :h3.text-lg.font-semibold "Import Completed with Errors"))))
+                                                                                   ;; Stats
+                                                                                   ($ :div.grid.grid-cols-2.gap-4.text-sm
+                                                                                      ($ :div.bg-green-50.border.border-green-200.rounded-lg.p-3
+                                                                                         ($ :div.text-green-800.font-medium "Successful")
+                                                                                         ($ :div.text-2xl.font-bold.text-green-900 (.-success_count data)))
+                                                                                      ($ :div.bg-red-50.border.border-red-200.rounded-lg.p-3
+                                                                                         ($ :div.text-red-800.font-medium "Failed")
+                                                                                         ($ :div.text-2xl.font-bold.text-red-900 (.-failure_count data)))))
+                                                                                ;; Errors section
+                                                                                (when (and (.-errors data) (> (.-failure_count data) 0))
+                                                                                  (let [errors (js->clj (.-errors data) :keywordize-keys true)]
+                                                                                    ($ :div.mt-6
+                                                                                       ($ :h4.text-md.font-semibold.text-gray-900.mb-3 "Error Details")
+                                                                                       ($ :div.max-h-96.overflow-y-auto.border.border-gray-200.rounded-lg
+                                                                                          ($ :div.divide-y.divide-gray-200
+                                                                                             (for [[idx error] (map-indexed vector errors)]
+                                                                                               ($ :div.p-4.hover:bg-gray-50 {:key idx}
+                                                                                                  ($ :div.text-sm.font-medium.text-gray-900.mb-2
+                                                                                                     (str "Line " (inc idx) ":"))
+                                                                                                  ($ :div.text-xs.font-mono.text-gray-600.bg-gray-100.p-2.rounded.mb-2.break-all
+                                                                                                     (:line_content error))
+                                                                                                  ($ :div.text-sm.text-red-600
+                                                                                                     (:error error))))))))))}])))
+                                       (.catch (fn [err]
+                                                 (set-uploading! false)
+                                                 (set-error! (str "An error occurred during upload: " (.-message err))))))))))]
+
+    ($ :div.p-6.space-y-4
+       ;; 1. Description Text
+       ($ :p.text-sm.text-gray-700
+          "Upload a "
+          ($ :a.text-blue-600.hover:underline {:href "https://jsonlines.org/examples/" :target "_blank"} "JSONL file")
+          " to add examples to this dataset in bulk. Each line in the file should be a valid JSON object representing a single example.")
+
+       ;; 2. Explanation of the format
+       ($ :div.bg-gray-50.p-3.rounded-md.border
+          ($ :h4.text-sm.font-medium.text-gray-800.mb-2 "Line Format:")
+          ($ :p.text-xs.text-gray-600.mb-2
+             "Each JSON object can have the following keys:")
+          ($ :ul.list-disc.list-inside.space-y-1.text-xs.text-gray-700
+             ($ :li ($ :code.font-mono.bg-gray-200.px-1.rounded "input") " (required): The input for the agent.")
+             ($ :li ($ :code.font-mono.bg-gray-200.px-1.rounded "output") " (optional): The expected reference output. Can also be named " ($ :code "reference-output") ".")
+             ($ :li ($ :code.font-mono.bg-gray-200.px-1.rounded "tags") " (optional): An array of strings.")))
+
+       ;; 3. Hidden File Input and "Choose File" Button
+       ($ :input {:ref file-input-ref
+                  :type "file"
+                  :accept ".jsonl"
+                  :style {:display "none"}
+                  :onChange handle-file-change})
+
+       ($ :div.mt-6.flex.flex-col.items-center
+          ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.disabled:opacity-50.disabled:cursor-not-allowed
+             {:onClick #(.click (.current file-input-ref))
+              :disabled uploading?}
+             (if uploading?
+               ($ common/spinner {:size :medium})
+               ($ DocumentArrowUpIcon {:className "h-5 w-5 mr-2"}))
+             (if uploading? "Uploading..." "Choose File..."))
+          (when error
+            ($ :p.text-sm.text-red-600.mt-2 error))))))
