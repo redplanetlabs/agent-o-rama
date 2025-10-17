@@ -42,6 +42,7 @@
 
 ;; for agent-o-rama namespace
 (defn hook:building-plain-agent-object [name o])
+(defn define-eval-agent? [] true)
 
 (defn- define-agent!
   [agent-name setup topologies stream-topology mb-topology analytics-mb-topology agent-graph]

@@ -269,7 +269,8 @@
      (:> (metadata-edit-val *value)))
    (local-transform> [(must *agent-invoke-id) :metadata (keypath *key) (term %metadata-edit-val)]
                      $$root)
-   (update-metadata-index! *agent-name {*key *value})
+   (<<if (some? *value)
+     (update-metadata-index! *agent-name {*key *value}))
   ))
 
 (defn hook:received-retry [agent-task-id agent-id retry-num])

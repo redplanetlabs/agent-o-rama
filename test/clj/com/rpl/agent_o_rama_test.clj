@@ -739,7 +739,8 @@
                     (swap! task-counts-atom
                       #(transform [(keypath task-id) (nil->val 0)]
                                   inc
-                                  %)))]
+                                  %)))
+                  i/define-eval-agent? (constantly false)]
       (with-open [ipc (rtest/create-ipc)]
         (letlocals
          (bind module
@@ -874,7 +875,8 @@
     (with-redefs [at/hook:writing-result
                   (fn [agent-task-id agent-id result]
                     (swap! results-atom conj result)
-                  )]
+                  )
+                  i/define-eval-agent?   (constantly false)]
       (with-open [ipc (rtest/create-ipc)]
         (letlocals
          (bind module
@@ -949,325 +951,327 @@
         )))))
 
 (deftest multiple-agents-test
-  (with-open [ipc (rtest/create-ipc)]
-    (letlocals
-     (bind module
-       (aor/agentmodule
-        [topology]
-        (->
-          topology
-          (aor/new-agent "foo")
-          (aor/node "start"
-                    "node1"
-                    (fn [agent-node arg]
-                      (aor/emit! agent-node "node1" (inc arg))
-                    ))
-          (aor/node "node1"
-                    nil
-                    (fn [agent-node arg]
-                      (aor/result! agent-node (* 2 arg))
-                    )))
-        (->
-          topology
-          (aor/new-agent "bar")
-          (aor/agg-start-node "start"
-                              "node1"
-                              (fn [agent-node arg]
-                                (aor/emit! agent-node "node1" arg)
-                                (aor/emit! agent-node "node1" (inc arg))
-                                (aor/emit! agent-node "node1" (* 2 arg))
-                              ))
-          (aor/agg-node "node1"
-                        nil
-                        aggs/+sum
-                        (fn [agent-node agg node-start-res]
-                          (aor/result! agent-node agg)))
-        )))
-     (rtest/launch-module! ipc module {:tasks 1 :threads 1})
-     (bind module-name (get-module-name module))
-     (bind depot-foo
-       (foreign-depot ipc
-                      module-name
-                      (po/agent-depot-name "foo")))
-     (bind root-pstate-foo
-       (foreign-pstate ipc
-                       module-name
-                       (po/agent-root-task-global-name "foo")))
-     (bind depot-bar
-       (foreign-depot ipc
-                      module-name
-                      (po/agent-depot-name "bar")))
-     (bind root-pstate-bar
-       (foreign-pstate ipc
-                       module-name
-                       (po/agent-root-task-global-name "bar")))
+  (with-redefs [i/define-eval-agent? (constantly false)]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (->
+            topology
+            (aor/new-agent "foo")
+            (aor/node "start"
+                      "node1"
+                      (fn [agent-node arg]
+                        (aor/emit! agent-node "node1" (inc arg))
+                      ))
+            (aor/node "node1"
+                      nil
+                      (fn [agent-node arg]
+                        (aor/result! agent-node (* 2 arg))
+                      )))
+          (->
+            topology
+            (aor/new-agent "bar")
+            (aor/agg-start-node "start"
+                                "node1"
+                                (fn [agent-node arg]
+                                  (aor/emit! agent-node "node1" arg)
+                                  (aor/emit! agent-node "node1" (inc arg))
+                                  (aor/emit! agent-node "node1" (* 2 arg))
+                                ))
+            (aor/agg-node "node1"
+                          nil
+                          aggs/+sum
+                          (fn [agent-node agg node-start-res]
+                            (aor/result! agent-node agg)))
+          )))
+       (rtest/launch-module! ipc module {:tasks 1 :threads 1})
+       (bind module-name (get-module-name module))
+       (bind depot-foo
+         (foreign-depot ipc
+                        module-name
+                        (po/agent-depot-name "foo")))
+       (bind root-pstate-foo
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "foo")))
+       (bind depot-bar
+         (foreign-depot ipc
+                        module-name
+                        (po/agent-depot-name "bar")))
+       (bind root-pstate-bar
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "bar")))
 
-     (bind [agent-task-id-foo1 agent-id-foo1]
-       (invoke-agent-and-wait! depot-foo root-pstate-foo [10]))
-     (bind [agent-task-id-foo2 agent-id-foo2]
-       (invoke-agent-and-wait! depot-foo root-pstate-foo [20]))
-     (bind [agent-task-id-bar1 agent-id-bar1]
-       (invoke-agent-and-wait! depot-bar root-pstate-bar [5]))
-     (bind [agent-task-id-bar2 agent-id-bar2]
-       (invoke-agent-and-wait! depot-bar root-pstate-bar [10]))
+       (bind [agent-task-id-foo1 agent-id-foo1]
+         (invoke-agent-and-wait! depot-foo root-pstate-foo [10]))
+       (bind [agent-task-id-foo2 agent-id-foo2]
+         (invoke-agent-and-wait! depot-foo root-pstate-foo [20]))
+       (bind [agent-task-id-bar1 agent-id-bar1]
+         (invoke-agent-and-wait! depot-bar root-pstate-bar [5]))
+       (bind [agent-task-id-bar2 agent-id-bar2]
+         (invoke-agent-and-wait! depot-bar root-pstate-bar [10]))
 
-     (is (= 22
-            (foreign-select-one
-             [(keypath agent-id-foo1) :result :val]
-             root-pstate-foo
-             {:pkey agent-task-id-foo1})))
-     (is (= 42
-            (foreign-select-one
-             [(keypath agent-id-foo2) :result :val]
-             root-pstate-foo
-             {:pkey agent-task-id-foo2})))
-     (is (= 21
-            (foreign-select-one
-             [(keypath agent-id-bar1) :result :val]
-             root-pstate-bar
-             {:pkey agent-task-id-bar1})))
-     (is (= 41
-            (foreign-select-one
-             [(keypath agent-id-bar2) :result :val]
-             root-pstate-bar
-             {:pkey agent-task-id-bar2})))
-    )))
+       (is (= 22
+              (foreign-select-one
+               [(keypath agent-id-foo1) :result :val]
+               root-pstate-foo
+               {:pkey agent-task-id-foo1})))
+       (is (= 42
+              (foreign-select-one
+               [(keypath agent-id-foo2) :result :val]
+               root-pstate-foo
+               {:pkey agent-task-id-foo2})))
+       (is (= 21
+              (foreign-select-one
+               [(keypath agent-id-bar1) :result :val]
+               root-pstate-bar
+               {:pkey agent-task-id-bar1})))
+       (is (= 41
+              (foreign-select-one
+               [(keypath agent-id-bar2) :result :val]
+               root-pstate-bar
+               {:pkey agent-task-id-bar2})))
+      ))))
 
 (deftest stores-test
-  (with-open [ipc (rtest/create-ipc)]
-    (letlocals
-     (bind module
-       (aor/agentmodule
-        [topology]
-        (aor/declare-key-value-store
-         topology
-         "$$kv"
-         clojure.lang.Keyword
-         Object)
-        (aor/declare-document-store
-         topology
-         "$$doc"
-         clojure.lang.Keyword
-         :a Long
-         :b java.util.List)
-        (aor/declare-pstate-store
-         topology
-         "$$p"
-         {clojure.lang.Keyword (map-schema Long Long {:subindex? true})})
-        (->
-          topology
-          (aor/new-agent "foo")
-          (aor/node
-           "kv"
-           "doc"
-           (fn [agent-node arg]
-             (let [kv (aor/get-store agent-node "$$kv")
-                   b  (store/get kv :b [])]
-               (store/put! kv :a arg)
-               (store/put! kv :b (conj b arg))
-               (store/update! kv :d #(+ (or % 0) arg))
-               (store/pstate-transform! [:zz (termval arg)] kv :e)
-               (aor/emit! agent-node
-                          "doc"
-                          arg
-                          {:kv
-                           {:a (store/get kv :a)
-                            :b (store/get kv :b)
-                            :c (store/get kv :c)
-                            :d (store/get kv :d)
-                            :e (store/pstate-select [:b ALL] kv)
-                            :f (store/pstate-select-one :a kv)
-                            :g [(store/pstate-select :zz kv :e)
-                                (store/pstate-select :zz kv)]
-                            :h [(store/pstate-select-one :zz kv :e)
-                                (store/pstate-select-one :zz kv)]
-                            :i (store/contains? kv :a)
-                            :j (store/contains? kv :abcde)
-                           }})
-             )))
-          (aor/node
-           "doc"
-           "pstate"
-           (fn [agent-node arg res]
-             (let [doc (aor/get-store agent-node "$$doc")
-                   s   (store/get doc :s {:a 2 :b [10]})
-                   ma  (store/get-document-field doc :m :a 100)
-                   mb  (store/get-document-field doc :m :b [])]
-               (store/put! doc
-                           :s
-                           (-> s
-                               (update :a inc)
-                               (update :b #(conj % arg))))
-               (store/update! doc :s #(update % :a (fn [v] (* 2 v))))
-               (store/put-document-field! doc :m :a (+ ma 2))
-               (store/update-document-field! doc :m :a #(* 2 %))
-               (store/put-document-field! doc :m :b (conj mb arg))
-               (store/pstate-transform! [:zz (termval {:a arg :b [(inc arg)]})]
-                                        doc
-                                        :e)
-               (aor/emit!
-                agent-node
-                "pstate"
-                arg
-                (assoc
-                 res
-                 :doc {:s     (store/get doc :s)
-                       :t     (store/get doc :t)
-                       :y     (store/contains? doc :s)
-                       :z     (store/contains? doc :abcde)
-                       :ma    (store/get-document-field doc :m :a)
-                       :mb    (store/get-document-field doc :m :b)
-                       :mc    (store/get-document-field doc :m :c)
-                       :ma?   (store/contains-document-field? doc :m :a)
-                       :mc?   (store/contains-document-field? doc :m :c)
-                       :psa   (store/pstate-select-one [:s :a] doc)
-                       :psb   (store/pstate-select [:s :b ALL] doc)
-                       :pzz   [(store/pstate-select :zz doc :e)
-                               (store/pstate-select :zz doc)]
-                       :pzz2  [(store/pstate-select-one :zz doc :e)
-                               (store/pstate-select-one :zz doc)]
-                       :error (try
-                                (store/put-document-field! doc :qq :c 1)
-                                nil
-                                (catch Exception e
-                                  (ex-message e)
-                                ))
-                      }))
-             )))
-          (aor/node
-           "pstate"
-           "end"
-           (fn [agent-node arg res]
-             (let [p (aor/get-store agent-node "$$p")
-                   _ (store/pstate-transform! [:a (keypath 0) (nil->val 50)
-                                               (term #(+ % arg))]
-                                              p
-                                              :a)
-                   i (store/pstate-select-one [:a LAST FIRST] p)]
-               (store/pstate-transform! [:a (keypath (inc i)) (termval arg)]
-                                        p
-                                        :a)
-               (store/pstate-transform! [:zz 0 (termval arg)]
-                                        p
-                                        :e)
-               (aor/emit!
-                agent-node
-                "end"
-                (assoc
-                 res
-                 :pstate {:ks   (store/pstate-select [:a MAP-KEYS] p)
-                          :kv   (store/pstate-select [:a MAP-VALS] p)
-                          :k0   (store/pstate-select-one [:a 0] p)
-                          :zz0  [(store/pstate-select [:zz 0] p :e)
-                                 (store/pstate-select [:zz 0] p)]
-                          :zz02 [(store/pstate-select-one [:zz 0] p :e)
-                                 (store/pstate-select-one [:zz 0] p)]
-                         }))
-             )))
-          (aor/node "end"
-                    nil
-                    (fn [agent-node res]
-                      (aor/result! agent-node res)
-                    ))
-        )
-       ))
-     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
-     (bind module-name (get-module-name module))
-     (bind depot
-       (foreign-depot ipc
-                      module-name
-                      (po/agent-depot-name "foo")))
-     (bind root-pstate
-       (foreign-pstate ipc
-                       module-name
-                       (po/agent-root-task-global-name "foo")))
-     (bind kv
-       (foreign-pstate ipc
-                       module-name
-                       "$$kv"))
-     (bind doc
-       (foreign-pstate ipc
-                       module-name
-                       "$$doc"))
-     (bind p
-       (foreign-pstate ipc
-                       module-name
-                       "$$p"))
+  (with-redefs [i/define-eval-agent? (constantly false)]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (aor/declare-key-value-store
+           topology
+           "$$kv"
+           clojure.lang.Keyword
+           Object)
+          (aor/declare-document-store
+           topology
+           "$$doc"
+           clojure.lang.Keyword
+           :a Long
+           :b java.util.List)
+          (aor/declare-pstate-store
+           topology
+           "$$p"
+           {clojure.lang.Keyword (map-schema Long Long {:subindex? true})})
+          (->
+            topology
+            (aor/new-agent "foo")
+            (aor/node
+             "kv"
+             "doc"
+             (fn [agent-node arg]
+               (let [kv (aor/get-store agent-node "$$kv")
+                     b  (store/get kv :b [])]
+                 (store/put! kv :a arg)
+                 (store/put! kv :b (conj b arg))
+                 (store/update! kv :d #(+ (or % 0) arg))
+                 (store/pstate-transform! [:zz (termval arg)] kv :e)
+                 (aor/emit! agent-node
+                            "doc"
+                            arg
+                            {:kv
+                             {:a (store/get kv :a)
+                              :b (store/get kv :b)
+                              :c (store/get kv :c)
+                              :d (store/get kv :d)
+                              :e (store/pstate-select [:b ALL] kv)
+                              :f (store/pstate-select-one :a kv)
+                              :g [(store/pstate-select :zz kv :e)
+                                  (store/pstate-select :zz kv)]
+                              :h [(store/pstate-select-one :zz kv :e)
+                                  (store/pstate-select-one :zz kv)]
+                              :i (store/contains? kv :a)
+                              :j (store/contains? kv :abcde)
+                             }})
+               )))
+            (aor/node
+             "doc"
+             "pstate"
+             (fn [agent-node arg res]
+               (let [doc (aor/get-store agent-node "$$doc")
+                     s   (store/get doc :s {:a 2 :b [10]})
+                     ma  (store/get-document-field doc :m :a 100)
+                     mb  (store/get-document-field doc :m :b [])]
+                 (store/put! doc
+                             :s
+                             (-> s
+                                 (update :a inc)
+                                 (update :b #(conj % arg))))
+                 (store/update! doc :s #(update % :a (fn [v] (* 2 v))))
+                 (store/put-document-field! doc :m :a (+ ma 2))
+                 (store/update-document-field! doc :m :a #(* 2 %))
+                 (store/put-document-field! doc :m :b (conj mb arg))
+                 (store/pstate-transform! [:zz (termval {:a arg :b [(inc arg)]})]
+                                          doc
+                                          :e)
+                 (aor/emit!
+                  agent-node
+                  "pstate"
+                  arg
+                  (assoc
+                   res
+                   :doc {:s     (store/get doc :s)
+                         :t     (store/get doc :t)
+                         :y     (store/contains? doc :s)
+                         :z     (store/contains? doc :abcde)
+                         :ma    (store/get-document-field doc :m :a)
+                         :mb    (store/get-document-field doc :m :b)
+                         :mc    (store/get-document-field doc :m :c)
+                         :ma?   (store/contains-document-field? doc :m :a)
+                         :mc?   (store/contains-document-field? doc :m :c)
+                         :psa   (store/pstate-select-one [:s :a] doc)
+                         :psb   (store/pstate-select [:s :b ALL] doc)
+                         :pzz   [(store/pstate-select :zz doc :e)
+                                 (store/pstate-select :zz doc)]
+                         :pzz2  [(store/pstate-select-one :zz doc :e)
+                                 (store/pstate-select-one :zz doc)]
+                         :error (try
+                                  (store/put-document-field! doc :qq :c 1)
+                                  nil
+                                  (catch Exception e
+                                    (ex-message e)
+                                  ))
+                        }))
+               )))
+            (aor/node
+             "pstate"
+             "end"
+             (fn [agent-node arg res]
+               (let [p (aor/get-store agent-node "$$p")
+                     _ (store/pstate-transform! [:a (keypath 0) (nil->val 50)
+                                                 (term #(+ % arg))]
+                                                p
+                                                :a)
+                     i (store/pstate-select-one [:a LAST FIRST] p)]
+                 (store/pstate-transform! [:a (keypath (inc i)) (termval arg)]
+                                          p
+                                          :a)
+                 (store/pstate-transform! [:zz 0 (termval arg)]
+                                          p
+                                          :e)
+                 (aor/emit!
+                  agent-node
+                  "end"
+                  (assoc
+                   res
+                   :pstate {:ks   (store/pstate-select [:a MAP-KEYS] p)
+                            :kv   (store/pstate-select [:a MAP-VALS] p)
+                            :k0   (store/pstate-select-one [:a 0] p)
+                            :zz0  [(store/pstate-select [:zz 0] p :e)
+                                   (store/pstate-select [:zz 0] p)]
+                            :zz02 [(store/pstate-select-one [:zz 0] p :e)
+                                   (store/pstate-select-one [:zz 0] p)]
+                           }))
+               )))
+            (aor/node "end"
+                      nil
+                      (fn [agent-node res]
+                        (aor/result! agent-node res)
+                      ))
+          )
+         ))
+       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind depot
+         (foreign-depot ipc
+                        module-name
+                        (po/agent-depot-name "foo")))
+       (bind root-pstate
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "foo")))
+       (bind kv
+         (foreign-pstate ipc
+                         module-name
+                         "$$kv"))
+       (bind doc
+         (foreign-pstate ipc
+                         module-name
+                         "$$doc"))
+       (bind p
+         (foreign-pstate ipc
+                         module-name
+                         "$$p"))
 
-     (is (= {:kv     {:a 3
-                      :b [3]
-                      :c nil
-                      :d 3
-                      :e [3]
-                      :f 3
-                      :g [[3] [nil]]
-                      :h [3 nil]
-                      :i true
-                      :j false}
-             :doc    {:s     {:a 6
-                              :b [10 3]}
-                      :t     nil
-                      :y     true
-                      :z     false
-                      :ma    204
-                      :mb    [3]
-                      :mc    nil
-                      :ma?   true
-                      :mc?   false
-                      :psa   6
-                      :psb   [10 3]
-                      :pzz   [[{:a 3 :b [4]}]
-                              [nil]]
-                      :pzz2  [{:a 3 :b [4]}
-                              nil]
-                      :error "Invalid key"
-                     }
-             :pstate {:ks   [0 1]
-                      :kv   [53 3]
-                      :k0   53
-                      :zz0  [[3] [nil]]
-                      :zz02 [3 nil]}}
-            (:val (invoke-agent-and-return! depot root-pstate [3]))))
-     (is (= {:kv     {:a 1
-                      :b [3 1]
-                      :c nil
-                      :d 4
-                      :e [3 1]
-                      :f 1
-                      :g [[1] [nil]]
-                      :h [1 nil]
-                      :i true
-                      :j false}
-             :doc    {:s     {:a 14
-                              :b [10 3 1]}
-                      :t     nil
-                      :y     true
-                      :z     false
-                      :ma    412
-                      :mb    [3 1]
-                      :mc    nil
-                      :ma?   true
-                      :mc?   false
-                      :psa   14
-                      :psb   [10 3 1]
-                      :pzz   [[{:a 1 :b [2]}]
-                              [nil]]
-                      :pzz2  [{:a 1 :b [2]}
-                              nil]
-                      :error "Invalid key"
-                     }
-             :pstate {:ks   [0 1 2]
-                      :kv   [54 3 1]
-                      :k0   54
-                      :zz0  [[1] [nil]]
-                      :zz02 [1 nil]}}
-            (:val (invoke-agent-and-return! depot root-pstate [1]))))
-     (is (= 1 (foreign-select-one :a kv)))
-     (is (= [3 1] (foreign-select-one :b kv)))
-     (is (= [10 3 1] (foreign-select-one [:s :b] doc)))
-     (is (= 54 (foreign-select-one [:a 0] p)))
-     (is (= 1 (foreign-select-one [:zz 0] p {:pkey :e})))
-    )))
+       (is (= {:kv     {:a 3
+                        :b [3]
+                        :c nil
+                        :d 3
+                        :e [3]
+                        :f 3
+                        :g [[3] [nil]]
+                        :h [3 nil]
+                        :i true
+                        :j false}
+               :doc    {:s     {:a 6
+                                :b [10 3]}
+                        :t     nil
+                        :y     true
+                        :z     false
+                        :ma    204
+                        :mb    [3]
+                        :mc    nil
+                        :ma?   true
+                        :mc?   false
+                        :psa   6
+                        :psb   [10 3]
+                        :pzz   [[{:a 3 :b [4]}]
+                                [nil]]
+                        :pzz2  [{:a 3 :b [4]}
+                                nil]
+                        :error "Invalid key"
+                       }
+               :pstate {:ks   [0 1]
+                        :kv   [53 3]
+                        :k0   53
+                        :zz0  [[3] [nil]]
+                        :zz02 [3 nil]}}
+              (:val (invoke-agent-and-return! depot root-pstate [3]))))
+       (is (= {:kv     {:a 1
+                        :b [3 1]
+                        :c nil
+                        :d 4
+                        :e [3 1]
+                        :f 1
+                        :g [[1] [nil]]
+                        :h [1 nil]
+                        :i true
+                        :j false}
+               :doc    {:s     {:a 14
+                                :b [10 3 1]}
+                        :t     nil
+                        :y     true
+                        :z     false
+                        :ma    412
+                        :mb    [3 1]
+                        :mc    nil
+                        :ma?   true
+                        :mc?   false
+                        :psa   14
+                        :psb   [10 3 1]
+                        :pzz   [[{:a 1 :b [2]}]
+                                [nil]]
+                        :pzz2  [{:a 1 :b [2]}
+                                nil]
+                        :error "Invalid key"
+                       }
+               :pstate {:ks   [0 1 2]
+                        :kv   [54 3 1]
+                        :k0   54
+                        :zz0  [[1] [nil]]
+                        :zz02 [1 nil]}}
+              (:val (invoke-agent-and-return! depot root-pstate [1]))))
+       (is (= 1 (foreign-select-one :a kv)))
+       (is (= [3 1] (foreign-select-one :b kv)))
+       (is (= [10 3 1] (foreign-select-one [:s :b] doc)))
+       (is (= 54 (foreign-select-one [:a 0] p)))
+       (is (= 1 (foreign-select-one [:zz 0] p {:pkey :e})))
+      ))))
 
 (deftest store-traces-test
   (let [advance-vol (volatile! 1)
@@ -1275,7 +1279,8 @@
                       (TopologyUtils/advanceSimTime @advance-vol)
                       (vswap! advance-vol inc))]
     (with-redefs [simpl/hook:initiating-pstate-write advance-fn
-                  simpl/hook:initiating-pstate-query advance-fn]
+                  simpl/hook:initiating-pstate-query advance-fn
+                  i/define-eval-agent? (constantly false)]
       (with-open [ipc (rtest/create-ipc)
                   _ (TopologyUtils/startSimTime)]
         (letlocals
@@ -1678,22 +1683,23 @@
   ))
 
 (deftest looped-test
-  (with-open [ipc (rtest/create-ipc)]
-    (letlocals
-     (rtest/launch-module! ipc LoopedModule {:tasks 4 :threads 2})
-     (bind module-name (get-module-name LoopedModule))
-     (bind depot
-       (foreign-depot ipc
-                      module-name
-                      (po/agent-depot-name "foo")))
-     (bind root-pstate
-       (foreign-pstate ipc
-                       module-name
-                       (po/agent-root-task-global-name "foo")))
+  (with-redefs [i/define-eval-agent? (constantly false)]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (rtest/launch-module! ipc LoopedModule {:tasks 4 :threads 2})
+       (bind module-name (get-module-name LoopedModule))
+       (bind depot
+         (foreign-depot ipc
+                        module-name
+                        (po/agent-depot-name "foo")))
+       (bind root-pstate
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "foo")))
 
-     (is (= ["start" "node1" "start" "node1" "start" 15]
-            (:val (invoke-agent-and-return! depot root-pstate [0 []]))))
-    )))
+       (is (= ["start" "node1" "start" "node1" "start" 15]
+              (:val (invoke-agent-and-return! depot root-pstate [0 []]))))
+      ))))
 
 
 (def +early-sum-accum
@@ -1724,7 +1730,8 @@
   (let [completions-atom (atom 0)]
     (with-redefs [SEM (h/mk-semaphore 0)
                   at/hook:running-complete-agg! (fn [& args]
-                                                  (swap! completions-atom inc))]
+                                                  (swap! completions-atom inc))
+                  i/define-eval-agent? (constantly false)]
       (with-open [ipc (rtest/create-ipc)]
         (letlocals
          (bind module
@@ -1986,82 +1993,83 @@
         )))))
 
 (deftest multi-agg-test
-  (with-open [ipc (rtest/create-ipc)]
-    (letlocals
-     (bind module
-       (aor/agentmodule
-        [topology]
-        (->
-          topology
-          (aor/new-agent "foo")
-          (aor/agg-start-node
-           "start"
-           ["a" "b" "c"]
-           (fn [agent-node]
-             (aor/emit! agent-node "a" 1)
-             (aor/emit! agent-node "b" 2)
-             (aor/emit! agent-node "c" 3)
-             (aor/emit! agent-node "a" 4)
-             (aor/emit! agent-node "a" 5)
-             (aor/emit! agent-node "c" 6)
-             (aor/emit! agent-node "a" 7)
-             (aor/emit! agent-node "b" 8)
-           ))
-          (aor/node
-           "a"
-           "agg"
-           (fn [agent-node v]
-             (aor/emit! agent-node "agg" "a" v)))
-          (aor/node
-           "b"
-           "agg"
-           (fn [agent-node v]
-             (aor/emit! agent-node "agg" "b" v)))
-          (aor/node
-           "c"
-           "agg"
-           (fn [agent-node v]
-             (aor/emit! agent-node "agg" "c" v)))
-          (aor/agg-node
-           "agg"
-           nil
-           (aor/multi-agg
-            (init [] [[] [] []])
-            (on "a"
-                [[a b c] v]
-                [(conj a v) b c])
-            (on "b"
-                [[a b c] v]
-                [a (conj b v) c])
-            (on "c"
-                [[a b c] v]
-                [a b (conj c v)]))
-           (fn [agent-node agg node-start-res]
-             (aor/result! agent-node agg)))
-        )))
-     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
-     (bind module-name (get-module-name module))
-     (bind depot
-       (foreign-depot ipc
-                      module-name
-                      (po/agent-depot-name "foo")))
-     (bind root-pstate
-       (foreign-pstate ipc
-                       module-name
-                       (po/agent-root-task-global-name "foo")))
+  (with-redefs [i/define-eval-agent? (constantly false)]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (->
+            topology
+            (aor/new-agent "foo")
+            (aor/agg-start-node
+             "start"
+             ["a" "b" "c"]
+             (fn [agent-node]
+               (aor/emit! agent-node "a" 1)
+               (aor/emit! agent-node "b" 2)
+               (aor/emit! agent-node "c" 3)
+               (aor/emit! agent-node "a" 4)
+               (aor/emit! agent-node "a" 5)
+               (aor/emit! agent-node "c" 6)
+               (aor/emit! agent-node "a" 7)
+               (aor/emit! agent-node "b" 8)
+             ))
+            (aor/node
+             "a"
+             "agg"
+             (fn [agent-node v]
+               (aor/emit! agent-node "agg" "a" v)))
+            (aor/node
+             "b"
+             "agg"
+             (fn [agent-node v]
+               (aor/emit! agent-node "agg" "b" v)))
+            (aor/node
+             "c"
+             "agg"
+             (fn [agent-node v]
+               (aor/emit! agent-node "agg" "c" v)))
+            (aor/agg-node
+             "agg"
+             nil
+             (aor/multi-agg
+              (init [] [[] [] []])
+              (on "a"
+                  [[a b c] v]
+                  [(conj a v) b c])
+              (on "b"
+                  [[a b c] v]
+                  [a (conj b v) c])
+              (on "c"
+                  [[a b c] v]
+                  [a b (conj c v)]))
+             (fn [agent-node agg node-start-res]
+               (aor/result! agent-node agg)))
+          )))
+       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind depot
+         (foreign-depot ipc
+                        module-name
+                        (po/agent-depot-name "foo")))
+       (bind root-pstate
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "foo")))
 
-     (bind ret
-       (:val (invoke-agent-and-return! depot root-pstate [])))
+       (bind ret
+         (:val (invoke-agent-and-return! depot root-pstate [])))
 
-     (is (= 3 (count ret)))
-     (bind [a b c] ret)
-     (is (= #{1 4 5 7} (set a)))
-     (is (= 4 (count a)))
-     (is (= #{2 8} (set b)))
-     (is (= 2 (count b)))
-     (is (= #{3 6} (set c)))
-     (is (= 2 (count c)))
-    )))
+       (is (= 3 (count ret)))
+       (bind [a b c] ret)
+       (is (= #{1 4 5 7} (set a)))
+       (is (= 4 (count a)))
+       (is (= #{2 8} (set b)))
+       (is (= 2 (count b)))
+       (is (= #{3 6} (set c)))
+       (is (= 2 (count c)))
+      ))))
 
 (defn opens-matches-closes?
   [opens closes]
@@ -2086,7 +2094,8 @@
                   close! (fn [item]
                            (swap! closes-atom conj item)
                            (orig-close! item))
-                  at/hook:writing-result (fn [& args] (swap! results-vol inc))]
+                  at/hook:writing-result (fn [& args] (swap! results-vol inc))
+                  i/define-eval-agent? (constantly false)]
       (with-open [ipc (rtest/create-ipc)]
         (letlocals
          (bind module
@@ -2180,7 +2189,8 @@
                   (fn [v]
                     (if @override-retry-num-atom
                       @override-retry-num-atom
-                      v))]
+                      v))
+                  i/define-eval-agent? (constantly false)]
       (with-open [ipc (rtest/create-ipc)]
         (letlocals
          (bind module
@@ -2377,7 +2387,8 @@
         closes-atom (atom 0)]
     (with-redefs [close! (fn [item]
                            (swap! closes-atom inc)
-                           (orig-close! item))]
+                           (orig-close! item))
+                  i/define-eval-agent? (constantly false)]
       (with-open [ipc (rtest/create-ipc)]
         (letlocals
          (bind module
@@ -2597,7 +2608,8 @@
 
 (deftest agent-stream-multiple-invokes-test
   (with-redefs [SEM  (h/mk-semaphore 0)
-                SEM2 (h/mk-semaphore 0)]
+                SEM2 (h/mk-semaphore 0)
+                i/define-eval-agent? (constantly false)]
     (with-open [ipc (rtest/create-ipc)]
       (letlocals
        (bind module
@@ -2671,7 +2683,8 @@
 (deftest agent-stream-specific-test
   (with-redefs [SEM   (h/mk-semaphore 0)
                 SEM2  (h/mk-semaphore 0)
-                NODE1 (atom 0)]
+                NODE1 (atom 0)
+                i/define-eval-agent? (constantly false)]
     (with-open [ipc (rtest/create-ipc)]
       (letlocals
        (bind module
@@ -2787,7 +2800,8 @@
       ))))
 
 (deftest stream-close-test
-  (with-redefs [SEM (h/mk-semaphore 0)]
+  (with-redefs [SEM (h/mk-semaphore 0)
+                i/define-eval-agent? (constantly false)]
     (with-open [ipc (rtest/create-ipc)
                 _ (TopologyUtils/startSimTime)]
       (letlocals
@@ -2866,10 +2880,11 @@
   (.getRunningInvokeIds node-exec))
 
 (deftest agent-pending-tracking-test
-  (with-redefs [SEM  (h/mk-semaphore 0)
+  (with-redefs [SEM (h/mk-semaphore 0)
                 SEM2 (h/mk-semaphore 0)
                 anode/log-node-error (fn [& args])
-                aor-types/get-config (max-retries-override 0)]
+                aor-types/get-config (max-retries-override 0)
+                i/define-eval-agent? (constantly false)]
     (with-open [ipc (rtest/create-ipc)
                 _ (TopologyUtils/startSimTime)]
       (letlocals
@@ -3135,9 +3150,10 @@
 
 (deftest metadata-test
   (with-redefs [RESULTS (atom {})
-                FAIL    (atom false)
+                FAIL (atom false)
                 anode/log-node-error (fn [& args])
-                aor-types/get-config (max-retries-override 10)]
+                aor-types/get-config (max-retries-override 10)
+                i/define-eval-agent? (constantly false)]
     (with-open [ipc (rtest/create-ipc)]
       (letlocals
        (bind module
@@ -3177,6 +3193,10 @@
        (bind module-name (get-module-name module))
        (bind agent-manager (aor/agent-manager ipc module-name))
        (bind foo (aor/agent-client agent-manager "foo"))
+       (bind stream-shared
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-stream-shared-task-global-name "foo")))
        (bind root-pstate
          (foreign-pstate ipc
                          module-name
@@ -3189,6 +3209,11 @@
        (bind expected-results-fn
          (fn [m]
            {"start" m "as" m "node1" m "agg" m "end" m}))
+
+       (bind all-meta
+         (fn []
+           (foreign-select-one [:metadata (view #(into {} %))] stream-shared {:pkey 0})
+         ))
 
        (bind expected-results
          (expected-results-fn
@@ -3263,4 +3288,50 @@
        (reset! RESULTS {})
        (is (= 10 (aor/agent-fork foo inv {agg [nil nil]})))
        (is (= @RESULTS (dissoc expected-results "start" "as" "node1")))
+
+
+       (bind m (all-meta))
+       (is (= m
+              {"a" #{1}
+               "b" #{true 2}
+               "c" #{"abc"}
+               "d" #{0.4 0.5}
+               "e" #{true}
+               "f" #{0.5}
+               "i" #{1}
+               "l" #{1}
+               "s" #{"abc"}}))
+
+
+       (aor/agent-invoke-with-context
+        foo
+        {:metadata {"b" 3}})
+
+       (bind m (all-meta))
+       (is (= m
+              {"a" #{1}
+               "b" #{true 2 3}
+               "c" #{"abc"}
+               "d" #{0.4 0.5}
+               "e" #{true}
+               "f" #{0.5}
+               "i" #{1}
+               "l" #{1}
+               "s" #{"abc"}}))
+
+       (aor/agent-invoke-with-context
+        foo
+        {:metadata {"b" 4}})
+
+       (bind m (all-meta))
+       (is (= m
+              {"a" #{1}
+               "b" #{true 2 3}
+               "c" #{"abc"}
+               "d" #{0.4 0.5}
+               "e" #{true}
+               "f" #{0.5}
+               "i" #{1}
+               "l" #{1}
+               "s" #{"abc"}}))
       ))))

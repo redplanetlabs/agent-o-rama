@@ -205,7 +205,8 @@
        (when @defined?-vol
          (throw (h/ex-info "Agent topology already defined" {})))
        (vreset! defined?-vol true)
-       (exp/define-evaluator-agent! this)
+       (when (i/define-eval-agent?)
+         (exp/define-evaluator-agent! this))
        (i/define-agents!
         setup
         topologies
