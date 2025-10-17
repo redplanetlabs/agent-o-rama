@@ -2111,7 +2111,7 @@
          (bind module-name (get-module-name module))
 
          (bind agent-manager (aor/agent-manager ipc module-name))
-         (is (= #{"foo" "bar" aor-types/EVALUATOR-AGENT-NAME} (aor/agent-names agent-manager)))
+         (is (= #{"foo" "bar"} (aor/agent-names agent-manager)))
 
          (bind foo (aor/agent-client agent-manager "foo"))
          (bind bar (aor/agent-client agent-manager "bar"))
