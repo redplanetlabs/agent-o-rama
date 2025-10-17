@@ -133,7 +133,7 @@
                  (aor/result! agent-node "done")
 
                )))))
-         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
          (bind config-depot
            (foreign-depot ipc module-name (po/agent-config-depot-name "foo")))
@@ -377,7 +377,7 @@
                                              (IsEqualTo. "b" 2)))
                    (aor/result! agent-node "eee")
                  ))))))))
-     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
 
      (bind agent-manager (aor/agent-manager ipc module-name))

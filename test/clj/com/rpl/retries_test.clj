@@ -194,7 +194,7 @@
                  (|origin)
                  (aggs/+count :> *res))
              )))
-         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
          (bind check-depot
            (foreign-depot ipc
@@ -416,7 +416,7 @@
                )
                (aor/define-agents! topology)
              )))
-         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
          (bind bar-failures-depot
            (foreign-depot ipc
@@ -579,7 +579,7 @@
                )
                (aor/define-agents! topology)
              )))
-         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
          (bind agent-manager (aor/agent-manager ipc module-name))
          (bind foo (aor/agent-client agent-manager "foo"))
@@ -697,7 +697,7 @@
            )
            (aor/define-agents! topology)
          )))
-     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
      (bind depot
        (foreign-depot ipc
@@ -852,7 +852,7 @@
                (tc/auto-node "agg3" "b4")
                (tc/auto-node "b4" nil)
              )))
-          (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+          (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
           (bind module-name (get-module-name module))
 
           (bind agent-manager (aor/agent-manager ipc module-name))
@@ -1067,7 +1067,7 @@
                (tc/auto-node "node1" "node2")
                (tc/auto-node "node2" nil))
             ))
-          (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+          (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
           (bind module-name (get-module-name module))
 
           (bind agent-manager (aor/agent-manager ipc module-name))
@@ -1251,7 +1251,7 @@
                  (aor/result! agent-node "done")
                ))))
          ))
-       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
        (bind module-name (get-module-name module))
 
        (bind agent-manager (aor/agent-manager ipc module-name))
