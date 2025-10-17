@@ -69,7 +69,7 @@
     (declare-pstate*
      stream-topology
      (symbol (po/agent-root-task-global-name agent-name))
-     (po/AGENT-ROOT-PSTATE-SCHEMA)
+     po/AGENT-ROOT-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
     (declare-pstate*
      stream-topology
@@ -89,7 +89,7 @@
     (declare-pstate*
      stream-topology
      (symbol (po/agent-node-task-global-name agent-name))
-     (po/AGENT-NODE-PSTATE-SCHEMA)
+     po/AGENT-NODE-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
     (declare-pstate*
      stream-topology
@@ -265,7 +265,7 @@
     (declare-pstate*
      stream-topology
      (symbol (po/datasets-task-global-name))
-     (po/DATASETS-PSTATE-SCHEMA))
+     po/DATASETS-PSTATE-SCHEMA)
     (declare-pstate*
      stream-topology
      (symbol (po/evaluators-task-global-name))
