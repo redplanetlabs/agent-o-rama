@@ -96,7 +96,9 @@
 
           ;; --- Parse String Identifiers into Rich Types ---
           parsed-dataset-id (when-let [did (:dataset-id thawed-data)]
-                              (if (string? did) (UUID/fromString did) did))
+                              (if (and (string? did) (not (str/blank? did)))
+                                (UUID/fromString did)
+                                did))
           parsed-experiment-id (when-let [eid (:experiment-id thawed-data)]
                                  (if (string? eid) (UUID/fromString eid) eid))
           parsed-invoke-pair (when-let [iid (:invoke-id thawed-data)]

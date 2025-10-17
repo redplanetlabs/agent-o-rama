@@ -47,6 +47,7 @@
     (useEffect
      (fn []
        (when (and debounced-dataset-id
+                  (not (str/blank? debounced-dataset-id))
                   (not (str/blank? debounced-input-data))
                   (not (str/blank? debounced-output-data)))
          (let [parsed-input (parse-json->cljs debounced-input-data)
