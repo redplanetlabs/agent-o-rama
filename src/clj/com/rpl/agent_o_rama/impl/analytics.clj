@@ -806,7 +806,6 @@
   [rule-name target]
   (let [rule-kw (keyword rule-name)]
     (metrics/->valid-MetricDefinition
-     [:eval rule-kw]
      target
      (fn [{:keys [feedback]}]
        (if-let [scores (select-first [:results

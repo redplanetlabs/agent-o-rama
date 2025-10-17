@@ -16,8 +16,7 @@
 (defn all-metrics [] ALL-METRICS)
 
 (aor-types/defaorrecord MetricDefinition
-  [id :- [clojure.lang.Keyword]
-   target :- (s/enum :root :nodes)
+  [target :- (s/enum :root :nodes)
    ;; (data map) -> {metric-id [{:type <:numeric, :categorical>, :values <values>} ...]}
    metrics-fn :- clojure.lang.IFn])
 
@@ -38,7 +37,6 @@
   [name info-map]
   `(let [info-map# ~info-map
          metric#   (->valid-MetricDefinition
-                    (:id info-map#)
                     (:target info-map#)
                     (value-fn->metrics-fn (:id info-map#) (:value-fn info-map#)))]
      (alter-var-root #'ALL-METRICS assoc (:id info-map#) metric#)
