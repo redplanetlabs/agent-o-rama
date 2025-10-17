@@ -274,11 +274,11 @@
                  "[?]")))
 
          ($ :input
-            (cond-> {:type        "text"
-                     :className   input-classes
-                     :value       (or (:value param-field) "")
+            (cond-> {:type "text"
+                     :className input-classes
+                     :value (or (:value param-field) "")
                      :placeholder (or (:default param-info) "")
-                     :onChange    #((:on-change param-field) (.. % -target -value))}
+                     :onChange #((:on-change param-field) (.. % -target -value))}
               data-id (assoc :data-id data-id)))
 
          (when show-description-below?
@@ -340,40 +340,6 @@
         :error (:error sampling-rate-field)
         :required? true
         :placeholder "1.0"})))
-
-(defui NodeSelector
-  [{:keys [module-id agent-name form-id]}]
-  (let [node-name-field (forms/use-form-field form-id :node-name)
-        {:keys [data loading? error]}
-        (queries/use-sente-query {:query-key [:graph module-id agent-name]
-                                  :sente-event [:invocations/get-graph {:module-id module-id
-                                                                        :agent-name agent-name}]})
-        nodes (when-let [graph (:graph data)]
-                (sort (keys (:node-map graph))))
-        select-classes "w-full p-3 border rounded-md text-sm transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"]
-
-    ($ :div.space-y-1
-       ($ :label.block.text-sm.font-medium.text-gray-700
-          "Node")
-       ($ :select {:className select-classes
-                   :value (or (:value node-name-field) "")
-                   :disabled loading?
-                   :onChange #(let [v (.. % -target -value)]
-                                ((:on-change node-name-field)
-                                 (if (= v "") nil v)))}
-          ($ :option {:value ""}
-             (if loading?
-               "Loading..."
-               "Agent-level (all nodes)"))
-          (when nodes
-            (for [node-name nodes]
-              ($ :option {:key node-name :value node-name}
-                 node-name))))
-       (when (:error node-name-field)
-         ($ :p.text-sm.text-red-600.mt-1 (:error node-name-field)))
-       (when error
-         ($ :p.text-sm.text-red-600.mt-1 (str "Failed to load nodes: " error)))
-       ($ :div.mt-1.h-5))))
 
 (defui ActionSelector
   [{:keys [module-id agent-name form-id]}]
@@ -438,9 +404,10 @@
            :placeholder "my-rule"
            :data-id "rule-name"})
 
-       ($ NodeSelector {:form-id form-id
-                        :module-id module-id
-                        :agent-name agent-name})
+       ;; Use the new shared TargetScopeSelector
+       ($ forms/TargetScopeSelector {:form-id form-id
+                                     :module-id module-id
+                                     :base-path []})
 
        ($ StatusFilterField {:form-id form-id})
 
@@ -463,6 +430,8 @@
   :main
   {:initial-fields (fn [props]
                      (merge {:rule-name ""
+                             :type :agent
+                             :agent-name nil
                              :node-name nil
                              :status-filter :success
                              :sampling-rate 1.0
@@ -476,6 +445,11 @@
                             props))
 
    :validators {:rule-name [forms/required]
+                :agent-name [forms/required]
+                :node-name [(fn [v form-state]
+                              (when (and (= (:type form-state) :node)
+                                         (str/blank? v))
+                                "Node name is required for node-level rules."))]
                 :status-filter [forms/required]
                 :sampling-rate [forms/required
                                 (fn [v]
@@ -519,14 +493,15 @@
 
   :on-submit
   {:event (fn [_db form-state]
-            (let [{:keys [module-id agent-name rule-name node-name status-filter
+            (let [{:keys [module-id rule-name type agent-name node-name status-filter
                           sampling-rate filter start-time
                           action-name action-params]} form-state
                   start-time-millis (compute-start-time-millis start-time)
                   action-params-cleaned (into {}
                                               #_(filter #(not (str/blank? (val %))))
                                               action-params)
-                  rule-spec {:node-name node-name
+                  rule-spec {:agent-name agent-name
+                             :node-name (when (= type :node) node-name)
                              :action-name action-name
                              :action-params action-params-cleaned
                              :filter filter
@@ -538,8 +513,9 @@
                 :agent-name agent-name
                 :rule-name rule-name
                 :rule-spec rule-spec}]))
-   :on-success (fn [db {:keys [module-id agent-name]} _reply]
-                 (let [current-val (get-in db [:ui :rules :refetch-trigger module-id agent-name] 0)
+   :on-success (fn [db {:keys [agent-name]} _reply]
+                 (let [module-id (:module-id db)
+                       current-val (get-in db [:ui :rules :refetch-trigger module-id agent-name] 0)
                        new-val (inc current-val)]
                    (state/dispatch [:db/set-value [:ui :rules :refetch-trigger module-id agent-name] new-val])))}})
 
