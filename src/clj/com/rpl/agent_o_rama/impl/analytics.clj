@@ -866,8 +866,8 @@
     (->AnaAllNodesTarget)))
 
 (defn to-bucket
-  [granularity start-time-millis]
-  (long (/ start-time-millis granularity)))
+  [granularity time-millis]
+  (long (/ time-millis granularity)))
 
 (defn mk-number-stats
   []
@@ -1151,3 +1151,53 @@
 (defn fetch-agent-rules
   [agent-rules-pstate]
   (foreign-select-one STAY agent-rules-pstate))
+
+(def METRIC-QUERIES
+  {:rest-sum number-stats/get-rest-sum
+   :mean     number-stats/get-mean
+   :count    number-stats/get-count
+   :min      number-stats/get-min
+   :max      number-stats/get-max
+   :latest   number-stats/get-latest
+  })
+
+(defn metrics-extract
+  [metrics-set number-stats]
+  (reduce
+   (fn [m metric]
+     (assoc m
+      metric
+      (if (number? metric)
+        (number-stats/get-quantile! number-stats metric)
+        ((get METRIC-QUERIES metric) number-stats)
+      )))
+   {}
+   metrics-set))
+
+(defn telemetry-extract
+  [metadata-key v]
+  (let [extract-path (if metadata-key
+                       (path :by-meta (keypath metadata-key))
+                       (path :overall))]
+    (select-any extract-path v)))
+
+;; metrics-set can contain any of:
+;; - [:rest-sum, :mean, :count, :min, :max, :latest, <number quantile>]
+;;    - for example, to get mean, p99, and max: #{:mean, 0.99, :max}
+;;    - to get min, p25, p50, p75, and max: #{:min, 0.25, 0.5, 0.75, :max}
+;; - doesn't use any anonymous functions so that this works across module update, as AOR clients
+;; won't usually use the same compilation as running modules
+(defn select-telemetry
+  [telemetry-pstate granularity metric-id start-time-millis end-time-millis metrics-set
+   metadata-key]
+  (let [start-bucket (to-bucket granularity start-time-millis)
+        end-bucket   (to-bucket granularity end-time-millis)
+        end-path     (if metadata-key
+                       (path MAP-VALS MAP-VALS)
+                       (path MAP-VALS))]
+    (foreign-select-one
+     [(keypath granularity metric-id)
+      (sorted-map-range start-bucket end-bucket)
+      (transformed [(putval metadata-key) MAP-VALS] telemetry-extract)
+      (transformed [(putval metrics-set) MAP-VALS end-path] metrics-extract)]
+     telemetry-pstate)))

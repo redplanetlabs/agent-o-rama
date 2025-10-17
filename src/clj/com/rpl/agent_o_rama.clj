@@ -608,6 +608,10 @@
                                       cluster
                                       module-name
                                       (po/agent-rules-task-global-name agentName))
+             telemetry-pstate        (foreign-pstate
+                                      cluster
+                                      module-name
+                                      (po/agent-telemetry-task-global-name agentName))
              tracing-query           (foreign-query
                                       cluster
                                       module-name
@@ -895,6 +899,7 @@
              :root-pstate             root-pstate
              :stream-shared-pstate    stream-shared-pstate
              :agent-rules-pstate      agent-rules-pstate
+             :telemetry-pstate        telemetry-pstate
              :tracing-query           tracing-query
              :invokes-page-query      invokes-page-query
              :current-graph-query     current-graph-query
