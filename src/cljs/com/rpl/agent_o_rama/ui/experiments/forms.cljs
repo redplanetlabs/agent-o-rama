@@ -49,12 +49,9 @@
             :targets (mapv
                       (fn [t]
                         (let [ts (:target-spec t)]
-                          {:target-spec (-> ts
-                                            ;; Rename :node to :node-name for consistency
-                                            (assoc :node-name (:node ts))
-                                            (dissoc :node)
-                                            ;; Set type based on whether node is present
-                                            (assoc :type (if (:node ts) :node :agent)))
+                          {:target-spec (if (:node ts)
+                                          (assoc ts :type :node)
+                                          (assoc ts :type :agent))
                            :input->args (normalize-mappings (:input->args t))}))
                       targets)}
      :evaluators (:evaluators info)
@@ -69,6 +66,38 @@
 ;; =============================================================================
 ;; REUSABLE SUB-COMPONENTS FOR THE FORM
 ;; =============================================================================
+
+(defui AgentSelectorDropdown [{:keys [module-id selected-agent on-select-agent disabled? data-testid]}]
+  (let [{:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:module-agents module-id]
+          :sente-event [:agents/get-for-module {:module-id module-id}]
+          :enabled? (boolean module-id)})
+        agent-items (->> data
+                         (keep (fn [agent]
+                                 (let [decoded-name (common/url-decode (:agent-name agent))]
+                                   (when (not= decoded-name "_aor-evaluator")
+                                     {:key decoded-name
+                                      :label decoded-name
+                                      :selected? (= selected-agent decoded-name)
+                                      :on-select #(on-select-agent decoded-name)}))))
+                         vec)
+        display-text (cond
+                       loading? "Loading agents..."
+                       selected-agent selected-agent
+                       :else "Select an agent")
+        dropdown-disabled? (or disabled? loading? (not module-id))
+        empty-content ($ :div.px-4.py-2.text-sm.text-gray-500 "No agents found in this module.")]
+
+    ($ common/Dropdown
+       {:label "Agent"
+        :disabled? dropdown-disabled?
+        :display-text display-text
+        :items agent-items
+        :loading? loading?
+        :error? error
+        :empty-content empty-content
+        :data-testid data-testid})))
 
 (defui EvaluatorSelector [{:keys [module-id selected-evaluators on-change filter-type use-remote?]}]
   (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
@@ -214,28 +243,81 @@
 (defui TargetEditor [{:keys [form-id index]}]
   (let [path [:spec :targets index]
         {:keys [module-id] :as form} (forms/use-form form-id)
+        target-spec-type-field (forms/use-form-field form-id (conj path :target-spec :type))
+        agent-name-field (forms/use-form-field form-id (conj path :target-spec :agent-name))
+        node-name-field (forms/use-form-field form-id (conj path :target-spec :node))
         metadata-field (forms/use-form-field form-id (conj path :metadata))
         input-mappings (or (get-in form (conj path :input->args)) [])
         is-comparative? (= :comparative (get-in form [:spec :type]))
-        num-targets (count (get-in form [:spec :targets]))]
+
+        selected-agent-name (:value agent-name-field)
+        handle-select-agent (fn [agent-name]
+                              ((:on-change agent-name-field) agent-name)
+                              ;; Reset node selection whenever agent changes
+                              (when (not= selected-agent-name agent-name)
+                                ((:on-change node-name-field) nil)))
+
+        graph-query (queries/use-sente-query
+                     {:query-key [:graph module-id selected-agent-name]
+                      :sente-event [:invocations/get-graph {:module-id module-id
+                                                            :agent-name selected-agent-name}]
+                      :enabled? (and (boolean module-id)
+                                     (not (str/blank? selected-agent-name)))})
+        graph-data (get-in graph-query [:data :graph])
+        node-names (->> (or (:node-map graph-data) {})
+                        keys
+                        sort
+                        vec)
+        node-disabled? (or (str/blank? selected-agent-name)
+                           (:loading? graph-query))
+        node-display-text (cond
+                            (str/blank? selected-agent-name) "← Select an agent first"
+                            (:loading? graph-query) "Loading nodes..."
+                            (:error graph-query) "Error loading nodes"
+                            (not (str/blank? (:value node-name-field))) (:value node-name-field)
+                            :else "Select a node...")
+        node-items (mapv (fn [node-name]
+                           {:key node-name
+                            :label node-name
+                            :selected? (= (:value node-name-field) node-name)
+                            :on-select #((:on-change node-name-field) node-name)})
+                         node-names)]
 
     ($ :div.p-4.bg-gray-50.border.rounded-lg
-       ($ :div.flex.justify-between.items-center.mb-3
-          ($ :h4.text-md.font-semibold (str "Target " (inc index)))
-          (when (and is-comparative? (> num-targets 1))
-            ($ :button.p-1.text-red-500.hover:text-red-700
-               {:type "button" :title "Remove Target"
-                :onClick (fn []
-                           (let [targets (get-in form [:spec :targets])
-                                 new-targets (vec (remove #(= % (get targets index)) targets))]
-                             (state/dispatch [:form/update-field form-id [:spec :targets] new-targets])))}
-               ($ TrashIcon {:className "h-4 w-4"}))))
+       ($ :h4.text-md.font-semibold.mb-3 (str "Target " (inc index)))
+       ($ :div.flex.items-center.gap-4.mb-4
+          ($ :label.text-sm.font-medium "Target Type:")
+          ($ :select.p-1.border.border-gray-300.rounded-md
+             {:value (name (or (:value target-spec-type-field) :agent))
+              :onChange #(state/dispatch [:form/set-experiment-target-type form-id index (keyword (.. % -target -value))])}
+             ($ :option {:value "agent"} "Agent")
+             ($ :option {:value "node"} "Node")))
 
-       ;; Use the new shared TargetScopeSelector
-       ($ forms/TargetScopeSelector
-          {:form-id form-id
-           :module-id module-id
-           :base-path (conj path :target-spec)})
+       ($ :div.mb-4
+          ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Agent Name")
+          ($ AgentSelectorDropdown
+             {:module-id module-id
+              :selected-agent selected-agent-name
+              :on-select-agent handle-select-agent
+              :data-testid "agent-name-dropdown"})
+          (when (:error agent-name-field)
+            ($ :p.text-sm.text-red-600.mt-1 (:error agent-name-field))))
+
+       ;; Conditionally render node name dropdown
+       (when (= (:value target-spec-type-field) :node)
+         ($ :div.mt-4
+            ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Node Name")
+            ($ common/Dropdown
+               {:label "Node"
+                :disabled? node-disabled?
+                :display-text node-display-text
+                :items node-items
+                :loading? (:loading? graph-query)
+                :error? (:error graph-query)
+                :empty-content ($ :div.px-4.py-2.text-sm.text-gray-500 "No nodes found for this agent.")
+                :data-testid "node-name-dropdown"})
+            (when (:error node-name-field)
+              ($ :p.text-sm.text-red-600.mt-1 (:error node-name-field)))))
 
        ($ :div.mt-4
           ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Metadata (JSON map, optional)")
@@ -473,7 +555,7 @@
     [:spec :targets] [(fn [targets]
                         (let [missing-agents (filter #(nil? (get-in % [:target-spec :agent-name])) targets)
                               missing-nodes (filter #(and (= :node (get-in % [:target-spec :type]))
-                                                          (str/blank? (get-in % [:target-spec :node-name])))
+                                                          (str/blank? (get-in % [:target-spec :node])))
                                                     targets)]
                           (cond
                             (seq missing-agents) "All targets must have an agent selected"
@@ -502,13 +584,9 @@
                                         (fn [targets]
                                           (mapv (fn [target]
                                                   (-> target
+                                                      ;; TODO this is questionable..
                                                       (update :metadata #(if (str/blank? %) {} (-> % js/JSON.parse js->clj)))
-                                                      (update :input->args (fn [args] (mapv :value args)))
-                                                      ;; Transform :node-name -> :node for backend compatibility
-                                                      (update :target-spec (fn [ts]
-                                                                             (-> ts
-                                                                                 (assoc :node (:node-name ts))
-                                                                                 (dissoc :node-name))))))
+                                                      (update :input->args (fn [args] (mapv :value args)))))
                                                 targets)))]
       (sente/request!
        [:experiments/start

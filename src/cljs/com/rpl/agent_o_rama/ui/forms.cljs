@@ -5,7 +5,6 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.sente :as sente]
-   [com.rpl.agent-o-rama.ui.queries :as queries]
    [clojure.string :as str]
    [com.rpl.specter :as s]
    ["react-dom" :refer [createPortal]]))
@@ -192,7 +191,7 @@
                      :onClick (:submit! form)
                      :data-id "form-submit"
                      :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
-                                     (if (or (not (:valid? form)) (:submitting? form) (:error form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
+                                             (if (or (not (:valid? form)) (:submitting? form) (:error form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
                     (when (:submitting? form) ($ common/spinner {:size :medium}))
                     (:submit-text modal-data "Submit")))))))))
 
@@ -271,174 +270,19 @@
       (catch js/Error e
         (str "Invalid JSON: " (.-message e))))))
 
-;; =============================================================================
-;; SHARED SCOPE SELECTION COMPONENTS
-;; =============================================================================
-
-(defui AgentSelectorDropdown
-  "Dropdown for selecting an agent within a module.
-
-   Props:
-   - :module-id - Module ID
-   - :selected-agent - Currently selected agent name
-   - :on-select-agent - Callback when agent is selected
-   - :disabled? - Whether the dropdown is disabled
-   - :data-testid - Test ID for the dropdown"
-  [{:keys [module-id selected-agent on-select-agent disabled? data-testid]}]
-  (let [{:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:module-agents module-id]
-          :sente-event [:agents/get-for-module {:module-id module-id}]
-          :enabled? (boolean module-id)})
-        agent-items (->> data
-                         (keep (fn [agent]
-                                 (let [decoded-name (common/url-decode (:agent-name agent))]
-                                   (when (not= decoded-name "_aor-evaluator")
-                                     {:key decoded-name
-                                      :label decoded-name
-                                      :selected? (= selected-agent decoded-name)
-                                      :on-select #(on-select-agent decoded-name)}))))
-                         vec)
-        display-text (cond
-                       loading? "Loading agents..."
-                       selected-agent selected-agent
-                       :else "Select an agent")
-        dropdown-disabled? (or disabled? loading? (not module-id))
-        empty-content ($ :div.px-4.py-2.text-sm.text-gray-500 "No agents found in this module.")]
-
-    ($ common/Dropdown
-       {:label "Agent"
-        :disabled? dropdown-disabled?
-        :display-text display-text
-        :items agent-items
-        :loading? loading?
-        :error? error
-        :empty-content empty-content
-        :data-testid data-testid})))
-
-(defui NodeSelectorDropdown
-  "Dropdown for selecting a node within an agent.
-
-   Props:
-   - :module-id - Module ID
-   - :agent-name - Agent name to fetch nodes from
-   - :value - Currently selected node name
-   - :on-change - Callback when selection changes
-   - :disabled? - Whether the dropdown is disabled"
-  [{:keys [module-id agent-name value on-change disabled?]}]
-  (let [{:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:graph module-id agent-name]
-          :sente-event [:invocations/get-graph {:module-id module-id :agent-name agent-name}]
-          :enabled? (and (boolean module-id) (not (str/blank? agent-name)))})
-        graph-data (get-in data [:graph])
-        node-names (->> (or (:node-map graph-data) {}) keys sort vec)
-        dropdown-disabled? (or disabled? loading? (not (seq node-names)))
-        display-text (cond
-                       (str/blank? agent-name) "← Select an agent first"
-                       loading? "Loading nodes..."
-                       error "Error loading nodes"
-                       (not (str/blank? value)) value
-                       :else "Select a node...")]
-    ($ common/Dropdown
-       {:label "Node"
-        :disabled? dropdown-disabled?
-        :display-text display-text
-        :items (mapv (fn [node-name]
-                       {:key node-name
-                        :label node-name
-                        :selected? (= value node-name)
-                        :on-select #(on-change node-name)})
-                     node-names)
-        :loading? loading?
-        :error? error
-        :empty-content ($ :div.px-4.py-2.text-sm.text-gray-500 "No nodes found.")
-        :data-testid "node-name-dropdown"})))
-
-(defui TargetScopeSelector
-  "A reusable component for selecting a target scope (Agent or Node).
-
-   Props:
-   - :form-id - The form ID
-   - :module-id - The module ID for fetching agents
-   - :base-path - Vector path prefix for the form fields (e.g., [] or [:spec :targets 0 :target-spec])"
-  [{:keys [form-id module-id base-path]}]
-  (let [;; Use form fields relative to the base-path
-        type-field (use-form-field form-id (conj base-path :type))
-        agent-name-field (use-form-field form-id (conj base-path :agent-name))
-        node-name-field (use-form-field form-id (conj base-path :node-name))
-
-        handle-agent-select (fn [agent-name]
-                              ;; When agent changes, update the agent name and clear the node name
-                              (state/dispatch [:db/set-values
-                                               [(into [:forms form-id] (conj base-path :agent-name)) agent-name]
-                                               [(into [:forms form-id] (conj base-path :node-name)) nil]]))]
-    ($ :div.space-y-4
-       ;; Scope Type Radio Buttons
-       ($ :div
-          ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Scope")
-          ($ :div.flex.gap-4
-             ($ :div.flex.items-center
-                ($ :input.h-4.w-4.border-gray-300.text-indigo-600.focus:ring-indigo-500
-                   {:type "radio" :id (str "scope-agent-" form-id) :name (str "scope-" form-id)
-                    :value "agent" :checked (= (:value type-field) :agent)
-                    :on-change #(state/dispatch [:form/set-target-scope form-id base-path :agent])})
-                ($ :label.ml-2.block.text-sm.text-gray-700 {:htmlFor (str "scope-agent-" form-id)} "Agent-level"))
-             ($ :div.flex.items-center
-                ($ :input.h-4.w-4.border-gray-300.text-indigo-600.focus:ring-indigo-500
-                   {:type "radio" :id (str "scope-node-" form-id) :name (str "scope-" form-id)
-                    :value "node" :checked (= (:value type-field) :node)
-                    :on-change #(state/dispatch [:form/set-target-scope form-id base-path :node])})
-                ($ :label.ml-2.block.text-sm.text-gray-700 {:htmlFor (str "scope-node-" form-id)} "Node-level"))))
-
-       ;; Agent Name Dropdown (always visible when scope is selected)
-       ($ :div
-          ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Agent Name")
-          ($ AgentSelectorDropdown
-             {:module-id module-id
-              :selected-agent (:value agent-name-field)
-              :on-select-agent handle-agent-select
-              :data-testid "agent-name-dropdown"})
-          (when (:error agent-name-field)
-            ($ :p.text-sm.text-red-600.mt-1 (:error agent-name-field))))
-
-       ;; Node Name Dropdown (conditionally visible)
-       (when (= (:value type-field) :node)
-         ($ :div
-            ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Node Name")
-            ($ NodeSelectorDropdown
-               {:module-id module-id
-                :agent-name (:value agent-name-field)
-                :value (:value node-name-field)
-                :on-change (:on-change node-name-field)
-                :disabled? (str/blank? (:value agent-name-field))})
-            (when (:error node-name-field)
-              ($ :p.text-sm.text-red-600.mt-1 (:error node-name-field))))))))
-
 (defn- validate-form-fields
   "Validate fields against validators keyed by Specter paths.
    Returns a map {:valid? boolean :errors {nested-error-map}}
 
    The form-state contains both field data and metadata. We need to extract
-   only the field data for validation by excluding known metadata keys.
-   
-   Validators can optionally take form-state as a second parameter for
-   conditional validation based on other fields."
+   only the field data for validation by excluding known metadata keys."
   [form-state validators]
   (let [metadata-keys #{:field-errors :valid? :submitting? :error :current-step :steps :set-field! :next-step! :prev-step! :submit!}
         field-data (apply dissoc form-state metadata-keys)]
     (reduce-kv
      (fn [acc path validator-fns]
        (let [value (s/select-one path field-data)
-             ;; Try calling validator with both value and form-state
-             ;; If validator has arity-2, it will receive form-state
-             first-error (some (fn [validator-fn]
-                                 (try
-                                   (validator-fn value field-data)
-                                   (catch js/Error _
-                                     ;; If error, validator might be arity-1, try with just value
-                                     (validator-fn value))))
-                               validator-fns)]
+             first-error (some #(% value) validator-fns)]
          (if first-error
            (-> acc
                (assoc :valid? false)
@@ -566,17 +410,6 @@
                              (state/dispatch [:db/set-value [:forms form-id] (assoc form-state :submitting? true :error nil)])
                              (on-submit-handler db form-state-with-id))))))
                    nil))
-
-(state/reg-event
- :form/set-target-scope
- (fn [db form-id base-path new-type]
-   (let [form-path (into [:forms form-id] base-path)]
-     (s/multi-path
-      ;; Set the new type (:agent or :node)
-      (into (state/path->specter-path (conj form-path :type)) [(s/terminal-val new-type)])
-      ;; If switching to :agent, ensure :node-name is removed to prevent stale state
-      (when (= new-type :agent)
-        (into (state/path->specter-path form-path) [(s/terminal #(dissoc % :node-name))]))))))
 
 (state/reg-event :form/clear
                  (fn [db form-id]
