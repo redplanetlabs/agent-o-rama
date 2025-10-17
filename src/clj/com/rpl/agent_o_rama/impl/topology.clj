@@ -202,9 +202,11 @@
    ;; does not need to be synchronous with the agent execution
    (<<atomic
      (ops/explode-map *metadata :> *k *v)
-     (local-select> [:metadata (keypath *k) (view count)] $$stream-shared :> *curr-count)
+     (local-select> [:metadata (keypath *k) :examples (view count)]
+                    $$stream-shared
+                    :> *curr-count)
      (<<if (< *curr-count 3)
-       (local-transform> [:metadata (keypath *k) NONE-ELEM (termval *v)] $$stream-shared)
+       (local-transform> [:metadata (keypath *k) :examples NONE-ELEM (termval *v)] $$stream-shared)
        (<<if (not= 0 (ops/current-task-id))
          (|direct 0)
          (%self *agent-name {*k *v})

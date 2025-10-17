@@ -3196,7 +3196,9 @@
 
        (bind all-meta
          (fn []
-           (foreign-select-one [:metadata (view #(into {} %))] stream-shared {:pkey 0})
+           (transform MAP-VALS
+                      :examples
+                      (foreign-select-one [:metadata (view #(into {} %))] stream-shared {:pkey 0}))
          ))
 
        (bind expected-results
@@ -3318,4 +3320,10 @@
                "i" #{1}
                "l" #{1}
                "s" #{"abc"}}))
+
+
+       (bind search-metadata (:search-metadata-query (aor-types/underlying-objects foo)))
+
+       ;; TODO: <<<<>>>> test metadata search
+       (println (foreign-invoke-query search-metadata "" 100 nil))
       ))))
