@@ -57,6 +57,10 @@
   [agent-name]
   (str "_agent-search-metadata-" agent-name))
 
+(defn all-agent-metrics-name
+  [agent-name]
+  (str "_agent-all-metrics-" agent-name))
+
 (defn get-datasets-page-query-name
   []
   "_aor-get-datasets")
@@ -940,8 +944,7 @@
     )))
 
 
-;; accepts filters :source, :tag, and search-string (looks for match within
-;; stringified input or reference-output)
+;; returns {:metadata [{:name ... :examples #{...}} ...] :pagination-params ...}
 (defn declare-search-metadata-topology
   [topologies agent-name]
   (let [shared-streaming-sym (symbol (po/agent-stream-shared-task-global-name agent-name))]
@@ -971,6 +974,22 @@
                    :> *items *page-key)
       (|origin)
       (hash-map :metadata *items :pagination-params *page-key :> *res)
+    )))
+
+(defn declare-all-agent-metrics-topology
+  [topologies agent-name]
+  (let [telemetry-sym (symbol (po/agent-telemetry-task-global-name agent-name))]
+    (<<query-topology topologies
+      (all-agent-metrics-name agent-name)
+      [:> *res]
+      (|all)
+      (local-select>
+       [(keypath 60) MAP-KEYS]
+       telemetry-sym
+       {:allow-yield? true}
+       :> *metric-id)
+      (|origin)
+      (aggs/+set-agg *metric-id :> *res)
     )))
 
 ;; direct queries on PStates

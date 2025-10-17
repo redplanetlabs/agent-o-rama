@@ -163,6 +163,7 @@
     (queries/declare-get-current-graph topologies agent-name)
     (queries/declare-get-action-log-page-topology topologies agent-name)
     (queries/declare-search-metadata-topology topologies agent-name)
+    (queries/declare-all-agent-metrics-topology topologies agent-name)
 
     (<<sources stream-topology
      (source> agent-config-depot-sym {:retry-mode :all-after} :> *data)
