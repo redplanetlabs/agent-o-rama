@@ -206,8 +206,17 @@ test.describe('Dataset Import/Export Round-trip', () => {
     // --- PHASE 5: IMPORT THE EXPORTED FILE BACK INTO THE SAME DATASET ---
     console.log('--- PHASE 5: IMPORT THE EXPORTED FILE BACK INTO THE SAME DATASET ---');
     
-    // Import the exported file into the same dataset (should add more examples)
-    // The import button is right next to the export button on the dataset detail page
+    // Click the Import button to open the import modal
+    await page.getByRole('button', { name: 'Import' }).click();
+    
+    // Wait for the import modal to appear
+    const importInstructionsModal = page.locator('[role="dialog"]').filter({ hasText: 'Import Examples from JSONL' });
+    await expect(importInstructionsModal).toBeVisible();
+    
+    // Verify the modal shows helpful information
+    await expect(importInstructionsModal.getByText('JSONL file')).toBeVisible();
+    
+    // Set the file to upload (file input is hidden in the modal)
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(downloadPath);
     
@@ -369,7 +378,14 @@ test.describe('Dataset Import/Export Round-trip', () => {
     writeFileSync(tempFile, malformedContent);
     
     try {
-      // Import the malformed file
+      // Click the Import button to open the import modal
+      await page.getByRole('button', { name: 'Import' }).click();
+      
+      // Wait for the import modal to appear
+      const importInstructionsModal = page.locator('[role="dialog"]').filter({ hasText: 'Import Examples from JSONL' });
+      await expect(importInstructionsModal).toBeVisible();
+      
+      // Import the malformed file (file input is hidden in the modal)
       const fileInput = page.locator('input[type="file"]');
       await fileInput.setInputFiles(tempFile);
       
