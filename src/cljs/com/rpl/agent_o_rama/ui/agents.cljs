@@ -49,9 +49,9 @@
                       (. e stopPropagation)
                       (state/dispatch [:modal/show :arguments-detail
                                        {:title "Invocation Arguments"
-                                        :component ($ common/ContentDetailModal 
-                                                     {:title "Invocation Arguments"
-                                                      :content args-json})}]))}
+                                        :component ($ common/ContentDetailModal
+                                                      {:title "Invocation Arguments"
+                                                       :content args-json})}]))}
           ($ :div.truncate.text-gray-900.font-mono
              args-json))
        ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
@@ -80,18 +80,27 @@
                            ($ :th {:className (:th common/table-classes)} "Module")
                            ($ :th {:className (:th common/table-classes)} "Agent")))
                      ($ :tbody
-                        (into []
-                              (for [agent data
-                                    :let [module (common/url-decode (:module-id agent))
-                                          agent-name (common/url-decode (:agent-name agent))
-                                          href (str "/agents/" (common/url-encode (:module-id agent)) "/agent/" (common/url-encode (:agent-name agent)))]]
-                                ($ :tr {:key href :className "hover:bg-gray-50 cursor-pointer"
-                                        :onClick (fn [_]
-                                                   (rfe/push-state :agent/detail
-                                                                   {:module-id (:module-id agent)
-                                                                    :agent-name (:agent-name agent)}))}
-                                   ($ :td {:className (:td common/table-classes)} module)
-                                   ($ :td {:className (:td common/table-classes)} agent-name)))))))))))
+                        (let [sorted-agents (sort-by
+                                             (fn [agent]
+                                               (let [module-name (:module-id agent)
+                                                     decoded-module (common/url-decode module-name)
+                                                     agent-name (:agent-name agent)
+                                                     decoded-agent (common/url-decode agent-name)]
+                                                  ;; Sort by: 1) module name, 2) underscore-prefixed agents last, 3) agent name
+                                                 [decoded-module (str/starts-with? decoded-agent "_") decoded-agent]))
+                                             data)]
+                          (into []
+                                (for [agent sorted-agents
+                                      :let [module (common/url-decode (:module-id agent))
+                                            agent-name (common/url-decode (:agent-name agent))
+                                            href (str "/agents/" (common/url-encode (:module-id agent)) "/agent/" (common/url-encode (:agent-name agent)))]]
+                                  ($ :tr {:key href :className "hover:bg-gray-50 cursor-pointer"
+                                          :onClick (fn [_]
+                                                     (rfe/push-state :agent/detail
+                                                                     {:module-id (:module-id agent)
+                                                                      :agent-name (:agent-name agent)}))}
+                                     ($ :td {:className (:td common/table-classes)} module)
+                                     ($ :td {:className (:td common/table-classes)} agent-name))))))))))))
 
 (defui invocations []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
