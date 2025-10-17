@@ -414,7 +414,7 @@
        ))
      (bind module-name2 (get-module-name module2))
      (launch-module-without-eval-agent! ipc module1 {:tasks 2 :threads 1})
-     (launch-module-without-eval-agent!ipc module2 {:tasks 4 :threads 2})
+     (launch-module-without-eval-agent! ipc module2 {:tasks 4 :threads 2})
      (bind agent-manager (aor/agent-manager ipc module-name2))
      (bind foo (aor/agent-client agent-manager "foo"))
 
