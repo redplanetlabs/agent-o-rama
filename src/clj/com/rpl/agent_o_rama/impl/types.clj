@@ -59,7 +59,6 @@
                         :strict-map->constructor       false
                         :valid-type-predicate          false
                         :map->valid!-constructor       false
-                        :map->valid-constructor        false
                         :map->constructor              false
                         :->valid!-constructor          false
                        }})]
