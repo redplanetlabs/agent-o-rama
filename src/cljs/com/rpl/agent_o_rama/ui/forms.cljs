@@ -373,7 +373,7 @@
                               (state/dispatch [:db/set-values
                                                [(into [:forms form-id] (conj base-path :agent-name)) agent-name]
                                                [(into [:forms form-id] (conj base-path :node-name)) nil]]))]
-    ($ :div.space-y-4
+    ($ :div.space-y-4.mb-4
        ;; Scope Type Radio Buttons
        ($ :div
           ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Scope")
@@ -571,12 +571,13 @@
  :form/set-target-scope
  (fn [db form-id base-path new-type]
    (let [form-path (into [:forms form-id] base-path)]
-     (s/multi-path
-      ;; Set the new type (:agent or :node)
-      (into (state/path->specter-path (conj form-path :type)) [(s/terminal-val new-type)])
-      ;; If switching to :agent, ensure :node-name is removed to prevent stale state
-      (when (= new-type :agent)
-        (into (state/path->specter-path form-path) [(s/terminal #(dissoc % :node-name))]))))))
+     (if (= new-type :agent)
+       ;; When switching to agent, set type and remove node-name
+       (s/multi-path
+        (into (state/path->specter-path (conj form-path :type)) [(s/terminal-val new-type)])
+        (into (state/path->specter-path form-path) [(s/terminal #(dissoc % :node-name))]))
+       ;; When switching to node, just set the type
+       (into (state/path->specter-path (conj form-path :type)) [(s/terminal-val new-type)])))))
 
 (state/reg-event :form/clear
                  (fn [db form-id]
