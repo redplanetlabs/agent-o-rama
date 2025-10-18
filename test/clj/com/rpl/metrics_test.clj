@@ -19,9 +19,57 @@
    [com.rpl.test-common :as tc])
   (:import
    [com.rpl.rama.helpers
-    TopologyUtils]))
+    TopologyUtils]
+   [dev.langchain4j.data.message
+    AiMessage
+    UserMessage]
+   [dev.langchain4j.model.chat
+    StreamingChatModel]
+   [dev.langchain4j.model.chat.response
+    ChatResponse$Builder]
+   [dev.langchain4j.model.output
+    TokenUsage]
+   [dev.langchain4j.store.embedding
+    EmbeddingSearchRequest
+    EmbeddingSearchResult
+    EmbeddingStore]
+   [dev.langchain4j.store.embedding.filter.comparison
+    IsEqualTo]))
 
 (def TICKS)
+
+(defrecord MockChatModel []
+  StreamingChatModel
+  (doChat [this request handler]
+    (let [^UserMessage um (-> request
+                              .messages
+                              last)
+          m        (.singleText um)
+          o        (str um "***")
+          response (-> (ChatResponse$Builder.)
+                       (.aiMessage (AiMessage. o))
+                       (.tokenUsage
+                        (TokenUsage. (int (count m))
+                                     (int (count o))
+                                     (int (+ (count m) (count o) 2))))
+                       .build)]
+      (when (h/contains-string? m "fail-model")
+        (throw (ex-info "fail model" {})))
+      (TopologyUtils/advanceSimTime 150)
+      (.onPartialResponse handler "abc ")
+      (TopologyUtils/advanceSimTime 100)
+      (.onPartialResponse handler "def")
+      (.onCompleteResponse handler response)
+    )))
+
+(deftype MockEmbeddingStore []
+  EmbeddingStore
+  (add [this embedding]
+    (TopologyUtils/advanceSimTime 10)
+    "999")
+  (search [this request]
+    (TopologyUtils/advanceSimTime 15)
+    (EmbeddingSearchResult. [])))
 
 (deftest basic-metrics-test
   (with-redefs [TICKS (atom 0)
@@ -58,20 +106,37 @@
                {"score-a" (count input)
                 "score-b" (count output)}
              )))
+          (aor/declare-agent-object-builder
+           topology
+           "my-model"
+           (fn [setup] (->MockChatModel)))
+          (aor/declare-agent-object-builder
+           topology
+           "emb"
+           (fn [setup] (MockEmbeddingStore.)))
           (-> topology
               (aor/new-agent "foo")
               (aor/node
                "start"
                "a"
                (fn [agent-node input]
+                 (lc4j/basic-chat (aor/get-agent-object agent-node "my-model") input)
                  (aor/emit! agent-node (str input "!"))))
               (aor/node
                "a"
                nil
                (fn [agent-node input]
-                 (if (= input "fail!")
-                   (throw (ex-info "fail" {}))
-                   (aor/result! agent-node (str input "?")))))
+                 (let [^EmbeddingStore es (aor/get-agent-object agent-node "emb")]
+                   (.add es (tc/embedding 1.0 2.0))
+                   (.search es
+                            (EmbeddingSearchRequest. (tc/embedding 0.1 0.3)
+                                                     (int 5)
+                                                     0.75
+                                                     (IsEqualTo. "b" 2)))
+                   (.add es (tc/embedding 1.0 2.0))
+                   (if (= input "fail!")
+                     (throw (ex-info "fail" {}))
+                     (aor/result! agent-node (str input "?"))))))
           )))
        (rtest/launch-module! ipc module {:tasks 2 :threads 2})
        (bind module-name (get-module-name module))
@@ -136,6 +201,9 @@
 
        ;; TODO: <<<<>>>>
        ;;  - agent needs mock chat model, streaming, and token counts
+       ;;  - needs some model failures
+       ;;  - needs store reads/writes
+       ;;  - needs database reads/writes (mock embedding store)
        ;;  - need mixture of success and failures
        ;;  - some with metadata, some without
        ;;  - some metadata with high cardinality
