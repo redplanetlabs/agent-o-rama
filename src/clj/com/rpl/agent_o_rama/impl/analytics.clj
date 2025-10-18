@@ -867,7 +867,7 @@
 
 (defn to-bucket
   [granularity time-millis]
-  (long (/ time-millis granularity)))
+  (quot time-millis (* granularity 1000)))
 
 (defn mk-number-stats
   []
@@ -1190,7 +1190,7 @@
 ;; - metadata-key is optional
 ;;   - if set, leaves are split by metadata value (5 max)
 (defn select-telemetry
-  [telemetry-pstate granularity metric-id start-time-millis end-time-millis metrics-set
+  [telemetry-pstate agent-name granularity metric-id start-time-millis end-time-millis metrics-set
    metadata-key]
   (let [start-bucket (to-bucket granularity start-time-millis)
         end-bucket   (to-bucket granularity end-time-millis)
@@ -1202,4 +1202,5 @@
       (sorted-map-range start-bucket end-bucket)
       (transformed [(putval metadata-key) MAP-VALS] telemetry-extract)
       (transformed [(putval metrics-set) MAP-VALS end-path] metrics-extract)]
-     telemetry-pstate)))
+     telemetry-pstate
+     {:pkey [agent-name granularity metric-id]})))

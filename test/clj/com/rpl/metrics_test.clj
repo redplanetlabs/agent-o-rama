@@ -13,6 +13,7 @@
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.store :as store]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
@@ -71,6 +72,13 @@
     (TopologyUtils/advanceSimTime 15)
     (EmbeddingSearchResult. [])))
 
+(defn advancer-pred
+  [amt]
+  (fn [_]
+    (TopologyUtils/advanceSimTime amt)
+    true
+  ))
+
 (deftest basic-metrics-test
   (with-redefs [TICKS (atom 0)
                 i/SUBSTITUTE-TICK-DEPOTS true
@@ -114,19 +122,28 @@
            topology
            "emb"
            (fn [setup] (MockEmbeddingStore.)))
+          (aor/declare-pstate-store
+           topology
+           "$$p"
+           Object)
           (-> topology
               (aor/new-agent "foo")
               (aor/node
                "start"
                "a"
                (fn [agent-node input]
-                 (lc4j/basic-chat (aor/get-agent-object agent-node "my-model") input)
-                 (aor/emit! agent-node (str input "!"))))
+                 (let [p (aor/get-store agent-node "$$p")]
+                   (store/pstate-transform! [(advancer-pred 12) (termval "a")]
+                                            p
+                                            :a)
+                   (lc4j/basic-chat (aor/get-agent-object agent-node "my-model") input)
+                   (aor/emit! agent-node "a" (str input "!")))))
               (aor/node
                "a"
                nil
                (fn [agent-node input]
-                 (let [^EmbeddingStore es (aor/get-agent-object agent-node "emb")]
+                 (let [^EmbeddingStore es (aor/get-agent-object agent-node "emb")
+                       p (aor/get-store agent-node "$$p")]
                    (.add es (tc/embedding 1.0 2.0))
                    (.search es
                             (EmbeddingSearchRequest. (tc/embedding 0.1 0.3)
@@ -134,17 +151,20 @@
                                                      0.75
                                                      (IsEqualTo. "b" 2)))
                    (.add es (tc/embedding 1.0 2.0))
+                   (store/pstate-select-one [:a (advancer-pred 14)] p)
                    (if (= input "fail!")
                      (throw (ex-info "fail" {}))
                      (aor/result! agent-node (str input "?"))))))
           )))
-       (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+       (time
+        (rtest/launch-module! ipc module {:tasks 2 :threads 2}))
        (bind module-name (get-module-name module))
        (bind agent-manager (aor/agent-manager ipc module-name))
        (bind global-actions-depot
          (:global-actions-depot (aor-types/underlying-objects agent-manager)))
        (bind foo (aor/agent-client agent-manager "foo"))
        (bind ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
+       (bind telemetry (:telemetry-pstate (aor-types/underlying-objects foo)))
 
        (bind cycle!
          (fn []
@@ -197,6 +217,34 @@
        (is (= "...!?" (aor/agent-invoke foo "...")))
        (is (thrown? Exception (aor/agent-invoke foo "fail")))
 
+       (TopologyUtils/advanceSimTime 60000)
+
+       (is (= "abc!?" (aor/agent-invoke foo "abc")))
+       (is (= "eeeee!?" (aor/agent-invoke foo "eeeee")))
+
+       (cycle!)
+       (cycle!)
+
+
+       (clojure.pprint/pprint
+        (ana/select-telemetry telemetry
+                              "foo"
+                              60
+                              [:agent :success-rate]
+                              0
+                              (* 1000 60 60)
+                              [:count :rest-sum]
+                              nil))
+       (println "\n")
+       (clojure.pprint/pprint
+        (ana/select-telemetry telemetry
+                              "foo"
+                              60
+                              [:agent :success-rate]
+                              0
+                              (* 1000 60 60)
+                              [:count :rest-sum]
+                              "aor/status"))
 
 
        ;; TODO: <<<<>>>>
