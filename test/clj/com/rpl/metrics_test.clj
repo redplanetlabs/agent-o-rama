@@ -46,7 +46,7 @@
                               .messages
                               last)
           m        (.singleText um)
-          o        (str um "***")
+          o        (str m "***")
           response (-> (ChatResponse$Builder.)
                        (.aiMessage (AiMessage. o))
                        (.tokenUsage
@@ -132,6 +132,7 @@
                "start"
                "a"
                (fn [agent-node input]
+                 (TopologyUtils/advanceSimTime 3)
                  (let [p (aor/get-store agent-node "$$p")]
                    (store/pstate-transform! [(advancer-pred 12) (termval "a")]
                                             p
@@ -226,25 +227,47 @@
        (cycle!)
 
 
-       (clojure.pprint/pprint
-        (ana/select-telemetry telemetry
-                              "foo"
-                              60
-                              [:agent :success-rate]
-                              0
-                              (* 1000 60 60)
-                              [:count :rest-sum]
-                              nil))
-       (println "\n")
-       (clojure.pprint/pprint
-        (ana/select-telemetry telemetry
-                              "foo"
-                              60
-                              [:agent :success-rate]
-                              0
-                              (* 1000 60 60)
-                              [:count :rest-sum]
-                              "aor/status"))
+       (doseq [metric-id [[:agent :success-rate]
+                          [:agent :latency]
+                          [:agent :model-call-count]
+                          [:agent :token-counts]
+                          [:agent :model-success-rate]
+                          [:agent :model-latency]
+                          [:agent :store-read-latency]
+                          [:agent :store-write-latency]
+                          [:agent :db-read-latency]
+                          [:agent :db-write-latency]
+                          [:agent :first-token-time]
+                          [:agent :model-first-token-time]
+                          [:eval :rule1 :concise?]
+                          [:eval :rule2 :score-a]
+                          [:eval :rule2 :score-b]
+                         ]]
+         (println "METRIC" metric-id)
+         (clojure.pprint/pprint
+          (ana/select-telemetry telemetry
+                                "foo"
+                                60
+                                metric-id
+                                0
+                                (* 1000 60 60)
+                                [:count :rest-sum]
+                                nil))
+         (println "\n")
+         (clojure.pprint/pprint
+          (ana/select-telemetry telemetry
+                                "foo"
+                                60
+                                metric-id
+                                0
+                                (* 1000 60 60)
+                                [:count :rest-sum]
+                                "aor/status"))
+
+         (println "----------------------------------\n\n")
+       )
+
+       ;; TODO: <<<<>>>>> model first token time not working
 
 
        ;; TODO: <<<<>>>>

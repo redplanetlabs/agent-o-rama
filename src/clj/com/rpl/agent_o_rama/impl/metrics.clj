@@ -104,7 +104,7 @@
   :target   :nodes
   :value-fn
   (fn [{:keys [nested-ops]}]
-    (let [model-info-maps (select [(selected? :type (pred= :model-call)) :info-map] nested-ops)
+    (let [model-info-maps (select [ALL (selected? :type (pred= :model-call)) :info] nested-ops)
           fcount (count (filter #(contains? % "failure") model-info-maps))]
       {:type   :categorical
        :values {"success" (- (count model-info-maps) fcount)
@@ -169,12 +169,13 @@
   :target   :nodes
   :value-fn
   (fn [{:keys [nested-ops]}]
-    (let [ops (select [(selected? :type (pred= :model-call))
-                       (selected? :info-map (must "firstTokenTimeMillis") number?)]
+    (let [ops (select [ALL
+                       (selected? :type (pred= :model-call))
+                       (selected? :info (must "firstTokenTimeMillis") number?)]
                       nested-ops)]
       {:type   :numerical
-       :values (mapv (fn [{:keys [start-time-millis info-map]}]
-                       (- (get info-map "firstTokenTimeMillis") start-time-millis))
+       :values (mapv (fn [{:keys [start-time-millis info]}]
+                       (- (get info "firstTokenTimeMillis") start-time-millis))
                      ops)
       }))})
 

@@ -960,7 +960,7 @@
   (filter> (not (experiment-source? *data-map)))
   (assoc *metadata
    "aor/status"
-   (ifexpr (metrics/run-success? *data-map) "success" "failure")
+   (ifexpr (metrics/run-success? *data-map) "run-success" "run-failure")
    :> *metadata)
   (ops/explode *metrics :> {:keys [*metrics-fn]})
   (h/invoke *metrics-fn *data-map :> *metrics-map)
