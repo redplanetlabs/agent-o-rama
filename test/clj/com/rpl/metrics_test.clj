@@ -96,6 +96,8 @@
 
                 ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
 
+                ana/node-stall-time (fn [] (+ (h/current-time-millis) 60000))
+
                 at/gen-new-agent-id
                 (fn [agent-name]
                   (h/random-uuid7-at-timestamp (h/current-time-millis)))]
@@ -131,28 +133,35 @@
               (aor/node
                "start"
                "a"
-               (fn [agent-node input]
+               (fn [agent-node input flags]
                  (TopologyUtils/advanceSimTime 3)
                  (let [p (aor/get-store agent-node "$$p")]
-                   (store/pstate-transform! [(advancer-pred 12) (termval "a")]
-                                            p
-                                            :a)
-                   (lc4j/basic-chat (aor/get-agent-object agent-node "my-model") input)
-                   (aor/emit! agent-node "a" (str input "!")))))
+                   (when (contains? flags :store-write)
+                     (store/pstate-transform! [(advancer-pred 12) (termval "a")]
+                                              p
+                                              :a))
+                   (when (contains? flags :model)
+                     (lc4j/basic-chat (aor/get-agent-object agent-node "my-model") ".")
+                     (lc4j/basic-chat (aor/get-agent-object agent-node "my-model") input))
+                   (aor/emit! agent-node "a" (str input "!") flags))))
               (aor/node
                "a"
                nil
-               (fn [agent-node input]
+               (fn [agent-node input flags]
                  (let [^EmbeddingStore es (aor/get-agent-object agent-node "emb")
                        p (aor/get-store agent-node "$$p")]
-                   (.add es (tc/embedding 1.0 2.0))
-                   (.search es
-                            (EmbeddingSearchRequest. (tc/embedding 0.1 0.3)
-                                                     (int 5)
-                                                     0.75
-                                                     (IsEqualTo. "b" 2)))
-                   (.add es (tc/embedding 1.0 2.0))
-                   (store/pstate-select-one [:a (advancer-pred 14)] p)
+                   (when (contains? flags :db-write)
+                     (.add es (tc/embedding 1.0 2.0)))
+                   (when (contains? flags :db-read)
+                     (.search es
+                              (EmbeddingSearchRequest. (tc/embedding 0.1 0.3)
+                                                       (int 5)
+                                                       0.75
+                                                       (IsEqualTo. "b" 2))))
+                   (when (contains? flags :db-write)
+                     (.add es (tc/embedding 1.0 2.0)))
+                   (when (contains? flags :store-read)
+                     (store/pstate-select-one [:a (advancer-pred 14)] p))
                    (if (= input "fail!")
                      (throw (ex-info "fail" {}))
                      (aor/result! agent-node (str input "?"))))))
@@ -214,14 +223,20 @@
 
        (TopologyUtils/advanceSimTime 1000)
 
-       (is (= "ab!?" (aor/agent-invoke foo "ab")))
-       (is (= "...!?" (aor/agent-invoke foo "...")))
-       (is (thrown? Exception (aor/agent-invoke foo "fail")))
+       (is (= "ab!?"
+              (aor/agent-invoke foo "ab" #{:model :store-read :store-write :db-read :db-write})))
+       (is (= "...!?" (aor/agent-invoke foo "..." #{:model :store-read :db-read})))
+       (is (thrown? Exception (aor/agent-invoke foo "fail" #{})))
 
        (TopologyUtils/advanceSimTime 60000)
 
-       (is (= "abc!?" (aor/agent-invoke foo "abc")))
-       (is (= "eeeee!?" (aor/agent-invoke foo "eeeee")))
+       (is (= "abc!?"
+              (aor/agent-invoke foo "abc" #{:store-write :db-read :db-write})))
+       (is (= "eeeee!?" (aor/agent-invoke foo "eeeee" #{:model})))
+
+       (TopologyUtils/advanceSimTime 60000)
+       (is (thrown? Exception (aor/agent-invoke foo "fail-model" #{:model})))
+
 
        (cycle!)
        (cycle!)
@@ -266,8 +281,6 @@
 
          (println "----------------------------------\n\n")
        )
-
-       ;; TODO: <<<<>>>>> model first token time not working
 
 
        ;; TODO: <<<<>>>>

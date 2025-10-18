@@ -104,6 +104,7 @@
   :target   :nodes
   :value-fn
   (fn [{:keys [nested-ops]}]
+
     (let [model-info-maps (select [ALL (selected? :type (pred= :model-call)) :info] nested-ops)
           fcount (count (filter #(contains? % "failure") model-info-maps))]
       {:type   :categorical

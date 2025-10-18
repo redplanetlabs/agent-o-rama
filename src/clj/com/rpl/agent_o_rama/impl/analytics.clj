@@ -881,9 +881,11 @@
 
 (defn metric-point->category-values
   [{:keys [type values]}]
-  (if (= type :numeric)
-    {po/DEFAULT-CATEGORY values}
-    (transform MAP-VALS vector values)))
+  (setval [MAP-VALS empty?]
+          NONE
+          (if (= type :numeric)
+            {po/DEFAULT-CATEGORY values}
+            (transform MAP-VALS vector values))))
 
 (defn add-number-stats-values
   [number-stats values]
@@ -967,6 +969,7 @@
   (ops/explode-map *metrics-map :> *metric-id *metric-points)
   (ops/explode *metric-points :> *metric-point)
   (metric-point->category-values *metric-point :> *category-values)
+  (filter> (not (empty? *category-values)))
 
   (ops/explode po/GRANULARITIES :> *granularity)
   (to-bucket *granularity *start-time-millis :> *bucket)
