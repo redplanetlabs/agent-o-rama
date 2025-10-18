@@ -881,11 +881,11 @@
 
 (defn metric-point->category-values
   [{:keys [type values]}]
-  (setval [MAP-VALS empty?]
-          NONE
-          (if (= type :numeric)
-            {po/DEFAULT-CATEGORY values}
-            (transform MAP-VALS vector values))))
+  (->> (if (= type :numeric)
+         {po/DEFAULT-CATEGORY values}
+         (transform MAP-VALS vector values))
+       (setval [MAP-VALS empty?]
+               NONE)))
 
 (defn add-number-stats-values
   [number-stats values]

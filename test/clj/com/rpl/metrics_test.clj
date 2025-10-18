@@ -114,7 +114,7 @@
            (fn [params]
              (fn [fetcher input ref-output output]
                {"score-a" (count input)
-                "score-b" (count output)}
+                "score-b" (+ (count output) 0.5)}
              )))
           (aor/declare-agent-object-builder
            topology
@@ -223,16 +223,26 @@
 
        (TopologyUtils/advanceSimTime 1000)
 
-       (is (= "ab!?"
-              (aor/agent-invoke foo "ab" #{:model :store-read :store-write :db-read :db-write})))
-       (is (= "...!?" (aor/agent-invoke foo "..." #{:model :store-read :db-read})))
-       (is (thrown? Exception (aor/agent-invoke foo "fail" #{})))
+       (is
+        (= "ab!?"
+           (aor/agent-invoke-with-context foo
+                                          {:metadata {"m1" "a"}}
+                                          "ab"
+                                          #{:model :store-read :store-write :db-read :db-write})))
+       (is (= "...!?"
+              (aor/agent-invoke-with-context foo
+                                             {:metadata {"m1" "a" "m2" "A"}}
+                                             "..."
+                                             #{:model :store-read :db-read})))
+       (is (thrown? Exception
+                    (aor/agent-invoke-with-context foo {:metadata {"m1" "b"}} "fail" #{})))
 
        (TopologyUtils/advanceSimTime 60000)
 
        (is (= "abc!?"
               (aor/agent-invoke foo "abc" #{:store-write :db-read :db-write})))
-       (is (= "eeeee!?" (aor/agent-invoke foo "eeeee" #{:model})))
+       (is (= "eeeee!?"
+              (aor/agent-invoke-with-context foo {:metadata {"m2" "B"}} "eeeee" #{:model})))
 
        (TopologyUtils/advanceSimTime 60000)
        (is (thrown? Exception (aor/agent-invoke foo "fail-model" #{:model})))
@@ -279,17 +289,35 @@
                                 [:count :rest-sum]
                                 "aor/status"))
 
+         (println "\n")
+         (clojure.pprint/pprint
+          (ana/select-telemetry telemetry
+                                "foo"
+                                60
+                                metric-id
+                                0
+                                (* 1000 60 60)
+                                [:count :rest-sum]
+                                "m1"))
+
+         (println "\n")
+         (clojure.pprint/pprint
+          (ana/select-telemetry telemetry
+                                "foo"
+                                60
+                                metric-id
+                                0
+                                (* 1000 60 60)
+                                [:count :rest-sum]
+                                "m2"))
+
          (println "----------------------------------\n\n")
        )
 
 
        ;; TODO: <<<<>>>>
-       ;;  - agent needs mock chat model, streaming, and token counts
-       ;;  - needs some model failures
-       ;;  - needs store reads/writes
-       ;;  - needs database reads/writes (mock embedding store)
-       ;;  - need mixture of success and failures
        ;;  - some with metadata, some without
-       ;;  - some metadata with high cardinality
+       ;;  - some metadata with high cardinality values
+       ;;  - check granularities
 
       ))))
