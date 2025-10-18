@@ -11,14 +11,15 @@
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.test-common :as tc]))
-
-
-;; TODO: <<<<>>>>
+   [com.rpl.test-common :as tc])
+  (:import
+   [com.rpl.rama.helpers
+    TopologyUtils]))
 
 (def TICKS)
 
@@ -29,10 +30,13 @@
                 i/hook:analytics-tick
                 (fn [& args] (swap! TICKS inc))
 
+                aor-types/get-config (max-retries-override 0)
 
                 anode/gen-node-id
                 (fn [& args]
                   (h/random-uuid7-at-timestamp (h/current-time-millis)))
+
+                anode/log-node-error (fn [& args])
 
                 ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
 
@@ -45,15 +49,29 @@
        (bind module
          (aor/agentmodule
           [topology]
+          (aor/declare-evaluator-builder
+           topology
+           "my-eval"
+           ""
+           (fn [params]
+             (fn [fetcher input ref-output output]
+               {"score-a" (count input)
+                "score-b" (count output)}
+             )))
           (-> topology
               (aor/new-agent "foo")
               (aor/node
                "start"
+               "a"
+               (fn [agent-node input]
+                 (aor/emit! agent-node (str input "!"))))
+              (aor/node
+               "a"
                nil
                (fn [agent-node input]
-                   ;; TODO: <<<<>>>>
-               )
-              )
+                 (if (= input "fail!")
+                   (throw (ex-info "fail" {}))
+                   (aor/result! agent-node (str input "?")))))
           )))
        (rtest/launch-module! ipc module {:tasks 2 :threads 2})
        (bind module-name (get-module-name module))
@@ -81,9 +99,14 @@
                               "aor/conciseness"
                               {"threshold" "5"}
                               "")
+       (aor/create-evaluator! agent-manager
+                              "eval1"
+                              "my-eval"
+                              {}
+                              "")
 
        (ana/add-rule! global-actions-depot
-                      "eval1"
+                      "rule1"
                       "foo"
                       {:action-name       "aor/eval"
                        :action-params     {"name" "concise5"}
@@ -92,10 +115,29 @@
                        :start-time-millis 0
                        :status-filter     :success
                       })
+       (ana/add-rule! global-actions-depot
+                      "rule2"
+                      "foo"
+                      {:action-name       "aor/eval"
+                       :action-params     {"name" "eval1"}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 0
+                       :status-filter     :success
+                      })
 
-       ;; TODO: <<<<>>>> add another eval with multiple scores
+       (TopologyUtils/advanceSimTime 1000)
+
+       (is (= "ab!?" (aor/agent-invoke foo "ab")))
+       (is (= "...!?" (aor/agent-invoke foo "...")))
+       (is (thrown? Exception (aor/agent-invoke foo "fail")))
 
 
-       (bind inv1 (aor/agent-initiate foo "ab"))
+
+       ;; TODO: <<<<>>>>
+       ;;  - agent needs mock chat model, streaming, and token counts
+       ;;  - need mixture of success and failures
+       ;;  - some with metadata, some without
+       ;;  - some metadata with high cardinality
 
       ))))
