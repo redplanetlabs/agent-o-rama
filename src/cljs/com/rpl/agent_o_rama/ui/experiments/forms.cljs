@@ -137,8 +137,10 @@
                             ($ :span.uppercase.font-bold.text-purple-600.text-xs "REMOTE"))
                           ($ :span.font-semibold (:name e))
                           (when evaluator-info
-                            ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
-                               {:className (evaluators/get-evaluator-type-badge-style (:type evaluator-info))}
+                            ($ :span
+                               {:className (common/cn
+                                          "inline-flex px-2 py-0.5 rounded-full text-xs font-medium"
+                                          (evaluators/get-evaluator-type-badge-style (:type evaluator-info)))}
                                (evaluators/get-evaluator-type-display (:type evaluator-info)))))
                        (when (and evaluator-info (not (str/blank? (:description evaluator-info))))
                          ($ :span.text-indigo-600.max-w-xs.truncate (:description evaluator-info))))
