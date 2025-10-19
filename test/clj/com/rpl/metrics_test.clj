@@ -80,6 +80,22 @@
     true
   ))
 
+(defn minute-millis
+  [i]
+  (* i 1000 po/MINUTE-GRANULARITY))
+
+(defn hour-millis
+  [i]
+  (* i 1000 po/HOUR-GRANULARITY))
+
+(defn day-millis
+  [i]
+  (* i 1000 po/DAY-GRANULARITY))
+
+(defn thirty-day-millis
+  [i]
+  (* i 1000 po/THIRTY-DAY-GRANULARITY))
+
 (deftest basic-metrics-test
   (with-redefs [TICKS (atom 0)
                 i/SUBSTITUTE-TICK-DEPOTS true
@@ -238,14 +254,14 @@
        (is (thrown? Exception
                     (aor/agent-invoke-with-context foo {:metadata {"m1" "b"}} "fail" #{})))
 
-       (TopologyUtils/advanceSimTime 60000)
+       (TopologyUtils/advanceSimTime (minute-millis 1))
 
        (is (= "abc!?"
               (aor/agent-invoke foo "abc" #{:store-write :db-read :db-write})))
        (is (= "eeeee!?"
               (aor/agent-invoke-with-context foo {:metadata {"m2" "B"}} "eeeee" #{:model})))
 
-       (TopologyUtils/advanceSimTime 60000)
+       (TopologyUtils/advanceSimTime (minute-millis 1))
        (is (thrown? Exception (aor/agent-invoke foo "fail-model" #{:model})))
 
 
@@ -259,7 +275,7 @@
                                  po/MINUTE-GRANULARITY
                                  metric-id
                                  0
-                                 (* 1000 po/DAY-GRANULARITY)
+                                 (day-millis 1)
                                  [:count :rest-sum]
                                  metadata-key)))
 
@@ -430,7 +446,7 @@
                   (conj [:eval :rule2 :score-b])
               )))
 
-       (TopologyUtils/advanceSimTime 60000)
+       (TopologyUtils/advanceSimTime (minute-millis 1))
 
        (doseq [i (range 20)]
          (let [s (apply str (repeat i "."))]
