@@ -183,8 +183,7 @@
                      (throw (ex-info "fail" {}))
                      (aor/result! agent-node (str input "?"))))))
           )))
-       (time
-        (rtest/launch-module! ipc module {:tasks 2 :threads 2}))
+       (rtest/launch-module! ipc module {:tasks 2 :threads 2})
        (bind module-name (get-module-name module))
        (bind agent-manager (aor/agent-manager ipc module-name))
        (bind global-actions-depot

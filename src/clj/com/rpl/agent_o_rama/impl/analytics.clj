@@ -477,8 +477,6 @@
     (po/agent-node-task-global agent-name)
     (po/agent-root-task-global agent-name)))
 
-(defn scan-amt [] 100)
-
 (defn experiment-source?
   [data]
   (and (contains? data :source)
@@ -703,7 +701,8 @@
     (identity nil :> *max-scan-offset))
   (action-target-pstate *agent-name (not (AnaRootTarget? *target)) :> $$p)
   (compute-end-offset *dep-end-offset *max-scan-offset :> *end-offset)
-  (scan-amt :> *scan-amt)
+  (anode/read-global-config aor-types/ANALYTICS-SCAN-AMOUNT-PER-TARGET-PER-TASK-CONFIG
+                            :> *scan-amt)
   (<<ramafn %add-run-type
     [*m]
     (:> (assoc (into {} *m) :run-type (ifexpr (AnaRootTarget? *target) :agent :node))))
