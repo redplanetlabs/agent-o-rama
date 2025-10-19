@@ -909,7 +909,7 @@
        (fn [m metadata-key metadata-value]
          (transform [(keypath metadata-key)
                      ;; only keep first 5 metadata values seen to bound size
-                     (selected? (view count) (pred<= 5))
+                     (selected? (view count) (pred< 5))
                      (keypath metadata-value)]
                     update-fn
                     m))

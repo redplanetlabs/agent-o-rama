@@ -380,7 +380,6 @@
                  1 {"_aor/default" {:count 2 :rest-sum 20}}}
                 (fetch-day [:agent :db-write-latency] nil))))
 
-
        ;; this is non-deterministic, since next model / node keep running while streaming is
        ;; processing, so checks here are against a lower bound
        (bind res (fetch-day [:agent :first-token-time] nil))
@@ -418,7 +417,35 @@
                 (fetch-day [:eval :rule2 :score-b] nil))))
 
 
+       (TopologyUtils/advanceSimTime 60000)
+
+       (doseq [i (range 20)]
+         (is
+          (= "a!?"
+             (aor/agent-invoke-with-context foo
+                                            {:metadata {"m3" (str i)}}
+                                            "a"
+                                            #{}))))
+
+       (cycle!)
+
+
+       (bind res
+         (ana/select-telemetry telemetry
+                               "foo"
+                               po/MINUTE-GRANULARITY
+                               [:agent :success-rate]
+                               (* 3 1000 po/MINUTE-GRANULARITY)
+                               (* 1000 po/HOUR-GRANULARITY)
+                               [:count :rest-sum]
+                               "m3"))
+       (is (= 5 (count (get res 3))))
+       (is (= [1 1 1 1 1] (select [MAP-VALS MAP-VALS MAP-VALS :count] res)))
+       (is (= [1 1 1 1 1] (select [MAP-VALS MAP-VALS MAP-VALS :rest-sum] res)))
+
        ;; TODO: <<<<>>>>
-       ;;  - some metadata with high cardinality values
+       ;;  - check every metric type
+       ;;     - :mean, :min, :max, :latest, <number quantile>
        ;;  - check all granularities (hour, day, 30-day)
+       ;;  - get all agent metrics query topology
       ))))
