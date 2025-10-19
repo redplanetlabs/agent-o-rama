@@ -323,12 +323,16 @@
   (str "$$_aor-telemetry-" agent-name))
 
 
+(def MINUTE-GRANULARITY 60)
+(def HOUR-GRANULARITY (* 60 MINUTE-GRANULARITY))
+(def DAY-GRANULARITY (* 24 HOUR-GRANULARITY))
+(def THIRTY-DAY-GRANULARITY (* 30 DAY-GRANULARITY))
+
 (def GRANULARITIES
-  [60 ; minute`
-   3600 ; hour
-   (* 24 3600) ; day
-   (* 24 3600 30) ; 30-day
-  ])
+  [MINUTE-GRANULARITY
+   HOUR-GRANULARITY
+   DAY-GRANULARITY
+   THIRTY-DAY-GRANULARITY])
 
 (def DEFAULT-CATEGORY "_aor/default")
 

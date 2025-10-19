@@ -420,5 +420,5 @@
 
        ;; TODO: <<<<>>>>
        ;;  - some metadata with high cardinality values
-       ;;  - check granularities
+       ;;  - check all granularities (hour, day, 30-day)
       ))))
