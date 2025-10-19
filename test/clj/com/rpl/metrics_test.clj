@@ -361,10 +361,20 @@
                  2 {"_aor/default" {:count 2 :rest-sum 400}}}
                 (fetch-day [:agent :model-latency] nil))))
 
+       (testing "store read latency"
+         (is (= {0 {"_aor/default" {:count 2 :rest-sum 28}}}
+                (fetch-day [:agent :store-read-latency] nil))))
 
-       (doseq [metric-id [[:agent :store-read-latency]
-                          [:agent :store-write-latency]
-                          [:agent :db-read-latency]
+       (testing "store write latency"
+         (is (= {0 {"_aor/default" {:count 1 :rest-sum 12}}
+                 1 {"_aor/default" {:count 1 :rest-sum 12}}}
+                (fetch-day [:agent :store-read-latency] nil))))
+
+
+
+
+
+       (doseq [metric-id [[:agent :db-read-latency]
                           [:agent :db-write-latency]
                           [:agent :first-token-time]
                           [:agent :model-first-token-time]
