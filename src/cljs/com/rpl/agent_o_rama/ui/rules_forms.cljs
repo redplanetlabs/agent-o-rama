@@ -329,18 +329,36 @@
 
 (defui SamplingRateField
   [{:keys [form-id]}]
-  (let [sampling-rate-field (forms/use-form-field form-id :sampling-rate)]
+  (let [sampling-rate-field (forms/use-form-field form-id :sampling-rate)
+        input-classes (str "w-full p-3 border rounded-md text-sm transition-colors "
+                           (if (:error sampling-rate-field)
+                             "border-red-300 focus:ring-red-500 focus:border-red-500"
+                             "border-gray-300 focus:ring-blue-500 focus:border-blue-500"))
 
-    ($ forms/form-field
-       {:label "Sampling Rate"
-        :type :number
-        :value (:value sampling-rate-field)
-        :on-change #(let [parsed (js/parseFloat %)]
-                      ((:on-change sampling-rate-field)
-                       (if (js/isNaN parsed) nil parsed)))
-        :error (:error sampling-rate-field)
-        :required? true
-        :placeholder "1.0"})))
+        handle-change (fn [e]
+                        (let [raw-value (.. e -target -value)
+                              parsed (js/parseFloat raw-value)]
+                          (if (or (js/isNaN parsed) (str/blank? raw-value))
+                            ((:on-change sampling-rate-field) nil)
+                            ;; Clamp value between 0.0 and 1.0
+                            (let [clamped (max 0.0 (min 1.0 parsed))]
+                              ((:on-change sampling-rate-field) clamped)))))]
+
+    ($ :div.space-y-1
+       ($ :label.block.text-sm.font-medium.text-gray-700
+          "Sampling Rate"
+          ($ :span.text-red-500.ml-1 "*"))
+       ($ :input {:type "number"
+                  :className input-classes
+                  :value (or (:value sampling-rate-field) "")
+                  :min "0.0"
+                  :max "1.0"
+                  :step "0.1"
+                  :placeholder "1.0"
+                  :onChange handle-change})
+       (if (:error sampling-rate-field)
+         ($ :p.text-sm.text-red-600.mt-1 (:error sampling-rate-field))
+         ($ :div.mt-1.h-5)))))
 
 (defui RuleScopeEditor [{:keys [form-id module-id agent-name]}]
   (let [node-name-field (forms/use-form-field form-id :node-name)
