@@ -10,6 +10,7 @@
    [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.metrics :as metrics]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
@@ -417,19 +418,33 @@
                 (fetch-day [:eval :rule2 :score-b] nil))))
 
 
+       ;; verify all-agent-metrics topology
+       (bind all-agent-metrics (:all-agent-metrics-query (aor-types/underlying-objects foo)))
+       (bind res (foreign-invoke-query all-agent-metrics))
+       (is (= res
+              (-> metrics/ALL-METRICS
+                  keys
+                  set
+                  (conj [:eval :rule1 :concise?])
+                  (conj [:eval :rule2 :score-a])
+                  (conj [:eval :rule2 :score-b])
+              )))
+
        (TopologyUtils/advanceSimTime 60000)
 
        (doseq [i (range 20)]
-         (is
-          (= "a!?"
-             (aor/agent-invoke-with-context foo
-                                            {:metadata {"m3" (str i)}}
-                                            "a"
-                                            #{}))))
+         (let [s (apply str (repeat i "."))]
+           (is
+            (= (str s "!?")
+               (aor/agent-invoke-with-context foo
+                                              {:metadata {"m3" (str i)}}
+                                              s
+                                              #{})))))
 
        (cycle!)
+       (cycle!)
 
-
+       ;; verify only first 5 metadata values are captured in a bucket
        (bind res
          (ana/select-telemetry telemetry
                                "foo"
@@ -443,9 +458,24 @@
        (is (= [1 1 1 1 1] (select [MAP-VALS MAP-VALS MAP-VALS :count] res)))
        (is (= [1 1 1 1 1] (select [MAP-VALS MAP-VALS MAP-VALS :rest-sum] res)))
 
+
+       ;; verify all the other ways to query for metrics
+       (bind res
+         (select-any [3 "_aor/default"]
+                     (ana/select-telemetry telemetry
+                                           "foo"
+                                           po/MINUTE-GRANULARITY
+                                           [:eval :rule2 :score-a]
+                                           (* 3 1000 po/MINUTE-GRANULARITY)
+                                           (* 1000 po/HOUR-GRANULARITY)
+                                           [:mean :min :max :latest 0.25 0.5 0.75]
+                                           nil)))
+       (is (= 9.5 (:mean res)))
+       (is (= 0.0 (:min res)))
+       (is (= 19.0 (:max res)))
+       (is (< (get res 0.25) (get res 0.5) (get res 0.75)))
+       (is (number? (:latest res)))
+
        ;; TODO: <<<<>>>>
-       ;;  - check every metric type
-       ;;     - :mean, :min, :max, :latest, <number quantile>
        ;;  - check all granularities (hour, day, 30-day)
-       ;;  - get all agent metrics query topology
       ))))
