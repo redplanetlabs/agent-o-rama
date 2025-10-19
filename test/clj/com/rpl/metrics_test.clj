@@ -262,20 +262,54 @@
                                  [:count :rest-sum]
                                  metadata-key)))
 
-       (is (= {0 {"_aor/default" {:count 3 :rest-sum 2}}
-               1 {"_aor/default" {:count 2 :rest-sum 2}}
-               2 {"_aor/default" {:count 1 :rest-sum 0}}}
-              (fetch-day [:agent :success-rate] nil)))
-       (is (= {0
-               {"run-success" {"_aor/default" {:count 2 :rest-sum 2}}
-                "run-failure" {"_aor/default" {:count 1 :rest-sum 0}}}
-               1 {"run-success" {"_aor/default" {:count 2 :rest-sum 2}}}
-               2 {"run-failure" {"_aor/default" {:count 1 :rest-sum 0}}}}
-              (fetch-day [:agent :success-rate] "aor/status")))
+
+       ;; check agent success rate
+       (testing "agent success rate"
+         (is (= {0 {"_aor/default" {:count 3 :rest-sum 2}}
+                 1 {"_aor/default" {:count 2 :rest-sum 2}}
+                 2 {"_aor/default" {:count 1 :rest-sum 0}}}
+                (fetch-day [:agent :success-rate] nil)))
+         (is (= {0
+                 {"run-success" {"_aor/default" {:count 2 :rest-sum 2}}
+                  "run-failure" {"_aor/default" {:count 1 :rest-sum 0}}}
+                 1 {"run-success" {"_aor/default" {:count 2 :rest-sum 2}}}
+                 2 {"run-failure" {"_aor/default" {:count 1 :rest-sum 0}}}}
+                (fetch-day [:agent :success-rate] "aor/status")))
+         (is (= {0
+                 {"a" {"_aor/default" {:count 2 :rest-sum 2}}
+                  "b" {"_aor/default" {:count 1 :rest-sum 0}}}}
+                (fetch-day [:agent :success-rate] "m1")))
+         (is (= {0 {"A" {"_aor/default" {:count 1 :rest-sum 1}}}
+                 1 {"B" {"_aor/default" {:count 1 :rest-sum 1}}}}
+                (fetch-day [:agent :success-rate] "m2"))))
+
+       ;; check agent latency
+       (testing "agent latency"
+         (is (= {0 {"_aor/default" {:count 3 :rest-sum 1099}}
+                 1 {"_aor/default" {:count 2 :rest-sum 553}}
+                 2 {"_aor/default" {:count 1 :rest-sum 253}}}
+                (fetch-day [:agent :latency] nil)))
 
 
-       (doseq [metric-id [[:agent :success-rate]
-                          [:agent :latency]
+         (is (= {0
+                 {"run-success" {"_aor/default" {:count 2 :rest-sum 1096}}
+                  "run-failure" {"_aor/default" {:count 1 :rest-sum 3}}}
+                 1 {"run-success" {"_aor/default" {:count 2 :rest-sum 553}}}
+                 2 {"run-failure" {"_aor/default" {:count 1 :rest-sum 253}}}}
+                (fetch-day [:agent :latency] "aor/status")))
+
+         (is (= {0
+                 {"a" {"_aor/default" {:count 2 :rest-sum 1096}}
+                  "b" {"_aor/default" {:count 1 :rest-sum 3}}}}
+                (fetch-day [:agent :latency] "m1")))
+
+
+         (is (= {0 {"A" {"_aor/default" {:count 1 :rest-sum 532}}}
+                 1 {"B" {"_aor/default" {:count 1 :rest-sum 503}}}}
+                (fetch-day [:agent :latency] "m2"))))
+
+
+       (doseq [metric-id [[:agent :latency]
                           [:agent :model-call-count]
                           [:agent :token-counts]
                           [:agent :model-success-rate]
