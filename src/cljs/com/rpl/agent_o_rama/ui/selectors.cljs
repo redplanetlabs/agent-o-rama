@@ -2,7 +2,8 @@
   (:require
    [uix.core :as uix :refer [defui $]]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.queries :as queries]))
+   [com.rpl.agent-o-rama.ui.queries :as queries]
+   [clojure.string :as str]))
 
 (defui ScopeSelector
   "A simple component with radio buttons to select a scope: Agent or Node."
@@ -45,7 +46,7 @@
         display-text (cond
                        (not agent-name) "← Select an agent first"
                        loading? "Loading nodes..."
-                       value value
+                       (not (str/blank? value)) value
                        :else "Select a node...")
 
         empty-content ($ :div.px-4.py-2.text-sm.text-gray-500 "No nodes found for this agent.")]
