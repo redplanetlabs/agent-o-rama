@@ -255,10 +255,10 @@
          (fn [metric-id metadata-key]
            (ana/select-telemetry telemetry
                                  "foo"
-                                 60
+                                 po/MINUTE-GRANULARITY
                                  metric-id
                                  0
-                                 (* 1000 60 60 24)
+                                 po/DAY-GRANULARITY
                                  [:count :rest-sum]
                                  metadata-key)))
 
