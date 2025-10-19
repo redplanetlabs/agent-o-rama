@@ -14,14 +14,14 @@
             :checked (= value :agent)
             :on-change #(on-change :agent)})
         ($ :label.ml-3.block.text-sm.text-gray-700 {:htmlFor "scope-agent"}
-           "Agent-level (all nodes)"))
+           "Agent"))
      ($ :div.flex.items-center
         ($ :input.h-4.w-4.border-gray-300.text-indigo-600.focus:ring-indigo-500
            {:type "radio" :id "scope-node" :name "scope-type"
             :checked (= value :node)
             :on-change #(on-change :node)})
         ($ :label.ml-3.block.text-sm.text-gray-700 {:htmlFor "scope-node"}
-           "Node-specific"))))
+           "Node"))))
 
 (defui NodeSelectorDropdown
   "A dropdown that fetches and displays nodes for a given agent."
