@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.experiments.events]
    [com.rpl.agent-o-rama.ui.datasets.snapshot-selector :as snapshot-selector]
+   [com.rpl.agent-o-rama.ui.selectors :as selectors]
    [clojure.string :as str]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    [reitit.frontend.easy :as rfe]
@@ -255,43 +256,15 @@
                               ((:on-change agent-name-field) agent-name)
                               ;; Reset node selection whenever agent changes
                               (when (not= selected-agent-name agent-name)
-                                ((:on-change node-name-field) nil)))
-
-        graph-query (queries/use-sente-query
-                     {:query-key [:graph module-id selected-agent-name]
-                      :sente-event [:invocations/get-graph {:module-id module-id
-                                                            :agent-name selected-agent-name}]
-                      :enabled? (and (boolean module-id)
-                                     (not (str/blank? selected-agent-name)))})
-        graph-data (get-in graph-query [:data :graph])
-        node-names (->> (or (:node-map graph-data) {})
-                        keys
-                        sort
-                        vec)
-        node-disabled? (or (str/blank? selected-agent-name)
-                           (:loading? graph-query))
-        node-display-text (cond
-                            (str/blank? selected-agent-name) "← Select an agent first"
-                            (:loading? graph-query) "Loading nodes..."
-                            (:error graph-query) "Error loading nodes"
-                            (not (str/blank? (:value node-name-field))) (:value node-name-field)
-                            :else "Select a node...")
-        node-items (mapv (fn [node-name]
-                           {:key node-name
-                            :label node-name
-                            :selected? (= (:value node-name-field) node-name)
-                            :on-select #((:on-change node-name-field) node-name)})
-                         node-names)]
+                                ((:on-change node-name-field) nil)))]
 
     ($ :div.p-4.bg-gray-50.border.rounded-lg
        ($ :h4.text-md.font-semibold.mb-3 (str "Target " (inc index)))
-       ($ :div.flex.items-center.gap-4.mb-4
-          ($ :label.text-sm.font-medium "Target Type:")
-          ($ :select.p-1.border.border-gray-300.rounded-md
-             {:value (name (or (:value target-spec-type-field) :agent))
-              :onChange #(state/dispatch [:form/set-experiment-target-type form-id index (keyword (.. % -target -value))])}
-             ($ :option {:value "agent"} "Agent")
-             ($ :option {:value "node"} "Node")))
+       ($ :div.mb-4
+          ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Target Type")
+          ($ selectors/ScopeSelector
+             {:value (or (:value target-spec-type-field) :agent)
+              :on-change #(state/dispatch [:form/set-experiment-target-type form-id index %])}))
 
        ($ :div.mb-4
           ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Agent Name")
@@ -306,18 +279,13 @@
        ;; Conditionally render node name dropdown
        (when (= (:value target-spec-type-field) :node)
          ($ :div.mt-4
-            ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Node Name")
-            ($ common/Dropdown
-               {:label "Node"
-                :disabled? node-disabled?
-                :display-text node-display-text
-                :items node-items
-                :loading? (:loading? graph-query)
-                :error? (:error graph-query)
-                :empty-content ($ :div.px-4.py-2.text-sm.text-gray-500 "No nodes found for this agent.")
-                :data-testid "node-name-dropdown"})
-            (when (:error node-name-field)
-              ($ :p.text-sm.text-red-600.mt-1 (:error node-name-field)))))
+            ($ selectors/NodeSelectorDropdown
+               {:module-id module-id
+                :agent-name selected-agent-name
+                :value (:value node-name-field)
+                :on-change (:on-change node-name-field)
+                :error (:error node-name-field)
+                :disabled? (not selected-agent-name)})))
 
        ($ :div.mt-4
           ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Metadata (JSON map, optional)")

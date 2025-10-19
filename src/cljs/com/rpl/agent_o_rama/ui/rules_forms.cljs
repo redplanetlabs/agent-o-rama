@@ -7,6 +7,7 @@
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.common :as common]
+   [com.rpl.agent-o-rama.ui.selectors :as selectors]
    [clojure.string :as str]
    ["use-debounce" :refer [useDebounce]]))
 
@@ -274,11 +275,11 @@
                  "[?]")))
 
          ($ :input
-            (cond-> {:type        "text"
-                     :className   input-classes
-                     :value       (or (:value param-field) "")
+            (cond-> {:type "text"
+                     :className input-classes
+                     :value (or (:value param-field) "")
                      :placeholder (or (:default param-info) "")
-                     :onChange    #((:on-change param-field) (.. % -target -value))}
+                     :onChange #((:on-change param-field) (.. % -target -value))}
               data-id (assoc :data-id data-id)))
 
          (when show-description-below?
@@ -341,39 +342,22 @@
         :required? true
         :placeholder "1.0"})))
 
-(defui NodeSelector
-  [{:keys [module-id agent-name form-id]}]
+(defui RuleScopeEditor [{:keys [form-id module-id agent-name]}]
   (let [node-name-field (forms/use-form-field form-id :node-name)
-        {:keys [data loading? error]}
-        (queries/use-sente-query {:query-key [:graph module-id agent-name]
-                                  :sente-event [:invocations/get-graph {:module-id module-id
-                                                                        :agent-name agent-name}]})
-        nodes (when-let [graph (:graph data)]
-                (sort (keys (:node-map graph))))
-        select-classes "w-full p-3 border rounded-md text-sm transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"]
-
-    ($ :div.space-y-1
-       ($ :label.block.text-sm.font-medium.text-gray-700
-          "Node")
-       ($ :select {:className select-classes
-                   :value (or (:value node-name-field) "")
-                   :disabled loading?
-                   :onChange #(let [v (.. % -target -value)]
-                                ((:on-change node-name-field)
-                                 (if (= v "") nil v)))}
-          ($ :option {:value ""}
-             (if loading?
-               "Loading..."
-               "Agent-level (all nodes)"))
-          (when nodes
-            (for [node-name nodes]
-              ($ :option {:key node-name :value node-name}
-                 node-name))))
-       (when (:error node-name-field)
-         ($ :p.text-sm.text-red-600.mt-1 (:error node-name-field)))
-       (when error
-         ($ :p.text-sm.text-red-600.mt-1 (str "Failed to load nodes: " error)))
-       ($ :div.mt-1.h-5))))
+        scope-type (if (nil? (:value node-name-field)) :agent :node)]
+    ($ :div.space-y-3
+       ($ :label.block.text-sm.font-medium.text-gray-700 "Scope")
+       ($ selectors/ScopeSelector
+          {:value scope-type
+           :on-change #(state/dispatch [:form/set-rule-scope-type form-id %])})
+       (when (= scope-type :node)
+         ($ selectors/NodeSelectorDropdown
+            {:module-id module-id
+             :agent-name agent-name
+             :value (:value node-name-field)
+             :on-change (:on-change node-name-field)
+             :error (:error node-name-field)
+             :disabled? (not agent-name)})))))
 
 (defui ActionSelector
   [{:keys [module-id agent-name form-id]}]
@@ -438,9 +422,9 @@
            :placeholder "my-rule"
            :data-id "rule-name"})
 
-       ($ NodeSelector {:form-id form-id
-                        :module-id module-id
-                        :agent-name agent-name})
+       ($ RuleScopeEditor {:form-id form-id
+                           :module-id module-id
+                           :agent-name agent-name})
 
        ($ StatusFilterField {:form-id form-id})
 
@@ -476,6 +460,9 @@
                             props))
 
    :validators {:rule-name [forms/required]
+                :node-name [(fn [v form-state]
+                              (when (not (nil? v))
+                                (forms/required v)))]
                 :status-filter [forms/required]
                 :sampling-rate [forms/required
                                 (fn [v]

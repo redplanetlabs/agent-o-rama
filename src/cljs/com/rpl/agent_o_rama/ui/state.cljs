@@ -379,6 +379,13 @@
 ;; FORM STATE MANAGEMENT EVENTS
 ;; =============================================================================
 
+(reg-event :form/set-rule-scope-type
+           (fn [db form-id new-type]
+             [:forms form-id :node-name
+              (s/terminal-val (if (= new-type :agent)
+                                nil ; Agent-level scope is represented by nil
+                                ""))])) ; Node-level scope starts empty to trigger validation
+
 ;; =============================================================================
 ;; ROUTING EVENTS
 ;; =============================================================================
