@@ -258,7 +258,7 @@
                                  po/MINUTE-GRANULARITY
                                  metric-id
                                  0
-                                 po/DAY-GRANULARITY
+                                 (* 1000 po/DAY-GRANULARITY)
                                  [:count :rest-sum]
                                  metadata-key)))
 
