@@ -289,29 +289,45 @@
                  1 {"_aor/default" {:count 2 :rest-sum 553}}
                  2 {"_aor/default" {:count 1 :rest-sum 253}}}
                 (fetch-day [:agent :latency] nil)))
-
-
          (is (= {0
                  {"run-success" {"_aor/default" {:count 2 :rest-sum 1096}}
                   "run-failure" {"_aor/default" {:count 1 :rest-sum 3}}}
                  1 {"run-success" {"_aor/default" {:count 2 :rest-sum 553}}}
                  2 {"run-failure" {"_aor/default" {:count 1 :rest-sum 253}}}}
                 (fetch-day [:agent :latency] "aor/status")))
-
          (is (= {0
                  {"a" {"_aor/default" {:count 2 :rest-sum 1096}}
                   "b" {"_aor/default" {:count 1 :rest-sum 3}}}}
                 (fetch-day [:agent :latency] "m1")))
-
-
          (is (= {0 {"A" {"_aor/default" {:count 1 :rest-sum 532}}}
                  1 {"B" {"_aor/default" {:count 1 :rest-sum 503}}}}
                 (fetch-day [:agent :latency] "m2"))))
 
+       (testing "agent model call count"
+         (is (= {0 {"_aor/default" {:count 3 :rest-sum 4}}
+                 1 {"_aor/default" {:count 2 :rest-sum 2}}
+                 ;; - the model calls are not in trace analytics because the node never succeeded:
+                 ;;   - if it retries and succeeds, all its stats would be sent back on ack
+                 ;;     - but since it failed and never retried, it never gets sent
+                 ;;     - can't send on failure because it would get sent again on retry success
+                 2 {"_aor/default" {:count 1 :rest-sum 0}}}
+                (fetch-day [:agent :model-call-count] nil)))
+         (is (= {0
+                 {"run-success" {"_aor/default" {:count 2 :rest-sum 4}}
+                  "run-failure" {"_aor/default" {:count 1 :rest-sum 0}}}
+                 1 {"run-success" {"_aor/default" {:count 2 :rest-sum 2}}}
+                 2 {"run-failure" {"_aor/default" {:count 1 :rest-sum 0}}}}
+                (fetch-day [:agent :model-call-count] "aor/status")))
+         (is (= {0
+                 {"a" {"_aor/default" {:count 2 :rest-sum 4}}
+                  "b" {"_aor/default" {:count 1 :rest-sum 0}}}}
+                (fetch-day [:agent :model-call-count] "m1")))
+         (is (= {0 {"A" {"_aor/default" {:count 1 :rest-sum 2}}}
+                 1 {"B" {"_aor/default" {:count 1 :rest-sum 2}}}}
+                (fetch-day [:agent :model-call-count] "m2"))))
 
-       (doseq [metric-id [[:agent :latency]
-                          [:agent :model-call-count]
-                          [:agent :token-counts]
+
+       (doseq [metric-id [[:agent :token-counts]
                           [:agent :model-success-rate]
                           [:agent :model-latency]
                           [:agent :store-read-latency]
