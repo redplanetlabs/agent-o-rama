@@ -251,6 +251,28 @@
        (cycle!)
        (cycle!)
 
+       (bind fetch-day
+         (fn [metric-id metadata-key]
+           (ana/select-telemetry telemetry
+                                 "foo"
+                                 60
+                                 metric-id
+                                 0
+                                 (* 1000 60 60 24)
+                                 [:count :rest-sum]
+                                 metadata-key)))
+
+       (is (= {0 {"_aor/default" {:count 3 :rest-sum 2}}
+               1 {"_aor/default" {:count 2 :rest-sum 2}}
+               2 {"_aor/default" {:count 1 :rest-sum 0}}}
+              (fetch-day [:agent :success-rate] nil)))
+       (is (= {0
+               {"run-success" {"_aor/default" {:count 2 :rest-sum 2}}
+                "run-failure" {"_aor/default" {:count 1 :rest-sum 0}}}
+               1 {"run-success" {"_aor/default" {:count 2 :rest-sum 2}}}
+               2 {"run-failure" {"_aor/default" {:count 1 :rest-sum 0}}}}
+              (fetch-day [:agent :success-rate] "aor/status")))
+
 
        (doseq [metric-id [[:agent :success-rate]
                           [:agent :latency]

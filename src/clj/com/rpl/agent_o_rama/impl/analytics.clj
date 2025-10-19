@@ -1182,7 +1182,9 @@
   (let [extract-path (if metadata-key
                        (path :by-meta (keypath metadata-key))
                        (path :overall))]
-    (select-any extract-path v)))
+    (if-let [ret (select-any extract-path v)]
+      ret
+      NONE)))
 
 ;; metrics-set can contain any of:
 ;; - [:rest-sum, :mean, :count, :min, :max, :latest, <number quantile>]
