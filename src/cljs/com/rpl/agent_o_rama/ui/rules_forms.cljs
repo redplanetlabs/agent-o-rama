@@ -300,13 +300,27 @@
       ($ :div.p-4.bg-gray-50.rounded-md.space-y-3
          ($ :div.text-sm.font-medium.text-gray-700 "Action Parameters")
          (for [[param-name param-info] params]
-           ($ ParamField {:key param-name
-                          :form-id form-id
-                          :param-name param-name
-                          :param-info param-info
-                          :action-name action-name
-                          :module-id module-id
-                          :data-id (str "param-" param-name)}))))))
+           (if (and (= action-name "aor/eval") (= param-name "name"))
+             ;; Use the new EvaluatorSelector for the evaluator 'name' parameter
+             (let [field (forms/use-form-field form-id [:action-params param-name])]
+               ($ :div {:key param-name}
+                  ($ :label.block.text-sm.font-medium.text-gray-700.mb-1
+                     "Evaluator"
+                     ($ :span.text-red-500.ml-1 "*"))
+                  ($ selectors/EvaluatorSelector
+                     {:module-id module-id
+                      :value (:value field)
+                      :on-change (:on-change field)
+                      :error (:error field)
+                      :placeholder "Search for an evaluator..."})))
+             ;; Use default ParamField for all other parameters
+             ($ ParamField {:key param-name
+                            :form-id form-id
+                            :param-name param-name
+                            :param-info param-info
+                            :action-name action-name
+                            :module-id module-id
+                            :data-id (str "param-" param-name)})))))))
 
 (defui StatusFilterField
   [{:keys [form-id]}]
@@ -490,6 +504,9 @@
                                   (when (or (< v 0.0) (> v 1.0))
                                     "Must be between 0.0 and 1.0"))]
                 :action-name [forms/required]
+                [:action-params "name"] [(fn [v form-state]
+                                           (when (= (:action-name form-state) "aor/eval")
+                                             (forms/required v)))]
                 :filter [(fn [filter-val]
                            (letfn [(validate-filter [f]
                                      (case (:type f)

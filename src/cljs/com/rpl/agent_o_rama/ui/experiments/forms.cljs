@@ -100,78 +100,54 @@
         :empty-content empty-content
         :data-testid data-testid})))
 
-(defui EvaluatorSelector [{:keys [module-id selected-evaluators on-change filter-type use-remote?]}]
-  (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
-        [remote-eval-name set-remote-eval-name] (uix/use-state "")
-        trigger-ref (uix/use-ref nil)
-        [position set-position] (uix/use-state nil)
+(defui EvaluatorMultiSelector
+  "A multi-select component for evaluators using the new searchable selector."
+  [{:keys [module-id selected-evaluators on-change filter-type use-remote?]}]
+  (let [[remote-eval-name set-remote-eval-name] (uix/use-state "")
+
+        ;; Fetch all evaluators to get info for display
         {:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:evaluator-instances module-id]
           :sente-event [:evaluators/get-all-instances {:module-id module-id}]
-          :enabled? (and (boolean module-id) (not use-remote?))})
+          :enabled? (boolean module-id)})
         all-evaluators (or (:items data) [])
-        ;; Filter evaluators based on the experiment type
         filtered-evaluators (if filter-type
                               (filter #(= (:type %) filter-type) all-evaluators)
-                              all-evaluators)
-        selected-names (set (map :name selected-evaluators))
-        available-evaluators (remove #(contains? selected-names (:name %)) filtered-evaluators)
-        recalc-position (fn []
-                          (when-let [el (.-current trigger-ref)]
-                            (let [rect (.getBoundingClientRect el)
-                                  top (+ (.-bottom rect) (.-scrollY js/window))
-                                  left (+ (.-left rect) (.-scrollX js/window))
-                                  width (.-width rect)]
-                              (set-position {:top top :left left :width width}))))]
+                              all-evaluators)]
 
-    (uix/use-effect
-     (fn []
-       (when dropdown-open?
-         (recalc-position)
-         (let [handle-click (fn [_] (set-dropdown-open false))
-               handle-recalc (fn [_] (recalc-position))]
-           (.addEventListener js/document "click" handle-click)
-           (.addEventListener js/window "scroll" handle-recalc true)
-           (.addEventListener js/window "resize" handle-recalc)
-           #(do
-              (.removeEventListener js/document "click" handle-click)
-              (.removeEventListener js/window "scroll" handle-recalc true)
-              (.removeEventListener js/window "resize" handle-recalc)))))
-     [dropdown-open?])
-
-    ($ :<>
-       ($ :div
-
-          ($ :div.flex.flex-wrap.gap-2.mb-2
-             (if (seq selected-evaluators)
-               (for [e selected-evaluators
-                     :let [is-remote-eval? (:remote? e)
-                           evaluator-info (when-not is-remote-eval?
-                                            (first (filter #(= (:name %) (:name e)) filtered-evaluators)))]]
-                 ($ :div
-                    {:key (:name e)
-                     :className (common/cn "inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium"
-                                           (if is-remote-eval?
-                                             "bg-purple-100 text-purple-800 border border-purple-200"
-                                             "bg-indigo-100 text-indigo-800 border border-indigo-200"))}
-                    ($ :<>
-                       ($ :div.flex.flex-col.gap-1
-                          ($ :div.flex.items-center.gap-2
-                             (when is-remote-eval?
-                               ($ :span.uppercase.font-bold.text-purple-600.text-xs "REMOTE"))
-                             ($ :span.font-semibold (:name e))
-                             (when evaluator-info
-                               ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
-                                  {:className (evaluators/get-evaluator-type-badge-style (:type evaluator-info))}
-                                  (evaluators/get-evaluator-type-display (:type evaluator-info)))))
-                          (when (and evaluator-info (not (str/blank? (:description evaluator-info))))
-                            ($ :span.text-indigo-600.max-w-xs.truncate (:description evaluator-info))))
-                       ($ :button.p-1.rounded-full.transition-colors
-                          {:className (if is-remote-eval? "hover:bg-purple-200" "hover:bg-indigo-200")
-                           :onClick #(on-change (vec (remove (fn [sel] (= (:name sel) (:name e))) selected-evaluators)))}
-                          ($ XMarkIcon {:className "h-3 w-3"})))))
-               ($ :div.text-sm.text-gray-500.italic "No evaluators selected."))))
+    ($ :div.space-y-3
+       ;; List of selected evaluators as badges
+       ($ :div.flex.flex-wrap.gap-2
+          (if (seq selected-evaluators)
+            (for [e selected-evaluators
+                  :let [is-remote-eval? (:remote? e)
+                        evaluator-info (when-not is-remote-eval?
+                                         (first (filter #(= (:name %) (:name e)) filtered-evaluators)))]]
+              ($ :div
+                 {:key (:name e)
+                  :className (common/cn "inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium"
+                                        (if is-remote-eval?
+                                          "bg-purple-100 text-purple-800 border border-purple-200"
+                                          "bg-indigo-100 text-indigo-800 border border-indigo-200"))}
+                 ($ :<>
+                    ($ :div.flex.flex-col.gap-1
+                       ($ :div.flex.items-center.gap-2
+                          (when is-remote-eval?
+                            ($ :span.uppercase.font-bold.text-purple-600.text-xs "REMOTE"))
+                          ($ :span.font-semibold (:name e))
+                          (when evaluator-info
+                            ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
+                               {:className (evaluators/get-evaluator-type-badge-style (:type evaluator-info))}
+                               (evaluators/get-evaluator-type-display (:type evaluator-info)))))
+                       (when (and evaluator-info (not (str/blank? (:description evaluator-info))))
+                         ($ :span.text-indigo-600.max-w-xs.truncate (:description evaluator-info))))
+                    ($ :button.p-1.rounded-full.transition-colors
+                       {:className (if is-remote-eval? "hover:bg-purple-200" "hover:bg-indigo-200")
+                        :type "button"
+                        :onClick #(on-change (vec (remove (fn [sel] (= (:name sel) (:name e))) selected-evaluators)))}
+                       ($ XMarkIcon {:className "h-3 w-3"})))))
+            ($ :div.text-sm.text-gray-500.italic "No evaluators selected.")))
 
        ;; Conditional rendering based on use-remote?
        (if use-remote?
@@ -192,50 +168,21 @@
                ($ PlusIcon {:className "h-4 w-4"})
                "Add Remote Evaluator"))
 
-         ;; Local evaluator dropdown
-         ($ :div.relative
-            ($ :button.inline-flex.items-center.gap-2.text-sm.text-blue-600.hover:underline
-               {:type "button"
-                :ref #(set! (.-current trigger-ref) %)
-                :onClick (fn [e]
-                           (.stopPropagation e)
-                           (if dropdown-open?
-                             (set-dropdown-open false)
-                             (set-dropdown-open true)))}
-               ($ PlusIcon {:className "h-4 w-4"})
-               "Add Evaluator")
-
-            (when (and dropdown-open? position)
-              (createPortal
-               ($ :div
-                  {:className "origin-top-left rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 w-80"
-                   :style {:position "fixed"
-                           :top (+ (:top position) 8)
-                           :left (:left position)}}
-                  ($ :div.py-1.max-h-60.overflow-y-auto
-                     (cond
-                       loading? ($ :div.px-4.py-2.text-sm.text-gray-500 "Loading...")
-                       error ($ :div.px-4.py-2.text-sm.text-red-500 "Error")
-                       (empty? available-evaluators) ($ :div.px-4.py-2.text-sm.text-gray-500
-                                                        (if filter-type
-                                                          (str "No " (name filter-type) " evaluators available to add.")
-                                                          "No more evaluators to add."))
-                       :else (for [e available-evaluators]
-                               ($ :div.px-3.py-2.hover:bg-gray-50.cursor-pointer.border-b.border-gray-100.last:border-b-0
-                                  {:key (:name e)
-                                   :onClick #(do
-                                               (on-change (conj selected-evaluators {:name (:name e) :remote? false}))
-                                               (set-dropdown-open false))}
-                                  ($ :div.flex.flex-col.gap-1
-                                     ($ :div.flex.items-center.justify-between
-                                        ($ :span.font-medium.text-gray-900 (:name e))
-                                        ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
-                                           {:className (evaluators/get-evaluator-type-badge-style (:type e))}
-                                           (evaluators/get-evaluator-type-display (:type e))))
-                                     (when-not (str/blank? (:description e))
-                                       ($ :span.text-sm.text-gray-600.max-w-xs.truncate (:description e)))
-                                     ($ :span.text-xs.text-gray-500.font-mono (:builder-name e))))))))
-               (.-body js/document))))))))
+         ;; Local evaluator searchable selector
+         ($ :div
+            ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Add Evaluator")
+            ($ selectors/EvaluatorSelector
+               {:module-id module-id
+                :value "" ;; Always empty since we're adding to a list
+                :on-change (fn [selected-name]
+                             (when selected-name
+                               (on-change (conj selected-evaluators {:name selected-name :remote? false}))))
+                :filter-type filter-type
+                :placeholder "Search and add an evaluator..."
+                :disabled? false})
+            (when use-remote?
+              ($ :p.text-xs.text-gray-500.mt-1
+                 "Remote evaluator selection is not yet supported via search. Add remote evaluators manually if needed.")))))))
 
 ;; =============================================================================
 ;; MAIN EXPERIMENT FORM COMPONENTS
@@ -469,12 +416,14 @@
                   "Use remote evaluators")))
 
           (let [evaluators-field (forms/use-form-field form-id :evaluators)]
-            ($ EvaluatorSelector
+            ($ EvaluatorMultiSelector
                {:module-id module-id
                 :selected-evaluators (:value evaluators-field)
                 :on-change (:on-change evaluators-field)
                 :filter-type spec-type
-                :use-remote? use-remote-evaluators?})))
+                :use-remote? use-remote-evaluators?})
+            (when (:error evaluators-field)
+              ($ :p.text-sm.text-red-600.mt-1 (:error evaluators-field)))))
 
        ;; Execution Settings Section
        ($ :div.mb-8
