@@ -26,7 +26,7 @@
 (defui NodeSelectorDropdown
   "A dropdown that fetches and displays nodes for a given agent."
   [{:keys [module-id agent-name value on-change disabled? error]}]
-  (let [{:keys [data loading? error]}
+  (let [{:keys [data loading? error query-error]}
         (queries/use-sente-query
          {:query-key [:graph module-id agent-name]
           :sente-event [:invocations/get-graph {:module-id module-id :agent-name agent-name}]
@@ -35,26 +35,32 @@
         nodes (when-let [graph (:graph data)]
                 (sort (keys (:node-map graph))))
 
-        select-classes (common/cn "w-full p-3 border rounded-md text-sm transition-colors"
-                                  (if error
-                                    "border-red-300 focus:ring-red-500 focus:border-red-500"
-                                    "border-gray-300 focus:ring-blue-500 focus:border-blue-500"))]
+        node-items (mapv (fn [node-name]
+                           {:key node-name
+                            :label node-name
+                            :selected? (= value node-name)
+                            :on-select #(on-change node-name)})
+                         (or nodes []))
+
+        display-text (cond
+                       (not agent-name) "← Select an agent first"
+                       loading? "Loading nodes..."
+                       value value
+                       :else "Select a node...")
+
+        empty-content ($ :div.px-4.py-2.text-sm.text-gray-500 "No nodes found for this agent.")]
+
     ($ :div.space-y-1
        ($ :label.block.text-sm.font-medium.text-gray-700
           "Node" ($ :span.text-red-500.ml-1 "*"))
-       ($ :select {:className select-classes
-                   :value (or value "")
-                   :disabled (or disabled? loading?)
-                   :onChange #(on-change (.. % -target -value))}
-          ($ :option {:value ""}
-             (cond
-               (not agent-name) "← Select an agent first"
-               loading? "Loading nodes..."
-               :else "Select a node..."))
-          (when nodes
-            (for [node-name nodes]
-              ($ :option {:key node-name :value node-name}
-                 node-name))))
+       ($ common/Dropdown
+          {:label "Node"
+           :disabled? (or disabled? (not agent-name))
+           :display-text display-text
+           :items node-items
+           :loading? loading?
+           :error? query-error
+           :empty-content empty-content})
        (if error
          ($ :p.text-sm.text-red-600.mt-1 error)
          ($ :div.mt-1.h-5)))))
