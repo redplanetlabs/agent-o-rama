@@ -368,15 +368,22 @@
        (testing "store write latency"
          (is (= {0 {"_aor/default" {:count 1 :rest-sum 12}}
                  1 {"_aor/default" {:count 1 :rest-sum 12}}}
-                (fetch-day [:agent :store-read-latency] nil))))
+                (fetch-day [:agent :store-write-latency] nil))))
+
+       (testing "db read latency"
+         (is (= {0 {"_aor/default" {:count 2 :rest-sum 30}}
+                 1 {"_aor/default" {:count 1 :rest-sum 15}}}
+                (fetch-day [:agent :db-read-latency] nil))))
+
+       (testing "db write latency"
+         (is (= {0 {"_aor/default" {:count 2 :rest-sum 20}}
+                 1 {"_aor/default" {:count 2 :rest-sum 20}}}
+                (fetch-day [:agent :db-write-latency] nil))))
 
 
 
 
-
-       (doseq [metric-id [[:agent :db-read-latency]
-                          [:agent :db-write-latency]
-                          [:agent :first-token-time]
+       (doseq [metric-id [[:agent :first-token-time]
                           [:agent :model-first-token-time]
                           [:eval :rule1 :concise?]
                           [:eval :rule2 :score-a]
@@ -430,8 +437,8 @@
 
 
        ;; TODO: <<<<>>>>
-       ;;  - some with metadata, some without
        ;;  - some metadata with high cardinality values
        ;;  - check granularities
+       ;;  - check [:agent :node-latencies]
 
       ))))
