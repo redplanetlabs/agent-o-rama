@@ -466,8 +466,8 @@
                                "foo"
                                po/MINUTE-GRANULARITY
                                [:agent :success-rate]
-                               (* 3 1000 po/MINUTE-GRANULARITY)
-                               (* 1000 po/HOUR-GRANULARITY)
+                               (minute-millis 3)
+                               (hour-millis 1)
                                [:count :rest-sum]
                                "m3"))
        (is (= 5 (count (get res 3))))
@@ -492,6 +492,67 @@
        (is (< (get res 0.25) (get res 0.5) (get res 0.75)))
        (is (number? (:latest res)))
 
-       ;; TODO: <<<<>>>>
-       ;;  - check all granularities (hour, day, 30-day)
+
+       (TopologyUtils/advanceSimTime (hour-millis 1))
+       (dotimes [_ 3]
+         (is (= ".!?"
+                (aor/agent-invoke foo "." #{}))))
+       (TopologyUtils/advanceSimTime (hour-millis 1))
+       (dotimes [_ 2]
+         (is (= ".!?"
+                (aor/agent-invoke foo "." #{}))))
+       (cycle!)
+       (cycle!)
+       (bind res
+         (ana/select-telemetry telemetry
+                               "foo"
+                               po/HOUR-GRANULARITY
+                               [:agent :success-rate]
+                               (hour-millis 1)
+                               (hour-millis 3)
+                               [:count]
+                               nil))
+       (is (= res {1 {"_aor/default" {:count 3}} 2 {"_aor/default" {:count 2}}}))
+
+       (TopologyUtils/advanceSimTime (day-millis 1))
+       (dotimes [_ 2]
+         (is (= ".!?"
+                (aor/agent-invoke foo "." #{}))))
+       (TopologyUtils/advanceSimTime (day-millis 1))
+       (dotimes [_ 3]
+         (is (= ".!?"
+                (aor/agent-invoke foo "." #{}))))
+       (cycle!)
+       (cycle!)
+       (bind res
+         (ana/select-telemetry telemetry
+                               "foo"
+                               po/DAY-GRANULARITY
+                               [:agent :success-rate]
+                               (day-millis 1)
+                               (day-millis 3)
+                               [:count]
+                               nil))
+       (is (= res {1 {"_aor/default" {:count 2}} 2 {"_aor/default" {:count 3}}}))
+
+       (TopologyUtils/advanceSimTime (thirty-day-millis 1))
+       (dotimes [_ 1]
+         (is (= ".!?"
+                (aor/agent-invoke foo "." #{}))))
+       (TopologyUtils/advanceSimTime (thirty-day-millis 1))
+       (dotimes [_ 2]
+         (is (= ".!?"
+                (aor/agent-invoke foo "." #{}))))
+       (cycle!)
+       (cycle!)
+       (bind res
+         (ana/select-telemetry telemetry
+                               "foo"
+                               po/THIRTY-DAY-GRANULARITY
+                               [:agent :success-rate]
+                               (thirty-day-millis 1)
+                               (thirty-day-millis 3)
+                               [:count]
+                               nil))
+       (is (= res {1 {"_aor/default" {:count 1}} 2 {"_aor/default" {:count 2}}}))
       ))))
