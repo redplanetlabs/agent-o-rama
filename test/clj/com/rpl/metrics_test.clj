@@ -381,10 +381,26 @@
                 (fetch-day [:agent :db-write-latency] nil))))
 
 
+       ;; this is non-deterministic, since next model / node keep running while streaming is
+       ;; processing, so checks here are against a lower bound
+       (bind res (fetch-day [:agent :first-token-time] nil))
+       (testing "agent first token time"
+         (is (= [0 1 2] (keys res)))
+         (is (= [2 1 1] (select [MAP-VALS MAP-VALS :count] res)))
+         (is (>= (select-any [0 "_aor/default" :rest-sum] res) (* 2 153)))
+         (is (>= (select-any [1 "_aor/default" :rest-sum] res) 153))
+         (is (>= (select-any [2 "_aor/default" :rest-sum] res) 153)))
 
 
-       (doseq [metric-id [[:agent :first-token-time]
-                          [:agent :model-first-token-time]
+       (testing "model first token time"
+         (is (= {0 {"_aor/default" {:count 4 :rest-sum 600}}
+                 1 {"_aor/default" {:count 2 :rest-sum 300}}
+                 2 {"_aor/default" {:count 1 :rest-sum 150}}}
+                (fetch-day [:agent :model-first-token-time] nil))))
+
+
+
+       (doseq [metric-id [[:agent :node-latencies]
                           [:eval :rule1 :concise?]
                           [:eval :rule2 :score-a]
                           [:eval :rule2 :score-b]

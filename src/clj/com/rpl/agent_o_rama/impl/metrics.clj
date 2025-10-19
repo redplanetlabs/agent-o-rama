@@ -174,7 +174,7 @@
                        (selected? :type (pred= :model-call))
                        (selected? :info (must "firstTokenTimeMillis") number?)]
                       nested-ops)]
-      {:type   :numerical
+      {:type   :numeric
        :values (mapv (fn [{:keys [start-time-millis info]}]
                        (- (get info "firstTokenTimeMillis") start-time-millis))
                      ops)
