@@ -392,14 +392,14 @@
          (is (>= (select-any [2 "_aor/default" :rest-sum] res) 153)))
 
        (testing "model first token time"
-         (is (= {0 {"start" {:count 3 :rest-sum 1021} "a" {:count 2 :rest-sum 78}}
-                 1 {"start" {:count 2 :rest-sum 518} "a" {:count 2 :rest-sum 35}}}
-                (fetch-day [:agent :model-first-token-time] nil))))
-
-       (testing "node latencies"
          (is (= {0 {"_aor/default" {:count 4 :rest-sum 600}}
                  1 {"_aor/default" {:count 2 :rest-sum 300}}
                  2 {"_aor/default" {:count 1 :rest-sum 150}}}
+                (fetch-day [:agent :model-first-token-time] nil))))
+
+       (testing "node latencies"
+         (is (= {0 {"start" {:count 3 :rest-sum 1021} "a" {:count 2 :rest-sum 78}}
+                 1 {"start" {:count 2 :rest-sum 518} "a" {:count 2 :rest-sum 35}}}
                 (fetch-day [:agent :node-latencies] nil))))
 
        (testing "concise? eval"
