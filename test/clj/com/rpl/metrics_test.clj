@@ -113,7 +113,7 @@
            ""
            (fn [params]
              (fn [fetcher input ref-output output]
-               {"score-a" (count input)
+               {"score-a" (count (first input))
                 "score-b" (+ (count output) 0.5)}
              )))
           (aor/declare-agent-object-builder
@@ -400,10 +400,25 @@
 
 
 
+       (testing "concise? eval"
+         (is (= {0 {"_aor/default" {:count 2 :rest-sum 2}}
+                 1 {"_aor/default" {:count 2 :rest-sum 1}}}
+                (fetch-day [:eval :rule1 :concise?] nil))))
+
+       (testing "score-a eval"
+         (is (= {0 {"_aor/default" {:count 2 :rest-sum 5}}
+                 1 {"_aor/default" {:count 2 :rest-sum 8}}}
+                (fetch-day [:eval :rule2 :score-a] nil))))
+
+       (testing "score-b eval"
+         (is (= {0 {"_aor/default" {:count 2 :rest-sum 10.0}}
+                 1 {"_aor/default" {:count 2 :rest-sum 13.0}}}
+                (fetch-day [:eval :rule2 :score-b] nil))))
+
+
+
+
        (doseq [metric-id [[:agent :node-latencies]
-                          [:eval :rule1 :concise?]
-                          [:eval :rule2 :score-a]
-                          [:eval :rule2 :score-b]
                          ]]
          (println "METRIC" metric-id)
          (clojure.pprint/pprint
@@ -455,6 +470,4 @@
        ;; TODO: <<<<>>>>
        ;;  - some metadata with high cardinality values
        ;;  - check granularities
-       ;;  - check [:agent :node-latencies]
-
       ))))
