@@ -54,9 +54,9 @@
                                      (int (count o))
                                      (int (+ (count m) (count o) 2))))
                        .build)]
+      (TopologyUtils/advanceSimTime 150)
       (when (h/contains-string? m "fail-model")
         (throw (ex-info "fail model" {})))
-      (TopologyUtils/advanceSimTime 150)
       (.onPartialResponse handler "abc ")
       (TopologyUtils/advanceSimTime 100)
       (.onPartialResponse handler "def")
@@ -287,13 +287,13 @@
        (testing "agent latency"
          (is (= {0 {"_aor/default" {:count 3 :rest-sum 1099}}
                  1 {"_aor/default" {:count 2 :rest-sum 553}}
-                 2 {"_aor/default" {:count 1 :rest-sum 253}}}
+                 2 {"_aor/default" {:count 1 :rest-sum 403}}}
                 (fetch-day [:agent :latency] nil)))
          (is (= {0
                  {"run-success" {"_aor/default" {:count 2 :rest-sum 1096}}
                   "run-failure" {"_aor/default" {:count 1 :rest-sum 3}}}
                  1 {"run-success" {"_aor/default" {:count 2 :rest-sum 553}}}
-                 2 {"run-failure" {"_aor/default" {:count 1 :rest-sum 253}}}}
+                 2 {"run-failure" {"_aor/default" {:count 1 :rest-sum 403}}}}
                 (fetch-day [:agent :latency] "aor/status")))
          (is (= {0
                  {"a" {"_aor/default" {:count 2 :rest-sum 1096}}
@@ -326,11 +326,43 @@
                  1 {"B" {"_aor/default" {:count 1 :rest-sum 2}}}}
                 (fetch-day [:agent :model-call-count] "m2"))))
 
+       (testing "token counts"
+         (is (= {0
+                 {"input"  {:count 3 :rest-sum 7}
+                  "output" {:count 3 :rest-sum 19}
+                  "total"  {:count 3 :rest-sum 34}}
+                 1
+                 {"input"  {:count 2 :rest-sum 6}
+                  "output" {:count 2 :rest-sum 12}
+                  "total"  {:count 2 :rest-sum 22}}
+                 2
+                 {"input"  {:count 1 :rest-sum 0}
+                  "output" {:count 1 :rest-sum 0}
+                  "total"  {:count 1 :rest-sum 0}}}
+                (fetch-day [:agent :token-counts] nil))))
 
-       (doseq [metric-id [[:agent :token-counts]
-                          [:agent :model-success-rate]
-                          [:agent :model-latency]
-                          [:agent :store-read-latency]
+
+       (testing "model success rate"
+         (is (= {0
+                 {"success" {:count 6 :rest-sum 4}
+                  "failure" {:count 6 :rest-sum 0}}
+                 1
+                 {"success" {:count 4 :rest-sum 2}
+                  "failure" {:count 4 :rest-sum 0}}
+                 2
+                 {"success" {:count 1 :rest-sum 1}
+                  "failure" {:count 1 :rest-sum 1}}}
+                (fetch-day [:agent :model-success-rate] nil))))
+
+       (testing "model latency"
+         (is (= {0 {"_aor/default" {:count 4 :rest-sum 1000}}
+                 1 {"_aor/default" {:count 2 :rest-sum 500}}
+                 ;; this includes the 150ms latency for the model failure
+                 2 {"_aor/default" {:count 2 :rest-sum 400}}}
+                (fetch-day [:agent :model-latency] nil))))
+
+
+       (doseq [metric-id [[:agent :store-read-latency]
                           [:agent :store-write-latency]
                           [:agent :db-read-latency]
                           [:agent :db-write-latency]
