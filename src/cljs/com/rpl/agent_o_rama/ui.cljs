@@ -13,6 +13,7 @@
    [com.rpl.agent-o-rama.ui.experiments.comparative :as comparative-experiments]
    [com.rpl.agent-o-rama.ui.experiments.regular-detail :as experiments-detail]
    [com.rpl.agent-o-rama.ui.experiments.comparative-detail :as comparative-experiments-detail]
+   [com.rpl.agent-o-rama.ui.analytics :as analytics]
    [reitit.core :as r]
    [reitit.frontend :as rf]
    [reitit.frontend.easy :as rfe]
@@ -55,6 +56,7 @@
       ["/invocations"
        ["" {:name :agent/invocations, :views [agents/invocations]}]
        ["/:invoke-id" {:name :agent/invocation-detail, :views [agents/invoke]}]]
+      ["/analytics" {:name :agent/analytics, :views [analytics/analytics-page]}]
       ["/rules"
        ["" {:name :agent/rules, :views [rules/rules-page]}]
        ["/:rule-name/action-log" {:name :agent/action-log, :views [action-log/action-log-page]}]]
@@ -130,6 +132,11 @@
                     :location location :collapsed? collapsed? :title "Invocations"}
           ($ RectangleStackIcon {:className "h-5 w-5 flex-shrink-0"})
           (when-not collapsed? ($ :span.ml-3 "Invocations")))
+
+       ($ nav-link {:href (rfe/href :agent/analytics {:module-id module-id :agent-name agent-name})
+                    :location location :collapsed? collapsed? :title "Analytics"}
+          ($ ChartBarIcon {:className "h-5 w-5 flex-shrink-0"})
+          (when-not collapsed? ($ :span.ml-3 "Analytics")))
 
        ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/rules")
                     :location location :collapsed? collapsed? :title "Rules/Actions"}
@@ -286,6 +293,7 @@
                                  {:label (case route-name
                                            :agent/invocations "Invocations"
                                            :agent/rules "Rules"
+                                           :agent/analytics "Analytics"
                                            :agent/config "Config"
                                            :agent/stats "Stats"
                                            "Agent")
