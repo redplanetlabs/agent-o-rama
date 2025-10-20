@@ -4,7 +4,7 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.CreateEvaluatorOptions;
 import com.rpl.agentorama.ExampleRun;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
@@ -37,7 +37,7 @@ public class EvaluatorAgent {
    * <p>This module demonstrates how to declare custom evaluator builders for assessing agent
    * outputs. It includes regular evaluators, comparative evaluators, and summary evaluators.
    */
-  public static class EvaluatorAgentModule extends AgentsModule {
+  public static class EvaluatorAgentModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

@@ -12,7 +12,7 @@ import java.util.Arrays;
  * actions using web search tools. It demonstrates the ReAct pattern where the agent alternates
  * between reasoning about what to do and taking actions.
  */
-public class ReActModule extends AgentsModule {
+public class ReActModule extends AgentModule {
 
   @Override
   protected void defineAgents(AgentTopology topology) {

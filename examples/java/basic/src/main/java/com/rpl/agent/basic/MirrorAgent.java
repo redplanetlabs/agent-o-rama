@@ -4,7 +4,7 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -30,7 +30,7 @@ public class MirrorAgent {
    *
    * <p>This module contains a simple agent that takes a name and returns a greeting.
    */
-  public static class GreeterModule extends AgentsModule {
+  public static class GreeterModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {
@@ -54,7 +54,7 @@ public class MirrorAgent {
    * <p>This module declares a mirror reference to the Greeter agent and uses it to demonstrate
    * cross-module agent invocation.
    */
-  public static class MirrorModule extends AgentsModule {
+  public static class MirrorModule extends AgentModule {
     private final String greeterModuleName;
 
     public MirrorModule(String greeterModuleName) {

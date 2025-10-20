@@ -4,7 +4,7 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentInvoke;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
@@ -31,7 +31,7 @@ import java.util.Map;
 public class ForkingAgent {
 
   /** Agent Module demonstrating forking functionality. */
-  public static class ForkingModule extends AgentsModule {
+  public static class ForkingModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

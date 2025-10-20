@@ -3,7 +3,7 @@ package com.rpl.agent.basic;
 import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.BuiltIn;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
@@ -35,7 +35,7 @@ import java.util.Map;
 public class AggregationAgent {
 
   /** Agent Module demonstrating aggregation functionality. */
-  public static class AggregationModule extends AgentsModule {
+  public static class AggregationModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

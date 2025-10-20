@@ -5,7 +5,7 @@ import com.rpl.agentorama.AgentInvoke;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.UpdateMode;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
@@ -34,7 +34,7 @@ public class ModuleUpdateAgent {
    * <p>The agent counts from 0 to 50, sleeping between increments to allow time for module updates
    * to occur during execution.
    */
-  public static class CounterModule extends AgentsModule {
+  public static class CounterModule extends AgentModule {
     @Override
     protected void defineAgents(AgentTopology topology) {
       topology

@@ -4,7 +4,7 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -63,7 +63,7 @@ public class ToolsAgent {
   }
 
   /** Agent Module demonstrating tools functionality. */
-  public static class ToolsModule extends AgentsModule {
+  public static class ToolsModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

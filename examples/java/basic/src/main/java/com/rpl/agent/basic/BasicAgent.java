@@ -3,8 +3,8 @@ package com.rpl.agent.basic;
 import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.AgentsModule;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -15,7 +15,7 @@ import com.rpl.rama.test.LaunchConfig;
  * <p>This example demonstrates:
  *
  * <ul>
- *   <li>Agent module definition as nested class extending AgentsModule
+ *   <li>Agent module definition as nested class extending AgentModule
  *   <li>Node function implementation as nested class
  *   <li>Single-node agent topology
  *   <li>Querying available agent names
@@ -33,7 +33,7 @@ public class BasicAgent {
    * <p>This nested module implements a simple agent with a single node that processes input and
    * returns a result.
    */
-  public static class BasicModule extends AgentsModule {
+  public static class BasicModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

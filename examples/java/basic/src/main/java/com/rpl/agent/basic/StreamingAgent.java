@@ -4,7 +4,7 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentInvoke;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class StreamingAgent {
 
   /** Agent Module demonstrating streaming functionality. */
-  public static class StreamingAgentModule extends AgentsModule {
+  public static class StreamingAgentModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

@@ -54,7 +54,7 @@ examples/java/react/
 
 | Clojure Component | Java Equivalent | Notes |
 |------------------|----------------|--------|
-| `(aor/defagentmodule ReActModule ...)` | `class ReActModule extends AgentsModule` | Java class inheritance |
+| `(aor/defagentmodule ReActModule ...)` | `class ReActModule extends AgentModule` | Java class inheritance |
 | `(aor/declare-agent-object-builder ...)` | `topology.declareAgentObjectBuilder(...)` | Lambda expressions |
 | `(aor/node "chat" "chat" chat-fn)` | `.node("chat", "chat", new ChatNodeFunction())` | Separate class implementation |
 | `(tools/new-tools-agent ...)` | `topology.newToolsAgent("tools", ...)` | Direct API call |

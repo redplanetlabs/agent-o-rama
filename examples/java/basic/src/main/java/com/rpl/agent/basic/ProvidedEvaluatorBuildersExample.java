@@ -4,7 +4,7 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.CreateEvaluatorOptions;
 import com.rpl.agentorama.ExampleRun;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
@@ -40,7 +40,7 @@ public class ProvidedEvaluatorBuildersExample {
    * <p>This module creates a simple text generator agent and demonstrates how to create and use the
    * three built-in evaluator builders available in agent-o-rama.
    */
-  public static class ProvidedEvaluatorBuildersModule extends AgentsModule {
+  public static class ProvidedEvaluatorBuildersModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

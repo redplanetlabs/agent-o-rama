@@ -4,7 +4,7 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.NestedOpType;
 import com.rpl.agentorama.UI;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
@@ -36,7 +36,7 @@ public class RecordOpAgent {
    * <p>This module implements an agent that records custom operations in its trace for debugging
    * and monitoring purposes.
    */
-  public static class RecordOpModule extends AgentsModule {
+  public static class RecordOpModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

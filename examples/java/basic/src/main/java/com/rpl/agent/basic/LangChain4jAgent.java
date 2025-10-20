@@ -3,7 +3,7 @@ package com.rpl.agent.basic;
 import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
@@ -29,7 +29,7 @@ import dev.langchain4j.model.openai.OpenAiChatModel;
 public class LangChain4jAgent {
 
   /** Agent Module demonstrating LangChain4j integration. */
-  public static class LangChain4jModule extends AgentsModule {
+  public static class LangChain4jModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {
@@ -40,7 +40,7 @@ public class LangChain4jAgent {
       topology.declareAgentObjectBuilder(
         "openai-model",
         setup -> {
-          String apiKey = (String) setup.getAgentObject("openai-api-key");
+          String apiKey = setup.getAgentObject("openai-api-key");
           return OpenAiChatModel.builder()
               .apiKey(apiKey)
               .modelName("gpt-4o-mini")
@@ -58,8 +58,7 @@ public class LangChain4jAgent {
 
     @Override
     public void invoke(AgentNode agentNode, String userMessage) {
-      // NOTE you can not use OpenAiChatModel as the type here
-      ChatModel model = (ChatModel) agentNode.getAgentObject("openai-model");
+      ChatModel model = agentNode.getAgentObject("openai-model");
 
       // Send chat request to OpenAI using simple API
       String responseText = model.chat(userMessage);

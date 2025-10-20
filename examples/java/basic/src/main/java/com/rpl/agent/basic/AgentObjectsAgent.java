@@ -4,8 +4,8 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentInvoke;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.AgentsModule;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -59,7 +59,7 @@ public class AgentObjectsAgent {
   }
 
   /** Agent Module demonstrating agent objects. */
-  public static class AgentObjectsModule extends AgentsModule {
+  public static class AgentObjectsModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

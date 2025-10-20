@@ -3,7 +3,7 @@ package com.rpl.agent.basic;
 import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.agentorama.store.KeyValueStore;
@@ -67,7 +67,7 @@ public class KeyValueStoreAgent {
   }
 
   /** Agent Module demonstrating key-value store usage. */
-  public static class KeyValueStoreModule extends AgentsModule {
+  public static class KeyValueStoreModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

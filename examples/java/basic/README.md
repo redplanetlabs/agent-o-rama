@@ -14,12 +14,12 @@ An agent with multiple connected nodes demonstrating inter-node emissions and da
 Demonstrates the three built-in evaluator builders (aor/llm-judge, aor/conciseness, aor/f1-score) for evaluating agent performance.
 
 ### RamaModuleAgent
-Shows how to implement a Rama module directly (not extending AgentsModule) to access full Rama features like depots and stream processing alongside agents.
+Shows how to implement a Rama module directly (not extending AgentModule) to access full Rama features like depots and stream processing alongside agents.
 
 ## Overview
 
 These examples show how to:
-- Define agent modules extending `AgentsModule`
+- Define agent modules extending `AgentModule`
 - Create single and multi-node agent topologies
 - Implement node functions using `RamaVoidFunction2` and `RamaVoidFunction3`
 - Use `emit()` to pass data between nodes
@@ -76,10 +76,10 @@ mvn test
 
 ### Single-Node Agent (BasicAgent)
 
-The `BasicModule` class extends `AgentsModule` and defines a simple topology:
+The `BasicModule` class extends `AgentModule` and defines a simple topology:
 
 ```java
-public static class BasicModule extends AgentsModule {
+public static class BasicModule extends AgentModule {
   @Override
   protected void defineAgents(AgentTopology topology) {
     topology.newAgent("BasicAgent").node("process", null, new ProcessFunction());

@@ -6,7 +6,7 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentStream;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -37,7 +37,7 @@ public class StreamResetAgent {
   static final AtomicBoolean firstExecution = new AtomicBoolean(true);
 
   /** Agent Module demonstrating stream reset on retry. */
-  public static class StreamResetAgentModule extends AgentsModule {
+  public static class StreamResetAgentModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

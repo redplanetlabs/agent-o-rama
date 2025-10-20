@@ -25,7 +25,7 @@ Deployment boundary for agent systems. Packages all resources needed for distrib
 ## Key Java API
 - Primary functions: Module building via topology
 - Creation: Through `AgentTopology.define()`
-- Access: `AgentsModule` class
+- Access: `AgentModule` class
 
 ## Relationships
 - Uses: [Agent Module](agent-module.md), [Agents Topology](agents-topology.md)

@@ -13,12 +13,12 @@ import com.rpl.rama.test.LaunchConfig;
 import java.util.HashMap;
 
 /**
- * Java example demonstrating direct Rama module usage instead of AgentsModule.
+ * Java example demonstrating direct Rama module usage instead of AgentModule.
  *
  * <p>This example demonstrates:
  *
  * <ul>
- *   <li>Implementing RamaModule directly (not extending AgentsModule)
+ *   <li>Implementing RamaModule directly (not extending AgentModule)
  *   <li>Creating AgentTopology manually via AgentTopology.create()
  *   <li>Accessing StreamTopology via getStreamTopology()
  *   <li>Declaring Rama depots alongside agents

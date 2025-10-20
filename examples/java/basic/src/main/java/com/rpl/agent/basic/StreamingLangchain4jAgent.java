@@ -5,7 +5,7 @@ import com.rpl.agentorama.AgentInvoke;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -33,7 +33,7 @@ import java.util.List;
 public class StreamingLangchain4jAgent {
 
   /** Agent Module demonstrating streaming LangChain4j integration. */
-  public static class StreamingLangChain4jModule extends AgentsModule {
+  public static class StreamingLangChain4jModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

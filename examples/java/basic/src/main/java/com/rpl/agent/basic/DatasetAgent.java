@@ -3,7 +3,7 @@ package com.rpl.agent.basic;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -64,7 +64,7 @@ public class DatasetAgent {
   }
 
   /** Agent Module demonstrating dataset lifecycle management. */
-  public static class DatasetModule extends AgentsModule {
+  public static class DatasetModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

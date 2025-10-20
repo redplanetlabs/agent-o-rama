@@ -4,7 +4,7 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.NestedOpType;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
@@ -15,7 +15,7 @@ import java.util.Map;
 /** Tests for AgentNode.recordNestedOp. */
 public class RecordNestedOpTest {
 
-  public static class RecordNestedOpModule extends AgentsModule {
+  public static class RecordNestedOpModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {
@@ -92,8 +92,8 @@ public class RecordNestedOpTest {
   public static void testRecordMultipleNestedOps() throws Exception {
     // Tests that multiple recordNestedOp calls can be made in sequence
     try (InProcessCluster ipc = InProcessCluster.create()) {
-      AgentsModule module =
-          new AgentsModule() {
+      AgentModule module =
+          new AgentModule() {
             @Override
             protected void defineAgents(AgentTopology topology) {
               topology.newAgent("MultiOpsAgent").node("process", null, new MultipleOpsFunction());
@@ -151,8 +151,8 @@ public class RecordNestedOpTest {
   public static void testRecordAllNestedOpTypes() throws Exception {
     // Tests that all NestedOpType enum values can be recorded
     try (InProcessCluster ipc = InProcessCluster.create()) {
-      AgentsModule module =
-          new AgentsModule() {
+      AgentModule module =
+          new AgentModule() {
             @Override
             protected void defineAgents(AgentTopology topology) {
               topology.newAgent("AllTypesAgent").node("process", null, new AllOpTypesFunction());

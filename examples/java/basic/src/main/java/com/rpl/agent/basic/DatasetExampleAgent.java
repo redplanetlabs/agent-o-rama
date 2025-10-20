@@ -5,7 +5,7 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -75,7 +75,7 @@ public class DatasetExampleAgent {
   }
 
   /** Agent Module demonstrating dataset example management. */
-  public static class DatasetExampleModule extends AgentsModule {
+  public static class DatasetExampleModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

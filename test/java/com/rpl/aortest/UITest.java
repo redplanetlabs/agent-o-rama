@@ -1,6 +1,6 @@
 package com.rpl.aortest;
 
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.UI;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -18,7 +18,7 @@ public class UITest {
     try (InProcessCluster ipc = InProcessCluster.create()) {
 
       // Launch a simple module to have something for the UI to monitor
-      AgentsModule module = new TestModules.BasicToolsOpenAIAgent();
+      AgentModule module = new TestModules.BasicToolsOpenAIAgent();
       ipc.launchModule(module, new LaunchConfig(1, 1));
 
       // Start UI with default settings
@@ -44,7 +44,7 @@ public class UITest {
     try (InProcessCluster ipc = InProcessCluster.create()) {
 
       // Launch a simple module to have something for the UI to monitor
-      AgentsModule module = new TestModules.BasicToolsOpenAIAgent();
+      AgentModule module = new TestModules.BasicToolsOpenAIAgent();
       ipc.launchModule(module, new LaunchConfig(1, 1));
 
       // Start UI with custom port
@@ -70,7 +70,7 @@ public class UITest {
     try (InProcessCluster ipc = InProcessCluster.create()) {
 
       // Launch a simple module to have something for the UI to monitor
-      AgentsModule module = new TestModules.BasicToolsOpenAIAgent();
+      AgentModule module = new TestModules.BasicToolsOpenAIAgent();
       ipc.launchModule(module, new LaunchConfig(1, 1));
 
       // Start UI

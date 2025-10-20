@@ -4,7 +4,7 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.AgentsModule;
+import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.MultiAgg;
 import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.agentorama.ops.RamaVoidFunction3;
@@ -38,7 +38,7 @@ import java.util.Map;
 public class MultiAggAgent {
 
   /** Agent Module demonstrating multi-agg functionality. */
-  public static class MultiAggModule extends AgentsModule {
+  public static class MultiAggModule extends AgentModule {
 
     @Override
     protected void defineAgents(AgentTopology topology) {

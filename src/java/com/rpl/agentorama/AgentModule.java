@@ -2,7 +2,7 @@ package com.rpl.agentorama;
 
 import com.rpl.rama.*;
 
-public abstract class AgentsModule implements RamaModule {
+public abstract class AgentModule implements RamaModule {
   protected abstract void defineAgents(AgentTopology topology);
 
   @Override
