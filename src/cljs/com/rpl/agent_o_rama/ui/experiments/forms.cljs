@@ -248,7 +248,8 @@
                 :value (:value node-name-field)
                 :on-change (:on-change node-name-field)
                 :error (:error node-name-field)
-                :disabled? (not selected-agent-name)})))
+                :disabled? (not selected-agent-name)
+                :data-testid "node-name-dropdown"})))
 
        ($ :div.mt-4
           ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Metadata (JSON map, optional)")

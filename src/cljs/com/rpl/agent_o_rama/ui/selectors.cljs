@@ -29,7 +29,7 @@
 
 (defui NodeSelectorDropdown
   "A dropdown that fetches and displays nodes for a given agent."
-  [{:keys [module-id agent-name value on-change disabled? error]}]
+  [{:keys [module-id agent-name value on-change disabled? error data-testid]}]
   (let [{:keys [data loading? error query-error]}
         (queries/use-sente-query
          {:query-key [:graph module-id agent-name]
@@ -64,7 +64,8 @@
            :items node-items
            :loading? loading?
            :error? query-error
-           :empty-content empty-content})
+           :empty-content empty-content
+           :data-testid data-testid})
        (if error
          ($ :p.text-sm.text-red-600.mt-1 error)
          ($ :div.mt-1.h-5)))))

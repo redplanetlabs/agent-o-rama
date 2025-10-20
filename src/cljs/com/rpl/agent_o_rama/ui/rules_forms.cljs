@@ -397,7 +397,8 @@
              :value (:value node-name-field)
              :on-change (:on-change node-name-field)
              :error (:error node-name-field)
-             :disabled? (not agent-name)})))))
+             :disabled? (not agent-name)
+             :data-testid "node-name-dropdown"})))))
 
 (defui ActionSelector
   [{:keys [module-id agent-name form-id]}]
