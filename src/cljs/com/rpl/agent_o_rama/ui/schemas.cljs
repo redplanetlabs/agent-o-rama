@@ -22,19 +22,19 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (s/defschema CurrentInvocationSchema
-  {:invoke-id  (s/maybe s/Str)
-   :module-id  (s/maybe s/Str)
+  {:invoke-id (s/maybe s/Str)
+   :module-id (s/maybe s/Str)
    :agent-name (s/maybe s/Str)})
 
 (s/defschema InvocationDataSchema
   {:status (s/enum :loading :success :error)
               ;; all optional because it starts with just {:status :loading}
    (s/optional-key :graph) {:raw-nodes {s/Uuid (spy "raw-nodes")}
-                            :nodes     {s/Uuid (spy "nodes")}
-                            :edges     [(spy "edges")]}
+                            :nodes {s/Uuid (spy "nodes")}
+                            :edges [(spy "edges")]}
    (s/optional-key :implicit-edges) [(spy "implicit-edges")]
-   (s/optional-key :summary) (s/maybe {:forks    #{s/Uuid}
-                                       :fork-of  (s/maybe s/Uuid)
+   (s/optional-key :summary) (s/maybe {:forks #{s/Uuid}
+                                       :fork-of (s/maybe s/Uuid)
                                        s/Keyword (spy "summary-extra")})
    (s/optional-key :root-invoke-id) (s/maybe (spy "root-invoke-id"))
    (s/optional-key :task-id) (s/maybe s/Int)
@@ -45,10 +45,10 @@
    (s/optional-key :error) (spy "invocation-error")})
 
 (s/defschema InvocationsSchema
-  {:all-invokes       [(spy "all-invokes")]
+  {:all-invokes [(spy "all-invokes")]
    :pagination-params (s/maybe {s/Int (s/maybe s/Int)})
-   :has-more?         (s/maybe s/Bool)
-   :loading?          s/Bool})
+   :has-more? (s/maybe s/Bool)
+   :loading? s/Bool})
 
 (s/defschema QueryStateSchema
   {:status (s/enum :loading :success :error)
@@ -64,8 +64,8 @@
 (def QueriesCacheSchema
   "A schema for the nested query cache. It's a recursive map where
    leaf nodes must match QueryStateSchema."
-   ;; Keys can be keywords, strings, or UUIDs (module-ids, dataset-ids, etc.)
-  {(s/cond-pre s/Keyword s/Str s/Uuid)
+   ;; Keys can be keywords, strings, numbers (for granularity), or UUIDs (module-ids, dataset-ids, etc.)
+  {(s/cond-pre s/Keyword s/Str s/Num s/Uuid)
    (s/conditional
     ;; Predicate: if the value is a map containing :status, treat it as a
     ;; leaf (QueryStateSchema)
@@ -99,17 +99,17 @@
 (s/defschema ModalStateSchema
   "Schema for modal state. Modal data can contain form metadata or a React component."
   {:active (s/maybe s/Keyword)
-   :data   {;; Common modal data fields
-            (s/optional-key :title)       s/Str
-            (s/optional-key :submit-text) s/Str
-            (s/optional-key :form-id)     s/Keyword
-            (s/optional-key :component)   s/Any ;; React component
-            }
-   :form   {:submitting? s/Bool
-            :error       (s/maybe s/Str)}})
+   :data {;; Common modal data fields
+          (s/optional-key :title) s/Str
+          (s/optional-key :submit-text) s/Str
+          (s/optional-key :form-id) s/Keyword
+          (s/optional-key :component) s/Any ;; React component
+          }
+   :form {:submitting? s/Bool
+          :error (s/maybe s/Str)}})
 
 (s/defschema HitlStateSchema
-  {:responses  {s/Uuid s/Str}
+  {:responses {s/Uuid s/Str}
    :submitting {s/Uuid s/Bool}})
 
 (s/defschema DatasetsUiSchema
@@ -117,19 +117,19 @@
    :selected-snapshot-per-dataset {s/Uuid (s/maybe s/Str)}})
 
 (s/defschema ManualRunSchema
-  {s/Str {s/Str {:args    s/Any
+  {s/Str {s/Str {:args s/Any
                  (s/optional-key :error-msg) (s/maybe s/Str)
                  :loading s/Bool}}})
 
 (s/defschema UiSchema
   {:selected-node-id (s/maybe s/Uuid)
-   :forking-mode?    s/Bool
-   :changed-nodes    {s/Uuid s/Str}
-   :active-tab       s/Keyword
-   :current-route    s/Str
-   :modal            ModalStateSchema
-   :hitl             HitlStateSchema
-   :datasets         DatasetsUiSchema
+   :forking-mode? s/Bool
+   :changed-nodes {s/Uuid s/Str}
+   :active-tab s/Keyword
+   :current-route s/Str
+   :modal ModalStateSchema
+   :hitl HitlStateSchema
+   :datasets DatasetsUiSchema
    (s/optional-key :manual-run) ManualRunSchema
    (s/optional-key :node-details)
    {:active-tab (s/enum :feedback :info)}
@@ -143,10 +143,10 @@
 (s/defschema AppDbSchema
   {:current-invocation CurrentInvocationSchema
    :invocations-data {s/Str InvocationDataSchema}
-   :invocations      InvocationsSchema
-   :queries          QueriesCacheSchema
-   :route            RouteMatchSchema
-   :forms            {s/Keyword FormStateSchema}
-   :ui               UiSchema
-   :sente            s/Any ;; don't want to schematize all of sente
+   :invocations InvocationsSchema
+   :queries QueriesCacheSchema
+   :route RouteMatchSchema
+   :forms {s/Keyword FormStateSchema}
+   :ui UiSchema
+   :sente s/Any ;; don't want to schematize all of sente
    })
