@@ -289,6 +289,20 @@
            ($ :p.text-sm.text-red-600.mt-1 (:error param-field))
            ($ :div.mt-1.h-5))))))
 
+(defui EvaluatorParamField
+  [{:keys [form-id param-name module-id]}]
+  (let [field (forms/use-form-field form-id [:action-params param-name])]
+    ($ :div
+       ($ :label.block.text-sm.font-medium.text-gray-700.mb-1
+          "Evaluator"
+          ($ :span.text-red-500.ml-1 "*"))
+       ($ selectors/EvaluatorSelector
+          {:module-id module-id
+           :value (:value field)
+           :on-change (:on-change field)
+           :error (:error field)
+           :placeholder "Search for an evaluator..."}))))
+
 (defui ActionParamsForm
   [{:keys [form-id action-builders module-id]}]
   (let [action-name-field (forms/use-form-field form-id :action-name)
@@ -301,18 +315,11 @@
          ($ :div.text-sm.font-medium.text-gray-700 "Action Parameters")
          (for [[param-name param-info] params]
            (if (and (= action-name "aor/eval") (= param-name "name"))
-             ;; Use the new EvaluatorSelector for the evaluator 'name' parameter
-             (let [field (forms/use-form-field form-id [:action-params param-name])]
-               ($ :div {:key param-name}
-                  ($ :label.block.text-sm.font-medium.text-gray-700.mb-1
-                     "Evaluator"
-                     ($ :span.text-red-500.ml-1 "*"))
-                  ($ selectors/EvaluatorSelector
-                     {:module-id module-id
-                      :value (:value field)
-                      :on-change (:on-change field)
-                      :error (:error field)
-                      :placeholder "Search for an evaluator..."})))
+             ;; Use the new EvaluatorParamField for the evaluator 'name' parameter
+             ($ EvaluatorParamField {:key param-name
+                                     :form-id form-id
+                                     :param-name param-name
+                                     :module-id module-id})
              ;; Use default ParamField for all other parameters
              ($ ParamField {:key param-name
                             :form-id form-id

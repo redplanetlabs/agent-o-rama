@@ -116,75 +116,89 @@
                               (filter #(= (:type %) filter-type) all-evaluators)
                               all-evaluators)]
 
-    ($ :div.space-y-3
-       ;; List of selected evaluators as badges
-       ($ :div.flex.flex-wrap.gap-2
-          (if (seq selected-evaluators)
-            (for [e selected-evaluators
-                  :let [is-remote-eval? (:remote? e)
-                        evaluator-info (when-not is-remote-eval?
-                                         (first (filter #(= (:name %) (:name e)) filtered-evaluators)))]]
-              ($ :div
-                 {:key (:name e)
-                  :className (common/cn "inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium"
-                                        (if is-remote-eval?
-                                          "bg-purple-100 text-purple-800 border border-purple-200"
-                                          "bg-indigo-100 text-indigo-800 border border-indigo-200"))}
-                 ($ :<>
-                    ($ :div.flex.flex-col.gap-1
-                       ($ :div.flex.items-center.gap-2
-                          (when is-remote-eval?
-                            ($ :span.uppercase.font-bold.text-purple-600.text-xs "REMOTE"))
-                          ($ :span.font-semibold (:name e))
-                          (when evaluator-info
-                            ($ :span
-                               {:className (common/cn
-                                          "inline-flex px-2 py-0.5 rounded-full text-xs font-medium"
-                                          (evaluators/get-evaluator-type-badge-style (:type evaluator-info)))}
-                               (evaluators/get-evaluator-type-display (:type evaluator-info)))))
-                       (when (and evaluator-info (not (str/blank? (:description evaluator-info))))
-                         ($ :span.text-indigo-600.max-w-xs.truncate (:description evaluator-info))))
-                    ($ :button.p-1.rounded-full.transition-colors
-                       {:className (if is-remote-eval? "hover:bg-purple-200" "hover:bg-indigo-200")
-                        :type "button"
-                        :onClick #(on-change (vec (remove (fn [sel] (= (:name sel) (:name e))) selected-evaluators)))}
-                       ($ XMarkIcon {:className "h-3 w-3"})))))
-            ($ :div.text-sm.text-gray-500.italic "No evaluators selected.")))
-
+    ($ :div
        ;; Conditional rendering based on use-remote?
        (if use-remote?
          ;; Remote evaluator text input
-         ($ :div.flex.gap-2.items-center
-            ($ :input.flex-1.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-               {:type "text"
-                :value remote-eval-name
-                :on-change #(set-remote-eval-name (.. % -target -value))
-                :placeholder "Enter remote evaluator name (e.g., aor/conciseness)"})
-            ($ :button.inline-flex.items-center.gap-2.px-3.py-2.text-sm.bg-indigo-600.text-white.rounded-md.hover:bg-indigo-700
-               {:type "button"
-                :disabled (str/blank? remote-eval-name)
-                :onClick (fn []
-                           (when-not (str/blank? remote-eval-name)
-                             (on-change (conj selected-evaluators {:name remote-eval-name :remote? true}))
-                             (set-remote-eval-name "")))}
-               ($ PlusIcon {:className "h-4 w-4"})
-               "Add Remote Evaluator"))
+         ($ :div.space-y-3
+            ;; List of selected remote evaluators
+            ($ :div.flex.flex-wrap.gap-2
+               (if (seq selected-evaluators)
+                 (for [e selected-evaluators]
+                   ($ :div
+                      {:key (:name e)
+                       :className "inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200"}
+                      ($ :span.uppercase.font-bold.text-purple-600.text-xs "REMOTE")
+                      ($ :span.font-semibold (:name e))
+                      ($ :button.p-1.rounded-full.transition-colors.hover:bg-purple-200
+                         {:type "button"
+                          :onClick #(on-change (vec (remove (fn [sel] (= (:name sel) (:name e))) selected-evaluators)))}
+                         ($ XMarkIcon {:className "h-3 w-3"}))))
+                 ($ :div.text-sm.text-gray-500.italic "No evaluators selected.")))
+
+            ($ :div.flex.gap-2.items-center
+               ($ :input.flex-1.px-3.py-2.border.border-gray-300.rounded-md.text-sm
+                  {:type "text"
+                   :value remote-eval-name
+                   :on-change #(set-remote-eval-name (.. % -target -value))
+                   :placeholder "Enter remote evaluator name (e.g., aor/conciseness)"})
+               ($ :button.inline-flex.items-center.gap-2.px-3.py-2.text-sm.bg-indigo-600.text-white.rounded-md.hover:bg-indigo-700
+                  {:type "button"
+                   :disabled (str/blank? remote-eval-name)
+                   :onClick (fn []
+                              (when-not (str/blank? remote-eval-name)
+                                (on-change (conj selected-evaluators {:name remote-eval-name :remote? true}))
+                                (set-remote-eval-name "")))}
+                  ($ PlusIcon {:className "h-4 w-4"})
+                  "Add Remote Evaluator")))
 
          ;; Local evaluator searchable selector
-         ($ :div
-            ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Add Evaluator")
-            ($ selectors/EvaluatorSelector
-               {:module-id module-id
-                :value "" ;; Always empty since we're adding to a list
-                :on-change (fn [selected-name]
-                             (when selected-name
-                               (on-change (conj selected-evaluators {:name selected-name :remote? false}))))
-                :filter-type filter-type
-                :placeholder "Search and add an evaluator..."
-                :disabled? false})
-            (when use-remote?
-              ($ :p.text-xs.text-gray-500.mt-1
-                 "Remote evaluator selection is not yet supported via search. Add remote evaluators manually if needed.")))))))
+         ($ :div.space-y-3
+            ;; List of selected evaluators as badges
+            ($ :div.flex.flex-wrap.gap-2
+               (if (seq selected-evaluators)
+                 (for [e selected-evaluators
+                       :let [is-remote-eval? (:remote? e)
+                             evaluator-info (when-not is-remote-eval?
+                                              (first (filter #(= (:name %) (:name e)) filtered-evaluators)))]]
+                   ($ :div
+                      {:key (:name e)
+                       :className (common/cn "inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium"
+                                             (if is-remote-eval?
+                                               "bg-purple-100 text-purple-800 border border-purple-200"
+                                               "bg-indigo-100 text-indigo-800 border border-indigo-200"))}
+                      ($ :div.flex.flex-col.gap-1
+                         ($ :div.flex.items-center.gap-2
+                            (when is-remote-eval?
+                              ($ :span.uppercase.font-bold.text-purple-600.text-xs "REMOTE"))
+                            ($ :span.font-semibold (:name e))
+                            (when evaluator-info
+                              ($ :span
+                                 {:className (common/cn
+                                              "inline-flex px-2 py-0.5 rounded-full text-xs font-medium"
+                                              (evaluators/get-evaluator-type-badge-style (:type evaluator-info)))}
+                                 (evaluators/get-evaluator-type-display (:type evaluator-info)))))
+                         (when (and evaluator-info (not (str/blank? (:description evaluator-info))))
+                           ($ :span.text-indigo-600.max-w-xs.truncate (:description evaluator-info))))
+                      ($ :button.p-1.rounded-full.transition-colors
+                         {:className (if is-remote-eval? "hover:bg-purple-200" "hover:bg-indigo-200")
+                          :type "button"
+                          :onClick #(on-change (vec (remove (fn [sel] (= (:name sel) (:name e))) selected-evaluators)))}
+                         ($ XMarkIcon {:className "h-3 w-3"}))))
+                 ($ :div.text-sm.text-gray-500.italic "No evaluators selected.")))
+
+            ;; The searchable selector
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Search and add evaluators")
+               ($ selectors/EvaluatorSelector
+                  {:module-id module-id
+                   :value "" ;; Always empty since we're adding to a list
+                   :on-change (fn [selected-name]
+                                (when selected-name
+                                  (on-change (conj selected-evaluators {:name selected-name :remote? false}))))
+                   :filter-type filter-type
+                   :placeholder "Search evaluators by name..."
+                   :disabled? false})))))))
 
 ;; =============================================================================
 ;; MAIN EXPERIMENT FORM COMPONENTS
