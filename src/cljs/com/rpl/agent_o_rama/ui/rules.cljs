@@ -356,7 +356,7 @@
             ($ :div.text-gray-500.italic "No rules configured for this agent"))
 
          :else
-         ($ :div.bg-white.shadow.overflow-hidden.sm:rounded-md
+         ($ :div.bg-white.shadow.overflow-x-auto.sm:rounded-md
             ($ :table.min-w-full.divide-y.divide-gray-200
                ($ :thead.bg-gray-50
                   ($ :tr
