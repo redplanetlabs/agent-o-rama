@@ -944,8 +944,7 @@
   ;; clear will never be visible
   (local-transform> (termval {}) $$metric-cursors)
   (ops/explode *maps :> {:keys [*target *query-id *metrics *dep-end-offset *start-time-millis]})
-  (select> [(keypath *agent-name *query-id)
-            (nil->val (h/min-uuid7-at-timestamp *start-time-millis))]
+  (select> [(keypath *query-id) (nil->val (h/min-uuid7-at-timestamp *start-time-millis))]
     *metric-cursors
     :> *offset)
   (fetch-data
@@ -954,7 +953,7 @@
    *offset
    *dep-end-offset
    :> *m *end-scan-offset)
-  (local-transform> [(keypath *agent-name *query-id) (termval *end-scan-offset)]
+  (local-transform> [(keypath *query-id) (termval *end-scan-offset)]
                     $$metric-cursors)
   (ops/explode-map *m :> *k {:keys [*start-time-millis *metadata] :as *data-map})
   (filter> (some? *start-time-millis)) ; defensive
@@ -964,6 +963,7 @@
    (ifexpr (metrics/run-success? *data-map) "run-success" "run-failure")
    :> *metadata)
   (ops/explode *metrics :> {:keys [*metrics-fn]})
+  ;; TODO: <<<<>>>> be defensive here just in case
   (h/invoke *metrics-fn *data-map :> *metrics-map)
   (ops/explode-map *metrics-map :> *metric-id *metric-points)
   (ops/explode *metric-points :> *metric-point)

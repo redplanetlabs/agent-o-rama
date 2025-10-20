@@ -9,9 +9,11 @@
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.core :as i]
+   [com.rpl.agent-o-rama.impl.feedback :as fb]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.metrics :as metrics]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.store :as store]
@@ -554,4 +556,256 @@
                                [:count]
                                nil))
        (is (= res {1 {"_aor/default" {:count 1}} 2 {"_aor/default" {:count 2}}}))
+      ))))
+
+(deftest metrics-coordination-test
+  (with-redefs [TICKS (atom 0)
+                i/SUBSTITUTE-TICK-DEPOTS true
+
+                i/hook:analytics-tick
+                (fn [& args] (swap! TICKS inc))
+
+                anode/gen-node-id
+                (fn [& args]
+                  (h/random-uuid7-at-timestamp (h/current-time-millis)))
+
+                ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
+
+                ana/node-stall-time (fn [] (+ (h/current-time-millis) 60000))
+
+                at/gen-new-agent-id
+                (fn [agent-name]
+                  (h/random-uuid7-at-timestamp (h/current-time-millis)))]
+    (with-open [ipc (rtest/create-ipc)
+                _ (TopologyUtils/startSimTime)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (-> topology
+              (aor/new-agent "foo")
+              (aor/node
+               "start"
+               nil
+               (fn [agent-node input]
+                 (aor/result! agent-node (str input "!!!"))
+               )))
+         ))
+       (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind global-actions-depot
+         (:global-actions-depot (aor-types/underlying-objects agent-manager)))
+       (bind pstate-write-depot (foreign-depot ipc module-name (po/agent-pstate-write-depot-name)))
+       (bind foo (aor/agent-client agent-manager "foo"))
+       (bind foo-root (:root-pstate (aor-types/underlying-objects foo)))
+       (bind ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
+       (bind telemetry (:telemetry-pstate (aor-types/underlying-objects foo)))
+       (bind cursors
+         (foreign-pstate ipc module-name (po/agent-metric-cursors-task-global-name "foo")))
+
+       (bind cycle!
+         (fn []
+           (reset! TICKS 0)
+           (foreign-append! ana-depot nil)
+           (is (condition-attained? (> @TICKS 0)))
+           (rtest/pause-microbatch-topology! ipc
+                                             module-name
+                                             aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
+           (rtest/resume-microbatch-topology! ipc
+                                              module-name
+                                              aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)))
+
+
+       (foreign-append! global-actions-depot
+                        (aor-types/change-analytics-scan-amount-per-target-per-task 2))
+
+
+       (aor/create-evaluator! agent-manager
+                              "concise5"
+                              "aor/conciseness"
+                              {"threshold" "5"}
+                              "")
+
+       (bind feedback-invs-vol (volatile! []))
+
+       (TopologyUtils/advanceSimTime 1000)
+
+       ;; some feedback is written manually for future rule to verify metrics only begin at start
+       ;; time of that rule (these should be skipped)
+       (binding [aor-types/FORCED-AGENT-TASK-ID 0]
+         (let [inv (aor/agent-initiate foo "a")]
+           (vswap! feedback-invs-vol conj inv)
+           (is (= "a!!!" (aor/agent-result foo inv)))
+           (simpl/do-pstate-write!
+            pstate-write-depot
+            nil
+            (po/agent-root-task-global-name "foo")
+            (path (keypath (:agent-invoke-id inv))
+                  (fb/add-feedback-path {"concise?" true}
+                                        (aor-types/->valid-EvalSourceImpl
+                                         "concise5"
+                                         inv
+                                         (aor-types/->valid-ActionSourceImpl "foo" "rule1"))))
+            (aor-types/->DirectTaskId (:task-id inv)))
+           (is (= "abcd!!!" (aor/agent-invoke foo "abcd")))))
+       (binding [aor-types/FORCED-AGENT-TASK-ID 1]
+         (let [inv (aor/agent-initiate foo "...")]
+           (vswap! feedback-invs-vol conj inv)
+           (is (= "...!!!" (aor/agent-result foo inv)))
+           (simpl/do-pstate-write!
+            pstate-write-depot
+            nil
+            (po/agent-root-task-global-name "foo")
+            (path (keypath (:agent-invoke-id inv))
+                  (fb/add-feedback-path {"concise?" false}
+                                        (aor-types/->valid-EvalSourceImpl
+                                         "concise5"
+                                         inv
+                                         (aor-types/->valid-ActionSourceImpl "foo" "rule1"))))
+            (aor-types/->DirectTaskId (:task-id inv)))
+         ))
+
+       ;; sanity check
+       (doseq [inv @feedback-invs-vol]
+         (is (not (empty? (foreign-select-one [(keypath (:agent-invoke-id inv)) :feedback :results]
+                                              foo-root
+                                              {:pkey (:task-id inv)})))))
+
+
+       (TopologyUtils/advanceSimTime 60000)
+       (ana/add-rule! global-actions-depot
+                      "rule1"
+                      "foo"
+                      {:node-name         "start"
+                       :action-name       "aor/eval"
+                       :action-params     {"name" "concise5"}
+                       :filter            (aor-types/->AndFilter [])
+                       :sampling-rate     1.0
+                       :start-time-millis 20000
+                       :status-filter     :success
+                      })
+
+       (binding [aor-types/FORCED-AGENT-TASK-ID 0]
+         (is (= "....!!!" (aor/agent-invoke foo "....")))
+         (is (= ".!!!" (aor/agent-invoke foo ".")))
+         (is (= "..!!!" (aor/agent-invoke foo "..")))
+         (is (= "z!!!" (aor/agent-invoke foo "z"))))
+       (binding [aor-types/FORCED-AGENT-TASK-ID 1]
+         (is (= "aa!!!" (aor/agent-invoke foo "aa")))
+         (is (= "x!!!" (aor/agent-invoke foo "x"))))
+
+       (cycle!)
+
+       (bind res
+         (ana/select-telemetry telemetry
+                               "foo"
+                               po/MINUTE-GRANULARITY
+                               [:eval :rule1 :concise?]
+                               0
+                               (* 1000 po/HOUR-GRANULARITY)
+                               [:count]
+                               nil))
+       ;; first cycle was to apply rule
+       (is (= {} res))
+
+       (bind res
+         (ana/select-telemetry telemetry
+                               "foo"
+                               po/MINUTE-GRANULARITY
+                               [:agent :success-rate]
+                               0
+                               (* 1000 po/HOUR-GRANULARITY)
+                               [:count]
+                               nil))
+       ;; - 2 from task 0 are in bucket 0
+       ;;  - 1 from task 1 is in bucket 0
+       ;;  - 1 from task 1 is in bucket 1
+       (is (= res {0 {"_aor/default" {:count 3}} 1 {"_aor/default" {:count 1}}}))
+
+       (cycle!)
+
+       (bind res
+         (ana/select-telemetry telemetry
+                               "foo"
+                               po/MINUTE-GRANULARITY
+                               [:eval :rule1 :concise?]
+                               0
+                               (* 1000 po/HOUR-GRANULARITY)
+                               [:count]
+                               nil))
+       ;; skipped everything from bucket 0
+       (is (= res {1 {"_aor/default" {:count 4}}}))
+
+       (bind res
+         (ana/select-telemetry telemetry
+                               "foo"
+                               po/MINUTE-GRANULARITY
+                               [:agent :success-rate]
+                               0
+                               (* 1000 po/HOUR-GRANULARITY)
+                               [:count]
+                               nil))
+       ;; last one from task 0 and 2 more from task 1
+       (is (= res {0 {"_aor/default" {:count 3}} 1 {"_aor/default" {:count 4}}}))
+
+
+       (cycle!)
+
+
+       (bind res
+         (ana/select-telemetry telemetry
+                               "foo"
+                               po/MINUTE-GRANULARITY
+                               [:eval :rule1 :concise?]
+                               0
+                               (* 1000 po/HOUR-GRANULARITY)
+                               [:count]
+                               nil))
+       (is (= res {1 {"_aor/default" {:count 6}}}))
+
+       (bind res
+         (ana/select-telemetry telemetry
+                               "foo"
+                               po/MINUTE-GRANULARITY
+                               [:agent :success-rate]
+                               0
+                               (* 1000 po/HOUR-GRANULARITY)
+                               [:count]
+                               nil))
+       (is (= res {0 {"_aor/default" {:count 3}} 1 {"_aor/default" {:count 6}}}))
+
+       (cycle!)
+
+       (bind res
+         (ana/select-telemetry telemetry
+                               "foo"
+                               po/MINUTE-GRANULARITY
+                               [:eval :rule1 :concise?]
+                               0
+                               (* 1000 po/HOUR-GRANULARITY)
+                               [:count]
+                               nil))
+       (is (= res {1 {"_aor/default" {:count 6}}}))
+
+       (bind res
+         (ana/select-telemetry telemetry
+                               "foo"
+                               po/MINUTE-GRANULARITY
+                               [:agent :success-rate]
+                               0
+                               (* 1000 po/HOUR-GRANULARITY)
+                               [:count]
+                               nil))
+       (is (= res {0 {"_aor/default" {:count 3}} 1 {"_aor/default" {:count 6}}}))
+
+       ;; verify associated cursors for a deleted rule get deleted on the next cycle
+       (dotimes [i 2]
+         (is (= #{[:root] [:nodes] [:eval :rule1]})
+             (set (foreign-select MAP-KEYS cursors {:pkey i}))))
+       (ana/delete-rule! global-actions-depot "foo" "rule1")
+       (cycle!)
+       (dotimes [i 2]
+         (is (= #{[:root] [:nodes]})
+             (set (foreign-select MAP-KEYS cursors {:pkey i}))))
       ))))
