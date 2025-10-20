@@ -8,7 +8,7 @@
    [com.rpl.rama.path :as path]
    [com.rpl.rama.test :as rtest]))
 
-(deftest ^:integration feedback-test-agent-basic-test
+(deftest feedback-test-agent-basic-test
   (testing "FeedbackTestAgent runs successfully with different modes"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module!
@@ -36,7 +36,7 @@
                 agent-client
                 {"mode" "prefixed" "text" "custom"})))))))
 
-(deftest ^:integration feedback-generation-test
+(deftest feedback-generation-test
   (testing "FeedbackTestAgent generates feedback with varying scores"
     (with-open [ipc (rtest/create-ipc)]
       (rtest/launch-module!

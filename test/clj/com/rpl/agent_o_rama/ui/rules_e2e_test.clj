@@ -134,7 +134,7 @@
     (catch Exception _
       0)))
 
-(deftest ^:integration add-and-delete-rule-test
+(deftest add-and-delete-rule-test
   ;; Test adding and deleting a rule via the UI
   (eth/with-system
     [system RulesTestAgentModule {:post-deploy-hook (post-deploy-hook {})}]
@@ -181,7 +181,7 @@
                   (is (= (dec initial-count)
                          (count-table-rows driver))))))))))))
 
-(deftest ^:integration action-log-test
+(deftest action-log-test
   ;; Test that rules execute and actions appear in the action log
   (eth/with-system
     [system RulesTestAgentModule {:post-deploy-hook (post-deploy-hook {})}]
@@ -205,7 +205,7 @@
             (testing "action log contains entries"
               (is (>= (count-action-log-entries driver) 1)))))))))
 
-(deftest ^:integration multiple-filter-types-test
+(deftest multiple-filter-types-test
   ;; Test rules with different filter types
   (eth/with-system
     [system RulesTestAgentModule {:post-deploy-hook (post-deploy-hook {})}]
@@ -243,7 +243,7 @@
 
               (is (>= (count-action-log-entries driver) 1)))))))))
 
-(deftest ^:integration node-specific-rules-test
+(deftest node-specific-rules-test
   ;; Test node-specific vs agent-level rules
   (eth/with-system
     [system RulesTestAgentModule {:post-deploy-hook (post-deploy-hook {})}]
@@ -272,7 +272,7 @@
               (wait-for-action-log-entries driver)
               (is (>= (count-action-log-entries driver) 1)))))))))
 
-(deftest ^:integration token-count-filter-test
+(deftest token-count-filter-test
   ;; Test token-count filter with actual model calls
   (testing "Token count filter with chat model"
     (when (System/getenv "OPENAI_API_KEY")

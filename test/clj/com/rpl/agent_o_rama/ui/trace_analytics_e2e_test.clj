@@ -11,7 +11,7 @@
 ;; (eth/teardown-system system)
 ;; (vreset! system nil)
 
-(deftest ^:integration conditional-rendering-test
+(deftest conditional-rendering-test
   ;; Test conditional rendering of stat sections based on available data
   (eth/with-system [system TraceAnalyticsTestAgentModule]
     (eth/with-webdriver [system driver]
@@ -113,7 +113,7 @@
                    {:data-id "other-operations"}
                    "Other Operations")))))))))
 
-(deftest ^:integration dropdown-toggle-test
+(deftest dropdown-toggle-test
   ;; Test dropdown expand/collapse functionality
   (eth/with-system [system TraceAnalyticsTestAgentModule]
     (eth/with-webdriver [system driver]
