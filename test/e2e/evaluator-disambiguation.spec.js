@@ -102,8 +102,8 @@ test.describe('Evaluator Metric Name Disambiguation', () => {
 
     await expModal.getByLabel('Experiment Name').fill(experimentName);
     
-    // Select Target Type: Node
-    await expModal.locator('select').first().selectOption('node');
+    // Select Target Type: Node (radio button)
+    await expModal.getByLabel('Node').check();
     
     // Select the agent
     await expModal.getByTestId('agent-name-dropdown').click();

@@ -214,8 +214,8 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
 
     // 5a. Fill out the experiment form
     await expModal.getByLabel('Experiment Name').fill(experimentName);
-    // Select Target Type: Node (the control is a <select>)
-    await expModal.locator('select').first().selectOption('node');
+    // Select Target Type: Node (radio button)
+    await expModal.getByLabel('Node').check();
 
     // Select the agent
     await expModal.getByTestId('agent-name-dropdown').click();
@@ -295,7 +295,7 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
 
     // 7b. Verify the form is pre-filled with the original experiment's data
     await expect(rerunModal.getByLabel('Experiment Name')).toHaveValue(`Copy of ${experimentName}`);
-    await expect(rerunModal.locator('select').first()).toHaveValue('node');
+    await expect(rerunModal.getByLabel('Node')).toBeChecked();
     await expect(rerunModal.getByTestId('agent-name-dropdown')).toHaveText(agentToRun);
     await expect(rerunModal.getByTestId('node-name-dropdown')).toHaveText('write-section');
     
