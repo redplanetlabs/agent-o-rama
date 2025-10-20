@@ -8,6 +8,7 @@ import {
   createEvaluator,
   deleteEvaluator,
   addExample,
+  addEvaluatorToExperiment,
 } from './helpers.js';
 
 // =============================================================================
@@ -112,9 +113,7 @@ async function runAndVerifyExperiment(page, { experimentName, snapshot, selector
   await modal.locator('div').filter({ hasText: /^Input Mappings/ }).getByRole('textbox').fill('$');
   
   // Select Evaluator
-  await modal.getByRole('button', { name: 'Add Evaluator' }).click();
-  await expect(page.getByText(evaluatorName, { exact: true })).toBeVisible(); // Wait for portal to render
-  await page.getByText(evaluatorName, { exact: true }).click();
+  await addEvaluatorToExperiment(page, modal, evaluatorName);
   
   // 2. Run the experiment
   await modal.getByRole('button', { name: 'Run Experiment' }).click();

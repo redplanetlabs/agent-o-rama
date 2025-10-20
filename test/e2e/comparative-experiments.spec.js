@@ -8,6 +8,7 @@ import {
   createEvaluator,
   deleteEvaluator,
   addExample,
+  addEvaluatorToExperiment,
 } from './helpers.js';
 
 // =============================================================================
@@ -136,16 +137,8 @@ test.describe('Comparative Experiment Flow', () => {
     console.log('Configured 3 targets for the experiment.');
 
     // Configure Evaluators (only 1 selector + 1 non-selector for first run)
-    await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
-    const evaluatorDropdown = page.locator('.origin-top-left');
-    await expect(evaluatorDropdown.getByText(selectLongestEvaluator.name, { exact: true })).toBeVisible();
-    await expect(evaluatorDropdown.getByText(selectRandomEvaluator.name, { exact: true })).toBeVisible();
-    await expect(evaluatorDropdown.getByText(otherEvaluator.name, { exact: true })).toBeVisible();
-    await expect(evaluatorDropdown.getByText('aor/conciseness')).not.toBeVisible(); // Verify filtering
-    await evaluatorDropdown.getByText(selectLongestEvaluator.name, { exact: true }).click();
-    
-    await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
-    await evaluatorDropdown.getByText(otherEvaluator.name, { exact: true }).click();
+    await addEvaluatorToExperiment(page, expModal, selectLongestEvaluator.name);
+    await addEvaluatorToExperiment(page, expModal, otherEvaluator.name);
     console.log('Evaluators configured (1 selector + 1 non-selector for first run).');
 
     // Run Experiment
@@ -255,9 +248,7 @@ test.describe('Comparative Experiment Flow', () => {
     console.log('Verified: Existing evaluators are pre-filled in the form.');
     
     // Add the second selector evaluator
-    await rerunModal.getByRole('button', { name: 'Add Evaluator' }).click();
-    const rerunEvalDropdown = page.locator('.origin-top-left');
-    await rerunEvalDropdown.getByText(selectRandomEvaluator.name, { exact: true }).click();
+    await addEvaluatorToExperiment(page, rerunModal, selectRandomEvaluator.name);
     console.log('Added second selector evaluator to the form.');
     
     // Update experiment name to distinguish from first run

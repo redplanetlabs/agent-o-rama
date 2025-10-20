@@ -7,6 +7,7 @@ import {
   createEvaluator,
   deleteEvaluator,
   addExample,
+  addEvaluatorToExperiment,
 } from './helpers.js';
 
 // =============================================================================
@@ -132,10 +133,8 @@ test.describe('Full Experiment Flow with E2E Test Agent', () => {
     await expModal.getByTestId('agent-name-dropdown').click();
     await expModal.getByText(agentToRun, { exact: true }).click();
     await expModal.locator('div').filter({ hasText: /^Input Mappings/ }).getByRole('textbox').fill('$');
-    await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
-    await page.getByText(randomFloatEvaluator.name, { exact: true }).click();
-    await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
-    await page.getByText(failingEvaluator.name, { exact: true }).click();
+    await addEvaluatorToExperiment(page, expModal, randomFloatEvaluator.name);
+    await addEvaluatorToExperiment(page, expModal, failingEvaluator.name);
     
     await expModal.getByRole('button', { name: 'Run Experiment' }).click();
     console.log('Experiment started...');

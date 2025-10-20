@@ -7,6 +7,7 @@ import {
   createEvaluator,
   deleteEvaluator,
   addExample,
+  addEvaluatorToExperiment,
 } from './helpers.js';
 
 // =============================================================================
@@ -234,16 +235,10 @@ test.describe('Full Experiment Flow E2E Test with Re-run', () => {
     await mappingsSection.locator('input').nth(1).fill('$[1]'); // messages
     await mappingsSection.locator('input').nth(2).fill('$[2]'); // context
 
-    // Select all three evaluators (via portal)
-    await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
-    await expect(page.getByText(evaluatorNamePass, { exact: true })).toBeVisible();
-    await page.getByText(evaluatorNamePass, { exact: true }).click();
-    await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
-    await expect(page.getByText(evaluatorNameFail, { exact: true })).toBeVisible();
-    await page.getByText(evaluatorNameFail, { exact: true }).click();
-    await expModal.getByRole('button', { name: 'Add Evaluator' }).click();
-    await expect(page.getByText(summaryEvaluatorName, { exact: true })).toBeVisible();
-    await page.getByText(summaryEvaluatorName, { exact: true }).click();
+    // Select all three evaluators
+    await addEvaluatorToExperiment(page, expModal, evaluatorNamePass);
+    await addEvaluatorToExperiment(page, expModal, evaluatorNameFail);
+    await addEvaluatorToExperiment(page, expModal, summaryEvaluatorName);
     console.log('All three evaluators selected.');
 
     // 5b. Start the experiment

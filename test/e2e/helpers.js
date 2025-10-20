@@ -220,3 +220,38 @@ export async function deleteEvaluator(page, name) {
   await expect(evalRow).not.toBeVisible();
   console.log(`Successfully deleted evaluator: ${name}`);
 }
+
+/**
+ * Adds an evaluator to an experiment form using the new search-based selector.
+ * This function works with the searchable evaluator selector introduced in the UI refactoring.
+ * @param {import('@playwright/test').Page} page - The Playwright page object.
+ * @param {Object} modal - The experiment modal locator.
+ * @param {string} evaluatorName - The name of the evaluator to add.
+ * @returns {Promise<void>}
+ */
+export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
+  console.log(`Adding evaluator to experiment: ${evaluatorName}`);
+  
+  // Find the search input within the modal (has placeholder "Search evaluators by name...")
+  const searchInput = modal.getByPlaceholder(/Search evaluators/);
+  await expect(searchInput).toBeVisible();
+  
+  // Click the search input to focus it and open the dropdown
+  await searchInput.click();
+  
+  // Type the evaluator name to search for it
+  await searchInput.fill(evaluatorName);
+  
+  // Wait for the dropdown results to appear and click the matching evaluator
+  // The dropdown appears as a div with position absolute
+  const dropdown = page.locator('.absolute.z-10').filter({ hasText: evaluatorName });
+  await expect(dropdown).toBeVisible({ timeout: 5000 });
+  
+  // Click the evaluator in the dropdown
+  await dropdown.getByText(evaluatorName, { exact: true }).click();
+  
+  // Verify the evaluator was added by checking for its badge
+  await expect(modal.getByText(evaluatorName, { exact: true })).toBeVisible();
+  
+  console.log(`Successfully added evaluator: ${evaluatorName}`);
+}
