@@ -3331,6 +3331,7 @@
        (is (= (:metadata res)
               [{:examples #{1} :name "a"}
                {:examples #{2} :name "a-hello"}
+               {:examples #{"run-success" "run-failure"} :name "aor/status"}
                {:examples #{true 3 2} :name "b"}
                {:examples #{"abc"} :name "c"}
                {:examples #{0.5 0.4} :name "d"}

@@ -943,6 +943,14 @@
                              (keypath agent-name *rule-name))
     )))
 
+(defn add-implicit-metadata
+  [items search-string-lower]
+  (if (h/contains-string? "aor/status" search-string-lower)
+    (->> (conj items {:name "aor/status" :examples #{"run-success" "run-failure"}})
+         (sort-by :name)
+         vec)
+    items
+  ))
 
 ;; returns {:metadata [{:name ... :examples #{...}} ...] :pagination-params ...}
 (defn declare-search-metadata-topology
@@ -969,7 +977,11 @@
                    false
                    :> *items *page-key)
       (|origin)
-      (hash-map :metadata *items :pagination-params *page-key :> *res)
+      (hash-map :metadata
+                (add-implicit-metadata *items *search-string-lower)
+                :pagination-params
+                *page-key
+                :> *res)
     )))
 
 (defn declare-all-agent-metrics-topology
