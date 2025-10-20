@@ -412,14 +412,6 @@
       ;; Final analytics cycle
       (cycle!)
 
-;; Start the UI (if not already running)
-      (println "\n🌐 Starting UI on port 1974...")
-      (try
-        (aor/start-ui ipc {:port 1974})
-        (println "✓ UI started successfully")
-        (catch java.net.BindException _e
-          (println "⚠️  Port 1974 already in use - UI may already be running")))
-
       (println "\n✅ Setup complete!")
       (println "   Visit http://localhost:1974 to view the analytics UI")
       (println "   The agent is: MetricsGenAgent")
