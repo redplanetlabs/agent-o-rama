@@ -432,14 +432,15 @@
                   "Use remote evaluators")))
 
           (let [evaluators-field (forms/use-form-field form-id :evaluators)]
-            ($ EvaluatorMultiSelector
-               {:module-id module-id
-                :selected-evaluators (:value evaluators-field)
-                :on-change (:on-change evaluators-field)
-                :filter-type spec-type
-                :use-remote? use-remote-evaluators?})
-            (when (:error evaluators-field)
-              ($ :p.text-sm.text-red-600.mt-1 (:error evaluators-field)))))
+            ($ :div
+               ($ EvaluatorMultiSelector
+                  {:module-id module-id
+                   :selected-evaluators (:value evaluators-field)
+                   :on-change (:on-change evaluators-field)
+                   :filter-type spec-type
+                   :use-remote? use-remote-evaluators?})
+               (when (:error evaluators-field)
+                 ($ :p.text-sm.text-red-600.mt-1 (:error evaluators-field))))))
 
        ;; Execution Settings Section
        ($ :div.mb-8
