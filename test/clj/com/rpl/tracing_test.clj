@@ -156,7 +156,7 @@
                           (fn [agent-node agg node-start-res]
                             (aor/result! agent-node [agg node-start-res])))
         )))
-     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
      (bind agent-manager (aor/agent-manager ipc module-name))
      (bind foo (aor/agent-client agent-manager "foo"))
@@ -490,7 +490,7 @@
                         (aor/result! agent-node ["done" arg])
                       ))
         )))
-     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
      (bind depot
        (foreign-depot ipc
@@ -858,7 +858,7 @@
                             (TopologyUtils/advanceSimTime 10)
                             (aor/result! agent-node agg)))
         )))
-     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
      (bind depot
        (foreign-depot ipc
@@ -988,7 +988,7 @@
                  (h/acquire-semaphore SEM)
                  (aor/result! agent-node agg)))
           )))
-       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
        (bind module-name (get-module-name module))
        (bind depot
          (foreign-depot ipc

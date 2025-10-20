@@ -3,9 +3,11 @@
         [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.helpers :as h]
-   [com.rpl.ramaspecter :refer [walker]]))
+   [com.rpl.ramaspecter :refer [walker]]
+   [com.rpl.rama.test :as rtest]))
 
 (defmacro letlocals
   [& body]
@@ -217,3 +219,8 @@
                meta
                :name))
   (flush))
+
+(defn launch-module-without-eval-agent!
+  [& args]
+  (with-redefs [i/define-eval-agent? (constantly false)]
+    (apply rtest/launch-module! args)))

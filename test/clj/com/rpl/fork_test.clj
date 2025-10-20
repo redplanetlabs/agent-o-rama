@@ -187,7 +187,7 @@
                   (aor/emit! agent-node "b5" 1))))
              (tc/auto-node "b5" nil)
            )))
-        (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+        (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
         (bind module-name (get-module-name module))
 
         (bind agent-manager (aor/agent-manager ipc module-name))
@@ -383,11 +383,11 @@
         (is (= (->> nodes
                     (mapv normalize-node)
                     frequencies)
-               {{:node "special4"
+               {{:node       "special4"
                  :nested-ops []
-                 :emits [(aor-types/->AgentNodeEmit 0 nil 0 "special2" [2])]
-                 :result nil
-                 :input [["aaa" 2 1]]}
+                 :emits      [(aor-types/->AgentNodeEmit 0 nil 0 "special2" [2])]
+                 :result     nil
+                 :input      [["aaa" 2 1]]}
                 1
 
                 {:node       "special4"
@@ -620,7 +620,7 @@
                   (tc/run-node! agent-node "end")
                   (aor/result! agent-node v)))
              )))
-          (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+          (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
           (bind module-name (get-module-name module))
 
           (bind agent-manager (aor/agent-manager ipc module-name))

@@ -42,6 +42,7 @@
 
 ;; for agent-o-rama namespace
 (defn hook:building-plain-agent-object [name o])
+(defn define-eval-agent? [] true)
 
 (defn- define-agent!
   [agent-name setup topologies stream-topology mb-topology analytics-mb-topology agent-graph]
@@ -79,22 +80,13 @@
       :key-partitioner apart/task-id-key-partitioner})
     (declare-pstate*
      stream-topology
-     (symbol (po/agent-active-invokes-task-global-name agent-name))
-     po/AGENT-ACTIVE-INVOKES-PSTATE-SCHEMA)
-    (declare-pstate*
-     stream-topology
-     (symbol (po/agent-gc-invokes-task-global-name agent-name))
-     po/AGENT-GC-ROOT-INVOKES-PSTATE-SCHEMA
+     (symbol (po/agent-stream-shared-task-global-name agent-name))
+     po/AGENT-STREAM-SHARED-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
     (declare-pstate*
      stream-topology
      (symbol (po/agent-node-task-global-name agent-name))
      po/AGENT-NODE-PSTATE-SCHEMA
-     {:key-partitioner apart/task-id-key-partitioner})
-    (declare-pstate*
-     stream-topology
-     (symbol (po/graph-history-task-global-name agent-name))
-     po/GRAPH-HISTORY-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
     (declare-pstate*
      stream-topology
@@ -147,18 +139,22 @@
 
     (declare-pstate*
      mb-topology
-     (symbol (po/agent-valid-invokes-task-global-name agent-name))
-     po/AGENT-VALID-INVOKES-PSTATE-SCHEMA
+     (symbol (po/agent-mb-shared-task-global-name agent-name))
+     po/AGENT-MB-SHARED-PSTATE-SCHEMA
      {:key-partitioner apart/task-id-key-partitioner})
-    (declare-pstate*
-     mb-topology
-     (symbol (po/pending-retries-task-global-name agent-name))
-     po/PENDING-RETRIES-PSTATE-SCHEMA)
     (declare-pstate*
      analytics-mb-topology
      (symbol (po/agent-rule-cursors-task-global-name agent-name))
      po/AGENT-RULE-CURSORS-PSTATE-SCHEMA
      {:global? true})
+    (declare-pstate*
+     analytics-mb-topology
+     (symbol (po/agent-metric-cursors-task-global-name agent-name))
+     po/AGENT-METRIC-CURSORS-PSTATE-SCHEMA)
+    (declare-pstate*
+     analytics-mb-topology
+     (symbol (po/agent-telemetry-task-global-name agent-name))
+     po/AGENT-TELEMETRY-PSTATE-SCHEMA)
 
     (retries/declare-check-impl mb-topology agent-name)
     (queries/declare-tracing-query-topology topologies agent-name)
@@ -166,6 +162,8 @@
     (queries/declare-get-invokes-page-topology topologies agent-name)
     (queries/declare-get-current-graph topologies agent-name)
     (queries/declare-get-action-log-page-topology topologies agent-name)
+    (queries/declare-search-metadata-topology topologies agent-name)
+    (queries/declare-all-agent-metrics-topology topologies agent-name)
 
     (<<sources stream-topology
      (source> agent-config-depot-sym {:retry-mode :all-after} :> *data)

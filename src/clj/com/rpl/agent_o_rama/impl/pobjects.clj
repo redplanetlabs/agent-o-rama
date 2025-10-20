@@ -31,7 +31,9 @@
     StartExperiment
     StreamingChunk]
    [java.util
-    UUID]))
+    UUID]
+   [rpl.rama.distributed.stats.number_stats
+    NumberStats]))
 
 (defn agents-store-info-name
   []
@@ -148,27 +150,30 @@
   [agent-name]
   (str "$$_agent-root-count-" agent-name))
 
-(defn agent-active-invokes-task-global-name
+(defn agent-mb-shared-task-global-name
+  [name]
+  (str "$$_agent-mb-shared-" name))
+
+(def AGENT-MB-SHARED-PSTATE-SCHEMA
+  (fixed-keys-schema
+   {:valid-invokes   (map-schema java.util.List Long {:subindex? true})
+    :pending-retries (set-schema java.util.List {:subindex? true})}
+  ))
+
+(defn agent-stream-shared-task-global-name
   [agent-name]
-  (str "$$_agent-active-invokes-" agent-name))
+  (str "$$_agent-stream-shared-" agent-name))
 
-(def AGENT-ACTIVE-INVOKES-PSTATE-SCHEMA
-  {UUID Boolean})
-
-(defn agent-valid-invokes-task-global-name
-  [agent-name]
-  (str "$$_agent-valid-invokes-" agent-name))
-
-(def AGENT-VALID-INVOKES-PSTATE-SCHEMA
-  ;; [agent-task-id agent-id] -> valid retry-num
-  {java.util.List Long})
-
-(defn agent-gc-invokes-task-global-name
-  [agent-name]
-  (str "$$_agent-gc-invokes-" agent-name))
-
-(def AGENT-GC-ROOT-INVOKES-PSTATE-SCHEMA
-  {UUID Object})
+(def AGENT-STREAM-SHARED-PSTATE-SCHEMA
+  (fixed-keys-schema
+   {:history         (map-schema Long HistoricalAgentGraphInfo {:subindex? true})
+    :gc-root-invokes (map-schema UUID Object {:subindex? true})
+    :active-invokes  (set-schema UUID {:subindex? true})
+    :metadata        (map-schema String ; metadata key
+                                 (fixed-keys-schema
+                                  {:examples #{Object}}) ; example values
+                                 {:subindex? true})
+   }))
 
 (defn agent-node-task-global-name
   [agent-name]
@@ -220,22 +225,6 @@
     String ; rule-name
     (map-schema UUID ActionLog {:subindex? true})
     {:subindex? true})})
-
-
-(defn graph-history-task-global-name
-  [agent-name]
-  (str "$$_agent-graph-history-" agent-name))
-
-(def GRAPH-HISTORY-PSTATE-SCHEMA
-  {Long HistoricalAgentGraphInfo})
-
-(defn pending-retries-task-global-name
-  [agent-name]
-  (str "$$_agent-pending-retries-" agent-name))
-
-(def PENDING-RETRIES-PSTATE-SCHEMA
-  ;; [agent-task-id agent-id retry-num]
-  {java.util.List Object})
 
 (defn agent-config-task-global-name
   [agent-name]
@@ -328,10 +317,50 @@
       {:subindex? true})
     })})
 
+
+(defn agent-telemetry-task-global-name
+  [agent-name]
+  (str "$$_aor-telemetry-" agent-name))
+
+
+(def MINUTE-GRANULARITY 60)
+(def HOUR-GRANULARITY (* 60 MINUTE-GRANULARITY))
+(def DAY-GRANULARITY (* 24 HOUR-GRANULARITY))
+(def THIRTY-DAY-GRANULARITY (* 30 DAY-GRANULARITY))
+
+(def GRANULARITIES
+  [MINUTE-GRANULARITY
+   HOUR-GRANULARITY
+   DAY-GRANULARITY
+   THIRTY-DAY-GRANULARITY])
+
+(def DEFAULT-CATEGORY "_aor/default")
+
+(defn- telemetry-schema
+  [leaf-schema]
+  {Long  ; granularity as seconds (60 for minute, 3600 for hour, etc.)
+   (map-schema
+    java.util.List ; metric ID
+    (map-schema
+     Long  ; bucket
+     (fixed-keys-schema
+      {:overall leaf-schema
+       :by-meta (map-schema
+                 String ; metadata key
+                 {String ; metadata value
+                  leaf-schema}
+                 {:subindex? true})
+      })
+     {:subindex? true})
+    {:subindex? true})})
+
+(def AGENT-TELEMETRY-PSTATE-SCHEMA
+  (telemetry-schema {String ; category
+                     NumberStats}))
+
 (defn evaluators-task-global-name
   []
   "$$_aor-evaluators")
-
 
 (def EVALUATORS-PSTATE-SCHEMA
   {String (fixed-keys-schema
@@ -357,6 +386,14 @@
 
 ;; rule-name -> task-id -> UUID
 (def AGENT-RULE-CURSORS-PSTATE-SCHEMA
+  java.util.Map)
+
+(defn agent-metric-cursors-task-global-name
+  [agent-name]
+  (str "$$_agent-metric-cursors-" agent-name))
+
+;; metric-name -> UUID
+(def AGENT-METRIC-CURSORS-PSTATE-SCHEMA
   java.util.Map)
 
 ;; Task global fetch helpers
@@ -411,26 +448,17 @@
   [name]
   (this-module-pobject-task-global (agent-root-count-task-global-name name)))
 
-(defn agent-active-invokes-task-global
+(defn agent-mb-shared-task-global
   [name]
-  (this-module-pobject-task-global (agent-active-invokes-task-global-name
-                                    name)))
+  (this-module-pobject-task-global (agent-mb-shared-task-global-name name)))
 
-(defn agent-valid-invokes-task-global
+(defn agent-stream-shared-task-global
   [name]
-  (this-module-pobject-task-global (agent-valid-invokes-task-global-name name)))
-
-(defn agent-gc-invokes-task-global
-  [name]
-  (this-module-pobject-task-global (agent-gc-invokes-task-global-name name)))
+  (this-module-pobject-task-global (agent-stream-shared-task-global-name name)))
 
 (defn agent-node-task-global
   [name]
   (this-module-pobject-task-global (agent-node-task-global-name name)))
-
-(defn graph-history-task-global
-  [name]
-  (this-module-pobject-task-global (graph-history-task-global-name name)))
 
 (defn agent-config-task-global
   [name]
@@ -443,6 +471,14 @@
 (defn agent-rule-cursors-task-global
   [name]
   (this-module-pobject-task-global (agent-rule-cursors-task-global-name name)))
+
+(defn agent-metric-cursors-task-global
+  [name]
+  (this-module-pobject-task-global (agent-metric-cursors-task-global-name name)))
+
+(defn agent-telemetry-task-global
+  [name]
+  (this-module-pobject-task-global (agent-telemetry-task-global-name name)))
 
 (defn agent-global-config-task-global
   []

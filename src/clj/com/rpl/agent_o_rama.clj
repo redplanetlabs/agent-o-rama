@@ -205,7 +205,8 @@
        (when @defined?-vol
          (throw (h/ex-info "Agent topology already defined" {})))
        (vreset! defined?-vol true)
-       (exp/define-evaluator-agent! this)
+       (when (i/define-eval-agent?)
+         (exp/define-evaluator-agent! this))
        (i/define-agents!
         setup
         topologies
@@ -577,51 +578,62 @@
      (getAgentNames [this]
        (foreign-invoke-query agent-names-query))
      (getAgentClient [this agentName]
-       (let [agents-set           (foreign-invoke-query agent-names-query)
+       (let [agents-set              (foreign-invoke-query agent-names-query)
              _ (when-not (contains? agents-set agentName)
                  (throw (h/ex-info "Agent does not exist"
                                    {:available  agents-set
                                     :agent-name agentName})))
-             agent-depot          (foreign-depot cluster
-                                                 module-name
-                                                 (po/agent-depot-name agentName))
-             human-depot          (foreign-depot cluster
-                                                 module-name
-                                                 (po/agent-human-depot-name agentName))
-             agent-config-depot   (foreign-depot cluster
-                                                 module-name
-                                                 (po/agent-config-depot-name agentName))
-             config-pstate        (foreign-pstate
-                                   cluster
-                                   module-name
-                                   (po/agent-config-task-global-name agentName))
-             root-pstate          (foreign-pstate
-                                   cluster
-                                   module-name
-                                   (po/agent-root-task-global-name agentName))
-             graph-history-pstate (foreign-pstate
-                                   cluster
-                                   module-name
-                                   (po/graph-history-task-global-name agentName))
-             agent-rules-pstate   (foreign-pstate
-                                   cluster
-                                   module-name
-                                   (po/agent-rules-task-global-name agentName))
-             tracing-query        (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/tracing-query-name agentName))
-             invokes-page-query   (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/agent-get-invokes-page-query-name agentName))
-             current-graph-query  (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/agent-get-current-graph-name agentName))
-             action-log-query     (foreign-query cluster
-                                                 module-name
-                                                 (queries/action-log-page-name agentName))]
+             agent-depot             (foreign-depot cluster
+                                                    module-name
+                                                    (po/agent-depot-name agentName))
+             human-depot             (foreign-depot cluster
+                                                    module-name
+                                                    (po/agent-human-depot-name agentName))
+             agent-config-depot      (foreign-depot cluster
+                                                    module-name
+                                                    (po/agent-config-depot-name agentName))
+             config-pstate           (foreign-pstate
+                                      cluster
+                                      module-name
+                                      (po/agent-config-task-global-name agentName))
+             root-pstate             (foreign-pstate
+                                      cluster
+                                      module-name
+                                      (po/agent-root-task-global-name agentName))
+             stream-shared-pstate    (foreign-pstate
+                                      cluster
+                                      module-name
+                                      (po/agent-stream-shared-task-global-name agentName))
+             agent-rules-pstate      (foreign-pstate
+                                      cluster
+                                      module-name
+                                      (po/agent-rules-task-global-name agentName))
+             telemetry-pstate        (foreign-pstate
+                                      cluster
+                                      module-name
+                                      (po/agent-telemetry-task-global-name agentName))
+             tracing-query           (foreign-query
+                                      cluster
+                                      module-name
+                                      (queries/tracing-query-name agentName))
+             invokes-page-query      (foreign-query
+                                      cluster
+                                      module-name
+                                      (queries/agent-get-invokes-page-query-name agentName))
+             current-graph-query     (foreign-query
+                                      cluster
+                                      module-name
+                                      (queries/agent-get-current-graph-name agentName))
+             action-log-query        (foreign-query cluster
+                                                    module-name
+                                                    (queries/action-log-page-name agentName))
+             search-metadata-query   (foreign-query cluster
+                                                    module-name
+                                                    (queries/search-metadata-name agentName))
+             all-agent-metrics-query (foreign-query cluster
+                                                    module-name
+                                                    (queries/all-agent-metrics-name agentName))
+            ]
          (reify
           AgentClient
           (invoke [this args]
@@ -881,16 +893,19 @@
              true))
           aor-types/UnderlyingObjects
           (underlying-objects [this]
-            {:agent-depot          agent-depot
-             :agent-config-depot   agent-config-depot
-             :config-pstate        config-pstate
-             :root-pstate          root-pstate
-             :graph-history-pstate graph-history-pstate
-             :agent-rules-pstate   agent-rules-pstate
-             :tracing-query        tracing-query
-             :invokes-page-query   invokes-page-query
-             :current-graph-query  current-graph-query
-             :action-log-query     action-log-query
+            {:agent-depot             agent-depot
+             :agent-config-depot      agent-config-depot
+             :config-pstate           config-pstate
+             :root-pstate             root-pstate
+             :stream-shared-pstate    stream-shared-pstate
+             :agent-rules-pstate      agent-rules-pstate
+             :telemetry-pstate        telemetry-pstate
+             :tracing-query           tracing-query
+             :invokes-page-query      invokes-page-query
+             :current-graph-query     current-graph-query
+             :action-log-query        action-log-query
+             :search-metadata-query   search-metadata-query
+             :all-agent-metrics-query all-agent-metrics-query
             })
          )))
      (createDataset [this name description inputJsonSchema outputJsonSchema]

@@ -1,4 +1,4 @@
-(ns com.rpl.analytics-test
+(ns com.rpl.rules-test
   (:use [clojure.test]
         [com.rpl.test-helpers]
         [com.rpl.rama]
@@ -307,7 +307,7 @@
                    ))
                ))))
        ))
-     (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+     (launch-module-without-eval-agent! ipc module {:tasks 2 :threads 2})
      (bind module-name (get-module-name module))
      (bind agent-manager (aor/agent-manager ipc module-name))
      (bind foo (aor/agent-client agent-manager "foo"))
@@ -802,6 +802,8 @@
                   anode/gen-node-id
                   (fn [& args]
                     (h/random-uuid7-at-timestamp (h/current-time-millis)))
+
+                  ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
 
                   at/gen-new-agent-id
                   (fn [agent-name]
@@ -1627,10 +1629,12 @@
 
                 anode/log-node-error (fn [& args])
 
+                ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
+
                 i/hook:analytics-tick
                 (fn [& args] (swap! TICKS inc))
 
-                ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
+                ana/node-stall-time (fn [] (+ (h/current-time-millis) 60000))
                ]
     (with-open [ipc (rtest/create-ipc)]
       (letlocals
@@ -1929,6 +1933,8 @@
 
                 anode/log-node-error (fn [& args])
 
+                ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
+
                 anode/gen-node-id
                 (fn [& args]
                   (h/random-uuid7-at-timestamp (h/current-time-millis)))
@@ -2222,6 +2228,8 @@
     (try
       (with-redefs [TICKS (atom 0)
                     i/SUBSTITUTE-TICK-DEPOTS true
+
+                    ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
 
                     i/hook:analytics-tick
                     (fn [& args] (swap! TICKS inc))]

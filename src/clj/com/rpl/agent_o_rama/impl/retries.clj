@@ -38,18 +38,15 @@
         agent-root-pstate-sym
         (symbol (po/agent-root-task-global-name agent-name))
 
-        agent-active-invokes-pstate-sym
-        (symbol (po/agent-active-invokes-task-global-name agent-name))
-
-        pending-retries-pstate-sym
-        (symbol (po/pending-retries-task-global-name agent-name))
+        agent-stream-shared-pstate-sym
+        (symbol (po/agent-stream-shared-task-global-name agent-name))
 
         node-exec (symbol (po/agent-node-executor-name))]
     (batch<- [*agent-task-id *agent-id *retry-num]
       (|all)
       (ops/current-task-id :> *agent-task-id)
-      (local-select> MAP-KEYS
-                     agent-active-invokes-pstate-sym
+      (local-select> [:active-invokes ALL]
+                     agent-stream-shared-pstate-sym
                      {:allow-yield? true}
                      :> *agent-id)
       (local-select> (keypath *agent-id)
@@ -127,11 +124,11 @@
         agent-root-pstate-sym (symbol (po/agent-root-task-global-name
                                        agent-name))
 
-        agent-valid-invokes-pstate-sym
-        (symbol (po/agent-valid-invokes-task-global-name agent-name))
+        agent-mb-shared-pstate-sym
+        (symbol (po/agent-mb-shared-task-global-name agent-name))
 
-        pending-retries-pstate-sym
-        (symbol (po/pending-retries-task-global-name agent-name))
+        agent-mb-shared-pstate-sym
+        (symbol (po/agent-mb-shared-task-global-name agent-name))
 
         uniqued-sym           (symbol (str "$$uniqued-" agent-name))]
     (<<sources mb-topology
@@ -155,15 +152,15 @@
       (hook:checker-finished*)
 
      (source> failure-depot-sym :> %microbatch)
-      ;; this needs to happen here so that the updates to valid-invokes-pstate
+      ;; this needs to happen here so that the updates to valid invokes
       ;; in the previous microbatch have been committed
       (<<batch
         (|all)
-        (local-select> MAP-KEYS
-                       pending-retries-pstate-sym
+        (local-select> [:pending-retries ALL]
+                       agent-mb-shared-pstate-sym
                        {:allow-yield? true}
                        :> [*agent-task-id *agent-id *retry-num :as *tuple])
-        (local-transform> [(keypath *tuple) NONE>] pending-retries-pstate-sym)
+        (local-transform> [:pending-retries (set-elem *tuple) NONE>] agent-mb-shared-pstate-sym)
         (depot-partition-append!
          agent-depot-sym
          (aor-types/->valid-RetryAgentInvoke
@@ -183,14 +180,16 @@
         (|direct *agent-task-id)
         (local-select> [(keypath *agent-id) :retry-num (pred= *retry-num)]
                        agent-root-pstate-sym)
-        (local-transform> [(keypath [*agent-task-id *agent-id *retry-num])
-                           (termval nil)]
-                          pending-retries-pstate-sym)
+        (local-transform> [:pending-retries
+                           NONE-ELEM
+                           (termval [*agent-task-id *agent-id *retry-num])]
+                          agent-mb-shared-pstate-sym)
         (inc *retry-num :> *next-retry-num)
         (|all)
-        (local-transform> [(keypath [*agent-task-id *agent-id])
+        (local-transform> [:valid-invokes
+                           (keypath [*agent-task-id *agent-id])
                            (termval *next-retry-num)]
-                          agent-valid-invokes-pstate-sym))
+                          agent-mb-shared-pstate-sym))
       (<<batch
         (uniqued-sym :> *agent-task-id *agent-id *retry-num)
         (|global)
@@ -205,6 +204,6 @@
       (<<batch
         (%microbatch :> *tuple)
         (|all)
-        (local-transform> [(keypath *tuple) NONE>]
-                          agent-valid-invokes-pstate-sym))
+        (local-transform> [:valid-invokes (keypath *tuple) NONE>]
+                          agent-mb-shared-pstate-sym))
     )))

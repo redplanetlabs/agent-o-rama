@@ -142,7 +142,7 @@
                       nil
                       (fn [agent-node]
                         (aor/result! agent-node "abc"))))))
-     (rtest/launch-module! ipc module {:tasks 2 :threads 1})
+     (launch-module-without-eval-agent! ipc module {:tasks 2 :threads 1})
      (bind module-name (get-module-name module))
      (bind agent-manager (aor/agent-manager ipc module-name))
      (bind foo (aor/agent-client agent-manager "foo"))

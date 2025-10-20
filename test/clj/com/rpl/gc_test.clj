@@ -117,7 +117,7 @@
                  (fn [agent-node agg-state _]
                    (aor/result! agent-node agg-state)))
             )))
-         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
          (bind agent-manager (aor/agent-manager ipc module-name))
          (bind foo (aor/agent-client agent-manager "foo"))
@@ -137,10 +137,10 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-node-task-global-name "foo")))
-         (bind gc-pstate
+         (bind stream-shared-pstate
            (foreign-pstate ipc
                            module-name
-                           (po/agent-gc-invokes-task-global-name "foo")))
+                           (po/agent-stream-shared-task-global-name "foo")))
          (bind traces-query
            (foreign-query ipc
                           module-name
@@ -150,7 +150,9 @@
              (let [elems (reduce concat
                           []
                           (for [i (range 4)]
-                            (foreign-select MAP-KEYS gc-pstate {:pkey i})))]
+                            (foreign-select [:gc-root-invokes MAP-KEYS]
+                                            stream-shared-pstate
+                                            {:pkey i})))]
                (when-not (empty? elems)
                  (throw (ex-info "GC PState not empty" {:count (count elems)})))
              )))
@@ -316,7 +318,7 @@
                  (fn [agent-node]
                    (aor/result! agent-node "done")))
             )))
-         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
          (bind agent-manager (aor/agent-manager ipc module-name))
          (bind foo (aor/agent-client agent-manager "foo"))
@@ -336,10 +338,10 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-node-task-global-name "foo")))
-         (bind valid-pstate
+         (bind mb-shared-pstate
            (foreign-pstate ipc
                            module-name
-                           (po/agent-valid-invokes-task-global-name "foo")))
+                           (po/agent-mb-shared-task-global-name "foo")))
          (bind traces-query
            (foreign-query ipc
                           module-name
@@ -358,7 +360,7 @@
              (into #{}
                    (apply concat
                     (for [i (range 4)]
-                      (foreign-select MAP-KEYS valid-pstate {:pkey i})
+                      (foreign-select [:valid-invokes MAP-KEYS] mb-shared-pstate {:pkey i})
                     )))
            ))
 
@@ -476,7 +478,7 @@
                  (fn [agent-node]
                    (aor/result! agent-node "done")))
             )))
-         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
          (bind agent-manager (aor/agent-manager ipc module-name))
          (bind foo (aor/agent-client agent-manager "foo"))

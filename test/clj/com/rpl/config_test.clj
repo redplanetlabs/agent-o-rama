@@ -25,7 +25,7 @@
            (fn [agent-node]
              (aor/result! agent-node "abcd")
            )))))
-     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
 
      (bind agent-manager (aor/agent-manager ipc module-name))

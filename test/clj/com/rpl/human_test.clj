@@ -60,7 +60,7 @@
                  (aor/result! agent-node [agg-state h])
                )))
         )))
-     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
      (bind agent-manager (aor/agent-manager ipc module-name))
      (bind foo (aor/agent-client agent-manager "foo"))

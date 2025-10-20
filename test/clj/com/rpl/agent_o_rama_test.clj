@@ -765,7 +765,7 @@
                               (fn [agent-node agg node-start-res]
                                 (aor/result! agent-node [agg node-start-res])))
             )))
-         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
          (bind depot
            (foreign-depot ipc
@@ -775,10 +775,10 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-root-task-global-name "foo")))
-         (bind graph-history-pstate
+         (bind stream-shared-pstate
            (foreign-pstate ipc
                            module-name
-                           (po/graph-history-task-global-name "foo")))
+                           (po/agent-stream-shared-task-global-name "foo")))
          (bind current-graph-query
            (foreign-query ipc
                           module-name
@@ -798,9 +798,9 @@
          (doseq [[_ v] @task-counts-atom]
            (is (= 1 v)))
 
-         (is (= [0] (foreign-select MAP-KEYS graph-history-pstate {:pkey 0})))
+         (is (= [0] (foreign-select [:history MAP-KEYS] stream-shared-pstate {:pkey 0})))
          (bind hgraph
-           (foreign-select-one (keypath 0) graph-history-pstate {:pkey 0}))
+           (foreign-select-one [:history (keypath 0)] stream-shared-pstate {:pkey 0}))
 
          (is (some? (:uuid hgraph)))
          (bind graph-history1
@@ -851,11 +851,11 @@
          (doseq [[_ v] @task-counts-atom]
            (is (= 1 v)))
 
-         (is (= [0 1] (foreign-select MAP-KEYS graph-history-pstate {:pkey 0})))
+         (is (= [0 1] (foreign-select [:history MAP-KEYS] stream-shared-pstate {:pkey 0})))
          (bind hgraph1
-           (foreign-select-one (keypath 0) graph-history-pstate {:pkey 0}))
+           (foreign-select-one [:history (keypath 0)] stream-shared-pstate {:pkey 0}))
          (bind hgraph2
-           (foreign-select-one (keypath 1) graph-history-pstate {:pkey 0}))
+           (foreign-select-one [:history (keypath 1)] stream-shared-pstate {:pkey 0}))
 
          (is (not= (:uuid hgraph1) (:uuid hgraph2)))
 
@@ -925,7 +925,7 @@
                           (aor/result! agent-node "result3")
                         ))
             )))
-         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
          (bind depot
            (foreign-depot ipc
@@ -983,7 +983,7 @@
                         (fn [agent-node agg node-start-res]
                           (aor/result! agent-node agg)))
         )))
-     (rtest/launch-module! ipc module {:tasks 1 :threads 1})
+     (launch-module-without-eval-agent! ipc module {:tasks 1 :threads 1})
      (bind module-name (get-module-name module))
      (bind depot-foo
        (foreign-depot ipc
@@ -1171,7 +1171,7 @@
                     ))
         )
        ))
-     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
      (bind depot
        (foreign-depot ipc
@@ -1354,7 +1354,7 @@
                  (aor/result! agent-node "done")))
             )
            ))
-         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
          (bind depot
            (foreign-depot ipc
@@ -1680,7 +1680,7 @@
 (deftest looped-test
   (with-open [ipc (rtest/create-ipc)]
     (letlocals
-     (rtest/launch-module! ipc LoopedModule {:tasks 4 :threads 2})
+     (launch-module-without-eval-agent! ipc LoopedModule {:tasks 4 :threads 2})
      (bind module-name (get-module-name LoopedModule))
      (bind depot
        (foreign-depot ipc
@@ -1851,7 +1851,7 @@
                (fn [agent-node agg node-start-res]
                  (aor/result! agent-node agg)))
             )))
-         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
          (bind depot
            (foreign-depot ipc
@@ -2039,7 +2039,7 @@
            (fn [agent-node agg node-start-res]
              (aor/result! agent-node agg)))
         )))
-     (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+     (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
      (bind depot
        (foreign-depot ipc
@@ -2107,11 +2107,11 @@
                         (fn [agent-node v1 v2]
                           (aor/result! agent-node (+ v1 v2)))))
            ))
-         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
 
          (bind agent-manager (aor/agent-manager ipc module-name))
-         (is (= #{"foo" "bar" aor-types/EVALUATOR-AGENT-NAME} (aor/agent-names agent-manager)))
+         (is (= #{"foo" "bar"} (aor/agent-names agent-manager)))
 
          (bind foo (aor/agent-client agent-manager "foo"))
          (bind bar (aor/agent-client agent-manager "bar"))
@@ -2231,7 +2231,7 @@
                   $$root)
                )
              )))
-         (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
 
          (bind reset-depot (foreign-depot ipc module-name "*reset-depot"))
@@ -2454,7 +2454,7 @@
                  (aor/result! agent-node "bbb")))
             )
            ))
-         (rtest/launch-module! ipc module {:tasks 8 :threads 8})
+         (launch-module-without-eval-agent! ipc module {:tasks 8 :threads 8})
          (bind module-name (get-module-name module))
 
          (bind agent-manager (aor/agent-manager ipc module-name))
@@ -2634,7 +2634,7 @@
              ))
           )
          ))
-       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
        (bind module-name (get-module-name module))
 
        (bind agent-manager (aor/agent-manager ipc module-name))
@@ -2709,7 +2709,7 @@
                    (aor/stream-chunk! agent-node 15))
                ))))
          ))
-       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
        (bind module-name (get-module-name module))
 
        (bind agent-manager (aor/agent-manager ipc module-name))
@@ -2813,7 +2813,7 @@
                (aor/stream-chunk! agent-node "e")
                (aor/result! agent-node "abcd")
              )))))
-       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
        (bind module-name (get-module-name module))
 
        (bind agent-manager (aor/agent-manager ipc module-name))
@@ -2876,12 +2876,12 @@
        (bind module
          (module
            [setup topologies]
-           (let [topology   (aor/agent-topology setup topologies)
-                 node-exec  (symbol (po/agent-node-executor-name))
-                 active-foo (symbol (po/agent-active-invokes-task-global-name
-                                     "foo"))
-                 active-bar (symbol (po/agent-active-invokes-task-global-name
-                                     "bar"))]
+           (let [topology          (aor/agent-topology setup topologies)
+                 node-exec         (symbol (po/agent-node-executor-name))
+                 stream-shared-foo (symbol (po/agent-stream-shared-task-global-name
+                                            "foo"))
+                 stream-shared-bar (symbol (po/agent-stream-shared-task-global-name
+                                            "bar"))]
              (->
                topology
                (aor/new-agent "foo")
@@ -2967,13 +2967,13 @@
                "pending-agent-count"
                [:> *res]
                (|all)
-               (local-select> MAP-KEYS active-foo :> *agent-id)
+               (local-select> [:active-invokes ALL] stream-shared-foo :> *agent-id)
                (identity "foo" :> *name)
                (anchor> <foo>)
 
                (gen>)
                (|all)
-               (local-select> MAP-KEYS active-bar :> *agent-id)
+               (local-select> [:active-invokes ALL] stream-shared-bar :> *agent-id)
                (identity "bar" :> *name)
                (anchor> <bar>)
 
@@ -2981,7 +2981,7 @@
                (|origin)
                (+compound {*name (aggs/+count)} :> *res))
            )))
-       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
        (bind module-name (get-module-name module))
        (bind pending-invoke-ids
          (foreign-query ipc module-name "pending-invoke-ids"))
@@ -3173,10 +3173,14 @@
                           (fail-and-add-metadata! agent-node "end")
                           (aor/result! agent-node 10)))
           )))
-       (rtest/launch-module! ipc module {:tasks 4 :threads 2})
+       (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
        (bind module-name (get-module-name module))
        (bind agent-manager (aor/agent-manager ipc module-name))
        (bind foo (aor/agent-client agent-manager "foo"))
+       (bind stream-shared
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-stream-shared-task-global-name "foo")))
        (bind root-pstate
          (foreign-pstate ipc
                          module-name
@@ -3189,6 +3193,13 @@
        (bind expected-results-fn
          (fn [m]
            {"start" m "as" m "node1" m "agg" m "end" m}))
+
+       (bind all-meta
+         (fn []
+           (transform MAP-VALS
+                      :examples
+                      (foreign-select-one [:metadata (view #(into {} %))] stream-shared {:pkey 0}))
+         ))
 
        (bind expected-results
          (expected-results-fn
@@ -3263,4 +3274,84 @@
        (reset! RESULTS {})
        (is (= 10 (aor/agent-fork foo inv {agg [nil nil]})))
        (is (= @RESULTS (dissoc expected-results "start" "as" "node1")))
+
+
+       (bind m (all-meta))
+       (is (= m
+              {"a" #{1}
+               "b" #{true 2}
+               "c" #{"abc"}
+               "d" #{0.4 0.5}
+               "e" #{true}
+               "f" #{0.5}
+               "i" #{1}
+               "l" #{1}
+               "s" #{"abc"}}))
+
+
+       (aor/agent-invoke-with-context
+        foo
+        {:metadata {"b" 3}})
+
+       (bind m (all-meta))
+       (is (= m
+              {"a" #{1}
+               "b" #{true 2 3}
+               "c" #{"abc"}
+               "d" #{0.4 0.5}
+               "e" #{true}
+               "f" #{0.5}
+               "i" #{1}
+               "l" #{1}
+               "s" #{"abc"}}))
+
+       (aor/agent-invoke-with-context
+        foo
+        {:metadata {"b" 4 "hello" "zyx" "world-HeLLO" 1 "a-hello" 2}})
+
+       (bind m (all-meta))
+       (is (= m
+              {"a"           #{1}
+               "a-hello"     #{2}
+               "b"           #{true 2 3}
+               "c"           #{"abc"}
+               "d"           #{0.4 0.5}
+               "e"           #{true}
+               "f"           #{0.5}
+               "hello"       #{"zyx"}
+               "i"           #{1}
+               "l"           #{1}
+               "s"           #{"abc"}
+               "world-HeLLO" #{1}}))
+
+
+       (bind search-metadata (:search-metadata-query (aor-types/underlying-objects foo)))
+
+       (bind res (foreign-invoke-query search-metadata "" 100 nil))
+       (is (= (:metadata res)
+              [{:examples #{1} :name "a"}
+               {:examples #{2} :name "a-hello"}
+               {:examples #{"run-success" "run-failure"} :name "aor/status"}
+               {:examples #{true 3 2} :name "b"}
+               {:examples #{"abc"} :name "c"}
+               {:examples #{0.5 0.4} :name "d"}
+               {:examples #{true} :name "e"}
+               {:examples #{0.5} :name "f"}
+               {:examples #{"zyx"} :name "hello"}
+               {:examples #{1} :name "i"}
+               {:examples #{1} :name "l"}
+               {:examples #{"abc"} :name "s"}
+               {:examples #{1} :name "world-HeLLO"}]
+           ))
+       (is (nil? (:pagination-params res)))
+
+       (bind res (foreign-invoke-query search-metadata "HELLO" 2 nil))
+       (is (= (:metadata res)
+              [{:examples #{2} :name "a-hello"} {:examples #{"zyx"} :name "hello"}]))
+       (is (some? (:pagination-params res)))
+
+       (bind res (foreign-invoke-query search-metadata "HELLO" 2 (:pagination-params res)))
+       (is (= (:metadata res)
+              [{:examples #{1} :name "world-HeLLO"}]))
+       (is (nil? (:pagination-params res)))
       ))))

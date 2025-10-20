@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.feedback :as fb]
    [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.metrics :as metrics]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.retries :as retries]
    [com.rpl.agent-o-rama.impl.stats :as stats]
@@ -18,7 +19,9 @@
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [jsonista.core :as j]
-   [org.httpkit.client :as http])
+   [org.httpkit.client :as http]
+   [rpl.rama.distributed.stats.number-stats :as number-stats]
+   [rpl.rama.distributed.stats.t-digest :as t-digest])
   (:import
    [com.rpl.agentorama.impl
     AgentDeclaredObjectsTaskGlobal
@@ -212,8 +215,10 @@
           {"response" body}
         )))))
 
+(def EVAL-ACTION-NAME "aor/eval")
+
 (def BUILT-IN-ACTIONS
-  {"aor/eval"
+  {EVAL-ACTION-NAME
    {:builder-fn  eval-action-builder-fn
     :description "Run an evaluator to add feedback to a node or agent"
     :options     {:params
@@ -467,12 +472,10 @@
   ))
 
 (defn action-target-pstate
-  [agent-name node-name]
-  (if (nil? node-name)
-    (po/agent-root-task-global agent-name)
-    (po/agent-node-task-global agent-name)))
-
-(defn scan-amt [] 100)
+  [agent-name node?]
+  (if node?
+    (po/agent-node-task-global agent-name)
+    (po/agent-root-task-global agent-name)))
 
 (defn experiment-source?
   [data]
@@ -480,10 +483,18 @@
        (aor-types/ExperimentSourceImpl? (:source data))))
 
 (def NODE-ACTION-STALL-TIME-MILLIS (* 1000 60 2))
+(def NODE-ACTION-MIN-WAIT-MILLIS (* 1000 30))
 
-(defn max-node-scan-time
+(defn node-stall-time
   []
   (- (h/current-time-millis) NODE-ACTION-STALL-TIME-MILLIS))
+
+;; - this is because nodes can be written out of order, as their IDs are generated on different
+;; tasks
+;; - so we give a little time for them to be written before scanning past them
+(defn max-node-scan-time
+  []
+  (- (h/current-time-millis) NODE-ACTION-MIN-WAIT-MILLIS))
 
 (defn compute-end-offset
   [dep-offset max-scan-offset]
@@ -503,18 +514,25 @@
       max-scan-offset
     )))
 
+(aor-types/defaorrecord AnaNodeTarget [node-name :- String])
+(aor-types/defaorrecord AnaRootTarget [])
+(aor-types/defaorrecord AnaAllNodesTarget [])
+
 (defn complete-node-map
-  [m node-name node-exec]
-  (if (nil? node-name)
+  [m target node-exec]
+  (if (AnaRootTarget? target)
     m
-    (let [max-time        (max-node-scan-time)
+    (let [stall-time      (node-stall-time)
+          max-time        (max-node-scan-time)
           invalid-offset?
           (fn [[k data]]
-            (and (not (contains? data :finish-time-millis))
-                 (not (contains? data :invoked-agg-invoke-id))
-                 (or (retries/invoke-id-executing? node-exec k)
-                     (and (contains? data :start-time-millis); not strictly necessary
-                          (> (:start-time-millis data) max-time)))))
+            (or (and (contains? data :start-time-millis)
+                     (> (:start-time-millis data) max-time))
+                (and (not (contains? data :finish-time-millis))
+                     (not (contains? data :invoked-agg-invoke-id))
+                     (or (retries/invoke-id-executing? node-exec k)
+                         (and (contains? data :start-time-millis) ; not strictly necessary
+                              (> (:start-time-millis data) stall-time))))))
           first-invalid-offset (select-first [ALL invalid-offset? FIRST] m)]
       (if (nil? first-invalid-offset)
         m
@@ -663,17 +681,70 @@
    (:>)
   ))
 
-
 (defn include-result-from-status?
-  [status-filter {:keys [run-type result finish-time-millis]}]
-  (let [success? (if (= :agent run-type)
-                   (not (:failure? result))
-                   (some? finish-time-millis))]
+  [status-filter data-map]
+  (let [success? (metrics/run-success? data-map)]
     (condp = status-filter
       :all true
       :success success?
       :fail (not success?)
       (throw (h/ex-info "Unexpected status filter" {:status-filter status-filter})))))
+
+(deframafn fetch-data
+  [*agent-name *target *offset *dep-end-offset]
+  (<<if (AnaRootTarget? *target)
+    (po/agent-stream-shared-task-global *agent-name :> $$stream-shared)
+    (local-select> [:active-invokes (subselect FIRST) (view first)]
+                   $$stream-shared
+                   :> *max-scan-offset)
+   (else>)
+    (identity nil :> *max-scan-offset))
+  (action-target-pstate *agent-name (not (AnaRootTarget? *target)) :> $$p)
+  (compute-end-offset *dep-end-offset *max-scan-offset :> *end-offset)
+  (anode/read-global-config aor-types/ANALYTICS-SCAN-AMOUNT-PER-TARGET-PER-TASK-CONFIG
+                            :> *scan-amt)
+  (<<ramafn %add-run-type
+    [*m]
+    (:> (assoc (into {} *m) :run-type (ifexpr (AnaRootTarget? *target) :agent :node))))
+  (po/agent-node-executor-task-global :> *node-exec)
+  (<<if (>= (compare *offset *end-offset) 0)
+    (sorted-map :> *m)
+   (else>)
+    (local-select> [(sorted-map-range-from *offset *scan-amt)
+                    (sorted-map-range *offset *end-offset)
+                    (view complete-node-map *target *node-exec)
+                    (transformed MAP-VALS %add-run-type)]
+                   $$p
+                   :> *m))
+  (compute-end-scan-offset *m *offset :> *end-scan-offset)
+  (:> *m *end-scan-offset))
+
+(deframafn get-matching-offsets
+  [*m *target *status-filter *filter *sampling-rate]
+  (<<ramafn %match?
+    [*data]
+    (:> (and> (not (experiment-source? *data))
+              (not (contains? *data :invoked-agg-invoke-id))
+              (contains? *data :start-time-millis) ; not stricly necessary
+              (include-result-from-status? *status-filter *data)
+              (or> (not (AnaNodeTarget? *target))
+                   (= (get *target :node-name) (get *data :node)))
+              (aor-types/rule-filter-matches? *filter *data)
+              (sample? *sampling-rate))))
+  (select> (subselect ALL
+                      (selected? LAST (pred %match?))
+                      FIRST)
+    *m
+    :> *matching-offsets)
+  (:> *matching-offsets))
+
+(deframafn compute-dep-end-offset
+  [*rule->info *task-id *dependency-names]
+  (<<batch
+    (ops/explode *dependency-names :> *dname)
+    (select> [(keypath *dname) :cursors (keypath *task-id)] *rule->info :> *other-offset)
+    (+min-uuid *other-offset :> *dep-end-offset))
+  (:> *dep-end-offset))
 
 (deframaop find-qualified-offsets-and-run-unlimited
   [*agent->rule->info *cache-pstate-name *processed-pstate-name]
@@ -690,48 +761,20 @@
    (select> [:cursors ALL (collect-one FIRST) LAST]
      *rule-info
      :> [*task-id *offset])
-   (<<batch
-     (ops/explode *dependency-names :> *dname)
-     (select> [(keypath *dname) :cursors (keypath *task-id)] *rule->info :> *other-offset)
-     (+min-uuid *other-offset :> *dep-end-offset))
+   (compute-dep-end-offset *rule->info *task-id *dependency-names :> *dep-end-offset)
    (|direct *task-id)
    (all-action-builders :> *action-builders)
    (get *action-builders *action-name :> {:keys [*builder-fn *options]})
    (get *options :limit-concurrency? false :> *limit-concurrency?)
    (completable-future> (build-action-fn *builder-fn *action-params) :> *action-fn)
-   (<<if (some? *node-name)
-     (identity nil :> *max-scan-offset)
-    (else>)
-     (po/agent-active-invokes-task-global *agent-name :> $$active)
-     (local-select> [(subselect FIRST) (view first) (view first)] $$active :> *max-scan-offset))
-   (compute-end-offset *dep-end-offset *max-scan-offset :> *end-offset)
-   (action-target-pstate *agent-name *node-name :> $$p)
-   (scan-amt :> *scan-amt)
-   (<<ramafn %add-run-type
-     [*m]
-     (:> (assoc (into {} *m) :run-type (ifexpr (some? *node-name) :node :agent))))
-   (po/agent-node-executor-task-global :> *node-exec)
-   (local-select> [(sorted-map-range-from *offset *scan-amt)
-                   (sorted-map-range *offset *end-offset)
-                   (view complete-node-map *node-name *node-exec)
-                   (transformed MAP-VALS %add-run-type)]
-                  $$p
-                  :> *m)
-   (compute-end-scan-offset *m *offset :> *end-scan-offset)
-   (<<ramafn %match?
-     [*data]
-     (:> (and> (not (experiment-source? *data))
-               (not (contains? *data :invoked-agg-invoke-id))
-               (contains? *data :start-time-millis) ; not stricly necessary
-               (include-result-from-status? *status-filter *data)
-               (or> (nil? *node-name) (= *node-name (get *data :node)))
-               (aor-types/rule-filter-matches? *filter *data)
-               (sample? *sampling-rate))))
-   (select> (subselect ALL
-                       (selected? LAST (pred %match?))
-                       FIRST)
-     *m
-     :> *matching-offsets)
+   (ifexpr (some? *node-name) (->AnaNodeTarget *node-name) (->AnaRootTarget) :> *target)
+   (fetch-data
+    *agent-name
+    *target
+    *offset
+    *dep-end-offset
+    :> *m *end-scan-offset)
+   (get-matching-offsets *m *target *status-filter *filter *sampling-rate :> *matching-offsets)
    (local-transform> [(keypath *agent-name *rule-name)
                       (multi-path [:data (termval *m)]
                                   [:action-fn (termval *action-fn)]
@@ -748,6 +791,206 @@
      (run-one-action! *cache-pstate-name *agent-name *rule-name *offset *action-name *node-name)
    )))
 
+(defn rule-source?-pred
+  [rule-name]
+  (fn [source]
+    (and (aor-types/EvalSourceImpl? source)
+         (aor-types/ActionSourceImpl? (:source source))
+         (= rule-name
+            (-> source
+                :source
+                :rule-name)))))
+
+(defn to-eval-metric
+  [rule-name target]
+  (let [rule-kw (keyword rule-name)]
+    (metrics/->valid-MetricDefinition
+     target
+     (fn [{:keys [feedback]}]
+       (if-let [scores (select-first [:results
+                                      ALL
+                                      (selected? :source (rule-source?-pred rule-name))
+                                      :scores]
+                                     feedback)]
+         (->> scores
+              (transform
+               MAP-KEYS
+               (fn [k]
+                 [:eval rule-kw (keyword k)]))
+              (transform
+               MAP-VALS
+               (fn [v]
+                 [(cond
+                    (string? v) {:type :categorical :values #{v}}
+                    (boolean? v) {:type :numeric :values [(if v 1 0)]}
+                    (number? v) {:type :numeric :values [v]}
+                    :else (throw (h/ex-info "Unexpected eval value" {:value v :type (class v)}))
+                  )])))
+       )))))
+
+(deframaop explode-metrics
+  [*rule->info]
+  (vals (metrics/all-metrics) :> *built-in-metrics)
+  (anchor> <root>)
+  (ops/explode-map (group-by :target *built-in-metrics) :> *target *metrics)
+  (:> {:target            *target
+       :query-id          [*target]
+       :metrics           *metrics
+       :dependency-rule-names []
+       :start-time-millis 0})
+
+  (hook> <root>)
+  (select> [ALL (collect-one FIRST) LAST :definition
+            (selected? :action-name (pred= EVAL-ACTION-NAME))]
+    *rule->info
+    :> [*rule-name {:keys [*node-name *start-time-millis]}])
+  (ifexpr (nil? *node-name) :root :nodes :> *target)
+  (:> {:target            *target
+       :query-id          [:eval *rule-name]
+       :metrics           [(to-eval-metric *rule-name *target)]
+       :dependency-rule-names [*rule-name]
+       :start-time-millis *start-time-millis}))
+
+(deframafn get-all-metrics
+  [*rule->info]
+  (<<batch
+    (explode-metrics *rule->info :> *m)
+    (aggs/+vec-agg *m :> *res))
+  (:> *res))
+
+(defn metrics-target
+  [target]
+  (if (= target :root)
+    (->AnaRootTarget)
+    (->AnaAllNodesTarget)))
+
+(defn to-bucket
+  [granularity time-millis]
+  (quot time-millis (* granularity 1000)))
+
+(defn mk-number-stats
+  []
+  (number-stats/->valid-NumberStats
+   nil
+   nil
+   nil
+   nil
+   nil
+   (t-digest/mk-merging-digest 25)))
+
+(defn metric-point->category-values
+  [{:keys [type values]}]
+  (->> (if (= type :numeric)
+         {po/DEFAULT-CATEGORY values}
+         (transform MAP-VALS vector values))
+       (setval [MAP-VALS empty?]
+               NONE)))
+
+(defn add-number-stats-values
+  [number-stats values]
+  (reduce number-stats/add-value! number-stats values))
+
+(defn category-map-updater
+  [category-values]
+  (fn [m]
+    (reduce-kv
+     (fn [m cat values]
+       (let [number-stats (or (get m cat) (mk-number-stats))]
+         (assoc m cat (add-number-stats-values number-stats values))))
+     m
+     category-values)))
+
+(defn metadata-stats-updater
+  [metadata category-values]
+  (let [update-fn (category-map-updater category-values)]
+    (fn [m]
+      (reduce-kv
+       (fn [m metadata-key metadata-value]
+         (transform [(keypath metadata-key)
+                     ;; only keep first 5 metadata values seen to bound size
+                     (selected? (view count) (pred< 5))
+                     (keypath metadata-value)]
+                    update-fn
+                    m))
+       m
+       metadata))))
+
+(defn stats-updater
+  [metadata category-values]
+  (fn [stats]
+    (multi-transform
+     (multi-path
+      [:overall (term (category-map-updater category-values))]
+      [:by-meta (term (metadata-stats-updater metadata category-values))])
+     stats)))
+
+(defn invoke-metrics-fn
+  [metrics-fn data-map]
+  (try
+    (h/invoke metrics-fn data-map)
+    (catch Throwable t
+      ;; - this is defensive, as all metrics fns are defined in AOR and should handle all cases
+      ;; - don't want analytics topology to come to a halt in case of a bug
+      (tl/error ::invoke-metrics-fn t "Metrics function invoke error")
+      {}
+    )))
+
+(deframaop compute-metrics!
+  [*agent->rule->info]
+  (ops/explode-map *agent->rule->info :> *agent-name *rule->info)
+  (get-all-metrics *rule->info :> *maps)
+  (ops/range> 0 (get-num-tasks) :> *task-id)
+  (<<ramafn %update-dep-end-offset
+    [{:keys [*dependency-rule-names] :as *m}]
+    (dissoc *m :dependency-rule-names :> *m)
+    (:> (assoc *m
+         :dep-end-offset
+         (compute-dep-end-offset *rule->info *task-id *dependency-rule-names))))
+  (mapv %update-dep-end-offset *maps :> *maps)
+  (|direct *task-id)
+  (po/agent-metric-cursors-task-global *agent-name :> $$metric-cursors)
+  (local-select> STAY $$metric-cursors :> *metric-cursors)
+  ;; - causes removed metrics (e.g. rules withe vals) to be cleared from here
+  ;; - since this is a microbatch topology, the existing metrics will overwrite this below and this
+  ;; clear will never be visible
+  (local-transform> (termval {}) $$metric-cursors)
+  (ops/explode *maps :> {:keys [*target *query-id *metrics *dep-end-offset *start-time-millis]})
+  (select> [(keypath *query-id) (nil->val (h/min-uuid7-at-timestamp *start-time-millis))]
+    *metric-cursors
+    :> *offset)
+  (fetch-data
+   *agent-name
+   (metrics-target *target)
+   *offset
+   *dep-end-offset
+   :> *m *end-scan-offset)
+  (local-transform> [(keypath *query-id) (termval *end-scan-offset)]
+                    $$metric-cursors)
+  (ops/explode-map *m :> *k {:keys [*start-time-millis *metadata] :as *data-map})
+  (filter> (some? *start-time-millis)) ; defensive
+  (filter> (not (experiment-source? *data-map)))
+  (assoc *metadata
+   "aor/status"
+   (ifexpr (metrics/run-success? *data-map) "run-success" "run-failure")
+   :> *metadata)
+  (ops/explode *metrics :> {:keys [*metrics-fn]})
+  (invoke-metrics-fn *metrics-fn *data-map :> *metrics-map)
+  (ops/explode-map *metrics-map :> *metric-id *metric-points)
+  (ops/explode *metric-points :> *metric-point)
+  (metric-point->category-values *metric-point :> *category-values)
+  (filter> (not (empty? *category-values)))
+
+  (ops/explode po/GRANULARITIES :> *granularity)
+  (to-bucket *granularity *start-time-millis :> *bucket)
+
+  (|hash [*agent-name *granularity *metric-id])
+  (po/agent-telemetry-task-global *agent-name :> $$telemetry)
+
+  (local-transform>
+   [(keypath *granularity *metric-id *bucket)
+    (term (stats-updater *metadata *category-values))]
+   $$telemetry)
+)
 
 (defn to-action-queue
   [task->agent->rule->info]
@@ -833,11 +1076,17 @@
         cache-pstate-name (str cache-pstate)
         processed-pstate (gen-pstatevar "processed-offsets")
         processed-pstate-name (str processed-pstate)
-        processed-agg-pstate (gen-pstatevar "processed-agg")]
+        processed-agg-pstate (gen-pstatevar "processed-agg")
+        root-anchor (gen-anchorvar "root")]
     [[anode/read-global-config aor-types/MAX-LIMITED-ACTIONS-CONCURRENCY-CONFIG :> '*max-concurrency]
      [anode/read-global-config aor-types/ACTIONS-PROCESSING-ITERATION-TIME-MILLIS-CONFIG :> '*target-millis]
      [h/current-time-millis :> '*actions-start-time-millis]
      [read-rules :> '*agent->rule->info]
+
+     [anchor> root-anchor]
+     [compute-metrics! '*agent->rule->info]
+
+     [hook> root-anchor]
      [<<batch
       [filter> false]
       [materialize> :> cache-pstate]
@@ -914,3 +1163,58 @@
 (defn fetch-agent-rules
   [agent-rules-pstate]
   (foreign-select-one STAY agent-rules-pstate))
+
+(def METRIC-QUERIES
+  {:rest-sum number-stats/get-rest-sum
+   :mean     number-stats/get-mean
+   :count    number-stats/get-count
+   :min      number-stats/get-min
+   :max      number-stats/get-max
+   :latest   number-stats/get-latest
+  })
+
+(defn metrics-extract
+  [metrics-set number-stats]
+  (reduce
+   (fn [m metric]
+     (assoc m
+      metric
+      (if (number? metric)
+        (number-stats/get-quantile! number-stats metric)
+        ((get METRIC-QUERIES metric) number-stats)
+      )))
+   {}
+   metrics-set))
+
+(defn telemetry-extract
+  [metadata-key v]
+  (let [extract-path (if metadata-key
+                       (path :by-meta (keypath metadata-key))
+                       (path :overall))]
+    (if-let [ret (select-any extract-path v)]
+      ret
+      NONE)))
+
+;; metrics-set can contain any of:
+;; - [:rest-sum, :mean, :count, :min, :max, :latest, <number quantile>]
+;;    - for example, to get mean, p99, and max: #{:mean, 0.99, :max}
+;;    - to get min, p25, p50, p75, and max: #{:min, 0.25, 0.5, 0.75, :max}
+;; - doesn't use any anonymous functions so that this works across module update, as AOR clients
+;; won't usually use the same compilation as running modules
+;; - metadata-key is optional
+;;   - if set, leaves are split by metadata value (5 max)
+(defn select-telemetry
+  [telemetry-pstate agent-name granularity metric-id start-time-millis end-time-millis metrics-set
+   metadata-key]
+  (let [start-bucket (to-bucket granularity start-time-millis)
+        end-bucket   (to-bucket granularity end-time-millis)
+        end-path     (if metadata-key
+                       (path MAP-VALS MAP-VALS)
+                       (path MAP-VALS))]
+    (foreign-select-one
+     [(keypath granularity metric-id)
+      (sorted-map-range start-bucket end-bucket)
+      (transformed [(putval metadata-key) MAP-VALS] telemetry-extract)
+      (transformed [(putval metrics-set) MAP-VALS end-path] metrics-extract)]
+     telemetry-pstate
+     {:pkey [agent-name granularity metric-id]})))

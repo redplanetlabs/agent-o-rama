@@ -36,7 +36,7 @@
       (Thread/sleep 1000)
       (recur (unchecked-inc i)))))
 
-(deftest ^:integration agent-level-feedback-test
+(deftest agent-level-feedback-test
   ;; Test agent-level feedback display in the main Feedback tab.
   ;; Uses feedback-test-agent which generates agent-level evaluator feedback.
   (eth/with-system
@@ -71,7 +71,7 @@
               (testing "feedback panels display scores"
                 (is (e/visible? driver {:data-id "feedback-panel"}))))))))))
 
-(deftest ^:integration node-level-feedback-test
+(deftest node-level-feedback-test
   ;; Test node-level feedback display in node details Feedback tab.
   ;; Uses feedback-test-agent which generates node-level evaluator feedback.
   (eth/with-system
@@ -112,7 +112,7 @@
               (testing "has feedback items from node-level evaluators"
                 (is (e/exists? driver {:data-id "feedback-item-0"}))))))))))
 
-(deftest ^:integration empty-feedback-state-test
+(deftest empty-feedback-state-test
   ;; Test empty state display when no feedback is present.
   ;; Uses an agent run without any evaluator rules configured.
   (eth/with-system [system FeedbackTestAgentModule]
@@ -147,7 +147,7 @@
                                  {:data-id "feedback-empty-state"}
                                  "No feedback available"))))))))))
 
-(deftest ^:integration feedback-score-types-test
+(deftest feedback-score-types-test
   ;; Test display of different score types (boolean and numeric).
   ;; Uses feedback-test-agent evaluators that return different score formats.
   (eth/with-system
@@ -184,7 +184,7 @@
               (testing "numeric scores display in node feedback"
                 (is (e/visible? driver {:data-id "feedback-list"}))))))))))
 
-(deftest ^:integration multiple-feedback-sources-test
+(deftest multiple-feedback-sources-test
   ;; Test that feedback from multiple evaluators displays together.
   ;; Uses both agent-level and node-level evaluators.
   (eth/with-system

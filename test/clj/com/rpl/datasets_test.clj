@@ -554,7 +554,7 @@
                  (aor/result! agent-node "done")
                )))
          ))
-       (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+       (launch-module-without-eval-agent! ipc module {:tasks 2 :threads 2})
        (bind module-name (get-module-name module))
        (bind manager (aor/agent-manager ipc module-name))
        (bind pstate

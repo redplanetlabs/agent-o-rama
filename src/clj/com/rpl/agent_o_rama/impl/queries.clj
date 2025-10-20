@@ -53,6 +53,14 @@
   [agent-name]
   (str "_agent-get-action-log-page-" agent-name))
 
+(defn search-metadata-name
+  [agent-name]
+  (str "_agent-search-metadata-" agent-name))
+
+(defn all-agent-metrics-name
+  [agent-name]
+  (str "_agent-all-metrics-" agent-name))
+
 (defn get-datasets-page-query-name
   []
   "_aor-get-datasets")
@@ -74,7 +82,6 @@
   "_aor-try-evaluator")
 
 (defn search-examples-name
-  []
   []
   "_aor-search-dataset-examples")
 
@@ -934,6 +941,63 @@
                              to-action-log-page-result
                              h/max-uuid
                              (keypath agent-name *rule-name))
+    )))
+
+(defn add-implicit-metadata
+  [items search-string-lower]
+  (if (h/contains-string? "aor/status" search-string-lower)
+    (->> (conj items {:name "aor/status" :examples #{"run-success" "run-failure"}})
+         (sort-by :name)
+         vec)
+    items
+  ))
+
+;; returns {:metadata [{:name ... :examples #{...}} ...] :pagination-params ...}
+(defn declare-search-metadata-topology
+  [topologies agent-name]
+  (let [shared-streaming-sym (symbol (po/agent-stream-shared-task-global-name agent-name))]
+    (<<query-topology topologies
+      (search-metadata-name agent-name)
+      [*search-string *limit *next-key :> *res]
+      (|direct 0)
+      (str/lower-case *search-string :> *search-string-lower)
+      (<<ramafn %filter
+        [*name _]
+        (<<cond
+         (case> (not (h/contains-string? (str/lower-case (str *name)) *search-string-lower)))
+          (:> nil nil)
+
+         (default>)
+          (:> {:name *name} nil)))
+      (search-loop shared-streaming-sym
+                   (path> :metadata)
+                   %filter
+                   *limit
+                   *next-key
+                   false
+                   :> *items *page-key)
+      (|origin)
+      (hash-map :metadata
+                (add-implicit-metadata *items *search-string-lower)
+                :pagination-params
+                *page-key
+                :> *res)
+    )))
+
+(defn declare-all-agent-metrics-topology
+  [topologies agent-name]
+  (let [telemetry-sym (symbol (po/agent-telemetry-task-global-name agent-name))]
+    (<<query-topology topologies
+      (all-agent-metrics-name agent-name)
+      [:> *res]
+      (|all)
+      (local-select>
+       [(keypath 60) MAP-KEYS]
+       telemetry-sym
+       {:allow-yield? true}
+       :> *metric-id)
+      (|origin)
+      (aggs/+set-agg *metric-id :> *res)
     )))
 
 ;; direct queries on PStates

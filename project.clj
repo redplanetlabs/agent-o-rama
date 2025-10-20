@@ -1,6 +1,6 @@
 (defproject com.rpl/agent-o-rama "0.9.0-SNAPSHOT"
   :source-paths ["src/clj" "src/cljs" "resource"]
-  :java-source-paths ["src/java" "test/cljs" "src/cljs"]
+  :java-source-paths ["src/java"]
   :test-paths ["test/clj"]
   :jvm-opts ["-Xss6m"
              "-Xms6g"
@@ -45,9 +45,10 @@
                  [ring-cors/ring-cors "0.1.13"]
                  [com.cognitect/transit-clj "1.0.333"]
                  [com.cognitect/transit-cljs "0.8.280"]]
-  :test-selectors {:default     (complement :integration)
-                   :integration :integration
-                   :all         (constantly true)}
+  :test-selectors
+  {:default (complement #(re-find #"^com\.rpl\.agent\-o\-rama\.ui" (str (:ns %))))
+   :ui      #(re-find #"^com\.rpl\.agent\-o\-rama\.ui" (str (:ns %)))
+   :all     (constantly true)}
   :global-vars {*warn-on-reflection* true}
   :repositories
   [["releases"
@@ -60,7 +61,6 @@
                                             "dev"
                                             "examples/clj/src"
                                             "examples/clj/test"]
-                        :test-paths        ["test/clj"]
                         :java-source-paths ["src/java" "test/java"]
                         :jvm-opts          ["-Xss6m"
                                             "-Xms6g"
