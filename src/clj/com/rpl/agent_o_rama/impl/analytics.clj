@@ -924,6 +924,17 @@
       [:by-meta (term (metadata-stats-updater metadata category-values))])
      stats)))
 
+(defn invoke-metrics-fn
+  [metrics-fn data-map]
+  (try
+    (h/invoke metrics-fn data-map)
+    (catch Throwable t
+      ;; - this is defensive, as all metrics fns are defined in AOR and should handle all cases
+      ;; - don't want analytics topology to come to a halt in case of a bug
+      (tl/error ::invoke-metrics-fn t "Metrics function invoke error")
+      {}
+    )))
+
 (deframaop compute-metrics!
   [*agent->rule->info]
   (ops/explode-map *agent->rule->info :> *agent-name *rule->info)
@@ -963,8 +974,7 @@
    (ifexpr (metrics/run-success? *data-map) "run-success" "run-failure")
    :> *metadata)
   (ops/explode *metrics :> {:keys [*metrics-fn]})
-  ;; TODO: <<<<>>>> be defensive here just in case
-  (h/invoke *metrics-fn *data-map :> *metrics-map)
+  (invoke-metrics-fn *metrics-fn *data-map :> *metrics-map)
   (ops/explode-map *metrics-map :> *metric-id *metric-points)
   (ops/explode *metric-points :> *metric-point)
   (metric-point->category-values *metric-point :> *category-values)
