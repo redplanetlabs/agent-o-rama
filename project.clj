@@ -1,6 +1,6 @@
 (defproject com.rpl/agent-o-rama "0.9.0-SNAPSHOT"
   :source-paths ["src/clj" "src/cljs" "resource"]
-  :java-source-paths ["src/java" "test/cljs" "src/cljs"]
+  :java-source-paths ["src/java"]
   :test-paths ["test/clj"]
   :jvm-opts ["-Xss6m"
              "-Xms6g"
@@ -60,7 +60,6 @@
                                             "dev"
                                             "examples/clj/src"
                                             "examples/clj/test"]
-                        :test-paths        ["test/clj"]
                         :java-source-paths ["src/java" "test/java"]
                         :dependencies
                         [[org.clojure/clojure "1.12.2"]
