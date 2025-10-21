@@ -13,12 +13,14 @@
   - data: uPlot data array [[timestamps] [series1] [series2] ...] (will be converted to JS)
   
   Returns:
-  - A React ref to attach to the target DOM element where the chart will render"
+  - A two-element vector: [target-ref chart-ref]
+    - target-ref: React ref to attach to the DOM element where the chart will render
+    - chart-ref: React ref containing the uPlot chart instance (for calling methods like .setSize())"
   [options data]
   (let [chart-ref (useRef nil)
         target-ref (useRef nil)]
 
-    ;; Create or update chart when data or options change
+    ;; Create or update chart when data changes
     (useLayoutEffect
      (fn []
        (when (and (.-current target-ref) data (seq data))
@@ -27,12 +29,10 @@
              ;; If chart exists, update its data
              (.setData current-chart (clj->js data))
              ;; Otherwise, create a new chart instance
-             ;; uPlot is the constructor function itself when imported with :as
              (let [new-chart (uPlot. (clj->js options) (clj->js data) (.-current target-ref))]
                (set! (.-current chart-ref) new-chart)))))
-       ;; No cleanup needed here since we handle it in the separate effect below
        js/undefined)
-     #js [data options]) ; Recreate chart if options change
+     #js [data]) ; Only re-run when data changes
 
     ;; Cleanup effect to destroy chart on unmount
     (useLayoutEffect
@@ -41,10 +41,10 @@
          (when-let [chart (.-current chart-ref)]
            (.destroy chart)
            (set! (.-current chart-ref) nil))))
-     #js []) ; Empty deps = run only on mount/unmount
+     #js [])
 
-    ;; Return the ref to attach to the DOM element
-    target-ref))
+    ;; Return both refs so caller can access the chart instance
+    [target-ref chart-ref]))
 
 (defui time-series-chart
   "A time-series chart component using uPlot.
@@ -99,12 +99,12 @@
                           :live true}}
 
         ;; Get the ref from our hook
-        chart-ref (use-uplot options data)]
+        [target-ref _chart-ref] (use-uplot options data)]
 
     ($ :div.w-full
        (when title
          ($ :h4.text-base.font-medium.text-gray-700.mb-2.text-center title))
-       ($ :div {:ref chart-ref}))))
+       ($ :div {:ref target-ref}))))
 
 (defn- prepare-analytics-data
   "Transform analytics data into uPlot format.
@@ -159,13 +159,16 @@
   - :metrics - Set of metrics to display (defaults to #{:min :max 0.5 0.9 0.99})
   - :start-time-millis - Start of time window (required for proper empty chart display)
   - :end-time-millis - End of time window (required for proper empty chart display)
-  - :width - Chart width in pixels (optional, defaults to full width)
+  - :width - Chart width in pixels (optional, auto-detects container width if not provided)
   - :height - Chart height in pixels (optional, defaults to 300)
   - :title - Chart title (optional)
   - :y-label - Y-axis label (optional)"
   [{:keys [data granularity metrics start-time-millis end-time-millis width height title y-label]}]
   (let [metrics (or metrics #{:min :max 0.5 0.9 0.99})
         height (or height 300)
+
+        ;; Container ref to measure width
+        container-ref (useRef nil)
 
         ;; Transform data for uPlot
         chart-data (uix/use-memo
@@ -191,10 +194,10 @@
                 ;; Sort metrics: keywords first (alphabetically), then numbers (numerically)
                 (sort-by (fn [k] [(if (keyword? k) 0 1) k]) metrics))
 
-        ;; Build uPlot options for time-series
+        ;; Build uPlot options for time-series (size will be set dynamically)
         options (uix/use-memo
                  (fn []
-                   {:width (or width js/window.innerWidth)
+                   {:width (or width 800) ; Initial width, will be updated on mount/resize
                     :height height
                     :series (into [{:label "Time"}] series)
                     :axes [{:stroke "#64748b"
@@ -219,12 +222,36 @@
                              :y {:auto true}}
                     :legend {:show true
                              :live true}})
-                 [width height y-label series])
+                 [height y-label series]) ; width intentionally not in deps
 
-        ;; Get the ref from our hook
-        chart-ref (use-uplot options chart-data)]
+        ;; Get both refs from our hook
+        [target-ref chart-ref] (use-uplot options chart-data)
+
+        ;; Handle resize following uPlot's recommended pattern
+        _ (uix/use-effect
+           (fn []
+             (when-not width ;; Only auto-resize if width not explicitly provided
+               (let [get-size (fn []
+                                (when-let [container (.-current container-ref)]
+                                  (let [rect (.getBoundingClientRect container)
+                                        container-width (.-width rect)]
+                                    (when (> container-width 0)
+                                      {:width container-width :height height}))))
+                     handle-resize (fn []
+                                     (when-let [chart (.-current chart-ref)]
+                                       (when-let [size (get-size)]
+                                         (.setSize chart (clj->js size)))))]
+                 ;; Set initial size after chart is created
+                 (handle-resize)
+                 ;; Listen for window resize
+                 (.addEventListener js/window "resize" handle-resize)
+                 ;; Cleanup
+                 (fn []
+                   (.removeEventListener js/window "resize" handle-resize)))))
+           [width height])] ; Re-run if explicit width or height changes
 
     ($ :div.w-full
+       {:ref container-ref}
        (when title
          ($ :h4.text-base.font-medium.text-gray-700.mb-3 title))
-       ($ :div {:ref chart-ref}))))
+       ($ :div {:ref target-ref}))))
