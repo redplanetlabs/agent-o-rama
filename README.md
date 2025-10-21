@@ -97,91 +97,49 @@ The following are the key similarities and differences between Agent-o-rama and 
 
 ### Key Similarities with LangGraph/LangSmith
 
-<details>
-<summary><strong>Graph-based agent definitions</strong></summary>
+- **Graph-based agent definitions:**  
+  Agents are defined as explicit graphs of regular Java or Clojure functions, with named nodes and edges, similar in spirit to LangGraph's approach to structured agent workflows.
 
-Agents are defined as explicit graphs of regular Java or Clojure functions, with named nodes and edges, similar in spirit to LangGraph's approach to structured agent workflows.
-</details>
+- **Structured execution traces:**  
+  Every agent invocation is captured as a trace with detailed stats on every aspect of execution including latency, token usage, model calls, tool invocations, and database calls.
 
-<details>
-<summary><strong>Structured execution traces</strong></summary>
+- **Streaming at the node level:**  
+  Nodes can emit intermediate chunks before completing, allowing fine-grained, real-time streaming. LLM calls are automatically streamed, and the AOR API includes methods to explicitly stream chunks from a node. A first-class client API can register a callbacks to receive all chunks from a node.
 
-Every agent invocation is captured as a trace with detailed stats on every aspect of execution including latency, token usage, model calls, tool invocations, and database calls.
-</details>
+- **Forking and versioning:**  
+  Any agent or node can be forked and modified independently, useful for testing prompt or logic variations without disrupting production agents.
 
-<details>
-<summary><strong>Streaming at the node level</strong></summary>
+- **Datasets and snapshots:**  
+  Inputs and outputs can be captured into versioned datasets, making it easy to replay examples and benchmark changes.
 
-Nodes can emit intermediate chunks before completing, allowing fine-grained, real-time streaming. LLM calls are automatically streamed, and the AOR API includes methods to explicitly stream chunks from a node. A first-class client API can register callbacks to receive all chunks from a node.
-</details>
+- **Experiments (agent-wide or per-node):**  
+  Test entire agents or individual nodes (e.g., a new prompt or model) against datasets. Results are evaluated using any number of user-defined evaluators, whether custom functions or using LLMs to score.
 
-<details>
-<summary><strong>Forking and versioning</strong></summary>
+- **Online evaluation and actions:**
+  Actions are user-defined hooks that run on a sampled subset of live agent or node executions. They can be used for real-time evaluation, dataset capture, triggering webhooks, or any custom logic. Actions can filter on conditions like latency, token usage, errors, or input/output content.
 
-Any agent or node can be forked and modified independently, useful for testing prompt or logic variations without disrupting production agents.
-</details>
+- **Human input integration:**  
+  Agents can pause mid-execution to request structured human input, then resume once the input is received.
 
-<details>
-<summary><strong>Datasets and snapshots</strong></summary>
-
-Inputs and outputs can be captured into versioned datasets, making it easy to replay examples and benchmark changes.
-</details>
-
-<details>
-<summary><strong>Experiments (agent-wide or per-node)</strong></summary>
-
-Test entire agents or individual nodes (e.g., a new prompt or model) against datasets. Results are evaluated using any number of user-defined evaluators, whether custom functions or using LLMs to score.
-</details>
-
-<details>
-<summary><strong>Online evaluation and actions</strong></summary>
-
-Actions are user-defined hooks that run on a sampled subset of live agent or node executions. They can be used for real-time evaluation, dataset capture, triggering webhooks, or any custom logic. Actions can filter on conditions like latency, token usage, errors, or input/output content.
-</details>
-
-<details>
-<summary><strong>Human input integration</strong></summary>
-
-Agents can pause mid-execution to request structured human input, then resume once the input is received.
-</details>
-
-<details>
-<summary><strong>Telemetry</strong></summary>
-
-Detailed, real-time time-series metrics across all agents—including invocation rates, latencies, model and token usage, database access, custom evaluator metrics, and more.
-</details>
+- **Telemetry:**  
+  Detailed, real-time time-series metrics across all agents—including invocation rates, latencies, model and token usage, database access, custom evaluator metrics, and more.
 
 ### Key Differences with LangGraph/LangSmith
 
-<details>
-<summary><strong>JVM, not Python</strong></summary>
+- **JVM, not Python:**  
+  AOR is a platform for developing agents on the JVM in Java or Clojure.
 
-AOR is a platform for developing agents on the JVM in Java or Clojure.
-</details>
+- **Distributed, parallel execution model:**  
+  AOR agents are compiled to distributed, parallel execution graphs with no central state or coordinator. Each node runs independently, and emit targets are processed concurrently across threads and machines.
 
-<details>
-<summary><strong>Distributed, parallel execution model</strong></summary>
+- **Built-in, high-performance store:**  
+  Built-in, high-performance storage (document stores, KV stores, or any other data model) eliminates the need for external databases in most cases.
 
-AOR agents are compiled to distributed, parallel execution graphs with no central state or coordinator. Each node runs independently, and emit targets are processed concurrently across threads and machines.
-</details>
+- **First-class human input:**  
+  Human input is a first-class API rather than based on using exceptions for break points.
 
-<details>
-<summary><strong>Built-in, high-performance store</strong></summary>
-
-Built-in, high-performance storage (document stores, KV stores, or any other data model) eliminates the need for external databases in most cases.
-</details>
-
-<details>
-<summary><strong>First-class human input</strong></summary>
-
-Human input is a first-class API rather than based on using exceptions for break points.
-</details>
-
-<details>
-<summary><strong>Unified infrastructure</strong></summary>
-
-Everything is deployed onto your own infrastructure via [Rama](https://redplanetlabs.com/), and there are no hosted services. The full system runs locally, in the cloud, or across clusters with no dependency on external SaaS platforms.
-</details>
+- **Unified infrastructure:**  
+  Everything is deployed onto your own infrastructure via [Rama](https://redplanetlabs.com/), and there are no hosted services. The full system runs locally, in the cloud, or across clusters with no dependency on external SaaS platforms.
 
 
 ## Tour of Agent-o-rama
