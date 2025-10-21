@@ -10,7 +10,7 @@ TODO: image gallery
  - experiment results
  - forking UI
 
-LLMs are powerful but inherently unpredictable, so building applications with LLMS that are helpful and performant with minimal hallucination requires being rigorous about testing and monitoring. Agent-o-rama addresses this by making evaluation and observability a first-class part of the development process, not an afterthought.
+LLMs are powerful but inherently unpredictable, so building applications with LLMs that are helpful and performant with minimal hallucination requires being rigorous about testing and monitoring. Agent-o-rama addresses this by making evaluation and observability a first-class part of the development process, not an afterthought.
 
 Agent-o-rama is deployed onto your own infrastructure on a [Rama cluster](https://redplanetlabs.com/), which is free to use. Every part of Agent-o-rama is built-in and requires no other dependency besides Rama, including high-performance, durable, and replicated storage of any data model that can be used as part of agents. Agent-o-rama also integrates seamlessly with any other tool, such as databases, vector stores, external APIs, or anything else.
 
@@ -117,7 +117,7 @@ The Maven target for Agent-o-rama is:
 * [Quickstart](TODO)
 * [Full documentation](https://github.com/redplanetlabs/agent-o-rama/wiki)
 * [Javadoc](TODO)
-* [Clojuredoc][TODO]
+* [Clojuredoc](TODO)
 
 
 ## Tour of Agent-o-rama
@@ -225,7 +225,7 @@ rama deploy --action launch \
 
 The launch parameters are detailed more in [this section](https://redplanetlabs.com/docs/~/operating-rama.html#_launching_modules) of the Rama docs.
 
-Updating a module to change agent definitions, add/remove new storage definitions, or any other change looks like:
+Updating a module to change agent definitions, add/remove storage definitions, or any other change looks like:
 
 ```
 rama deploy \
@@ -283,7 +283,7 @@ TODO
 - mention action builders
 
 
-### Time-series elemetry
+### Time-series telemetry
 
 TODO
 - split by metadata
