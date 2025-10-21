@@ -132,6 +132,8 @@ The following are the key similarities and differences between Agent-o-rama and 
 - **Telemetry:**  
   Detailed, real-time time-series metrics across all agents—including invocation rates, latencies, model and token usage, database access, custom evaluator metrics, and more.
 
+---
+
 ### 🔀 Key Differences with LangGraph/LangSmith
 
 #### 💻 Language & Runtime
