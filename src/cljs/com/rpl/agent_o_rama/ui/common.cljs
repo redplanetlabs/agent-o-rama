@@ -273,14 +273,9 @@
                         (when on-expand
                           (on-expand {:title modal-title
                                       :content content-str})))]
-    ($ :div.relative.group.p-2.rounded
-       {:className (when is-long? "cursor-pointer hover:bg-gray-100")
-        :onClick (when is-long? handle-expand)}
-       ($ :pre.text-sm.font-mono.whitespace-pre-wrap
-          {:className (str "text-" color "-800")}
-          truncated-str)
-       (when is-long?
-         ($ :div {:className "absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"}
-            ($ :button {:className "text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
-                        :onClick handle-expand}
-               "Expand"))))))
+    ($ :div {:className (cn "relative group p-2 rounded min-w-0"
+                            (when is-long? "cursor-pointer hover:bg-gray-100"))
+             :onClick (when is-long? handle-expand)}
+       ($ :pre {:className (cn "text-sm font-mono whitespace-pre-wrap break-words overflow-x-auto"
+                               (str "text-" color "-800"))}
+          truncated-str))))
