@@ -126,7 +126,7 @@ Below is a quick tour of all aspects of Agent-o-rama, starting with defining age
 
 ### Defining and deploying agents
 
-Agents are defined in "modules" which also contain storage definitions, agent objects (such as LLM or database clients), custom [evaluators](TODO), and custom [actions](TODO). A module is launched on a cluster using the Rama CLI with one-line commands. For example, here's how to define a module `BasicAgentModule` that does a single LLM call and run it in the "in-process cluster" (IPC) development environment in both Java and Clojure:
+Agents are defined in "modules" which also contain storage definitions, agent objects (such as LLM or database clients), custom [evaluators](TODO), and custom [actions](TODO). A module can have any number of agents in it, and a module is launched on a cluster with one-line commands with the Rama CLI. For example, here's how to define a module `BasicAgentModule` with one agent that does a single LLM call and run it in the "in-process cluster" (IPC) development environment in both Java and Clojure:
 
 #### Java example
 
@@ -203,7 +203,11 @@ try (InProcessCluster ipc = InProcessCluster.create();
 
 These examples also launch the Agent-o-rama UI locally at `http://localhost:1974`.
 
-See [this page](TODO) for all the details of coding agents, including having multiple nodes, getting human input as part of execution, and aggregation.
+The first argument to each agent node function is an [AgentNode](TODO) object, which is used to interact with the graph to emit to other nodes, fetch agent objects, or set the result for the agent.
+
+You can also see from this example how to create a client to an agent and invoke it. The arguments to the agent are the arguments to the first node function.
+
+See [this page](TODO) for all the details of coding agents, including having multiple nodes, getting human input as part of execution, and aggregation. For lots of examples of agents in either Java or Clojure, see the [examples](https://github.com/redplanetlabs/agent-o-rama/tree/master/examples) directory in the repository.
 
 #### Managing modules on a real cluster
 
@@ -287,8 +291,6 @@ TODO
 
 
 TODO
-  - explain clusters, modules, launch, update, scale
-  - have a hello world example first
   - clients are just function calls
   - agent objects
   - aggregation
