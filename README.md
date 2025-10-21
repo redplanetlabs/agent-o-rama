@@ -95,10 +95,17 @@ This also launches the Agent-o-rama UI locally at `http://localhost:1974`.
 
 The following are the key similarities and differences between Agent-o-rama and LangGraph/LangSmith:
 
-### Key Similarities with LangGraph/LangSmith
+### ✅ Key Similarities with LangGraph/LangSmith
+
+#### 🧱 Agent Structure
 
 - **Graph-based agent definitions:**  
   Agents are defined as explicit graphs of regular Java or Clojure functions, with named nodes and edges, similar in spirit to LangGraph's approach to structured agent workflows.
+
+- **Forking and versioning:**  
+  Any agent or node can be forked and modified independently, useful for testing prompt or logic variations without disrupting production agents.
+
+#### 📋 Execution & Tracing
 
 - **Structured execution traces:**  
   Every agent invocation is captured as a trace with detailed stats on every aspect of execution including latency, token usage, model calls, tool invocations, and database calls.
@@ -106,8 +113,7 @@ The following are the key similarities and differences between Agent-o-rama and 
 - **Streaming at the node level:**  
   Nodes can emit intermediate chunks before completing, allowing fine-grained, real-time streaming. LLM calls are automatically streamed, and the AOR API includes methods to explicitly stream chunks from a node. A first-class client API can register a callbacks to receive all chunks from a node.
 
-- **Forking and versioning:**  
-  Any agent or node can be forked and modified independently, useful for testing prompt or logic variations without disrupting production agents.
+#### 🧪 Experimentation & Evaluation
 
 - **Datasets and snapshots:**  
   Inputs and outputs can be captured into versioned datasets, making it easy to replay examples and benchmark changes.
@@ -115,8 +121,10 @@ The following are the key similarities and differences between Agent-o-rama and 
 - **Experiments (agent-wide or per-node):**  
   Test entire agents or individual nodes (e.g., a new prompt or model) against datasets. Results are evaluated using any number of user-defined evaluators, whether custom functions or using LLMs to score.
 
-- **Online evaluation and actions:**
+- **Online evaluation and actions:**  
   Actions are user-defined hooks that run on a sampled subset of live agent or node executions. They can be used for real-time evaluation, dataset capture, triggering webhooks, or any custom logic. Actions can filter on conditions like latency, token usage, errors, or input/output content.
+
+#### 🤝 Interaction & Monitoring
 
 - **Human input integration:**  
   Agents can pause mid-execution to request structured human input, then resume once the input is received.
@@ -124,7 +132,9 @@ The following are the key similarities and differences between Agent-o-rama and 
 - **Telemetry:**  
   Detailed, real-time time-series metrics across all agents—including invocation rates, latencies, model and token usage, database access, custom evaluator metrics, and more.
 
-### Key Differences with LangGraph/LangSmith
+### 🔀 Key Differences with LangGraph/LangSmith
+
+#### 💻 Language & Runtime
 
 - **JVM, not Python:**  
   AOR is a platform for developing agents on the JVM in Java or Clojure.
@@ -132,14 +142,20 @@ The following are the key similarities and differences between Agent-o-rama and 
 - **Distributed, parallel execution model:**  
   AOR agents are compiled to distributed, parallel execution graphs with no central state or coordinator. Each node runs independently, and emit targets are processed concurrently across threads and machines.
 
+#### 🧠 State & Control
+
 - **Built-in, high-performance store:**  
   Built-in, high-performance storage (document stores, KV stores, or any other data model) eliminates the need for external databases in most cases.
 
 - **First-class human input:**  
   Human input is a first-class API rather than based on using exceptions for break points.
 
+#### ☁️ Deployment
+
 - **Unified infrastructure:**  
   Everything is deployed onto your own infrastructure via [Rama](https://redplanetlabs.com/), and there are no hosted services. The full system runs locally, in the cloud, or across clusters with no dependency on external SaaS platforms.
+
+
 
 
 ## Tour of Agent-o-rama
