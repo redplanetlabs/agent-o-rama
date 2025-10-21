@@ -125,7 +125,7 @@ Below is a quick tour of all aspects of Agent-o-rama, starting with defining age
 
 Agents are defined in "modules" which also contain storage definitions, agent objects (such as LLM or database clients), custom [evaluators](TODO), and custom [actions](TODO). A module is launched on a cluster using the Rama CLI with one-line commands. For example, here's how to define a module `BasicAgentModule` that does a single LLM call and run it in the "in-process cluster" (IPC) development environment in both Java and Clojure:
 
-#### Java Example
+#### Java example
 
 ```java
 public BasicAgentModule extends AgentModule {
@@ -164,7 +164,7 @@ try (InProcessCluster ipc = InProcessCluster.create();
 }
 ```
 
-#### Clojure Example
+#### Clojure example
 
 ```clojure
 (aor/defagentmodule BasicAgentModule
@@ -238,7 +238,48 @@ rama scaleExecutors \
 
 ### Viewing agent traces
 
+TODO
 
+
+### Forking agent invokes
+
+TODO
+
+
+### Streaming agent nodes to clients
+
+TODO
+
+
+### Creating and managing datasets
+
+TODO
+- show manual add
+- show add to dataset button
+- explain schemas
+
+### Running experiments
+
+TODO
+- show creating evaluators and JSON paths
+  - types of evaluators
+- mention custom evaluator builders
+- show configuring an experiment
+- show comparative experiment
+- show results
+
+### Online actions
+
+TODO
+- show defining rules
+- show online eval and webhooks
+- mention action builders
+
+
+### Time-series elemetry
+
+TODO
+- split by metadata
 
 
 
