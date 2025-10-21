@@ -126,7 +126,7 @@ The following are the key similarities and differences between Agent-o-rama and 
 
 ### Key Differences with LangGraph/LangSmith
 
-- **JVM, not Python:**
+- **JVM, not Python:**  
   AOR is a platform for developing agents on the JVM in Java or Clojure.
 
 - **Distributed, parallel execution model:**  
