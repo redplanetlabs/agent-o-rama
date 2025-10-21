@@ -261,14 +261,10 @@
                error
                ($ :div.text-red-600 "Error: " (str error))
 
-               (and data (seq data))
+               :else
                ($ chart/analytics-time-series-chart
-                  {:data data
+                  {:data (or data [])
                    :granularity (:seconds granularity-config)
                    :metrics metrics-set
                    :height 300
-                   :y-label "Latency (ms)"})
-
-               :else
-               ($ :div.text-gray-500.text-center.py-8
-                  "No data available for the selected time range")))))))
+                   :y-label "Latency (ms)"})))))))

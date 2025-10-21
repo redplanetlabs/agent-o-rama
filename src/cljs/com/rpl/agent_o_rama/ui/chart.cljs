@@ -115,9 +115,9 @@
   - metrics-to-show: Set of metric keys to display (e.g., #{:min :max 0.5 0.9})
   
   Returns:
-  - uPlot data format [[timestamps] [series1] [series2] ...]"
+  - uPlot data format [[timestamps] [series1] [series2] ...], or empty structure if no data"
   [telemetry-data granularity metrics-to-show]
-  (when (seq telemetry-data)
+  (if (seq telemetry-data)
     (let [;; Sort buckets chronologically
           sorted-buckets (sort (keys telemetry-data))
 
@@ -137,10 +137,14 @@
                        {}
                        metrics-to-show)]
 
-;; Return in uPlot format: [timestamps series1 series2 ...]
-      ;; Sort metrics: keywords first (alphabetically), then numbers (numerically)
+          ;; Return in uPlot format: [timestamps series1 series2 ...]
+          ;; Sort metrics: keywords first (alphabetically), then numbers (numerically)
       (let [sorted-metrics (sort-by (fn [k] [(if (keyword? k) 0 1) k]) metrics-to-show)]
-        (into [timestamps] (map series-data sorted-metrics))))))
+        (into [timestamps] (map series-data sorted-metrics))))
+    ;; Return empty data structure with one timestamp point at current time
+    (let [now (.now js/Date)
+          sorted-metrics (sort-by (fn [k] [(if (keyword? k) 0 1) k]) metrics-to-show)]
+      (into [[now]] (repeat (count sorted-metrics) [nil])))))
 
 (defui analytics-time-series-chart
   "A time-series chart for analytics telemetry data.
@@ -214,9 +218,7 @@
         ;; Get the ref from our hook
         chart-ref (use-uplot options chart-data)]
 
-    (if (and chart-data (seq chart-data))
-      ($ :div.w-full
-         (when title
-           ($ :h4.text-base.font-medium.text-gray-700.mb-3 title))
-         ($ :div {:ref chart-ref}))
-      ($ :div.text-gray-500.text-sm.py-4 "No data available"))))
+    ($ :div.w-full
+       (when title
+         ($ :h4.text-base.font-medium.text-gray-700.mb-3 title))
+       ($ :div {:ref chart-ref}))))
