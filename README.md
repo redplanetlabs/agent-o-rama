@@ -84,7 +84,7 @@ The following are the key similarities and differences between Agent-o-rama and 
 
 ## Downloads
 
-Download Agent-o-rama releases [here](https://github.com/redplanetlabs/agent-o-rama/releases). A release is used to run the Agent-o-rama frontend. See the [deployment page](TODO) for instructions on deploying. For building agent modules, use this Maven dependency in this repository:
+Download Agent-o-rama releases [here](https://github.com/redplanetlabs/agent-o-rama/releases). A release is used to run the Agent-o-rama frontend. See the [deployment page](TODO) for instructions on deploying. For building agent modules, add these repositories to the Maven dependencies for your project:
 
 ```
 <repositories>
@@ -99,7 +99,7 @@ Download Agent-o-rama releases [here](https://github.com/redplanetlabs/agent-o-r
 </repositories>
 ```
 
-The Clojars repo hosts some of Rama's dependencies. The Maven target for Agent-o-rama is:
+The Maven target for Agent-o-rama is:
 
 ```
 <dependency>
@@ -119,10 +119,11 @@ The Clojars repo hosts some of Rama's dependencies. The Maven target for Agent-o
 
 ## Tour of Agent-o-rama
 
-### Defining agents
+Below is a quick tour of all aspects of Agent-o-rama, starting with defining agents through running experiments and analyzing telemetry.
 
-TODO
+### Defining and deploying agents
 
+Agents are defined in "modules" which also contain storage definitions, agent objects (such as LLM or database clients), custom [evaluators](TODO), and custom [actions](TODO). A module is launched on a cluster using the Rama CLI with one-line commands. For example, here's how to define a module `BasicAgentModule` that does a single LLM call and run it in the "in-process cluster" (IPC) development environment in both Java and Clojure:
 
 #### Java Example
 
@@ -197,4 +198,54 @@ try (InProcessCluster ipc = InProcessCluster.create();
     ))
 ```
 
-This also launches the Agent-o-rama UI locally at `http://localhost:1974`.
+These examples also launch the Agent-o-rama UI locally at `http://localhost:1974`.
+
+See [this page](TODO) for all the details of coding agents, including having multiple nodes, getting human input as part of execution, and aggregation.
+
+#### Managing modules on a real cluster
+
+Modules are launched, updated, and scaled on a real cluster with the Rama CLI. Here's an example of launching:
+
+```
+rama deploy --action launch \
+--jar my-application-1.0.0.jar \
+--module com.mycompany.BasicAgentModule \
+--tasks 32 \
+--threads 8 \
+--workers 4 \
+--replicationFactor 2
+```
+
+The launch parameters are detailed more in [this section](https://redplanetlabs.com/docs/~/operating-rama.html#_launching_modules) of the Rama docs.
+
+Updating a module to change agent definitions, add/remove new storage definitions, or any other change looks like:
+
+```
+rama deploy \
+  --action update \
+  --jar my-application-1.0.1.jar \
+  --module com.mycompany.BasicAgentModule
+```
+
+Finally, scaling a module to add or remove resources looks like:
+
+```
+rama scaleExecutors \
+--module com.mycompany.BasicAgentModule \
+--threads 16 \
+--workers 8
+```
+
+### Viewing agent traces
+
+
+
+
+
+TODO
+  - explain clusters, modules, launch, update, scale
+  - have a hello world example first
+  - clients are just function calls
+  - agent objects
+  - aggregation
+    - should leave this to separate page and get to the rest of the tour
