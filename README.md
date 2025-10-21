@@ -1,6 +1,6 @@
 # Agent-o-rama
 
-Agent-o-rama is a library for building scalable and stateful AI agents in Java or Clojure. Agents are defined as simple graphs of pure Java or Clojure functions, and Agent-o-rama automatically captures detailed traces and provides facilities and a web UI for offline experimentation, online evaluation, time-series telemetry (e.g. latencies, token usage), and much more. Agent-o-rama is heavily inspired by [LangGraph](https://www.langchain.com/langgraph) and [LangSmith](https://smith.langchain.com/).
+Agent-o-rama is a library for building scalable and stateful AI agents in Java or Clojure. Agents are defined as simple graphs of pure Java or Clojure functions, and Agent-o-rama automatically captures detailed traces and provides facilities and a web UI for offline experimentation, online evaluation, time-series telemetry (e.g. latencies, token usage), and much more. Agent-o-rama is heavily inspired by [LangGraph](https://www.langchain.com/langgraph) and [LangSmith](https://www.langchain.com/langsmith/observability).
 
 
 TODO: image gallery
@@ -12,9 +12,9 @@ TODO: image gallery
 
 LLMs are powerful but inherently unpredictable, so building applications with LLMS that are helpful and performant with minimal hallucination requires being rigorous about testing and monitoring. Agent-o-rama addresses this by making evaluation and observability a first-class part of the development process, not an afterthought.
 
-Agent-o-rama is deployed onto your own infrastructure on a [Rama cluster](https://redplanetlabs.com/), which is free to use. Every part of Agent-o-rama is built-in and requires no other dependency besides Rama, including high-performance built-in storage of any data model that can be used as part of agents. Agent-o-rama also integrates seamlessly with any other tool, such as databases, vector stores, external APIs, or anything else.
+Agent-o-rama is deployed onto your own infrastructure on a [Rama cluster](https://redplanetlabs.com/), which is free to use. Every part of Agent-o-rama is built-in and requires no other dependency besides Rama, including high-performance, durable, and replicated storage of any data model that can be used as part of agents. Agent-o-rama also integrates seamlessly with any other tool, such as databases, vector stores, external APIs, or anything else.
 
-Rama can be downloaded [here](https://redplanetlabs.com/download), and instructions for setting up a cluster are [here](https://redplanetlabs.com/docs/~/operating-rama.html#_setting_up_a_rama_cluster). A cluster can be [as small as one node](https://redplanetlabs.com/docs/~/operating-rama.html#_running_single_node_cluster) or as big as thousands of nodes. There's also one-click deploys [for AWS](https://github.com/redplanetlabs/rama-aws-deploy) and [for Azure](https://github.com/redplanetlabs/rama-azure-deploy).
+Rama can be downloaded [here](https://redplanetlabs.com/download), and instructions for setting up a cluster are [here](https://redplanetlabs.com/docs/~/operating-rama.html#_setting_up_a_rama_cluster). A cluster can be [as small as one node](https://redplanetlabs.com/docs/~/operating-rama.html#_running_single_node_cluster) or as big as thousands of nodes. There's also one-click deploys [for AWS](https://github.com/redplanetlabs/rama-aws-deploy) and [for Azure](https://github.com/redplanetlabs/rama-azure-deploy). Instructions for developing with and deploying Agent-o-rama [are below](#downloads).
 
 Development of Agent-o-rama applications is done with "in-process cluster" (IPC), which simulates Rama clusters in a single process. IPC is great for unit testing or experimentation at a REPL. [See below](#defining-agents) for examples in both Java and Clojure of agents utilizing an LLM run with IPC.
 
@@ -84,7 +84,7 @@ The following are the key similarities and differences between Agent-o-rama and 
 
 ## Downloads
 
-Download Agent-o-rama releases [here](https://github.com/redplanetlabs/agent-o-rama/releases). A release is used to run the Agent-o-rama front-end. See the [deployment page](TODO) for instructions on deploying. For building agent modules, use this Maven dependency in this repository:
+Download Agent-o-rama releases [here](https://github.com/redplanetlabs/agent-o-rama/releases). A release is used to run the Agent-o-rama frontend. See the [deployment page](TODO) for instructions on deploying. For building agent modules, use this Maven dependency in this repository:
 
 ```
 <repositories>
