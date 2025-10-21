@@ -24,7 +24,6 @@
   [["releases"
     {:id  "maven-releases"
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
-  :test-paths ["test"]
   :profiles {:dev      {:resource-paths ["test/resources/"]
                         :src-paths      ["src" "test"]
                         :dependencies   [[meander/epsilon "0.0.650"]]
