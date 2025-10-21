@@ -18,7 +18,8 @@ Rama can be downloaded [here](https://redplanetlabs.com/download), and instructi
 
 Development of Agent-o-rama applications is done with "in-process cluster" (IPC), which simulates Rama clusters in a single process. IPC is great for unit testing or experimentation at a REPL. Here's an example of defining and running an agent with IPC (for both Java and Clojure):
 
-<details><summary><strong>Java Example</strong></summary>
+### Java Example
+
 ```java
 public BasicAgentModule extends AgentModule {
   @Override
@@ -54,10 +55,9 @@ try (InProcessCluster ipc = InProcessCluster.create();
   String result = agent.invoke("What are use cases for AI agents?");
   System.out.println("Result: " + result);
 }
-```
-</details>
 
-<details><summary><strong>Clojure Example</strong></summary>
+### Clojure Example
+
 ```clojure
 (aor/defagentmodule BasicAgentModule
   [topology]
@@ -89,13 +89,12 @@ try (InProcessCluster ipc = InProcessCluster.create();
     (println "Result:" (aor/agent-invoke agent "What are use cases for AI agents?"))
     ))
 ```
-</details>
 
 This also launches the Agent-o-rama UI locally at `http://localhost:1974`.
 
 The following are the key similarities and differences between Agent-o-rama and LangGraph/LangSmith:
 
-*Key Similarities*
+### Key Similarities with LangGraph/LangSmith
 
 - **Graph-based agent definitions:**  
   Agents are defined as explicit graphs of regular Java or Clojure functions, with named nodes and edges, similar in spirit to LangGraph's approach to structured agent workflows.
@@ -124,7 +123,7 @@ The following are the key similarities and differences between Agent-o-rama and 
 - **Telemetry:**  
   Detailed, real-time time-series metrics across all agents—including invocation rates, latencies, model and token usage, database access, custom evaluator metrics, and more.
 
-*Key Differences*
+### Key Differences with LangGraph/LangSmith
 
 - **JVM, not Python:**
   AOR is a platform for developing agents on the JVM in Java or Clojure.
