@@ -105,3 +105,115 @@
        (when title
          ($ :h4.text-base.font-medium.text-gray-700.mb-2.text-center title))
        ($ :div {:ref chart-ref}))))
+
+(defn- prepare-analytics-data
+  "Transform analytics data into uPlot format.
+  
+  Args:
+  - telemetry-data: Map of {bucket-number {metadata-key {metric-key value}}}
+  - granularity: Granularity in seconds (e.g., 60 for minute)
+  - metrics-to-show: Set of metric keys to display (e.g., #{:min :max 0.5 0.9})
+  
+  Returns:
+  - uPlot data format [[timestamps] [series1] [series2] ...]"
+  [telemetry-data granularity metrics-to-show]
+  (when (seq telemetry-data)
+    (let [;; Sort buckets chronologically
+          sorted-buckets (sort (keys telemetry-data))
+
+          ;; Convert bucket numbers to timestamps (bucket * granularity * 1000)
+          timestamps (mapv #(* % granularity 1000) sorted-buckets)
+
+          ;; For each metric, extract values across all buckets
+          ;; Using "_aor/default" as the metadata key for now
+          series-data (reduce
+                       (fn [acc metric-key]
+                         (let [values (mapv
+                                       (fn [bucket]
+                                         (get-in telemetry-data
+                                                 [bucket "_aor/default" metric-key]))
+                                       sorted-buckets)]
+                           (assoc acc metric-key values)))
+                       {}
+                       metrics-to-show)]
+
+      ;; Return in uPlot format: [timestamps series1 series2 ...]
+      (into [timestamps] (map series-data (sort metrics-to-show))))))
+
+(defui analytics-time-series-chart
+  "A time-series chart for analytics telemetry data.
+  
+  Props:
+  - :data - Analytics telemetry data {bucket-number {metadata-key {metric-key value}}}
+  - :granularity - Time granularity in seconds (e.g., 60 for minute)
+  - :metrics - Set of metrics to display (defaults to #{:min :max 0.5 0.9 0.99})
+  - :width - Chart width in pixels (optional, defaults to full width)
+  - :height - Chart height in pixels (optional, defaults to 300)
+  - :title - Chart title (optional)
+  - :y-label - Y-axis label (optional)"
+  [{:keys [data granularity metrics width height title y-label]}]
+  (let [metrics (or metrics #{:min :max 0.5 0.9 0.99})
+        height (or height 300)
+
+        ;; Transform data for uPlot
+        chart-data (uix/use-memo
+                    (fn [] (prepare-analytics-data data granularity metrics))
+                    [data granularity metrics])
+
+        ;; Define series configurations with nice colors
+        metric-colors {:min "#10b981" ; green
+                       :max "#ef4444" ; red
+                       0.5 "#3b82f6" ; blue
+                       0.9 "#f59e0b" ; amber
+                       0.99 "#8b5cf6"} ; purple
+
+        series (mapv
+                (fn [metric-key]
+                  {:label (cond
+                            (keyword? metric-key) (name metric-key)
+                            (number? metric-key) (str "p" (int (* metric-key 100)))
+                            :else (str metric-key))
+                   :stroke (get metric-colors metric-key "#6b7280")
+                   :width 2
+                   :points {:show false}})
+                (sort metrics))
+
+        ;; Build uPlot options for time-series
+        options (uix/use-memo
+                 (fn []
+                   {:width (or width js/window.innerWidth)
+                    :height height
+                    :series (into [{:label "Time"}] series)
+                    :axes [{:stroke "#64748b"
+                            :grid {:show true :stroke "#e2e8f0" :width 1}
+                            :ticks {:show true :stroke "#cbd5e1"}
+                            ;; Format timestamps as readable dates
+                            :values (fn [self splits]
+                                      (.map splits
+                                            (fn [timestamp]
+                                              (let [date (js/Date. timestamp)
+                                                    hours (.getHours date)
+                                                    minutes (.getMinutes date)]
+                                                (str (when (< hours 10) "0") hours
+                                                     ":"
+                                                     (when (< minutes 10) "0") minutes)))))}
+                           {:stroke "#64748b"
+                            :grid {:show true :stroke "#e2e8f0" :width 1}
+                            :ticks {:show true :stroke "#cbd5e1"}
+                            :label (or y-label "Value")
+                            :labelSize 14}]
+                    :scales {:x {:time true}
+                             :y {:auto true}}
+                    :legend {:show true
+                             :live true}})
+                 [width height y-label series])
+
+        ;; Get the ref from our hook
+        chart-ref (use-uplot options chart-data)]
+
+    (if (and chart-data (seq chart-data))
+      ($ :div.w-full
+         (when title
+           ($ :h4.text-base.font-medium.text-gray-700.mb-3 title))
+         ($ :div {:ref chart-ref}))
+      ($ :div.text-gray-500.text-sm.py-4 "No data available"))))

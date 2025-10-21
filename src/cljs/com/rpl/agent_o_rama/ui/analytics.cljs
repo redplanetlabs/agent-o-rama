@@ -4,6 +4,7 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.ui.chart :as chart]
    ["@heroicons/react/24/outline" :refer [ChartBarIcon]]))
 
 (defui analytics-page []
@@ -64,16 +65,29 @@
           ($ ChartBarIcon {:className "h-8 w-8 text-indigo-600"})
           ($ :h2.text-2xl.font-bold.text-gray-900
              (str "Analytics for " decoded-agent-name)))
-       ($ :div.bg-white.p-6.rounded-lg.shadow-md.border.border-gray-200
-          ($ :h3.text-lg.font-medium.text-gray-700 "Analytics Dashboard")
-          ($ :p.mt-2.text-sm.text-gray-500 "The new analytics and charting features will be available here soon.")
-          (cond
-            loading?
-            ($ :div.mt-4.flex.items-center.gap-2.text-blue-600
-               ($ common/spinner {:size :medium}) "Loading analytics data...")
+       ($ :div.space-y-6
+          ;; Header card
+          ($ :div.bg-white.p-6.rounded-lg.shadow-md.border.border-gray-200
+             ($ :h3.text-lg.font-medium.text-gray-700.mb-2 "Agent Latency")
+             ($ :p.text-sm.text-gray-500.mb-4
+                "Latency metrics over the last 60 minutes (minute granularity)")
 
-            error
-            ($ :div.mt-4.text-red-600 "Error: " (str error))
+             (cond
+               loading?
+               ($ :div.flex.items-center.gap-2.text-blue-600
+                  ($ common/spinner {:size :medium}) "Loading analytics data...")
 
-            data
-            ($ :div.mt-4.text-green-600 "✓ Data received. Check browser console for details."))))))
+               error
+               ($ :div.text-red-600 "Error: " (str error))
+
+               (and data (seq data))
+               ($ chart/analytics-time-series-chart
+                  {:data data
+                   :granularity granularity
+                   :metrics metrics-set
+                   :height 300
+                   :y-label "Latency (ms)"})
+
+               :else
+               ($ :div.text-gray-500.text-center.py-8
+                  "No data available for the selected time range")))))))
