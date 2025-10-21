@@ -55,6 +55,7 @@ try (InProcessCluster ipc = InProcessCluster.create();
   String result = agent.invoke("What are use cases for AI agents?");
   System.out.println("Result: " + result);
 }
+```
 
 ### Clojure Example
 
