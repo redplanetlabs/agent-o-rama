@@ -146,7 +146,7 @@ The following are the key similarities and differences between Agent-o-rama and 
 
 #### 🧠 State & Control
 
-- **Built-in, high-performance store:**  
+- **Built-in, high-performance storage:**  
   Built-in, high-performance storage (document stores, KV stores, or any other data model) eliminates the need for external databases in most cases.
 
 - **First-class human input:**  
