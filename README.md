@@ -18,8 +18,7 @@ Rama can be downloaded [here](https://redplanetlabs.com/download), and instructi
 
 Development of Agent-o-rama applications is done with "in-process cluster" (IPC), which simulates Rama clusters in a single process. IPC is great for unit testing or experimentation at a REPL. Here's an example of defining and running an agent with IPC (for both Java and Clojure):
 
-**Java**:
-
+<details><summary><strong>Java Example</strong></summary>
 ```java
 public BasicAgentModule extends AgentModule {
   @Override
@@ -56,9 +55,9 @@ try (InProcessCluster ipc = InProcessCluster.create();
   System.out.println("Result: " + result);
 }
 ```
+</details>
 
-**Clojure**:
-
+<details><summary><strong>Clojure Example</strong></summary>
 ```clojure
 (aor/defagentmodule BasicAgentModule
   [topology]
@@ -90,6 +89,7 @@ try (InProcessCluster ipc = InProcessCluster.create();
     (println "Result:" (aor/agent-invoke agent "What are use cases for AI agents?"))
     ))
 ```
+<details>
 
 This also launches the Agent-o-rama UI locally at `http://localhost:1974`.
 
