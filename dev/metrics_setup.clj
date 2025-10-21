@@ -213,7 +213,14 @@
 
     (let [ipc (rtest/create-ipc)
           _ (TopologyUtils/startSimTime)
-          _ (println "✓ IPC created and simulated time started")
+          ;; Advance simulated time to current time minus 30 minutes
+          ;; UI queries for last 60 minutes, so all our data will be in that window
+          now (System/currentTimeMillis)
+          thirty-mins-ago (- now (* 30 60 1000))
+          _ (TopologyUtils/advanceSimTime thirty-mins-ago)
+          _ (println "✓ IPC created and simulated time started at" thirty-mins-ago)
+          _ (println "  Current bucket:" (long (/ now 60000))
+                     "| Data starts at bucket:" (long (/ thirty-mins-ago 60000)))
 
           module (create-metrics-gen-module)
           _ (println "✓ Module created")
@@ -278,9 +285,6 @@
                       :start-time-millis 0
                       :status-filter :success})
       (println "✓ Rules added")
-
-      ;; Start time at 1000ms
-      (TopologyUtils/advanceSimTime 1000)
 
       ;; ========================================================================
       ;; MINUTE 0 - First batch of invocations
@@ -353,70 +357,52 @@
       (println "✓ Minute 3 data generated (15 invocations with varied metadata)")
 
       ;; ========================================================================
-      ;; HOUR 1 - Different hourly bucket
+      ;; Continue generating more recent minute-level data
       ;; ========================================================================
-      (TopologyUtils/advanceSimTime (hour-millis 1))
-      (println "\n📊 Generating data for hour 1...")
-      (dotimes [_ 5]
-        (aor/agent-invoke-with-context agent-client
-                                       {:metadata {"user-id" "eve" "region" "eu-north"}}
-                                       "."
-                                       #{}))
-
+      (println "\n📊 Generating more recent data across multiple minutes...")
+      
+      ;; Generate data across minutes 4-20 with varying patterns
+      (doseq [minute-offset (range 4 21)]
+        (TopologyUtils/advanceSimTime (minute-millis 1))
+        (when (zero? (mod minute-offset 3))
+          (println "  ✓ Generated data through minute" minute-offset))
+        
+        ;; Vary the operations based on minute number
+        (cond
+          (zero? (mod minute-offset 5))
+          ;; Every 5th minute: model calls with metadata
+          (dotimes [_ 2]
+            (aor/agent-invoke-with-context agent-client
+                                           {:metadata {"user-id" (str "user-" minute-offset)
+                                                       "region" (rand-nth ["us-west" "us-east" "eu" "apac"])}}
+                                           "test"
+                                           #{:model}))
+          
+          (zero? (mod minute-offset 3))
+          ;; Every 3rd minute: store operations
+          (aor/agent-invoke agent-client "data" #{:store-write :store-read})
+          
+          :else
+          ;; Other minutes: simple successful calls
+          (aor/agent-invoke agent-client "." #{})))
+      
       (cycle!)
       (cycle!)
-      (println "✓ Hour 1 data generated")
-
-      ;; ========================================================================
-      ;; HOUR 2 - More hourly data
-      ;; ========================================================================
-      (TopologyUtils/advanceSimTime (hour-millis 1))
-      (println "\n📊 Generating data for hour 2...")
-      (dotimes [_ 3]
-        (aor/agent-invoke-with-context agent-client
-                                       {:metadata {"user-id" "frank" "region" "ap-north"}}
-                                       "."
-                                       #{:model}))
-
-      (cycle!)
-      (cycle!)
-      (println "✓ Hour 2 data generated")
-
-      ;; ========================================================================
-      ;; DAY 1 - Different daily bucket
-      ;; ========================================================================
-      (TopologyUtils/advanceSimTime (day-millis 1))
-      (println "\n📊 Generating data for day 1...")
-      (dotimes [_ 4]
-        (aor/agent-invoke agent-client ".." #{:store-write}))
-
-      (cycle!)
-      (cycle!)
-      (println "✓ Day 1 data generated")
-
-      ;; ========================================================================
-      ;; DAY 2 - More daily data
-      ;; ========================================================================
-      (TopologyUtils/advanceSimTime (day-millis 1))
-      (println "\n📊 Generating data for day 2...")
-      (dotimes [_ 6]
-        (aor/agent-invoke-with-context agent-client
-                                       {:metadata {"user-id" "grace" "region" "us-central"}}
-                                       "..."
-                                       #{:model :db-read}))
-
-      (cycle!)
-      (cycle!)
-      (println "✓ Day 2 data generated")
+      (println "✓ Generated 20 minutes of varied data")
 
       ;; Final analytics cycle
       (cycle!)
 
-      (println "\n✅ Setup complete!")
-      (println "   Visit http://localhost:1974 to view the analytics UI")
-      (println "   The agent is: MetricsGenAgent")
-      (println "   Use the returned IPC handle to continue interacting with the system")
-      (println "   When done, call (aor/stop-ui) and (.close ipc)\n")
+      (let [final-time (h/current-time-millis)
+            start-bucket (long (/ thirty-mins-ago 60000))
+            end-bucket (long (/ final-time 60000))]
+        (println "\n✅ Setup complete!")
+        (println "   Visit http://localhost:1974 to view the analytics UI")
+        (println "   The agent is: MetricsGenAgent")
+        (println "   Data generated in buckets:" start-bucket "to" end-bucket 
+                 "(" (- end-bucket start-bucket) "minute buckets)")
+        (println "   Use the returned IPC handle to continue interacting with the system")
+        (println "   When done, call (aor/stop-ui) and (.close ipc)\n"))
 
       ;; Return the IPC handle
       ipc)))

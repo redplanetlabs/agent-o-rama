@@ -207,14 +207,13 @@
 
 (defmethod sente/-event-msg-handler :analytics/fetch-telemetry
   [{:keys [manager decoded-agent-name granularity metric-id start-time-millis end-time-millis metrics-set metadata-key]} uid]
-  (when manager
-    (let [agent-client (aor/agent-client manager decoded-agent-name)
-          {:keys [telemetry-pstate]} (aor-types/underlying-objects agent-client)]
-      (ana/select-telemetry telemetry-pstate
-                            decoded-agent-name
-                            granularity
-                            metric-id
-                            start-time-millis
-                            end-time-millis
-                            metrics-set
-                            metadata-key))))
+  (let [agent-client (aor/agent-client manager decoded-agent-name)
+        {:keys [telemetry-pstate]} (aor-types/underlying-objects agent-client)]
+    (ana/select-telemetry telemetry-pstate
+                          decoded-agent-name
+                          granularity
+                          metric-id
+                          start-time-millis
+                          end-time-millis
+                          (vec metrics-set)
+                          metadata-key)))
