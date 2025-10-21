@@ -137,8 +137,10 @@
                        {}
                        metrics-to-show)]
 
-      ;; Return in uPlot format: [timestamps series1 series2 ...]
-      (into [timestamps] (map series-data (sort metrics-to-show))))))
+;; Return in uPlot format: [timestamps series1 series2 ...]
+      ;; Sort metrics: keywords first (alphabetically), then numbers (numerically)
+      (let [sorted-metrics (sort-by (fn [k] [(if (keyword? k) 0 1) k]) metrics-to-show)]
+        (into [timestamps] (map series-data sorted-metrics))))))
 
 (defui analytics-time-series-chart
   "A time-series chart for analytics telemetry data.
@@ -176,7 +178,8 @@
                    :stroke (get metric-colors metric-key "#6b7280")
                    :width 2
                    :points {:show false}})
-                (sort metrics))
+                ;; Sort metrics: keywords first (alphabetically), then numbers (numerically)
+                (sort-by (fn [k] [(if (keyword? k) 0 1) k]) metrics))
 
         ;; Build uPlot options for time-series
         options (uix/use-memo
