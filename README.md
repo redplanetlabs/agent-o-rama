@@ -69,6 +69,9 @@ The following are the key similarities and differences between Agent-o-rama and 
 - **Distributed, parallel execution model:**  
   AOR agents are distributed, parallel execution graphs with no central state or coordinator. Each node runs independently, and emit targets are processed concurrently across threads and machines.
 
+- **Agent code executes on virtual threads:**
+  All agent code executes on [virtual threads](https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html), which lets all code be written in a blocking style without consuming scarce platform threads. Coding long-running or I/O-intensive tasks is straightforward since the complexity of callbacks or async frameworks is avoided.
+
 #### 🧠 State & Control
 
 - **Built-in, high-performance storage:**  
