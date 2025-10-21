@@ -111,7 +111,7 @@ The following are the key similarities and differences between Agent-o-rama and 
   Every agent invocation is captured as a trace with detailed stats on every aspect of execution including latency, token usage, model calls, tool invocations, and database calls.
 
 - **Streaming at the node level:**  
-  Nodes can emit intermediate chunks before completing, allowing fine-grained, real-time streaming. LLM calls are automatically streamed, and the AOR API includes methods to explicitly stream chunks from a node. A first-class client API can register a callbacks to receive all chunks from a node.
+  Nodes can emit intermediate chunks before completing, allowing fine-grained, real-time streaming. LLM calls are automatically streamed, and the AOR API includes methods to explicitly stream chunks from a node. A first-class client API can register a callback to receive all chunks from a node.
 
 #### 🧪 Experimentation & Evaluation
 
@@ -130,7 +130,7 @@ The following are the key similarities and differences between Agent-o-rama and 
   Agents can pause mid-execution to request structured human input, then resume once the input is received.
 
 - **Telemetry:**  
-  Detailed, real-time time-series metrics across all agents—including invocation rates, latencies, model and token usage, database access, custom evaluator metrics, and more.
+  Detailed, real-time time-series metrics across all agents, including invocation rates, latencies, model and token usage, database access, custom evaluator metrics, and more.
 
 ---
 
@@ -142,7 +142,7 @@ The following are the key similarities and differences between Agent-o-rama and 
   AOR is a platform for developing agents on the JVM in Java or Clojure.
 
 - **Distributed, parallel execution model:**  
-  AOR agents are compiled to distributed, parallel execution graphs with no central state or coordinator. Each node runs independently, and emit targets are processed concurrently across threads and machines.
+  AOR agents are distributed, parallel execution graphs with no central state or coordinator. Each node runs independently, and emit targets are processed concurrently across threads and machines.
 
 #### 🧠 State & Control
 
