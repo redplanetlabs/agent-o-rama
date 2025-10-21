@@ -64,14 +64,14 @@
              (mapv (fn [msg]
                      (let [{:keys [role text]} (extract-message-role-and-text
                                                 msg " ")
-                           label               (case role
-                                                 "SystemMessage" "SYSTEM"
-                                                 "UserMessage"   "USER"
-                                                 "AiMessage"     "AI"
-                                                 (or role "MSG"))
-                           display-text        (if (str/blank? text)
-                                                 "(empty)"
-                                                 text)]
+                           label (case role
+                                   "SystemMessage" "SYSTEM"
+                                   "UserMessage" "USER"
+                                   "AiMessage" "AI"
+                                   (or role "MSG"))
+                           display-text (if (str/blank? text)
+                                          "(empty)"
+                                          text)]
                        (str label ": " display-text)))))]
     (if (> (count messages) 3)
       (conj
@@ -86,11 +86,11 @@
              [bg-class text-class label]
              (case role
                "SystemMessage" ["bg-gray-100" "text-gray-700" "SYSTEM"]
-               "UserMessage"   ["bg-blue-50" "text-blue-900" "USER"]
-               "AiMessage"     ["bg-green-50" "text-green-900" "AI"]
+               "UserMessage" ["bg-blue-50" "text-blue-900" "USER"]
+               "AiMessage" ["bg-green-50" "text-green-900" "AI"]
                ["bg-gray-50" "text-gray-800" (or role "MESSAGE")])]
          ($ :div
-            {:key       idx
+            {:key idx
              :className (str bg-class " p-3 rounded-lg border border-gray-200")}
             ($ :div {:className "flex items-center gap-2 mb-2"}
                ($ :span
@@ -98,8 +98,8 @@
                   label))
             ($ :pre
                {:className (str "text-sm " text-class " whitespace-pre-wrap break-words font-sans")
-                :style     {:overflow-wrap "break-word"
-                            :word-break    "break-word"}}
+                :style {:overflow-wrap "break-word"
+                        :word-break "break-word"}}
                (or text "(no text)")))))))
 
 (defui conversation-display
@@ -116,7 +116,7 @@
             {:title (str "Conversation (" num-messages " messages)")
              :component
              ($ ConversationModal
-                {:title    (str "Conversation (" num-messages " messages)")
+                {:title (str "Conversation (" num-messages " messages)")
                  :messages messages})}]))
         display-json-modal
         (fn [e]
@@ -131,21 +131,21 @@
                      json-str))}])))]
     ($ :div
        {:className
-        (str "text-" color "-600 bg-" color "-50 border border-" color "-200 rounded p-2 min-w-0 max-w-full")}
+        (str "text-" color "-600 bg-" color "-50 border border-" color "-200 rounded p-2 min-w-0 max-w-full overflow-hidden")}
        ($ :div {:className "flex items-center justify-between text-xs font-semibold mb-1 min-w-0 gap-2"
-                :style     {:color "#6b7280"}}
-          ($ :span (str "💬 Conversation (" num-messages " messages)"))
-          ($ :a {:className "text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                :style {:color "#6b7280"}}
+          ($ :span {:className "truncate"} (str "💬 Conversation (" num-messages " messages)"))
+          ($ :a {:className "text-blue-600 hover:text-blue-800 underline cursor-pointer flex-shrink-0"
                  :onClick display-json-modal
                  :title "View as JSON"}
              "as json"))
        ($ :div
           {:className
-           (str "cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded transition-colors min-w-0")
+           (str "cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded transition-colors min-w-0 overflow-hidden")
            :onClick display-modal
-           :title   "Click to view full conversation"}
-          ($ :div {:className "text-xs font-sans space-y-0.5 min-w-0"}
+           :title "Click to view full conversation"}
+          ($ :div {:className "text-xs font-sans space-y-0.5 min-w-0 max-w-full"}
              (for [[idx line] (map-indexed vector preview-text)]
-               ($ :div {:key       idx
+               ($ :div {:key idx
                         :className "truncate min-w-0"}
                   line)))))))

@@ -148,11 +148,11 @@
              :style {:background-color "rgba(0, 0, 0, 0.02)"}}
        (for [[idx item] (map-indexed vector displayed-items)]
          ($ :div {:key idx
-                  :className (common/cn "flex items-start gap-2")}
+                  :className (common/cn "flex items-start gap-2 min-w-0")}
             ($ :span {:className (str "text-" color "-400 text-xs flex-shrink-0")}
                (str (inc idx) "."))
             ;; Recursively render each item using the generic viewer
-            ($ :div {:className (common/cn "flex-1")}
+            ($ :div {:className (common/cn "flex-1 min-w-0 overflow-hidden")}
                ($ generic-data-viewer {:data item
                                        :color color
                                        :truncate-length truncate-length
@@ -213,10 +213,10 @@
                :style {:background-color "rgba(0, 0, 0, 0.02)"}}
          (for [[k v] (sort-by (comp str key) data)]
            ($ :div {:key (str k)}
-              ($ :div {:className "flex items-start gap-1"}
-                 ($ :span {:className "text-gray-500 font-medium"} (str (name k) ":"))
+              ($ :div {:className "flex items-start gap-1 min-w-0"}
+                 ($ :span {:className "text-gray-500 font-medium flex-shrink-0"} (str (name k) ":"))
            ;; Wrap value in a div with flex constraints to enable truncation
-                 ($ :div {:className "flex-1 min-w-0"}
+                 ($ :div {:className "flex-1 min-w-0 overflow-hidden"}
                     ($ generic-data-viewer {:data v
                                             :color color
                                             :truncate-length truncate-length
