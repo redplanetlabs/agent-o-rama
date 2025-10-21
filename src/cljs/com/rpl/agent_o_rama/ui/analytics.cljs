@@ -266,5 +266,7 @@
                   {:data (or data [])
                    :granularity (:seconds granularity-config)
                    :metrics metrics-set
+                   :start-time-millis (:start-time-millis time-window)
+                   :end-time-millis (:end-time-millis time-window)
                    :height 300
                    :y-label "Latency (ms)"})))))))

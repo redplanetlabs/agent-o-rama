@@ -113,10 +113,12 @@
   - telemetry-data: Map of {bucket-number {metadata-key {metric-key value}}}
   - granularity: Granularity in seconds (e.g., 60 for minute)
   - metrics-to-show: Set of metric keys to display (e.g., #{:min :max 0.5 0.9})
+  - start-time-millis: Start of the time window being queried
+  - end-time-millis: End of the time window being queried
   
   Returns:
-  - uPlot data format [[timestamps] [series1] [series2] ...], or empty structure if no data"
-  [telemetry-data granularity metrics-to-show]
+  - uPlot data format [[timestamps] [series1] [series2] ...], or empty structure spanning the time window if no data"
+  [telemetry-data granularity metrics-to-show start-time-millis end-time-millis]
   (if (seq telemetry-data)
     (let [;; Sort buckets chronologically
           sorted-buckets (sort (keys telemetry-data))
@@ -141,10 +143,12 @@
           ;; Sort metrics: keywords first (alphabetically), then numbers (numerically)
       (let [sorted-metrics (sort-by (fn [k] [(if (keyword? k) 0 1) k]) metrics-to-show)]
         (into [timestamps] (map series-data sorted-metrics))))
-    ;; Return empty data structure with one timestamp point at current time
-    (let [now (.now js/Date)
-          sorted-metrics (sort-by (fn [k] [(if (keyword? k) 0 1) k]) metrics-to-show)]
-      (into [[now]] (repeat (count sorted-metrics) [nil])))))
+    ;; Return empty data structure spanning the actual time window
+    ;; This ensures the chart x-axis shows the correct historical time range even with no data
+    (let [sorted-metrics (sort-by (fn [k] [(if (keyword? k) 0 1) k]) metrics-to-show)
+          ;; Create timestamps at the start and end of the time window
+          timestamps [start-time-millis end-time-millis]]
+      (into [timestamps] (repeat (count sorted-metrics) [nil nil])))))
 
 (defui analytics-time-series-chart
   "A time-series chart for analytics telemetry data.
@@ -153,18 +157,20 @@
   - :data - Analytics telemetry data {bucket-number {metadata-key {metric-key value}}}
   - :granularity - Time granularity in seconds (e.g., 60 for minute)
   - :metrics - Set of metrics to display (defaults to #{:min :max 0.5 0.9 0.99})
+  - :start-time-millis - Start of time window (required for proper empty chart display)
+  - :end-time-millis - End of time window (required for proper empty chart display)
   - :width - Chart width in pixels (optional, defaults to full width)
   - :height - Chart height in pixels (optional, defaults to 300)
   - :title - Chart title (optional)
   - :y-label - Y-axis label (optional)"
-  [{:keys [data granularity metrics width height title y-label]}]
+  [{:keys [data granularity metrics start-time-millis end-time-millis width height title y-label]}]
   (let [metrics (or metrics #{:min :max 0.5 0.9 0.99})
         height (or height 300)
 
         ;; Transform data for uPlot
         chart-data (uix/use-memo
-                    (fn [] (prepare-analytics-data data granularity metrics))
-                    [data granularity metrics])
+                    (fn [] (prepare-analytics-data data granularity metrics start-time-millis end-time-millis))
+                    [data granularity metrics start-time-millis end-time-millis])
 
         ;; Define series configurations with nice colors
         metric-colors {:min "#10b981" ; green
