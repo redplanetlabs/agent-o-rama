@@ -108,6 +108,18 @@
          ($ :h4.text-base.font-medium.text-gray-700.mb-2.text-center title))
        ($ :div {:ref target-ref}))))
 
+(defn- sort-metrics
+  "Sort metrics in display order: min, percentiles (ascending), max"
+  [metrics]
+  (let [metric-order {:min 0
+                      0.5 1
+                      0.9 2
+                      0.99 3
+                      :max 4}]
+    (sort-by (fn [k]
+               (get metric-order k 999)) ; Unknown metrics go to end
+             metrics)))
+
 (defn- prepare-analytics-data
   "Transform analytics data into uPlot format.
   
@@ -141,13 +153,12 @@
                        {}
                        metrics-to-show)]
 
-          ;; Return in uPlot format: [timestamps series1 series2 ...]
-          ;; Sort metrics: keywords first (alphabetically), then numbers (numerically)
-      (let [sorted-metrics (sort-by (fn [k] [(if (keyword? k) 0 1) k]) metrics-to-show)]
+;; Sort metrics in display order: min, percentiles, max
+      (let [sorted-metrics (sort-metrics metrics-to-show)]
         (into [timestamps] (map series-data sorted-metrics))))
     ;; Return empty data structure spanning the actual time window
     ;; This ensures the chart x-axis shows the correct historical time range even with no data
-    (let [sorted-metrics (sort-by (fn [k] [(if (keyword? k) 0 1) k]) metrics-to-show)
+    (let [sorted-metrics (sort-metrics metrics-to-show)
           ;; Create timestamps at the start and end of the time window (in seconds)
           timestamps [(/ start-time-millis 1000) (/ end-time-millis 1000)]]
       (into [timestamps] (repeat (count sorted-metrics) [nil nil])))))
@@ -193,8 +204,8 @@
                    :stroke (get metric-colors metric-key "#6b7280")
                    :width 2
                    :points {:show true :size 4}})
-                ;; Sort metrics: keywords first (alphabetically), then numbers (numerically)
-                (sort-by (fn [k] [(if (keyword? k) 0 1) k]) metrics))
+                ;; Sort metrics in display order: min, percentiles, max
+                (sort-metrics metrics))
 
         ;; Build uPlot options for time-series (size will be set dynamically)
         options (uix/use-memo
