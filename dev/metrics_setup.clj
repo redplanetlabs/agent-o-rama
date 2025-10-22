@@ -306,8 +306,6 @@
         (catch Exception _e
           (println "  (Expected failure for charlie)")))
 
-      (cycle!)
-      (cycle!)
       (println "✓ Minute 0 data generated")
 
       ;; ========================================================================
@@ -321,8 +319,6 @@
                                      "eeeee"
                                      #{:model})
 
-      (cycle!)
-      (cycle!)
       (println "✓ Minute 1 data generated")
 
       ;; ========================================================================
@@ -335,8 +331,6 @@
         (catch Exception _e
           (println "  (Expected model failure)")))
 
-      (cycle!)
-      (cycle!)
       (println "✓ Minute 2 data generated")
 
       ;; ========================================================================
@@ -352,8 +346,6 @@
                                          s
                                          #{})))
 
-      (cycle!)
-      (cycle!)
       (println "✓ Minute 3 data generated (15 invocations with varied metadata)")
 
       ;; ========================================================================
@@ -386,11 +378,8 @@
           ;; Other minutes: simple successful calls
           (aor/agent-invoke agent-client "." #{})))
       
-      (cycle!)
-      (cycle!)
-      (println "✓ Generated 20 minutes of varied data")
-
       ;; Final analytics cycle
+      (cycle!)
       (cycle!)
 
       (let [final-time (h/current-time-millis)
