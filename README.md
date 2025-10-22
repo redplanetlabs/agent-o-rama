@@ -14,9 +14,22 @@ Agent-o-rama is a library for building scalable and stateful AI agents in Java o
   <img src="readme/create-llm-judge.png" width="30%" alt="Create LLM judge evaluator">
 </p>
 
+TODO: add telemetry image here
 
-TODO: image gallery
- - telemetry
+- [Key similarities and differences with LangGraph/LangSmith](#-key-similarities-with-langgraphlangsmith)
+- [Downloads](#downloads)
+- [Learning Agent-o-rama](#learning-agent-o-rama)
+- [Tour of Agent-o-rama](#tour-of-agent-o-rama)
+  - [Defining and Deploying Agents](#defining-and-deploying-agents)
+  - [Viewing Agent Traces](#viewing-agent-traces)
+  - [Forking Agent Invokes](#forking-agent-invokes)
+  - [Incorporating Human Input into Agent Execution](#incorporating-human-input-into-agent-execution)
+  - [Streaming Agent Nodes to Clients](#streaming-agent-nodes-to-clients)
+  - [Creating and Managing Datasets](#creating-and-managing-datasets)
+  - [Running Experiments](#running-experiments)
+  - [Online Actions](#online-actions)
+  - [Time-series Telemetry](#time-series-telemetry)
+
 
 LLMs are powerful but inherently unpredictable, so building applications with LLMs that are helpful and performant with minimal hallucination requires being rigorous about testing and monitoring. Agent-o-rama addresses this by making evaluation and observability a first-class part of the development process, not an afterthought.
 
@@ -120,12 +133,14 @@ The Maven target for Agent-o-rama is:
 </dependency>
 ```
 
-## Resources
+## Learning Agent-o-rama
 
 * [Quickstart](TODO)
 * [Full documentation](https://github.com/redplanetlabs/agent-o-rama/wiki)
 * [Javadoc](TODO)
 * [Clojuredoc](TODO)
+* [Mailing list](https://groups.google.com/u/1/g/rama-user)
+* #rama channel on [Clojurians](https://clojurians.slack.com/)
 
 
 ## Tour of Agent-o-rama
@@ -301,7 +316,7 @@ Datasets can then be used to run experiments to track agent performance, do regr
 
 ![Experiments list](readme/experiments.png)
 
-An experiments results look like:
+Experiment results look like:
 
 ![Experiment results](readme/experiment-results.png)
 
