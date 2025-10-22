@@ -565,6 +565,7 @@
                :granularity (:seconds granularity-config)
                :metric-key metric-key
                :categories (:categories config)
+               :metadata-key metadata-key
                :start-time-millis (:start-time-millis time-window)
                :end-time-millis (:end-time-millis time-window)
                :height 300
@@ -576,6 +577,7 @@
                :granularity (:seconds granularity-config)
                :metric-key metric-key
                :categories (:categories config)
+               :metadata-key metadata-key
                :start-time-millis (:start-time-millis time-window)
                :end-time-millis (:end-time-millis time-window)
                :height 300
@@ -586,6 +588,7 @@
               {:data (or data [])
                :granularity (:seconds granularity-config)
                :metric-key metric-key
+               :metadata-key metadata-key
                :start-time-millis (:start-time-millis time-window)
                :end-time-millis (:end-time-millis time-window)
                :height 300

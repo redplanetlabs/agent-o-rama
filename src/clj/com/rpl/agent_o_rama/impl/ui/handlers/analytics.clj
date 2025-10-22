@@ -226,6 +226,7 @@
     (def end-time-millis end-time-millis)
     (def metrics-set metrics-set)
     (def metadata-key metadata-key)
+    (def metric-id metric-id)
     (ana/select-telemetry telemetry-pstate
                           decoded-agent-name
                           granularity

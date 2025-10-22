@@ -539,32 +539,63 @@
   "Transform analytics data with multiple categories into uPlot format.
   
   Args:
-  - telemetry-data: Map of {bucket-number {metadata-key {metric-key value}}}
+  - telemetry-data: Map of {bucket-number {metadata-key {metric-key value}}} (no split)
+                    or {bucket-number {metadata-value {category {metric-key value}}}} (with split)
   - granularity: Granularity in seconds
   - metric-key: The metric key to extract (e.g., :rest-sum)
   - categories: List of category strings (e.g., [\"input\" \"output\" \"total\"])
+  - metadata-key: The metadata key being split by (nil if no split)
   - start-time-millis: Start of the time window
   - end-time-millis: End of the time window
   
   Returns:
   - uPlot data format [[timestamps] [category1-values] [category2-values] ...]"
-  [telemetry-data granularity metric-key categories start-time-millis end-time-millis]
+  [telemetry-data granularity metric-key categories metadata-key start-time-millis end-time-millis]
+  (println "=== prepare-multi-category-data ===")
+  (println "metadata-key:" metadata-key)
+  (println "categories:" categories)
+  (println "metric-key:" metric-key)
+  (println "telemetry-data (first 2 buckets):" (take 2 telemetry-data))
+
   (if (seq telemetry-data)
     (let [sorted-buckets (sort (keys telemetry-data))
+
+          ;; Get metadata value from first bucket if metadata split is active
+          first-bucket (first sorted-buckets)
+          first-bucket-data (get telemetry-data first-bucket)
+          metadata-value (when metadata-key
+                           (first (keys first-bucket-data)))
+
+          _ (println "first-bucket:" first-bucket)
+          _ (println "first-bucket-data:" first-bucket-data)
+          _ (println "metadata-value:" metadata-value)
+
           timestamps (mapv #(* % granularity) sorted-buckets)
+
           ;; Extract values for each category
           category-series (mapv
                            (fn [category]
-                             (mapv
-                              (fn [bucket]
-                                (get-in telemetry-data [bucket category metric-key]))
-                              sorted-buckets))
+                             (let [values (mapv
+                                           (fn [bucket]
+                                             (let [path (if metadata-key
+                                                          [bucket metadata-value category metric-key]
+                                                          [bucket category metric-key])
+                                                   value (get-in telemetry-data path)]
+                                               (when (= bucket first-bucket)
+                                                 (println "  category:" category "path:" path "value:" value))
+                                               value))
+                                           sorted-buckets)]
+                               (println "category:" category "values (first 5):" (take 5 values))
+                               values))
                            categories)]
+      (println "Final result - timestamps (first 5):" (take 5 timestamps))
       (into [timestamps] category-series))
     ;; Empty data
-    (let [empty-timestamps [(/ start-time-millis 1000) (/ end-time-millis 1000)]
-          empty-series (repeat (count categories) [nil nil])]
-      (into [empty-timestamps] empty-series))))
+    (do
+      (println "Empty telemetry-data!")
+      (let [empty-timestamps [(/ start-time-millis 1000) (/ end-time-millis 1000)]
+            empty-series (repeat (count categories) [nil nil])]
+        (into [empty-timestamps] empty-series)))))
 
 (defui analytics-multi-category-chart
   "A multi-line chart for data with multiple categories (e.g., token types).
@@ -574,20 +605,21 @@
   - :granularity - Time granularity in seconds
   - :metric-key - Which metric to display (e.g., :rest-sum)
   - :categories - List of category strings to display
+  - :metadata-key - The metadata key being split by (nil if no split)
   - :start-time-millis - Start of time window
   - :end-time-millis - End of time window
   - :height - Chart height in pixels (optional, defaults to 300)
   - :title - Chart title (optional)
   - :y-label - Y-axis label (optional)"
-  [{:keys [data granularity metric-key categories start-time-millis end-time-millis height title y-label]}]
+  [{:keys [data granularity metric-key categories metadata-key start-time-millis end-time-millis height title y-label]}]
   (let [height (or height 300)
 
         container-ref (useRef nil)
 
         ;; Transform data for uPlot
         chart-data (uix/use-memo
-                    (fn [] (prepare-multi-category-data data granularity metric-key categories start-time-millis end-time-millis))
-                    [data granularity metric-key categories start-time-millis end-time-millis])
+                    (fn [] (prepare-multi-category-data data granularity metric-key categories metadata-key start-time-millis end-time-millis))
+                    [data granularity metric-key categories metadata-key start-time-millis end-time-millis])
 
         ;; Colors for categories
         category-colors {"input" "#3b82f6" ; blue
@@ -670,30 +702,43 @@
   For each bucket, calculates: success_count / (success_count + failure_count) * 100
   
   Note: This function expects the telemetry data to have \"success \" and \"failure \" as
-  the category keys (second level of nesting), not as user-selected metadata split keys.
-  It does not apply the 'first bucket metadata key' logic since it needs both success
-  and failure categories to calculate the rate.
+  the category keys. When no metadata split is active, they're at level 2. When a metadata
+  split is active, they're at level 3 (after the metadata value).
   
   Args:
-  - telemetry-data: Map of {bucket-number {category {metric-key value}}}
-                    where categories are \"success \" and \"failure \"
+  - telemetry-data: Map of {bucket-number {category {metric-key value}}} (no split)
+                    or {bucket-number {metadata-value {category {metric-key value}}}} (with split)
   - granularity: Granularity in seconds
   - metric-key: The metric key to extract (e.g., :rest-sum)
+  - metadata-key: The metadata key being split by (nil if no split)
   - start-time-millis: Start of the time window
   - end-time-millis: End of the time window
   
   Returns:
   - uPlot data format [[timestamps] [percentage-values]]"
-  [telemetry-data granularity metric-key start-time-millis end-time-millis]
+  [telemetry-data granularity metric-key metadata-key start-time-millis end-time-millis]
   (if (seq telemetry-data)
     (let [sorted-buckets (sort (keys telemetry-data))
+
+          ;; Get metadata value from first bucket if metadata split is active
+          metadata-value (when metadata-key
+                           (first (keys (get telemetry-data (first sorted-buckets)))))
+
           timestamps (mapv #(* % granularity) sorted-buckets)
+
           ;; Calculate success rate for each bucket
-          ;; Note: Using hardcoded "success " and "failure " categories
           values (mapv
                   (fn [bucket]
-                    (let [success-count (get-in telemetry-data [bucket "success " metric-key] 0)
-                          failure-count (get-in telemetry-data [bucket "failure " metric-key] 0)
+                    (let [success-count (if metadata-key
+                                          ;; With split: bucket -> metadata-value -> "success " -> metric-key
+                                          (get-in telemetry-data [bucket metadata-value "success " metric-key] 0)
+                                          ;; No split: bucket -> "success " -> metric-key
+                                          (get-in telemetry-data [bucket "success " metric-key] 0))
+                          failure-count (if metadata-key
+                                          ;; With split: bucket -> metadata-value -> "failure " -> metric-key
+                                          (get-in telemetry-data [bucket metadata-value "failure " metric-key] 0)
+                                          ;; No split: bucket -> "failure " -> metric-key
+                                          (get-in telemetry-data [bucket "failure " metric-key] 0))
                           total (+ success-count failure-count)]
                       (if (pos? total)
                         (* (/ success-count total) 100)
@@ -710,12 +755,13 @@
   - :data - Analytics telemetry data {bucket-number {category {metric-key value}}}
   - :granularity - Time granularity in seconds
   - :metric-key - Which metric to display (e.g., :rest-sum)
+  - :metadata-key - The metadata key being split by (nil if no split)
   - :start-time-millis - Start of time window
   - :end-time-millis - End of time window
   - :height - Chart height in pixels (optional, defaults to 300)
   - :title - Chart title (optional)
   - :color - Line color (optional, defaults to green)"
-  [{:keys [data granularity metric-key start-time-millis end-time-millis height title color]}]
+  [{:keys [data granularity metric-key metadata-key start-time-millis end-time-millis height title color]}]
   (let [height (or height 300)
         color (or color "#10b981")
 
@@ -723,8 +769,8 @@
 
         ;; Transform data for uPlot
         chart-data (uix/use-memo
-                    (fn [] (prepare-model-success-rate-data data granularity metric-key start-time-millis end-time-millis))
-                    [data granularity metric-key start-time-millis end-time-millis])
+                    (fn [] (prepare-model-success-rate-data data granularity metric-key metadata-key start-time-millis end-time-millis))
+                    [data granularity metric-key metadata-key start-time-millis end-time-millis])
 
         ;; Line chart series configuration
         series [{:label "Success Rate"
