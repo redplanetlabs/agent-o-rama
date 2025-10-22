@@ -211,10 +211,6 @@ try (InProcessCluster ipc = InProcessCluster.create();
 
 These examples also launch the Agent-o-rama UI locally at `http://localhost:1974`.
 
-The first argument to each agent node function is an [AgentNode](TODO) object, which is used to interact with the graph to emit to other nodes, fetch agent objects, or set the result for the agent.
-
-You can also see from this example how to create a client to an agent and invoke it. The arguments to the agent are the arguments to the first node function.
-
 See [this page](TODO) for all the details of coding agents, including having multiple nodes, getting human input as part of execution, and aggregation. For lots of examples of agents in either Java or Clojure, see the [examples](https://github.com/redplanetlabs/agent-o-rama/tree/master/examples) directory in the repository.
 
 #### Managing modules on a real cluster
@@ -253,52 +249,67 @@ rama scaleExecutors \
 
 ### Viewing agent traces
 
-![Forking UI](readme/trace.png)
+A trace of every agent invoke is viewable in the Agent-o-rama web UI. Every aspect of execution is captured, including node emits, node timings, model calls, token counts, database read/write latencies, tool calls, subagent invokes, and much more. On the right is aggregated stats across all node.
 
-TODO
+![Agent invoke trace](readme/trace.png)
 
 
 ### Forking agent invokes
 
-![Forking UI](readme/fork.png)
+From the trace UI you can also fork any previous agent invoke, changing the arguments for any number of nodes and rerunning from there. This is useful to quickly see how small tweaks change the results to inform further iteration on the agent.
 
-TODO
+![Forking UI](readme/fork.png)
 
 ### Incorporating human input into agent execution
 
+Agent-o-rama has a first-class API for dynamically requesting human input in the middle of agent execution. Pending human input is viewable in traces and can be provided there or via the API.
+
 ![Human input](readme/human-input.png)
 
-TODO
+Human input is requested in a node function with the blocking call `agentNode.getHumanInput(prompt)` in Java and `(aor/get-human-input agent-node prompt)` in Clojure. Since nodes run on virtual threads, this is efficient. This returns the string the human provided that can be utilized in the rest of the agent execution.
 
 
 ### Streaming agent nodes to clients
 
-TODO
+The client API can stream results from individual nodes. Nested model calls are automatically streamed back for the node, and node functions can also use the Agent-o-rama API to explicitly stream chunks as well. Here's what it looks like in Java and Clojure to register a callback to stream a node:
+
+```java
+client.stream(invoke, "someNode", (List<String> allChunks, List<String> newChunks, boolean isReset, boolean isComplete) -> {
+  System.out.println("Received new chunks: " + newChunks);
+};
+```
+
+```clojure
+(aor/agent-stream client invoke "some-node"
+ (fn [all-chunks new-chunks reset? complete?]
+   (println "Received new chunks:" new-chunks)))
+```
+
+See [this page](TODO) for all the info on stremaing.
 
 
 ### Creating and managing datasets
 
+Datasets of examples can be created and managed via the UI or API. Examples can be added manually, imported in bulk via [JSONL](https://jsonlines.org/examples/) files, or added automatically from production runs with [actions](TODO). See all the info about datasets [on this page](TODO).
+
 ![Dataset](readme/dataset.png)
 
 
-TODO
-- show manual add
-- show add to dataset button
-- explain schemas
-
 ### Running experiments
+
+Datasets can then be used to run experiments to track agent performance, do regression testing, or test new agents. Experiments can be run on entire agents or on individual nodes of an agent. A single target can be tested at a time, or comparative experiments can be done to evaluate multiple different targets (e.g. the same agent paramterized to use different models).
 
 ![Experiments list](readme/experiments.png)
 
-TODO: add experiment results view with summary eval
+An experiments results look like:
 
-TODO
-- show creating evaluators and JSON paths
-  - types of evaluators
-- mention custom evaluator builders
-- show configuring an experiment
-- show comparative experiment
-- show results
+![Experiment results](readme/experiment-results.png)
+
+Experiments use "evaluators" to score performance. Evaluators are any function, and they can use models or databases during their execution. Agent-o-rama has some built-in evaluators like the "LLM as judge" evaluator which uses an LLM with a prompt to produce a score.
+
+![Create LLM judge](readme/create-llm-judge.png)
+
+See all the info about experiments [on this page](TODO).
 
 ### Online actions
 
