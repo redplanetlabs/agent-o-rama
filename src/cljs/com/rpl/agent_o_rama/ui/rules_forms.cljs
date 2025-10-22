@@ -301,7 +301,7 @@
            :value (:value field)
            :on-change (:on-change field)
            :error (:error field)
-           :filter-type :regular
+           :allowed-types #{:regular}
            :placeholder "Search for an evaluator..."}))))
 
 (defui ActionParamsForm

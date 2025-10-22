@@ -72,7 +72,7 @@
 
 (defui EvaluatorSelector
   "A searchable combobox for selecting an evaluator."
-  [{:keys [module-id value on-change error filter-type disabled? placeholder]}]
+  [{:keys [module-id value on-change error allowed-types disabled? placeholder]}]
   (let [[search-term set-search-term!] (uix/use-state "")
         [debounced-search] (useDebounce search-term 300)
         [is-open? set-open!] (uix/use-state false)
@@ -80,11 +80,11 @@
 
         {:keys [data loading? error query-error]}
         (queries/use-sente-query
-         {:query-key [:evaluator-instances module-id debounced-search filter-type]
+         {:query-key [:evaluator-instances module-id debounced-search allowed-types]
           :sente-event [:evaluators/get-all-instances
                         {:module-id module-id
                          :filters {:search-string debounced-search
-                                   :types (when filter-type #{filter-type})}}]
+                                   :types allowed-types}}]
           :enabled? (and is-open? (boolean module-id))})
 
         evaluators (:items data)

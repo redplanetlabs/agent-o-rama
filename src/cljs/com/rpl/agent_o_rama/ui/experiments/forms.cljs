@@ -102,7 +102,7 @@
 
 (defui EvaluatorMultiSelector
   "A multi-select component for evaluators using the new searchable selector."
-  [{:keys [module-id selected-evaluators on-change filter-type use-remote?]}]
+  [{:keys [module-id selected-evaluators on-change allowed-types use-remote?]}]
   (let [[remote-eval-name set-remote-eval-name] (uix/use-state "")
 
         ;; Fetch all evaluators to get info for display
@@ -112,8 +112,8 @@
           :sente-event [:evaluators/get-all-instances {:module-id module-id}]
           :enabled? (boolean module-id)})
         all-evaluators (or (:items data) [])
-        filtered-evaluators (if filter-type
-                              (filter #(= (:type %) filter-type) all-evaluators)
+        filtered-evaluators (if allowed-types
+                              (filter #(allowed-types (:type %)) all-evaluators)
                               all-evaluators)]
 
     ($ :div
@@ -196,7 +196,7 @@
                    :on-change (fn [selected-name]
                                 (when selected-name
                                   (on-change (conj selected-evaluators {:name selected-name :remote? false}))))
-                   :filter-type filter-type
+                   :allowed-types allowed-types
                    :placeholder "Search evaluators by name..."
                    :disabled? false})))))))
 
@@ -432,13 +432,17 @@
                   {:htmlFor "use-remote-evaluators"}
                   "Use remote evaluators")))
 
-          (let [evaluators-field (forms/use-form-field form-id :evaluators)]
+          (let [evaluators-field (forms/use-form-field form-id :evaluators)
+                allowed-evaluator-types (case spec-type
+                                          :regular #{:regular :summary}
+                                          :comparative #{:comparative}
+                                          nil)]
             ($ :div
                ($ EvaluatorMultiSelector
                   {:module-id module-id
                    :selected-evaluators (:value evaluators-field)
                    :on-change (:on-change evaluators-field)
-                   :filter-type spec-type
+                   :allowed-types allowed-evaluator-types
                    :use-remote? use-remote-evaluators?})
                (when (:error evaluators-field)
                  ($ :p.text-sm.text-red-600.mt-1 (:error evaluators-field))))))
