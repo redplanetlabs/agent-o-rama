@@ -93,10 +93,13 @@ The following are the key similarities and differences between Agent-o-rama and 
 - **Agent code executes on virtual threads:**
   All agent code executes on [virtual threads](https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html), which lets all code be written in a blocking style without consuming scarce platform threads. Coding long-running or I/O-intensive tasks is straightforward since the complexity of callbacks or async frameworks is avoided.
 
+- **Feature parity:**  
+  Agent-o-rama doesn't have every feature of Langsmith yet, such as annotation queues and "few-shot examples". However, we're working on those.
+
 #### 🧠 State & Control
 
 - **Built-in, high-performance storage:**  
-  Built-in, high-performance storage (document stores, KV stores, or any other data model) eliminates the need for external databases in most cases.
+  Built-in, high-performance storage (document stores, KV stores, or any other data model) eliminates the need for external databases in most cases. This greatly simplifies deployment, optimization, and operations.
 
 - **First-class human input:**  
   Human input is a first-class API rather than based on using exceptions for break points.
@@ -309,7 +312,6 @@ Datasets of examples can be created and managed via the UI or API. Examples can 
 
 ![Dataset](readme/dataset.png)
 
-
 ### Running experiments
 
 Datasets can then be used to run experiments to track agent performance, do regression testing, or test new agents. Experiments can be run on entire agents or on individual nodes of an agent. A single target can be tested at a time, or comparative experiments can be done to evaluate multiple different targets (e.g. the same agent paramterized to use different models).
@@ -328,10 +330,17 @@ See all the info about experiments [on this page](TODO).
 
 ### Online actions
 
-TODO
-- show defining rules
-- show online eval and webhooks
-- mention action builders
+Actions can be set up via the UI to run automatically on the results of production runs. Actions can do online evaluation, add to datasets, trigger webhooks, or run any custom function. Actions receive as input the run input/output, run statistics (e.g. latency, token counts), and any errors during the run. Actions can set a sampling rate or filter for runs matching particular parameters.
+
+Online evaluation gets added as feedback on the run that is viewable in traces, and time-series charts are automatically created that are viewable in the [analytics section](#time-series-telemetry). Here's an example of setting up an action to do online evaluation:
+
+![Online evaluation](readme/action-eval.png)
+
+Here's an example of creating an action to add slow runs to a dataset:
+
+![Add to dataset](readme/action-eval.png)
+
+See [this page](TODO) for the details on creating actions.
 
 
 ### Time-series telemetry
