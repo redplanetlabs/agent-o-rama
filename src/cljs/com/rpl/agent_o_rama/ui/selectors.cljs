@@ -78,9 +78,13 @@
         [is-open? set-open!] (uix/use-state false)
         input-ref (uix/use-ref nil)
 
+        ;; Create a stable string key from filters to avoid schema nesting issues
+        filter-key (str (when allowed-types (str/join "," (sort allowed-types)))
+                        "|" debounced-search)
+
         {:keys [data loading? error query-error]}
         (queries/use-sente-query
-         {:query-key [:evaluator-instances module-id debounced-search allowed-types]
+         {:query-key [:evaluator-instances module-id filter-key]
           :sente-event [:evaluators/get-all-instances
                         {:module-id module-id
                          :filters {:search-string debounced-search
