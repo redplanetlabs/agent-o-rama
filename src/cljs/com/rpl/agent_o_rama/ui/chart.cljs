@@ -360,7 +360,8 @@
                                  :range (fn [_self _min _max]
                                           #js [(/ start-time-millis 1000) (/ end-time-millis 1000)])}
                              :y {:auto true}}
-                    :legend {:show false}})
+                    :legend {:show true
+                             :live true}})
                  [height y-label start-time-millis end-time-millis])
 
         [target-ref chart-ref] (use-uplot options chart-data)
@@ -477,7 +478,8 @@
                                  :range (fn [_self _min max]
                                           ;; Force y-axis to show 0-100%
                                           #js [0 100])}}
-                    :legend {:show false}})
+                    :legend {:show true
+                             :live true}})
                  [height start-time-millis end-time-millis])
 
         [target-ref chart-ref] (use-uplot options chart-data)
@@ -730,7 +732,8 @@
                                  :range (fn [_self _min _max]
                                           ;; Force y-axis to show 0-100%
                                           #js [0 100])}}
-                    :legend {:show false}})
+                    :legend {:show true
+                             :live true}})
                  [height start-time-millis end-time-millis])
 
         [target-ref chart-ref] (use-uplot options chart-data)

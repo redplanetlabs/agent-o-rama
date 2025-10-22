@@ -209,8 +209,8 @@
 
             ;; Scaled-down declarative plan for faster setup
             generation-plan [{:label "day", :duration-units :days, :duration 34, :invokes-per-unit 1}
-                             {:label "hour", :duration-units :hours, :duration 23, :invokes-per-unit 5}
-                             {:label "minute", :duration-units :minutes, :duration 59, :invokes-per-unit 4}]]
+                             {:label "hour", :duration-units :hours, :duration 23, :invokes-per-unit 1}
+                             {:label "minute", :duration-units :minutes, :duration 59, :invokes-per-unit 1}]]
 
         (doseq [{:keys [label duration-units duration invokes-per-unit]} generation-plan]
           (let [time-advancer (case duration-units
