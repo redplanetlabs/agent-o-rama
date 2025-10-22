@@ -3,12 +3,20 @@
 Agent-o-rama is a library for building scalable and stateful AI agents in Java or Clojure. Agents are defined as simple graphs of pure Java or Clojure functions, and Agent-o-rama automatically captures detailed traces and provides facilities and a web UI for offline experimentation, online evaluation, time-series telemetry (e.g. latencies, token usage), and much more. Agent-o-rama is heavily inspired by [LangGraph](https://www.langchain.com/langgraph) and [LangSmith](https://www.langchain.com/langsmith/observability).
 
 
+<p align="center">
+  <img src="readme/trace.png" width="30%" alt="Agent execution trace">
+  <img src="readme/dataset.png" width="30%" alt="Dataset">
+  <img src="readme/experiments.png" width="30%" alt="Experiments listing">
+</p>
+<p align="center">
+  <img src="readme/human-input.png" width="30%" alt="Human input">
+  <img src="readme/fork.png" width="30%" alt="Forking">
+  <img src="readme/create-llm-judge.png" width="30%" alt="Create LLM judge evaluator">
+</p>
+
+
 TODO: image gallery
- - trace
  - telemetry
- - datasets
- - experiment results
- - forking UI
 
 LLMs are powerful but inherently unpredictable, so building applications with LLMs that are helpful and performant with minimal hallucination requires being rigorous about testing and monitoring. Agent-o-rama addresses this by making evaluation and observability a first-class part of the development process, not an afterthought.
 
@@ -245,10 +253,20 @@ rama scaleExecutors \
 
 ### Viewing agent traces
 
+![Forking UI](readme/trace.png)
+
 TODO
 
 
 ### Forking agent invokes
+
+![Forking UI](readme/fork.png)
+
+TODO
+
+### Incorporating human input into agent execution
+
+![Human input](readme/human-input.png)
 
 TODO
 
@@ -260,12 +278,19 @@ TODO
 
 ### Creating and managing datasets
 
+![Dataset](readme/dataset.png)
+
+
 TODO
 - show manual add
 - show add to dataset button
 - explain schemas
 
 ### Running experiments
+
+![Experiments list](readme/experiments.png)
+
+TODO: add experiment results view with summary eval
 
 TODO
 - show creating evaluators and JSON paths
