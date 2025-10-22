@@ -325,12 +325,11 @@
                     (fn [] (prepare-bar-chart-data data granularity metric-key start-time-millis end-time-millis))
                     [data granularity metric-key start-time-millis end-time-millis])
 
-;; Bar chart series configuration - use filled area under line
+;; Line chart series configuration with dots
         series [{:label (or y-label "Value")
                  :stroke color
-                 :fill (str color "CC") ;; More opaque fill for bars
-                 :width 0 ;; No stroke line
-                 :points {:show false}}]
+                 :width 2
+                 :points {:show true :size 4}}]
 
         ;; Build uPlot options
         options (uix/use-memo
