@@ -1,25 +1,28 @@
 (ns dev.metrics-setup
-  "REPL-friendly, comprehensive metrics data generation for UI development and testing.
-
-  This namespace creates a realistic, time-distributed dataset for the analytics UI,
-  simulating an agent that has been running in production for over a month.
-
-  It generates varied data to populate all standard charts, including:
-  - Agent success/failure rates.
-  - Latency distributions (agent, model, store operations).
-  - Token counts for model calls.
-  - Custom evaluator scores (for testing dynamic evaluator charts).
-  - Rich metadata for testing the 'Split by' functionality.
+  "REPL-friendly metrics data generation for UI development.
+  
+  This namespace provides a single function, `setup-metrics-env`, which creates
+  a realistic, multi-dimensional, and time-aware dataset for testing and
+  developing the analytics UI. It simulates a long-running production environment
+  with varied agent behaviors.
 
   Usage:
     (require '[dev.metrics-setup :as ms])
+    ;; This will take a moment to generate all the data.
     (def ipc (ms/setup-metrics-env))
-    "
+    
+    ;; Now visit http://localhost:1974 to see the populated analytics UI.
+    ;; You can explore different time granularities and use the 'Split by'
+    ;; feature with keys like 'user-tier', 'region', and 'ab-test-group'.
+    
+    ;; When done:
+    ;; (aor/stop-ui) ;; Assuming you have a handle to the UI object
+    ;; (.close ipc)"
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.analytics :as ana]
-   [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
+   [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.topology :as at]
@@ -27,8 +30,7 @@
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.store :as store]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.test-common :as tc]
-   [clojure.string :as str])
+   [com.rpl.test-common :as tc])
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:import
@@ -41,7 +43,8 @@
     EmbeddingSearchRequest
     EmbeddingSearchResult
     EmbeddingStore]
-   [dev.langchain4j.store.embedding.filter.comparison IsEqualTo]))
+   [dev.langchain4j.store.embedding.filter.comparison IsEqualTo]
+   [java.util.concurrent CompletableFuture]))
 
 ;; =============================================================================
 ;; Mock Objects & Helpers
@@ -54,20 +57,20 @@
   (doChat [this request handler]
     (let [^UserMessage um (-> request .messages last)
           m (.singleText um)
-          o (str "Mock response to: " m)
+          o (str m "***")
           response (-> (ChatResponse$Builder.)
                        (.aiMessage (AiMessage. o))
                        (.tokenUsage
-                        (TokenUsage. (int (* (count m) 1.5))
-                                     (int (* (count o) 2.0))
-                                     (int (+ (* (count m) 1.5) (* (count o) 2.0)))))
+                        (TokenUsage. (int (count m))
+                                     (int (count o))
+                                     (int (+ (count m) (count o) 2))))
                        .build)]
-      (TopologyUtils/advanceSimTime (+ 50 (rand-int 150)))
+      (TopologyUtils/advanceSimTime 150)
       (when (h/contains-string? m "fail-model")
         (throw (ex-info "fail model" {})))
-      (.onPartialResponse handler (subs o 0 (min 5 (count o))))
-      (TopologyUtils/advanceSimTime (+ 50 (rand-int 100)))
-      (.onPartialResponse handler (subs o 5))
+      (.onPartialResponse handler "abc ")
+      (TopologyUtils/advanceSimTime 100)
+      (.onPartialResponse handler "def")
       (.onCompleteResponse handler response))))
 
 (deftype MockEmbeddingStore []
@@ -79,114 +82,95 @@
     (TopologyUtils/advanceSimTime 15)
     (EmbeddingSearchResult. [])))
 
-(defn advancer-pred [amt]
-  (fn [_]
-    (TopologyUtils/advanceSimTime amt)
-    true))
+(defn- advancer-pred [amt]
+  (fn [_] (TopologyUtils/advanceSimTime amt) true))
+
+(defn- minute-millis [i] (* i 1000 po/MINUTE-GRANULARITY))
+(defn- hour-millis [i] (* i 1000 po/HOUR-GRANULARITY))
+(defn- day-millis [i] (* i 1000 po/DAY-GRANULARITY))
 
 ;; =============================================================================
-;; Module Definition with a Configurable Agent and Evaluators
+;; Module Definition
 ;; =============================================================================
 
-(defn create-metrics-gen-module []
+(defn create-metrics-gen-module
+  "Creates an agent module specifically designed to generate varied metrics data."
+  []
   (aor/agentmodule
    [topology]
 
-   ;; --- Evaluator Builders for Testing ---
+   ;; Evaluator builders for testing evaluator charts
+   (aor/declare-evaluator-builder
+    topology
+    "numeric-score"
+    ""
+    (fn [params]
+      (fn [fetcher input ref-output output]
+        {"score" (count (str output))})))
+
    (aor/declare-evaluator-builder
     topology
     "conciseness"
-    "Boolean evaluator for output length."
-    (fn [params]
-      (let [threshold (Long/parseLong (get params "threshold" "50"))]
-        (fn [fetcher input ref-output output]
-          {"concise?" (< (count (str output)) threshold)}))))
-
-   (aor/declare-evaluator-builder
-    topology
-    "word-count"
-    "Numeric evaluator for word count."
+    ""
     (fn [params]
       (fn [fetcher input ref-output output]
-        {"word-count" (count (str/split (str output) #"\s+"))})))
+        {"is-concise?" (< (count (str output)) 20)})))
 
-   ;; --- Agent Objects ---
-   (aor/declare-agent-object-builder
-    topology "my-model" (fn [setup] (->MockChatModel)))
+   ;; Action builder to confirm rules are firing
+   (aor/declare-action-builder
+    topology
+    "logging-action"
+    "A simple action that logs its execution"
+    (fn [params]
+      (fn [fetcher input output run-info]
+        {"rule-fired" (:rule-name run-info)})))
 
-   (aor/declare-agent-object-builder
-    topology "emb" (fn [setup] (MockEmbeddingStore.)))
-
+   ;; Declare mock objects for agent to use
+   (aor/declare-agent-object-builder topology "my-model" (fn [_] (->MockChatModel)))
+   (aor/declare-agent-object-builder topology "emb" (fn [_] (MockEmbeddingStore.)))
    (aor/declare-pstate-store topology "$$p" Object)
 
-   ;; --- Agent Definition ---
+   ;; The agent itself, configurable via input params to generate varied runs
    (-> topology
        (aor/new-agent "MetricsGenAgent")
        (aor/node
         "start"
+        "process"
+        (fn [agent-node {:keys [flags delay-ms should-fail?] :as params}]
+          (when delay-ms (TopologyUtils/advanceSimTime delay-ms))
+
+          (when (contains? flags :model)
+            (lc4j/basic-chat (aor/get-agent-object agent-node "my-model") "test-prompt"))
+
+          (aor/emit! agent-node "process" params)))
+       (aor/node
+        "process"
         nil
-        (fn [agent-node {:keys [delay-ms should-fail? ops input-text]}]
-          ;; 1. Simulate Latency
-          (when (pos? delay-ms)
-            (TopologyUtils/advanceSimTime delay-ms))
+        (fn [agent-node {:keys [flags input] :as params}]
+          (let [p (aor/get-store agent-node "$$p")
+                ^EmbeddingStore es (aor/get-agent-object agent-node "emb")]
+            (when (contains? flags :store-write)
+              (store/pstate-transform! [(advancer-pred 10) (termval "value")] p :key))
+            (when (contains? flags :store-read)
+              (store/pstate-select-one [:key (advancer-pred 10)] p))
+            (when (contains? flags :db-write)
+              (.add es (tc/embedding 1.0 2.0)))
+            (when (contains? flags :db-read)
+              (.search es (EmbeddingSearchRequest. (tc/embedding 0.1 0.3) 5 0.75 (IsEqualTo. "b" 2))))
 
-          ;; 2. Simulate Failure
-          (when should-fail?
-            (throw (ex-info "Intentional test failure" {})))
-
-          ;; 3. Perform nested operations
-          (when (:model ops)
-            (lc4j/basic-chat (aor/get-agent-object agent-node "my-model")
-                             (or input-text "default input")))
-          (when (:store-write ops)
-            (store/pstate-transform! [(advancer-pred 12) (termval "a")]
-                                     (aor/get-store agent-node "$$p")
-                                     :a))
-          (when (:store-read ops)
-            (store/pstate-select-one [:a (advancer-pred 14)]
-                                     (aor/get-store agent-node "$$p")))
-          (when (:db-write ops)
-            (.add ^EmbeddingStore (aor/get-agent-object agent-node "emb") (tc/embedding 1.0)))
-          (when (:db-read ops)
-            (.search ^EmbeddingStore (aor/get-agent-object agent-node "emb")
-                     (EmbeddingSearchRequest. (tc/embedding 0.1) 5 0.75 (IsEqualTo. "b" 2))))
-
-          ;; 4. Return result
-          (aor/result! agent-node (str "Completed with input: " (or input-text "none"))))))))
-
-;; =============================================================================
-;; Data Generation Logic
-;; =============================================================================
-
-(defn generate-random-run-config []
-  "Generates a random configuration for an agent run, including metadata and behavior."
-  {:metadata {"user-tier" (rand-nth ["free" "premium" "enterprise"])
-              "region" (rand-nth ["us-west" "us-east" "eu-central" "apac"])
-              "ab-test-group" (rand-nth ["prompt-v1" "prompt-v2-experimental"])}
-   :behavior {:delay-ms (+ 20 (rand-int 300))
-              :should-fail? (< (rand) 0.1) ;; 10% failure rate
-              :ops (set (random-sample 0.6 #{:model :store-read :store-write :db-read :db-write}))
-              :input-text (str/join " " (repeatedly (+ 2 (rand-int 10))
-                                                    #(rand-nth ["a" "b" "c" "d" "e"])))}
-   })
-
-(defn run-agent-at [timestamp-ms agent-client {:keys [metadata behavior]}]
-  "Sets the simulated time and runs the agent with the given configuration."
-  (TopologyUtils/setTimeMillis timestamp-ms)
-  (try
-    (aor/agent-invoke-with-context agent-client {:metadata metadata} behavior)
-    (catch Exception _e
-      ;; Expected for failure simulations
-      )))
+            (if (:should-fail? params)
+              (throw (ex-info "Intentional test failure" {}))
+              (aor/result! agent-node (str "Success: " input))))))))
 
 ;; =============================================================================
 ;; Main Setup Function
 ;; =============================================================================
 
-(defn setup-metrics-env []
-  (println "🚀 Starting comprehensive metrics environment setup...")
-
-  (alter-var-root #'*ticks* (constantly (atom 0)))
+(defn setup-metrics-env
+  "Sets up a rich development environment with varied analytics data.
+   Returns the IPC handle."
+  []
+  (println "🚀 Starting metrics environment setup...")
 
   (with-redefs [i/SUBSTITUTE-TICK-DEPOTS true
                 i/hook:analytics-tick (fn [& args] (swap! *ticks* inc))
@@ -194,14 +178,15 @@
                 anode/log-node-error (fn [& args])
                 ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
                 ana/node-stall-time (fn [] (+ (h/current-time-millis) 60000))
-                at/gen-new-agent-id (fn [agent-name] (h/random-uuid7-at-timestamp (h/current-time-millis)))]
+                at/gen-new-agent-id (fn [_] (h/random-uuid7-at-timestamp (h/current-time-millis)))]
 
     (let [ipc (rtest/create-ipc)
           _ (TopologyUtils/startSimTime)
+          ;; Start simulation 35 days ago to have a rich history
           now (System/currentTimeMillis)
-          start-of-sim-time (- now (* 40 24 60 60 1000)) ; 40 days ago
-          _ (TopologyUtils/advanceSimTime start-of-sim-time)
-          _ (println "✓ IPC created and simulated time started 40 days in the past.")
+          start-time (- now (* 35 24 60 60 1000))
+          _ (TopologyUtils/advanceSimTime start-time)
+          _ (println "✓ IPC created. Simulated time started 35 days in the past.")
 
           module (create-metrics-gen-module)
           _ (rtest/launch-module! ipc module {:tasks 2 :threads 2})
@@ -209,62 +194,78 @@
 
           module-name (get-module-name module)
           agent-manager (aor/agent-manager ipc module-name)
-          global-actions-depot (:global-actions-depot (aor-types/underlying-objects agent-manager))
           agent-client (aor/agent-client agent-manager "MetricsGenAgent")
+          global-actions-depot (:global-actions-depot (aor-types/underlying-objects agent-manager))
           ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name))
           cycle! (fn []
                    (reset! *ticks* 0)
                    (foreign-append! ana-depot nil)
-                   (Thread/sleep 500)
+                   (Thread/sleep 500) ; Wait for analytics to process
                    (rtest/pause-microbatch-topology! ipc module-name aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
                    (rtest/resume-microbatch-topology! ipc module-name aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME))]
 
-      ;; Create evaluators and rules BEFORE generating data
-      (aor/create-evaluator! agent-manager "concise-eval" "conciseness" {"threshold" "30"} "")
-      (aor/create-evaluator! agent-manager "word-count-eval" "word-count" {} "")
-      (ana/add-rule! global-actions-depot "rule-concise" "MetricsGenAgent"
+      (println "✓ Agent manager and analytics depot configured.")
+
+      ;; Create evaluators and rules
+      (aor/create-evaluator! agent-manager "numeric-eval" "numeric-score" {} "")
+      (aor/create-evaluator! agent-manager "concise-eval" "conciseness" {} "")
+      (ana/add-rule! global-actions-depot "numeric-rule" "MetricsGenAgent"
+                     {:action-name "aor/eval", :action-params {"name" "numeric-eval"}, :filter (aor-types/->AndFilter []), :sampling-rate 1.0, :start-time-millis 0, :status-filter :success})
+      (ana/add-rule! global-actions-depot "concise-rule" "MetricsGenAgent"
                      {:action-name "aor/eval", :action-params {"name" "concise-eval"}, :filter (aor-types/->AndFilter []), :sampling-rate 1.0, :start-time-millis 0, :status-filter :success})
-      (ana/add-rule! global-actions-depot "rule-word-count" "MetricsGenAgent"
-                     {:action-name "aor/eval", :action-params {"name" "word-count-eval"}, :filter (aor-types/->AndFilter []), :sampling-rate 1.0, :start-time-millis 0, :status-filter :success})
       (println "✓ Evaluators and rules created.")
 
-      ;; Generate historical data
-      (println "📊 Generating historical data...")
-      (doseq [days-ago (reverse (range 1 41))]
-        (let [day-start-ms (- now (* days-ago 24 60 60 1000))
-              num-invokes (+ 5 (rand-int (* (- 41 days-ago) 5)))] ; More invocations for recent days
-          (when (zero? (mod days-ago 5))
-            (println "  ...generating data for" days-ago "days ago (" num-invokes "invokes)"))
-          (dotimes [_ num-invokes]
-            (let [timestamp (+ day-start-ms (rand-int (* 24 60 60 1000)))
-                  config (generate-random-run-config)]
-              (run-agent-at timestamp agent-client config)))))
+      (println "\n📊 Generating historical and recent data...")
+      (let [futures (atom [])
+            ;; Metadata profiles for segmentation
+            profiles [{:metadata {"user-tier" "free", "region" "us-west"}}
+                      {:metadata {"user-tier" "premium", "region" "us-west"}}
+                      {:metadata {"user-tier" "premium", "region" "eu-central", "ab-test-group" "v2"}}
+                      {:metadata {"user-tier" "enterprise", "region" "apac", "ab-test-group" "v1"}}]
 
-      ;; Generate recent, high-density data for the last day
-      (println "📊 Generating recent high-density data for the last 24 hours...")
-      (let [day-start-ms (- now (* 1 24 60 60 1000))]
-        (dotimes [_ 200]
-          (let [timestamp (+ day-start-ms (rand-int (* 24 60 60 1000)))
-                config (generate-random-run-config)]
-            (run-agent-at timestamp agent-client config))))
+            ;; Declarative plan for data generation
+            generation-plan [{:duration-units :days, :duration 34, :invokes-per-unit 3}
+                             {:duration-units :hours, :duration 23, :invokes-per-unit 10}
+                             {:duration-units :minutes, :duration 59, :invokes-per-unit 25}]]
 
-      ;; Force some specific scenarios for predictable testing
-      (println "📊 Generating specific scenarios...")
-      (let [current-time (- now (* 5 60 1000))] ; 5 minutes ago
-        ;; A very slow, successful run with all ops
-        (run-agent-at current-time agent-client
-                      {:metadata {"user-tier" "enterprise", "region" "us-west", "scenario" "slow-success"}
-                       :behavior {:delay-ms 1200, :should-fail? false, :ops #{:model :store-read :store-write :db-read :db-write}, :input-text "long query text for token testing"}})
-        ;; A fast, failing run
-        (run-agent-at (+ current-time 1000) agent-client
-                      {:metadata {"user-tier" "free", "region" "eu-central", "scenario" "fast-fail"}
-                       :behavior {:delay-ms 10, :should-fail? true, :ops #{:model}}}))
+        (doseq [{:keys [duration-units duration invokes-per-unit]} generation-plan]
+          (let [time-advancer (case duration-units
+                                :days #(TopologyUtils/advanceSimTime (day-millis %))
+                                :hours #(TopologyUtils/advanceSimTime (hour-millis %))
+                                :minutes #(TopologyUtils/advanceSimTime (minute-millis %)))]
+            (dotimes [_ duration]
+              (time-advancer 1)
+              (dotimes [i invokes-per-unit]
+                (let [profile (rand-nth profiles)
+                      params {:input (str "run-" i)
+                              :flags (cond-> #{}
+                                       (> (rand) 0.5) (conj :model)
+                                       (> (rand) 0.7) (conj :store-write)
+                                       (> (rand) 0.8) (conj :db-read))
+                              :delay-ms (+ 50 (rand-int 500))
+                              :should-fail? (< (rand) 0.1)}]
+                  (swap! futures conj
+                         (aor/agent-initiate-with-context agent-client profile params)))))))
 
-      (println "✓ All data generated.")
-      (println "⚙️ Running analytics processing cycles...")
-      (cycle!)
-      (cycle!)
-      (println "✓ Analytics processed.")
+        ;; Wait for all agent invocations to finish
+        (println "  Waiting for" (count @futures) "agent invocations to complete...")
+        (.get (CompletableFuture/allOf (into-array CompletableFuture @futures)))
+        (println "  All invocations complete.")
 
-      ;; Start UI at the end
-      ipc)))
+        ;; Run analytics cycle multiple times to process all data
+        (println "  Running analytics cycles to process metrics...")
+        (dotimes [_ 3] (cycle!))
+        (println "  Analytics processing complete."))
+
+      (let [final-time (h/current-time-millis)
+            start-bucket (long (/ start-time 60000))
+            end-bucket (long (/ final-time 60000))]
+        (println "\n✅ Setup complete!")
+        (println "   UI is running at http://localhost:1974")
+        (println "   Agent 'MetricsGenAgent' has been populated with data.")
+        (println "   Data spans from bucket" start-bucket "to" end-bucket
+                 "(" (- end-bucket start-bucket) "minute buckets).")
+        (println "   Use the 'Split by' dropdown with 'user-tier', 'region', or 'ab-test-group'.")
+        (println "   Charts for evaluators 'numeric-eval' and 'concise-eval' are also available.")
+        (println "\n   Return value is the IPC handle. Call (.close ipc) when done."))
+      ipc))))
