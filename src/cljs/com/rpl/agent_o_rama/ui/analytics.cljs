@@ -19,8 +19,9 @@
                                          "en-US"
                                          #js {:month "short"
                                               :day "numeric"
-                                              :hour "2-digit"
-                                              :minute "2-digit"}))}
+                                              :hour "numeric"
+                                              :minute "2-digit"
+                                              :hour12 true}))}
    {:id :hour
     :label "Hour"
     :seconds 3600
@@ -29,8 +30,9 @@
                                          "en-US"
                                          #js {:month "short"
                                               :day "numeric"
-                                              :hour "2-digit"
-                                              :minute "2-digit"}))}
+                                              :hour "numeric"
+                                              :minute "2-digit"
+                                              :hour12 true}))}
    {:id :day
     :label "Day"
     :seconds 86400

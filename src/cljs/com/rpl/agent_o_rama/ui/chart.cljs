@@ -207,12 +207,11 @@
                             :values (fn [self splits]
                                       (.map splits
                                             (fn [timestamp]
-                                              (let [date (js/Date. timestamp)
-                                                    hours (.getHours date)
-                                                    minutes (.getMinutes date)]
-                                                (str (when (< hours 10) "0") hours
-                                                     ":"
-                                                     (when (< minutes 10) "0") minutes)))))}
+                                              (.toLocaleString (js/Date. timestamp)
+                                                               "en-US"
+                                                               #js {:hour "numeric"
+                                                                    :minute "2-digit"
+                                                                    :hour12 true}))))}
                            {:stroke "#64748b"
                             :grid {:show true :stroke "#e2e8f0" :width 1}
                             :ticks {:show true :stroke "#cbd5e1"}
