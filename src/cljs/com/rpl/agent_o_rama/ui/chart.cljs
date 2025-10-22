@@ -125,8 +125,8 @@
     (let [;; Sort buckets chronologically
           sorted-buckets (sort (keys telemetry-data))
 
-          ;; Convert bucket numbers to timestamps (bucket * granularity * 1000)
-          timestamps (mapv #(* % granularity 1000) sorted-buckets)
+;; Convert bucket numbers to timestamps in seconds (uPlot expects seconds for time scale)
+          timestamps (mapv #(* % granularity) sorted-buckets)
 
           ;; For each metric, extract values across all buckets
           ;; Using "_aor/default" as the metadata key for now
@@ -148,8 +148,8 @@
     ;; Return empty data structure spanning the actual time window
     ;; This ensures the chart x-axis shows the correct historical time range even with no data
     (let [sorted-metrics (sort-by (fn [k] [(if (keyword? k) 0 1) k]) metrics-to-show)
-          ;; Create timestamps at the start and end of the time window
-          timestamps [start-time-millis end-time-millis]]
+          ;; Create timestamps at the start and end of the time window (in seconds)
+          timestamps [(/ start-time-millis 1000) (/ end-time-millis 1000)]]
       (into [timestamps] (repeat (count sorted-metrics) [nil nil])))))
 
 (defui analytics-time-series-chart
@@ -208,8 +208,9 @@
                             ;; Format timestamps as readable dates
                             :values (fn [self splits]
                                       (.map splits
-                                            (fn [timestamp]
-                                              (.toLocaleString (js/Date. timestamp)
+                                            (fn [timestamp-seconds]
+                                              ;; Convert seconds to milliseconds for JS Date
+                                              (.toLocaleString (js/Date. (* timestamp-seconds 1000))
                                                                "en-US"
                                                                #js {:hour "numeric"
                                                                     :minute "2-digit"
@@ -221,8 +222,8 @@
                             :labelSize 14}]
                     :scales {:x {:time true
                                  :range (fn [self min max]
-                                      ;; Force the range to always be the full time window
-                                          #js [start-time-millis end-time-millis])}
+                                      ;; Force the range to always be the full time window (in seconds)
+                                          #js [(/ start-time-millis 1000) (/ end-time-millis 1000)])}
                              :y {:auto true}}
                     :legend {:show true
                              :live true}})
