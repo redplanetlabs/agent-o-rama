@@ -218,11 +218,14 @@
                             :ticks {:show true :stroke "#cbd5e1"}
                             :label (or y-label "Value")
                             :labelSize 14}]
-                    :scales {:x {:time true}
+                    :scales {:x {:time true
+                                 :range (fn [self min max]
+                                      ;; Force the range to always be the full time window
+                                          #js [start-time-millis end-time-millis])}
                              :y {:auto true}}
                     :legend {:show true
                              :live true}})
-                 [height y-label series]) ; width intentionally not in deps
+                 [height y-label series start-time-millis end-time-millis]) ; width intentionally not in deps
 
         ;; Get both refs from our hook
         [target-ref chart-ref] (use-uplot options chart-data)
