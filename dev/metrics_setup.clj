@@ -258,6 +258,5 @@
       ;; Run analytics cycle multiple times to process all data
       (println "  Running analytics cycles to process metrics...")
       (dotimes [_ 3] (cycle!))
-      (println "  Analytics processing complete."))
-
-    ipc))
+      (println "  Analytics processing complete.")
+      ipc)))
