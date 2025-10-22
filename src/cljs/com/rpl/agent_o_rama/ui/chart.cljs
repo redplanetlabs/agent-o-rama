@@ -137,23 +137,31 @@
     (let [;; Sort buckets chronologically
           sorted-buckets (sort (keys telemetry-data))
 
-;; Convert bucket numbers to timestamps in seconds (uPlot expects seconds for time scale)
+          ;; Get metadata keys from the first bucket only
+          first-bucket (first sorted-buckets)
+          first-bucket-metadata-keys (when first-bucket
+                                       (keys (get telemetry-data first-bucket)))
+          ;; Use "_aor/default" if available, otherwise first available key
+          metadata-key (or (first (filter #(= "_aor/default" %) first-bucket-metadata-keys))
+                           (first first-bucket-metadata-keys)
+                           "_aor/default")
+
+          ;; Convert bucket numbers to timestamps in seconds (uPlot expects seconds for time scale)
           timestamps (mapv #(* % granularity) sorted-buckets)
 
-          ;; For each metric, extract values across all buckets
-          ;; Using "_aor/default" as the metadata key for now
+          ;; For each metric, extract values across all buckets using the metadata key from first bucket
           series-data (reduce
                        (fn [acc metric-key]
                          (let [values (mapv
                                        (fn [bucket]
                                          (get-in telemetry-data
-                                                 [bucket "_aor/default" metric-key]))
+                                                 [bucket metadata-key metric-key]))
                                        sorted-buckets)]
                            (assoc acc metric-key values)))
                        {}
                        metrics-to-show)]
 
-;; Sort metrics in display order: min, percentiles, max
+      ;; Sort metrics in display order: min, percentiles, max
       (let [sorted-metrics (sort-metrics metrics-to-show)]
         (into [timestamps] (map series-data sorted-metrics))))
     ;; Return empty data structure spanning the actual time window
@@ -295,10 +303,19 @@
   [telemetry-data granularity metric-key start-time-millis end-time-millis]
   (if (seq telemetry-data)
     (let [sorted-buckets (sort (keys telemetry-data))
+
+          ;; Get metadata key from the first bucket only
+          first-bucket (first sorted-buckets)
+          first-bucket-metadata-keys (when first-bucket
+                                       (keys (get telemetry-data first-bucket)))
+          metadata-key-to-use (or (first (filter #(= "_aor/default" %) first-bucket-metadata-keys))
+                                  (first first-bucket-metadata-keys)
+                                  "_aor/default")
+
           timestamps (mapv #(* % granularity) sorted-buckets)
           values (mapv
                   (fn [bucket]
-                    (get-in telemetry-data [bucket "_aor/default" metric-key]))
+                    (get-in telemetry-data [bucket metadata-key-to-use metric-key]))
                   sorted-buckets)]
       [timestamps values])
     ;; Empty data
@@ -406,11 +423,20 @@
   [telemetry-data granularity metric-key start-time-millis end-time-millis]
   (if (seq telemetry-data)
     (let [sorted-buckets (sort (keys telemetry-data))
+
+          ;; Get metadata key from the first bucket only
+          first-bucket (first sorted-buckets)
+          first-bucket-metadata-keys (when first-bucket
+                                       (keys (get telemetry-data first-bucket)))
+          metadata-key-to-use (or (first (filter #(= "_aor/default" %) first-bucket-metadata-keys))
+                                  (first first-bucket-metadata-keys)
+                                  "_aor/default")
+
           timestamps (mapv #(* % granularity) sorted-buckets)
           ;; Convert 0.0-1.0 values to 0-100 percentages
           values (mapv
                   (fn [bucket]
-                    (when-let [val (get-in telemetry-data [bucket "_aor/default" metric-key])]
+                    (when-let [val (get-in telemetry-data [bucket metadata-key-to-use metric-key])]
                       (* val 100)))
                   sorted-buckets)]
       [timestamps values])
@@ -643,9 +669,14 @@
   "Transform analytics data for model success rate into uPlot format.
   For each bucket, calculates: success_count / (success_count + failure_count) * 100
   
+  Note: This function expects the telemetry data to have \"success \" and \"failure \" as
+  the category keys (second level of nesting), not as user-selected metadata split keys.
+  It does not apply the 'first bucket metadata key' logic since it needs both success
+  and failure categories to calculate the rate.
+  
   Args:
   - telemetry-data: Map of {bucket-number {category {metric-key value}}}
-                    where categories are \"success\" and \"failure\"
+                    where categories are \"success \" and \"failure \"
   - granularity: Granularity in seconds
   - metric-key: The metric key to extract (e.g., :rest-sum)
   - start-time-millis: Start of the time window
@@ -658,10 +689,11 @@
     (let [sorted-buckets (sort (keys telemetry-data))
           timestamps (mapv #(* % granularity) sorted-buckets)
           ;; Calculate success rate for each bucket
+          ;; Note: Using hardcoded "success " and "failure " categories
           values (mapv
                   (fn [bucket]
-                    (let [success-count (get-in telemetry-data [bucket \"success \" metric-key] 0)
-                          failure-count (get-in telemetry-data [bucket \"failure \" metric-key] 0)
+                    (let [success-count (get-in telemetry-data [bucket "success " metric-key] 0)
+                          failure-count (get-in telemetry-data [bucket "failure " metric-key] 0)
                           total (+ success-count failure-count)]
                       (if (pos? total)
                         (* (/ success-count total) 100)

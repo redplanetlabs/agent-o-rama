@@ -5,6 +5,8 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.chart :as chart]
+   [clojure.string :as str]
+   ["use-debounce" :refer [useDebounce]]
    ["@heroicons/react/24/outline" :refer [ChartBarIcon
                                           ChevronLeftIcon
                                           ChevronRightIcon]]))
@@ -253,10 +255,148 @@
      :end-time-millis end-time-millis
      :is-live? (= offset 0)}))
 
+(defui metadata-search-dropdown
+  "Searchable dropdown for metadata keys with example values.
+  
+  Props:
+  - :module-id - Module ID for queries
+  - :agent-name - Agent name for queries
+  - :value - Current metadata key value
+  - :on-change - Callback when selection changes"
+  [{:keys [module-id agent-name value on-change]}]
+  (let [[search-term set-search-term!] (uix/use-state "")
+        [debounced-search] (useDebounce search-term 300)
+        [is-open? set-open!] (uix/use-state false)
+        [highlighted-idx set-highlighted-idx!] (uix/use-state 0)
+        input-ref (uix/use-ref nil)
+
+        ;; Fetch metadata keys with search filter
+        {:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:metadata-search module-id agent-name debounced-search]
+          :sente-event [:analytics/search-metadata
+                        {:module-id module-id
+                         :agent-name agent-name
+                         :search-string debounced-search}]
+          :enabled? is-open?
+          :refetch-on-mount true})
+
+        ;; Extract metadata array from response
+        metadata-items (or (:metadata data) [])
+
+        ;; Display value - show current selection or placeholder
+        display-value (cond
+                        value value
+                        (and is-open? (not (str/blank? search-term))) search-term
+                        :else "")
+
+        ;; Event handlers
+        handle-input-change (fn [e]
+                              (let [v (.. e -target -value)]
+                                (set-search-term! v)
+                                (set-open! true)
+                                (set-highlighted-idx! 0)))
+
+        handle-select (fn [metadata-key]
+                        (on-change metadata-key)
+                        (set-search-term! metadata-key)
+                        (set-open! false))
+
+        handle-clear (fn []
+                       (on-change nil)
+                       (set-search-term! "")
+                       (set-open! false))
+
+        handle-input-focus (fn []
+                             (set-open! true)
+                             (when (str/blank? search-term)
+                               (set-search-term! "")))
+
+        handle-input-blur (fn []
+                            ;; Delay to allow click on dropdown item
+                            (js/setTimeout #(set-open! false) 200))
+
+        handle-keydown (fn [e]
+                         (when is-open?
+                           (case (.-key e)
+                             "ArrowDown" (do (.preventDefault e)
+                                             (set-highlighted-idx!
+                                              #(min (dec (count metadata-items)) (inc %))))
+                             "ArrowUp" (do (.preventDefault e)
+                                           (set-highlighted-idx!
+                                            #(max 0 (dec %))))
+                             "Enter" (do (.preventDefault e)
+                                         (when (< highlighted-idx (count metadata-items))
+                                           (handle-select (:name (nth metadata-items highlighted-idx)))))
+                             "Escape" (do (.preventDefault e)
+                                          (set-open! false))
+                             nil)))]
+
+    ;; Reset search term when value changes externally
+    (uix/use-effect
+     (fn []
+       (when (and value (not= search-term value))
+         (set-search-term! value))
+       js/undefined)
+     [value])
+
+    ($ :div.relative.w-full
+       ($ :div.relative
+          ($ :input {:ref input-ref
+                     :type "text"
+                     :className "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+                     :value display-value
+                     :placeholder "Search metadata keys..."
+                     :onChange handle-input-change
+                     :onFocus handle-input-focus
+                     :onBlur handle-input-blur
+                     :onKeyDown handle-keydown})
+
+          ;; Clear button (X) when there's a selected value
+          (when value
+            ($ :button.absolute.right-2.top-1.5.p-1.text-gray-400.hover:text-gray-600
+               {:onClick #(do (.stopPropagation %)
+                              (.preventDefault %)
+                              (handle-clear))
+                :type "button"}
+               ($ :svg.h-4.w-4 {:fill "none" :viewBox "0 0 24 24" :stroke "currentColor"}
+                  ($ :path {:strokeLinecap "round" :strokeLinejoin "round" :strokeWidth 2 :d "M6 18L18 6M6 6l12 12"})))))
+
+       ;; Dropdown list
+       (when is-open?
+         ($ :div.absolute.z-50.w-full.mt-1.bg-white.border.border-gray-300.rounded-md.shadow-lg.max-h-60.overflow-y-auto
+            (if loading?
+              ($ :div.p-4.text-center.text-gray-500.flex.items-center.justify-center
+                 ($ common/spinner {:size :medium})
+                 ($ :span.ml-2 "Loading..."))
+
+              (if error
+                ($ :div.p-4.text-center.text-red-500
+                   "Error loading metadata")
+
+                (if (empty? metadata-items)
+                  ($ :div.p-4.text-center.text-gray-500
+                     "No metadata keys found")
+
+                  (for [[idx metadata-item] (map-indexed vector metadata-items)]
+                    (let [metadata-name (:name metadata-item)
+                          example-values (:examples metadata-item)]
+                      ($ :div {:key metadata-name
+                               :className (str "p-3 cursor-pointer hover:bg-blue-50 "
+                                               (when (= idx highlighted-idx) "bg-blue-100"))
+                               :onMouseEnter #(set-highlighted-idx! idx)
+                               :onClick #(handle-select metadata-name)}
+                         ($ :div.font-medium.text-sm metadata-name)
+                         (when (seq example-values)
+                           ($ :div.text-xs.text-gray-500.mt-1
+                              (str "Examples: " (str/join ", " (take 3 example-values))))))))))))))))
+
 (defui global-controls
   [{:keys [granularity set-granularity
            time-offset set-time-offset
-           metadata-key set-metadata-key]}]
+           metadata-key set-metadata-key
+           module-id
+           agent-name]}]
   (let [granularity-config (first (filter #(= (:id %) granularity) granularities))
         time-window (calculate-time-window (:seconds granularity-config) time-offset)
         is-live? (:is-live? time-window)
@@ -275,17 +415,7 @@
                                   :on-select #(do
                                                 (set-granularity (:id g))
                                                 (set-time-offset 0))})
-                               granularities)
-
-        ;; Metadata split-by items (placeholder for now)
-        metadata-items [{:key :none
-                         :label "None (Overall)"
-                         :selected? (nil? metadata-key)
-                         :on-select #(set-metadata-key nil)}
-                        {:key :aor-status
-                         :label "aor/status"
-                         :selected? (= metadata-key "aor/status")
-                         :on-select #(set-metadata-key "aor/status")}]]
+                               granularities)]
 
     ($ :div.bg-white.p-4.rounded-lg.shadow-sm.border.border-gray-200.mb-6
        ;; First row: Granularity and Metadata Split-by
@@ -301,16 +431,16 @@
                     :items granularity-items
                     :data-testid "granularity-selector"})))
 
-          ;; Metadata split-by selector
+          ;; Metadata split-by selector with search
           ($ :div.flex.items-center.gap-2
              ($ :label.text-sm.font-medium.text-gray-700.whitespace-nowrap
                 "Split by:")
-             ($ :div.w-48
-                ($ common/Dropdown
-                   {:label "Split by"
-                    :display-text (if metadata-key metadata-key "None (Overall)")
-                    :items metadata-items
-                    :data-testid "metadata-selector"}))))
+             ($ :div.w-72
+                ($ metadata-search-dropdown
+                   {:module-id module-id
+                    :agent-name agent-name
+                    :value metadata-key
+                    :on-change set-metadata-key}))))
 
        ;; Second row: Time navigation
        ($ :div.flex.items-center.justify-between
@@ -510,7 +640,9 @@
            :time-offset time-offset
            :set-time-offset set-time-offset
            :metadata-key metadata-key
-           :set-metadata-key set-metadata-key})
+           :set-metadata-key set-metadata-key
+           :module-id module-id
+           :agent-name decoded-agent-name})
 
        ;; Charts grid - 2 columns on large screens, 1 column on mobile
        ($ :div.grid.grid-cols-1.lg:grid-cols-2.gap-6
