@@ -15,9 +15,10 @@
     ;; You can explore different time granularities and use the 'Split by'
     ;; feature with keys like 'user-tier', 'region', and 'ab-test-group'.
     
-    ;; When done:
-    ;; (aor/stop-ui) ;; Assuming you have a handle to the UI object
-    ;; (.close ipc)"
+    ;; When done (optional, can just close the REPL):
+    ;; (.close ipc)
+    ;; Note: The UI server is not managed by this script, it is assumed to be
+    ;; running from `lein repl`."
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.analytics :as ana]
@@ -101,17 +102,13 @@
 
    ;; Evaluator builders for testing evaluator charts
    (aor/declare-evaluator-builder
-    topology
-    "numeric-score"
-    ""
+    topology "numeric-score" ""
     (fn [params]
       (fn [fetcher input ref-output output]
         {"score" (count (str output))})))
 
    (aor/declare-evaluator-builder
-    topology
-    "conciseness"
-    ""
+    topology "conciseness" ""
     (fn [params]
       (fn [fetcher input ref-output output]
         {"is-concise?" (< (count (str output)) 20)})))
@@ -141,7 +138,6 @@
 
           (when (contains? flags :model)
             (lc4j/basic-chat (aor/get-agent-object agent-node "my-model") "test-prompt"))
-
           (aor/emit! agent-node "process" params)))
        (aor/node
         "process"
@@ -217,17 +213,18 @@
       (println "✓ Evaluators and rules created.")
 
       (println "\n📊 Generating historical and recent data...")
-      (let [futures (atom [])
-            ;; Metadata profiles for segmentation
+      (let [;; Metadata profiles for segmentation
             profiles [{:metadata {"user-tier" "free", "region" "us-west"}}
-                      {:metadata {"user-tier" "premium", "region" "us-west"}}
+                      {:metadata {"user-tier" "premium", "region" "us-west", "ab-test-group" "v1"}}
                       {:metadata {"user-tier" "premium", "region" "eu-central", "ab-test-group" "v2"}}
                       {:metadata {"user-tier" "enterprise", "region" "apac", "ab-test-group" "v1"}}]
 
-            ;; Declarative plan for data generation
-            generation-plan [{:duration-units :days, :duration 34, :invokes-per-unit 3}
-                             {:duration-units :hours, :duration 23, :invokes-per-unit 10}
-                             {:duration-units :minutes, :duration 59, :invokes-per-unit 25}]]
+            ;; Scaled-down declarative plan for data generation
+            generation-plan [{:duration-units :days, :duration 34, :invokes-per-unit 1}
+                             {:duration-units :hours, :duration 23, :invokes-per-unit 2}
+                             {:duration-units :minutes, :duration 59, :invokes-per-unit 5}]
+            
+            initiation-futures (atom [])]
 
         (doseq [{:keys [duration-units duration invokes-per-unit]} generation-plan]
           (let [time-advancer (case duration-units
@@ -241,18 +238,23 @@
                       params {:input (str "run-" i)
                               :flags (cond-> #{}
                                        (> (rand) 0.5) (conj :model)
-                                       (> (rand) 0.7) (conj :store-write)
-                                       (> (rand) 0.8) (conj :db-read))
-                              :delay-ms (+ 50 (rand-int 500))
+                                       (> (rand) 0.8) (conj :store-write)
+                                       (> (rand) 0.9) (conj :db-read))
+                              :delay-ms (+ 20 (rand-int 200))
                               :should-fail? (< (rand) 0.1)}]
-                  (swap! futures conj
-                         (aor/agent-initiate-with-context agent-client profile params)))))))
+                  (swap! initiation-futures conj
+                         (aor/agent-initiate-with-context-async agent-client profile params)))))))
 
-        ;; Wait for all agent invocations to finish
-        (println "  Waiting for" (count @futures) "agent invocations to complete...")
-        (.get (CompletableFuture/allOf (into-array CompletableFuture @futures)))
-        (println "  All invocations complete.")
+        ;; Wait for all agent INITIATIONS to complete
+        (println "  Waiting for" (count @initiation-futures) "agent initiations to complete...")
+        (let [agent-invokes (mapv deref @initiation-futures)]
+          (println "  All agents initiated. Now waiting for executions to finish...")
 
+          ;; Wait for all agent EXECUTIONS to complete
+          (let [result-futures (mapv #(aor/agent-result-async agent-client %) agent-invokes)]
+            (.get (CompletableFuture/allOf (into-array CompletableFuture result-futures)))
+            (println "  All agent executions complete."))))
+        
         ;; Run analytics cycle multiple times to process all data
         (println "  Running analytics cycles to process metrics...")
         (dotimes [_ 3] (cycle!))
@@ -262,11 +264,12 @@
             start-bucket (long (/ start-time 60000))
             end-bucket (long (/ final-time 60000))]
         (println "\n✅ Setup complete!")
-        (println "   UI is running at http://localhost:1974")
-        (println "   Agent 'MetricsGenAgent' has been populated with data.")
+        (println "   UI is running. If you started with `lein repl`, it's likely at http://localhost:7888")
+        (println "   (or the port you specified).")
+        (println "   The agent is: MetricsGenAgent")
         (println "   Data spans from bucket" start-bucket "to" end-bucket
                  "(" (- end-bucket start-bucket) "minute buckets).")
         (println "   Use the 'Split by' dropdown with 'user-tier', 'region', or 'ab-test-group'.")
         (println "   Charts for evaluators 'numeric-eval' and 'concise-eval' are also available.")
         (println "\n   Return value is the IPC handle. Call (.close ipc) when done."))
-      ipc)))
+      ipc))
