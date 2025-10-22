@@ -325,38 +325,12 @@
                     (fn [] (prepare-bar-chart-data data granularity metric-key start-time-millis end-time-millis))
                     [data granularity metric-key start-time-millis end-time-millis])
 
-        ;; Bar chart series configuration
+;; Bar chart series configuration - use filled area under line
         series [{:label (or y-label "Value")
                  :stroke color
-                 :fill (str color "80") ;; Add transparency
-                 :width 1
-                 :paths (fn [self series-idx idx0 idx1]
-                          ;; Custom path builder for bars
-                          (let [s (.scale self "x")
-                                data (.-data self)
-                                xs (aget data 0)
-                                ys (aget data series-idx)
-                                y0 (.valToPos self 0 "y")
-                                bar-width (* 0.8 (- (.valToPos s (aget xs 1) "x")
-                                                    (.valToPos s (aget xs 0) "x")))]
-                            (clj->js
-                             {:stroke (reduce
-                                       (fn [path i]
-                                         (let [x (aget xs i)
-                                               y (aget ys i)]
-                                           (if (nil? y)
-                                             path
-                                             (let [x-pos (.valToPos s x "x")
-                                                   y-pos (.valToPos self y "y")]
-                                               (str path
-                                                    " M" (- x-pos (/ bar-width 2)) "," y0
-                                                    " L" (- x-pos (/ bar-width 2)) "," y-pos
-                                                    " L" (+ x-pos (/ bar-width 2)) "," y-pos
-                                                    " L" (+ x-pos (/ bar-width 2)) "," y0
-                                                    " Z")))))
-                                       ""
-                                       (range idx0 (inc idx1)))
-                              :fill (.-fill (aget (.-series self) series-idx))})))}]
+                 :fill (str color "CC") ;; More opaque fill for bars
+                 :width 0 ;; No stroke line
+                 :points {:show false}}]
 
         ;; Build uPlot options
         options (uix/use-memo
