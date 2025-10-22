@@ -210,7 +210,7 @@
         ;; Build uPlot options for time-series (size will be set dynamically)
         options (uix/use-memo
                  (fn []
-                   {:width (or width 800) ; Initial width, will be updated on mount/resize
+                   {:width (or width 100) ; Use small initial width to avoid overflow
                     :height height
                     :series (into [{:label "Time"}] series)
                     :axes [{:stroke "#64748b"
@@ -257,14 +257,17 @@
                                      (when-let [chart (.-current chart-ref)]
                                        (when-let [size (get-size)]
                                          (.setSize chart (clj->js size)))))]
-                 ;; Set initial size after chart is created
-                 (handle-resize)
+                 ;; Use requestAnimationFrame to ensure DOM has settled
+                 (js/requestAnimationFrame
+                  (fn []
+                    ;; Set initial size after chart is created and DOM is stable
+                    (handle-resize)))
                  ;; Listen for window resize
                  (.addEventListener js/window "resize" handle-resize)
                  ;; Cleanup
                  (fn []
                    (.removeEventListener js/window "resize" handle-resize)))))
-           [width height])] ; Re-run if explicit width or height changes
+           [width height chart-data])] ; Add chart-data to re-run resize when data changes
 
     ($ :div.w-full
        {:ref container-ref}
@@ -334,7 +337,7 @@
         ;; Build uPlot options
         options (uix/use-memo
                  (fn []
-                   {:width 800
+                   {:width 100
                     :height height
                     :series (into [{:label "Time"}] series)
                     :axes [{:stroke "#64748b"
@@ -375,11 +378,11 @@
                                    (when-let [chart (.-current chart-ref)]
                                      (when-let [size (get-size)]
                                        (.setSize chart (clj->js size)))))]
-               (handle-resize)
+               (js/requestAnimationFrame handle-resize)
                (.addEventListener js/window "resize" handle-resize)
                (fn []
                  (.removeEventListener js/window "resize" handle-resize))))
-           [height])]
+           [height chart-data])]
 
     ($ :div.w-full
        {:ref container-ref}
@@ -445,7 +448,7 @@
         ;; Build uPlot options
         options (uix/use-memo
                  (fn []
-                   {:width 800
+                   {:width 100
                     :height height
                     :series (into [{:label "Time"}] series)
                     :axes [{:stroke "#64748b"
@@ -492,11 +495,11 @@
                                    (when-let [chart (.-current chart-ref)]
                                      (when-let [size (get-size)]
                                        (.setSize chart (clj->js size)))))]
-               (handle-resize)
+               (js/requestAnimationFrame handle-resize)
                (.addEventListener js/window "resize" handle-resize)
                (fn []
                  (.removeEventListener js/window "resize" handle-resize))))
-           [height])]
+           [height chart-data])]
 
     ($ :div.w-full
        {:ref container-ref}
@@ -575,7 +578,7 @@
         ;; Build uPlot options
         options (uix/use-memo
                  (fn []
-                   {:width 800
+                   {:width 100
                     :height height
                     :series (into [{:label "Time"}] series)
                     :axes [{:stroke "#64748b"
@@ -617,11 +620,11 @@
                                    (when-let [chart (.-current chart-ref)]
                                      (when-let [size (get-size)]
                                        (.setSize chart (clj->js size)))))]
-               (handle-resize)
+               (js/requestAnimationFrame handle-resize)
                (.addEventListener js/window "resize" handle-resize)
                (fn []
                  (.removeEventListener js/window "resize" handle-resize))))
-           [height])]
+           [height chart-data])]
 
     ($ :div.w-full
        {:ref container-ref}
@@ -698,7 +701,7 @@
         ;; Build uPlot options
         options (uix/use-memo
                  (fn []
-                   {:width 800
+                   {:width 100
                     :height height
                     :series (into [{:label "Time"}] series)
                     :axes [{:stroke "#64748b"
@@ -745,11 +748,11 @@
                                    (when-let [chart (.-current chart-ref)]
                                      (when-let [size (get-size)]
                                        (.setSize chart (clj->js size)))))]
-               (handle-resize)
+               (js/requestAnimationFrame handle-resize)
                (.addEventListener js/window "resize" handle-resize)
                (fn []
                  (.removeEventListener js/window "resize" handle-resize))))
-           [height])]
+           [height chart-data])]
 
     ($ :div.w-full
        {:ref container-ref}
