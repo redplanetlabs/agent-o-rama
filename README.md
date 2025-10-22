@@ -300,7 +300,7 @@ client.stream(invoke, "someNode", (List<String> allChunks, List<String> newChunk
    (println "Received new chunks:" new-chunks)))
 ```
 
-See [this page](TODO) for all the info on stremaing.
+See [this page](TODO) for all the info on streaming.
 
 
 ### Creating and managing datasets
@@ -320,7 +320,7 @@ Experiment results look like:
 
 ![Experiment results](readme/experiment-results.png)
 
-Experiments use "evaluators" to score performance. Evaluators are any function, and they can use models or databases during their execution. Agent-o-rama has some built-in evaluators like the "LLM as judge" evaluator which uses an LLM with a prompt to produce a score.
+Experiments use "evaluators" to score performance. Evaluators are functions that return scores, and they can use models or databases during their execution. Agent-o-rama has built-in evaluators like the "LLM as judge" evaluator which uses an LLM with a prompt to produce a score.
 
 ![Create LLM judge](readme/create-llm-judge.png)
 
