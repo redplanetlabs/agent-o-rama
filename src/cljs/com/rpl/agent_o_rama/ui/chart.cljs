@@ -20,19 +20,21 @@
   (let [chart-ref (useRef nil)
         target-ref (useRef nil)]
 
-    ;; Create or update chart when data changes
+    ;; Create or update chart when data or options change
     (useLayoutEffect
      (fn []
        (when (and (.-current target-ref) data (seq data))
          (let [current-chart (.-current chart-ref)]
-           (if current-chart
-             ;; If chart exists, update its data
-             (.setData current-chart (clj->js data))
-             ;; Otherwise, create a new chart instance
-             (let [new-chart (uPlot. (clj->js options) (clj->js data) (.-current target-ref))]
-               (set! (.-current chart-ref) new-chart)))))
+           ;; Always destroy and recreate chart when options or data change
+           ;; This ensures axis ranges and other config updates are applied
+           (when current-chart
+             (.destroy current-chart)
+             (set! (.-current chart-ref) nil))
+           ;; Create new chart instance
+           (let [new-chart (uPlot. (clj->js options) (clj->js data) (.-current target-ref))]
+             (set! (.-current chart-ref) new-chart))))
        js/undefined)
-     #js [data]) ; Only re-run when data changes
+     #js [data options]) ; Re-run when data OR options change
 
     ;; Cleanup effect to destroy chart on unmount
     (useLayoutEffect
@@ -190,7 +192,7 @@
                             :else (str metric-key))
                    :stroke (get metric-colors metric-key "#6b7280")
                    :width 2
-                   :points {:show false}})
+                   :points {:show true :size 4}})
                 ;; Sort metrics: keywords first (alphabetically), then numbers (numerically)
                 (sort-by (fn [k] [(if (keyword? k) 0 1) k]) metrics))
 
