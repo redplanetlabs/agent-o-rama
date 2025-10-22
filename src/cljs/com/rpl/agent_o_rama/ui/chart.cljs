@@ -270,4 +270,516 @@
        {:ref container-ref}
        (when title
          ($ :h4.text-base.font-medium.text-gray-700.mb-3 title))
+;; Add style tag for vertical legend layout
+       ($ :style ".uplot-vertical-legend .u-legend { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+                  .uplot-vertical-legend .u-legend .u-series { display: flex; align-items: center; gap: 8px; }
+                  .uplot-vertical-legend .u-legend .u-series > * { display: inline-block; }
+                  .uplot-vertical-legend .u-legend .u-marker { width: 12px; height: 12px; border-radius: 50%; }")
+       ($ :div.uplot-vertical-legend {:ref target-ref}))))
+
+(defn- prepare-bar-chart-data
+  "Transform analytics data into uPlot format for bar charts.
+  
+  Args:
+  - telemetry-data: Map of {bucket-number {metadata-key {metric-key value}}}
+  - granularity: Granularity in seconds
+  - metric-key: The metric key to extract (e.g., :count or :rest-sum)
+  - start-time-millis: Start of the time window
+  - end-time-millis: End of the time window
+  
+  Returns:
+  - uPlot data format [[timestamps] [values]]"
+  [telemetry-data granularity metric-key start-time-millis end-time-millis]
+  (if (seq telemetry-data)
+    (let [sorted-buckets (sort (keys telemetry-data))
+          timestamps (mapv #(* % granularity) sorted-buckets)
+          values (mapv
+                  (fn [bucket]
+                    (get-in telemetry-data [bucket "_aor/default" metric-key]))
+                  sorted-buckets)]
+      [timestamps values])
+    ;; Empty data
+    [[(/ start-time-millis 1000) (/ end-time-millis 1000)] [nil nil]]))
+
+(defui analytics-bar-chart
+  "A bar chart for analytics telemetry data.
+  
+  Props:
+  - :data - Analytics telemetry data {bucket-number {metadata-key {metric-key value}}}
+  - :granularity - Time granularity in seconds
+  - :metric-key - Which metric to display (e.g., :count or :rest-sum)
+  - :start-time-millis - Start of time window
+  - :end-time-millis - End of time window
+  - :height - Chart height in pixels (optional, defaults to 300)
+  - :title - Chart title (optional)
+  - :y-label - Y-axis label (optional)
+  - :color - Bar color (optional, defaults to blue)"
+  [{:keys [data granularity metric-key start-time-millis end-time-millis height title y-label color]}]
+  (let [height (or height 300)
+        color (or color "#3b82f6")
+
+        container-ref (useRef nil)
+
+        ;; Transform data for uPlot
+        chart-data (uix/use-memo
+                    (fn [] (prepare-bar-chart-data data granularity metric-key start-time-millis end-time-millis))
+                    [data granularity metric-key start-time-millis end-time-millis])
+
+        ;; Bar chart series configuration
+        series [{:label (or y-label "Value")
+                 :stroke color
+                 :fill (str color "80") ;; Add transparency
+                 :width 1
+                 :paths (fn [self series-idx idx0 idx1]
+                          ;; Custom path builder for bars
+                          (let [s (.scale self "x")
+                                data (.-data self)
+                                xs (aget data 0)
+                                ys (aget data series-idx)
+                                y0 (.valToPos self 0 "y")
+                                bar-width (* 0.8 (- (.valToPos s (aget xs 1) "x")
+                                                    (.valToPos s (aget xs 0) "x")))]
+                            (clj->js
+                             {:stroke (reduce
+                                       (fn [path i]
+                                         (let [x (aget xs i)
+                                               y (aget ys i)]
+                                           (if (nil? y)
+                                             path
+                                             (let [x-pos (.valToPos s x "x")
+                                                   y-pos (.valToPos self y "y")]
+                                               (str path
+                                                    " M" (- x-pos (/ bar-width 2)) "," y0
+                                                    " L" (- x-pos (/ bar-width 2)) "," y-pos
+                                                    " L" (+ x-pos (/ bar-width 2)) "," y-pos
+                                                    " L" (+ x-pos (/ bar-width 2)) "," y0
+                                                    " Z")))))
+                                       ""
+                                       (range idx0 (inc idx1)))
+                              :fill (.-fill (aget (.-series self) series-idx))})))}]
+
+        ;; Build uPlot options
+        options (uix/use-memo
+                 (fn []
+                   {:width 800
+                    :height height
+                    :series (into [{:label "Time"}] series)
+                    :axes [{:stroke "#64748b"
+                            :grid {:show true :stroke "#e2e8f0" :width 1}
+                            :ticks {:show true :stroke "#cbd5e1"}
+                            :values (fn [self splits]
+                                      (.map splits
+                                            (fn [timestamp-seconds]
+                                              (.toLocaleString (js/Date. (* timestamp-seconds 1000))
+                                                               "en-US"
+                                                               #js {:hour "numeric"
+                                                                    :minute "2-digit"
+                                                                    :hour12 true}))))}
+                           {:stroke "#64748b"
+                            :grid {:show true :stroke "#e2e8f0" :width 1}
+                            :ticks {:show true :stroke "#cbd5e1"}
+                            :label (or y-label "Value")
+                            :labelSize 14}]
+                    :scales {:x {:time true
+                                 :range (fn [_self _min _max]
+                                          #js [(/ start-time-millis 1000) (/ end-time-millis 1000)])}
+                             :y {:auto true}}
+                    :legend {:show false}})
+                 [height y-label start-time-millis end-time-millis])
+
+        [target-ref chart-ref] (use-uplot options chart-data)
+
+        ;; Handle resize
+        _ (uix/use-effect
+           (fn []
+             (let [get-size (fn []
+                              (when-let [container (.-current container-ref)]
+                                (let [rect (.getBoundingClientRect container)
+                                      container-width (.-width rect)]
+                                  (when (> container-width 0)
+                                    {:width container-width :height height}))))
+                   handle-resize (fn []
+                                   (when-let [chart (.-current chart-ref)]
+                                     (when-let [size (get-size)]
+                                       (.setSize chart (clj->js size)))))]
+               (handle-resize)
+               (.addEventListener js/window "resize" handle-resize)
+               (fn []
+                 (.removeEventListener js/window "resize" handle-resize))))
+           [height])]
+
+    ($ :div.w-full
+       {:ref container-ref}
+       (when title
+         ($ :h4.text-base.font-medium.text-gray-700.mb-3 title))
+       ($ :div {:ref target-ref}))))
+
+(defn- prepare-percentage-chart-data
+  "Transform analytics data into uPlot format for percentage line charts.
+  
+  Args:
+  - telemetry-data: Map of {bucket-number {metadata-key {metric-key value}}}
+  - granularity: Granularity in seconds
+  - metric-key: The metric key to extract (e.g., :mean)
+  - start-time-millis: Start of the time window
+  - end-time-millis: End of the time window
+  
+  Returns:
+  - uPlot data format [[timestamps] [values]] where values are in 0-100 range"
+  [telemetry-data granularity metric-key start-time-millis end-time-millis]
+  (if (seq telemetry-data)
+    (let [sorted-buckets (sort (keys telemetry-data))
+          timestamps (mapv #(* % granularity) sorted-buckets)
+          ;; Convert 0.0-1.0 values to 0-100 percentages
+          values (mapv
+                  (fn [bucket]
+                    (when-let [val (get-in telemetry-data [bucket "_aor/default" metric-key])]
+                      (* val 100)))
+                  sorted-buckets)]
+      [timestamps values])
+    ;; Empty data
+    [[(/ start-time-millis 1000) (/ end-time-millis 1000)] [nil nil]]))
+
+(defui analytics-percentage-chart
+  "A line chart for percentage data (0-100%).
+  
+  Props:
+  - :data - Analytics telemetry data {bucket-number {metadata-key {metric-key value}}}
+  - :granularity - Time granularity in seconds
+  - :metric-key - Which metric to display (e.g., :mean)
+  - :start-time-millis - Start of time window
+  - :end-time-millis - End of time window
+  - :height - Chart height in pixels (optional, defaults to 300)
+  - :title - Chart title (optional)
+  - :color - Line color (optional, defaults to green)"
+  [{:keys [data granularity metric-key start-time-millis end-time-millis height title color]}]
+  (let [height (or height 300)
+        color (or color "#10b981")
+
+        container-ref (useRef nil)
+
+        ;; Transform data for uPlot
+        chart-data (uix/use-memo
+                    (fn [] (prepare-percentage-chart-data data granularity metric-key start-time-millis end-time-millis))
+                    [data granularity metric-key start-time-millis end-time-millis])
+
+        ;; Line chart series configuration
+        series [{:label "Success Rate"
+                 :stroke color
+                 :width 2
+                 :points {:show true :size 4}}]
+
+        ;; Build uPlot options
+        options (uix/use-memo
+                 (fn []
+                   {:width 800
+                    :height height
+                    :series (into [{:label "Time"}] series)
+                    :axes [{:stroke "#64748b"
+                            :grid {:show true :stroke "#e2e8f0" :width 1}
+                            :ticks {:show true :stroke "#cbd5e1"}
+                            :values (fn [self splits]
+                                      (.map splits
+                                            (fn [timestamp-seconds]
+                                              (.toLocaleString (js/Date. (* timestamp-seconds 1000))
+                                                               "en-US"
+                                                               #js {:hour "numeric"
+                                                                    :minute "2-digit"
+                                                                    :hour12 true}))))}
+                           {:stroke "#64748b"
+                            :grid {:show true :stroke "#e2e8f0" :width 1}
+                            :ticks {:show true :stroke "#cbd5e1"}
+                            :label "Percentage (%)"
+                            :labelSize 14
+                            :values (fn [_self splits]
+                                      ;; Format y-axis as percentages
+                                      (.map splits (fn [v] (str (int v) "%"))))}]
+                    :scales {:x {:time true
+                                 :range (fn [_self _min _max]
+                                          #js [(/ start-time-millis 1000) (/ end-time-millis 1000)])}
+                             :y {:auto true
+                                 :range (fn [_self _min max]
+                                          ;; Force y-axis to show 0-100%
+                                          #js [0 100])}}
+                    :legend {:show false}})
+                 [height start-time-millis end-time-millis])
+
+        [target-ref chart-ref] (use-uplot options chart-data)
+
+        ;; Handle resize
+        _ (uix/use-effect
+           (fn []
+             (let [get-size (fn []
+                              (when-let [container (.-current container-ref)]
+                                (let [rect (.getBoundingClientRect container)
+                                      container-width (.-width rect)]
+                                  (when (> container-width 0)
+                                    {:width container-width :height height}))))
+                   handle-resize (fn []
+                                   (when-let [chart (.-current chart-ref)]
+                                     (when-let [size (get-size)]
+                                       (.setSize chart (clj->js size)))))]
+               (handle-resize)
+               (.addEventListener js/window "resize" handle-resize)
+               (fn []
+                 (.removeEventListener js/window "resize" handle-resize))))
+           [height])]
+
+    ($ :div.w-full
+       {:ref container-ref}
+       (when title
+         ($ :h4.text-base.font-medium.text-gray-700.mb-3 title))
+       ($ :div {:ref target-ref}))))
+
+(defn- prepare-multi-category-data
+  "Transform analytics data with multiple categories into uPlot format.
+  
+  Args:
+  - telemetry-data: Map of {bucket-number {metadata-key {metric-key value}}}
+  - granularity: Granularity in seconds
+  - metric-key: The metric key to extract (e.g., :rest-sum)
+  - categories: List of category strings (e.g., [\"input\" \"output\" \"total\"])
+  - start-time-millis: Start of the time window
+  - end-time-millis: End of the time window
+  
+  Returns:
+  - uPlot data format [[timestamps] [category1-values] [category2-values] ...]"
+  [telemetry-data granularity metric-key categories start-time-millis end-time-millis]
+  (if (seq telemetry-data)
+    (let [sorted-buckets (sort (keys telemetry-data))
+          timestamps (mapv #(* % granularity) sorted-buckets)
+          ;; Extract values for each category
+          category-series (mapv
+                           (fn [category]
+                             (mapv
+                              (fn [bucket]
+                                (get-in telemetry-data [bucket category metric-key]))
+                              sorted-buckets))
+                           categories)]
+      (into [timestamps] category-series))
+    ;; Empty data
+    (let [empty-timestamps [(/ start-time-millis 1000) (/ end-time-millis 1000)]
+          empty-series (repeat (count categories) [nil nil])]
+      (into [empty-timestamps] empty-series))))
+
+(defui analytics-multi-category-chart
+  "A multi-line chart for data with multiple categories (e.g., token types).
+  
+  Props:
+  - :data - Analytics telemetry data {bucket-number {category {metric-key value}}}
+  - :granularity - Time granularity in seconds
+  - :metric-key - Which metric to display (e.g., :rest-sum)
+  - :categories - List of category strings to display
+  - :start-time-millis - Start of time window
+  - :end-time-millis - End of time window
+  - :height - Chart height in pixels (optional, defaults to 300)
+  - :title - Chart title (optional)
+  - :y-label - Y-axis label (optional)"
+  [{:keys [data granularity metric-key categories start-time-millis end-time-millis height title y-label]}]
+  (let [height (or height 300)
+
+        container-ref (useRef nil)
+
+        ;; Transform data for uPlot
+        chart-data (uix/use-memo
+                    (fn [] (prepare-multi-category-data data granularity metric-key categories start-time-millis end-time-millis))
+                    [data granularity metric-key categories start-time-millis end-time-millis])
+
+        ;; Colors for categories
+        category-colors {"input" "#3b82f6" ; blue
+                         "output" "#10b981" ; green
+                         "total" "#8b5cf6"} ; purple
+
+        ;; Line chart series configuration for each category
+        series (mapv
+                (fn [category]
+                  {:label (str (clojure.string/capitalize category))
+                   :stroke (get category-colors category "#6b7280")
+                   :width 2
+                   :points {:show true :size 4}})
+                categories)
+
+        ;; Build uPlot options
+        options (uix/use-memo
+                 (fn []
+                   {:width 800
+                    :height height
+                    :series (into [{:label "Time"}] series)
+                    :axes [{:stroke "#64748b"
+                            :grid {:show true :stroke "#e2e8f0" :width 1}
+                            :ticks {:show true :stroke "#cbd5e1"}
+                            :values (fn [self splits]
+                                      (.map splits
+                                            (fn [timestamp-seconds]
+                                              (.toLocaleString (js/Date. (* timestamp-seconds 1000))
+                                                               "en-US"
+                                                               #js {:hour "numeric"
+                                                                    :minute "2-digit"
+                                                                    :hour12 true}))))}
+                           {:stroke "#64748b"
+                            :grid {:show true :stroke "#e2e8f0" :width 1}
+                            :ticks {:show true :stroke "#cbd5e1"}
+                            :label (or y-label "Value")
+                            :labelSize 14}]
+                    :scales {:x {:time true
+                                 :range (fn [_self _min _max]
+                                          #js [(/ start-time-millis 1000) (/ end-time-millis 1000)])}
+                             :y {:auto true}}
+                    :legend {:show true
+                             :live true}})
+                 [height y-label categories start-time-millis end-time-millis])
+
+        [target-ref chart-ref] (use-uplot options chart-data)
+
+        ;; Handle resize
+        _ (uix/use-effect
+           (fn []
+             (let [get-size (fn []
+                              (when-let [container (.-current container-ref)]
+                                (let [rect (.getBoundingClientRect container)
+                                      container-width (.-width rect)]
+                                  (when (> container-width 0)
+                                    {:width container-width :height height}))))
+                   handle-resize (fn []
+                                   (when-let [chart (.-current chart-ref)]
+                                     (when-let [size (get-size)]
+                                       (.setSize chart (clj->js size)))))]
+               (handle-resize)
+               (.addEventListener js/window "resize" handle-resize)
+               (fn []
+                 (.removeEventListener js/window "resize" handle-resize))))
+           [height])]
+
+    ($ :div.w-full
+       {:ref container-ref}
+       (when title
+         ($ :h4.text-base.font-medium.text-gray-700.mb-3 title))
+       ;; Add style for vertical legend
+       ($ :style ".uplot-vertical-legend .u-legend { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+                  .uplot-vertical-legend .u-legend .u-series { display: flex; align-items: center; gap: 8px; }
+                  .uplot-vertical-legend .u-legend .u-series > * { display: inline-block; }
+                  .uplot-vertical-legend .u-legend .u-marker { width: 12px; height: 12px; border-radius: 50%; }")
+       ($ :div.uplot-vertical-legend {:ref target-ref}))))
+
+(defn- prepare-model-success-rate-data
+  "Transform analytics data for model success rate into uPlot format.
+  For each bucket, calculates: success_count / (success_count + failure_count) * 100
+  
+  Args:
+  - telemetry-data: Map of {bucket-number {category {metric-key value}}}
+                    where categories are \"success\" and \"failure\"
+  - granularity: Granularity in seconds
+  - metric-key: The metric key to extract (e.g., :rest-sum)
+  - start-time-millis: Start of the time window
+  - end-time-millis: End of the time window
+  
+  Returns:
+  - uPlot data format [[timestamps] [percentage-values]]"
+  [telemetry-data granularity metric-key start-time-millis end-time-millis]
+  (if (seq telemetry-data)
+    (let [sorted-buckets (sort (keys telemetry-data))
+          timestamps (mapv #(* % granularity) sorted-buckets)
+          ;; Calculate success rate for each bucket
+          values (mapv
+                  (fn [bucket]
+                    (let [success-count (get-in telemetry-data [bucket \"success \" metric-key] 0)
+                          failure-count (get-in telemetry-data [bucket \"failure \" metric-key] 0)
+                          total (+ success-count failure-count)]
+                      (if (pos? total)
+                        (* (/ success-count total) 100)
+                        nil))) ;; Return nil if no data
+                  sorted-buckets)]
+      [timestamps values])
+    ;; Empty data
+    [[(/ start-time-millis 1000) (/ end-time-millis 1000)] [nil nil]]))
+
+(defui analytics-model-success-rate-chart
+  "A line chart for model success rate with special calculation.
+  
+  Props:
+  - :data - Analytics telemetry data {bucket-number {category {metric-key value}}}
+  - :granularity - Time granularity in seconds
+  - :metric-key - Which metric to display (e.g., :rest-sum)
+  - :start-time-millis - Start of time window
+  - :end-time-millis - End of time window
+  - :height - Chart height in pixels (optional, defaults to 300)
+  - :title - Chart title (optional)
+  - :color - Line color (optional, defaults to green)"
+  [{:keys [data granularity metric-key start-time-millis end-time-millis height title color]}]
+  (let [height (or height 300)
+        color (or color "#10b981")
+
+        container-ref (useRef nil)
+
+        ;; Transform data for uPlot
+        chart-data (uix/use-memo
+                    (fn [] (prepare-model-success-rate-data data granularity metric-key start-time-millis end-time-millis))
+                    [data granularity metric-key start-time-millis end-time-millis])
+
+        ;; Line chart series configuration
+        series [{:label "Success Rate"
+                 :stroke color
+                 :width 2
+                 :points {:show true :size 4}}]
+
+        ;; Build uPlot options
+        options (uix/use-memo
+                 (fn []
+                   {:width 800
+                    :height height
+                    :series (into [{:label "Time"}] series)
+                    :axes [{:stroke "#64748b"
+                            :grid {:show true :stroke "#e2e8f0" :width 1}
+                            :ticks {:show true :stroke "#cbd5e1"}
+                            :values (fn [self splits]
+                                      (.map splits
+                                            (fn [timestamp-seconds]
+                                              (.toLocaleString (js/Date. (* timestamp-seconds 1000))
+                                                               "en-US"
+                                                               #js {:hour "numeric"
+                                                                    :minute "2-digit"
+                                                                    :hour12 true}))))}
+                           {:stroke "#64748b"
+                            :grid {:show true :stroke "#e2e8f0" :width 1}
+                            :ticks {:show true :stroke "#cbd5e1"}
+                            :label "Percentage (%)"
+                            :labelSize 14
+                            :values (fn [_self splits]
+                                      ;; Format y-axis as percentages
+                                      (.map splits (fn [v] (str (int v) "%"))))}]
+                    :scales {:x {:time true
+                                 :range (fn [_self _min _max]
+                                          #js [(/ start-time-millis 1000) (/ end-time-millis 1000)])}
+                             :y {:auto true
+                                 :range (fn [_self _min _max]
+                                          ;; Force y-axis to show 0-100%
+                                          #js [0 100])}}
+                    :legend {:show false}})
+                 [height start-time-millis end-time-millis])
+
+        [target-ref chart-ref] (use-uplot options chart-data)
+
+        ;; Handle resize
+        _ (uix/use-effect
+           (fn []
+             (let [get-size (fn []
+                              (when-let [container (.-current container-ref)]
+                                (let [rect (.getBoundingClientRect container)
+                                      container-width (.-width rect)]
+                                  (when (> container-width 0)
+                                    {:width container-width :height height}))))
+                   handle-resize (fn []
+                                   (when-let [chart (.-current chart-ref)]
+                                     (when-let [size (get-size)]
+                                       (.setSize chart (clj->js size)))))]
+               (handle-resize)
+               (.addEventListener js/window "resize" handle-resize)
+               (fn []
+                 (.removeEventListener js/window "resize" handle-resize))))
+           [height])]
+
+    ($ :div.w-full
+       {:ref container-ref}
+       (when title
+         ($ :h4.text-base.font-medium.text-gray-700.mb-3 title))
        ($ :div {:ref target-ref}))))
