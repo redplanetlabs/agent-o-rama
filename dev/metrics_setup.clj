@@ -254,22 +254,10 @@
           (let [result-futures (mapv #(aor/agent-result-async agent-client %) agent-invokes)]
             (.get (CompletableFuture/allOf (into-array CompletableFuture result-futures)))
             (println "  All agent executions complete."))))
-        
-        ;; Run analytics cycle multiple times to process all data
-        (println "  Running analytics cycles to process metrics...")
-        (dotimes [_ 3] (cycle!))
-        (println "  Analytics processing complete."))
+      
+      ;; Run analytics cycle multiple times to process all data
+      (println "  Running analytics cycles to process metrics...")
+      (dotimes [_ 3] (cycle!))
+      (println "  Analytics processing complete."))
 
-      (let [final-time (h/current-time-millis)
-            start-bucket (long (/ start-time 60000))
-            end-bucket (long (/ final-time 60000))]
-        (println "\n✅ Setup complete!")
-        (println "   UI is running. If you started with `lein repl`, it's likely at http://localhost:7888")
-        (println "   (or the port you specified).")
-        (println "   The agent is: MetricsGenAgent")
-        (println "   Data spans from bucket" start-bucket "to" end-bucket
-                 "(" (- end-bucket start-bucket) "minute buckets).")
-        (println "   Use the 'Split by' dropdown with 'user-tier', 'region', or 'ab-test-group'.")
-        (println "   Charts for evaluators 'numeric-eval' and 'concise-eval' are also available.")
-        (println "\n   Return value is the IPC handle. Call (.close ipc) when done."))
-      ipc))
+    ipc))
