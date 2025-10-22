@@ -160,7 +160,8 @@
 
             (if (:should-fail? params)
               (throw (ex-info "Intentional test failure" {}))
-              (aor/result! agent-node (str "Success: " input))))))))
+              (aor/result! agent-node (str "Success: " input)))))))))
+  
 
 ;; =============================================================================
 ;; Main Setup Function
@@ -268,4 +269,4 @@
         (println "   Use the 'Split by' dropdown with 'user-tier', 'region', or 'ab-test-group'.")
         (println "   Charts for evaluators 'numeric-eval' and 'concise-eval' are also available.")
         (println "\n   Return value is the IPC handle. Call (.close ipc) when done."))
-      ipc))))
+      ipc)))
