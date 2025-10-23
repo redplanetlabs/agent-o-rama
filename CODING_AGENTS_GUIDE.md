@@ -4,23 +4,22 @@ This page explains how to code agents with Agent-o-rama. All examples are shown 
 
 ## Table of Contents
 
-TODO: update this TOC after doing rest of updates
-
 1. [Basic Concepts](#basic-concepts)
 2. [Nodes, Emits, and Results](#nodes-emits-and-results)
-3. [Agent Graphs with Loops](#agent-graphs-with-loops)
+3. [Routing in Agent Graphs](#routing-in-agent-graphs)
 4. [Aggregation Subgraphs](#aggregation-subgraphs)
-5. [Custom Aggregators](#custom-aggregators)
-6. [Agent Objects](#agent-objects)
-7. [Stores](#stores)
-8. [Subagents and Recursion](#subagents-and-recursion)
-9. [Advanced Patterns](#advanced-patterns)
+5. [Agent Objects](#agent-objects)
+6. [Stores](#stores)
+7. [Subagents and Recursion](#subagents-and-recursion)
+8. [Advanced Patterns](#advanced-patterns)
 
 ## Basic Concepts
 
-Agent-o-rama is a library for building AI agents as directed graphs. Nodes are the fundamental computation units in agent graphs. Each node is a plain Java or Clojure function that receives data, processes it, and either passes it along to other nodes or return a final result. This is the basic building block that enables all other agent patterns. Agent-o-rama executes all nodes on [virtual threads](https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html), which means node functions can be long-running and written in a blocking style without wasting thread resources.
+Agent-o-rama is a library for building AI agents as directed graphs. Nodes are the fundamental computation units in agent graphs. Each node is a plain Java or Clojure function that receives data, processes it, and either passes it along to other nodes or returns a final result. This is the basic building block that enables all other agent patterns. Agent-o-rama executes all nodes on [virtual threads](https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html), which means node functions can be long-running and written in a blocking style without wasting thread resources.
 
 Agent-o-rama captures all inputs, nested operations (e.g. model calls or database operations), and outputs from each node for viewing in the web UI. This information is also used and for to produce and display aggregated analytics about individual agent executions and time-series analytics for all agent executions.
+
+Besides tracing, nodes are also the granularity at which streaming is consumed by agent clients. Things like calls to Langchain4j models are automatically streamed for the node, and node functionsd can explicitly stream chunks back as well. This is discussed more on the [agent client](TODO) page.
 
 ### Key Components
 
@@ -45,16 +44,16 @@ This example shows a basic two-node pipeline where the first node processes the 
 import com.rpl.agentorama.*;
 
 public class BasicAgentModule extends AgentModule {
-    @Override
-    protected void defineAgents(AgentTopology topology) {
-      topology.newAgent("BasicAgent")
-              .node("start", "process", (AgentNode agentNode, String input) -> {
-                  agentNode.emit("process", "Hello " + input);
-              })
-              .node("process", null, (AgentNode agentNode, String data) -> {
-                  agentNode.result("Processed: " + data);
-              });
-    }
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    topology.newAgent("BasicAgent")
+            .node("start", "process", (AgentNode agentNode, String input) -> {
+                agentNode.emit("process", "Hello " + input);
+            })
+            .node("process", null, (AgentNode agentNode, String data) -> {
+                agentNode.result("Processed: " + data);
+            });
+  }
 }
 ```
 
@@ -96,29 +95,29 @@ This example demonstrates how an agent can route different types of messages thr
 
 ```java
 public class RouterAgentModule extends AgentModule {
-    @Override
-    protected void defineAgents(AgentTopology topology) {
-        topology.newAgent("RouterAgent")
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    topology.newAgent("RouterAgent")
             .node("route", new String[]{"handle-urgent", "handle-default"},
                   (AgentNode agentNode, String message) -> {
-                if (message.startsWith("urgent:")) {
-                    agentNode.emit("handle-urgent", message);
-                } else {
-                    agentNode.emit("handle-default", message);
-                }
+              if (message.startsWith("urgent:")) {
+                  agentNode.emit("handle-urgent", message);
+              } else {
+                  agentNode.emit("handle-default", message);
+              }
             })
             .node("handle-urgent", "finalize", (AgentNode agentNode, String message) -> {
-                String content = message.substring(7);
-                agentNode.emit("finalize", Map.of("priority", "HIGH", "message", content));
+              String content = message.substring(7);
+              agentNode.emit("finalize", Map.of("priority", "HIGH", "message", content));
             })
             .node("handle-default", "finalize", (AgentNode agentNode, String message) -> {
-                agentNode.emit("finalize", Map.of("priority", "NORMAL", "message", message));
+              agentNode.emit("finalize", Map.of("priority", "NORMAL", "message", message));
             })
             .node("finalize", null, (AgentNode agentNode, Map<String, String> data) -> {
-                String result = String.format("[%s] %s", data.get("priority"), data.get("message"));
-                agentNode.result(result);
+              String result = String.format("[%s] %s", data.get("priority"), data.get("message"));
+              agentNode.result(result);
             });
-    }
+  }
 }
 ```
 
@@ -153,57 +152,109 @@ public class RouterAgentModule extends AgentModule {
 ```
 
 
-### Emitting multiple times example
+### Emitting Multiple Times
 
-TODO:
-- explain how when a node emits multiple times:
-  - the first emit runs on the same node/thread
-  - subsequent emits will run in parallel on other threads or even other nodes
-    - so agent graphs automatically parallelize/distribute execution
-    - only something you need to think about if you're nodes could be doing database calls to the same entities in parallel
-- show example of this with just regular nodes, where the example does do multiple result! calls due to multiple emits
-  - explain first-write-wins behavior, and why that's allowed
-    - you might want to try multiple things and have the first result go back to user for expediency
+When a node emits multiple times, the first emit runs on the same node/thread, but subsequent emits will run in parallel on other threads or even other nodes. This means agent graphs automatically parallelize and distribute execution, which is powerful for performance but requires consideration if nodes might access the same resources (e.g. a database) in parallel. A node can emit any number of times to any number of downstream nodes.
 
-## Aggregation Subgraphs
-
-Aggregation subgraphs enable fan-out/fan-in patterns where work is distributed to multiple parallel nodes and results are collected and combined. This is essential for handling multiple concurrent operations, TODO: <example here about doing multiple LLM calls in parallel (since they're slow), and then combining results>
-
-### Basic Aggregation Example
-
-This example shows how to distribute work across multiple parallel processors and then collect the results.
+If multiple nodes call `result()`, only the first one wins – subsequent results are ignored. This "first-wins" behavior is useful when you want to try multiple approaches and return the first successful result for expediency. That said, most agents will only call `result()` once and any parallel processing triggered by multiple emits will be combined with [agggregation](#aggregation-subgraphs).
 
 #### Java API
 
-TODO: this example is way too complicated. just have the agg start node explicitly emit multiple times to the intermediate node rather than partition data like this
+```java
+public class MultiEmitAgentModule extends AgentModule {
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    topology.newAgent("MultiEmitAgent")
+            .node("start", new String[]{"process-a", "process-b"}, (AgentNode agentNode, String input) -> {
+              // Emit to multiple nodes in parallel
+              agentNode.emit("process-a", input + "-A1");
+              agentNode.emit("process-b", input + "-B");
+              agentNode.emit("process-a", input + "-A2");
+            })
+            .node("process-a", "finalize", (AgentNode agentNode, String data) -> {
+              // Simulate some work
+              Thread.sleep(100);
+              agentNode.emit("finalize", "Result A: " + data);
+            })
+            .node("process-b", "finalize", (AgentNode agentNode, String data) -> {
+              // Simulate some work
+              Thread.sleep(50);
+              agentNode.emit("finalize", "Result B: " + data);
+            })
+            .node("finalize", null, (AgentNode agentNode, String result) -> {
+              agentNode.result(result);
+            });
+  }
+}
+```
+
+#### Clojure API
+
+```clojure
+(aor/defagentmodule MultiEmitAgentModule
+  [topology]
+  (-> (aor/new-agent topology "MultiEmitAgent")
+      (aor/node
+       "start"
+       ["process-a" "process-b"]
+       (fn [agent-node input]
+         ;; Emit to both processing nodes in parallel
+         (aor/emit! agent-node "process-a" (str input "-A"))
+         (aor/emit! agent-node "process-b" (str input "-B"))
+         (aor/emit! agent-node "process-a" (str input "-A"))))
+      (aor/node
+       "process-a"
+       "finalize"
+       (fn [agent-node data]
+         ;; Simulate some work
+         (Thread/sleep 100)
+         (aor/emit! agent-node "finalize" (str "Result A: " data))))
+      (aor/node
+       "process-b"
+       "finalize"
+       (fn [agent-node data]
+         ;; Simulate some work
+         (Thread/sleep 50)
+         (aor/emit! agent-node "finalize" (str "Result B: " data))))
+      (aor/node
+       "finalize"
+       nil
+       (fn [agent-node result]
+         (aor/result! agent-node result)))))
+```
+
+## Aggregation Subgraphs
+
+Aggregation subgraphs enable fan-out/fan-in patterns where work is distributed to multiple parallel nodes and results are collected and combined. This is essential for handling multiple concurrent operations, like making multiple LLM calls in parallel (since they're slow) and then combining the results.
+
+### Basic Aggregation Example
+
+This example shows how to distribute work across multiple parallel processors and then collect the results. The agg node runs once the subgraph preceding it has finished running/emitting.
+
+#### Java API
 
 ```java
 public class AggregationAgentModule extends AgentModule {
-    @Override
-    protected void defineAgents(AgentTopology topology) {
-        topology.newAgent("AggregationAgent")
-            .aggStartNode("distribute-work", "process-chunk",
-                          (AgentNode agentNode, Map<String, Object> data) -> {
-                List<Integer> numbers = (List<Integer>) data.get("data");
-                Integer chunkSize = (Integer) data.get("chunk-size");
-
-                // Partition data into chunks
-                for (int i = 0; i < numbers.size(); i += chunkSize) {
-                    int end = Math.min(i + chunkSize, numbers.size());
-                    List<Integer> chunk = numbers.subList(i, end);
-                    agentNode.emit("process-chunk", chunk);
-                }
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    topology.newAgent("AggregationAgent")
+            .aggStartNode("distribute-work", "process-item", (AgentNode agentNode, List<String> items) -> {
+              // Emit each item for parallel processing
+              for (String item: items) {
+                  agentNode.emit("process-item", item);
+              }
+              return null;
             })
-            .node("process-chunk", "collect-results", (AgentNode agentNode, List<Integer> chunk) -> {
-                int sum = chunk.stream().mapToInt(x -> x * x).sum();
-                agentNode.emit("collect-results", Map.of("chunk", chunk, "sum", sum));
+            .node("process-item", "collect-results", (AgentNode agentNode, String item) -> {
+              // Simulate processing each item
+              String processed = "Processed: " + item.toUpperCase();
+              agentNode.emit("collect-results", processed);
             })
-            .aggNode("collect-results", null, BuiltInAgg.vector(),
-                     (AgentNode agentNode, List<Map<String, Object>> results, Object _) -> {
-                int totalSum = results.stream().mapToInt(r -> (Integer) r.get("sum")).sum();
-                agentNode.result(Map.of("total-sum", totalSum, "chunks-processed", results.size()));
+            .aggNode("collect-results", null, BuiltIn.LIST_AGG,
+                     (AgentNode agentNode, List<String> results, Object nodeStartRes) -> {
+              agentNode.result(results);
             });
-    }
+  }
 }
 ```
 
@@ -215,37 +266,123 @@ public class AggregationAgentModule extends AgentModule {
   (-> (aor/new-agent topology "AggregationAgent")
       (aor/agg-start-node
        "distribute-work"
-       "process-chunk"
-       (fn [agent-node {:keys [data chunk-size]}]
-         (doseq [chunk (partition-all chunk-size data)]
-           (aor/emit! agent-node "process-chunk" chunk))))
+       "process-item"
+       (fn [agent-node items]
+         ;; Emit each item for parallel processing
+         (doseq [item items]
+           (aor/emit! agent-node "process-item" item))))
       (aor/node
-       "process-chunk"
+       "process-item"
        "collect-results"
-       (fn [agent-node chunk]
-         (let [sum (reduce + (map #(* % %) chunk))]
-           (aor/emit! agent-node "collect-results" {:chunk chunk :sum sum}))))
+       (fn [agent-node item]
+         ;; Simulate processing each item
+         (let [processed (str "Processed: " (str/upper-case item))]
+           (aor/emit! agent-node "collect-results" processed))))
       (aor/agg-node
        "collect-results"
        nil
        aggs/+vec-agg
        (fn [agent-node results _]
-         (let [total-sum (reduce + (map :sum results))]
-           (aor/result! agent-node {:total-sum total-sum :chunks-processed (count results)}))))))
+         (aor/result! agent-node results)))))
 ```
 
-### Aggregation scope
+### Aggregation Scope
 
-TODO: explain here how agg subgraphs can be nested and how each invocation of an agg start node is a new context for aggregation that will lead to the corresponding aggNode being run once. so you could have a first agg start node that emits multiple times to another agg start node, and then that nested agg gets agged into the first agg context. look at research-agent.clj in examples/ for a real example of this, and then make a simplified but relatable example here
+Aggregation subgraphs can be nested, where each invocation of an agg start node creates a new aggregation context. This means you can have a first agg start node that emits multiple times to another agg start node, and the nested aggregation results get collected into the outer aggregation context.
+
+For example, imagine processing multiple documents where each document needs to be analyzed by multiple experts in parallel, then the expert results for each document need to be combined, and finally all document results need to be aggregated together.
+
+Agg start nodes are the only nodes that have return values. The return value is passed as the last argument to the corresponding agg node, allowing you to pass non-aggregated information (like metadata or configuration) through the aggregation.
+
+#### Java API
+
+```java
+public class NestedAggregationModule extends AgentModule {
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    topology.newAgent("NestedAggregationAgent")
+            // Outer aggregation: process multiple documents
+            .aggStartNode("distribute-docs", "analyze-doc", (AgentNode agentNode, List<String> docs) -> {
+              for (String doc : docs) {
+                agentNode.emit("analyze-doc", doc);
+              }
+              return docs.size(); // Return value passed to outer agg node
+            })
+            // Inner aggregation: analyze each document with multiple methods
+            .aggStartNode("analyze-doc", "analyze-method", (AgentNode agentNode, String doc) -> {
+              agentNode.emit("analyze-method", doc, "sentiment");
+              agentNode.emit("analyze-method", doc, "keywords");
+              agentNode.emit("analyze-method", doc, "summary");
+              return doc; // Return value passed to inner agg node
+            })
+            .node("analyze-method", "combine-analysis", (AgentNode agentNode, String doc, String method) -> {
+              String result = method + " analysis of: " + doc;
+              agentNode.emit("combine-analysis", Map.of("method", method, "result", result));
+            })
+            // Inner agg node: combine analyses for one document
+            .aggNode("combine-analysis", "collect-docs", BuiltIn.LIST_AGG,
+                     (AgentNode agentNode, List<Map<String, String>> analyses, String originalDoc) -> {
+              agentNode.emit("collect-docs", Map.of("doc", originalDoc, "analyses", analyses));
+            })
+            // Outer agg node: collect all document results
+            .aggNode("collect-docs", null, BuiltIn.LIST_AGG,
+                     (AgentNode agentNode, List<Map<String, Object>> allResults, Integer totalDocs) -> {
+              agentNode.result(Map.of("total-docs", totalDocs, "results", allResults));
+            });
+  }
+}
+```
+
+#### Clojure API
+
+```clojure
+(aor/defagentmodule NestedAggregationModule
+  [topology]
+  (-> (aor/new-agent topology "NestedAggregationAgent")
+      ;; Outer aggregation: process multiple documents
+      (aor/agg-start-node
+       "distribute-docs"
+       "analyze-doc"
+       (fn [agent-node docs]
+         (doseq [doc docs]
+           (aor/emit! agent-node "analyze-doc" doc))
+         (count docs))) ; Return value passed to outer agg node
+      ;; Inner aggregation: analyze each document with multiple methods
+      (aor/agg-start-node
+       "analyze-doc"
+       "analyze-method"
+       (fn [agent-node doc]
+         (aor/emit! agent-node "analyze-method" doc "sentiment")
+         (aor/emit! agent-node "analyze-method" doc "keywords")
+         (aor/emit! agent-node "analyze-method" doc "summary")
+         doc)) ; Return value passed to inner agg node
+      (aor/node
+       "analyze-method"
+       "combine-analysis"
+       (fn [agent-node doc method]
+         (let [result (str method " analysis of: " doc)]
+           (aor/emit! agent-node "combine-analysis" {:method method :result result}))))
+      ;; Inner agg node: combine analyses for one document
+      (aor/agg-node
+       "combine-analysis"
+       "collect-docs"
+       aggs/+vec-agg
+       (fn [agent-node analyses original-doc]
+         (aor/emit! agent-node "collect-docs" {:doc original-doc :analyses analyses})))
+      ;; Outer agg node: collect all document results
+      (aor/agg-node
+       "collect-docs"
+       nil
+       aggs/+vec-agg
+       (fn [agent-node all-results total-docs]
+         (aor/result! agent-node {:total-docs total-docs :results all-results})))))
+```
 
 ### Custom Aggregators
 
 Built-in aggregators handle most use cases, but sometimes you need custom logic on how to aggregate inputs. You can do that by defining custom Rama aggregators, which is explained [here for Java](https://redplanetlabs.com/docs/~/aggregators.html#_defining_aggregators) and [here for Clojure](https://redplanetlabs.com/docs/~/clj-dataflow-lang.html#_aggregators).
 
-Agent-o-rama also has a special aggregator type called "multi aggregator" which can process different kinds of inputs.
-
-TODO: needs a more gentle intro to multi-aggs. explain how aggregation inputs specify which "target" to run, and then show the multi-agg definition, and then show using it in an agent module
-
+Agent-o-rama also has a special aggregator type called "multi aggregator" which can process different kinds of inputs. When using multi-aggregators, aggregation inputs specify which "target" to run by including a tag as the first argument to `emit()`. The multi-agg then routes each input to the appropriate handler based on this tag.
 
 This example shows how to process different types of data (numbers and text) with different logic, then combine the results.
 
@@ -253,50 +390,47 @@ This example shows how to process different types of data (numbers and text) wit
 
 ```java
 public class MultiAggAgentModule extends AgentModule {
-    @Override
-    protected void defineAgents(AgentTopology topology) {
-        topology.newAgent("MultiAggAgent")
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    topology.newAgent("MultiAggAgent")
             .aggStartNode("distribute-data", Arrays.asList("process-numbers", "process-text"),
                           (AgentNode agentNode, Map<String, Object> data) -> {
-                List<Integer> numbers = (List<Integer>) data.get("numbers");
-                List<String> text = (List<String>) data.get("text");
+              List<Integer> numbers = (List<Integer>) data.get("numbers");
+              List<String> text = (List<String>) data.get("text");
 
-                for (Integer num : numbers) {
-                    agentNode.emit("process-numbers", num);
-                }
-                for (String txt : text) {
-                    agentNode.emit("process-text", txt);
-                }
+              for (Integer num : numbers) {
+                  agentNode.emit("process-numbers", num);
+              }
+              for (String txt : text) {
+                  agentNode.emit("process-text", txt);
+              }
+              return null;
             })
             .node("process-numbers", "combine-results", (AgentNode agentNode, Integer number) -> {
-                Map<String, Object> analysis = Map.of("value", number, "square", number * number);
-                agentNode.emit("combine-results", "number", analysis);
+              agentNode.emit("combine-results", "number", number);
             })
             .node("process-text", "combine-results", (AgentNode agentNode, String text) -> {
-                Map<String, Object> analysis = Map.of("value", text, "length", text.length());
-                agentNode.emit("combine-results", "text", analysis);
+              agentNode.emit("combine-results", "text", text);
             })
             .aggNode("combine-results", null,
-                     MultiAgg.init(() -> new AggregationState())
-                         .on("number", (AggregationState state, Map<String, Object> analysis) -> {
-                             state.numbers.add(analysis);
-                             return state;
-                         })
-                         .on("text", (AggregationState state, Map<String, Object> analysis) -> {
-                             state.text.add(analysis);
-                             return state;
-                         }),
-                     (AgentNode agentNode, AggregationState state, Object _) -> {
-                int numberSum = state.numbers.stream().mapToInt(n -> (Integer) n.get("value")).sum();
-                int totalChars = state.text.stream().mapToInt(t -> (Integer) t.get("length")).sum();
-                agentNode.result(Map.of("number-sum", numberSum, "total-chars", totalChars));
+                     MultiAgg.init(() -> {
+                         Map<String, Object> state = new HashMap<>();
+                         state.put("number-sum", 0);
+                         state.put("text", "");
+                         return state;
+                     })
+                     .on("number", (Map<String, Object> state, Integer num) -> {
+                         state.put("number-sum", (Integer) state.get("number-sum") + num);
+                         return state;
+                     })
+                     .on("text", (Map<String, Object> state, String txt) -> {
+                         state.put("text", state.get("text") + txt + " ");
+                         return state;
+                     }),
+                     (AgentNode agentNode, Map<String, Object> state, Object _) -> {
+              agentNode.result(state);
             });
-    }
-
-    public static class AggregationState implements RamaSerializable {
-        public List<Map<String, Object>> numbers = new ArrayList<>();
-        public List<Map<String, Object>> text = new ArrayList<>();
-    }
+  }
 }
 ```
 
@@ -316,64 +450,108 @@ public class MultiAggAgentModule extends AgentModule {
        "process-numbers"
        "combine-results"
        (fn [agent-node number]
-         (aor/emit! agent-node "combine-results" "number" {:value number :square (* number number)})))
+         (aor/emit! agent-node "combine-results" "number" number)))
       (aor/node
        "process-text"
        "combine-results"
        (fn [agent-node text]
-         (aor/emit! agent-node "combine-results" "text" {:value text :length (count text)})))
+         (aor/emit! agent-node "combine-results" "text" text)))
       (aor/agg-node
        "combine-results"
        nil
        (aor/multi-agg
-        (init [] {:numbers [] :text []})
-        (on "number" [state analysis] (update state :numbers conj analysis))
-        (on "text" [state analysis] (update state :text conj analysis)))
+        (init [] {:number-sum 0 :text ""})
+        (on "number" [state num] (update state :number-sum + num))
+        (on "text" [state txt] (update state :text str txt " ")))
        (fn [agent-node state _]
-         (let [number-sum (reduce + (map :value (:numbers state)))
-               total-chars (reduce + (map :length (:text state)))]
-           (aor/result! agent-node {:number-sum number-sum :total-chars total-chars}))))))
+         (aor/result! agent-node state)))))
 ```
 
-### Early aggregation return
+### Early Aggregation Return
 
-TODO: explain how aggregators can be written to return early, in clojure by returning a value wrapped in reduce, and in java with FinishedAgg. this causes aggregation to immediately finish (before all incoming data has been processed), and run the agg node. look at tests for examples of both of these
+Aggregators can be written to return early, which causes aggregation to immediately finish (before all incoming data has been processed) and run the agg node. In Clojure, this is done by returning a value wrapped in `reduced`, and in Java with `FinishedAgg`. This is useful when you want to stop processing as soon as you have enough data or when a certain condition is met.
+
+#### Java API
+
+TODO: this java example should be written as a class that implements RamaAccumulatorAgg. just base it on EarlySumAccum.java in the tests
+```java
+// Custom aggregator that stops when sum exceeds 100
+RamaAccumulatorAgg<Integer, Integer> sumUntil100 = new RamaAccumulatorAgg<Integer, Integer>() {
+  @Override
+  public Integer init() {
+    return 0;
+  }
+
+  @Override
+  public Object update(Integer state, Integer value) {
+    int newSum = state + value;
+    if (newSum > 100) {
+      return new FinishedAgg(newSum); // Stop aggregating early
+    }
+    return newSum;
+  }
+};
+```
+
+#### Clojure API
+
+TODO: this should be a def that makes an accumulator... look in the tests for basically this exact example
+```clojure
+;; Custom aggregator that stops when sum exceeds 100
+(defn sum-until-100-agg []
+  (aggs/accumulator-agg
+   (init [] 0)
+   (update [state value]
+     (let [new-sum (+ state value)]
+       (if (> new-sum 100)
+         (reduced new-sum) ; Stop aggregating early
+         new-sum)))))
+```
 
 ## Agent Objects
 
-Agent objects are shared resources like AI models, database connections, or API clients that agents can access during execution. They enable agents to interact with external systems and maintain expensive resources efficiently. Agent objects handle connection pooling if necessary and ensure thread safety. They're essential for building real-world agents that integrate with other systems.
+Agent objects are shared resources like AI models, database connections, or API clients that agents can access during execution. They enable agents to interact with external systems and maintain expensive resources efficiently. Many resources like AI models and database connections are expensive to create and maintain persistent connections. Agent object builders allow you to create these resources once and reuse them across multiple agent invocations, rather than recreating them for every agent execution.
 
-### Static Objects Example
+### Thread Safety and Pooling
 
-TODO: this example is showing static example, which is good, and ALSO a dynamic example. so this section should really be not just about "static objects". I think showing both is fine and not too much at once. just explain it better here
+Agent objects are all about thread safety. There are two modes:
 
-This example shows how to declare and use static objects like API keys or other static info.
+1. **Thread-safe objects**: When declared with `threadSafe()`, one object is built for the entire process and reused across all node invokes on all threads. Use this if you know the object you're creating (like a database client) is thread-safe.
+
+2. **Pooled objects**: By default, a pool of objects is maintained, and nodes get exclusive access to an instance during execution. When the node finishes, the object goes back into the pool. The pool size can be configured with the `workerObjectLimit(amt)` option (defaults to 100).
+
+This ensures that your agents can safely use shared resources without worrying about concurrency issues.
+
+### Static and Dynamic Objects
+
+This example shows both static objects (like API keys) and dynamic objects (like AI models that need to be built with configuration). Static objects are created once and shared, while dynamic objects are built on-demand with proper pooling and thread safety.
 
 #### Java API
 
 ```java
 public class AgentObjectsModule extends AgentModule {
-    @Override
-    protected void defineAgents(AgentTopology topology) {
-        // Declare static agent object
-        topology.declareAgentObject("openai-api-key", System.getenv("OPENAI_API_KEY"));
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    // Declare static agent object
+    topology.declareAgentObject("openai-api-key", System.getenv("OPENAI_API_KEY"));
 
-        // Declare agent object builder
-        topology.declareAgentObjectBuilder("openai-model", setup -> {
-            String apiKey = setup.getAgentObject("openai-api-key");
-            return OpenAiChatModel.builder()
-                .apiKey(apiKey)
-                .modelName("gpt-4o-mini")
-                .build();
-        });
+    // Declare agent object builder
+    topology.declareAgentObjectBuilder("openai-model", setup -> {
+      String apiKey = setup.getAgentObject("openai-api-key");
+      return OpenAiStreamingChatModel.builder()
+                                    .apiKey(apiKey)
+                                    .modelName("gpt-4o-mini")
+                                    .build();
+      },
+      AgentObjectOptions.workerObjectLimit(200));
 
-        topology.newAgent("AgentWithObjects")
+    topology.newAgent("AgentWithObjects")
             .node("process", null, (AgentNode agentNode, String input) -> {
-                OpenAiChatModel model = agentNode.getAgentObject("openai-model");
-                String response = model.chat(input);
-                agentNode.result(response);
+              ChatModel model = agentNode.getAgentObject("openai-model");
+              String response = model.chat(input);
+              agentNode.result(response);
             });
-    }
+  }
 }
 ```
 
@@ -390,10 +568,11 @@ public class AgentObjectsModule extends AgentModule {
    topology
    "openai-model"
    (fn [setup]
-     (-> (OpenAiChatModel/builder)
+     (-> (OpenAiStreamingChatModel/builder)
          (.apiKey (aor/get-agent-object setup "openai-api-key"))
          (.modelName "gpt-4o-mini")
-         .build)))
+         .build))
+    {:worker-object-limit 200})
 
   (-> (aor/new-agent topology "AgentWithObjects")
       (aor/node
@@ -405,13 +584,78 @@ public class AgentObjectsModule extends AgentModule {
 ```
 
 
-TODO: need to also explain in agent objects section:
-  - worker object pool size options
-  - thread safety option
-  - show example of using an embedding store (from langchain4j)
-  - explain how lc4j chat models and embedding stores are automatically wrapped and traced, but this can be turned off with auto tracing option
-  - explain how streaming chat model gets wrapped in chat model when you get it in an agent node
-    - so you always use it in a blocking style in agent nodes, but by declaring it as streaming chat model AOR automatically captures the stream and forwards its chunks to the node. so agent clients can stream the node and get stream of all calls done of streaming chat models. if you don't want streaming, declare the object as non-streaming model
+### Advanced Object Configuration
+
+Agent objects support several configuration options:
+
+- **Pool size**: Control the maximum number of objects in the pool with `workerObjectLimit`
+- **Thread safety**: Mark objects as thread-safe with `threadSafe` to share a single instance
+- **Auto-tracing**: LangChain4j chat models and embedding stores are automatically wrapped and traced, but this can be turned off with the `autoTracing` option
+
+### Streaming Chat Models
+
+When you declare a `StreamingChatModel` as an agent object, Agent-o-rama automatically captures the stream and forwards chunks to the node. However, when you fetch the object in a node, you always get a `ChatModel` interface (not `StreamingChatModel`). This means you can use streaming models in a blocking style within agent nodes, while agent clients can stream the node to get the stream of all model calls. If you don't want streaming behavior, declare the object as a non-streaming `ChatModel`.
+
+#### Java API
+
+```java
+// Declare streaming model
+topology.declareAgentObjectBuilder("streaming-model", setup -> {
+  return OpenAiStreamingChatModel.builder()
+                                 .apiKey(apiKey)
+                                 .modelName("gpt-4")
+                                 .build();
+});
+
+// In node: fetch as ChatModel (not StreamingChatModel)
+topology.newAgent("MyAgent")
+        .node("process", null, (AgentNode agentNode, String input) -> {
+          ChatModel model = agentNode.getAgentObject("streaming-model"); // Always ChatModel
+          String response = model.chat(input); // Blocking call, but streaming happens automatically
+          agentNode.result(response);
+        });
+
+// Non-streaming model - no streaming behavior
+topology.declareAgentObjectBuilder("blocking-model", setup -> {
+  return OpenAiChatModel.builder()
+                        .apiKey(apiKey)
+                        .modelName("gpt-4")
+                        .build();
+});
+```
+
+#### Clojure API
+
+```clojure
+;; Declare streaming model
+(aor/declare-agent-object-builder
+ topology
+ "streaming-model"
+ (fn [setup]
+   (-> (OpenAiStreamingChatModel/builder)
+       (.apiKey api-key)
+       (.modelName "gpt-4")
+       .build)))
+
+;; In node: fetch as ChatModel (not StreamingChatModel)
+(-> (aor/new-agent topology "MyAgent")
+    (aor/node
+     "process"
+     nil
+     (fn [agent-node input]
+       (let [model (aor/get-agent-object agent-node "streaming-model")] ; Always ChatModel
+         (aor/result! agent-node (aor/chat model input)))))) ; Blocking call, but streaming happens automatically
+
+;; Non-streaming model - no streaming behavior
+(aor/declare-agent-object-builder
+ topology
+ "blocking-model"
+ (fn [setup]
+   (-> (OpenAiChatModel/builder)
+       (.apiKey api-key)
+       (.modelName "gpt-4")
+       .build)))
+```
 
 
 ## Stores
