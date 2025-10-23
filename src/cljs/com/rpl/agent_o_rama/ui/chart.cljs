@@ -310,7 +310,7 @@
                             (if metadata-key
                               selected-metrics
                               all-metrics))
-
+ 
         height (or height 300)
 
         ;; Container ref to measure width
@@ -330,46 +330,49 @@
 
         ;; When metadata split is active, we have multiple series per metric (one per metadata value)
         ;; When no split, we have one series per metric
-        series (if metadata-key
-                 ;; METADATA SPLIT: Extract up to 5 metadata values from data and create series
-                 (let [sorted-buckets (sort (keys data))
-                       all-metadata-values (loop [remaining-buckets sorted-buckets
-                                                  collected-values (sorted-set)]
-                                             (if (or (empty? remaining-buckets)
-                                                     (>= (count collected-values) 5))
-                                               collected-values
-                                               (let [bucket (first remaining-buckets)
-                                                     bucket-values (keys (get data bucket))]
-                                                 (recur (rest remaining-buckets)
-                                                        (into collected-values (take (- 5 (count collected-values)) bucket-values))))))
-                       sorted-metrics (sort-metrics metrics-to-show)]
-                   (vec (mapcat
-                         (fn [metric-key]
-                           (map
-                            (fn [metadata-value]
-                              {:label (str (cond
-                                             (keyword? metric-key) (name metric-key)
-                                             (number? metric-key) (str "p" (int (* metric-key 100)))
-                                             :else (str metric-key))
-                                           " (" metadata-value ")")
-                               :stroke (get metric-colors metric-key "#6b7280")
-                               :width 2
-                               :points {:show true :size 4}
-                               :spanGaps true})
-                            all-metadata-values))
-                         sorted-metrics)))
-                 ;; NO SPLIT: One series per metric
-                 (mapv
-                  (fn [metric-key]
-                    {:label (cond
-                              (keyword? metric-key) (name metric-key)
-                              (number? metric-key) (str "p" (int (* metric-key 100)))
-                              :else (str metric-key))
-                     :stroke (get metric-colors metric-key "#6b7280")
-                     :width 2
-                     :points {:show true :size 4}
-                     :spanGaps true})
-                  (sort-metrics metrics-to-show)))
+        series (uix/use-memo
+                (fn []
+                  (if metadata-key
+                    ;; METADATA SPLIT: Extract up to 5 metadata values from data and create series
+                    (let [sorted-buckets (sort (keys data))
+                          all-metadata-values (loop [remaining-buckets sorted-buckets
+                                                     collected-values (sorted-set)]
+                                                (if (or (empty? remaining-buckets)
+                                                        (>= (count collected-values) 5))
+                                                  collected-values
+                                                  (let [bucket (first remaining-buckets)
+                                                        bucket-values (keys (get data bucket))]
+                                                    (recur (rest remaining-buckets)
+                                                           (into collected-values (take (- 5 (count collected-values)) bucket-values))))))
+                          sorted-metrics (sort-metrics metrics-to-show)]
+                      (vec (mapcat
+                            (fn [metric-key]
+                              (map
+                               (fn [metadata-value]
+                                 {:label (str (cond
+                                                (keyword? metric-key) (name metric-key)
+                                                (number? metric-key) (str "p" (int (* metric-key 100)))
+                                                :else (str metric-key))
+                                              " (" metadata-value ")")
+                                  :stroke (get metric-colors metric-key "#6b7280")
+                                  :width 2
+                                  :points {:show true :size 4}
+                                  :spanGaps true})
+                               all-metadata-values))
+                            sorted-metrics)))
+                    ;; NO SPLIT: One series per metric
+                    (mapv
+                     (fn [metric-key]
+                       {:label (cond
+                                 (keyword? metric-key) (name metric-key)
+                                 (number? metric-key) (str "p" (int (* metric-key 100)))
+                                 :else (str metric-key))
+                        :stroke (get metric-colors metric-key "#6b7280")
+                        :width 2
+                        :points {:show true :size 4}
+                        :spanGaps true})
+                     (sort-metrics metrics-to-show))))
+                [data metadata-key metrics-to-show])
 
         ;; Build uPlot options for time-series (size will be set dynamically)
         options (uix/use-memo

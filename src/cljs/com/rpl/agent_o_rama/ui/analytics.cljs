@@ -556,14 +556,17 @@
 
            :multi-line
            ($ chart/analytics-time-series-chart
-              {:data (or data [])
-               :granularity (:seconds granularity-config)
-               :metrics metrics-set
-               :metadata-key metadata-key
-               :start-time-millis (:start-time-millis time-window)
-               :end-time-millis (:end-time-millis time-window)
-               :height 300
-               :y-label y-label})
+              (merge
+               {:data (or data [])
+                :granularity (:seconds granularity-config)
+                :metadata-key metadata-key
+                :start-time-millis (:start-time-millis time-window)
+                :end-time-millis (:end-time-millis time-window)
+                :height 300
+                :y-label y-label}
+               ;; Only pass metrics prop when no metadata split (let component manage its own state when split)
+               (when-not metadata-key
+                 {:metrics metrics-set})))
 
            :multi-category
            ($ chart/analytics-multi-category-chart
