@@ -356,3 +356,6 @@ TODO
   - aggregation
     - should leave this to separate page and get to the rest of the tour
     - multi-aggs
+  - tool subagent
+    - specifying tools (param schemas, etc.)
+    - providing impls
