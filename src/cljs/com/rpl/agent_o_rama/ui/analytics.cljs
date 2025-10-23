@@ -6,6 +6,7 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.chart :as chart]
    [clojure.string :as str]
+   [clojure.set :as set]
    ["use-debounce" :refer [useDebounce]]
    ["@heroicons/react/24/outline" :refer [ChartBarIcon
                                           ChevronLeftIcon
@@ -61,20 +62,20 @@
   - :id - Unique identifier
   - :title - Display title
   - :description - Description of what the chart shows
-  - :chart-type - One of :bar, :line, :percentage, :multi-line
+  - :variant - Chart variant: :single-metric, :multi-metric, :percentage, :multi-category, :computed-percentage
   - :metric-id - The metric ID to query (e.g., [:agent :latency])
   - :metrics-set - Set of metric keys to request (e.g., #{:count}, #{:min 0.5 :max})
-  - :metric-key - For single-value charts, which key to display
+  - :variant-opts - Options passed to the unified chart component
   - :y-label - Y-axis label
   - :color - Optional color override for single-series charts"
   [;; 1. Agent Invokes
    {:id :agent-invokes
     :title "Agent invokes"
     :description "Total number of agent runs per time bucket"
-    :chart-type :bar
+    :variant :single-metric
     :metric-id [:agent :success-rate]
     :metrics-set #{:count}
-    :metric-key :count
+    :variant-opts {:metric-key :count}
     :y-label "Count"
     :color "#6366f1"} ; indigo
 
@@ -82,29 +83,30 @@
    {:id :agent-success-rate
     :title "Agent success rate"
     :description "Percentage of successful agent runs per time bucket"
-    :chart-type :percentage
+    :variant :percentage
     :metric-id [:agent :success-rate]
     :metrics-set #{:mean}
-    :metric-key :mean
+    :variant-opts {:metric-key :mean}
     :color "#10b981"} ; green
 
    ;; 3. Agent Latency
    {:id :agent-latency
     :title "Agent latency"
     :description "Distribution of end-to-end agent execution time"
-    :chart-type :multi-line
+    :variant :multi-metric
     :metric-id [:agent :latency]
     :metrics-set #{:min 0.5 0.9 0.99 :max}
+    :variant-opts {:metrics #{:min 0.5 0.9 0.99 :max}}
     :y-label "Latency (ms)"}
 
    ;; 4. Total Model Calls
    {:id :total-model-calls
     :title "Total model calls"
     :description "Sum of all LLM calls made by agents in each time bucket"
-    :chart-type :bar
+    :variant :single-metric
     :metric-id [:agent :model-call-count]
     :metrics-set #{:rest-sum}
-    :metric-key :rest-sum
+    :variant-opts {:metric-key :rest-sum}
     :y-label "Total Calls"
     :color "#8b5cf6"} ; purple
 
@@ -112,134 +114,113 @@
    {:id :model-calls-per-invoke
     :title "Model calls per agent invoke"
     :description "Distribution of LLM calls per agent run"
-    :chart-type :multi-line
+    :variant :multi-metric
     :metric-id [:agent :model-call-count]
     :metrics-set #{:min 0.25 0.5 0.75 :max}
+    :variant-opts {:metrics #{:min 0.25 0.5 0.75 :max}}
     :y-label "Calls per Invoke"}
 
    ;; 6. Model Latency
    {:id :model-latency
     :title "Model latency"
     :description "Distribution of individual LLM call latency"
-    :chart-type :multi-line
+    :variant :multi-metric
     :metric-id [:agent :model-latency]
     :metrics-set #{:min 0.5 0.9 0.99 :max}
+    :variant-opts {:metrics #{:min 0.5 0.9 0.99 :max}}
     :y-label "Latency (ms)"}
 
    ;; 7. Store Read Latency
    {:id :store-read-latency
     :title "Store read latency"
     :description "Distribution of store read operation latency"
-    :chart-type :multi-line
+    :variant :multi-metric
     :metric-id [:agent :store-read-latency]
     :metrics-set #{:min 0.5 0.9 0.99 :max}
+    :variant-opts {:metrics #{:min 0.5 0.9 0.99 :max}}
     :y-label "Latency (ms)"}
 
    ;; 8. Store Write Latency
    {:id :store-write-latency
     :title "Store write latency"
     :description "Distribution of store write operation latency"
-    :chart-type :multi-line
+    :variant :multi-metric
     :metric-id [:agent :store-write-latency]
     :metrics-set #{:min 0.5 0.9 0.99 :max}
+    :variant-opts {:metrics #{:min 0.5 0.9 0.99 :max}}
     :y-label "Latency (ms)"}
 
    ;; 9. Database Read Latency
    {:id :db-read-latency
     :title "Database read latency"
     :description "Distribution of database read operation latency"
-    :chart-type :multi-line
+    :variant :multi-metric
     :metric-id [:agent :db-read-latency]
     :metrics-set #{:min 0.5 0.9 0.99 :max}
+    :variant-opts {:metrics #{:min 0.5 0.9 0.99 :max}}
     :y-label "Latency (ms)"}
 
    ;; 10. Database Write Latency
    {:id :db-write-latency
     :title "Database write latency"
     :description "Distribution of database write operation latency"
-    :chart-type :multi-line
+    :variant :multi-metric
     :metric-id [:agent :db-write-latency]
     :metrics-set #{:min 0.5 0.9 0.99 :max}
+    :variant-opts {:metrics #{:min 0.5 0.9 0.99 :max}}
     :y-label "Latency (ms)"}
 
    ;; 11. Time to First Token (Agent)
    {:id :agent-first-token
     :title "Time to first token (agent)"
     :description "Distribution of time until first token in agent response"
-    :chart-type :multi-line
+    :variant :multi-metric
     :metric-id [:agent :first-token-time]
     :metrics-set #{:min 0.5 0.9 0.99 :max}
+    :variant-opts {:metrics #{:min 0.5 0.9 0.99 :max}}
     :y-label "Time (ms)"}
 
    ;; 12. Time to First Token (Model Call)
    {:id :model-first-token
     :title "Time to first token (individual model call)"
     :description "Distribution of time until first token in individual LLM calls"
-    :chart-type :multi-line
+    :variant :multi-metric
     :metric-id [:agent :model-first-token-time]
     :metrics-set #{:min 0.5 0.9 0.99 :max}
+    :variant-opts {:metrics #{:min 0.5 0.9 0.99 :max}}
     :y-label "Time (ms)"}
 
    ;; 13. Token Usage (Multi-category)
    {:id :token-usage
     :title "Token usage"
     :description "Total tokens consumed by LLM calls over time"
-    :chart-type :multi-category
+    :variant :multi-category
     :metric-id [:agent :token-counts]
     :metrics-set #{:rest-sum}
-    :metric-key :rest-sum
-    :y-label "Tokens"
-    :categories ["input" "output" "total"]}
+    :variant-opts {:metric-key :rest-sum
+                   :categories ["input" "output" "total"]}
+    :y-label "Tokens"}
 
    ;; 14. Token Usage Per Agent Invoke
    {:id :token-usage-per-invoke
     :title "Token usage per agent invoke"
     :description "Distribution of token consumption per agent run"
-    :chart-type :multi-category-percentiles
+    :variant :multi-category
     :metric-id [:agent :token-counts]
     :metrics-set #{:min 0.25 0.5 0.75 :max}
-    :metric-key :min ; Using :min as the representative metric (charts will use all metrics from set)
-    :y-label "Tokens"
-    :categories ["input" "output" "total"]}
+    :variant-opts {:metric-key :min
+                   :categories ["input" "output" "total"]}
+    :y-label "Tokens"}
 
    ;; 15. Model Success Rate (Special calculation)
    {:id :model-success-rate
     :title "Model success rate"
     :description "Percentage of successful individual LLM calls"
-    :chart-type :model-success-rate
+    :variant :computed-percentage
     :metric-id [:agent :model-success-rate]
     :metrics-set #{:rest-sum}
-    :metric-key :rest-sum
-    :color "#10b981"}
-
-   ;; NOTE: Evaluator Score Charts
-   ;; Evaluator charts can be added dynamically or statically to this configuration.
-   ;; To add an evaluator chart, use the following pattern:
-   ;;
-   ;; For numeric/boolean scores (percentile distribution):
-   ;; {:id :eval-rule-name-score-name
-   ;;  :title "Evaluator score: rule-name/score-name"
-   ;;  :description "Distribution of evaluator scores"
-   ;;  :chart-type :multi-line
-   ;;  :metric-id [:eval :rule-name :score-name]
-   ;;  :metrics-set #{:min 0.5 0.9 0.99 :max}
-   ;;  :y-label "Score"}
-   ;;
-   ;; For categorical scores (count per category):
-   ;; {:id :eval-rule-name-score-name
-   ;;  :title "Evaluator score: rule-name/score-name"
-   ;;  :description "Count by category"
-   ;;  :chart-type :multi-category
-   ;;  :metric-id [:eval :rule-name :score-name]
-   ;;  :metrics-set #{:count}
-   ;;  :metric-key :count
-   ;;  :categories ["category1" "category2" ...]
-   ;;  :y-label "Count"}
-   ;;
-   ;; Future enhancement: Implement dynamic discovery of evaluator metrics
-   ;; by querying all-agent-metrics-query and automatically generating charts
-   ;; based on available [:eval ...] metrics.
-   ])
+    :variant-opts {:metric-key :rest-sum}
+    :color "#10b981"}])
 
 (defn calculate-time-window
   "Calculate start and end times for the time window.
@@ -257,6 +238,21 @@
     {:start-time-millis start-time-millis
      :end-time-millis end-time-millis
      :is-live? (= offset 0)}))
+
+(defn- group-charts-by-metric
+  "Group charts by their metric-id and compute union of metrics-set for each group.
+  Returns: {metric-id {:charts [chart-configs...] :metrics-set #{...}}}"
+  [charts]
+  (reduce
+   (fn [acc chart]
+     (let [metric-id (:metric-id chart)]
+       (update acc metric-id
+               (fn [existing]
+                 {:charts (conj (get existing :charts []) chart)
+                  :metrics-set (set/union (get existing :metrics-set #{})
+                                          (:metrics-set chart))}))))
+   {}
+   charts))
 
 (defui metadata-search-dropdown
   "Searchable dropdown for metadata keys with example values.
@@ -485,37 +481,15 @@
   "Renders a single analytics chart in a card.
   
   Props:
-  - :config - Chart configuration from chart-configs
-  - :module-id - Module ID for queries
-  - :agent-name - Agent name for queries
+  - :config - Chart configuration
+  - :data - Pre-fetched telemetry data (or nil if loading/error)
+  - :loading? - Whether data is loading
+  - :error - Error object if query failed
   - :granularity-config - Current granularity configuration
-  - :time-window - Current time window {:start-time-millis :end-time-millis :is-live?}
-  - :metadata-key - Current metadata key (or nil)
-  - :refresh-counter - Counter that increments to trigger refetch"
-  [{:keys [config module-id agent-name granularity-config time-window metadata-key refresh-counter]}]
-  (let [{:keys [id title description chart-type metric-id metrics-set metric-key y-label color]} config
-
-        ;; Setup the sente query for this chart
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:analytics-telemetry
-                      id
-                      module-id
-                      agent-name
-                      (:seconds granularity-config)
-                      (vec metric-id)
-                      (:start-time-millis time-window)
-                      refresh-counter]
-          :sente-event [:analytics/fetch-telemetry
-                        {:module-id module-id
-                         :agent-name agent-name
-                         :granularity (:seconds granularity-config)
-                         :metric-id metric-id
-                         :start-time-millis (:start-time-millis time-window)
-                         :end-time-millis (:end-time-millis time-window)
-                         :metrics-set metrics-set
-                         :metadata-key metadata-key}]
-          :enabled? (boolean (and module-id agent-name))})]
+  - :time-window - Current time window
+  - :metadata-key - Current metadata key (or nil)"
+  [{:keys [config data loading? error granularity-config time-window metadata-key]}]
+  (let [{:keys [title description variant variant-opts y-label color]} config]
 
     ($ :div.bg-white.p-6.rounded-lg.shadow-md.border.border-gray-200
        ($ :h3.text-lg.font-medium.text-gray-700.mb-2 title)
@@ -530,81 +504,18 @@
          ($ :div.text-red-600 "Error: " (str error))
 
          :else
-         (case chart-type
-           :bar
-           ($ chart/analytics-bar-chart
-              {:data (or data [])
-               :granularity (:seconds granularity-config)
-               :metric-key metric-key
-               :metadata-key metadata-key
-               :start-time-millis (:start-time-millis time-window)
-               :end-time-millis (:end-time-millis time-window)
-               :height 300
-               :y-label y-label
-               :color color})
-
-           :percentage
-           ($ chart/analytics-percentage-chart
-              {:data (or data [])
-               :granularity (:seconds granularity-config)
-               :metric-key metric-key
-               :metadata-key metadata-key
-               :start-time-millis (:start-time-millis time-window)
-               :end-time-millis (:end-time-millis time-window)
-               :height 300
-               :color color})
-
-           :multi-line
-           ($ chart/analytics-time-series-chart
-              (merge
-               {:data (or data [])
-                :granularity (:seconds granularity-config)
-                :metadata-key metadata-key
-                :start-time-millis (:start-time-millis time-window)
-                :end-time-millis (:end-time-millis time-window)
-                :height 300
-                :y-label y-label}
-               ;; Only pass metrics prop when no metadata split (let component manage its own state when split)
-               (when-not metadata-key
-                 {:metrics metrics-set})))
-
-           :multi-category
-           ($ chart/analytics-multi-category-chart
-              {:data (or data [])
-               :granularity (:seconds granularity-config)
-               :metric-key metric-key
-               :categories (:categories config)
-               :metadata-key metadata-key
-               :start-time-millis (:start-time-millis time-window)
-               :end-time-millis (:end-time-millis time-window)
-               :height 300
-               :y-label y-label})
-
-           :multi-category-percentiles
-           ($ chart/analytics-multi-category-chart
-              {:data (or data [])
-               :granularity (:seconds granularity-config)
-               :metric-key metric-key
-               :categories (:categories config)
-               :metadata-key metadata-key
-               :start-time-millis (:start-time-millis time-window)
-               :end-time-millis (:end-time-millis time-window)
-               :height 300
-               :y-label y-label})
-
-           :model-success-rate
-           ($ chart/analytics-model-success-rate-chart
-              {:data (or data [])
-               :granularity (:seconds granularity-config)
-               :metric-key metric-key
-               :metadata-key metadata-key
-               :start-time-millis (:start-time-millis time-window)
-               :end-time-millis (:end-time-millis time-window)
-               :height 300
-               :color color})
-
-           ;; Default fallback
-           ($ :div.text-gray-500 "Unsupported chart type: " (str chart-type)))))))
+         ($ chart/analytics-chart
+            {:data (or data {})
+             :granularity (:seconds granularity-config)
+             :metadata-key metadata-key
+             :start-time-millis (:start-time-millis time-window)
+             :end-time-millis (:end-time-millis time-window)
+             :height 300
+             :title nil ; Title shown above chart card
+             :y-label y-label
+             :color color
+             :variant variant
+             :variant-opts variant-opts})))))
 
 (defui analytics-page []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
@@ -636,7 +547,39 @@
                                   60000)] ;; Refresh every 60 seconds
                  (fn [] (js/clearInterval interval-id)))
                js/undefined))
-           [is-live?])]
+           [is-live?])
+
+        ;; Group charts by metric-id to batch queries
+        metric-groups (uix/use-memo
+                       (fn [] (group-charts-by-metric chart-configs))
+                       [])
+
+        ;; Create one query per metric-id with union of all metrics
+        metric-queries
+        (into {}
+              (map (fn [[metric-id {:keys [metrics-set]}]]
+                     (let [{:keys [data loading? error]}
+                           (queries/use-sente-query
+                            {:query-key [:analytics-telemetry
+                                         metric-id
+                                         module-id
+                                         decoded-agent-name
+                                         (:seconds granularity-config)
+                                         (:start-time-millis time-window)
+                                         metadata-key
+                                         refresh-counter]
+                             :sente-event [:analytics/fetch-telemetry
+                                           {:module-id module-id
+                                            :agent-name decoded-agent-name
+                                            :granularity (:seconds granularity-config)
+                                            :metric-id metric-id
+                                            :start-time-millis (:start-time-millis time-window)
+                                            :end-time-millis (:end-time-millis time-window)
+                                            :metrics-set metrics-set
+                                            :metadata-key metadata-key}]
+                             :enabled? (boolean (and module-id decoded-agent-name))})]
+                       [metric-id {:data data :loading? loading? :error error}]))
+                   metric-groups))]
 
     ($ :div.p-6
        ;; Page header
@@ -660,13 +603,15 @@
        ($ :div.grid.grid-cols-1.lg:grid-cols-2.gap-6
           ;; Render all charts from configuration
           (map (fn [config]
-                 ($ chart-card
-                    {:key (:id config)
-                     :config config
-                     :module-id module-id
-                     :agent-name decoded-agent-name
-                     :granularity-config granularity-config
-                     :time-window time-window
-                     :metadata-key metadata-key
-                     :refresh-counter refresh-counter}))
+                 (let [metric-id (:metric-id config)
+                       query-result (get metric-queries metric-id)]
+                   ($ chart-card
+                      {:key (:id config)
+                       :config config
+                       :data (:data query-result)
+                       :loading? (:loading? query-result)
+                       :error (:error query-result)
+                       :granularity-config granularity-config
+                       :time-window time-window
+                       :metadata-key metadata-key})))
                chart-configs)))))
