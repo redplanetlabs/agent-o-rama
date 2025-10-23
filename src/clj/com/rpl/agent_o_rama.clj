@@ -924,58 +924,62 @@ Example:\n
   (.getStore agent-node name))
 
 (defn get-agent-object
-  "Gets a shared agent object (AI models, database clients, etc.) within a node, evaluator, or action function.
-
-   Agent objects are shared resources declared in the topology that can be
-   accessed by any node. They support automatic lifecycle management and
-   connection pooling.
-
-   Args:
-     fetch - object fetcher instance (agent-node or first argument to evaluator or action function)
-     name - String name of the object (declared with declare-agent-object*)
-
-   Returns:
-     The shared object instance
-
-   Example:
-     (let [model (get-agent-object agent-node \"openai-model\")]
-       (lc4j/chat model messages))"
+  "Gets a shared agent object (AI models, database clients, etc.) within a node, evaluator, or action function.\n
+\n
+Agent objects are shared resources declared in the topology that can be\n
+accessed by any node. They support automatic lifecycle management and\n
+connection pooling.\n
+\n
+Args:\n
+  fetch - object fetcher instance (agent-node or first argument to evaluator or action function)\n
+  name - String name of the object (declared with declare-agent-object*)\n
+\n
+Returns:\n
+  The shared object instance\n
+\n
+Example:\n
+<pre>
+(let [model (get-agent-object agent-node \"openai-model\")]
+  (lc4j/chat model messages))
+</pre>"
   [^AgentObjectFetcher fetch name]
   (.getAgentObject fetch name))
 
 (defn stream-chunk!
-  "Manually streams a chunk of data from the current node for real-time consumption from agent clients via [[agent-stream]] or [[agent-stream-all]].
-
-   Streaming chunks are separate from the agent's final result and allow
-   for real-time progress updates and incremental data delivery to clients.
-   Chunks are delivered to streaming subscriptions in order.
-
-   Args:
-     agent-node - agent node instance from the current node function
-     chunk - The data chunk to stream (any serializable value)
-
-   Example:
-     (aor/stream-chunk! agent-node {:progress (count processed) :item item})"
+  "Manually streams a chunk of data from the current node for real-time consumption from agent clients via [[agent-stream]] or [[agent-stream-all]].\n
+\n
+Streaming chunks are separate from the agent's final result and allow\n
+for real-time progress updates and incremental data delivery to clients.\n
+Chunks are delivered to streaming subscriptions in order.\n
+\n
+Args:\n
+  agent-node - agent node instance from the current node function\n
+  chunk - The data chunk to stream (any serializable value)\n
+\n
+Example:\n
+<pre>
+(aor/stream-chunk! agent-node {:progress (count processed) :item item})
+</pre>"
   [^AgentNode agent-node chunk]
   (.streamChunk agent-node chunk))
 
 (defn record-nested-op!
-  "Records a nested operation for tracing and performance monitoring.
-
-   This function is used by the framework to track operations like AI model calls, database queries,
-   and external API calls, is viewable in the trace in the UI, and is included in aggregated statistics about
-   agent execution.
-
-   Args:
-     agent-node - agent node instance from the current node function
-     nested-op-type - Keyword type of the operation. Must be one of:
-       :store-read, :store-write, :db-read, :db-write, :model-call,
-       :tool-call, :agent-call, :human-input, :other
-     start-time-millis - Long start time of the operation
-     finish-time-millis - Long finish time of the operation
-     info-map - Map from String to value with additional operation metadata.
-                For :model-call, include \"inputTokenCount\", \"outputTokenCount\", \"totalTokenCount\"
-                for analytics, or \"failure\" with exception string for failures."
+  "Records a nested operation for tracing and performance monitoring.\n
+\n
+This function is used by the framework to track operations like AI model calls, database queries,\n
+and external API calls, is viewable in the trace in the UI, and is included in aggregated statistics about\n
+agent execution.\n
+\n
+Args:\n
+  agent-node - agent node instance from the current node function\n
+  nested-op-type - Keyword type of the operation. Must be one of:\n
+    :store-read, :store-write, :db-read, :db-write, :model-call,\n
+    :tool-call, :agent-call, :human-input, :other\n
+  start-time-millis - Long start time of the operation\n
+  finish-time-millis - Long finish time of the operation\n
+  info-map - Map from String to value with additional operation metadata.\n
+             For :model-call, include \"inputTokenCount\", \"outputTokenCount\", \"totalTokenCount\"\n
+             for analytics, or \"failure\" with exception string for failures."
   [agent-node nested-op-type start-time-millis finish-time-millis info-map]
   (anode/record-nested-op!-impl agent-node
                                 nested-op-type
@@ -984,50 +988,54 @@ Example:\n
                                 info-map))
 
 (defn get-human-input
-  "Requests human input during agent execution, blocking until response is received.
-
-   This function pauses agent execution and requests input from a human user.
-   The agent will remain in a waiting state until the human provides a response
-   through the client API or web UI. Since nodes run on virtual threads, this is efficient.
-
-   Args:
-     agent-node - agent node instance from the current node function
-     prompt - String prompt to display to the human user
-
-   Returns:
-     String - The human's response
-
-   Example:
-     (defn human-yes?
-      [agent-node prompt]
-      (loop [res (aor/get-human-input agent-node prompt)]
-        (cond (= res \"yes\") true
-              (= res \"no\") false
-              :else (recur (aor/get-human-input agent-node \"Please answer 'yes' or 'no'.\")))))"
+  "Requests human input during agent execution, blocking until response is received.\n
+\n
+This function pauses agent execution and requests input from a human user.\n
+The agent will remain in a waiting state until the human provides a response\n
+through the client API or web UI. Since nodes run on virtual threads, this is efficient.\n
+\n
+Args:\n
+  agent-node - agent node instance from the current node function\n
+  prompt - String prompt to display to the human user\n
+\n
+Returns:\n
+  String - The human's response\n
+\n
+Example:\n
+<pre>
+(defn human-yes?
+ [agent-node prompt]
+ (loop [res (aor/get-human-input agent-node prompt)]
+   (cond (= res \"yes\") true
+         (= res \"no\") false
+         :else (recur (aor/get-human-input agent-node \"Please answer 'yes' or 'no'.\")))))
+</pre>"
   [^AgentNode agent-node prompt]
   (.getHumanInput agent-node prompt))
 
 
 (defn get-metadata
-  "Gets metadata associated with an agent invocation. Can be called from an agent client to get the
-   metadata for that invoke, or can be called from within any agent node function.
-
-   Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional
-   parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside
-   agents by calling [[get-metadata]] within node functions.
-
-   Args:
-     client - agent client instance
-     agent-invoke - agent invoke returned by [[agent-initiate]]
-   OR
-     agent-node - agent node instance (for accessing within agent execution)
-
-   Returns:
-     Map - The metadata associated with the invocation or node
-
-   Example:
-     (get-metadata client agent-invoke)
-     (get-metadata agent-node)"
+  "Gets metadata associated with an agent invocation. Can be called from an agent client to get the\n
+metadata for that invoke, or can be called from within any agent node function.\n
+\n
+Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional\n
+parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside\n
+agents by calling [[get-metadata]] within node functions.\n
+\n
+Args:\n
+  client - agent client instance\n
+  agent-invoke - agent invoke returned by [[agent-initiate]]\n
+OR\n
+  agent-node - agent node instance (for accessing within agent execution)\n
+\n
+Returns:\n
+  Map - The metadata associated with the invocation or node\n
+\n
+Example:\n
+<pre>
+(get-metadata client agent-invoke)
+(get-metadata agent-node)
+</pre>"
   ([^AgentClient client agent-invoke]
    (.getMetadata client agent-invoke))
   ([^AgentNode agent-node]
@@ -1038,37 +1046,39 @@ Example:\n
   (if (map? arg1) [arg1 rest-args] [{} args]))
 
 (defmacro agentmodule
-  "Creates an anonymous agent module for packaging agents, stores, and objects into a deployable unit.
-
-   An agent module is the top-level container that defines a complete agent system,
-   encapsulating all resources needed for distributed agent execution. It provides
-   the context for defining agents, stores, and shared objects within a Rama module.
-
-   The topology provides the configuration context for:
-   - Declaring agents with [[new-agent]]
-   - Declaring stores: [[declare-key-value-store]], [[declare-document-store]], [[declare-pstate-store]]
-   - Declaring agent objects: [[declare-agent-object]], [[declare-agent-object-builder]]
-   - Declaring evaluators: [[declare-evaluator-builder]], [[declare-comparative-evaluator-builder]], [[declare-summary-evaluator-builder]]
-   - Declaring actions: [[declare-action-builder]]
-   - Declaring cluster agents: [[declare-cluster-agent]]
-
-   Args:
-     options - Optional map with configuration:
-       :module-name - String name for the module (defaults to auto-generated)
-     agent-topology-sym - Symbol for the agent topology binding in the body
-     body - Forms that define agents, stores, and objects using the topology
-
-   Returns:
-     Rama module that can be deployed to a cluster
-
-   Example:
-     (agentmodule
+  "Creates an anonymous agent module for packaging agents, stores, and objects into a deployable unit.\n
+\n
+An agent module is the top-level container that defines a complete agent system,\n
+encapsulating all resources needed for distributed agent execution. It provides\n
+the context for defining agents, stores, and shared objects within a Rama module.\n
+\n
+The topology provides the configuration context for:\n
+- Declaring agents with [[new-agent]]\n
+- Declaring stores: [[declare-key-value-store]], [[declare-document-store]], [[declare-pstate-store]]\n
+- Declaring agent objects: [[declare-agent-object]], [[declare-agent-object-builder]]\n
+- Declaring evaluators: [[declare-evaluator-builder]], [[declare-comparative-evaluator-builder]], [[declare-summary-evaluator-builder]]\n
+- Declaring actions: [[declare-action-builder]]\n
+- Declaring cluster agents: [[declare-cluster-agent]]\n
+\n
+Args:\n
+  options - Optional map with configuration:\n
+    :module-name - String name for the module (defaults to auto-generated)\n
+  agent-topology-sym - Symbol for the agent topology binding in the body\n
+  body - Forms that define agents, stores, and objects using the topology\n
+\n
+Returns:\n
+  Rama module that can be deployed to a cluster\n
+\n
+Example:\n
+<pre>
+(agentmodule
        [topology]
        (-> topology
            (aor/new-agent \"my-agent\")
            (aor/node \"process\" nil
              (fn [agent-node input]
-               (aor/result! agent-node (str \"Processed: \" input))))))"
+               (aor/result! agent-node (str \"Processed: \" input))))))
+</pre>"
   [& args]
   (let [[options [[agent-topology-sym] & body]] (parse-map-options args)]
     `(module ~options
@@ -1079,37 +1089,40 @@ Example:\n
        ))))
 
 (defmacro defagentmodule
-  "Defines a named agent module for packaging agents, stores, and objects into a deployable unit.
+  "Defines a named agent module for packaging agents, stores, and objects into a deployable unit.\n
+\n
+This is a convenience macro that creates a def binding for an agent module,\n
+automatically setting the module name to the symbol name. It's the primary\n
+way to define agent modules in most applications.\n
+\n
+The topology provides the configuration context for:\n
+- Declaring agents with [[new-agent]]\n
+- Declaring stores: [[declare-key-value-store]], [[declare-document-store]], [[declare-pstate-store]]\n
+- Declaring agent objects: [[declare-agent-object]], [[declare-agent-object-builder]]\n
+- Declaring evaluators: [[declare-evaluator-builder]], [[declare-comparative-evaluator-builder]], [[declare-summary-evaluator-builder]]\n
+- Declaring actions: [[declare-action-builder]]\n
+- Declaring cluster agents: [[declare-cluster-agent]]\n
+\n
+Args:\n
+  sym - Symbol name for the module (becomes the module name)\n
+  options - Optional map with configuration to override the module name\n
+  agent-topology-sym - Symbol for the agent topology binding in the body\n
+  body - Forms that define agents, stores, and objects using the topology\n
+\n
+Returns:\n
+  Defines a Rama module that can be deployed to a cluster
 
-   This is a convenience macro that creates a def binding for an agent module,
-   automatically setting the module name to the symbol name. It's the primary
-   way to define agent modules in most applications.
-
-   The topology provides the configuration context for:
-   - Declaring agents with [[new-agent]]
-   - Declaring stores: [[declare-key-value-store]], [[declare-document-store]], [[declare-pstate-store]]
-   - Declaring agent objects: [[declare-agent-object]], [[declare-agent-object-builder]]
-   - Declaring evaluators: [[declare-evaluator-builder]], [[declare-comparative-evaluator-builder]], [[declare-summary-evaluator-builder]]
-   - Declaring actions: [[declare-action-builder]]
-   - Declaring cluster agents: [[declare-cluster-agent]]
-
-   Args:
-     sym - Symbol name for the module (becomes the module name)
-     options - Optional map with configuration to override the module name
-     agent-topology-sym - Symbol for the agent topology binding in the body
-     body - Forms that define agents, stores, and objects using the topology
-
-   Returns:
-     Defines a Rama module that can be deployed to a cluster
-
-   Example:
-     (defagentmodule BasicAgentModule
-       [topology]
-       (-> topology
-           (aor/new-agent \"my-agent\")
-           (aor/node \"process\" nil
-             (fn [agent-node user-name]
-               (aor/result! agent-node (str \"Welcome, \" user-name \"!\"))))))"
+\n
+Example:\n
+<pre>
+(defagentmodule BasicAgentModule
+  [topology]
+  (-> topology
+      (aor/new-agent \"my-agent\")
+      (aor/node \"process\" nil
+        (fn [agent-node user-name]
+          (aor/result! agent-node (str \"Welcome, \" user-name \"!\"))))))
+</pre>"
   [sym & args]
   (let [[options args] (parse-map-options args)
         name-default   (str sym)]
@@ -1117,21 +1130,23 @@ Example:\n
        (agentmodule ~(merge {:module-name name-default} options) ~@args))))
 
 (defn agent-manager
-  "Creates an agent manager for managing and interacting with deployed agents on a Rama cluster.
-
-   The agent manager provides access to agent clients, dataset management,
-   and evaluation capabilities for a specific module deployed on a cluster.
-
-   Args:
-     cluster - Rama cluster instance (IPC or remote cluster)
-     module-name - String name of the deployed module
-
-   Returns:
-     Interface for managing agents and datasets
-
-   Example:
-     (let [manager (aor/agent-manager ipc \"MyModule\")]
-       (aor/agent-client manager \"MyAgent\"))"
+  "Creates an agent manager for managing and interacting with deployed agents on a Rama cluster.\n
+\n
+The agent manager provides access to agent clients, dataset management,\n
+and evaluation capabilities for a specific module deployed on a cluster.\n
+\n
+Args:\n
+  cluster - Rama cluster instance (IPC or remote cluster)\n
+  module-name - String name of the deployed module\n
+\n
+Returns:\n
+  Interface for managing agents and datasets\n
+\n
+Example:\n
+<pre>
+(let [manager (aor/agent-manager ipc \"MyModule\")]
+  (aor/agent-client manager \"MyAgent\"))
+</pre>"
   [cluster module-name]
   (let [agent-names-query
         (try
@@ -1740,457 +1755,473 @@ Example:\n
        }))))
 
 (defn agent-client
-  "Gets an agent client for interacting with a specific agent either in a client or within an agent node function.
+  "Gets an agent client for interacting with a specific agent either in a client or within an agent node function.\n
+\n
+Agent clients provide the interface for invoking agents, streaming data,\n
+handling human input, and managing agent executions.\n
+\n
+When called from within an agent node function, this enables subagent execution:\n
+- Can invoke any other agent in the same module (including the current agent)\n
+- Enables recursive agent execution patterns\n
+- Enables mutually recursive agent execution between different agents\n
+- Subagent calls are tracked and displayed in the UI trace\n
+\n
+Args:\n
+  agent-client-fetcher - either an agent manager or agent node\n
+  agent-name - String name of the agent\n
+\n
+Returns:\n
+  AgentClient - Interface for agent interaction\n
+\n
+Example:\n
+<pre>
+;; From client code
+(let [client (aor/agent-client manager \"my-agent\")]
+  (aor/agent-invoke client \"Hello world\"))
 
-   Agent clients provide the interface for invoking agents, streaming data,
-   handling human input, and managing agent executions.
-
-   When called from within an agent node function, this enables subagent execution:
-   - Can invoke any other agent in the same module (including the current agent)
-   - Enables recursive agent execution patterns
-   - Enables mutually recursive agent execution between different agents
-   - Subagent calls are tracked and displayed in the UI trace
-
-   Args:
-     agent-client-fetcher - either an agent manager or agent node
-     agent-name - String name of the agent
-
-   Returns:
-     AgentClient - Interface for agent interaction
-
-   Example:
-     ;; From client code
-     (let [client (aor/agent-client manager \"my-agent\")]
-       (aor/agent-invoke client \"Hello world\"))
-
-     ;; From within an agent node (subagent execution)
-     (fn [agent-node input]
-       (let [subagent-client (aor/agent-client agent-node \"helper-agent\")
-             result (aor/agent-invoke subagent-client input)]
-         (aor/result! agent-node result)))"
+  ;; From within an agent node (subagent execution)
+  (fn [agent-node input]
+    (let [subagent-client (aor/agent-client agent-node \"helper-agent\")
+          result (aor/agent-invoke subagent-client input)]
+      (aor/result! agent-node result)))
+</pre>"
   ^AgentClient [^IFetchAgentClient agent-client-fetcher agent-name]
   (.getAgentClient agent-client-fetcher agent-name))
 
 (defn agent-names
-  "Gets the names of all available agents in a module.
-
-   Args:
-     agent-manager - agent manager instance
-
-   Returns:
-     Set of agent names available in the module
-
-   Example:
-     (aor/agent-names manager) ; => #{\"ChatAgent\" \"ProcessAgent\" \"ToolsAgent\"}"
+  "Gets the names of all available agents in a module.\n
+\n
+Args:\n
+  agent-manager - agent manager instance\n
+\n
+Returns:\n
+  Set of agent names available in the module\n
+\n
+Example:\n
+<pre>
+(aor/agent-names manager) ; => #{\"ChatAgent\" \"ProcessAgent\" \"ToolsAgent\"}
+</pre>"
   [^AgentManager agent-manager]
   (.getAgentNames agent-manager))
 
 (defn agent-invoke
-  "Synchronously invokes an agent with the provided arguments.
-
-   This function blocks until the agent execution completes and returns
-   the final result. For long-running agents, consider using [[agent-initiate]]
-   with [[agent-result]] for better control.
-
-   Args:
-     agent-client - agent client instance
-     args - Arguments to pass to the agent
-
-   Returns:
-     The final result from the agent execution
-
-   Example:
-     (aor/agent-invoke client \"Hello world\")
-     (aor/agent-invoke client {:query \"What is AI?\" :context \"educational\"})"
+  "Synchronously invokes an agent with the provided arguments.\n
+\n
+This function blocks until the agent execution completes and returns\n
+the final result. For long-running agents, consider using [[agent-initiate]]\n
+with [[agent-result]] for better control.\n
+\n
+Args:\n
+  agent-client - agent client instance\n
+  args - Arguments to pass to the agent\n
+\n
+Returns:\n
+  The final result from the agent execution\n
+\n
+Example:\n
+<pre>
+(aor/agent-invoke client \"Hello world\")
+(aor/agent-invoke client {:query \"What is AI?\" :context \"educational\"})
+</pre>"
   [^AgentClient agent-client & args]
   (.invoke agent-client (into-array Object args)))
 
 (defn agent-invoke-async
-  "Asynchronously invokes an agent with the provided arguments.
-
-   Returns a CompletableFuture that will complete with the agent's result.
-   This allows for non-blocking agent execution and better resource utilization.
-
-   Args:
-     agent-client - agent client instance
-     args - Arguments to pass to the agent
-
-   Returns:
-     CompletableFuture - Future that completes with the agent result
-
-   Example:
-     (-> (agent-invoke-async client \"Hello world\")
-         (.thenAccept println))"
+  "Asynchronously invokes an agent with the provided arguments.\n
+\n
+Returns a CompletableFuture that will complete with the agent's result.\n
+This allows for non-blocking agent execution and better resource utilization.\n
+\n
+Args:\n
+  agent-client - agent client instance\n
+  args - Arguments to pass to the agent\n
+\n
+Returns:\n
+  CompletableFuture - Future that completes with the agent result\n
+\n
+Example:\n
+<pre>
+(-> (agent-invoke-async client \"Hello world\")
+    (.thenAccept println))
+</pre>"
   ^CompletableFuture [^AgentClient agent-client & args]
   (.invokeAsync agent-client (into-array Object args)))
 
 (defn agent-initiate
-  "Initiates an agent execution and returns a handle for tracking.
-
-   This function starts an agent execution but doesn't wait for completion.
-   Use the returned result handle with [[agent-result]], [[agent-next-step]], or
-   streaming functions to interact with the running agent.
-
-   Args:
-     agent-client - agent client instance
-     args - Arguments to pass to the agent
-
-   Returns:
-     \"Agent invoke\" handle for tracking and interacting with the execution
-
-   Example:
-     (let [invoke (aor/agent-initiate client \"Hello world\")]
-       (aor/agent-result client invoke))"
+  "Initiates an agent execution and returns a handle for tracking.\n
+\n
+This function starts an agent execution but doesn't wait for completion.\n
+Use the returned result handle with [[agent-result]], [[agent-next-step]], or\n
+streaming functions to interact with the running agent.\n
+\n
+Args:\n
+  agent-client - agent client instance\n
+  args - Arguments to pass to the agent\n
+\n
+Returns:\n
+  \"Agent invoke\" handle for tracking and interacting with the execution\n
+\n
+Example:\n
+<pre>
+(let [invoke (aor/agent-initiate client \"Hello world\")]
+  (aor/agent-result client invoke))
+</pre>"
   ^AgentInvoke [agent-client & args]
   (apply c/agent-initiate agent-client args))
 
 (defn agent-initiate-async
-  "Asynchronously initiates an agent execution and returns a CompletableFuture with a handle for tracking.
-
-   Args:
-     agent-client - agent client instance
-     args - Arguments to pass to the agent
-
-   Returns:
-     CompletableFuture<AgentInvoke> - Future that completes with the handle"
+  "Asynchronously initiates an agent execution and returns a CompletableFuture with a handle for tracking.\n
+\n
+Args:\n
+  agent-client - agent client instance\n
+  args - Arguments to pass to the agent\n
+\n
+Returns:\n
+  CompletableFuture<AgentInvoke> - Future that completes with the handle"
   ^CompletableFuture [agent-client & args]
   (apply c/agent-initiate-async agent-client args))
 
 (defn agent-invoke-with-context-async
-  "Asynchronously invokes an agent with context metadata.
-
-   Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional
-   parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside
-   agents by calling [[get-metadata]] within node functions.
-
-   Args:
-     agent-client - agent client instance
-     context - Map with single key :metadata containing a map with string keys and values that are strings, numbers, or booleans
-     args - Arguments to pass to the agent
-
-   Returns:
-     CompletableFuture - Future that completes with the agent result
-
-   Example:
-     (aor/agent-invoke-with-context-async client
-       {:metadata {\"model\" \"openai\"}}
-       \"Hello world\")"
+  "Asynchronously invokes an agent with context metadata.\n
+\n
+Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional\n
+parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside\n
+agents by calling [[get-metadata]] within node functions.\n
+\n
+Args:\n
+  agent-client - agent client instance\n
+  context - Map with single key :metadata containing a map with string keys and values that are strings, numbers, or booleans\n
+  args - Arguments to pass to the agent\n
+\n
+Returns:\n
+  CompletableFuture - Future that completes with the agent result\n
+\n
+Example:\n
+<pre>
+(aor/agent-invoke-with-context-async client
+  {:metadata {\"model\" \"openai\"}}
+  \"Hello world\")
+</pre>"
   ^CompletableFuture [agent-client context & args]
   (aor-types/invoke-with-context-async-internal agent-client context (into [] args)))
 
 (defn agent-invoke-with-context
-  "Synchronously invokes an agent with context metadata.
-
-   Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional
-   parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside
-   agents by calling [[get-metadata]] within node functions.
-
-   Args:
-     agent-client - agent client instance
-     context - Map with single key :metadata containing a map with string keys and values that are strings, numbers, or booleans
-     args - Arguments to pass to the agent
-
-   Returns:
-     The final result from the agent execution
-
-   Example:
-     (aor/agent-invoke-with-context client
-       {:metadata {\"model\" \"openai\"}}
-       \"Hello world\")"
+  "Synchronously invokes an agent with context metadata.\n
+\n
+Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional\n
+parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside\n
+agents by calling [[get-metadata]] within node functions.\n
+\n
+Args:\n
+  agent-client - agent client instance\n
+  context - Map with single key :metadata containing a map with string keys and values that are strings, numbers, or booleans\n
+  args - Arguments to pass to the agent\n
+\n
+Returns:\n
+  The final result from the agent execution\n
+\n
+Example:\n
+<pre>
+(aor/agent-invoke-with-context client
+  {:metadata {\"model\" \"openai\"}}
+  \"Hello world\")
+</pre>"
   [agent-client context & args]
   (.get ^CompletableFuture (apply agent-invoke-with-context-async agent-client context args)))
 
 (defn agent-initiate-with-context-async
-  "Asynchronously initiates an agent execution with context metadata.
-
-   Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional
-   parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside
-   agents by calling [[get-metadata]] within node functions.
-
-   Args:
-     agent-client - agent client instance
-     context - Map with single key :metadata containing a map with string keys and values that are strings, numbers, or booleans
-     args - Arguments to pass to the agent
-
-   Returns:
-     CompletableFuture<AgentInvoke> - Future that completes with the AgentInvoke handle
-
-   Example:
-     (aor/agent-initiate-with-context-async client
-       {:metadata {\"model\" \"openai\"}}
-       \"Hello world\")"
+  "Asynchronously initiates an agent execution with context metadata.\n
+\n
+Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional\n
+parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside\n
+agents by calling [[get-metadata]] within node functions.\n
+\n
+Args:\n
+  agent-client - agent client instance\n
+  context - Map with single key :metadata containing a map with string keys and values that are strings, numbers, or booleans\n
+  args - Arguments to pass to the agent\n
+\n
+Returns:\n
+  CompletableFuture<AgentInvoke> - Future that completes with the AgentInvoke handle\n
+\n
+Example:\n
+<pre>
+(aor/agent-initiate-with-context-async client
+  {:metadata {\"model\" \"openai\"}}
+  \"Hello world\")
+</pre>"
   ^CompletableFuture [agent-client context & args]
   (apply c/agent-initiate-with-context-async agent-client context args))
 
 (defn agent-initiate-with-context
-  "Initiates an agent execution with context metadata.
-
-   Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional
-   parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside
-   agents by calling [[get-metadata]] within node functions.
-
-   Args:
-     agent-client - agent client instance
-     context - Map with single key :metadata containing a map with string keys and values that are strings, numbers, or booleans
-     args - Arguments to pass to the agent
-
-   Returns:
-     AgentInvoke - Handle for tracking and interacting with the execution
-
-   Example:
-     (aor/agent-initiate-with-context client
-       {:metadata {\"model\" \"openai\"}}
-       \"Hello world\")"
+  "Initiates an agent execution with context metadata.\n
+\n
+Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional\n
+parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside\n
+agents by calling [[get-metadata]] within node functions.\n
+\n
+Args:\n
+  agent-client - agent client instance\n
+  context - Map with single key :metadata containing a map with string keys and values that are strings, numbers, or booleans\n
+  args - Arguments to pass to the agent\n
+\n
+Returns:\n
+  AgentInvoke - Handle for tracking and interacting with the execution\n
+\n
+Example:\n
+<pre>
+(aor/agent-initiate-with-context client
+  {:metadata {\"model\" \"openai\"}}
+  \"Hello world\")
+</pre>"
   ^AgentInvoke [agent-client context & args]
   (apply c/agent-initiate-with-context agent-client context args))
 
 (defn agent-fork
-  "Creates a fork of an agent execution with modified parameters for specific nodes.
-
-   Forking allows creating execution branches with different inputs for testing
-   variations or exploring alternative execution paths.
-
-   Args:
-     agent-client - agent clint instance
-     invoke - agent invoke handle to fork from
-     node-invoke-id->new-args - Map from node invoke ID (UUID) to new arguments. Node invoke IDs can be found in the trace UI.
-
-   Returns:
-    Result of the forked execution"
+  "Creates a fork of an agent execution with modified parameters for specific nodes.\n
+\n
+Forking allows creating execution branches with different inputs for testing\n
+variations or exploring alternative execution paths.\n
+\n
+Args:\n
+  agent-client - agent clint instance\n
+  invoke - agent invoke handle to fork from\n
+  node-invoke-id->new-args - Map from node invoke ID (UUID) to new arguments. Node invoke IDs can be found in the trace UI.\n
+\n
+Returns:\n
+ Result of the forked execution"
   [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
   (.fork agent-client invoke node-invoke-id->new-args))
 
 (defn agent-fork-async
-  "Asynchronously creates a fork of an agent execution.
-
-   Forking allows creating execution branches with different inputs for testing
-   variations or exploring alternative execution paths.
-
-   Args:
-     agent-client - AgentClient instance
-     invoke - AgentInvoke instance to fork from
-     node-invoke-id->new-args - Map from node invoke ID (UUID) to new arguments. Node invoke IDs can be found in the trace UI.
-
-   Returns:
-     CompletableFuture - Future that completes with the result of the forked execution"
+  "Asynchronously creates a fork of an agent execution.\n
+\n
+Forking allows creating execution branches with different inputs for testing\n
+variations or exploring alternative execution paths.\n
+\n
+Args:\n
+  agent-client - AgentClient instance\n
+  invoke - AgentInvoke instance to fork from\n
+  node-invoke-id->new-args - Map from node invoke ID (UUID) to new arguments. Node invoke IDs can be found in the trace UI.\n
+\n
+Returns:\n
+  CompletableFuture - Future that completes with the result of the forked execution"
   ^CompletableFuture
   [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
   (.forkAsync agent-client invoke node-invoke-id->new-args))
 
 (defn agent-initiate-fork
-  "Initiates a fork of an agent execution without waiting for completion.
-
-   Args:
-     agent-client - AgentClient instance
-     invoke - AgentInvoke instance to fork from
-     node-invoke-id->new-args - Map from node invoke ID (UUID) to new arguments. Node invoke IDs can be found in the trace UI.
-
-   Returns:
-     New agent invoke handle for the forked execution"
+  "Initiates a fork of an agent execution without waiting for completion.\n
+\n
+Args:\n
+  agent-client - AgentClient instance\n
+  invoke - AgentInvoke instance to fork from\n
+  node-invoke-id->new-args - Map from node invoke ID (UUID) to new arguments. Node invoke IDs can be found in the trace UI.\n
+\n
+Returns:\n
+  New agent invoke handle for the forked execution"
   ^AgentInvoke
   [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
   (.initiateFork agent-client invoke node-invoke-id->new-args))
 
 (defn agent-initiate-fork-async
-  "Asynchronously initiates a fork of an agent execution.
-
-   Args:
-     agent-client - AgentClient instance
-     invoke - AgentInvoke instance to fork from
-     node-invoke-id->new-args - Map from node invoke ID (UUID) to new arguments. Node invoke IDs can be found in the trace UI.
-
-   Returns:
-     Future that completes with the forked agent invoke handle"
+  "Asynchronously initiates a fork of an agent execution.\n
+\n
+Args:\n
+  agent-client - AgentClient instance\n
+  invoke - AgentInvoke instance to fork from\n
+  node-invoke-id->new-args - Map from node invoke ID (UUID) to new arguments. Node invoke IDs can be found in the trace UI.\n
+\n
+Returns:\n
+  Future that completes with the forked agent invoke handle"
   ^CompletableFuture
   [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
   (.initiateForkAsync agent-client invoke node-invoke-id->new-args))
 
 (defn agent-next-step
-  "Gets the next step in an agent execution for step-by-step control.
-
-   Returns the next execution step, which is either a human input request or agent result.
-   Check which one by calling [[human-input-request?]]. If it's a result, it's a record with
-   a key `:result` in it. If the agent fails, it will throw an exception.
-
-   Args:
-     client - agent client instance
-     agent-invoke - agent invoke handle
-
-   Returns:
-     Either a human input request or agent result record
-
-   Example:
-     (let [step (agent-next-step client invoke)]
-       (if (human-input-request? step)
-         (do-something-with-human-input step)
-         (let [result (:result step)]
-           (process-result result))))"
+  "Gets the next step in an agent execution for step-by-step control.\n
+\n
+Returns the next execution step, which is either a human input request or agent result.\n
+Check which one by calling [[human-input-request?]]. If it's a result, it's a record with\n
+a key `:result` in it. If the agent fails, it will throw an exception.\n
+\n
+Args:\n
+  client - agent client instance\n
+  agent-invoke - agent invoke handle\n
+\n
+Returns:\n
+  Either a human input request or agent result record\n
+\n
+Example:\n
+<pre>
+(let [step (agent-next-step client invoke)]
+  (if (human-input-request? step)
+    (do-something-with-human-input step)
+    (let [result (:result step)]
+      (process-result result))))
+</pre>"
   [^AgentClient client agent-invoke]
   (.nextStep client agent-invoke))
 
 (defn agent-next-step-async
-  "Asynchronously gets the next step in an agent execution.
-
-   Returns the next execution step, which is either a human input request or agent result.
-   Check which one by calling [[human-input-request?]]. If it's a result, it's a record with
-   a key `:result` in it. If the agent fails, it will deliver an exception.
-
-   Args:
-     client - agent client instance
-     agent-invoke - agent invoke handle
-
-   Returns:
-     CompletableFuture - Future that completes with either a human input request or agent result record
-
-   Example:
-     (-> (agent-next-step-async client invoke)
-         (.thenAccept (fn [step]
-           (if (human-input-request? step)
-             (do-something-with-human-input step)
-             (let [result (:result step)]
-               (process-result result))))))"
+  "Asynchronously gets the next step in an agent execution.\n
+\n
+Returns the next execution step, which is either a human input request or agent result.\n
+Check which one by calling [[human-input-request?]]. If it's a result, it's a record with\n
+a key `:result` in it. If the agent fails, it will deliver an exception.\n
+\n
+Args:\n
+  client - agent client instance\n
+  agent-invoke - agent invoke handle\n
+\n
+Returns:\n
+  CompletableFuture - Future that completes with either a human input request or agent result record"
   ^CompletableFuture
   [^AgentClient client agent-invoke]
   (.nextStepAsync client agent-invoke))
 
 (defn set-metadata!
-  "Sets metadata on an agent invocation for tracking and debugging.
-
-   Note: This only affects metadata visible to external clients and analytics. For agent execution
-   within nodes, only the metadata provided at invocation time via [[agent-invoke-with-context]]
-   or [[agent-initiate-with-context]] is accessible via [[get-metadata]].
-
-   Args:
-     client - agent client instance
-     agent-invoke - agent invoke handle
-     key - String key for the metadata
-     value - Value to store (must be a restricted type: int, long, float, double, boolean, or string)
-
-   Example:
-     (set-metadata! client invoke \"user-id\" \"user-123\")"
+  "Sets metadata on an agent invocation for tracking and debugging.\n
+\n
+Note: This only affects metadata visible to external clients and analytics. For agent execution\n
+within nodes, only the metadata provided at invocation time via [[agent-invoke-with-context]]\n
+or [[agent-initiate-with-context]] is accessible via [[get-metadata]].\n
+\n
+Args:\n
+  client - agent client instance\n
+  agent-invoke - agent invoke handle\n
+  key - String key for the metadata\n
+  value - Value to store (must be a restricted type: int, long, float, double, boolean, or string)\n
+\n
+Example:\n
+<pre>
+(set-metadata! client invoke \"user-id\" \"user-123\")
+</pre>"
   [client agent-invoke key value]
   (aor-types/set-metadata-internal! client agent-invoke key value))
 
 (defn remove-metadata!
-  "Removes metadata from an agent invocation.
-
-   Note: This only affects metadata visible to external clients and analytics. For agent execution
-   within nodes, only the metadata provided at invocation time via [[agent-invoke-with-context]]
-   or [[agent-initiate-with-context]] is accessible via [[get-metadata]].
-
-   Args:
-     client - agent client instance
-     agent-invoke - agent invoke handle
-     key - String key of the metadata to remove"
+  "Removes metadata from an agent invocation.\n
+\n
+Note: This only affects metadata visible to external clients and analytics. For agent execution\n
+within nodes, only the metadata provided at invocation time via [[agent-invoke-with-context]]\n
+or [[agent-initiate-with-context]] is accessible via [[get-metadata]].\n
+\n
+Args:\n
+  client - agent client instance\n
+  agent-invoke - agent invoke handle\n
+  key - String key of the metadata to remove"
   [^AgentClient client agent-invoke key]
   (.removeMetadata client agent-invoke key))
 
 (defn human-input-request?
-  "Checks if an object returned by [[agent-next-step]] is a human input request.
-
-   Args:
-     obj - Object to check
-
-   Returns:
-     Boolean - True if the object is a human input request"
+  "Checks if an object returned by [[agent-next-step]] is a human input request.\n
+\n
+Args:\n
+  obj - Object to check\n
+\n
+Returns:\n
+  Boolean - True if the object is a human input request"
   [obj]
   (instance? HumanInputRequest obj))
 
 (defn agent-result
-  "Gets the final result from an agent execution.
-
-   Blocks until the agent execution completes and returns the final result.
-   For non-blocking access, use [[agent-result-async]].
-
-   Args:
-     agent-client - agent client instance
-     agent-invoke - agent invoke handle
-
-   Returns:
-     The final result from the agent execution"
+  "Gets the final result from an agent execution.\n
+\n
+Blocks until the agent execution completes and returns the final result.\n
+For non-blocking access, use [[agent-result-async]].\n
+\n
+Args:\n
+  agent-client - agent client instance\n
+  agent-invoke - agent invoke handle\n
+\n
+Returns:\n
+  The final result from the agent execution"
   [agent-client agent-invoke]
   (c/agent-result agent-client agent-invoke))
 
 (defn agent-result-async
-  "Asynchronously gets the final result from an agent execution.
-
-   Args:
-     agent-client - agent client instance
-     agent-invoke - agent invoke handle
-
-   Returns:
-     CompletableFuture - Future that completes with the agent result"
+  "Asynchronously gets the final result from an agent execution.\n
+\n
+Args:\n
+  agent-client - agent client instance\n
+  agent-invoke - agent invoke handle\n
+\n
+Returns:\n
+  CompletableFuture - Future that completes with the agent result"
   ^CompletableFuture [agent-client agent-invoke]
   (c/agent-result-async agent-client agent-invoke))
 
 (defn agent-invoke-complete?
-  "Checks if an agent invocation has completed.
-
-   Args:
-     agent-client - agent client instance
-     agent-invoke - agent invoke handle
-
-   Returns:
-     Boolean - True if the invocation has completed"
+  "Checks if an agent invocation has completed.\n
+\n
+Args:\n
+  agent-client - agent client instance\n
+  agent-invoke - agent invoke handle\n
+\n
+Returns:\n
+  Boolean - True if the invocation has completed"
   [^AgentClient agent-client agent-invoke]
   (.isAgentInvokeComplete agent-client agent-invoke))
 
 (defn agent-stream
-  "Creates a streaming subscription to receive data from a specific node.
-
-   Streams data from the first invocation of the specified node during
-   agent execution. Useful for real-time monitoring and progress tracking.
-
-   The returned object can be deref'd to get the current streamed chunks (list of chunks).
-   The returned object can have Closeable/close called on it to immediately stop streaming.
-
-   Args:
-     agent-client - agent client instance
-     agent-invoke - agent invoke handle
-     node - String name of the node to stream from
-     callback-fn - Optional callback function for handling chunks. Takes 4 arguments:
-                   [all-chunks new-chunks reset? complete?] where all-chunks is the complete
-                   list of chunks so far, new-chunks are the latest chunks, reset? indicates
-                   if the stream was reset because the node failed and retried, and complete?
-                   indicates if streaming is finished
-
-   Returns:
-     Streaming subscription for the node.
-
-   Example:
-     (aor/agent-stream client invoke \"process-node\"
-       (fn [all-chunks new-chunks reset? complete?]
-         (when reset? (println \"Stream was reset due to node retry\"))
-         (doseq [chunk new-chunks]
-           (println \"New chunk:\" chunk))
-         (when complete? (println \"Streaming finished\"))))"
+  "Creates a streaming subscription to receive data from a specific node.\n
+\n
+Streams data from the first invocation of the specified node during\n
+agent execution. Useful for real-time monitoring and progress tracking.\n
+\n
+The returned object can be deref'd to get the current streamed chunks (list of chunks).\n
+The returned object can have Closeable/close called on it to immediately stop streaming.\n
+\n
+Args:\n
+  agent-client - agent client instance\n
+  agent-invoke - agent invoke handle\n
+  node - String name of the node to stream from\n
+  callback-fn - Optional callback function for handling chunks. Takes 4 arguments:\n
+                [all-chunks new-chunks reset? complete?] where all-chunks is the complete\n
+                list of chunks so far, new-chunks are the latest chunks, reset? indicates\n
+                if the stream was reset because the node failed and retried, and complete?\n
+                indicates if streaming is finished\n
+\n
+Returns:\n
+  Streaming subscription for the node.\n
+\n
+Example:\n
+<pre>
+(aor/agent-stream client invoke \"process-node\"
+  (fn [all-chunks new-chunks reset? complete?]
+    (when reset? (println \"Stream was reset due to node retry\"))
+    (doseq [chunk new-chunks]
+      (println \"New chunk:\" chunk))
+    (when complete? (println \"Streaming finished\"))))
+</pre>"
   (^AgentStream [^AgentClient agent-client agent-invoke node]
    (.stream agent-client agent-invoke node))
   (^AgentStream [^AgentClient agent-client agent-invoke node callback-fn]
    (aor-types/stream-internal agent-client agent-invoke node callback-fn)))
 
 (defn agent-stream-specific
-  "Creates a streaming subscription to a specific node invocation.
-
-   Streams data from a particular invocation of a node, useful when
-   a node is invoked multiple times and you want to track a specific one.
-
-   The returned object can be deref'd to get the current streamed chunks (list of chunks).
-   The returned object can have Closeable/close called on it to immediately stop streaming.
-
-   Args:
-     agent-client - agent client instance
-     agent-invoke - agent invoke handle
-     node - String name of the node to stream from
-     node-invoke-id - UUID of the specific node invocation to stream from. Node invoke IDs can be found in the trace UI.
-     callback-fn - Optional callback function for handling chunks. Takes 4 arguments:
-                   [all-chunks new-chunks reset? complete?] where all-chunks is the complete
-                   list of chunks so far, new-chunks are the latest chunks, reset? indicates
-                   if the stream was reset because the node failed and retried, and complete?
-                   indicates if streaming is finished
-
-   Returns:
-     Streaming subscription for the specific node invocation"
+  "Creates a streaming subscription to a specific node invocation.\n
+\n
+Streams data from a particular invocation of a node, useful when\n
+a node is invoked multiple times and you want to track a specific one.\n
+\n
+The returned object can be deref'd to get the current streamed chunks (list of chunks).\n
+The returned object can have Closeable/close called on it to immediately stop streaming.\n
+\n
+Args:\n
+  agent-client - agent client instance\n
+  agent-invoke - agent invoke handle\n
+  node - String name of the node to stream from\n
+  node-invoke-id - UUID of the specific node invocation to stream from. Node invoke IDs can be found in the trace UI.\n
+  callback-fn - Optional callback function for handling chunks. Takes 4 arguments:\n
+                [all-chunks new-chunks reset? complete?] where all-chunks is the complete\n
+                list of chunks so far, new-chunks are the latest chunks, reset? indicates\n
+                if the stream was reset because the node failed and retried, and complete?\n
+                indicates if streaming is finished\n
+\n
+Returns:\n
+  Streaming subscription for the specific node invocation"
   (^AgentStream
    [^AgentClient agent-client agent-invoke node node-invoke-id]
    (.streamSpecific agent-client agent-invoke node node-invoke-id))
@@ -2203,34 +2234,37 @@ Example:\n
                                        callback-fn)))
 
 (defn agent-stream-all
-  "Creates a streaming subscription to all invocations of a specific node.
+  "Creates a streaming subscription to all invocations of a specific node.\n
+\n
+Streams data from all invocations of the specified node, with chunks\n
+grouped by invocation ID. Useful for monitoring parallel processing.\n
+\n
+The returned object can be deref'd to get the current streamed chunks (map from node invoke ID to chunks).\n
+The returned object can have Closeable/close called on it to immediately stop streaming.\n
+\n
+Args:\n
+  agent-client - agent client instance\n
+  agent-invoke - agent invoke handle\n
+  node - String name of the node to stream from\n
+  callback-fn - Optional callback function for handling chunks. Takes 4 arguments:\n
+                [all-chunks new-chunks reset-invoke-ids complete?] where all-chunks is a map from\n
+                node invoke ID to complete list of chunks, new-chunks are the latest chunks\n
+                grouped by invoke ID, reset-invoke-ids indicates if any nodes invokes in this iteration failed and retried,\n
+                and complete? indicates if streaming is finished across all nodes invocations for the full agent execution.
 
-   Streams data from all invocations of the specified node, with chunks
-   grouped by invocation ID. Useful for monitoring parallel processing.
-
-   The returned object can be deref'd to get the current streamed chunks (map from node invoke ID to chunks).
-   The returned object can have Closeable/close called on it to immediately stop streaming.
-
-   Args:
-     agent-client - agent client instance
-     agent-invoke - agent invoke handle
-     node - String name of the node to stream from
-     callback-fn - Optional callback function for handling chunks. Takes 4 arguments:
-                   [all-chunks new-chunks reset-invoke-ids complete?] where all-chunks is a map from
-                   node invoke ID to complete list of chunks, new-chunks are the latest chunks
-                   grouped by invoke ID, reset-invoke-ids indicates if any nodes invokes in this iteration failed and retried,
-                   and complete? indicates if streaming is finished across all nodes invocations for the full agent execution.
-
-   Returns:
-     Streaming subscription for all node invocations
-
-   Example:
-     (aor/agent-stream-all client invoke \"process-node\"
-       (fn [all-chunks new-chunks reset-invoke-ids complete?]
-         (when (not (empty? reset-invoke-ids)) (println \"Stream was reset for one or more node invokes\"))
-         (doseq [[invoke-id chunks] new-chunks]
-           (println \"New chunks for invocation\" invoke-id \":\" chunks))
-         (when complete? (println \"Streaming finished\"))))"
+\n
+Returns:\n
+  Streaming subscription for all node invocations\n
+\n
+Example:\n
+<pre>
+(aor/agent-stream-all client invoke \"process-node\"
+  (fn [all-chunks new-chunks reset-invoke-ids complete?]
+    (when (not (empty? reset-invoke-ids)) (println \"Stream was reset for one or more node invokes\"))
+    (doseq [[invoke-id chunks] new-chunks]
+      (println \"New chunks for invocation\" invoke-id \":\" chunks))
+    (when complete? (println \"Streaming finished\"))))
+</pre>"
   (^AgentStreamByInvoke [^AgentClient agent-client agent-invoke node]
    (.streamAll agent-client agent-invoke node))
   (^AgentStreamByInvoke
@@ -2238,19 +2272,19 @@ Example:\n
    (aor-types/stream-all-internal agent-client agent-invoke node callback-fn)))
 
 (defn agent-stream-reset-info
-  "Gets reset information from a streaming subscription.
-
-   Returns reset information based on the stream type:
-   - For streams created with [[agent-stream]] or [[agent-stream-specific]]: Number of resets
-   - For streams created with [[agent-stream-all]]: Map from node invoke ID to reset count
-
-   Resets occur due to nodes failing and retrying.
-
-   Args:
-     stream - return from [[agent-stream]], [[agent-stream-all]], or [[agent-stream-specific]]
-
-   Returns:
-     Number or Map - Reset count for single streams, or map of invoke ID to reset count for stream-all"
+  "Gets reset information from a streaming subscription.\n
+\n
+Returns reset information based on the stream type:\n
+- For streams created with [[agent-stream]] or [[agent-stream-specific]]: Number of resets\n
+- For streams created with [[agent-stream-all]]: Map from node invoke ID to reset count\n
+\n
+Resets occur due to nodes failing and retrying.\n
+\n
+Args:\n
+  stream - return from [[agent-stream]], [[agent-stream-all]], or [[agent-stream-specific]]\n
+\n
+Returns:\n
+  Number or Map - Reset count for single streams, or map of invoke ID to reset count for stream-all"
   [stream]
   (cond (instance? AgentStream stream)
         (.numResets ^AgentStream stream)
@@ -2261,91 +2295,97 @@ Example:\n
         :else (throw (h/ex-info "Unknown type" {:class (class stream)}))))
 
 (defn pending-human-inputs
-  "Gets all pending human input requests for an agent invocation handle.
-
-   Returns a collection of request objects that are waiting
-   for human responses to continue agent execution.
-
-   Args:
-     client - agent client instance
-     agent-invoke - agent invoke handle
-
-   Returns:
-     Collection - Pending human input requests. Each request has fields `:node` and `:prompt` to get the node name making the request and the prompt.
-
-   Example:
-     (let [requests (aor/pending-human-inputs client invoke)]
-       (doseq [request requests]
-         (aor/provide-human-input client request \"yes\")))"
+  "Gets all pending human input requests for an agent invocation handle.\n
+\n
+Returns a collection of request objects that are waiting\n
+for human responses to continue agent execution.\n
+\n
+Args:\n
+  client - agent client instance\n
+  agent-invoke - agent invoke handle\n
+\n
+Returns:
+  Collection - Pending human input requests. Each request has fields `:node` and `:prompt` to get the node name making the request and the prompt.\n
+\n
+Example:\n
+<pre>
+(let [requests (aor/pending-human-inputs client invoke)]
+  (doseq [request requests]
+    (aor/provide-human-input client request \"yes\")))
+</pre>"
   [^AgentClient client agent-invoke]
   (.pendingHumanInputs client agent-invoke))
 
 (defn pending-human-inputs-async
-  "Asynchronously gets all pending human input requests for an agent invocation.
-
-   Args:
-     client - agent client instance
-     agent-invoke - agent invoke handle
-
-   Returns:
-     CompletableFuture - Future with pending requests. Each request has fields `:node` and `:prompt` to get the node name making the request and the prompt."
+  "Asynchronously gets all pending human input requests for an agent invocation.\n
+\n
+Args:\n
+  client - agent client instance\n
+  agent-invoke - agent invoke handle\n
+\n
+Returns:\n
+  CompletableFuture - Future with pending requests. Each request has fields `:node` and `:prompt` to get the node name making the request and the prompt."
   ^CompletableFuture
   [^AgentClient client agent-invoke]
   (.pendingHumanInputsAsync client agent-invoke))
 
 (defn provide-human-input
-  "Provides a human response to a pending human input request.
-
-   This function sends a response to continue agent execution
-   that was paused waiting for human input.
-
-   Args:
-     client - agent client instance
-     request - request object from [[pending-human-inputs]] or [[agent-next-step]]
-     response - String response from the human
-
-   Example:
-     (aor/provide-human-input agent-client request \"yes\")"
+  "Provides a human response to a pending human input request.\n
+\n
+This function sends a response to continue agent execution\n
+that was paused waiting for human input.\n
+\n
+Args:\n
+  client - agent client instance\n
+  request - request object from [[pending-human-inputs]] or [[agent-next-step]]\n
+  response - String response from the human\n
+\n
+Example:\n
+<pre>
+(aor/provide-human-input agent-client request \"yes\")
+</pre>"
   [^AgentClient client request response]
   (.provideHumanInput client request response))
 
 (defn provide-human-input-async
-  "Asynchronously provides a human response to a pending human input request.
-
-   Args:
-     client - agent client instance
-     request - request object from [[pending-human-inputs]] or [[agent-next-step]]
-     response - String response from the human
-
-   Returns:
-     CompletableFuture - Future that completes when the response is processed"
+  "Asynchronously provides a human response to a pending human input request.\n
+\n
+Args:\n
+  client - agent client instance\n
+  request - request object from [[pending-human-inputs]] or [[agent-next-step]]\n
+  response - String response from the human\n
+\n
+Returns:\n
+  CompletableFuture - Future that completes when the response is processed"
   ^CompletableFuture
   [^AgentClient client request response]
   (.provideHumanInputAsync client request response))
 
 
 (defn create-dataset!
-  "Creates a new dataset for agent testing and evaluation.
-
-   Datasets are collections of input/output examples used for testing
-   agent performance, running experiments, and regression testing.
-
-   Args:
-     manager - agent manager instance
-     name - String name for the dataset
-     options - Optional map with configuration:
-       :description - String description of the dataset
-       :input-json-schema - JSON schema for input validation
-       :output-json-schema - JSON schema for output validation
-
-   Returns:
-     UUID of the created dataset
-
-   Example:
-     (aor/create-dataset! agent-manager \"test-cases\"
-       {:description \"Basic test cases\"
-        :input-json-schema {\"type\" \"object\" \"properties\" {\"query\" {\"type\" \"string\"}} \"required\" [\"query\"]}
-        :output-json-schema {\"type\" \"string\"}})"
+  "Creates a new dataset for agent testing and evaluation.\n
+\n
+Datasets are collections of input/output examples used for testing\n
+agent performance, running experiments, and regression testing.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  name - String name for the dataset\n
+  options - Optional map with configuration:\n
+    :description - String description of the dataset\n
+    :input-json-schema - JSON schema for input validation\n
+    :output-json-schema - JSON schema for output validation\n
+\n
+Returns:\n
+  UUID of the created dataset\n
+\n
+Example:\n
+<pre>
+(aor/create-dataset! agent-manager \"test-cases\"
+  {:description \"Basic test cases\"
+   :input-json-schema {\"type\" \"object\" \"properties\" {\"query\" {\"type\" \"string\"}} \"required\" [\"query\"]}
+   :output-json-schema {\"type\" \"string\"}})
+</pre>"
   ([manager name] (create-dataset! manager name nil))
   ([^AgentManager manager name options]
    ;; types are validated by Java API
@@ -2361,47 +2401,47 @@ Example:\n
                    (:output-json-schema options))))
 
 (defn set-dataset-name!
-  "Updates the name of an existing dataset.
-
-   Args:
-     manager - agent manager instance
-     dataset-id - UUID of the dataset
-     name - String new name for the dataset"
+  "Updates the name of an existing dataset.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  dataset-id - UUID of the dataset\n
+  name - String new name for the dataset"
   [^AgentManager manager dataset-id name]
   (.setDatasetName manager dataset-id name))
 
 (defn set-dataset-description!
-  "Updates the description of an existing dataset.
-
-   Args:
-     manager - agent manager instance
-     dataset-id - UUID of the dataset
-     description - String new description for the dataset"
+  "Updates the description of an existing dataset.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  dataset-id - UUID of the dataset\n
+  description - String new description for the dataset"
   [^AgentManager manager dataset-id description]
   (.setDatasetDescription manager dataset-id description))
 
 (defn destroy-dataset!
-  "Permanently deletes a dataset and all its examples.
-
-   Args:
-     manager - agent manager instance
-     dataset-id - UUID of the dataset to delete"
+  "Permanently deletes a dataset and all its examples.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  dataset-id - UUID of the dataset to delete"
   [^AgentManager manager dataset-id]
   (.destroyDataset manager dataset-id))
 
 (defn add-dataset-example-async!
-  "Asynchronously adds an example to a dataset. Fails and throws exception of input or output violates the dataset's JSON schemas.
-
-   Args:
-     manager - agent manager instance
-     dataset-id - UUID of the dataset
-     input - Input data for the example
-     options - Optional map with configuration:
-       :reference-output - Expected output for the example
-       :tags - Set of tags for categorization
-
-   Returns:
-     CompletableFuture<UUID> - Future that completes with the example UUID"
+  "Asynchronously adds an example to a dataset. Fails and throws exception of input or output violates the dataset's JSON schemas.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  dataset-id - UUID of the dataset\n
+  input - Input data for the example\n
+  options - Optional map with configuration:\n
+    :reference-output - Expected output for the example\n
+    :tags - Set of tags for categorization\n
+\n
+Returns:\n
+  CompletableFuture<UUID> - Future that completes with the example UUID"
   (^CompletableFuture [manager dataset-id input]
    (c/add-dataset-example-async! manager dataset-id input))
   (^CompletableFuture [^AgentManager manager dataset-id input options]
