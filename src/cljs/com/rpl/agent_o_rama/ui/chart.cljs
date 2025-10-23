@@ -149,12 +149,17 @@
           result (if metadata-key
                    ;; METADATA SPLIT: Create one series per metadata-value per metric
                    ;; Data structure: {bucket -> metadata-value -> "_aor/default" -> {metric-key value}}
-                   (let [;; Collect all unique metadata values across all buckets
-                         all-metadata-values (into (sorted-set)
-                                                   (mapcat (fn [bucket]
-                                                             (keys (get telemetry-data bucket)))
-                                                           sorted-buckets))
-                         _ (println "all-metadata-values:" all-metadata-values)
+                   (let [;; Collect up to 5 unique metadata values across all buckets
+                         all-metadata-values (loop [remaining-buckets sorted-buckets
+                                                    collected-values (sorted-set)]
+                                               (if (or (empty? remaining-buckets)
+                                                       (>= (count collected-values) 5))
+                                                 collected-values
+                                                 (let [bucket (first remaining-buckets)
+                                                       bucket-values (keys (get telemetry-data bucket))]
+                                                   (recur (rest remaining-buckets)
+                                                          (into collected-values (take (- 5 (count collected-values)) bucket-values))))))
+                         _ (println "all-metadata-values (max 5):" all-metadata-values)
 
                          ;; For each metric and each metadata value, create a series
                          sorted-metrics (sort-metrics metrics-to-show)
@@ -232,12 +237,17 @@
         ;; When metadata split is active, we have multiple series per metric (one per metadata value)
         ;; When no split, we have one series per metric
         series (if metadata-key
-                 ;; METADATA SPLIT: Extract metadata values from data and create series
+                 ;; METADATA SPLIT: Extract up to 5 metadata values from data and create series
                  (let [sorted-buckets (sort (keys data))
-                       all-metadata-values (into (sorted-set)
-                                                 (mapcat (fn [bucket]
-                                                           (keys (get data bucket)))
-                                                         sorted-buckets))
+                       all-metadata-values (loop [remaining-buckets sorted-buckets
+                                                  collected-values (sorted-set)]
+                                             (if (or (empty? remaining-buckets)
+                                                     (>= (count collected-values) 5))
+                                               collected-values
+                                               (let [bucket (first remaining-buckets)
+                                                     bucket-values (keys (get data bucket))]
+                                                 (recur (rest remaining-buckets)
+                                                        (into collected-values (take (- 5 (count collected-values)) bucket-values))))))
                        sorted-metrics (sort-metrics metrics)]
                    (vec (mapcat
                          (fn [metric-key]
@@ -365,13 +375,18 @@
           _ (println "sorted-buckets (first 5):" (take 5 sorted-buckets))
 
           result (if metadata-key
-                   ;; METADATA SPLIT: Create one series per metadata value
+                   ;; METADATA SPLIT: Create one series per metadata value (max 5)
                    ;; Data structure: {bucket -> metadata-value -> "_aor/default" -> {metric-key value}}
-                   (let [all-metadata-values (into (sorted-set)
-                                                   (mapcat (fn [bucket]
-                                                             (keys (get telemetry-data bucket)))
-                                                           sorted-buckets))
-                         _ (println "all-metadata-values:" all-metadata-values)
+                   (let [all-metadata-values (loop [remaining-buckets sorted-buckets
+                                                    collected-values (sorted-set)]
+                                               (if (or (empty? remaining-buckets)
+                                                       (>= (count collected-values) 5))
+                                                 collected-values
+                                                 (let [bucket (first remaining-buckets)
+                                                       bucket-values (keys (get telemetry-data bucket))]
+                                                   (recur (rest remaining-buckets)
+                                                          (into collected-values (take (- 5 (count collected-values)) bucket-values))))))
+                         _ (println "all-metadata-values (max 5):" all-metadata-values)
 
                          series-data (map
                                       (fn [metadata-value]
@@ -428,13 +443,18 @@
         ;; Color palette for multiple series
         series-colors ["#3b82f6" "#10b981" "#f59e0b" "#ef4444" "#8b5cf6" "#ec4899" "#14b8a6" "#f97316"]
 
-        ;; When metadata split is active, we have multiple series (one per metadata value)
+        ;; When metadata split is active, we have multiple series (max 5 metadata values)
         series (if metadata-key
                  (let [sorted-buckets (sort (keys data))
-                       all-metadata-values (into (sorted-set)
-                                                 (mapcat (fn [bucket]
-                                                           (keys (get data bucket)))
-                                                         sorted-buckets))]
+                       all-metadata-values (loop [remaining-buckets sorted-buckets
+                                                  collected-values (sorted-set)]
+                                             (if (or (empty? remaining-buckets)
+                                                     (>= (count collected-values) 5))
+                                               collected-values
+                                               (let [bucket (first remaining-buckets)
+                                                     bucket-values (keys (get data bucket))]
+                                                 (recur (rest remaining-buckets)
+                                                        (into collected-values (take (- 5 (count collected-values)) bucket-values))))))]
                    (vec (map-indexed
                          (fn [idx metadata-value]
                            {:label metadata-value
@@ -532,13 +552,18 @@
           _ (println "sorted-buckets (first 5):" (take 5 sorted-buckets))
 
           result (if metadata-key
-                   ;; METADATA SPLIT: Create one series per metadata value
+                   ;; METADATA SPLIT: Create one series per metadata value (max 5)
                    ;; Data structure: {bucket -> metadata-value -> "_aor/default" -> {metric-key value}}
-                   (let [all-metadata-values (into (sorted-set)
-                                                   (mapcat (fn [bucket]
-                                                             (keys (get telemetry-data bucket)))
-                                                           sorted-buckets))
-                         _ (println "all-metadata-values:" all-metadata-values)
+                   (let [all-metadata-values (loop [remaining-buckets sorted-buckets
+                                                    collected-values (sorted-set)]
+                                               (if (or (empty? remaining-buckets)
+                                                       (>= (count collected-values) 5))
+                                                 collected-values
+                                                 (let [bucket (first remaining-buckets)
+                                                       bucket-values (keys (get telemetry-data bucket))]
+                                                   (recur (rest remaining-buckets)
+                                                          (into collected-values (take (- 5 (count collected-values)) bucket-values))))))
+                         _ (println "all-metadata-values (max 5):" all-metadata-values)
 
                          series-data (map
                                       (fn [metadata-value]
@@ -596,13 +621,18 @@
         ;; Color palette for multiple series
         series-colors ["#3b82f6" "#10b981" "#f59e0b" "#ef4444" "#8b5cf6" "#ec4899" "#14b8a6" "#f97316"]
 
-        ;; When metadata split is active, we have multiple series (one per metadata value)
+        ;; When metadata split is active, we have multiple series (max 5 metadata values)
         series (if metadata-key
                  (let [sorted-buckets (sort (keys data))
-                       all-metadata-values (into (sorted-set)
-                                                 (mapcat (fn [bucket]
-                                                           (keys (get data bucket)))
-                                                         sorted-buckets))]
+                       all-metadata-values (loop [remaining-buckets sorted-buckets
+                                                  collected-values (sorted-set)]
+                                             (if (or (empty? remaining-buckets)
+                                                     (>= (count collected-values) 5))
+                                               collected-values
+                                               (let [bucket (first remaining-buckets)
+                                                     bucket-values (keys (get data bucket))]
+                                                 (recur (rest remaining-buckets)
+                                                        (into collected-values (take (- 5 (count collected-values)) bucket-values))))))]
                    (vec (map-indexed
                          (fn [idx metadata-value]
                            {:label metadata-value
